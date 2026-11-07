@@ -1,0 +1,197 @@
+--- a/jetstreamer-r2/src/fleet.rs
++++ b/jetstreamer-r2/src/fleet.rs
+@@ -120,0 +121 @@
++mod live145_fleet;
+@@ -4051,0 +4053 @@
++    let (live145_fleet_before,live145_legacy_before)=live145_fleet::capture_native(&plan_value,&before)?;
+@@ -4058 +4060 @@
+-        .map(|route| route.inherited_native(&before))
++        .map(|route| route.inherited_native(&live145_legacy_before))
+@@ -4060 +4062 @@
+-    let compatibility_before = cold185_inherited_before.as_ref().unwrap_or(&before);
++    let compatibility_before = cold185_inherited_before.as_ref().unwrap_or(&live145_legacy_before);
+@@ -5412,0 +5415 @@
++    let (live145_fleet_after,live145_legacy_after)=live145_fleet::capture_native(&plan_value,&after)?;
+@@ -5433 +5436 @@
+-        .map(|route| route.inherited_native(&after))
++        .map(|route| route.inherited_native(&live145_legacy_after))
+@@ -5435 +5438 @@
+-    let compatibility_after = cold185_inherited_after.as_ref().unwrap_or(&after);
++    let compatibility_after = cold185_inherited_after.as_ref().unwrap_or(&live145_legacy_after);
+@@ -5553,0 +5557 @@
++    let (live145_comparison_before,comparison_after,live145_guard_history)=live145_fleet::compare(&plan_value,&before,&comparison_after,&live145_fleet_before,&live145_fleet_after)?;
+@@ -5561 +5565 @@
+-    let cached145_guard_rollover = if !same_census_or_completed154_guard(&before, &comparison_after)
++    let cached145_guard_rollover = if !same_census_or_completed154_guard(&live145_comparison_before, &comparison_after)
+@@ -5572 +5576 @@
+-    if !same_census_or_completed154_guard(&before, &comparison_after)
++    if !same_census_or_completed154_guard(&live145_comparison_before, &comparison_after)
+@@ -5622,0 +5627 @@
++    if let Some(history)=live145_guard_history {receipt["live145_prefix_guard_history"]=history;}
+--- a/jetstreamer-r2/src/fleet/live145_fleet.rs
++++ b/jetstreamer-r2/src/fleet/live145_fleet.rs
+@@ -0,0 +1,43 @@
++//! Exact live145 family views for fleet compatibility. Raw emitted census is retained.
++use super::*;
++use horizon_recovered_resource_frame_typed_bridge_v1::live145_frame as contract;
++pub(super) type NativeCensus=BTreeMap<String,Value>;
++pub(super) type NativeComparison=(NativeCensus,NativeCensus,Option<Value>);
++pub(super) fn continuity(prior:&Value,next:&Value)->Result<()> {
++ let prior_selected=contract::selected(prior)?;
++ let next_selected=contract::selected(next)?;
++ ensure!(!prior_selected || next_selected,"live145 protected family cannot disappear without a qualified lifecycle");
++ Ok(())
++}
++pub(super) fn plan(raw:&Value)->Result<Value> {
++ let now=SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
++ let proof=contract::capture(raw,now)?;
++ ensure!(!contract::selected(raw)? || proof.is_some(),"declared live145 plan lacks actual native proof");
++ contract::project_plan(raw)
++}
++pub(super) fn capture_native(plan:&Value,raw:&BTreeMap<String,Value>)->Result<(Option<Value>,BTreeMap<String,Value>)> {
++ let now=SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
++ let proof=contract::capture(plan,now)?;
++ let projected=contract::comparison_native(plan,raw,proof.as_ref())?;
++ Ok((proof,projected))
++}
++pub(super) fn previous(plan:&Value,previous:&Value)->Result<Value> {
++ let count=contract::FAMILY.iter().filter(|u|previous["unit_census"].get(**u).is_some()).count();
++ if count==0{return Ok(previous.clone())}
++ ensure!(count==3 && contract::selected(plan)?,"historical live145 census lost declaration or a protective role");
++ let proof=contract::capture(plan,SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())?;
++ contract::comparison_fleet(plan,previous,proof.as_ref())
++}
++pub(super) fn compare(plan:&Value,before:&BTreeMap<String,Value>,after:&BTreeMap<String,Value>,a:&Option<Value>,b:&Option<Value>)->Result<NativeComparison> {
++ let history=contract::history(a,b)?;
++ Ok((contract::comparison_native(plan,before,a.as_ref())?,contract::comparison_native(plan,after,b.as_ref())?,history))
++}
++#[cfg(test)] mod tests {
++ use super::*;
++ fn p()->Value{serde_json::json!({"tracked_units":["retained.service"]})}
++ fn declared()->Value{let mut p=p();p["tracked_units"].as_array_mut().unwrap().extend(contract::FAMILY.into_iter().map(|u|serde_json::json!(u)));p}
++ #[test] fn old_historical_scope_stays_a_no_native_capture_comparison(){let p=p();let n=BTreeMap::from([("retained.service".into(),serde_json::json!({"Id":"retained.service"}))]);let (a,b,h)=compare(&p,&n,&n,&None,&None).unwrap();assert_eq!(a,n);assert_eq!(b,n);assert!(h.is_none());}
++ #[test] fn selected_family_cannot_be_dropped_or_partially_declared(){assert!(continuity(&declared(),&p()).is_err());let mut partial=p();partial["tracked_units"].as_array_mut().unwrap().push(serde_json::json!(contract::FAMILY[0]));assert!(continuity(&p(),&partial).is_err());}
++ #[test] fn a_declared_census_cannot_get_projected_without_actual_proof(){let p=declared();let n=BTreeMap::new();assert!(compare(&p,&n,&n,&None,&None).is_err());}
++ #[test] fn historical_census_cannot_smuggle_an_undeclared_live_owner(){let mut old=serde_json::json!({"unit_census":{}});old["unit_census"][contract::FAMILY[0]]=serde_json::json!({"Id":contract::FAMILY[0]});assert!(previous(&p(),&old).is_err());}
++}
+--- a/jetstreamer-r2/src/fleet/cached145_entry.rs
++++ b/jetstreamer-r2/src/fleet/cached145_entry.rs
+@@ -19,0 +20 @@
++    live145_plan: Value,
+@@ -290,0 +292,4 @@
++    super::live145_fleet::continuity(&prior_raw,&next_raw)?;
++    let live145_plan=next_raw.clone();
++    let prior_raw=super::live145_fleet::plan(&prior_raw)?;
++    let next_raw=super::live145_fleet::plan(&next_raw)?;
+@@ -357,0 +363 @@
++        live145_plan,
+@@ -441 +447 @@
+-        Ok(previous)
++        super::live145_fleet::previous(&self.live145_plan,&previous)
+@@ -488,0 +495 @@
++        let previous=super::live145_fleet::previous(&self.live145_plan,&self.previous)?;
+@@ -491 +498 @@
+-            &self.previous,
++            &previous,
+--- a/jetstreamer-r2/src/fleet/cached145_entry_tests.rs
++++ b/jetstreamer-r2/src/fleet/cached145_entry_tests.rs
+@@ -274,0 +275,12 @@
++
++#[test]
++fn exact_live145_projection_restores_complete_cached_policy_and_preserves_other_rejections() {
++ let f=fixture();let p=prospective(&f);let mut augmented=p.clone();
++ augmented["tracked_units"].as_array_mut().unwrap().extend(horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::FAMILY.into_iter().map(|u|json!(u)));
++ assert!(!selected(&f,&augmented));
++ let projected=horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::project_plan(&augmented).unwrap();
++ assert_eq!(projected,p);assert!(selected(&f,&projected));
++ let mut crossed=augmented.clone();crossed["gates"]["199"]["state"]=json!("live-replay");
++ assert!(!selected(&f,&horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::project_plan(&crossed).unwrap()));
++ assert_eq!(augmented["tracked_units"].as_array().unwrap().len(),p["tracked_units"].as_array().unwrap().len()+3);
++}
+--- a/jetstreamer-r2/src/fleet/cold185/lifecycle.rs
++++ b/jetstreamer-r2/src/fleet/cold185/lifecycle.rs
+@@ -415 +415 @@
+-    let previous = native::read_json(&spec.previous_fleet, 16 << 20)?;
++    let previous = native::read_generated_json(&spec.previous_fleet, 16 << 20)?;
+@@ -577,0 +578,59 @@
++    }
++}
++
++// Integrate only into the independently reviewed helper lifecycle source
++// alongside LIFECYCLE_ORIGINAL_FLEET_CUSTODY.patch. Not compiled/run here.
++#[cfg(test)]
++mod original_fleet_writer_custody_tests {
++    use super::*;
++    use std::io::Write;
++    use std::os::unix::fs::{MetadataExt,PermissionsExt};
++    fn original_writer_fixture() -> (tempfile::TempDir, BoundFile, Vec<u8>) {
++        assert_eq!(unsafe { libc::geteuid() },0,"custody control requires booked Root QA");
++        let dir=tempfile::tempdir_in("/var/lib/jetstreamer/horizon-positive185-original-writer-custody-qa-20261107-v1").unwrap();
++        // The real QA profile must supply its private Root TMPDIR, rather than
++        // borrowing an unsafe/tmp ancestor as an immutable-reader exception.
++        for parent in dir.path().ancestors() {
++            let m=fs::symlink_metadata(parent).unwrap();
++            assert_eq!(m.uid(),0);
++            assert_eq!(m.mode()&0o022,0);
++        }
++        let raw=b"{\"schema\":\"synthetic-fleet-writer-custody-only\",\"credit_bytes\":0}\n".to_vec();
++        let mut file=tempfile::NamedTempFile::new_in(dir.path()).unwrap();
++        file.write_all(&raw).unwrap();file.as_file().sync_all().unwrap();
++        let path=dir.path().join("original.json");file.persist_noclobber(&path).unwrap();
++        assert_eq!(fs::symlink_metadata(&path).unwrap().mode()&0o777,0o600);
++        let b=BoundFile{path,sha256:hex_lower(&Sha256::digest(&raw))};
++        (dir,b,raw)
++    }
++    #[test]
++    fn original0600_writer_bytes_are_read_without_chmod_or_path_rebinding() {
++        let(_dir,b,raw)=original_writer_fixture();
++        let original_mode=fs::symlink_metadata(&b.path).unwrap().mode();
++        let immutable_error=native::read_json(&b,16<<20).unwrap_err();
++        assert!(format!("{immutable_error:#}").contains("immutable source custody"));
++        let v=native::read_generated_json(&b,16<<20).unwrap();
++        assert_eq!(v["credit_bytes"],0);
++        assert_eq!(fs::read(&b.path).unwrap(),raw);
++        assert_eq!(fs::symlink_metadata(&b.path).unwrap().mode(),original_mode);
++    }
++    #[test]
++    fn protected_writer_path_still_rejects_symlinks_digest_drift_and_group_writes() {
++        let(dir,b,_raw)=original_writer_fixture();
++        let alias=dir.path().join("alias.json");
++        std::os::unix::fs::symlink(&b.path,&alias).unwrap();
++        let aliased=BoundFile{path:alias,sha256:b.sha256.clone()};
++        assert!(native::read_generated_json(&aliased,16<<20).is_err());
++        let crossed=BoundFile{path:b.path.clone(),sha256:"0".repeat(64)};
++        assert!(native::read_generated_json(&crossed,16<<20).is_err());
++        fs::set_permissions(&b.path,fs::Permissions::from_mode(0o620)).unwrap();
++        assert!(native::read_generated_json(&b,16<<20).is_err());
++    }
++    #[test]
++    fn generated_original_still_rejects_a_group_writable_ancestor() {
++        let(dir,b,_raw)=original_writer_fixture();
++        fs::set_permissions(dir.path(),fs::Permissions::from_mode(0o770)).unwrap();
++        let error=native::read_generated_json(&b,16<<20).unwrap_err();
++        assert!(format!("{error:#}").contains("ancestor custody changed"));
++        fs::set_permissions(dir.path(),fs::Permissions::from_mode(0o700)).unwrap();
++        assert!(native::read_generated_json(&b,1).is_err());
+--- a/jetstreamer-r2/src/fleet/cold185/native.rs
++++ b/jetstreamer-r2/src/fleet/cold185/native.rs
+@@ -103,0 +104,12 @@
++/// The original fleet writer publishes Root0600 bytes. Retain native ancestor,
++/// bound and identity checks while allowing only that owner's writable metadata.
++pub(in crate::fleet) fn read_generated_json(b: &BoundFile, maximum: u64) -> Result<Value> {
++    ancestors(&b.path)?;
++    let before=fs::symlink_metadata(&b.path)?;
++    ensure!(maximum>0 && maximum<=16<<20 && before.len()<=maximum
++        && before.mode() & 0o7022 == 0,"epoch185 generated source bound or custody");
++    let value=crate::fleet::epoch186::accounting::protected_generated(b)?;
++    ensure!(identity(&before)==identity(&fs::symlink_metadata(&b.path)?),
++        "epoch185 original generated source drift");
++    Ok(value)
++}
+--- a/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs
++++ b/jetstreamer-r2/src/fleet/epoch186/recovered_resource_frame_adapter.rs
+@@ -191,0 +192,2 @@
++// Root may fill only after genuine new CLI capability/capture; fleet support alone grants no reader authority.
++const LIVE145_CENSUS_FRAME_CAPTURE_SHA: Option<&str> = None;
+@@ -198,0 +201 @@
++        || typed_bridge_capture_with_pin(frame, LIVE145_CENSUS_FRAME_CAPTURE_SHA)
