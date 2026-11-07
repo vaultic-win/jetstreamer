@@ -41,7 +41,7 @@
   "zero_fuzz_apply_and_all_preimage_successor_hashes_verified": true,
   "qualified_capture_SHA256": "b692189704ed9001c016b1931ec6e54210104d36a5fbf787dfdd9d2505ae75eb",
   "linked_library_reused_SHA256": "edd3b6531376444f2bbc30b8c858cd1ec9770ef832bb4d7d4eafc64b4a31fa0b",
-  "qualification_status": "Successor production Clippy passed. Test Clippy and test build running. Expected2737 ordinary tests, preserving all2733 baseline names and exact112 ignored names; full ordinary/release/native qualification remains pending.",
+  "qualification_status": "Strict production and test Clippy, both builds, four targeted full-adapter cases, all2737 ordinary tests with0 failures, and all112 ignored-name conservation passed. All2733 prior ordinary names preserved. Production helper normally sealed; all10 actual QA scopes drained, additional8GiB memory phase closed. Current native full-reader requalification against a distinct later sample remains pending.",
   "four_regressions": "Genuine0558 native capture/QA/seal provenance; all transitive registration and historical dispatch; actual full Frame reader adapter/source loaders and linked consumer; rejection of foreign images/context/markers,owners,clocks,crossed sources,native census,promises and authority.",
   "scope": "One exact additional typed-bridge capture pin. All27 externs,both native features,every previous pin,source loader,envelope,resource,admission and publication gate retained. No library or CLI rebuild.",
   "original_full_reader_failure": {
@@ -53,5 +53,29 @@
     "no_same_sample_retry": true
   },
   "first_unqualified_test_draft_naming_failure_preserved": true,
-  "goal101_200_complete": false
+  "goal101_200_complete": false,
+  "qualified_successor": {
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-full-reader-qualified-capture-shared-helper-tools-20261107-v2/jetstreamer-r2",
+      "sha256": "28c9f320548557160229fc6b9b888861d21900ac21c6ab26c5f6118dfeb59496"
+    },
+    "proof": {
+      "path": "/usr/local/lib/jetstreamer/horizon-full-reader-qualified-capture-shared-helper-tools-20261107-v2/artifact-proof.json",
+      "sha256": "e593c37bd7bbc1137e2d51c529a0178440ae5234cdbc0a26a521573d08ec190f"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-full-reader-qualified-capture-shared-helper-tools-20261107-v2/deployment-seal-receipt.json",
+      "sha256": "38e3ed810df19471719f70d21fa55ce3198250b6ee2d05c1179b1e895090c87e"
+    },
+    "QA_closure": {
+      "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/ROOT_ADDITIONAL8GiB_QA_PHASE_CLOSED_AFTER_ALL10_DRAINS.json",
+      "sha256": "d972673f6d0f8ea53258de3fcd419cc4d404518ecf21a21b9901c81ac558fd98"
+    },
+    "same_v25_resource_ledger_with_total16GiB_additional_DATA": {
+      "path": "/home/sol/.jetstreamer-private/full-reader-qualified-capture-20261107-v1/RESOURCE_PHASES_R25_REVIEWED_FULL_READER_CONSUMER_DATA_ADDENDUM.json",
+      "sha256": "25ea4c7544f0aa378da29d3eaaaf339da86952d18f83e5cfaf842cb95c907bb1"
+    },
+    "all27_externs_unchanged_from_immediate_predecessor": true,
+    "actual_new_helper_full_reader_not_yet_run": true
+  }
 }
