@@ -28,7 +28,8 @@ dependency rather than repeatedly reassessing the same idle capacity.
 
 Assess reclaimable local bytes and eligible R2 offloads as part of every next-lane fit decision.
 Disk pressure triggers qualified cleanup and juggling through this host's already authorized
-R2 scratch/holding prefix; it does not lower the memory-selected lane target. Reuse the recorded prefix
+R2 scratch/holding prefix; it does not lower the memory-selected lane target. Treat that prefix as
+part of the working capacity plan before declaring a disk-blocked lane unavailable. Reuse the recorded prefix
 authorization and execute the [holding lifecycle](references/r2-holding.md) when needed, accounting
 for restore space and time. First retire completed, unneeded local data; next park eligible closed
 artifacts; checkpoint and stop a selected live job only through its qualified restore path. A disk

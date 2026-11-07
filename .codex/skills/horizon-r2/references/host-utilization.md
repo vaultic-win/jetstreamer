@@ -43,6 +43,12 @@ When executing lanes are below target, the main agent owns the path to the next 
    Record an actual park/retire/restore action and its result, or the precise failed gate and the
    qualification action taken. Reuse the recorded host-prefix authorization. Do not reduce the
    desired count because local disk is full or count proposed offloads as reclaimed capacity.
+   Bind each disk-blocked candidate to a concrete rotation budget: its local byte deficit, the
+   eligible artifact set and verified reclaimable bytes, the next runnable working set to retain,
+   restore staging/transfer allowance, and the next executable transition. Recompute fit after
+   actual retirement against all live floors and growth claims. If one candidate still cannot
+   fit, advance another disjoint candidate while resolving that deficit; do not stall the entire
+   backfill queue behind one oversized epoch.
 
 At every next-lane fit decision, assess eligible cleanup and offload sets alongside local disk
 claims, even before disk is exhausted. If disk is not the failed gate, advance the actual accounting,

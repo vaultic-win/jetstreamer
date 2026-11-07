@@ -34,6 +34,10 @@ destination.
   closed inputs for later epochs, and restore those inputs when their turn approaches. Charge
   upload/readback and restore staging against peak local overlap; an upload alone frees no bytes.
   After qualified local retirement, apply the normal fresh admission to the lane it makes room for.
+  Carry that rotation across handoffs: record the candidate epoch, exact parked/local artifact
+  identities, custody receipt, actual reclaimed bytes, restore trigger and next transition in the
+  existing campaign ledger. Resume from that state rather than uploading an already parked set
+  again or leaving a runnable candidate waiting for inputs whose restore can safely begin.
 - Never evict open or mmap-backed AccountsDb/ledger files, live replay scratch, active/staged inputs,
   resumable state without a qualified checkpoint/restore path, or required immutable deployment
   members. A generic R2 FUSE mount does not preserve the latency and filesystem behavior required
