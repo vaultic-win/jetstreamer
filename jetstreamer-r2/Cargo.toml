@@ -9,6 +9,15 @@ repository.workspace = true
 documentation.workspace = true
 keywords.workspace = true
 
+[features]
+# Private retained-input metadata planning; never issues replay admission.
+epoch185-offline-metadata-plan = []
+
+[[bin]]
+name = "jetstreamer-epoch185-offline-metadata-plan"
+path = "src/bin/epoch185-offline-metadata/source/main.rs"
+required-features = ["epoch185-offline-metadata-plan"]
+
 [dependencies]
 anyhow.workspace = true
 aws-credential-types.workspace = true
