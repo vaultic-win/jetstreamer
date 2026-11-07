@@ -26,7 +26,9 @@ An observation, skill edit or pushed commit does not resolve an operational lane
 Carry the last attempted action and its result across handoffs; resume its next executable
 dependency rather than repeatedly reassessing the same idle capacity.
 When a prerequisite finishes, immediately advance the dependent admission or launch step using
-its completion evidence. The 30-minute observation interval limits routine polling; it is not a
+its completion evidence. A failed recovery attempt requires a changed, evidence-backed next step;
+repeated metadata generations without opening the failed gate do not satisfy lane recovery.
+The 30-minute observation interval limits routine polling; it is not a
 waiting period for lane recovery or qualified cleanup/offload/restore transitions.
 
 Assess reclaimable local bytes and eligible R2 offloads as part of every next-lane fit decision.
@@ -39,7 +41,9 @@ for restore space and time. First retire completed, unneeded local data; next pa
 artifacts; checkpoint and stop a selected live job only through its qualified restore path. A disk
 blocker requires an attempted reclamation/offload transition or concrete recovery qualification
 work in the same cycle, with the result recorded. Rotate closed inputs for later epochs through
-holding while retaining or restoring the next runnable epochs' working sets. Count capacity only
+holding while retaining or restoring the next runnable epochs' working sets. Record the concrete
+rotation budget and resume its next transition across handoffs; the scratch prefix must be usable
+in scheduling, rather than merely mentioned as an option. Count capacity only
 after verified offload and actual local retirement; reserve restore staging and transfer time in
 the next admission. Preserve healthy work and every admission/integrity
 gate. Delete completed epochs' unnecessary local files promptly under

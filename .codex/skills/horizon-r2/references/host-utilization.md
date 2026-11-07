@@ -119,9 +119,16 @@ start request alone proves neither protection nor synchronization. Honor any gen
 through the normal failure lifecycle. Preserve producer invocations, timer definitions and limits.
 
 Derive the usable window from the earliest actual armed next deadline after completion. Retain
-the qualified minimum window, timeout and stop margin, and execute the final preflight and fleet
-CLI consecutively in one bounded operator call: an intervening model/tool handoff can consume the
-window. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
+the qualified minimum window and execute the final preflight and fleet CLI consecutively in one
+bounded operator call: an intervening model/tool handoff can consume the window. Select execution
+timeouts from successful complete native runs and the operation's accepted limits, with a stop
+margin. A failed fast run is not a duration estimate. A quiet dispatch window proves only the
+initial guard state; it does not prove that a longer operation can safely span later guard
+invocations. If the complete operation cannot fit, qualify genuine completed-guard rollover or a
+supported handoff under the existing contracts instead of shortening required work to fit.
+Preserve a timeout as a failed original invocation, then use a distinct reviewed attempt with
+appropriate full-operation limits and unchanged protection. Unit tests and sealing alone cannot
+establish operational success. This procedure grants no producer restart, timer stop/edit, unsupported rollover bypass
 or repeated replay observer. Routine replay/resource observations and status audits remain on the
 single 30-minute cadence.
 
