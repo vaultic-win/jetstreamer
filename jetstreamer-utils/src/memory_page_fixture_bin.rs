@@ -13,8 +13,8 @@ use std::{
 };
 const PAGE: u64 = 4096;
 const PAGES: usize = 512;
-const POSITIVE: &str = "horizon-memory-page-fixture946-v1.service";
-const NEGATIVE: &str = "horizon-memory-page-fixture946-no-admin-v1.service";
+const POSITIVE: &str = "horizon-memory-page-fixture947-diagnostic-v1.service";
+const NEGATIVE: &str = "horizon-memory-page-fixture947-diagnostic-no-admin-v1.service";
 const KERNEL: &str = "7.0.0-38-generic";
 const CONFIG_SHA: &str = "6cb18717c6914d4947489eedf8cb69ac23db3faa8ef9b9f563ff02c346dcd32d";
 const ADMIN: u64 = 1 << 21;
@@ -283,13 +283,20 @@ impl Reader {
             charges: open_read("/proc/kpagecgroup")?,
         })
     }
-    fn sample(&self, mapping: &Mapping, owner: u64) -> Result<BTreeSet<u64>> {
+    fn sample(&self, mapping: &Mapping, owner: u64, stage: &str) -> Result<BTreeSet<u64>> {
         let mut set = BTreeSet::new();
+        let mut attributes = BTreeMap::<String, u64>::new();
+        let mut flag_counts = BTreeMap::<String, u64>::new();
+        let mut charge_counts = BTreeMap::<String, u64>::new();
+        let mut exclusions = BTreeMap::<String, u64>::new();
         for n in 0..PAGES {
             let address = (mapping.ptr as u64)
                 .checked_add(n as u64 * PAGE)
                 .context("virtual address overflow")?;
             let before = word(&self.pagemap, address / PAGE)?;
+            *attributes
+                .entry(format!("{:03x}", before >> 55))
+                .or_default() += 1;
             if let Some(pfn) = decode_pfn(before)? {
                 let flags = word(&self.flags, pfn)?;
                 let charge = word(&self.charges, pfn)?;
@@ -299,11 +306,33 @@ impl Reader {
                         && word(&self.charges, pfn)? == charge,
                     "self page changed during sample"
                 );
+                *flag_counts.entry(format!("{flags:016x}")).or_default() += 1;
+                *charge_counts.entry(charge.to_string()).or_default() += 1;
+                if flags & (ANON | SWAPBACKED) != (ANON | SWAPBACKED) {
+                    *exclusions
+                        .entry("required_ANON_SWAPBACKED_missing".into())
+                        .or_default() += 1;
+                }
+                if flags & FORBIDDEN != 0 {
+                    *exclusions
+                        .entry("forbidden_class_flags".into())
+                        .or_default() += 1;
+                }
+                if flags >> 27 != 0 {
+                    *exclusions.entry("unknown_flag_bits".into()).or_default() += 1;
+                }
+                if charge != owner || owner == 0 {
+                    *exclusions.entry("charge_mismatch".into()).or_default() += 1;
+                }
                 if eligible(flags, charge, owner) {
                     set.insert(pfn);
                 }
             }
         }
+        println!(
+            "{}",
+            json!({"schema":"horizon-self-memory-page-diagnostic-v1","stage":stage,"expected_memcg_inode":owner,"pagemap_attributes_without_PFNs":attributes,"public_kernel_page_flags":flag_counts,"page_charge_inode_counts":charge_counts,"exclusions_may_overlap":exclusions,"eligible_unique_pages":set.len(),"diagnostic_only":true,"eligibility_rules_unchanged":true,"capacity_credit_bytes":0,"admission_authorized":false,"live_freeze_authorized":false})
+        );
         Ok(set)
     }
 }
@@ -312,28 +341,30 @@ fn run() -> Result<()> {
     let reader = Reader::new()?;
     let map = Mapping::new()?;
     ensure!(
-        reader.sample(&map, ctx.inode)?.is_empty(),
+        reader.sample(&map, ctx.inode, "untouched")?.is_empty(),
         "untouched pages unexpectedly eligible"
     );
     unsafe {
         std::hint::black_box(map.ptr.read_volatile());
     }
     ensure!(
-        reader.sample(&map, ctx.inode)?.is_empty(),
+        reader.sample(&map, ctx.inode, "read-zero")?.is_empty(),
         "read-zero page unexpectedly eligible"
     );
     map.touch();
-    let owned = reader.sample(&map, ctx.inode)?;
+    let owned = reader.sample(&map, ctx.inode, "touched-private-anonymous")?;
     ensure!(
         owned.len() == PAGES,
         "own anonymous PFN/flags/charge profile not established"
     );
     ensure!(
-        reader.sample(&map, ctx.inode.wrapping_add(1))?.is_empty(),
+        reader
+            .sample(&map, ctx.inode.wrapping_add(1), "wrong-charge-control")?
+            .is_empty(),
         "foreign charge accepted"
     );
     map.lazy_free()?;
-    let lazy = reader.sample(&map, ctx.inode)?;
+    let lazy = reader.sample(&map, ctx.inode, "MADV_FREE")?;
     ensure!(
         lazy.is_empty(),
         "MADV_FREE pages remain eligible: contract unqualified"
