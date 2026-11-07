@@ -1,4 +1,5 @@
 include!("completed_current_check.rs");
+include!("current_start_job.rs");
 use super::*;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 enum RecipeRole {
@@ -724,7 +725,8 @@ pub(super) fn authenticate_current(p: &Plan) -> Result<Value> {
         "--property=Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,NRestarts,Restart,KillMode,Delegate,Job,Triggers,TriggeredBy,OnSuccess,OnFailure,DropInPaths,FragmentPath,User,Group,Type,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,TimeoutStartUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,ReadWritePaths,ReadOnlyPaths,BindReadOnlyPaths,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost,EnvironmentFiles,CapabilityBoundingSet,AmbientCapabilities",
     ])?;
     let m = props(&native)?;
-    no_triggers(&m)?;
+    // A running oneshot owns its original start job. Historical actors still
+    // require no Job through the unchanged no_triggers path.
     for (k, v) in [
         ("Id", o.unit.as_str()),
         ("LoadState", "loaded"),
@@ -762,6 +764,8 @@ pub(super) fn authenticate_current(p: &Plan) -> Result<Value> {
             && fs::read_to_string("/proc/self/cgroup")? == format!("0::{expected_group}\n"),
         "current operation cgroup mismatch"
     );
+    let initial_jobs = systemctl(&["list-jobs", "--no-legend", "--no-pager", "--plain"])?;
+    let original_start_job = current_start_job(&m, &initial_jobs, &o.unit, &iid, own)?;
     ensure!(
         m.get("FragmentPath") == Some(&o.installed.to_str().context("installed UTF8")?),
         "current FragmentPath differs"
@@ -920,26 +924,22 @@ pub(super) fn authenticate_current(p: &Plan) -> Result<Value> {
         "show",
         &o.unit,
         "--all",
-        "--property=Id,InvocationID,MainPID,ControlPID,ActiveState,SubState,NRestarts,ControlGroup",
+        "--property=Id,LoadState,InvocationID,MainPID,ControlPID,ActiveState,SubState,NRestarts,ControlGroup,Type,Job,Triggers,TriggeredBy,OnSuccess,OnFailure,DropInPaths",
     ])?;
     let last = props(&last)?;
-    for k in [
-        "Id",
-        "InvocationID",
-        "MainPID",
-        "ControlPID",
-        "ActiveState",
-        "SubState",
-        "NRestarts",
-        "ControlGroup",
-    ] {
-        ensure!(
-            last.get(k) == m.get(k),
-            "current native owner changed during authentication"
-        );
-    }
+    let final_jobs = systemctl(&["list-jobs", "--no-legend", "--no-pager", "--plain"])?;
+    ensure!(
+        current_start_job(&last, &final_jobs, &o.unit, &iid, own)? == original_start_job,
+        "current original start job changed during authentication"
+    );
+    unchanged_start_owner(&m, &last)?;
+    ensure!(
+        start_ticks(&fs::read_to_string("/proc/self/stat")?)? == ticks
+            && fs::read_to_string("/proc/self/cgroup")? == format!("0::{expected_group}\n"),
+        "current process/cgroup changed during final job authentication"
+    );
     Ok(
-        json!({"process_status":status,"mountinfo_sha256":hash(mountinfo.as_bytes()),"pid":own,"start_ticks":ticks,"invocation_id":iid,"unit":o.unit,"argv":argv,"native":m,"self_source_recipe":o.recipe,"plan_sha256":digest}),
+        json!({"process_status":status,"mountinfo_sha256":hash(mountinfo.as_bytes()),"pid":own,"start_ticks":ticks,"invocation_id":iid,"unit":o.unit,"argv":argv,"native":m,"self_source_recipe":o.recipe,"plan_sha256":digest,"original_running_start_job":{"id":original_start_job,"unit":o.unit,"type":"start","state":"running","initial_list_jobs_sha256":hash(initial_jobs.as_bytes()),"final_list_jobs_sha256":hash(final_jobs.as_bytes()),"before_after_owner_and_job_stable":true}}),
     )
 }
 #[cfg(test)]
