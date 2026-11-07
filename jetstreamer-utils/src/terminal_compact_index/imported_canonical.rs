@@ -374,6 +374,7 @@ mod tests {
                 .collect();
             assert_eq!(indexes.len(), 2);
             let plan = Plan {
+                legacy202_check: None,
                 schema: "jetstreamer-terminal-compact-index-retirement-plan-v1".into(),
                 state: "/var/lib/jetstreamer/unused-test-state".into(),
                 owners: vec![owner],

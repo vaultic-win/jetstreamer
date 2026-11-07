@@ -1,0 +1,147 @@
+{
+  "schema": "jetstreamer-terminal-compact-index-retirement-plan-v1",
+  "state": "/var/lib/jetstreamer/horizon202-two-index-retirement919-state-v1",
+  "owners": [
+    {
+      "root": "/home/ubuntu/.jetstreamer-private/qualification-202",
+      "actors": [
+        {
+          "unit": "horizon-qualify-202-selected-store8-v1.service",
+          "invocation_id": "8ae2897ece784e1988b7b4fb4ef3616e",
+          "historical_provenance": {
+            "evidence": {
+              "path": "/var/lib/jetstreamer/horizon-terminal-compact-index-operation-preparation-v2/evidence/202-original-actor.json",
+              "sha256": "2716e11b14cfaa41f73dc14af7446f4d764dc75eba26c61dc6e267216ee33a22",
+              "uid": 0
+            },
+            "unit_json_pointer": "/unit",
+            "invocation_id_json_pointer": "/invocation_id"
+          }
+        }
+      ],
+      "preserved": [
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-202/diagnostic-output-selected-store8-v1/epoch-202-through-87695515.jet",
+          "identity": {
+            "device": 66305,
+            "inode": 7277771,
+            "size": 101738775740,
+            "blocks": 198708752,
+            "uid": 1000,
+            "gid": 1000,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1791556425,
+            "mtime_nsec": 116340459
+          },
+          "ctime": 1791556425,
+          "ctime_nsec": 116340459
+        },
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-202/diagnostic-output-selected-store8-v1/epoch-202-through-87695515.jet.segment.json",
+          "identity": {
+            "device": 66305,
+            "inode": 7275525,
+            "size": 1810,
+            "blocks": 8,
+            "uid": 0,
+            "gid": 0,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1791560930,
+            "mtime_nsec": 491436619
+          },
+          "ctime": 1791560930,
+          "ctime_nsec": 495436606
+        },
+        {
+          "path": "/home/ubuntu/.jetstreamer-private/qualification-202/observation-selected-store8-v1-20261009T072447Z.json",
+          "identity": {
+            "device": 66305,
+            "inode": 6526740,
+            "size": 2839,
+            "blocks": 8,
+            "uid": 0,
+            "gid": 0,
+            "mode": 33152,
+            "nlink": 1,
+            "mtime": 1791530837,
+            "mtime_nsec": 998415503
+          },
+          "ctime": 1791530837,
+          "ctime_nsec": 999728939
+        }
+      ]
+    }
+  ],
+  "indexes": [
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-202/diagnostic-output-selected-store8-v1/compact-indexes/202/epoch-202-bafyreifb7sgso2papddd2qi7odimlathgwzukzebr5riizjhvnwkwgsbwa-mainnet-cid-to-offset-and-size.index",
+      "identity": {
+        "device": 66305,
+        "inode": 7526408,
+        "size": 4725217390,
+        "blocks": 9228952,
+        "uid": 1000,
+        "gid": 1000,
+        "mode": 33152,
+        "nlink": 1,
+        "mtime": 1791454731,
+        "mtime_nsec": 794705309
+      },
+      "original_ctime": 1791454732,
+      "original_ctime_nsec": 647164285,
+      "owner": 0,
+      "epoch": 202,
+      "header_hex": "636f6d7069737a64760000000900000000000000cc99000001040565706f636808ca0000000000000007726f6f744369642401711220a1fc8d2769e078c63d411f70d0c5826735b34564818f62846527ab6cab1a41b0076e6574776f726b076d61696e6e6574046b696e64166369642d746f2d6f66667365742d616e642d73697a65",
+      "reproduction_url": "https://files.old-faithful.net/202/epoch-202-bafyreifb7sgso2papddd2qi7odimlathgwzukzebr5riizjhvnwkwgsbwa-mainnet-cid-to-offset-and-size.index",
+      "canonical_r2_receipt": {
+        "path": "/var/lib/jetstreamer/horizon-terminal-compact-index-operation-preparation-v2/evidence/canonical-epoch-202.r2.json",
+        "sha256": "1c4cd7b99132b09e733e98e030b1bdaf40606d9ab86e4587a2f11c2347950417",
+        "uid": 0
+      }
+    },
+    {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-202/diagnostic-output-selected-store8-v1/compact-indexes/202/epoch-202-bafyreifb7sgso2papddd2qi7odimlathgwzukzebr5riizjhvnwkwgsbwa-mainnet-slot-to-cid.index",
+      "identity": {
+        "device": 66305,
+        "inode": 7526407,
+        "size": 11922681,
+        "blocks": 23288,
+        "uid": 1000,
+        "gid": 1000,
+        "mode": 33152,
+        "nlink": 1,
+        "mtime": 1791454726,
+        "mtime_nsec": 155835140
+      },
+      "original_ctime": 1791454726,
+      "original_ctime_nsec": 163185449,
+      "owner": 0,
+      "epoch": 202,
+      "header_hex": "636f6d7069737a646b00000024000000000000001f00000001040565706f636808ca0000000000000007726f6f744369642401711220a1fc8d2769e078c63d411f70d0c5826735b34564818f62846527ab6cab1a41b0076e6574776f726b076d61696e6e6574046b696e640b736c6f742d746f2d636964",
+      "reproduction_url": "https://files.old-faithful.net/202/epoch-202-bafyreifb7sgso2papddd2qi7odimlathgwzukzebr5riizjhvnwkwgsbwa-mainnet-slot-to-cid.index",
+      "canonical_r2_receipt": {
+        "path": "/var/lib/jetstreamer/horizon-terminal-compact-index-operation-preparation-v2/evidence/canonical-epoch-202.r2.json",
+        "sha256": "1c4cd7b99132b09e733e98e030b1bdaf40606d9ab86e4587a2f11c2347950417",
+        "uid": 0
+      }
+    }
+  ],
+  "source_review": {
+    "path": "/var/lib/jetstreamer/horizon-terminal-compact-index-operation-preparation-v2/evidence/source-author-review.md",
+    "sha256": "c2d6546fc048c7ec9e503b3f249915b20d66117d91068e93229b73f7003d06de",
+    "uid": 0
+  },
+  "inert_recipes": [
+    {
+      "path": "/etc/systemd/system/horizon-qualify-202-selected-store8-v1.service",
+      "sha256": "891abdf5013621a662cbcf9a94561ed24c975b6c30c9071dcf9917978e4540bb",
+      "unit": "horizon-qualify-202-selected-store8-v1.service"
+    }
+  ],
+  "local_index_retirement_authorized": true,
+  "archive_deletion_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

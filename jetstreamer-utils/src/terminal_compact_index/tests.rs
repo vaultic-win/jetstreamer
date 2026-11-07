@@ -40,6 +40,7 @@ fn index() -> Index {
 }
 pub(super) fn plan() -> Plan {
     Plan {
+        legacy202_check: None,
         schema: "jetstreamer-terminal-compact-index-retirement-plan-v1".into(),
         state: "/var/lib/jetstreamer/test-index-state".into(),
         owners: vec![Owner {

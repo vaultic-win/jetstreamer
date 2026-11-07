@@ -65,6 +65,19 @@ pub(super) struct Operation {
     expected_read_only_paths: Vec<PathBuf>,
     expected_bind_read_only_paths: String,
 }
+impl Operation {
+    pub(super) fn is_legacy202_check(&self) -> bool {
+        self.unit == legacy202::UNIT && self.check_only && !self.retirement_preflight
+    }
+}
+pub(super) fn has_complete_fixed_registry(p: &Plan) -> bool {
+    complete_fixed_registry(
+        &p.typed_recipes
+            .iter()
+            .map(|r| r.installed.clone())
+            .collect(),
+    )
+}
 fn ordinary_path(path: &Path) -> bool {
     path.is_absolute()
         && !path.components().any(|c| {
@@ -98,6 +111,7 @@ fn safe_input(i: &Input) -> bool {
         && i.children.iter().all(|p| ordinary_path(p))
 }
 pub(super) fn validate(p: &Plan) -> Result<()> {
+    legacy202::validate_shape(p)?;
     let mut installed = BTreeSet::new();
     for r in &p.typed_recipes {
         ensure!(
@@ -164,7 +178,11 @@ pub(super) fn validate(p: &Plan) -> Result<()> {
                 "horizon-235237-index939-retire-v1.service"
             ]
             .contains(&o.unit.as_str())
-                && o.check_only == o.unit.contains("check-only")
+                || (p.legacy202_check.is_some() && o.is_legacy202_check()),
+            "unknown current operation unit"
+        );
+        ensure!(
+            o.check_only == o.unit.contains("check-only")
                 && !(o.check_only && o.retirement_preflight)
                 && direct_installed_path(&o.installed, &o.unit)
                 && o.recipe.uid == 0
@@ -595,15 +613,16 @@ fn consumer_input(i: &Input) -> bool {
         )
 }
 pub(super) fn indirect_reference(bytes: &[u8], p: &Plan) -> bool {
-    p.typed_recipes
-        .iter()
-        .flat_map(|r| {
-            r.inputs
-                .iter()
-                .filter(|i| consumer_input(i))
-                .map(|i| &i.binding.path)
-        })
-        .any(|path| path_reference(bytes, path.as_os_str().as_bytes()))
+    legacy202::metadata_reference(bytes, p)
+        || p.typed_recipes
+            .iter()
+            .flat_map(|r| {
+                r.inputs
+                    .iter()
+                    .filter(|i| consumer_input(i))
+                    .map(|i| &i.binding.path)
+            })
+            .any(|path| path_reference(bytes, path.as_os_str().as_bytes()))
         || p.completed_check
             .as_ref()
             .is_some_and(|c| path_reference(bytes, c.plan.path.as_os_str().as_bytes()))
@@ -622,6 +641,7 @@ pub(super) fn indirect_inodes(p: &Plan) -> Result<BTreeSet<(u64, u64)>> {
     if let Some(c) = &p.completed_check {
         paths.push(&c.plan.path);
     }
+    paths.extend(legacy202::metadata_paths(p));
     paths
         .into_iter()
         .map(|p| {
@@ -1411,8 +1431,17 @@ mod system_executable_link_tests {
     #[test]
     fn only_exact_readonly_root_coreutils_provenance_accepts_multiple_links() {
         for name in [
-            "cat", "stat", "sha256sum", "install", "sleep", "test", "id", "printf", "readlink",
-            "dirname", "uname",
+            "cat",
+            "stat",
+            "sha256sum",
+            "install",
+            "sleep",
+            "test",
+            "id",
+            "printf",
+            "readlink",
+            "dirname",
+            "uname",
         ] {
             let path = Path::new("/usr/lib/cargo/bin/coreutils").join(name);
             assert!(input_links_allowed(

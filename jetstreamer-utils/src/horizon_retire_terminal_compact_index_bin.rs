@@ -52,6 +52,9 @@ const ROOTS: &[&str] = &[
     "adaptive-220-232-v1",
     "adaptive-220-223-current-9d8e964-v1",
 ];
+mod legacy202 {
+    include!("terminal_compact_index/legacy202_check.rs");
+}
 mod reviewed {
     include!("terminal_compact_index/reviewed_closure.rs");
 }
@@ -160,6 +163,8 @@ struct Plan {
     typed_recipes: Vec<typed::Recipe>,
     #[serde(default)]
     current_operation: Option<typed::Operation>,
+    #[serde(default)]
+    legacy202_check: Option<legacy202::Profile>,
     #[serde(default)]
     completed_check: Option<typed::CompletedCurrentCheck>,
     local_index_retirement_authorized: bool,
@@ -740,6 +745,7 @@ fn path_reference(bytes: &[u8], needle: &[u8]) -> bool {
 }
 fn recipe_reference(bytes: &[u8], p: &Plan) -> bool {
     typed::recipe_mentions(bytes, p)
+        || legacy202::metadata_reference(bytes, p)
         || p.owners.iter().any(|o| {
             path_reference(bytes, o.root.as_os_str().as_bytes())
                 || o.actors
@@ -1041,7 +1047,8 @@ fn quarantine_path(p: &Plan, index: &Index, ordinal: usize, op: &str) -> Result<
         &p.state,
         ordinal,
         op,
-        owner.imported_canonical.is_some() && p.current_operation.is_some(),
+        (owner.imported_canonical.is_some() && p.current_operation.is_some())
+            || legacy202::same_parent(p, index),
     )
 }
 fn quarantine_destination(
@@ -1086,6 +1093,8 @@ fn anchor_matches(dir: &File, name: &str, index: &Index) -> Result<()> {
 }
 fn run(p: &Plan, op: &str, self_sha: &str, check: bool) -> Result<Value> {
     validate_plan(p)?;
+    legacy202::action_allowed(p, check)?;
+    legacy202::authenticate_original(p)?;
     typed::authenticate_current(p)?;
     let dir = OpenOptions::new()
         .read(true)
