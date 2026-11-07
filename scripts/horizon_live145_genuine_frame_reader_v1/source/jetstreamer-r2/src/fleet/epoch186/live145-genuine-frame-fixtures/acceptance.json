@@ -1,0 +1,61 @@
+{
+  "DATA_credit_bytes": 0,
+  "accepted_selector": {
+    "path": "/home/sol/.jetstreamer-private/native1328r2-full-operation-workflow-source-20261107-v1/runtime/accepted-frame-selector.json",
+    "sha256": "3548e5e3bf480dfd9513da712b65dfbe48a90d3ec10494cd0e9127fb4c16af3c"
+  },
+  "actual0728_predecessor": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/runtime/ROOT_ACTUAL0728_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
+    "sha256": "25a131ff63c267132845e25293b0c2f69e383d6e2c9387e3d6c886915a9beada"
+  },
+  "actual_completed_writer": {
+    "ActiveState": "active",
+    "ControlPID": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-retained145-terminal-Frame-current1328r2-closedfamily-capture-20261107-v1.service",
+    "InvocationID": "f943458d0d2143439c2e7d1c28e3c8ea",
+    "Job": "",
+    "LoadState": "loaded",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "exited"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T132809Z-cached145-loaded-terminal-reload-r2-v1.json",
+    "sha256": "52a52b08819956e9722ff51c00f8bf979c971c1086661d4a84a77b1cf145f3d0"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-postreplay145-current1328r2-fleet-plan-20261107-v1/fleet-plan.json",
+    "sha256": "baf67a5a1da472a73d072cde614d864f7d0edcbb7b5945d907dd489bfe83ddb3"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T132809-cached145-original-terminal-reload-native-r2-v1.json",
+    "sha256": "35821dfc3ff1deaf404df7fc92af55d352178c2f5ee8d8b17112e2d7a3cc792b"
+  },
+  "full_current_reader_memory_DATA_pending": true,
+  "memory_credit_bytes": 0,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T132809Z-postcompletion154-v1.json",
+    "sha256": "b7e31f3f7104610e22c84c0fa7dd6d6e5f187eaf2a97439c4c73cb83d129da30"
+  },
+  "original_guard_owned_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/native1328r2-full-operation-workflow-source-20261107-v1/runtime/frame1328-capture-PID1.json",
+    "sha256": "3fe7b38a32947703f9d9266d15deec0ddf3ad706130d4f5bc07644b14a7740b1"
+  },
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-retained145-terminal-Frame-current1328r2-plan-20261107-v1/plan.json",
+    "sha256": "70c91ca0635f5affd8d9bab72b58b1912f2e03da5d53cb3b842f5f251f0d14db"
+  },
+  "qualified1228_guard": {
+    "path": "/home/sol/.jetstreamer-private/native1328r2-full-operation-workflow-source-20261107-v1/ROOT_GUARD1328R2_ALL81_DRAINS_NORMAL_SEAL_ACCEPTED.json",
+    "sha256": "ea2c629b60b404eeec1fa5b92f75782c0169dbbb48e56551480e0923c12e51c4"
+  },
+  "qualified_current_helper": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-production-census-helper-tools-20261107-v1/compile-and-qa-proof.json",
+    "sha256": "2c8351824aa2788d04bc7c103ed1623efc0de2e4676a9a177b077a0517be918d"
+  },
+  "reader_not_run_in_this_recovery": true,
+  "replay_admission_authorized": false,
+  "schema": "horizon-native1328-Frame-accepted-reader-accounting-pending-v1"
+}

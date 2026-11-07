@@ -1,0 +1,48 @@
+{
+  "schema": "horizon-live145-genuine-Frame-reader-helper-root-acceptance-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-genuine-frame-reader-helper-tools-20261107-v1/jetstreamer-r2",
+    "sha256": "012b6be173815c8c760a445c343e21b5082ce1ea8ef29097cec7019c2602ae46"
+  },
+  "artifact_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-genuine-frame-reader-helper-tools-20261107-v1/compile-and-qa-proof.json",
+    "sha256": "751318a16305742096e37f000938d669737961c263cfdb3f242e4763972eeb48"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-live145-genuine-frame-reader-helper-tools-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "e29aa3cbca005d09f06502583c0686fd822bcb66f6e8fe9b9320abb81bdc6bee"
+  },
+  "source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/live145-genuine-frame-reader-qualification-20261107-v1/ROOT_GENUINE_FRAME_REGISTRATION_SOURCE_FREEZE_V1.json",
+    "sha256": "f2cc5dc13b25a1c9b06fcb1f9bc6391e24d246a2e90a4636908854a83b569e92"
+  },
+  "all13_drains_and_extra_QA_closure": {
+    "path": "/home/sol/.jetstreamer-private/live145-genuine-frame-reader-qualification-20261107-v1/ROOT_ALL13_DRAINS_EXTRA_QA6GiB_CLOSED_DATA_RETAINED.json",
+    "sha256": "5bb3c7c6737b800b7bddf26f2acb223c52cd9e1890ff38af7846c95436cc84f3"
+  },
+  "ordinary_tests_passed": 2865,
+  "ignored_tests_retained": 115,
+  "all3_explicit_native_controls_passed": true,
+  "complete_genuine_Frame_adapter_regressions_passed": 3,
+  "extra_QA_memory_bytes": 0,
+  "normal_external_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5101532614450,
+  "new_Frame_CLI_reader_registration_enabled": true,
+  "actual_operational_full_reader_memory_DATA_and_positive185_acceptance_pending": true,
+  "next_prepared_source": {
+    "path": "/home/sol/.jetstreamer-private/native1428-full-operation-workflow-source-20261107-v1/ROOT_NEXT1428_SOURCE_ONLY_AND_PENDING_GATES.json",
+    "sha256": "14d8d05eb50ce54887eee087c08320fb83e6b818762c073d9113d29bd2e44847"
+  },
+  "no_replay_or_release_credit": true,
+  "root_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/live145-genuine-frame-reader-qualification-20261107-v1/ROOT_GENUINE_FRAME_READER_HELPER_QUALIFIED_SEALED_AND_NEXT_NATIVE_GATES.json",
+    "sha256": "7e5e855ba75d2d495a141ec92c844fadf2d8f78cde457eb4ebe5d01ff9233fe4"
+  },
+  "same_end_current_capacity": {
+    "path": "/home/sol/.jetstreamer-private/actual1358-observer-root-acceptance-20261107-v1/CAPACITY1358_SAME_END_GENUINE_READER_QA_CLOSED.json",
+    "sha256": "71eda941b87afab89bafce38cdeb24dc4f6140763c0b4213f72be8bffc1e22d7"
+  },
+  "executing_replay_lanes": 0,
+  "memory_selected_target": 5,
+  "next_concrete_action": "Use prepared1428 source after genuine scheduled sample, qualify distinct dispatcher and execute fresh fleet/Frame then full reader/typed memoryDATA using this helper; positive185 acceptance/lifecycle must use the same final image before fresh replay admission."
+}

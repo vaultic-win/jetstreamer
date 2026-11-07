@@ -1,0 +1,27 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "fec79a684f33d5a4bc61c73b5f7bf2ffd2e5739bb5f7285d32a315797cde8d25",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-live145-nested-predecessor-frame-cli-tools-20261107-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/cli-work/jetstreamer-horizon-frame",
+      "name": "jetstreamer-horizon-frame",
+      "sha256": "454ca6069a17ab9d917f59324a9c318dddb8c31203f5a753cb8070ee3efefec5",
+      "bytes": 9680320,
+      "mode": "0555"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/live145-nested-predecessor-frame-qualification-20261107-v1/cli-artifact-proof.json",
+      "name": "artifact-proof.json",
+      "sha256": "a920e23650508f3283c352b43aca81ff93343e037fa747102eafc8690a960cad",
+      "bytes": 7571,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794056642,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}
