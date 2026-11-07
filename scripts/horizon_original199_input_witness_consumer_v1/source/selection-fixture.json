@@ -1,0 +1,43 @@
+{
+  "schema": "horizon-original199-explicit-complete-input-witness-selection-v1",
+  "original_enrollment": {
+    "path": "/home/sol/.jetstreamer-private/epoch199-backfill-current-preparation-20261102-v1/ACTUAL2258_R2_ENROLLMENT.json",
+    "sha256": "a2313858851adecca3ff2e144cb61d342cf6757c2dd1249ba0ab88f9770f6b80"
+  },
+  "witness": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-accepted-20261107-v3/witness.json",
+    "sha256": "97faf3d988eb549dc77ce564869f0d36a5ba7a3717073449a2f443330cd086aa"
+  },
+  "witness_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-accepted-20261107-v3/deployment-seal-receipt.json",
+    "sha256": "00431452162ce572d98446db539ad088756bd5df11974d4c521d8aeb40f3356c"
+  },
+  "producer": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-tools-20261107-v3/input-witness",
+    "sha256": "53346c7900eb2a17f8da59897b2dbaf0a22f137f64f0cdfd70376bd1ededc027"
+  },
+  "producer_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-tools-20261107-v3/deployment-seal-receipt.json",
+    "sha256": "5549020f70bb3e36d116bd534944b75e37a887b0fa6c6c6faf6f36353aa48235"
+  },
+  "completion": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-accepted-20261107-v3/original-completion.json",
+    "sha256": "aa7741d6bd85aa00193c81ff7287dcdaa56fe0ccee648c1b611f6e805eec3144"
+  },
+  "root_acceptance": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-accepted-20261107-v3/acceptance.json",
+    "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+  },
+  "state_copy": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-quarantined-state-capture-20261107-v1/state.json",
+    "sha256": "051642bf5ff3f1fffb5e7d8b2133ff399a0a0f1947fef50c74976b12858da152"
+  },
+  "state_copy_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-quarantined-state-capture-20261107-v1/deployment-seal-receipt.json",
+    "sha256": "13a332a0b63312f182f9198f36c6eff2a7237b90181e989f20fc2d5d5c547f70"
+  },
+  "original_context": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-terminal-context-20261104-v2/registry.json",
+    "sha256": "733487fcb07438d603999234b0a0598d62261ba0c1cb0ba6003693260ebc1389"
+  }
+}

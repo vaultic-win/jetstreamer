@@ -1,0 +1,228 @@
+{
+  "actor": {
+    "ActiveState": "active",
+    "CPUQuotaPerSecUSec": "8s",
+    "ControlGroup": "/system.slice/horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+    "ControlPID": "0",
+    "ExecMainCode": "0",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract extract /usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json --plan-sha256 c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3 --self-sha256 b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76 ; ignore_errors=no ; start_time=[Sat 2026-11-07 07:44:22 UTC] ; stop_time=[n/a] ; pid=2463122 ; code=(null) ; status=0/0 }",
+    "Group": "root",
+    "Id": "horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+    "InvocationID": "f37b155136614e0183ba2e9adb8714ef",
+    "Job": "",
+    "KillMode": "control-group",
+    "LoadState": "loaded",
+    "MainPID": "2463122",
+    "MemoryMax": "85899345920",
+    "MemorySwapMax": "0",
+    "NRestarts": "0",
+    "NoNewPrivileges": "yes",
+    "PrivateNetwork": "yes",
+    "ProtectHome": "read-only",
+    "ProtectSystem": "strict",
+    "Restart": "no",
+    "Result": "success",
+    "SubState": "running",
+    "TasksMax": "512",
+    "TimeoutStartUSec": "1min 30s",
+    "TimeoutStopUSec": "15s",
+    "Type": "exec",
+    "User": "root"
+  },
+  "all_original_sources_fully_hashed": true,
+  "all_protected_source_descriptors_closed_before_native_recheck": true,
+  "archive_publication_authorized": false,
+  "completed_monotonic_usec": 2413054736590,
+  "guard": {
+    "ActiveState": "inactive",
+    "CPUQuotaPerSecUSec": "1s",
+    "ControlGroup": "",
+    "ControlPID": "0",
+    "ExecMainCode": "1",
+    "ExecMainStatus": "0",
+    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-tools-20261107-v8/epoch145-prefix-extract guard /usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json --plan-sha256 c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3 --self-sha256 b416b7c932ef781c8d0f863b63b803379dd58cb1affe99dced6a61830a95ad76 ; ignore_errors=no ; start_time=[Sat 2026-11-07 15:46:18 UTC] ; stop_time=[Sat 2026-11-07 15:46:28 UTC] ; pid=2688748 ; code=exited ; status=0 }",
+    "Group": "root",
+    "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+    "InvocationID": "720ce8a7b332493998d5a13dc11d6f03",
+    "Job": "",
+    "KillMode": "control-group",
+    "LoadState": "loaded",
+    "MainPID": "0",
+    "MemoryMax": "268435456",
+    "MemorySwapMax": "0",
+    "NRestarts": "0",
+    "NoNewPrivileges": "yes",
+    "PrivateNetwork": "yes",
+    "ProtectHome": "read-only",
+    "ProtectSystem": "strict",
+    "Restart": "no",
+    "Result": "success",
+    "SubState": "dead",
+    "TasksMax": "512",
+    "TimeoutStartUSec": "1min 30s",
+    "TimeoutStopUSec": "15s",
+    "Type": "exec",
+    "User": "root"
+  },
+  "native_original_completion_and_normal_sealing_still_required": true,
+  "original_guard_actor_timer_unchanged": true,
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-actual-second-plan-20261107-v3/plan.json",
+    "sha256": "20a8acceaf99082b44f6c32acf51bfc11ba1d3186e8ff2d31733e7a13066badd"
+  },
+  "producer_invocation_id": "dc4c92601a7a41419d485c52f147ceb1",
+  "producer_pid": 2688860,
+  "producer_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-input-witness-tools-20261107-v3/input-witness",
+    "sha256": "53346c7900eb2a17f8da59897b2dbaf0a22f137f64f0cdfd70376bd1ededc027"
+  },
+  "producer_unit": "horizon-original199-input-witness-actual-second-20261107-v3.service",
+  "recorded_unix_seconds": 1794066393,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-original199-complete-input-verification-witness-v1",
+  "started_monotonic_usec": 2413049428892,
+  "timer": {
+    "ActiveState": "active",
+    "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+    "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+    "Job": "",
+    "LoadState": "loaded",
+    "Result": "success",
+    "SubState": "waiting",
+    "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+  },
+  "timer_policy_after": {
+    "data": [
+      [
+        "OnUnitActiveUSec",
+        30000000,
+        2413069906167
+      ],
+      [
+        "OnActiveUSec",
+        1000000,
+        2384132757954
+      ]
+    ],
+    "type": "a(stt)"
+  },
+  "timer_policy_before": {
+    "data": [
+      [
+        "OnUnitActiveUSec",
+        30000000,
+        2413069906167
+      ],
+      [
+        "OnActiveUSec",
+        1000000,
+        2384132757954
+      ]
+    ],
+    "type": "a(stt)"
+  },
+  "verified_inputs": [
+    {
+      "binding": {
+        "path": "/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/jetstreamer-node",
+        "sha256": "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+      },
+      "complete_bytes_hashed": 47753136,
+      "identity": {
+        "bytes": 47753136,
+        "ctime": 1792239118,
+        "ctime_nsec": 218934390,
+        "device": 2304,
+        "gid": 0,
+        "inode": 6161877,
+        "links": 1,
+        "mode": 33133,
+        "mtime": 1792239118,
+        "mtime_nsec": 217934383,
+        "uid": 0
+      }
+    },
+    {
+      "binding": {
+        "path": "/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/jetstreamer-historical-worker-v1-6-15",
+        "sha256": "9339aa0ee5c39e91ec446bfa561c0e81280a0ddc474a03cf5bb0ce07a3674893"
+      },
+      "complete_bytes_hashed": 8961328,
+      "identity": {
+        "bytes": 8961328,
+        "ctime": 1792239118,
+        "ctime_nsec": 299934953,
+        "device": 2304,
+        "gid": 0,
+        "inode": 6161878,
+        "links": 1,
+        "mode": 33133,
+        "mtime": 1792239118,
+        "mtime_nsec": 298934946,
+        "uid": 0
+      }
+    },
+    {
+      "binding": {
+        "path": "/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/preflight-199-with-private-200-tail-v4.json",
+        "sha256": "9a975243f50d37ed71329b5f3cd0f5e4a4c83faf2e8018f6db41ed9170ac1de9"
+      },
+      "complete_bytes_hashed": 14005,
+      "identity": {
+        "bytes": 14005,
+        "ctime": 1792239118,
+        "ctime_nsec": 312935043,
+        "device": 2304,
+        "gid": 0,
+        "inode": 6161879,
+        "links": 1,
+        "mode": 33060,
+        "mtime": 1792239118,
+        "mtime_nsec": 312935043,
+        "uid": 0
+      }
+    },
+    {
+      "binding": {
+        "path": "/usr/local/lib/jetstreamer/deploy-epoch199-singleton-20261017-v1/snapshot-85967282-BQvC7FcQTSguJkWHeLnpkVSFv32ZKRqUbgHKxVF97o3x.tar.zst",
+        "sha256": "d4a74f54f44258fd4b078d8d3304a6cb6a7911a87883160e1579727dafbf9e6d"
+      },
+      "complete_bytes_hashed": 7997778185,
+      "identity": {
+        "bytes": 7997778185,
+        "ctime": 1792239128,
+        "ctime_nsec": 591006442,
+        "device": 2304,
+        "gid": 0,
+        "inode": 6161880,
+        "links": 1,
+        "mode": 33060,
+        "mtime": 1792239128,
+        "mtime_nsec": 590006435,
+        "uid": 0
+      }
+    },
+    {
+      "binding": {
+        "path": "/var/lib/jetstreamer-root-sweep-epoch199-backfill-20261102-v1/state.json",
+        "sha256": "051642bf5ff3f1fffb5e7d8b2133ff399a0a0f1947fef50c74976b12858da152"
+      },
+      "complete_bytes_hashed": 960,
+      "identity": {
+        "bytes": 960,
+        "ctime": 1793811980,
+        "ctime_nsec": 636384787,
+        "device": 2304,
+        "gid": 0,
+        "inode": 8781861,
+        "links": 1,
+        "mode": 33152,
+        "mtime": 1793811980,
+        "mtime_nsec": 635384782,
+        "uid": 0
+      }
+    }
+  ]
+}

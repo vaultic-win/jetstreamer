@@ -1,0 +1,11 @@
+{
+  "schema": "horizon-original199-explicit-input-witness-context-v1",
+  "original_context": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-terminal-context-20261104-v2/registry.json",
+    "sha256": "733487fcb07438d603999234b0a0598d62261ba0c1cb0ba6003693260ebc1389"
+  },
+  "input_verification_selection": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-witness-consumer-selection-20261107-v1/selection.json",
+    "sha256": "ca40ef194019d83ee9a9aae51e5a173591e49c7c612745dd99c68b2543f4a6ec"
+  }
+}
