@@ -81,6 +81,10 @@ Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not
   conceal a missing predecessor registration. Bind the predecessor's genuine native acceptance,
   exact archive of its metadata, and normal deployment seal; retain rejection of unknown images
   and changed native envelopes. An older registered fixture or a leaf allowlist test is insufficient.
+  Inspect every actual `--extern` binding; changing a library search path leaves an explicit old
+  binding in force. After CLI qualification, sealing and genuine Frame capture, register its exact
+  image in each selected downstream consumer and exercise the complete reader adapter with that
+  real envelope before opening the operational reader clock. Preserve earlier qualified pins.
 - Existing reviewed and sealed Python or shell components may continue when they are already bound
   into an active or prepared workflow and replacing them would invalidate durable evidence,
   require restarting healthy work, or add migration risk. Do not stop, restart, or mutate a healthy
