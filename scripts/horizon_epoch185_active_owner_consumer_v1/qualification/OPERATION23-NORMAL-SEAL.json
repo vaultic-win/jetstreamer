@@ -1,0 +1,34 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "220dd6a0169861d77d24464f3c1e2de7ce6884ebb0a300f19b1b1757b092020e",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v23-split-r1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation-qa-20261108-v23-split-r1/qa/planner",
+      "name": "operation",
+      "sha256": "38f0b26a56fa9232108df4643ebfc5da87cd54d9cde4921c813785e6ed387569",
+      "bytes": 5706608,
+      "mode": "0555"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation-qa-20261108-v23-split-r1/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "7e1d86f583e1d893cd98bfde11f61decd3448af26f328512a4012b750cc695d7",
+      "bytes": 25322,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation-qa-20261108-v23-split-r1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "exact-source-and-recipes.json",
+      "sha256": "9ecff00eadfb8f4499cebae481c0f9686893bf72f50700016c13168f6d6c42b8",
+      "bytes": 16143,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794138305,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

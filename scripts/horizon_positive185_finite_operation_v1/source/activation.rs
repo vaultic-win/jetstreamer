@@ -93,6 +93,8 @@ fn profile_child(
     process::stdout_json(&v)
 }
 pub fn qualify(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
+    let selected_postreader_role = crate::postreader::role()?;
+    let selected_postreader_image = crate::postreader::image()?;
     let reader_control = binding(&v["reader_lifecycle_control"])?;
     crate::persistent_reader::validate_control(r, &reader_control)?;
     let prior = binding(&v["original_v19_negative"])?;
@@ -221,12 +223,12 @@ pub fn qualify(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
     let proof = storage::save(
         r.root,
         "route-capability.json",
-        &json!({"schema":"horizon-positive185-final-route-capability-v2","executor":fixed(FINAL,FINAL_SHA),"helper":fixed(HELPER,HELPER_SHA),"driver":fixed(DRIVER,DRIVER_SHA),"scope":"one-original-post-reader-release-attempt","original_setup_seconds":600,"all_raw_obligations_and_live_guards_preserved":true,"original_writer_custody_supported":true,"bounded_probe_only":true,"full_boundary_route_qualified":false,"retained_source_base_helper_sha256":"50b2b6636068811d1176f87f5d49b76206db785dcb1e0ac80023c517cefac07a","native_capture_image":fixed(NATIVE,NATIVE_SHA),"original_v19_negative":prior,"actual_persistent_reader_lifecycle_control":reader_control,"actual_root_profile":root_result,"actual_sol_profile":sol_result,"actual_c71_sol_eight_file_read":read_result,"actual_eight_file_control_package":views,"original_start_request_policy_source":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs"),1<<20)?,"original_start_request_policy_normal_seal":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/deployment-seal-receipt.json"),4<<20)?,"actual_start_request_common_control":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/actual-held-reload-control.json"),4<<20)?,"start_request_common_control_normal_seal":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/deployment-seal-receipt.json"),4<<20)?,"original_start_request_common_qualification":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/completion.json"),4<<20)?,"metadata_control_not_native_input_or_positive_replay_capability":true,"fresh_admission_ready_task_fleet_reader_and_original_release_still_required":true,"publication_authorized":false}),
+        &json!({"schema":"horizon-positive185-final-route-capability-v2","executor":fixed(FINAL,FINAL_SHA),"helper":selected_postreader_image,"prelaunch_reader_image":fixed(HELPER,HELPER_SHA),"split_prelaunch_postreader_roles":true,"driver":fixed(DRIVER,DRIVER_SHA),"scope":"one-original-post-reader-release-attempt","original_setup_seconds":600,"all_raw_obligations_and_live_guards_preserved":true,"original_writer_custody_supported":true,"bounded_probe_only":true,"full_boundary_route_qualified":false,"retained_source_base_helper_sha256":"50b2b6636068811d1176f87f5d49b76206db785dcb1e0ac80023c517cefac07a","native_capture_image":fixed(NATIVE,NATIVE_SHA),"original_v19_negative":prior,"actual_persistent_reader_lifecycle_control":reader_control,"actual_root_profile":root_result,"actual_sol_profile":sol_result,"actual_c71_sol_eight_file_read":read_result,"actual_eight_file_control_package":views,"original_start_request_policy_source":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs"),1<<20)?,"original_start_request_policy_normal_seal":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/deployment-seal-receipt.json"),4<<20)?,"actual_start_request_common_control":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/actual-held-reload-control.json"),4<<20)?,"start_request_common_control_normal_seal":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/deployment-seal-receipt.json"),4<<20)?,"original_start_request_common_qualification":process::bind_file(Path::new("/usr/local/lib/jetstreamer/horizon-positive185-start-request-common-control-20261108-v1/completion.json"),4<<20)?,"metadata_control_not_native_input_or_positive_replay_capability":true,"fresh_admission_ready_task_fleet_reader_and_original_release_still_required":true,"publication_authorized":false}),
     )?;
     let route = storage::save(
         r.root,
         "qualified-route.json",
-        &json!({"schema":"horizon-positive185-final-qualified-route-v1","purpose":"bounded_prefix_probe","helper":role(HELPER,HELPER_SHA)?,"driver":fixed(DRIVER,DRIVER_SHA),"driver_normal_seal":process::bind_file(&Path::new(DRIVER).with_file_name("deployment-seal-receipt.json"),16<<20)?,"capability_acceptance":{"path":Path::new("/usr/local/lib/jetstreamer").join(format!("horizon-epoch185-positive-qualified-route-{}/capability.json",r.iid)),"sha256":proof.sha256}}),
+        &json!({"schema":"horizon-positive185-final-qualified-route-v1","purpose":"bounded_prefix_probe","helper":selected_postreader_role,"driver":fixed(DRIVER,DRIVER_SHA),"driver_normal_seal":process::bind_file(&Path::new(DRIVER).with_file_name("deployment-seal-receipt.json"),16<<20)?,"capability_acceptance":{"path":Path::new("/usr/local/lib/jetstreamer").join(format!("horizon-epoch185-positive-qualified-route-{}/capability.json",r.iid)),"sha256":proof.sha256}}),
     )?;
     let dest = Path::new("/usr/local/lib/jetstreamer").join(format!(
         "horizon-epoch185-positive-qualified-route-{}",
@@ -435,9 +437,8 @@ pub fn start(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
     let route_bound = binding(&v["qualified_route"])?;
     let route = storage::json(&route_bound)?;
     ensure!(
-        route["purpose"] == "bounded_prefix_probe"
-            && route["helper"]["image"] == json!(fixed(HELPER, HELPER_SHA)),
-        "same-image qualified finite route"
+        route["purpose"] == "bounded_prefix_probe" && route["helper"] == crate::postreader::role()?,
+        "same-image qualified finite postreader route"
     );
     let capability = storage::json(&binding(&route["capability_acceptance"])?)?;
     ensure!(

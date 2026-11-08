@@ -5,6 +5,7 @@
 mod activation;
 mod follow_on;
 mod persistent_reader;
+mod postreader;
 mod process;
 mod reader_phase;
 #[path = "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs"]

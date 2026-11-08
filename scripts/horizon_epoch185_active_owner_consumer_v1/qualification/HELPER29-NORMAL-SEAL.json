@@ -1,0 +1,34 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "f9c3333d98405e5cb6e93f76a248670f9aa67d7fea6a05805234db5135e1760b",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-active-owner-postreader-tools-20261108-v29",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-active-owner-helper-qa-20261108-v29/work/v29-jetstreamer-r2",
+      "name": "jetstreamer-r2",
+      "sha256": "aaa051c04688043b51576911f80cfb317ee868d0b03f52a0ca3dfc53bc50755a",
+      "bytes": 86998752,
+      "mode": "0555"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-active-owner-helper-qa-20261108-v29/HELPER29-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "b06cfa4088eae83c2adfae92aec03120907f2a444fd69612d7f2577047c740eb",
+      "bytes": 36877,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-active-owner-helper-qa-20261108-v29/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "exact-source-and-recipes.json",
+      "sha256": "62d796ea3e01b4caee6374685e8e249ecec78f68c4c011ea00040919df367601",
+      "bytes": 450420,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794137559,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

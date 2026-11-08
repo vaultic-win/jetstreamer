@@ -445,11 +445,10 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     let execution = crate::persistent_reader::read(r, &reader_spec, &reader_generation, deadline)?;
     let reader_bound = binding(&execution["reader_proof"])?;
     let reader = storage::json(&reader_bound)?;
+    crate::postreader::require_reader_image(&reader["image"])?;
     ensure!(
-        reader["image"] == json!(fixed(HELPER, HELPER_SHA))
-            && reader["raw_history_preserved"] == true
-            && reader["all_DATA_promises_preserved"] == true,
-        "same helper actual original complete reader"
+        reader["raw_history_preserved"] == true && reader["all_DATA_promises_preserved"] == true,
+        "qualified postreader actual original complete reader"
     );
     let riid = text(&reader, "invocation_id")?;
     let original_pid = text(&reader["native"], "MainPID")?.parse::<u64>()?;

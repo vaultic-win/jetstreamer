@@ -585,15 +585,9 @@ pub fn read(
 ) -> Result<Value> {
     let declaration = storage::json(spec)?;
     let expected = PathBuf::from(text(&declaration, "output_directory")?).join("proof.json");
-    let argv = vec![
-        HELPER.into(),
-        "read-failed4-current-accounting".into(),
-        spec.path.display().to_string(),
-        "--spec-sha256".into(),
-        spec.sha256.clone(),
-        "--self-sha256".into(),
-        HELPER_SHA.into(),
-    ];
+    let selected_role = crate::postreader::role()?;
+    let selected_image = crate::postreader::image()?;
+    let argv = crate::postreader::reader_argv(spec)?;
     let installed = install(r, generation, READER_UNIT.into(), argv, Kind::Production)?;
     let phase = crate::reader_phase::prepare_persistent_start(r, original_setup_deadline)?;
     let lifecycle = original(
@@ -607,7 +601,7 @@ pub fn read(
         r,
         READER_UNIT,
         iid,
-        Path::new(HELPER),
+        &selected_image.path,
         text(&lifecycle["original_native"], "ExecMainPID")?,
     )?;
     let mut found = Vec::new();
@@ -626,17 +620,17 @@ pub fn read(
     );
     let (reader_bound, row) = found.pop().context("original reader bound")?;
     let reader = storage::json(&reader_bound)?;
+    crate::postreader::require_reader_image(&reader["image"])?;
     ensure!(
         reader["unit"] == READER_UNIT
             && reader["invocation_id"] == iid
-            && reader["image"] == json!(fixed(HELPER, HELPER_SHA))
             && reader["native"]["MainPID"] == lifecycle["original_native"]["ExecMainPID"],
         "actual reader payload/proof/native PID lineage crossed"
     );
     let record = storage::save(
         r.root,
         "genuine-original-persistent-reader.json",
-        &json!({"lifecycle":lifecycle,"actual_original_stdout_payload":row,"reader_proof":reader_bound,"original_unit_package_seal":installed.seal}),
+        &json!({"lifecycle":lifecycle,"actual_original_stdout_payload":row,"reader_proof":reader_bound,"original_unit_package_seal":installed.seal,"actual_postreader_role":selected_role}),
     )?;
     Ok(
         json!({"reader_proof":reader_bound,"lifecycle":lifecycle,"original_native_execution_record":record}),
@@ -663,6 +657,7 @@ pub fn harmless_exec(spec: &Bound, self_image: &Bound) -> Result<()> {
     Ok(())
 }
 pub fn qualify(r: &mut process::Runner<'_>) -> Result<()> {
+    let selected_postreader_role = crate::postreader::role()?;
     r.deadline = Instant::now() + Duration::from_secs(90);
     r.pool_deadline = r.deadline;
     let generation = format!("control-{}", r.iid);
@@ -740,7 +735,7 @@ pub fn qualify(r: &mut process::Runner<'_>) -> Result<()> {
     let proof = storage::save(
         r.root,
         "actual-reader-lifecycle-kernel-control.json",
-        &json!({"schema":"horizon-positive185-actual-persistent-reader-kernel-control-v1","program":r.self_image,"candidate_normal_role":role(r.self_image.path.to_str().context("self image UTF8")?,&r.self_image.sha256)?,"actual_original_lifecycle":lifecycle,"actual_harmless_payload":actual[0],"production_persistent_original_primitive_exercised":true,"actual_original_pidfd_wait_exercised":true,"input_body_reads":0,"resource_observations":0,"campaign_mutations":false,"replay_launch_authorized":false,"publication_authorized":false}),
+        &json!({"schema":"horizon-positive185-actual-persistent-reader-kernel-control-v1","program":r.self_image,"candidate_normal_role":role(r.self_image.path.to_str().context("self image UTF8")?,&r.self_image.sha256)?,"actual_postreader_role":selected_postreader_role,"prelaunch_reader_image":fixed(HELPER,HELPER_SHA),"actual_original_lifecycle":lifecycle,"actual_harmless_payload":actual[0],"production_persistent_original_primitive_exercised":true,"actual_original_pidfd_wait_exercised":true,"input_body_reads":0,"resource_observations":0,"campaign_mutations":false,"replay_launch_authorized":false,"publication_authorized":false}),
     )?;
     let dest = Path::new("/usr/local/lib/jetstreamer").join(format!(
         "horizon-positive185-reader-lifecycle-kernel-control-{generation}"
@@ -786,6 +781,11 @@ pub fn validate_control(r: &mut process::Runner<'_>, bound: &Bound) -> Result<()
         "actual original reader control normal member seal"
     );
     let proof = storage::json(bound)?;
+    ensure!(
+        proof["actual_postreader_role"] == crate::postreader::role()?
+            && proof["prelaunch_reader_image"] == json!(fixed(HELPER, HELPER_SHA)),
+        "same-image reader control crossed split prelaunch/postreader roles"
+    );
     ensure!(
         proof["schema"] == "horizon-positive185-actual-persistent-reader-kernel-control-v1"
             && proof["program"]["sha256"] == r.self_image.sha256
@@ -862,13 +862,13 @@ mod tests {
     #[test]
     fn production_reader_keeps_exact_profile_and_original_dead_lifecycle() {
         let argv = vec![
-            HELPER.into(),
+            crate::postreader::PATH.into(),
             "read-failed4-current-accounting".into(),
             "/usr/local/lib/jetstreamer/exact/spec.json".into(),
             "--spec-sha256".into(),
             "a".repeat(64),
             "--self-sha256".into(),
-            HELPER_SHA.into(),
+            "c".repeat(64), // Pure source-profile fixture, not a qualified pin.
         ];
         let s = source(Kind::Production, &argv).unwrap();
         for expected in [
