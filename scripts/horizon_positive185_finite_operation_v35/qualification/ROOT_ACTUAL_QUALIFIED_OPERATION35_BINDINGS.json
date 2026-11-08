@@ -1,0 +1,34 @@
+{
+  "schema": "horizon-actual-qualified-operation35-fleet-order-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v35-planner4-r1/operation",
+    "sha256": "2a46be553c8e07f91e4e8e5e0f378761b5c9a4cacf5008e5542d59380051b543"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v35-planner4-r1/artifact-proof.json",
+    "sha256": "995def66ad8d41b0d9b188c9dfdad2f6ff736495e8bd1cb461dbd985cf87dc48"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v35-planner4-r1/deployment-seal-receipt.json",
+    "sha256": "ae3f584af2bc4d7380945df58b25c6e895b77f90135e6b217b12cc0b18d61fe8"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v35-planner4-r1-r3/route.json",
+    "sha256": "b49880494060d2f7f57c9a51edcaadc01c63adcdc9b062bc602767dfce8147a9"
+  },
+  "capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v35-planner4-r1-r3/capability.json",
+    "sha256": "0b9420c3ff5f3d876423888df11c50a9603d11a73a2134defb1cc2abc97efd27"
+  },
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v35-planner4-r1/completion.json",
+    "sha256": "4064103aa2390b3d2c5be531be3625aabc029f988bbd82d39462c30a24f34e96"
+  },
+  "successful_reader_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v35-planner4-r1/completion.json",
+    "sha256": "84e5274ccc9668d8f3b750654af81ec0b5769b73f5499f8dbb0e0fd6bb21c18f"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5153841164948,
+  "fresh_original_guard_and_admission_still_required": true
+}

@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v4-r2",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/qa/planner",
+      "name": "planner",
+      "sha256": "ce57c4b8a03278a0e56955d7257bb353cd9fe70addea3aa6538574fea82f8076",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/PRODUCTION-R2-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "9062ceb228b9013ab0bfca90067eb8d828fcc2b5fd227ab3d778dda31d42fbd1",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "source-and-recipes.json",
+      "sha256": "f40b32393bbe18db4d3b6341a5a1ffa73ebe984a647e2d9aae1404def9b88c37",
+      "mode": 292
+    }
+  ]
+}

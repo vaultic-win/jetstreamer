@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet_order::tests::actual_original2100_failed_plan_repairs_without_dropping_any_role ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 64 filtered out; finished in 0.01s\n\n",
+  "stderr": "Running as unit: horizon-operation35-r1-actual-current-fleet-order-native-20261108-v3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 10ms\nCPU time consumed: 10ms\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,238 @@
+{
+  "coordinated_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T223022Z-postcompletion154-v1.json",
+    "sha256": "8b2617e2682ec147171512ec35b5865b32f31ba79dbd0c43fe4e0072d2f34dc4"
+  },
+  "current_cycle_reassessment": "Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit. CurrentDATA5153841164948 (Planner4DATA512 andOperation35DATA512 eachonce),normal6,extraQA0.0useful/target5. Sole23observeralreadyarmed.",
+  "latest_authenticated_status_by_epoch": {
+    "136": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261108220306.json",
+      "sha256": "0a42cbb0672a4125af38873f5ada610163485b22664522872c07d5aee4397d97"
+    },
+    "137": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261108220306.json",
+      "sha256": "b9520c44a960b2d431fba53e02a3af007ef3163bb90c3ed3e4fb4ce3648174b6"
+    },
+    "141": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261108220306.json",
+      "sha256": "677ab5af7c1888b1ae3360932f5d7c985c41cc2ef67f2a4edd43bab35984d1f0"
+    },
+    "145": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261108220306.json",
+      "sha256": "78c1cf95e5a8f18e6152e9d5d972f491de71c055800db351261dcd5a62264294"
+    },
+    "159": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261108220306.json",
+      "sha256": "7728b23c0b3ed49eae9c9a45e22bf432376181baeb3ac7c8451f3debeac96c45"
+    },
+    "161": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261108220306.json",
+      "sha256": "2fb8b470eee829e8d258ed597b921e1c6952961e7024a9531e3e719af76c27fe"
+    },
+    "163": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261108220306.json",
+      "sha256": "b48815318d7e47d297fbdc64637a81892d34791243e92f3eec0f1daf78fc9b02"
+    },
+    "185": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261108221840.json",
+      "sha256": "a0aa6c41323b509a707a2224c385f32d5ded59cbf6d17082f69d268a03b74e9b"
+    },
+    "186": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261108220306.json",
+      "sha256": "69ee8adf53bf9c96baf3248e388eeed6205ec91810161baf85b0c27f48657d6c"
+    },
+    "199": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261108220306.json",
+      "sha256": "fd8a84536c0fab4d77813e85cae80cf0d4e760b47630e7e425ecadde7d6fd827"
+    },
+    "200": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261108220306.json",
+      "sha256": "dc472e4390f23ed455e749d50e4468bd2010dd1a6d30a94bce721fd0724ebe02"
+    }
+  },
+  "owner_review_approved_by_main": true,
+  "owner_updates_by_epoch": {
+    "136": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Finish combined shared-helper and canonical-publisher integration using the qualified timer library and CLI, then advance fresh epoch 136 charge-recovery admission and enrollment. Preserve the original hourly-charge failure and all retained obligations.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261107153407.json",
+        "sha256": "0a7160759bc9e54830fa41543720ffe8e54bab0497b421354a2fc9e2a4f8159f"
+      }
+    },
+    "137": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Qualify a distinct exact-input admission envelope for the retained g3 transfer artifacts; the earlier comparable build exceeded its original time and memory limits. Preserve first-entry, release and original failure gates before any consumption or replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261107153407.json",
+        "sha256": "1ad4352a77f8d46abe1ac60fbda073636f21b92d40ec335a3a712530341e4ce3"
+      }
+    },
+    "141": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Continue canonical epoch 141 input, terminal-root and runtime repair. Preserve retained DATA and CPU obligations; any memory-retirement selection and replay still require complete fresh candidate admission.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261107153407.json",
+        "sha256": "07f53db9330daf9381bc239c93bc4ff1ab5b11132c7ea0a8c83c8741dd73a714"
+      }
+    },
+    "145": {
+      "current_internal_stage": "terminal-native-guard-recovery",
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Diagnose original145 v8g1 guard reference closure failure at17:33, preserve all sources/partial and original outcome, qualify recovery exporter and fresh admission before retry. No live replay or export claimed.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261107153407.json",
+        "sha256": "ca4b0fef5685b7511ccf27f0d09c6070e30ebe24f4116123d278558fdda4bc00"
+      },
+      "terminal_event": {
+        "path": "/home/sol/.jetstreamer-private/actual173022-terminal145-status-recovery-20261107-v2/ROOT_ORIGINAL145_TERMINAL_FAILURE_AND_NO_RELEASE.json",
+        "sha256": "00298147c0c204fcd957814ec33f8bdddf1ab1faf34dd21f9b76949a7690afa2"
+      }
+    },
+    "159": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Continue trusted source-shred, hidden-PoH and exact-state qualification from the retained successful metadata audit. Preserve its 5,774 requests, 17,322 post-gap targets, 44,102 skipped slots and 61,424 boundaries as metadata evidence; canonical replay and delivery remain unqualified.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261107153407.json",
+        "sha256": "555f75ec76ae1203766f143034a4476d4ba6026be76bba5726e375406d170307"
+      }
+    },
+    "161": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Preserve the epoch 161 retained family and completed reader, memory and DATA evidence. After combined shared-helper integration, restore a fresh complete typed tuple before any new candidate admission or producer enrollment.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261107153407.json",
+        "sha256": "4ec083cc2d0c224597bf3e3900cae2011cad0024621c5dadc9d14ecf523ad444"
+      }
+    },
+    "163": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Refreshed login validated for exact generation; qualified Rust downloader verified1901405026 compressed bytes with CRC32C/MD5/SHA256 and stable before/after generation metadata. Continue native48/helper qualification, explicit original199 witness-reader integration, fresh complete accounting and guarded replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261107153407.json",
+        "sha256": "6354f540471418df3d92d983844529ed051f835069c628522009884dc4ed5dad"
+      }
+    },
+    "185": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit. CurrentDATA5153841164948 (Planner4DATA512 andOperation35DATA512 eachonce),normal6,extraQA0.0useful/target5. Sole23observeralreadyarmed.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+        "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+      },
+      "qualified_state_copy": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+        "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+      },
+      "qualified_witness": {
+        "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+        "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+      },
+      "fixed_work_eta_model": {
+        "path": "/home/sol/.jetstreamer-private/actual2230-planner4-explicit-control-review3-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW3.json",
+        "sha256": "7277c044bde1cd513ba1c03e2ffc807ebdc1a3ef633511e0634497683ce66edc"
+      }
+    },
+    "186": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Qualify retained capped-singleton runtime, continuing-floor accounting and exact registrations. The root 128 guard still needs a production-enforced allocation or write-rate ceiling before its overshoot can be established; preserve existing DATA and all earlier failures.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261107153407.json",
+        "sha256": "eaf50364bf83120499172689fab709d3508c36c3f5aac9b02e33d13b2de89026"
+      }
+    },
+    "199": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Preserve the failed cohort output, original live controller and read-only FD 9. Advance distinct HTTP 500 recovery admission, guard enrollment and bounded retry integration after fresh accounting and exact-input gates; the original failed producer is not a live replay.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261107153407.json",
+        "sha256": "513d0b4b9ea374aa751926cf55690cff9ae4c924a2deca9c1dbd6bbae0ffb4f6"
+      }
+    },
+    "200": {
+      "current_operator": "/root",
+      "current_phase": "verification",
+      "current_shared_dependency": "22:30 routine cycle. Helper33 and Operation34 genuinely qualified and normally sealed; Final3/Planner3/Driver11 retained. Actual22:00 Frame/fullReader13/parent/cached145/memory/DATA completed; no22:00 original actor was started because900s startup cutoff expired. Fresh22:30 full chain and native guard/admission still required for useful replay. Fresh Helper33 extraQA4 closed by actual75fd5bf7; normal6 retained. Retained DATA5152767423124 includes Helper33DATA4, Operation34DATA512 and guard2200DATA512 exactly once; guard2230DATA512 is actually booked and included exactly once; actual guard2230 qualified and sealed with65 tests passed. Original failures and raw promises retained. Useful replay target5; no compiler/control counted. Fixed413404206ms review2 replay and original17:30:22+24h qualification/19:25:15 control anchors preserved with elapsed deducted. Sole22:30 observer already armed; no timer or archive/sidecar mutation.",
+      "current_task": "Retain epoch 200 input custody, failed cohort lineage and original controller state. Advance the distinct HTTP 500 recovery admission and enrollment with bounded retries, while preserving every independent verification and sidecar gate.",
+      "previous_authenticated_owner_evidence": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261107153407.json",
+        "sha256": "27d15f81d1bcc8b3a3f0a9fecb96f67d360c308a4d660727f4f64bcac6574008"
+      }
+    }
+  },
+  "parts_by_epoch": {
+    "136": {
+      "remaining_until_prior_authenticated_planning_arrival": 841670797
+    },
+    "137": {
+      "remaining_until_prior_authenticated_planning_arrival": 334621000
+    },
+    "141": {
+      "remaining_until_prior_authenticated_planning_arrival": 475021000
+    },
+    "145": {
+      "guard_process_reference_failure_diagnosis_and_qualified_recovery": 0,
+      "independent_full_plugin_boundary": 0,
+      "source_validation_and_fresh_guarded_export": 128027000,
+      "uncertainty_contingency": 0,
+      "upload_readback_sidecar": 21600000
+    },
+    "159": {
+      "remaining_until_prior_authenticated_planning_arrival": 453421000
+    },
+    "161": {
+      "complete_epoch_replay_and_checkpoint_qualification": 345600000,
+      "full_plugin_boundary_and_authenticated_delivery": 43200000,
+      "recovery_and_queue_contingency": 21421000,
+      "remaining_distinct_successor_and_history_integration": 14400000,
+      "remaining_input_qualification_and_package_admission": 43200000,
+      "retained161_all_original_failure_families_reader_journal_repair_and_requalification_millis": 9000000
+    },
+    "163": {
+      "remaining_until_prior_authenticated_planning_arrival": 323821000
+    },
+    "185": {
+      "archive_close_full_plugin_boundary_verification_millis": 21600000,
+      "bootstrap_load_and_warmup_millis": 3600000,
+      "current_fleet_order_repair_and_launch_controls_millis": 0,
+      "fresh_full_reader_memory_DATA_and_replay_admission_millis": 1852000,
+      "full_boundary_runtime_native_Frame_successor_qualification_millis": 67250000,
+      "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+      "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+    },
+    "186": {
+      "remaining_until_prior_authenticated_planning_arrival": 482221000
+    },
+    "199": {
+      "remaining_until_prior_authenticated_planning_arrival": 415621000
+    },
+    "200": {
+      "remaining_until_prior_authenticated_planning_arrival": 415621000
+    }
+  },
+  "schema": "horizon-main-status-planning-review-v1",
+  "latest_completed_event_execution": {
+    "path": "/home/sol/.jetstreamer-private/actual2200-qualified-helper33-next2230-event185-20261108-v1/STATUS-EVENT-ORIGINAL-EXECUTION.json",
+    "sha256": "29700d880bb024d81180c9fd7334c20e9fdd02eeb50731719a4678e8daf2a790"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "original_service": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainStatus": "0",
+    "ActiveState": "inactive"
+  },
+  "same_original_fire_completed_without_signal": true,
+  "no_old_timer_or_actor_mutation": true
+}

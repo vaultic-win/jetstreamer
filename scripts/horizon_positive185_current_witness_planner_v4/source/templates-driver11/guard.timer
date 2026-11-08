@@ -1,0 +1,7 @@
+[Unit]
+Description=Epoch 185 missing-token qualification dormant native guard timer
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=30s
+AccuracySec=1s
+Unit=horizon-guard-185-capped-cold-missing-token-20261106-v14.service

@@ -1,0 +1,25 @@
+{
+  "schema": "horizon-actual-qualified-planner4-helper33-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v4-r2/planner",
+    "sha256": "ce57c4b8a03278a0e56955d7257bb353cd9fe70addea3aa6538574fea82f8076"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v4-r2/artifact-proof.json",
+    "sha256": "9062ceb228b9013ab0bfca90067eb8d828fcc2b5fd227ab3d778dda31d42fbd1"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v4-r2/deployment-seal-receipt.json",
+    "sha256": "00d5e900d118b79a7c9a92a1de05a5da0ea94b314550b7a84197a8f59ce50c68"
+  },
+  "actual2230_request_control": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/ACTUAL2230-REQUEST-CONTROL-ORIGINAL-EXECUTION.json",
+    "sha256": "9f5ff2793a41234b243d0fd832bdde8a43e957bbe29356cf62bc35e337ee7884"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper33-current-witness-planner-qa-20261108-v4/ROOT_NORMAL6_SERIAL_PLANNER4_DATA512_BOOKING.json",
+    "sha256": "d9f508368026d52397a4b81669940982d01c850163d8189c2de5fef0788eda8a"
+  },
+  "complete_DATA_lower_bound_bytes": 5153304294036,
+  "no_replay_or_admission_authority": true
+}

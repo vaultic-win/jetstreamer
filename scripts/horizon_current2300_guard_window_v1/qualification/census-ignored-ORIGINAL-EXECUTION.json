@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "0 tests, 0 benchmarks\n",
+  "stderr": "Running as unit: horizon-current2300-guard-census-ignored-20261108-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 11ms\nCPU time consumed: 11ms\nMemory peak: 544.0K\nMemory swap peak: 0B\n"
+}

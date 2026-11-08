@@ -1,0 +1,17 @@
+{
+  "schema": "horizon-planner4-helper33-normal6-serial-DATA512-booking-v1",
+  "normal_pool_bytes": 6442450944,
+  "serial_compiler_bytes": 2147483648,
+  "observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "new_extra_QA_memory_bytes": 0,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "previous_DATA_lower_bound_bytes": 5152767423124,
+  "complete_DATA_lower_bound_bytes": 5153304294036,
+  "actual_helper33": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_ACTUAL_QUALIFIED_HELPER33_BINDINGS.json",
+    "sha256": "547ed1f8104333be8a263cbd9b9ce5722579ab6236bfa24882e4a0e1e65c3ebe"
+  },
+  "no_credit_or_lease_or_clock_reset": true,
+  "native_kernel_bounds_before_first_instruction": true
+}
