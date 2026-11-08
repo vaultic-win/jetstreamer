@@ -1,5 +1,5 @@
 {
-  "README.md": "4845787b88ff296f1fc50391fcba4ae995c486acb913e6250eed61d85cb1e0e9",
+  "README.md": "2b34c34f440ea50a750c5ef97e32365b3d7692c557fcc0cb297d99eda63127ab",
   "guard-window/ACTUAL0730_CENSUS_WRAPPER_RECOVERY.json": "aa4e274ca6f132e8ca575be26bb303d11a527d6143f6ca9080ab44f3270a9b2b",
   "guard-window/ACTUAL0730_COMPILER_AND_TEST_ARGV.json": "0bf1f51785bd83d35de40ac7ad87ef28eb9173b0ad838fbf19aad268bc6c46bb",
   "guard-window/ACTUAL0730_PRODUCTION_QUALIFICATION.json": "f9b78ec1624b7e131fd4eea2d6f4ae0a4e12926f45334907f398da8a0a21b2cf",
@@ -81,6 +81,12 @@
   "qualification/operation29-PRODUCTION-ORIGINAL-QUALIFICATION.json": "ff57bea52863f0d9a6e81c993467e391e6b489129434f5facb40a17b00e1af20",
   "qualification/operation29-ROOT_ACTUAL_QUALIFIED_OPERATION29_FOR_CURRENT1600_BINDINGS.json": "e09be227ea5b22a2ee7f6ee3d47f8814ddd67b1ea172013dac6aa8496c320591",
   "qualification/operation29-SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "e0bbf4b3dc5bcdad535f49c205b734489bb5501624803dff1980ec66defb40d7",
+  "qualification/operation30-ACTUAL-EXACT1630-SUCCESSFUL-RETIREMENT-ORIGINAL-EXECUTION.json": "35c4638493c7d79ae7c14b00fc93885a790e9293fc9a0df7ad806b2463a2090a",
+  "qualification/operation30-EXACT1630-SUCCESSFUL-READER-RETIREMENT.json": "7b3d7695f77126661974717b8afd2c1a5c3cdb9dd96a0b8a8cdd90c9d042e7b6",
+  "qualification/operation30-ORDINARY-ORIGINAL-EXECUTION.json": "e74f16c91e5860d94c2b1eee2ad0089cff43b45823c08f00a775ecf49d07492c",
+  "qualification/operation30-PRODUCTION-ORIGINAL-QUALIFICATION.json": "7045a01628215f9059a42150bb52a82934f527de5fb013656cc6f872f95a0e96",
+  "qualification/operation30-ROOT_ACTUAL_QUALIFIED_OPERATION30_HELPER31_FOR_CURRENT1730_BINDINGS_R2.json": "d1f6371c8635abc3b3cb342b26967df5e6a6c606c4816a80d1b625e6a921e42b",
+  "qualification/operation30-SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "cd41f67bab63dd99f991c03a8c9aef696acd5d0d7c5d32b435d5c7ed59c79add",
   "source/activation.rs": "460734a41657160931b0eafc6878d61839c9655bcd77e901d90a9f1be37c839d",
   "source/disposable-oneshot.rs": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a",
   "source/failed_reader_retirement.rs": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe",
@@ -88,11 +94,11 @@
   "source/follow_on.rs": "30cb22ecaba13b61572cd95d695c8849c2ac46c4332a18052e04dc3edc583ec9",
   "source/main.rs": "4678d2a75109c9502d0dad75090722fc4f5bcc486b322e2aae15df7468324aab",
   "source/persistent_reader.rs": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec",
-  "source/postreader.rs": "343469b21a06d0dffbb7dc7fe4bf9a9726ee225f8cf423dc5a6b9b29cccb701e",
+  "source/postreader.rs": "4eab23d3625af7b9f0716347ce1606587698c361bd3b1b9a17067ac529d8e2ca",
   "source/process.rs": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c",
   "source/reader-argv-template.json": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc",
   "source/reader_phase.rs": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f",
   "source/storage.rs": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6",
-  "source/successful_reader_retirement.rs": "e6481109c8ec3eadc5095b72625fb7f1fa1fcd7bbaff504660b57c2c647e8569",
-  "source/timers.rs": "61a1d26b1d0d16d974cf14bebaf6c6f723bfc22087811a8ef15e5e51e0e245ed"
+  "source/successful_reader_retirement.rs": "58c9364f1692bf3100b77db274ea86beb3d6c38925f175237ef673a58d9d749b",
+  "source/timers.rs": "fe29207607388adda0271a13a6278d057edfa625af0e436e3b1d679f6fb3c704"
 }

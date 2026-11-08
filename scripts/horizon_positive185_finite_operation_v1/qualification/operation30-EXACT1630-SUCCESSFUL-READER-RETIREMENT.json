@@ -1,0 +1,51 @@
+{
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-positive-56e8732c576449908e19e099c954a61a-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1630-successful30-reader-retirement-20261108-v30-r2/successful-reader-retirement-intent.json",
+    "sha256": "3db545881a623ada79e9a2d6a546de5ffb5f6f991485d9c0f98a7e396a5d1ec2"
+  },
+  "only_successfully_completed_reader_retired": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1630-successful30-reader-retirement-20261108-v30-r2/successful-reader-original-PID1.json",
+    "sha256": "ebaa93fc2a2fec11b34700f7d9f1b9e647801bb32805d0afe7ab660c5999a528"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v30-typed-peer31-r2/operation",
+    "sha256": "90c71de64cffd356c1e983b221253525692a4f7e6cee510923ff49b838e4a410"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "reset_failed_called": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-successful-reader-manager-retirement-v1",
+  "sealed_packages_and_successful_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1630-successful30-reader-retirement-20261108-v30-r2/successful-reader-retirement-timer-audit.json",
+    "sha256": "0f07622d12ac22459fbfd440a05ae200beabb7159b79cd6ae4bc4cc09a0d0595"
+  }
+}

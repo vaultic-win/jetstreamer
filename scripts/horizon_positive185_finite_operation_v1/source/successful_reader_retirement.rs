@@ -1,17 +1,17 @@
-//! Child of persistent_reader: retire only the preserved1530 successful30 reader or
+//! Child of persistent_reader: retire only the preserved1630 successful30 reader or
 //! this executable's harmless successful-control unit. No payload/artifact removal.
 use super::*;
 const SUCCESSFUL_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
 const SUCCESSFUL_HELPER_SHA: &str =
     "51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f";
-const SUCCESSFUL_IID: &str = "a3fdc90e73654ba981797a9a16b076c7";
-const SUCCESSFUL_PID: u64 = 3455013;
-const SUCCESSFUL_GENERATION: &str = "positive-f3ba06c7d00044e3a462e1d3c45edb0e";
-const SUCCESSFUL_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/1919-persistent-reader-native-original-outcome.json";
+const SUCCESSFUL_IID: &str = "43dca2b7a35c42e6a67ed1c197be7cc4";
+const SUCCESSFUL_PID: u64 = 3497331;
+const SUCCESSFUL_GENERATION: &str = "positive-56e8732c576449908e19e099c954a61a";
+const SUCCESSFUL_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1630-original-r3-20261108-next/1953-persistent-reader-native-original-outcome.json";
 const SUCCESSFUL_CAPTURE_SHA: &str =
-    "13c4c9aced4f21d6495d120eb61a75fbd8a2da45f0317be4e10aa418987d55e3";
-const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-f3ba06c7d00044e3a462e1d3c45edb0e/spec.json";
-const SPEC_SHA: &str = "de524b83b735ae60f9fb030434f109875c6e08230a3e7665577bcb275d4ffe9d";
+    "2182398f49d9ef31bea47781d0f7eb297281f5096999d6d3dc3d7b7f324f9747";
+const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-56e8732c576449908e19e099c954a61a/spec.json";
+const SPEC_SHA: &str = "db945e093c756ee965d565f744e7be3db336598ecb7c665f20c9ab4007f34fa9";
 const CONTROL_PREFIX: &str = "horizon-positive185-reader-retirement-control-";
 
 fn successful_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {
@@ -404,23 +404,33 @@ fn control_proof(r: &process::Runner<'_>, b: &Bound) -> Result<()> {
 }
 pub(crate) fn execute(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
     ensure!(
-        v["schema"] == "positive185-retire-exact1530-successful-reader-v1",
-        "exact1530 successful retirement request"
+        v["schema"] == "positive185-retire-exact1630-successful-reader-v1",
+        "exact1630 successful retirement request"
     );
     let expiry = fixed(
-        "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/ROOT_ACTUAL1530_ORIGINAL_SETUP_EXPIRED_AND_DRAINED.json",
-        "dd7626c6bc65076d1689b73ca32813dcec1bcbd1ad49193f77a793dd2a4d03eb",
+        "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1630-original-r3-20261108-next/ROOT_ACTUAL1630_ORIGINAL_SETUP_EXPIRED_AND_DRAINED.json",
+        "19b8a02bd3aa2f4a11be822c4d23d71d90a9e53a75739548b9df67e88c6500f2",
     );
     let ended = storage::json(&expiry)?;
     ensure!(
-        ended["original_invocation_id"] == "f3ba06c7d00044e3a462e1d3c45edb0e"
-            && ended["original_setup_deadline"] == 1794152948u64
+        ended["original_invocation_id"] == "56e8732c576449908e19e099c954a61a"
+            && ended["original_setup_deadline"] == 1794156381u64
             && ended["main_never_started"] == true
             && ended["token_destination_absent"] == true
-            && ended["final_control_root_empty"] == true
-            && ended["actual_postreader_context_never_written"] == true
-            && now()? > 1794152948,
-        "exact successful1530reader no-final-consumer expiry"
+            && ended["original_process_absent"] == true
+            && ended["original_cgroup_empty"] == true
+            && ended["no_second_final_attempt"] == true
+            && now()? > 1794156381,
+        "exact successful1630reader no-final-consumer expiry"
+    );
+    let final_outcome = storage::json(&binding(&ended["final_original_outcome"])?)?;
+    ensure!(
+        final_outcome["exit_code"] == 1
+            && final_outcome["wait_error"].is_null()
+            && final_outcome["program"] == FINAL
+            && ended["final_control_root_empty"] == false
+            && ended["actual_postreader_context_never_written"] == false,
+        "actual failed original final consumer preserved and reaped"
     );
     control_proof(r, &binding(&v["native_retirement_control"])?)?;
     let capture = fixed(SUCCESSFUL_CAPTURE, SUCCESSFUL_CAPTURE_SHA);

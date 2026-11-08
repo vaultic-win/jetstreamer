@@ -568,7 +568,7 @@ mod tests {
     #[ignore = "Root-only actual disposable timer and normally sealed test image required"]
     fn native_disposable_original_oneshot_completion_yields_coherent_finite_clock() {
         let root = std::path::PathBuf::from(
-            std::env::var_os("OPERATION29_CONTROL_EVIDENCE")
+            std::env::var_os("OPERATION30_CONTROL_EVIDENCE")
                 .expect("fresh private Root evidence directory"),
         );
         crate::private(&root, true).unwrap();
@@ -584,8 +584,8 @@ mod tests {
             pool_deadline: end,
             sequence: 0,
         };
-        let name = "horizon-operation29-coherence-disposable-20261108-v3.timer";
-        let trigger = json!("horizon-operation29-coherence-disposable-20261108-v3.service");
+        let name = "horizon-operation30-coherence-disposable-20261108-v1.timer";
+        let trigger = json!("horizon-operation30-coherence-disposable-20261108-v1.service");
         let (_, actual, samples) =
             coherent_timer(&mut runner, name, &trigger, "native-control", true).unwrap();
         assert!(

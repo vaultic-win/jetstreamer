@@ -1,11 +1,11 @@
 //! A separately qualified post-enrollment reader. Prelaunch memory/DATA readers
 //! remain exact13; an unresolved successor pin never falls back to that image.
 use crate::*;
-pub(super) const PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
+pub(super) const PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-typed-peer-postreader-tools-20261108-v31/jetstreamer-r2";
 // Root replaces ONLY this None after actual helper29 qualification+normal seal.
 // Source proposal presence grants no authority and invents no future digest.
 const QUALIFIED_SHA: Option<&str> =
-    Some("51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f");
+    Some("25b0c4114639d74f5cc7136857b61437e77085cca190c5533d48a3734723bd0b");
 
 fn selected(path: &str, sha: Option<&str>) -> Result<Bound> {
     let sha = sha.context("actual qualified postreader30 image SHA is unresolved")?;

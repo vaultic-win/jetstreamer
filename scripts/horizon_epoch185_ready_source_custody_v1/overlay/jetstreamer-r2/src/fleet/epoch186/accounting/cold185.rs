@@ -866,15 +866,7 @@ pub(crate) fn capture_reader_acceptance() -> Result<()> {
             .as_array()
             .context("cold185 complete output peers")?
         {
-            for source in row["source_bindings"]
-                .as_array()
-                .context("cold185 original peer source bindings")?
-            {
-                let b: BoundFile = serde_json::from_value(source.clone())?;
-                if b.path.extension().is_some_and(|e| e == "json") {
-                    revalidate_bound_source(&b, ready_custody.as_ref())?;
-                }
-            }
+            revalidate_original_peer_sources(&output, row, ready_custody.as_ref())?;
         }
         output_bindings.insert(role.into(), json!(bound));
     }
@@ -911,6 +903,133 @@ pub(crate) fn capture_reader_acceptance() -> Result<()> {
         "original_four_families_preserved":true,"resource_credit_bytes":0})
     );
     Ok(())
+}
+
+// Preserve the original typed ledgers through their independently qualified
+// validators. Unknown peers still require the original generic source transport.
+fn revalidate_original_peer_sources(
+    output: &Value,
+    row: &Value,
+    ready: Option<&ReadySource>,
+) -> Result<()> {
+    if row["state"] == "retained-terminal-original199" {
+        return crate::fleet::terminal199_memory::validate_peer(output, row);
+    }
+    if row["unit"] == crate::fleet::charge136_retry0005_history::pure::FAILED4_UNIT {
+        let peers = output["active_peer_allocations"]
+            .as_array()
+            .context("cold185 complete typed failed4 peers")?;
+        let selected = crate::fleet::charge136_retry0005_history::pure::failed4_peer(peers)?;
+        let actual = crate::fleet::charge136_retry0005_failed4_adapter::actual()?;
+        ensure!(
+            selected == row && *row == actual,
+            "cold185 retained failed4 peer differs from its genuine normalized custody"
+        );
+        return Ok(());
+    }
+    for source in row["source_bindings"]
+        .as_array()
+        .context("cold185 original peer source bindings")?
+    {
+        let bound: BoundFile = serde_json::from_value(source.clone())?;
+        if bound.path.extension().is_some_and(|ext| ext == "json") {
+            revalidate_bound_source(&bound, ready)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod original_peer_source_tests {
+    use super::*;
+    #[test]
+    fn unknown_peer_does_not_borrow_typed_transport_exception() {
+        let output = json!({"active_peer_allocations":[]});
+        for row in [
+            json!({"unit":"unknown.service"}),
+            json!({"state":"retained-terminal-original199-other","unit":"unknown.service"}),
+            json!({"unit":"horizon-qualify-136-hourly-charge-trace-retry-0004-other.service"}),
+        ] {
+            assert!(revalidate_original_peer_sources(&output, &row, None).is_err());
+        }
+    }
+    #[test]
+    fn typed_terminal199_without_its_bound_context_never_passes() {
+        let row =
+            json!({"state":"retained-terminal-original199","memory_max_bytes":207232172032u64});
+        let output = json!({"active_peer_allocations":[row]});
+        assert!(revalidate_original_peer_sources(&output, &row, None).is_err());
+    }
+    #[test]
+    fn typed_failed4_rejects_changed_owner_promises_and_duplicate_debt_before_native_read() {
+        use crate::fleet::charge136_retry0005_history::pure::{FAILED4_IID, FAILED4_UNIT};
+        let row = json!({"unit":FAILED4_UNIT,"invocation_id":FAILED4_IID,"pid":0,"start_ticks":0,
+            "data_reservation_bytes":77309411328u64,"memory_max_bytes":73014444032u64,
+            "cpu_quota_micros":3000000,"native_pool_suballocation":false,"resource_credit_bytes":0,"remaining_growth_released":false});
+        for key in [
+            "invocation_id",
+            "data_reservation_bytes",
+            "memory_max_bytes",
+            "cpu_quota_micros",
+            "native_pool_suballocation",
+            "resource_credit_bytes",
+            "remaining_growth_released",
+        ] {
+            let mut bad = row.clone();
+            bad[key] = json!("changed");
+            let output = json!({"active_peer_allocations":[bad]});
+            assert!(
+                revalidate_original_peer_sources(&output, &bad, None).is_err(),
+                "{key}"
+            );
+        }
+        let output = json!({"active_peer_allocations":[row,row]});
+        assert!(revalidate_original_peer_sources(&output, &row, None).is_err());
+    }
+    #[test]
+    #[ignore = "Root-only exact preserved1630 original-reader source transaction and normally sealed image required"]
+    fn actual_original1630_all_peer_sources_reach_the_same_acceptance_consumer() -> Result<()> {
+        let original=BoundFile {path:"/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cfeb8c07f0113ffa27e64ff6220b6cef3dbc9b6c2d36a07b69bbc6e1a987a011-cold185-56e8732c576449908e19e099c954a61a/proof.json".into(),sha256:"765b89c4fbc0aceb2225aa2f4936d5f74303bc8eec96b3ecd4541097e05670f7".into()};
+        let reader = protected_generated(&original)?;
+        let mut counts = Vec::new();
+        for role in [
+            "original_raw_builder_before",
+            "original_raw_builder_after",
+            "accounting_before",
+            "accounting",
+        ] {
+            let bound: BoundFile = serde_json::from_value(reader[role].clone())?;
+            let output = protected_generated(&bound)?;
+            let current = &output["cold185_startpre_native_task_before"];
+            ensure!(
+                current == &output["cold185_startpre_native_task_after"],
+                "genuine original task stability"
+            );
+            let custody = ready_source(Some(current))?;
+            let peers = output["active_peer_allocations"]
+                .as_array()
+                .context("genuine all-peer ledger")?;
+            let mut terminal199 = 0;
+            let mut failed4 = 0;
+            for row in peers {
+                revalidate_original_peer_sources(&output, row, custody.as_ref())?;
+                terminal199 += usize::from(row["state"] == "retained-terminal-original199");
+                failed4 += usize::from(
+                    row["unit"] == crate::fleet::charge136_retry0005_history::pure::FAILED4_UNIT,
+                );
+            }
+            ensure!(
+                terminal199 == 1 && failed4 == usize::from(role.starts_with("accounting")),
+                "exact genuine typed-row coverage"
+            );
+            counts.push(json!({"role":role,"output":bound,"complete_peer_count":peers.len(),"typed199":terminal199,"typed_failed4":failed4}));
+        }
+        println!(
+            "{}",
+            json!({"same_acceptance_peer_consumer_exercised":true,"genuine_original_reader":original,"outputs":counts,"no_actor_or_clock_mutation":true,"resource_credit_bytes":0,"replay_launch_authorized":false})
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]
