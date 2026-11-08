@@ -1,0 +1,122 @@
+{
+  "schema": "native163-original0400-failure-preservation-v1",
+  "roles": {
+    "actor": {
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Id": "horizon-epoch163-native-input-20261106-v1.service",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "Job": "",
+        "InvocationID": "96f86d3c463c429ca461d084617886fa"
+      },
+      "original_journal": [
+        {
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "_SYSTEMD_SLICE": "system.slice",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "_SYSTEMD_CGROUP": "/system.slice/horizon-epoch163-native-input-20261106-v1.service",
+          "_PID": "3048476",
+          "MESSAGE": "epoch163 input capability failed: original held admission deadline",
+          "__SEQNUM": "57197272",
+          "_UID": "0",
+          "SYSLOG_FACILITY": "3",
+          "_SYSTEMD_UNIT": "horizon-epoch163-native-input-20261106-v1.service",
+          "_COMM": "native-input",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "PRIORITY": "6",
+          "_GID": "0",
+          "__MONOTONIC_TIMESTAMP": "2458461485205",
+          "_CAP_EFFECTIVE": "80022",
+          "__REALTIME_TIMESTAMP": "1794111800382925",
+          "_STREAM_ID": "a4b39bb103584d1ea491474cecff6a65",
+          "_HOSTNAME": "dev-samjohnson",
+          "SYSLOG_IDENTIFIER": "native-input",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368c2d8;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23c67b93895;t=65fbc348c95cd;x=e5b615a161758d8c",
+          "_TRANSPORT": "stdout",
+          "_SYSTEMD_INVOCATION_ID": "96f86d3c463c429ca461d084617886fa",
+          "_RUNTIME_SCOPE": "system",
+          "_SELINUX_CONTEXT": "unconfined\n"
+        }
+      ],
+      "cgroup_drained": true
+    },
+    "issuer": {
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Id": "horizon-epoch163-native-input-admission-20261107-v1.service",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "Job": "",
+        "InvocationID": "496f176fa8144f7d96cec484fcc5e5da"
+      },
+      "original_journal": [
+        {
+          "_UID": "0",
+          "_SYSTEMD_CGROUP": "/system.slice/horizon-epoch163-native-input-admission-20261107-v1.service",
+          "_HOSTNAME": "dev-samjohnson",
+          "_SYSTEMD_UNIT": "horizon-epoch163-native-input-admission-20261107-v1.service",
+          "_CAP_EFFECTIVE": "80022",
+          "SYSLOG_FACILITY": "3",
+          "_PID": "3048478",
+          "__MONOTONIC_TIMESTAMP": "2458400493452",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "_SYSTEMD_INVOCATION_ID": "496f176fa8144f7d96cec484fcc5e5da",
+          "_GID": "0",
+          "__SEQNUM": "57197212",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=368c29c;b=763ea84ca81f4dddad364b1ea2ba36dd;m=23c64168f8c;t=65fbc30e9ecc3;x=4a03bb52a86ff990",
+          "PRIORITY": "6",
+          "_SYSTEMD_SLICE": "system.slice",
+          "_TRANSPORT": "stdout",
+          "__REALTIME_TIMESTAMP": "1794111739391171",
+          "_STREAM_ID": "ff9d1297b2914bee969198843ec4d5b0",
+          "SYSLOG_IDENTIFIER": "jetstreamer-r2",
+          "MESSAGE": "Error: native current adjacent memory/DATA/inode/VMA physical fit",
+          "_COMM": "jetstreamer-r2",
+          "_SELINUX_CONTEXT": "horizon-witness-test-deny199-20261107-v1 (enforce)\n",
+          "_RUNTIME_SCOPE": "system"
+        }
+      ],
+      "cgroup_drained": true
+    }
+  },
+  "state_files": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-epoch163-native-input-0400-20261108-v10/unpack-tracer.stderr",
+      "sha256": "6c6ad96c3094cccd4ad6a8725ab478270c53de4bc582eabf82567addf5a0e82a",
+      "bytes": 222
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-epoch163-native-input-0400-20261108-v10/unpack-syscalls.strace",
+      "sha256": "0cdefed83cd26addc36a97814ab970311ad46c81f6bc60a29a79912fb391c2ff",
+      "bytes": 119136
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-epoch163-native-input-0400-20261108-v10/ready.json",
+      "sha256": "0c857e33c4d4cb79af0d1cee6f164cac1c69eef2e430935d8ef2811c185c75c8",
+      "bytes": 324
+    }
+  ],
+  "admission_published": false,
+  "restore_started": false,
+  "actor_natural_original_deadline": true,
+  "no_signal_stop_restart_or_extension": true,
+  "failed_predicate": "native current adjacent memory/DATA/inode/VMA physical fit",
+  "original_failing_physical_snapshots_unavailable": true,
+  "specific_resource_cause_established": false,
+  "preserved_at_unix": 1794112255,
+  "replay_lanes": 0,
+  "target_lanes": 5
+}

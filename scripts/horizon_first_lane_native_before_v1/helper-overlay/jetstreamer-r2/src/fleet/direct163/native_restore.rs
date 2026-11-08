@@ -302,13 +302,23 @@ fn fit(
         p.minimum_free_bytes >= disk,
         "prepared native guard omits current retained DATA/floor"
     );
-    for v in [a, b] {
+    for (sample, v) in [("before", a), ("after", b)] {
+        let free_bytes = n(v, "free_bytes")?;
+        let available_memory_bytes = n(v, "available_memory_bytes")?;
+        let free_inodes = n(v, "free_inodes")?;
+        let vm_max_map_count = n(v, "vm_max_map_count")?;
         ensure!(
-            n(v, "free_bytes")? >= p.minimum_free_bytes
-                && n(v, "available_memory_bytes")? >= p.minimum_available_memory_bytes
-                && n(v, "free_inodes")? >= INODES
-                && n(v, "vm_max_map_count")? > VMA,
-            "native current adjacent memory/DATA/inode/VMA physical fit"
+            free_bytes >= p.minimum_free_bytes
+                && available_memory_bytes >= p.minimum_available_memory_bytes
+                && free_inodes >= INODES
+                && vm_max_map_count > VMA,
+            "native current adjacent memory/DATA/inode/VMA physical fit: \
+             sample={sample}, free_bytes={free_bytes} required_at_least={}, \
+             available_memory_bytes={available_memory_bytes} required_at_least={}, \
+             free_inodes={free_inodes} required_at_least={INODES}, \
+             vm_max_map_count={vm_max_map_count} required_greater_than={VMA}",
+            p.minimum_free_bytes,
+            p.minimum_available_memory_bytes
         );
     }
     let elapsed = n(b, "sampled_unix_micros")?
