@@ -434,7 +434,7 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     );
     let unit = crate::persistent_reader::READER_UNIT;
     let reader_generation = format!("positive-{iid}");
-    let execution = crate::persistent_reader::read(r, &reader_spec, &reader_generation)?;
+    let execution = crate::persistent_reader::read(r, &reader_spec, &reader_generation, deadline)?;
     let reader_bound = binding(&execution["reader_proof"])?;
     let reader = storage::json(&reader_bound)?;
     ensure!(

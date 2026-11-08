@@ -1860,7 +1860,10 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
     if claim.unit == direct163::first128::PARENT128 {
-        ensure!(direct163::first128::launch_matches(claim, receipt), "first128 exact diagnostic enrollment");
+        ensure!(
+            direct163::first128::launch_matches(claim, receipt),
+            "first128 exact diagnostic enrollment"
+        );
         return Ok(());
     }
     if receipt["schema"] == cold185::enrollment::SCHEMA {
@@ -2594,7 +2597,8 @@ pub(super) fn utc_seconds(value: &str) -> Result<u64> {
 }
 
 fn observed_unit_name(name: &str) -> bool {
-    (name == direct163::first128::TIMER128 || name.ends_with(".service")
+    (name == direct163::first128::TIMER128
+        || name.ends_with(".service")
         || name == suffix154_admission::contract::GUARD_TIMER
         || name == "horizon-durable-prefix141-guard-20261030-v1.timer"
         || name == ordinary199::TIMER
@@ -2813,7 +2817,10 @@ pub(super) fn unit(name: &str) -> Result<Value> {
     } else {
         "--property=Id,LoadState,Type,ActiveState,SubState,InvocationID,NRestarts,Result,ExecMainStatus,ExecStart,ControlGroup,MainPID"
     };
-    let properties = if cached145::native_namespace(name) || name == ordinary199::TIMER || direct163::first128::native_namespace(name) {
+    let properties = if cached145::native_namespace(name)
+        || name == ordinary199::TIMER
+        || direct163::first128::native_namespace(name)
+    {
         format!(
             "{properties},Triggers,TriggeredBy,Unit,TimersMonotonic,OnFailure,Conflicts,After,TimeoutStartUSec"
         )
@@ -2832,7 +2839,8 @@ pub(super) fn unit(name: &str) -> Result<Value> {
             .context("malformed systemctl property")?;
         if key == "TimersMonotonic"
             && ((name.ends_with("-guard.timer") && cached145::native_namespace(name))
-                || name == ordinary199::TIMER || name == direct163::first128::TIMER128)
+                || name == ordinary199::TIMER
+                || name == direct163::first128::TIMER128)
         {
             let base = cached145::timer_monotonic_base(value)
                 .context("invalid cached145 timer vector entry")?;
@@ -3375,7 +3383,9 @@ pub(super) async fn run() -> Result<()> {
     // Full raw plan/censuses and cold185 allocation remain authoritative below.
     let live145_compatibility_plan_value = if let Some(route) = &cold185_route {
         route.live145_comparison_plan(&plan_value)?
-    } else { plan_value.clone() };
+    } else {
+        plan_value.clone()
+    };
     // Authenticate the exact cached145 addition before legacy metadata routing.
     // Inherited adapters see their genuine sealed predecessor plan; full current
     // policy/native evidence remains bound and is independently checked below.
@@ -3788,7 +3798,14 @@ pub(super) async fn run() -> Result<()> {
                     started_seconds,
                 )?;
             } else if event["schema"] == "epoch163-first-output128-fleet-enrollment-v1" {
-                direct163::first128::validate_transition(&previous, &plan, &plan_value, &event, sample, started_seconds)?;
+                direct163::first128::validate_transition(
+                    &previous,
+                    &plan,
+                    &plan_value,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
             } else if event["schema"] == "horizon-direct163-typed-enrollment-v1" {
                 direct163::validate_transition(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native209::SCHEMA {
@@ -4106,7 +4123,13 @@ pub(super) async fn run() -> Result<()> {
         .transpose()?;
     let cold185_inherited_before = cold185_route
         .as_ref()
-        .map(|route| route.inherited_native(&live145_legacy_before))
+        .map(|route| {
+            route.legacy_native(
+                &before,
+                &live145_compatibility_plan_value,
+                &live145_fleet_before,
+            )
+        })
         .transpose()?;
     let compatibility_before = cold185_inherited_before
         .as_ref()
@@ -5490,7 +5513,13 @@ pub(super) async fn run() -> Result<()> {
         serde_json::from_value(cold185_comparison_after)?;
     let cold185_inherited_after = cold185_route
         .as_ref()
-        .map(|route| route.inherited_native(&live145_legacy_after))
+        .map(|route| {
+            route.legacy_native(
+                &after,
+                &live145_compatibility_plan_value,
+                &live145_fleet_after,
+            )
+        })
         .transpose()?;
     let compatibility_after = cold185_inherited_after
         .as_ref()
@@ -5613,6 +5642,16 @@ pub(super) async fn run() -> Result<()> {
     } else {
         recovery_comparison_after.clone()
     };
+    let cold185_inherited_comparison_after = cold185_route
+        .as_ref()
+        .map(|route| {
+            route.legacy_native(
+                &comparison_after,
+                &live145_compatibility_plan_value,
+                &live145_fleet_after,
+            )
+        })
+        .transpose()?;
     let (live145_comparison_before, comparison_after, live145_guard_history) =
         live145_fleet::compare(
             &live145_compatibility_plan_value,
@@ -5621,10 +5660,6 @@ pub(super) async fn run() -> Result<()> {
             &live145_fleet_before,
             &live145_fleet_after,
         )?;
-    let cold185_inherited_comparison_after = cold185_route
-        .as_ref()
-        .map(|route| route.inherited_native(&comparison_after))
-        .transpose()?;
     let compatibility_comparison_after = cold185_inherited_comparison_after
         .as_ref()
         .unwrap_or(&comparison_after);

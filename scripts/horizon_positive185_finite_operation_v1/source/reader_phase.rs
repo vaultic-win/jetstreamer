@@ -196,6 +196,47 @@ fn wait_phase(r: &mut process::Runner<'_>) -> Result<Value> {
     }
     anyhow::bail!("no original stable phase within65s; no reader launched")
 }
+fn persistent_budget(clock: u64, deadline: u64, phase_wait_pending: bool) -> bool {
+    clock
+        .checked_add(if phase_wait_pending { 305 } else { 240 })
+        .is_some_and(|end| end < deadline)
+}
+pub(crate) fn prepare_persistent_start(
+    r: &mut process::Runner<'_>,
+    original_setup_deadline: u64,
+) -> Result<Value> {
+    ensure!(
+        persistent_budget(now()?, original_setup_deadline, true),
+        "original setup cannot fund65s phase wait and unchanged240s reader/final budget"
+    );
+    let evidence = wait_phase(r)?;
+    validate_persistent_start(r, &evidence, original_setup_deadline)?;
+    Ok(evidence)
+}
+pub(crate) fn validate_persistent_start(
+    r: &mut process::Runner<'_>,
+    evidence: &Value,
+    original_setup_deadline: u64,
+) -> Result<()> {
+    ensure!(
+        persistent_budget(now()?, original_setup_deadline, false),
+        "original setup reader/final budget consumed by phase wait"
+    );
+    let guard = query(r, GUARD)?;
+    let timer = query(r, TIMER)?;
+    ensure!(
+        evidence["failed_guard_is_not_safety_coverage"] == true
+            && guard == evidence["guard"]
+            && timer == evidence["timer"]
+            && phase(
+                mono()?,
+                n(evidence, "guard_exit_monotonic_usec")?,
+                n(evidence, "next_guard_deadline_monotonic_usec")?,
+            ),
+        "persistent reader original phase consumed or native identity changed"
+    );
+    Ok(())
+}
 fn exact_argv(v: &Value, spec: &Bound) -> Result<Vec<String>> {
     let actual: Vec<String> = serde_json::from_value(v.clone())?;
     let mut expected: Vec<String> =
@@ -277,6 +318,15 @@ pub fn qualify(r: &mut process::Runner<'_>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn persistent_wait_and_launch_preserve_the_original_deadline_budget() {
+        assert!(!persistent_budget(1000, 1305, true));
+        assert!(persistent_budget(1000, 1306, true));
+        assert!(!persistent_budget(1065, 1305, false));
+        assert!(persistent_budget(1065, 1306, false));
+        assert!(!persistent_budget(u64::MAX, u64::MAX, true));
+        assert!(!persistent_budget(u64::MAX, u64::MAX, false));
+    }
     #[test]
     fn admitted_phase_respects_both_original_clocks() {
         assert!(phase(13000000, 0, 30000000));

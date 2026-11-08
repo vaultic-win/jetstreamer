@@ -499,7 +499,12 @@ fn payload_rows(
         })
         .collect())
 }
-fn original(r: &mut process::Runner<'_>, i: &Installed, limit: Duration) -> Result<Value> {
+fn original(
+    r: &mut process::Runner<'_>,
+    i: &Installed,
+    limit: Duration,
+    start_phase: (&Value, u64),
+) -> Result<Value> {
     let end = (Instant::now() + limit)
         .min(r.deadline)
         .min(r.pool_deadline);
@@ -517,6 +522,7 @@ fn original(r: &mut process::Runner<'_>, i: &Installed, limit: Duration) -> Resu
         );
         let boot_raw = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         let boot = boot_raw.trim().replace('-', "");
+        crate::reader_phase::validate_persistent_start(r, start_phase.0, start_phase.1)?;
         let mut c = Command::new("/usr/bin/systemctl");
         c.args(["start", &i.keeper]);
         let outer = r.run("start-original-reader-keeper", c, Duration::from_secs(5))?;
@@ -563,13 +569,18 @@ fn original(r: &mut process::Runner<'_>, i: &Installed, limit: Duration) -> Resu
         );
         control_group_empty(&i.unit)?;
         Ok(
-            json!({"schema":"horizon-positive185-genuine-persistent-reader-original-lifecycle-v1","unit":i.unit,"invocation_id":observed_iid,"original_native":terminal_native,"original_PID1_success_event":event,"original_outer_reaped":true,"original_cgroup_empty":true,"original_descriptors_drained":true,"actual_original_outer_execution":outer_bound,"original_process_wait":waited,"actual_keeper_native":keeper,"normal_unit_package_seal":i.seal,"original_ExecStart_argv":i.argv,"before_native_preserved":before,"no_IID_reconstruction_or_deadline_renewal":true}),
+            json!({"schema":"horizon-positive185-genuine-persistent-reader-original-lifecycle-v1","unit":i.unit,"invocation_id":observed_iid,"original_native":terminal_native,"original_PID1_success_event":event,"original_outer_reaped":true,"original_cgroup_empty":true,"original_descriptors_drained":true,"actual_original_outer_execution":outer_bound,"original_process_wait":waited,"actual_keeper_native":keeper,"normal_unit_package_seal":i.seal,"original_ExecStart_argv":i.argv,"before_native_preserved":before,"actual_advisory_start_phase":start_phase.0,"original_setup_deadline_checked_without_renewal":start_phase.1,"no_IID_reconstruction_or_deadline_renewal":true}),
         )
     })();
     r.deadline = outer_deadline;
     result
 }
-pub fn read(r: &mut process::Runner<'_>, spec: &Bound, generation: &str) -> Result<Value> {
+pub fn read(
+    r: &mut process::Runner<'_>,
+    spec: &Bound,
+    generation: &str,
+    original_setup_deadline: u64,
+) -> Result<Value> {
     let declaration = storage::json(spec)?;
     let expected = PathBuf::from(text(&declaration, "output_directory")?).join("proof.json");
     let argv = vec![
@@ -582,7 +593,13 @@ pub fn read(r: &mut process::Runner<'_>, spec: &Bound, generation: &str) -> Resu
         HELPER_SHA.into(),
     ];
     let installed = install(r, generation, READER_UNIT.into(), argv, Kind::Production)?;
-    let lifecycle = original(r, &installed, Duration::from_secs(180))?;
+    let phase = crate::reader_phase::prepare_persistent_start(r, original_setup_deadline)?;
+    let lifecycle = original(
+        r,
+        &installed,
+        Duration::from_secs(180),
+        (&phase, original_setup_deadline),
+    )?;
     let iid = text(&lifecycle, "invocation_id")?;
     let rows = payload_rows(
         r,
@@ -674,7 +691,16 @@ pub fn qualify(r: &mut process::Runner<'_>) -> Result<()> {
         r.self_image.sha256.clone(),
     ];
     let installed = install(r, &generation, unit, argv, Kind::Control)?;
-    let lifecycle = original(r, &installed, Duration::from_secs(15))?;
+    // The harmless metadata control exercises the same phase/start primitive.
+    // This synthetic control budget grants no admission or replay authority.
+    let control_deadline = now()?.checked_add(600).context("control phase deadline")?;
+    let phase = crate::reader_phase::prepare_persistent_start(r, control_deadline)?;
+    let lifecycle = original(
+        r,
+        &installed,
+        Duration::from_secs(15),
+        (&phase, control_deadline),
+    )?;
     ensure!(
         lifecycle["original_process_wait"]["actual_original_pidfd_exit_event"] == true,
         "actual native control must exercise the original running-process pidfd wait path"

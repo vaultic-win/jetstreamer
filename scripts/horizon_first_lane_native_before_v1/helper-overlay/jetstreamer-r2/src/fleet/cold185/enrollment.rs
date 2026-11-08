@@ -765,11 +765,19 @@ impl FleetRoute {
             && claim.scratch_path.to_str() == self.event["run_root"].as_str()
             && json!(claim.launch_receipt) == self.aggregate["registration"]
     }
-    pub(in crate::fleet) fn inherited_native(
+    pub(in crate::fleet) fn legacy_native(
         &self,
-        actual: &BTreeMap<String, Value>,
+        actual_raw: &BTreeMap<String, Value>,
+        live145_plan: &Value,
+        live145_proof: &Option<Value>,
     ) -> Result<BTreeMap<String, Value>> {
-        inherited_native_view(actual, &self.event, &self.aggregate["prior_fleet_value"])
+        legacy_native_view(
+            actual_raw,
+            &self.event,
+            &self.aggregate["prior_fleet_value"],
+            live145_plan,
+            live145_proof,
+        )
     }
     pub(in crate::fleet) fn validate_current(
         &self,
@@ -1049,6 +1057,24 @@ fn inherited_native_view(
     Ok(inherited)
 }
 
+// Each projection checks its own genuine predecessor. Cold185's predecessor
+// still contains live145, so authenticate that complete census before live145
+// removes its independently authenticated family. Neither raw input is changed.
+fn legacy_native_view(
+    actual_raw: &BTreeMap<String, Value>,
+    event: &Value,
+    previous: &Value,
+    live145_plan: &Value,
+    live145_proof: &Option<Value>,
+) -> Result<BTreeMap<String, Value>> {
+    let inherited = inherited_native_view(actual_raw, event, previous)?;
+    horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::comparison_native(
+        live145_plan,
+        &inherited,
+        live145_proof.as_ref(),
+    )
+}
+
 #[cfg(test)]
 mod allocation_tests {
     use super::*;
@@ -1173,6 +1199,76 @@ mod allocation_tests {
         raw.remove("foreign.service");
         raw.remove("original199.service");
         assert!(inherited_native_view(&raw, &loaded.event, &loaded.previous_fleet).is_err());
+    }
+
+    #[test]
+    #[ignore = "Root-only authentication of actual0600 retained live145 evidence; no new census"]
+    fn actual0600_cold185_then_live145_preserves_both_native_contracts() {
+        use horizon_recovered_resource_frame_typed_bridge_v1::live145_frame as live145;
+        let f: Value =
+            serde_json::from_str(include_str!("../fixtures/cold185-live145-0600-native.json"))
+                .unwrap();
+        let previous = json!({"unit_census": f["previous_census"]});
+        let mut raw: BTreeMap<String, Value> =
+            serde_json::from_value(f["previous_census"].clone()).unwrap();
+        let new_roles: BTreeMap<String, Value> =
+            serde_json::from_value(f["new_roles"].clone()).unwrap();
+        assert_eq!(raw.len(), 566);
+        assert_eq!(new_roles.len(), 3);
+        for (name, row) in new_roles {
+            assert!(raw.insert(name, row).is_none());
+        }
+        let saved = raw.clone();
+        let proof = Some(f["live145_proof"].clone());
+        let reversed =
+            live145::comparison_native(&f["live145_plan"], &raw, proof.as_ref()).unwrap();
+        assert!(inherited_native_view(&reversed, &f["event"], &previous).is_err());
+        let projected =
+            legacy_native_view(&raw, &f["event"], &previous, &f["live145_plan"], &proof).unwrap();
+        assert_eq!(raw, saved);
+        let mut expected: BTreeMap<String, Value> =
+            serde_json::from_value(f["previous_census"].clone()).unwrap();
+        for name in live145::FAMILY {
+            assert!(expected.remove(name).is_some());
+        }
+        assert_eq!(projected, expected);
+        assert_eq!(projected.len(), 563);
+        let check = |candidate: &BTreeMap<String, Value>| {
+            legacy_native_view(
+                candidate,
+                &f["event"],
+                &previous,
+                &f["live145_plan"],
+                &proof,
+            )
+        };
+        assert!(
+            legacy_native_view(&raw, &f["event"], &previous, &f["live145_plan"], &None,).is_err()
+        );
+        let mut foreign = raw.clone();
+        foreign.insert("foreign.service".into(), json!({"Id":"foreign.service"}));
+        assert!(check(&foreign).is_err());
+        let retained_name = expected.keys().next().unwrap();
+        let mut missing = raw.clone();
+        missing.remove(retained_name);
+        assert!(check(&missing).is_err());
+        let mut missing_owner = raw.clone();
+        missing_owner.remove(f["event"]["actor_unit"].as_str().unwrap());
+        assert!(check(&missing_owner).is_err());
+        let mut changed_live = raw.clone();
+        changed_live.get_mut(live145::FAMILY[0]).unwrap()["InvocationID"] = json!("f".repeat(32));
+        assert!(check(&changed_live).is_err());
+        let mut changed_retained = raw.clone();
+        changed_retained.get_mut(retained_name).unwrap()["unchanged_test_marker"] = json!(false);
+        let changed_projection = check(&changed_retained).unwrap();
+        assert_ne!(changed_projection, projected);
+        assert_eq!(
+            changed_projection[retained_name]["unchanged_test_marker"],
+            false
+        );
+        println!(
+            "actual0600:569raw/566cold185-inherited/563legacy; reversed order rejected; raw, every retained role, proof and unknown-role gates preserved"
+        );
     }
 }
 
@@ -1398,14 +1494,25 @@ mod complete_fleet_tests {
 }
 
 impl FleetRoute {
-    pub(in crate::fleet) fn live145_comparison_plan(&self, raw:&Value) -> Result<Value> {
+    pub(in crate::fleet) fn live145_comparison_plan(&self, raw: &Value) -> Result<Value> {
         if self.retained {
             self.projected_plan(raw)
         } else {
-            ensure!(raw[FIELD] == self.aggregate["registration"],"cold185 live145 view crossed original registration");
-            let old=bound_json(&self.inherited_bound)?;
-            let prior=&self.aggregate["prior_fleet_value"];
-            transition_shape(prior,&old,raw,&self.event,&self.aggregate["registration"],text(prior,"sampled_at_utc")?,integer(&self.event,"sampled_at")?)?;
+            ensure!(
+                raw[FIELD] == self.aggregate["registration"],
+                "cold185 live145 view crossed original registration"
+            );
+            let old = bound_json(&self.inherited_bound)?;
+            let prior = &self.aggregate["prior_fleet_value"];
+            transition_shape(
+                prior,
+                &old,
+                raw,
+                &self.event,
+                &self.aggregate["registration"],
+                text(prior, "sampled_at_utc")?,
+                integer(&self.event, "sampled_at")?,
+            )?;
             Ok(old)
         }
     }
