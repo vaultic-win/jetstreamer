@@ -34,9 +34,17 @@ fn call(r: &mut process::Runner<'_>, label: &str, args: &[&str]) -> Result<Vec<u
     let x = r.run(label, c, Duration::from_secs(10))?;
     Ok(serde_json::from_value(x["stdout_bytes"].clone())?)
 }
-pub fn capture(r: &mut process::Runner<'_>, side: &str) -> Result<Value> {capture_selected(r,side,None)}
-pub fn capture_after(r: &mut process::Runner<'_>, side: &str, before:&Value) -> Result<Value> {capture_selected(r,side,Some(before))}
-fn capture_selected(r: &mut process::Runner<'_>, side: &str, before:Option<&Value>) -> Result<Value> {
+pub fn capture(r: &mut process::Runner<'_>, side: &str) -> Result<Value> {
+    capture_selected(r, side, None)
+}
+pub fn capture_after(r: &mut process::Runner<'_>, side: &str, before: &Value) -> Result<Value> {
+    capture_selected(r, side, Some(before))
+}
+fn capture_selected(
+    r: &mut process::Runner<'_>,
+    side: &str,
+    before: Option<&Value>,
+) -> Result<Value> {
     let rows: Value = serde_json::from_slice(&call(
         r,
         &format!("timers-{side}"),
@@ -46,7 +54,9 @@ fn capture_selected(r: &mut process::Runner<'_>, side: &str, before:Option<&Valu
     for row in rows.as_array().context("real list-timers JSON")? {
         // Only pending deadlines participate in reload validation. Keep all raw
         // rows, including elapsed/stopped timers, without opening their sources.
-        if n_or_zero(row, "next")? == 0 && before.is_none_or(|v| v["policies"].get(text(row,"unit").unwrap_or("")).is_none()) {
+        if n_or_zero(row, "next")? == 0
+            && before.is_none_or(|v| v["policies"].get(text(row, "unit").unwrap_or("")).is_none())
+        {
             continue;
         }
         let name = text(row, "unit")?;

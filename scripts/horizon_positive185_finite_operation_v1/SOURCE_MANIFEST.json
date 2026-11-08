@@ -1,5 +1,5 @@
 {
-  "README.md": "8b77ce92c93c6006709ecbdd8c4df6ab8aef8a75d63a469667a7b99b94ba9888",
+  "README.md": "bd20fcc045c3bb33a412332b29bf2946f215c01a38e0edf2158b3d085ab3bce0",
   "qualification/ACTUAL-READER-CONTROL-ORIGINAL-EXECUTION.json": "a84c6df23a344be047313cd77c710ac6ee4f59928a610cb5230a68957faa86ea",
   "qualification/ACTUAL_CONFLICT_AND_ORIGINAL_CLOCK_PRESERVED.json": "99011ea0ff955784915ffb05571db528c93013fc87ee857189ae6a8f7df81043",
   "qualification/ACTUAL_PERSISTENT_READER_KERNEL_CONTROL.json": "b526ff9e92cde99da458b130d46fd0e23e6b82d0c0dc9cd9658c392d8980b6df",
@@ -12,11 +12,18 @@
   "qualification/V14-ORDINARY-ORIGINAL-EXECUTION.json": "ab19becf5a8c792865cc0cb2b807c2a188d91779edffa323bf8e2648bf96e6dc",
   "qualification/V14-PRODUCTION-ORIGINAL-QUALIFICATION.json": "a2b8a3da353031043936df50297d7fd14beab502ab0bbe26d9988e519d9f7e1d",
   "qualification/V14-SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "286e87f4a65f1281e8b45a1147aaf948b97bacbb74661da77a8d0f4c4bbba800",
+  "qualification/V15-ACTUAL-READER-PHASE-ORIGINAL-EXECUTION.json": "d96d3ec8662f01e1dcf5a622b63c2770c0d6b9158d9bd6e7addb642d64c77bfe",
+  "qualification/V15-ACTUAL_NATIVE_READER_START_PHASE.json": "a9078fe99f1c1d82435cefebcfff8c7e71f4529d9b9294169dd13809d33831d3",
+  "qualification/V15-ORDINARY-ORIGINAL-EXECUTION.json": "37bbb1caa38725cd8e40ce151afc6f4a32eec21d18cb2dfe6f0fa5e59ddcd931",
+  "qualification/V15-PRODUCTION-ORIGINAL-QUALIFICATION.json": "d48f78069c5a139e0717b341858719bff0f4bc775d2a27fba314ccfd92c6d4ef",
+  "qualification/V15-SOURCE_AND_EXACT4_FROZEN_RECIPES.json": "6b766716aef02ff3358f78cd51d3afdff03b4847e177d5e49b8f67cbf7a5a56e",
   "source/activation.rs": "1ba2eced936c6174711cb7584d97a85b23c3db40996befbe7b1ab787877e898e",
-  "source/follow_on.rs": "57556ac08a24181d11bc0654eefa27cbf8fbbe6fb9d346ae2bb1d42db7d1ded0",
-  "source/main.rs": "f5e01d6b983b4b6791bbe39652539470679f9fda49888db6d02b7e33d9ea0011",
-  "source/persistent_reader.rs": "345d171ab93d44d7990ff076449f1ee752fa094b0df282aaf35e74c236914707",
+  "source/follow_on.rs": "c4e901fcc3d9743b9c5de77f6a66f2570ec1f6b7abb619c4a87d6ad15582d103",
+  "source/main.rs": "448f0b002d7364c4cdaad857e8d62cec53499a8aea89d1eda1b7729d7acd4d6f",
+  "source/persistent_reader.rs": "e54f83643fad22551a30d2cc82360234a3b8d0786b94cfcc0ca451b3b7539d0a",
   "source/process.rs": "e516957f6f74e658e090b6dbc143f1b29c0bb1aae27e17a81b575ced72e72331",
+  "source/reader-argv-template.json": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc",
+  "source/reader_phase.rs": "5f1b67e3fbb19b76259d61eec444ba89173e2a193688f481e28d63c5f2f04e22",
   "source/storage.rs": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6",
-  "source/timers.rs": "3a9588a62120fde5188e601d8c4a7e589450c8d2b844fb88bc19eeb510de8b6a"
+  "source/timers.rs": "74ff47746ece67c958612d117faed18246c641001640ac9102ea50af1374f9a1"
 }

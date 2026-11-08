@@ -73,17 +73,34 @@ fn query(r: &mut process::Runner<'_>, unit: &str) -> Result<Value> {
     let mut n = parse(&bytes)?;
     ensure!(n["Id"] == unit, "actual reader native unit");
     if n.get("EnvironmentFiles").is_none() {
-        let mut object=String::from("/org/freedesktop/systemd1/unit/");
+        let mut object = String::from("/org/freedesktop/systemd1/unit/");
         for byte in unit.bytes() {
-            if byte.is_ascii_alphanumeric() {object.push(char::from(byte));}
-            else {use std::fmt::Write as _;write!(object,"_{byte:02x}")?;}
+            if byte.is_ascii_alphanumeric() {
+                object.push(char::from(byte));
+            } else {
+                use std::fmt::Write as _;
+                write!(object, "_{byte:02x}")?;
+            }
         }
-        let mut c=Command::new("/usr/bin/busctl");
-        c.args(["get-property","org.freedesktop.systemd1",&object,"org.freedesktop.systemd1.Service","EnvironmentFiles"]);
-        let actual=r.run("persistent-reader-empty-environment-files",c,Duration::from_secs(5))?;
-        let raw:Vec<u8>=serde_json::from_value(actual["stdout_bytes"].clone())?;
-        ensure!(std::str::from_utf8(&raw)?.trim()=="a(sb) 0","missing environment array is not an authenticated empty native property");
-        n["EnvironmentFiles"]=json!("");
+        let mut c = Command::new("/usr/bin/busctl");
+        c.args([
+            "get-property",
+            "org.freedesktop.systemd1",
+            &object,
+            "org.freedesktop.systemd1.Service",
+            "EnvironmentFiles",
+        ]);
+        let actual = r.run(
+            "persistent-reader-empty-environment-files",
+            c,
+            Duration::from_secs(5),
+        )?;
+        let raw: Vec<u8> = serde_json::from_value(actual["stdout_bytes"].clone())?;
+        ensure!(
+            std::str::from_utf8(&raw)?.trim() == "a(sb) 0",
+            "missing environment array is not an authenticated empty native property"
+        );
+        n["EnvironmentFiles"] = json!("");
     }
     Ok(n)
 }

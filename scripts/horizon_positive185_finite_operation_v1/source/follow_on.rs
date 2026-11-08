@@ -249,14 +249,26 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     r.pool_deadline = r.deadline;
     let registry = Path::new(REGISTRY).join(iid);
     if registry.try_exists()? {
-        ensure!(env::args().nth(1).as_deref()==Some("continue-positive185-original"),"existing registry only for explicit original continuation");
-        private(&registry,true)?;
-        let failure=binding(&ctx["original_failed_task_capture"])?;
-        let original=storage::json(&failure)?;
-        ensure!(original["exit_code"]==1 && original["no_retry_or_clock_reset"]==true,"original failed task capture proof required");
-        let stderr:Vec<u8>=serde_json::from_value(original["stderr_bytes"].clone())?;
-        ensure!(std::str::from_utf8(&stderr)?.contains("epoch 185 task status crossed the original Root admission"),"only exact original status alias failure may continue");
-    } else {make_private(&registry)?;}
+        ensure!(
+            env::args().nth(1).as_deref() == Some("continue-positive185-original"),
+            "existing registry only for explicit original continuation"
+        );
+        private(&registry, true)?;
+        let failure = binding(&ctx["original_failed_task_capture"])?;
+        let original = storage::json(&failure)?;
+        ensure!(
+            original["exit_code"] == 1 && original["no_retry_or_clock_reset"] == true,
+            "original failed task capture proof required"
+        );
+        let stderr: Vec<u8> = serde_json::from_value(original["stderr_bytes"].clone())?;
+        ensure!(
+            std::str::from_utf8(&stderr)?
+                .contains("epoch 185 task status crossed the original Root admission"),
+            "only exact original status alias failure may continue"
+        );
+    } else {
+        make_private(&registry)?;
+    }
     storage::save(
         r.root,
         "original-ready-native.json",
@@ -266,9 +278,13 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     let dir = PathBuf::from(text(&units, "destination")?);
     let envelope = binding(&ctx["envelope"])?;
     let admission = binding(&ctx["admission"])?;
-    let admitted=storage::json(&admission)?;
-    let admitted_status=binding(&admitted["status_readback"])?;
-    ensure!(storage::bytes(&admitted_status,32<<20,true)?==storage::bytes(&a.status_readback,32<<20,false)?,"original status alias bytes differ");
+    let admitted = storage::json(&admission)?;
+    let admitted_status = binding(&admitted["status_readback"])?;
+    ensure!(
+        storage::bytes(&admitted_status, 32 << 20, true)?
+            == storage::bytes(&a.status_readback, 32 << 20, false)?,
+        "original status alias bytes differ"
+    );
     let task_spec = json!({"schema":"horizon-epoch185-native-startpre-task-capture-v1","native_spec":{"schema":"horizon-epoch185-native-startpre-spec-v1","actor_unit":actor,"expected_actor_invocation_id":iid,"envelope":envelope,"admission":admission,
   "actor_source":process::bind_file(&dir.join(actor),1<<20)?,"guard_source":process::bind_file(&dir.join(text(&ctx,"guard")?),1<<20)?,"timer_source":process::bind_file(&dir.join(text(&ctx,"timer")?),1<<20)?,"ready":ready_bound,"current_task_status":admitted_status,"mode":"task-start-pre"},"output":registry.join("task.json")});
     let tb = sealed_spec(r, "task-capture-status-bound-v12", iid, &task_spec)?;
@@ -361,8 +377,8 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     ] {
         command.arg(format!("--property={p}"));
     }
-    role(FLEET_HELPER,FLEET_HELPER_SHA)?;
-    storage::bytes(&fixed(FLEET_HELPER,FLEET_HELPER_SHA),128<<20,true)?;
+    role(FLEET_HELPER, FLEET_HELPER_SHA)?;
+    storage::bytes(&fixed(FLEET_HELPER, FLEET_HELPER_SHA), 128 << 20, true)?;
     command
         .arg(FLEET_HELPER)
         .arg("fleet-reconcile")
