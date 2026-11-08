@@ -1,0 +1,20 @@
+{
+  "schema": "horizon-positive185-final3-serial-normal6-QA-booking-v1",
+  "normal_pool_bytes": 6442450944,
+  "serial_compiler_bytes": 1073741824,
+  "observer_bytes": 2147483648,
+  "Root_bytes": 536870912,
+  "status_bytes": 536870912,
+  "maximum_overlap_bytes": 4294967296,
+  "additional_memory_bytes": 0,
+  "prior_pool_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_CLOSED_NORMAL6_DATA4_RETAINED.json",
+    "sha256": "222be54763b1068a1bda2a4c68f5b50b9662d6e69731e9b078fe71daf21f90dd"
+  },
+  "additional_retained_DATA_bytes": 536870912,
+  "previous_retained_DATA_lower_bound_bytes": 5142030004884,
+  "retained_DATA_lower_bound_bytes": 5142566875796,
+  "no_resource_credit": true,
+  "native_kernel_limits_enforced_from_unit_creation": true,
+  "no_new_guard_armed_after_activation": true
+}

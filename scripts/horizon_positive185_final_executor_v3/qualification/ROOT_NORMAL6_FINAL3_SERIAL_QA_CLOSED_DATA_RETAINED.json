@@ -1,0 +1,12 @@
+{
+  "schema": "horizon-final3-serial-normal6-QA-closed-DATA-retained-v1",
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final3-driver11-qa-20261108-v1/ROOT_NORMAL6_SERIAL_FINAL3_QA_BOOKING.json",
+    "sha256": "f04afb7d6ef11e0a20d2587c08c63b2c030b269e8cc451940aac4ceec45c2460"
+  },
+  "all_five_original_actors_terminal_and_drained": true,
+  "new_QA_memory_released_bytes": 0,
+  "normal_pool_bytes": 6442450944,
+  "complete_DATA_lower_bound_bytes": 5142566875796,
+  "new_DATA512MiB_retained": true
+}
