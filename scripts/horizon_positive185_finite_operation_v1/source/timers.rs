@@ -29,9 +29,17 @@ const PROTECTIVE: &[&str] = &[
     "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
 ];
 fn call(r: &mut process::Runner<'_>, label: &str, args: &[&str]) -> Result<Vec<u8>> {
+    call_limit(r, label, args, Duration::from_secs(10))
+}
+fn call_limit(
+    r: &mut process::Runner<'_>,
+    label: &str,
+    args: &[&str],
+    limit: Duration,
+) -> Result<Vec<u8>> {
     let mut c = Command::new("/usr/bin/systemctl");
     c.args(args);
-    let x = r.run(label, c, Duration::from_secs(10))?;
+    let x = r.run(label, c, limit)?;
     Ok(serde_json::from_value(x["stdout_bytes"].clone())?)
 }
 fn parse_clocks(raw: &[u8]) -> Result<Value> {
@@ -57,7 +65,12 @@ fn parse_clocks(raw: &[u8]) -> Result<Value> {
     }
     Ok(result)
 }
-fn native_clocks(r: &mut process::Runner<'_>, unit: &str, side: &str) -> Result<Value> {
+fn native_clocks(
+    r: &mut process::Runner<'_>,
+    unit: &str,
+    side: &str,
+    until: Instant,
+) -> Result<Value> {
     let mut object = String::from("/org/freedesktop/systemd1/unit/");
     for byte in unit.bytes() {
         if byte.is_ascii_alphanumeric() {
@@ -82,7 +95,7 @@ fn native_clocks(r: &mut process::Runner<'_>, unit: &str, side: &str) -> Result<
     let result = r.run(
         &format!("timer-clocks-{side}"),
         command,
-        Duration::from_secs(5),
+        metadata_budget(until, Duration::from_secs(5))?,
     )?;
     parse_clocks(&serde_json::from_value::<Vec<u8>>(
         result["stdout_bytes"].clone(),
@@ -106,6 +119,7 @@ fn capture_selected(
     )?)?;
     let mut policies = json!({});
     let mut clocks = json!({});
+    let mut coherent_samples = json!({});
     for row in rows.as_array().context("real list-timers JSON")? {
         // Only pending deadlines participate in reload validation. Keep all raw
         // rows, including elapsed/stopped timers, without opening their sources.
@@ -119,39 +133,142 @@ fn capture_selected(
             unit_name(name) && name.ends_with(".timer"),
             "timer identity"
         );
-        let raw = call(
+        let (policy, actual, samples) = coherent_timer(
             r,
-            &format!("timer-policy-{side}"),
-            &[
-                "show",
-                name,
-                "--no-pager",
-                "--property=Id,LoadState,InvocationID,FragmentPath,DropInPaths,RandomizedDelayUSec,FixedRandomDelay,AccuracyUSec,Unit,Persistent,RemainAfterElapse,WakeSystem",
-            ],
+            name,
+            &row["activates"],
+            side,
+            n_or_zero(row, "next")? != 0,
         )?;
-        let mut native = json!({});
-        for line in std::str::from_utf8(&raw)?.lines() {
-            let (k, v) = line.split_once('=').context("timer policy framing")?;
-            ensure!(native.get(k).is_none(), "duplicate timer policy");
-            native[k] = json!(v);
-        }
-        ensure!(
-            native["Id"] == name
-                && native["LoadState"] == "loaded"
-                && storage::hex(text(&native, "InvocationID")?, 32)
-                && native["Unit"] == row["activates"],
-            "exact native timer trigger"
-        );
-        clocks[name] = native_clocks(r, name, side)?;
-        let mut sources = Vec::new();
-        let paths = std::iter::once(text(&native, "FragmentPath")?)
-            .chain(text(&native, "DropInPaths")?.split_whitespace());
-        for p in paths {
-            sources.push(timer_source(Path::new(p))?);
-        }
-        policies[name] = json!({"native":native,"sources":sources});
+        policies[name] = policy;
+        clocks[name] = actual;
+        coherent_samples[name] = json!(samples);
     }
-    Ok(json!({"rows":rows,"policies":policies,"native_clocks":clocks}))
+    Ok(
+        json!({"rows":rows,"policies":policies,"native_clocks":clocks,"coherent_samples":coherent_samples}),
+    )
+}
+fn timer_policy(
+    r: &mut process::Runner<'_>,
+    name: &str,
+    trigger: &Value,
+    side: &str,
+    until: Instant,
+) -> Result<Value> {
+    let raw = call_limit(
+        r,
+        &format!("timer-policy-{side}"),
+        &[
+            "show",
+            name,
+            "--no-pager",
+            "--property=Id,LoadState,InvocationID,FragmentPath,DropInPaths,RandomizedDelayUSec,FixedRandomDelay,AccuracyUSec,Unit,Persistent,RemainAfterElapse,WakeSystem",
+        ],
+        metadata_budget(until, Duration::from_secs(10))?,
+    )?;
+    let mut native = json!({});
+    for line in std::str::from_utf8(&raw)?.lines() {
+        let (k, v) = line.split_once('=').context("timer policy framing")?;
+        ensure!(native.get(k).is_none(), "duplicate timer policy");
+        native[k] = json!(v);
+    }
+    ensure!(
+        native["Id"] == name
+            && native["LoadState"] == "loaded"
+            && storage::hex(text(&native, "InvocationID")?, 32)
+            && native["Unit"] == *trigger,
+        "exact native timer trigger"
+    );
+    let mut sources = Vec::new();
+    let paths = std::iter::once(text(&native, "FragmentPath")?)
+        .chain(text(&native, "DropInPaths")?.split_whitespace());
+    for p in paths {
+        sources.push(timer_source(Path::new(p))?);
+    }
+    Ok(json!({"native":native,"sources":sources}))
+}
+fn finite(value: u64) -> bool {
+    value != 0 && value != u64::MAX
+}
+fn metadata_budget(until: Instant, limit: Duration) -> Result<Duration> {
+    let left = until
+        .checked_duration_since(Instant::now())
+        .context("timer coherence bounded metadata budget exhausted")?;
+    ensure!(!left.is_zero(), "timer coherence metadata budget empty");
+    Ok(left.min(limit))
+}
+fn finite_deadline(clocks: &Value) -> Result<bool> {
+    Ok(finite(n(clocks, "next_monotonic_usec")?) || finite(n(clocks, "next_realtime_usec")?))
+}
+// An unset clock cannot authorize a new invocation, trigger, policy or source.
+fn coherent_sample(
+    anchor: &Value,
+    before: &Value,
+    after: &Value,
+    clocks: &Value,
+    require_pending: bool,
+) -> Result<bool> {
+    ensure!(
+        anchor == before && anchor == after,
+        "timer coherence owner/source/policy/trigger changed"
+    );
+    Ok(!require_pending || finite_deadline(clocks)?)
+}
+fn coherent_timer(
+    r: &mut process::Runner<'_>,
+    name: &str,
+    trigger: &Value,
+    side: &str,
+    require_pending: bool,
+) -> Result<(Value, Value, Vec<Value>)> {
+    let until = (Instant::now() + Duration::from_secs(30))
+        .min(r.deadline)
+        .min(r.pool_deadline);
+    let mut anchor = None;
+    let mut samples = Vec::new();
+    for attempt in 0..128u32 {
+        ensure!(
+            Instant::now() < until,
+            "timer coherent capture original budget exhausted"
+        );
+        let policy_before = timer_policy(r, name, trigger, side, until)?;
+        let anchor = anchor.get_or_insert_with(|| policy_before.clone());
+        let clocks = native_clocks(r, name, side, until)?;
+        let policy_after = timer_policy(r, name, trigger, side, until)?;
+        let decision = coherent_sample(
+            anchor,
+            &policy_before,
+            &policy_after,
+            &clocks,
+            require_pending,
+        );
+        let sample = json!({"unit":name,"attempt":attempt,"policy_before":policy_before,
+            "policy_after":policy_after,"raw_native_clocks":clocks,
+            "finite_actual_deadline":finite_deadline(&clocks)?,
+            "accepted":decision.as_ref().is_ok_and(|ready| *ready),
+            "rejection":decision.as_ref().err().map(|e| format!("{e:#}")),
+            "unset_pending_requires_metadata_requery":decision.as_ref().is_ok_and(|ready| !*ready),
+            "raw_uint64_values_preserved":true,"no_timer_mutation_or_deadline_reset":true});
+        r.sequence = r.sequence.checked_add(1).context("timer evidence sequence overflow")?;
+        storage::save(
+            r.root,
+            &format!("{:02}-timer-coherence-{side}.json", r.sequence),
+            &sample,
+        )?;
+        samples.push(sample);
+        ensure!(
+            Instant::now() < until,
+            "timer coherent capture original budget exhausted after sample"
+        );
+        if decision? {
+            return Ok((anchor.clone(), clocks, samples));
+        }
+        let remaining = until
+            .checked_duration_since(Instant::now())
+            .context("timer coherence original deadline exhausted")?;
+        std::thread::sleep(Duration::from_millis(200).min(remaining));
+    }
+    anyhow::bail!("timer coherent finite sample attempt bound exhausted")
 }
 fn timer_source(path: &Path) -> Result<Value> {
     let before = fs::symlink_metadata(path)?;
@@ -297,7 +414,7 @@ pub fn validate(before: &Value, after: &Value) -> Result<Value> {
         let old_last = n(old_clocks, "last_trigger_monotonic_usec")?;
         let new_last = n(new_clocks, "last_trigger_monotonic_usec")?;
         ensure!(
-            old_mono > 0 || old_real > 0,
+            finite(old_mono) || finite(old_real),
             "pending timer requires actual native deadline"
         );
         ensure!(
@@ -305,8 +422,10 @@ pub fn validate(before: &Value, after: &Value) -> Result<Value> {
             "native timer fire clock moved backward"
         );
         let fired = new_last > old_last;
-        let unchanged_or_earlier = (old_mono == new_mono || (new_mono > 0 && new_mono < old_mono))
-            && (old_real == new_real || (new_real > 0 && new_real < old_real));
+        let unchanged_or_earlier = (old_mono == new_mono
+            || (finite(old_mono) && finite(new_mono) && new_mono < old_mono))
+            && (old_real == new_real
+                || (finite(old_real) && finite(new_real) && new_real < old_real));
         ensure!(
             old["activates"] == new["activates"]
                 && before["policies"][&name] == after["policies"][&name],
@@ -361,6 +480,128 @@ mod tests {
         json!({"rows":[{"unit":name,"activates":"fixture.service","next":display_next,"last":100}],
             "policies":{name:{"native":{"InvocationID":"a".repeat(32),"RandomizedDelayUSec":"30s"},"sources":[]}},
             "native_clocks":{name:{"next_monotonic_usec":mono,"next_realtime_usec":real,"last_trigger_monotonic_usec":last}}})
+    }
+    #[test]
+    fn unset_max_sample_is_requeried_without_normalizing_or_changing_anchor() {
+        let name = PROTECTIVE[6];
+        let unset = captured(name, 100, u64::MAX, u64::MAX, 900);
+        let ready = captured(name, 100, 1000, 0, 900);
+        let policy = &unset["policies"][name];
+        assert!(
+            !coherent_sample(policy, policy, policy, &unset["native_clocks"][name], true).unwrap()
+        );
+        assert_eq!(
+            unset["native_clocks"][name]["next_monotonic_usec"],
+            u64::MAX
+        );
+        assert!(
+            coherent_sample(policy, policy, policy, &ready["native_clocks"][name], true).unwrap()
+        );
+        assert!(validate(&ready, &captured(name, 200, 1001, 0, 900)).is_err());
+    }
+    #[test]
+    fn raw_unset_baseline_is_rejected_even_if_a_later_real_fire_exists() {
+        let name = PROTECTIVE[6];
+        for (mono, real) in [(u64::MAX, u64::MAX), (0, 0), (0, u64::MAX), (u64::MAX, 0)] {
+            let raw = captured(name, 100, mono, real, 900);
+            let after = captured(name, 200, 1000, 0, 901);
+            assert!(validate(&raw, &after).is_err());
+            let policy = &raw["policies"][name];
+            assert!(
+                !coherent_sample(policy, policy, policy, &raw["native_clocks"][name], true)
+                    .unwrap()
+            );
+        }
+    }
+    #[test]
+    fn coherent_requery_rejects_changed_invocation_source_policy_or_trigger() {
+        let name = PROTECTIVE[6];
+        let raw = captured(name, 100, u64::MAX, u64::MAX, 900);
+        let ready = captured(name, 100, 1000, 0, 900);
+        let anchor = &raw["policies"][name];
+        for key in ["InvocationID", "Unit", "RandomizedDelayUSec"] {
+            let mut changed = anchor.clone();
+            changed["native"][key] = json!("changed");
+            for clocks in [&raw["native_clocks"][name], &ready["native_clocks"][name]] {
+                assert!(coherent_sample(anchor, &changed, &changed, clocks, true).is_err());
+                assert!(coherent_sample(anchor, anchor, &changed, clocks, true).is_err());
+            }
+        }
+        let mut changed = anchor.clone();
+        changed["sources"] = json!([{"sha256":"changed"}]);
+        assert!(
+            coherent_sample(
+                anchor,
+                anchor,
+                &changed,
+                &ready["native_clocks"][name],
+                true
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn mixed_finite_and_infinite_domains_preserve_exact_raw_comparison() {
+        let name = PROTECTIVE[6];
+        let before = captured(name, 100, 1000, u64::MAX, 900);
+        assert!(finite_deadline(&before["native_clocks"][name]).unwrap());
+        assert!(validate(&before, &before).is_ok());
+        assert!(validate(&before, &captured(name, 100, 1000, 0, 900)).is_err());
+        assert!(validate(&before, &captured(name, 100, u64::MAX, u64::MAX, 900)).is_err());
+    }
+    #[test]
+    fn metadata_budget_never_extends_expired_clock() {
+        assert!(
+            metadata_budget(
+                Instant::now() - Duration::from_secs(1),
+                Duration::from_secs(10)
+            )
+            .is_err()
+        );
+        let limit = Duration::from_millis(2);
+        assert!(metadata_budget(Instant::now() + Duration::from_secs(1), limit).unwrap() <= limit);
+    }
+    #[test]
+    #[ignore = "Root-only actual disposable timer and normally sealed test image required"]
+    fn native_disposable_original_oneshot_completion_yields_coherent_finite_clock() {
+        let root = std::path::PathBuf::from(
+            std::env::var_os("OPERATION28_CONTROL_EVIDENCE")
+                .expect("fresh private Root evidence directory"),
+        );
+        crate::private(&root, true).unwrap();
+        let image = process::bind_file(&std::env::current_exe().unwrap(), 64 << 20).unwrap();
+        let iid = std::env::var("INVOCATION_ID").expect("actual test control invocation");
+        assert!(storage::hex(&iid, 32));
+        let end = Instant::now() + Duration::from_secs(30);
+        let mut runner = process::Runner {
+            root: &root,
+            self_image: &image,
+            iid: &iid,
+            deadline: end,
+            pool_deadline: end,
+            sequence: 0,
+        };
+        let name = "horizon-operation28-coherence-disposable-20261108-v1.timer";
+        let trigger = json!("horizon-operation28-coherence-disposable-20261108-v1.service");
+        let (_, actual, samples) =
+            coherent_timer(&mut runner, name, &trigger, "native-control", true).unwrap();
+        assert!(
+            samples.len() >= 2,
+            "must observe actual unset while original oneshot still executing"
+        );
+        assert_eq!(samples[0]["accepted"], false);
+        assert!(!finite_deadline(&samples[0]["raw_native_clocks"]).unwrap());
+        assert!(finite_deadline(&actual).unwrap());
+        let last = &samples[0]["raw_native_clocks"]["last_trigger_monotonic_usec"];
+        assert!(
+            samples
+                .iter()
+                .all(|sample| &sample["raw_native_clocks"]["last_trigger_monotonic_usec"] == last),
+            "same original fire; no reset or refire"
+        );
+        assert_eq!(runner.deadline, end);
+        assert_eq!(runner.pool_deadline, end);
+        storage::save(&root,"actual-disposable-timer-control.json", &json!({"actual_samples":samples,"actual_finite_clocks":actual,"same_original_fire":true,"no_signals_or_clock_extension":true})).unwrap();
     }
     #[test]
     fn overdue_display_can_advance_only_with_unchanged_authoritative_deadlines() {

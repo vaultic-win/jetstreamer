@@ -1,0 +1,57 @@
+{
+  "schema": "horizon-positive185-original-pretask-unset-timer-rejection-v1",
+  "bindings": {
+    "1272-timer-clocks-pre-task-before-original-outcome.json": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1430-original-r3-20261108-next/1272-timer-clocks-pre-task-before-original-outcome.json",
+      "sha256": "34bbfd45c7f7eb332d7be1cc94984ed916365a6e1e584551265ed4fa48f1a0ac"
+    },
+    "1330-timer-clocks-pre-task-after-original-outcome.json": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1430-original-r3-20261108-next/1330-timer-clocks-pre-task-after-original-outcome.json",
+      "sha256": "a478149735fe030f336ea1edb4cd21717efe0e394b4860ec922dcec662114070"
+    },
+    "original-ready-native.json": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1430-original-r3-20261108-next/original-ready-native.json",
+      "sha256": "94a9ad686662548be11c59ce63afbdde61a8720b2add4ba3ea67bb08bf23fbee"
+    },
+    "original-activation-context.json": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1430-original-r3-20261108-next/original-activation-context.json",
+      "sha256": "62794868eefa6b13e6dde57ef632dce87f8956bb10404dd64b6b63530783c74a"
+    }
+  },
+  "actual_before_typed": [
+    {
+      "type": "t",
+      "data": 18446744073709551615
+    },
+    {
+      "type": "t",
+      "data": 18446744073709551615
+    },
+    {
+      "type": "t",
+      "data": 2495639911952
+    }
+  ],
+  "actual_after_typed": [
+    {
+      "type": "t",
+      "data": 2495649810890
+    },
+    {
+      "type": "t",
+      "data": 0
+    },
+    {
+      "type": "t",
+      "data": 2495639911952
+    }
+  ],
+  "original_actor_IID": "68f5e1bbbe404a888e8fba3fa82177e8",
+  "original_setup_deadline": 1794149578,
+  "known_typed_unset_values_not_actual_finite_deadlines": true,
+  "rejection_preserved": true,
+  "no_task_registration_or_postreader_or_replay_release": true,
+  "original_own_deadline_must_naturally_expire": true,
+  "original_registry_empty": true,
+  "resource_credit_bytes": 0
+}
