@@ -15,6 +15,12 @@ continue. An attached terminal client alone does not establish a second campaign
 
 Keep several replay lanes executing whenever qualified capacity permits; aim for at least three
 when the memory-selected target and fresh admissions allow, and continue toward that target.
+Treat useful background replay during coding as a standing campaign requirement. Preserve running
+lanes while repairing code, and prepare several replacements concurrently. If no replay is running,
+opening the next qualified lane is the main agent's immediate task; coding must directly advance
+that launch or an independent replacement. Builds, restores and repair agents do not satisfy this
+requirement. Existing campaign authorization survives handoffs and compaction; do not issue
+acknowledgement or "Continue" question cards or wait for renewed permission to resume authorized work.
 Assess the shortfall against the memory-selected target at the start of every work cycle and at the existing
 30-minute check-in; do not wait for a user reminder. After immediate safety and status corrections,
 take the next executable backfill action before discretionary repairs or optimization. A source
