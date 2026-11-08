@@ -1,0 +1,28 @@
+{
+  "schema": "horizon-driver11-native-trigger-actual-QA-v1",
+  "ordinary_passed": 31,
+  "root_native_passed": 3,
+  "unprivileged_sol_native_passed": 1,
+  "all_original_names_preserved": true,
+  "actual_new_test_image": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/work/guarded-cold-tests",
+    "sha256": "ea4d44071d420195b72f055acef91a6aae9463f693ccee568817fecd8e4fe209"
+  },
+  "actual_fully_sandboxed_Root_and_unprivileged_sol_queries": true,
+  "no_unit_activation_no_resource_sample": true,
+  "originals": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ordinary-r2-ORIGINAL-EXECUTION.json",
+      "sha256": "d98ff48d124e50c9ae13601b8f8b5c57fe7d52c3251a730647d5c43ca0965fe7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/all-native-metadata-ORIGINAL-EXECUTION.json",
+      "sha256": "c97a0920ab2ef47d8c0fe0747852b554dbdc6a95695740e03deb345cbc032083"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/sol-native-metadata-ORIGINAL-EXECUTION.json",
+      "sha256": "db9f60a761a244353850c081e94e3b7445faabf3f004b96ca523243781e33848"
+    }
+  ],
+  "first_predecessor_test_transport_preserved_and_excluded": true
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "horizon-driver11-native-trigger-strict-four-accepted-v1",
+  "all_strict_stages_passed": true,
+  "originals": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "1c30846c1d8fa244a4bb5775d68a9bfaec3f7e0a716032a11a51f68f5ded8fb0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "07189fd45efd62a781ba0d7f42bfa26d51027e753d3be3563c8e36e128cd0476"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "f776cbe9fd1219da976d6215db564db50068104288b88230fcbf114f48b2098a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/release-ORIGINAL-EXECUTION.json",
+      "sha256": "7392b4cfa68ea8359428495c6d2a123d9fa394acf2d6973aa351c0a118f2fe79"
+    }
+  ],
+  "actual_source_freeze": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/SOURCE_FREEZE.json",
+    "sha256": "a17392ee6aab1fb2191f6709af674285440b7032d559dc26f0a33c52c2b300e8"
+  }
+}

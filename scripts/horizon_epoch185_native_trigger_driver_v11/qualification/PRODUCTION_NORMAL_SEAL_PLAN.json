@@ -1,0 +1,30 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11",
+  "members": [
+    {
+      "name": "epoch185-guarded-cold",
+      "source": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/work/epoch185-guarded-cold",
+      "sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+      "mode": 365
+    },
+    {
+      "name": "artifact-proof.json",
+      "source": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_ACTUAL_DRIVER_ARTIFACT_PROOF.json",
+      "sha256": "4366c991c590c50223a73ca46323aee55b0a8987dbd855e5c066c7927a774b60",
+      "mode": 292
+    },
+    {
+      "name": "source-freeze.json",
+      "source": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/SOURCE_FREEZE.json",
+      "sha256": "a17392ee6aab1fb2191f6709af674285440b7032d559dc26f0a33c52c2b300e8",
+      "mode": 292
+    },
+    {
+      "name": "qa.json",
+      "source": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/ROOT_ALL31_AND_ROOT_SOL_NATIVE_TRANSPORT_CASES_ACCEPTED.json",
+      "sha256": "9346e5819d3146f1507859439f95563c996c0c518f1244e379afd6bf9fd27138",
+      "mode": 292
+    }
+  ]
+}

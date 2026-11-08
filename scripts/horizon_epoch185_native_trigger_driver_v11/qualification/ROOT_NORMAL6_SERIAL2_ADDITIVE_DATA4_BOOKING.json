@@ -1,0 +1,52 @@
+{
+  "schema": "horizon-driver11-normal6-serial2-additive-DATA4-booking-v1",
+  "source_recipe": {
+    "path": "/tmp/epoch185-driver11-native-trigger-source-20261108-v1/SOURCE_AND_EXACT4_RECIPES_NOT_EXECUTED.json",
+    "sha256": "4de6c8e4aa79c76e0c35a848df221d90ee1ce573ede5e13a2bd8b654412e5408"
+  },
+  "actual_current_resource_phase": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current1800-reviewed-metadata-20261108-v1/RESOURCE_PHASES_POSITIVE185_CURRENT1800.json",
+    "sha256": "acd3c1e27ed3d9b89ec6daa4529ee652931ab50270c606b54992d537e0d9c504"
+  },
+  "source": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/adapter/tests.rs",
+      "sha256": "f5d959a87747eff9441aebc892aec2fce57887221ddc563c4b27ef511a2e06cb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/adapter.rs",
+      "sha256": "878755cd0d15486a993a42a2fa092830ee1532fa286fdc14dc5360823090b366"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/bounded_resource_runner.rs",
+      "sha256": "9827dc473cd3e77a2f08db2e8ac8ce9e20a1e72f7577a2ea008c66fb9e2e0c0d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/main.rs",
+      "sha256": "d73f82c4a6a8e95bd459f55028a0dea1c610f36de9cd83e83bcbe2b2a16c42ea"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/native_empty_hooks.rs",
+      "sha256": "53c77d1419afafbc0f6ccf1d7e6eede8d7ed84f4d4575349903ab7e8f733c4ac"
+    }
+  ],
+  "normal_pool_bytes": 6442450944,
+  "serial_compiler_or_test_bytes": 2147483648,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 2147483648,
+  "total_normal_overlap_bytes": 6442450944,
+  "new_extra_QA_memory_bytes": 0,
+  "new_additive_retained_DATA_bytes": 4294967296,
+  "complete_DATA_lower_bound_bytes": 5137735037588,
+  "complete_conservative_raw_DATA_booking_bytes": 5259327910548,
+  "all_old_memory_and_DATA_promises_preserved": true,
+  "no_resource_credit": true,
+  "original1800_expired": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1800-original-r3-20261108-next/ROOT_ACTUAL1800_ORIGINAL_EXPIRED_FAILED_GUARD_TIMER_RETIRED_NO_CREDIT.json",
+    "sha256": "24e8285bf579d852693fbf5dd54fc003fdaac171bfd0bce4741b17bf8900a9c1"
+  },
+  "bounds_enforced_from_unit_creation": true,
+  "no_new_guard_bound_or_armed_after_activation": true,
+  "no_late_armed_guard_proof_claimed": true,
+  "protection": "Retained normal6 envelope; native per-unit MemoryMax/MemorySwapMax/RuntimeMaxSec/LimitFSIZE before first compiler instruction. No late-bound build-guard transition."
+}

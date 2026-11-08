@@ -1,0 +1,33 @@
+{
+  "schema": "horizon-driver11-native-trigger-exact-source-freeze-v1",
+  "source": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/adapter/tests.rs",
+      "sha256": "f5d959a87747eff9441aebc892aec2fce57887221ddc563c4b27ef511a2e06cb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/adapter.rs",
+      "sha256": "878755cd0d15486a993a42a2fa092830ee1532fa286fdc14dc5360823090b366"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/bounded_resource_runner.rs",
+      "sha256": "9827dc473cd3e77a2f08db2e8ac8ce9e20a1e72f7577a2ea008c66fb9e2e0c0d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/main.rs",
+      "sha256": "d73f82c4a6a8e95bd459f55028a0dea1c610f36de9cd83e83bcbe2b2a16c42ea"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-native-trigger-parser-driver11-qa-20261108-v1/src/native_empty_hooks.rs",
+      "sha256": "53c77d1419afafbc0f6ccf1d7e6eede8d7ed84f4d4575349903ab7e8f733c4ac"
+    }
+  ],
+  "base_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v10/epoch185-guarded-cold",
+    "sha256": "0a7dddaaa5ae049a6a9f6ca103fd8463987d6aff52397a4ece09a43387107e1a"
+  },
+  "recipe": {
+    "path": "/tmp/epoch185-driver11-native-trigger-source-20261108-v1/SOURCE_AND_EXACT4_RECIPES_NOT_EXECUTED.json",
+    "sha256": "4de6c8e4aa79c76e0c35a848df221d90ee1ce573ede5e13a2bd8b654412e5408"
+  }
+}
