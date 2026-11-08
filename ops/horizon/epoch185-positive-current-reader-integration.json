@@ -23,9 +23,12 @@
     },
     {
       "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/enrollment.rs",
-      "sha256": "de7ff2eef80b7d5e9d9d84333ddbe801cc282edeb369938852f12087a91a126a",
-      "bytes": 61642,
-      "qualified_predecessor_source": null
+      "sha256": "a9f4df6e904725ab9c07bb9690d3e88b63f2655765050c72e03cc3e5e100b90c",
+      "bytes": 67162,
+      "qualified_predecessor_source": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/source/jetstreamer-r2/src/fleet/cold185/enrollment.rs",
+        "sha256": "de7ff2eef80b7d5e9d9d84333ddbe801cc282edeb369938852f12087a91a126a"
+      }
     },
     {
       "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/lifecycle.rs",
@@ -213,5 +216,78 @@
   "all_old_MEMORY_DATA_and_live145_floors_retained": true,
   "temporary_additional4GiB_QA_now_closed": true,
   "source_build_seal_DATA4GiB_still_retained": true,
-  "native_positive_startup_or_replay_authorized": false
+  "native_positive_startup_or_replay_authorized": false,
+  "enrollment_predecessor_before_helper33": {
+    "relative_path": "scripts/horizon_epoch185_positive_reader_v1/source/jetstreamer-r2/src/fleet/cold185/enrollment.rs",
+    "sha256": "de7ff2eef80b7d5e9d9d84333ddbe801cc282edeb369938852f12087a91a126a",
+    "bytes": 61642,
+    "qualified_predecessor_source": null
+  },
+  "qualified_helper33_enrollment_composition": {
+    "schema": "horizon-actual-qualified-helper33-enrollment-composition-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/jetstreamer-r2",
+      "sha256": "b445a1fb3717da5b68984d6598d7d75efcf5131f0bc82091af506d586b8f49fd"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/artifact-proof.json",
+      "sha256": "66469e4d071e4b78c5819ef1b9aa85769fc1e38e34a4c520d3670aeeeedc227b"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/deployment-seal-receipt.json",
+      "sha256": "bdba483d7927e2c8ac8f4202da03793e72d0a2c29e89e5389b890f95505419ab"
+    },
+    "source_and_recipes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/source-and-recipes.json",
+      "sha256": "13fd996ea4e3d391a77d166220422c3640f6290dc6bfd476f5958d077996bba6"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_FRESH_EXTRA_QA4_COMPILER6_R2_BOOKING.json",
+      "sha256": "3c137977f6567aa0d9cee937525674f4f204023668746fea6b8873d8051fdd6c"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_FRESH_EXTRA_QA4_CLOSED_NORMAL6_DATA4_RETAINED.json",
+      "sha256": "75fd5bf76ba31878cef5d8ea27cbfd8404de826a99bcd5aa3df43a509f3db7a5"
+    },
+    "actual2130_enrollment_composition_control": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ACTUAL2130-TRANSITION-ORIGINAL-EXECUTION.json",
+      "sha256": "b99e1ec2988b4926ad147c4971cc1b12e743cf49549d4e6546a6ea968dfc8ac0"
+    },
+    "complete_DATA_lower_bound_bytes": 5152230552212,
+    "fresh_original_fleet_reader_guard_and_replay_still_required": true
+  },
+  "qualified_operation34": {
+    "schema": "horizon-actual-qualified-operation34-fleet-order-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v34-helper33-r1/operation",
+      "sha256": "198d802bd508473ef75001a65f8b78aead24d4d8608691876829acd576c85cbd"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v34-helper33-r1/artifact-proof.json",
+      "sha256": "e0a140032ba7240b01612389279dc518b404d921bf08d31bbbce03b966a28233"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v34-helper33-r1/deployment-seal-receipt.json",
+      "sha256": "7cea9b6024403f3db33912cc4d42a37f35795e9db5c162adc4f934559bb2a4b3"
+    },
+    "qualified_route": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v34-helper33-r1-r3/route.json",
+      "sha256": "ce08dd5508845d996fa3da05fe53d01d945d22588b3fc89a931b309db4320857"
+    },
+    "capability": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v34-helper33-r1-r3/capability.json",
+      "sha256": "faaa1588858393033a5b0e3cefb37f75d71e70e78b4187415711d64b41d8b1c8"
+    },
+    "reader_lifecycle_control": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v34-helper33-r1/completion.json",
+      "sha256": "eb91841d095d60842bc230548ed0806aa6d88470fbc42a30a1f0afa80ad8bd10"
+    },
+    "successful_reader_retirement_control": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v34-helper33-r1/completion.json",
+      "sha256": "66ffb35c48a8c362ba4b2c2c3deb7e3cbea64d09718be7d258f5cc539ee2a10e"
+    },
+    "normal6_retained": true,
+    "complete_DATA_lower_bound_bytes": 5152230552212,
+    "fresh_original_guard_and_admission_still_required": true
+  }
 }

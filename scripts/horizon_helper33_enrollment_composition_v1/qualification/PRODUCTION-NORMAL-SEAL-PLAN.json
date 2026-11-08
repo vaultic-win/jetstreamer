@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/work-r3/v31-jetstreamer-r2",
+      "name": "jetstreamer-r2",
+      "sha256": "b445a1fb3717da5b68984d6598d7d75efcf5131f0bc82091af506d586b8f49fd",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "66469e4d071e4b78c5819ef1b9aa85769fc1e38e34a4c520d3670aeeeedc227b",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ACCEPTED_SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "source-and-recipes.json",
+      "sha256": "13fd996ea4e3d391a77d166220422c3640f6290dc6bfd476f5958d077996bba6",
+      "mode": 292
+    }
+  ]
+}

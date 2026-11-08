@@ -1,0 +1,14 @@
+{
+  "operation_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-profile-control-20261108-v34-helper33-r1-r3",
+  "generation": "positive-profile-v34-helper33-r1-r3",
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v34-helper33-r1/completion.json",
+    "sha256": "eb91841d095d60842bc230548ed0806aa6d88470fbc42a30a1f0afa80ad8bd10"
+  },
+  "original_v19_negative": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/finite-v19-r1/materialized/ROOT_ACTUAL_MISSING_TOKEN_NATIVE_CASE_ACCEPTED.json",
+    "sha256": "e020c7eeb875191fc09a2ee9e09bbf8ec6bfac79ea3d19db02c5f4a8185e4581"
+  },
+  "profile_sol_run_root": "/home/sol/.jetstreamer-private/epoch185-positive-profile-control-sol-run-20261108-v34-helper33-r1-r3",
+  "profile_sol_control_root": "/home/sol/.jetstreamer-private/epoch185-positive-profile-control-sol-control-20261108-v34-helper33-r1-r3"
+}

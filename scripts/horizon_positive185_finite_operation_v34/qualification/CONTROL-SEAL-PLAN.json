@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/operation34-coherence-control-20261108-v1",
+  "members": [
+    {
+      "source": "/usr/local/lib/jetstreamer/operation30-coherence-control-20261108-v1/disposable-oneshot",
+      "name": "disposable-oneshot",
+      "sha256": "0541f7abe98453bb2dae57e521d23c6af1b481fd6cd9dc962e01d83fdf0e578a",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation34-helper33-qa-20261108-v1/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "name": "horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation34-helper33-qa-20261108-v1/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "name": "horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8",
+      "mode": 292
+    }
+  ]
+}

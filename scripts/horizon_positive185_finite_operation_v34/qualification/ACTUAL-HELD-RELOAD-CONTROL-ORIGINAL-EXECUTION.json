@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"actual_held_reload_control\":{\"path\":\"/home/sol/.jetstreamer-private/epoch185-positive-upstream-held-reload-control-20261108-v34-helper33-r1/actual-held-reload-control.json\",\"sha256\":\"8b01e73d4467f8dc9e9408b8cad2e0a72e33e9604c198f3f5bcc27abfe330fcd\"},\"no_campaign_work\":true}\n",
+  "stderr": "Running as unit: horizon-positive185-held-reload-actual-20261108-v34-helper33-r1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 30.124s\nCPU time consumed: 960ms\nMemory peak: 23.9M\nMemory swap peak: 0B\n"
+}

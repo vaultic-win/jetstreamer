@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-current2200-guard-compiler-1-clippy-tests-20261108-r2.service; invocation ID: 1d4225fc47e3457e85cd19f7beec052f\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 280ms\nCPU time consumed: 279ms\nMemory peak: 3.6M\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "horizon-actual-qualified-helper33-enrollment-composition-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/jetstreamer-r2",
+    "sha256": "b445a1fb3717da5b68984d6598d7d75efcf5131f0bc82091af506d586b8f49fd"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/artifact-proof.json",
+    "sha256": "66469e4d071e4b78c5819ef1b9aa85769fc1e38e34a4c520d3670aeeeedc227b"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/deployment-seal-receipt.json",
+    "sha256": "bdba483d7927e2c8ac8f4202da03793e72d0a2c29e89e5389b890f95505419ab"
+  },
+  "source_and_recipes": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tools-20261108-v33/source-and-recipes.json",
+    "sha256": "13fd996ea4e3d391a77d166220422c3640f6290dc6bfd476f5958d077996bba6"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_FRESH_EXTRA_QA4_COMPILER6_R2_BOOKING.json",
+    "sha256": "3c137977f6567aa0d9cee937525674f4f204023668746fea6b8873d8051fdd6c"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ROOT_FRESH_EXTRA_QA4_CLOSED_NORMAL6_DATA4_RETAINED.json",
+    "sha256": "75fd5bf76ba31878cef5d8ea27cbfd8404de826a99bcd5aa3df43a509f3db7a5"
+  },
+  "actual2130_enrollment_composition_control": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ACTUAL2130-TRANSITION-ORIGINAL-EXECUTION.json",
+    "sha256": "b99e1ec2988b4926ad147c4971cc1b12e743cf49549d4e6546a6ea968dfc8ac0"
+  },
+  "complete_DATA_lower_bound_bytes": 5152230552212,
+  "fresh_original_fleet_reader_guard_and_replay_still_required": true
+}

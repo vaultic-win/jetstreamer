@@ -7,6 +7,49 @@ pub(in crate::fleet) const FIELD: &str = "epoch185_cold_startpre_registration";
 pub(in crate::fleet) const SCHEMA: &str = "horizon-epoch185-startpre-fleet-registration-v1";
 const ENROLLMENT_ROOT: &str = super::ROOT;
 const GUARD_MEMORY_BYTES: u64 = 256 << 20;
+const RETAINED145_SUFFIX: [&str; 7] = [
+    "horizon-qualify-145-cached-b2a09f57de39c384.service",
+    "horizon-qualify-145-cached-b2a09f57de39c384-guard.service",
+    "horizon-qualify-145-cached-b2a09f57de39c384-guard.timer",
+    "horizon-qualify-145-cached-b2a09f57de39c384-stop.service",
+    "horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+    "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+    "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+];
+
+fn enrolled_units(old: &Value, event: &Value) -> Result<Value> {
+    let selected = horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::selected(old)?;
+    let mut names = old["tracked_units"]
+        .as_array()
+        .context("cold185 old tracked units")?
+        .clone();
+    let at = if selected {
+        ensure!(
+            names.ends_with(&RETAINED145_SUFFIX.map(|name| json!(name)))
+                && RETAINED145_SUFFIX.iter().all(|name| {
+                    names
+                        .iter()
+                        .filter(|value| value.as_str() == Some(name))
+                        .count()
+                        == 1
+                }),
+            "cold185 enrollment requires exact retained cached/live145 suffix"
+        );
+        names.len() - RETAINED145_SUFFIX.len()
+    } else {
+        names.len()
+    };
+    let mut additions = Vec::new();
+    for key in ["actor_unit", "guard_unit", "timer_unit"] {
+        ensure!(
+            !names.iter().any(|name| *name == event[key]),
+            "cold185 fresh enrollment already exists in historical tracked units"
+        );
+        additions.push(event[key].clone());
+    }
+    names.splice(at..at, additions);
+    Ok(json!(names))
+}
 
 fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
     v[key]
@@ -134,16 +177,7 @@ fn transition_shape(
     for key in ["output", "previous_fleet", "metadata_event", FIELD] {
         expected[key] = plan[key].clone();
     }
-    let names = expected["tracked_units"]
-        .as_array_mut()
-        .context("cold185 old tracked units")?;
-    for key in ["actor_unit", "guard_unit", "timer_unit"] {
-        ensure!(
-            !names.iter().any(|name| *name == event[key]),
-            "cold185 fresh enrollment already exists in historical tracked units"
-        );
-        names.push(event[key].clone());
-    }
+    expected["tracked_units"] = enrolled_units(old, event)?;
     let claims = expected["diagnostics"]
         .as_array_mut()
         .context("cold185 old diagnostic claims")?;
@@ -244,6 +278,125 @@ mod tests {
         (previous, old, next, event, registration, now)
     }
     #[test]
+    #[ignore = "Root exact sealed failed21:30 plan, historical metadata only; no native admission"]
+    fn actual2130_plan_composes_complete_transition_with_same_live145_consumer() {
+        let binding = json!({"path":"/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-387a0dcd086f4f209e087059783107b8/spec.json",
+            "sha256":"98124a339ae6f09cbe1036047e0fa4daeaced50e91c668d925f2dd511cd2f273"});
+        let plan = bound_json(&checked_binding(&binding).unwrap()).unwrap();
+        let registration = plan[FIELD].clone();
+        let event = bound_json(&checked_binding(&registration).unwrap()).unwrap();
+        let old = bound_json(&checked_binding(&event["previous_plan"]).unwrap()).unwrap();
+        let previous = bound_json(&checked_binding(&event["previous_fleet"]).unwrap()).unwrap();
+        assert_eq!(enrolled_units(&old, &event).unwrap(), plan["tracked_units"]);
+        transition_shape(
+            &previous,
+            &old,
+            &plan,
+            &event,
+            &registration,
+            text(&previous, "sampled_at_utc").unwrap(),
+            integer(&event, "sampled_at").unwrap(),
+        )
+        .unwrap();
+        assert!(
+            horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::selected(&plan)
+                .unwrap()
+        );
+        let mut changed = plan.clone();
+        changed["pipeline_claims"] = json!([]);
+        assert!(transition_shape(
+            &previous,
+            &old,
+            &changed,
+            &event,
+            &registration,
+            text(&previous, "sampled_at_utc").unwrap(),
+            integer(&event, "sampled_at").unwrap()
+        )
+        .is_err());
+    }
+    #[test]
+    fn retained145_order_composes_with_exact_cold185_transition() {
+        let (previous, mut old, mut plan, event, registration, now) = fixture();
+        old["tracked_units"]
+            .as_array_mut()
+            .unwrap()
+            .extend(RETAINED145_SUFFIX.map(|name| json!(name)));
+        plan["tracked_units"] = enrolled_units(&old, &event).unwrap();
+        transition_shape(
+            &previous,
+            &old,
+            &plan,
+            &event,
+            &registration,
+            "2026-11-05T18:28:09Z",
+            now,
+        )
+        .unwrap();
+        assert!(
+            horizon_recovered_resource_frame_typed_bridge_v1::live145_frame::selected(&plan)
+                .unwrap()
+        );
+        for key in [
+            "pipeline_claims",
+            "epoch199_terminal_context",
+            "extra_historical_field",
+        ] {
+            let mut changed = plan.clone();
+            changed[key] = json!("foreign");
+            assert!(transition_shape(
+                &previous,
+                &old,
+                &changed,
+                &event,
+                &registration,
+                "2026-11-05T18:28:09Z",
+                now
+            )
+            .is_err());
+        }
+        let mut appended = plan.clone();
+        let mut rows = old["tracked_units"].as_array().unwrap().clone();
+        rows.extend([
+            event["actor_unit"].clone(),
+            event["guard_unit"].clone(),
+            event["timer_unit"].clone(),
+        ]);
+        appended["tracked_units"] = json!(rows);
+        assert!(transition_shape(
+            &previous,
+            &old,
+            &appended,
+            &event,
+            &registration,
+            "2026-11-05T18:28:09Z",
+            now
+        )
+        .is_err());
+    }
+    #[test]
+    fn malformed_retained145_suffix_never_reorders_or_drops_history() {
+        let (_, mut old, _, event, _, _) = fixture();
+        old["tracked_units"]
+            .as_array_mut()
+            .unwrap()
+            .extend(RETAINED145_SUFFIX.map(|name| json!(name)));
+        for mode in 0..3 {
+            let mut changed = old.clone();
+            let rows = changed["tracked_units"].as_array_mut().unwrap();
+            match mode {
+                0 => {
+                    rows.remove(1);
+                }
+                1 => rows.swap(1, 2),
+                _ => rows.insert(0, json!(RETAINED145_SUFFIX[0])),
+            }
+            let saved = changed.clone();
+            assert!(enrolled_units(&changed, &event).is_err());
+            assert_eq!(changed, saved);
+        }
+    }
+    #[test]
     fn exact185_metadata_addition_preserves_complete_old_policy_and_failed_gate() {
         let (previous, old, plan, event, registration, now) = fixture();
         let original = old.clone();
@@ -273,32 +426,28 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .push(epoch185_claim(&event, &registration).unwrap());
-        assert!(
-            transition_shape(
-                &previous,
-                &old,
-                &plan,
-                &event,
-                &registration,
-                "2026-11-05T18:28:09Z",
-                now
-            )
-            .is_err()
-        );
+        assert!(transition_shape(
+            &previous,
+            &old,
+            &plan,
+            &event,
+            &registration,
+            "2026-11-05T18:28:09Z",
+            now
+        )
+        .is_err());
         let (previous, old, mut plan, event, registration, now) = fixture();
         plan["diagnostics"][0]["invocation_id"] = json!("f".repeat(32));
-        assert!(
-            transition_shape(
-                &previous,
-                &old,
-                &plan,
-                &event,
-                &registration,
-                "2026-11-05T18:28:09Z",
-                now
-            )
-            .is_err()
-        );
+        assert!(transition_shape(
+            &previous,
+            &old,
+            &plan,
+            &event,
+            &registration,
+            "2026-11-05T18:28:09Z",
+            now
+        )
+        .is_err());
     }
     #[test]
     fn unrelated_gates_allocations_pipelines_and_fields_cannot_change() {
@@ -1146,16 +1295,12 @@ mod allocation_tests {
                 .count(),
             1
         );
-        assert!(
-            bindings
-                .iter()
-                .any(|b| b["path"] == binding("admission")["path"])
-        );
-        assert!(
-            bindings
-                .iter()
-                .any(|b| b["path"] == binding("registration")["path"])
-        );
+        assert!(bindings
+            .iter()
+            .any(|b| b["path"] == binding("admission")["path"]));
+        assert!(bindings
+            .iter()
+            .any(|b| b["path"] == binding("registration")["path"]));
     }
     #[test]
     fn inherited_native_projection_removes_only_the_three_proven_new_roles() {

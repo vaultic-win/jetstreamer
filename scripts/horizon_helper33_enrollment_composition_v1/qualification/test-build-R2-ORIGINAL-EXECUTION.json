@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-first-lane-combined-helper-test-build-20261108-enrollment-composition-v33-r2.service\nFinished with result: oom-kill\nMain processes terminated with: code=killed/status=KILL\nService runtime: 1min 11.481s\nCPU time consumed: 1min 33.233s\nMemory peak: 6.0G\nMemory swap peak: 0B\n"
+}

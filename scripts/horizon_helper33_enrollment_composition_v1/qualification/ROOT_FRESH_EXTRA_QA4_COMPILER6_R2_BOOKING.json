@@ -1,0 +1,36 @@
+{
+  "schema": "horizon-helper33-fresh-extra-QA4-compiler6-original-r2-booking-v1",
+  "current_same_end_capacity": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2130-20261108-v1/ROOT_CURRENT2130_READONLY_POOL_CAPACITY.json",
+    "sha256": "a43e5e55001c5d954ef3bf573ec8713d145358bb786ec920a7178080fc47af67"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T213022Z-postcompletion154-v1.json",
+    "sha256": "e1f155ce9642b96a0f80b56b343868f8982b9cad7f7e961730938ea4042efe9e"
+  },
+  "original3G_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/ORIGINAL3G_COMPILER_OOM_TERMINAL_AND_DRAIN_NO_CREDIT.json",
+    "sha256": "228a47e3c3d55c3f199aed19a252f200ec90777502cb55f2064160d40a7dceb4"
+  },
+  "old_comparable_guard_floor_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_ADDITIVE_DATA4_BOOKING.json",
+    "sha256": "4bef891750ab7364a212e9f9bd377f94698e1229c93c2bd20484ed5f0fba5124"
+  },
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA4_bytes": 4294967296,
+  "total_external_pool_bytes": 10737418240,
+  "one_serial_compiler_bytes": 6442450944,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "minimum_live145_and_retained185_with_external10_bytes": 790621945856,
+  "actual_conservative_MemAvailable_bytes": 790805082112,
+  "guard_runway_headroom_bytes": 183136256,
+  "total_raw_same_end_memory_with_fresh_extra4_bytes": 803478147072,
+  "host_total_bytes": 810902843392,
+  "complete_DATA_lower_bound_bytes": 5151156810388,
+  "existing_this_phase_DATA4_reused_not_credited_or_added_twice": true,
+  "no_credit_from_old_extraQA_release": true,
+  "all_old_promises_retained": true,
+  "kernel_limits_before_first_instruction": true,
+  "no_new_guard_after_activation": true
+}

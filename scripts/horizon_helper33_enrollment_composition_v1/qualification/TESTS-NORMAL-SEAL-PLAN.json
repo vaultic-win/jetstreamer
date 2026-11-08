@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-enrollment-composition-postreader-tests-20261108-v33",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-enrollment-composition-helper-qa-20261108-v33/work-r3/v31-helper-tests",
+      "name": "helper-tests",
+      "sha256": "a701070b056cf6caff4531b8bd1a2cee8c84921d83b40cef516362ce57f52d8c",
+      "mode": 365
+    }
+  ]
+}
