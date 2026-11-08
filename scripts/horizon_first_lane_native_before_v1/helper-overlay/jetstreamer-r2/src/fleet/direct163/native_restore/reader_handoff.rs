@@ -134,6 +134,35 @@ fn comparison(before: &Value, semantic_after: &Value, old: &Value, new: &Value) 
     unchanged_claims(before,&out)?;
     Ok(out)
 }
+const CENSUS_FIELDS:[&str;12]=["ActiveState","ControlGroup","ExecMainStatus","ExecStart","Id","InvocationID","LoadState","MainPID","NRestarts","Result","SubState","Type"];
+fn exact_helper_census(row:&Value,helper:&Value)->Result<()> {
+ let object=row.as_object().context("native handoff census row")?;
+ ensure!(object.len()==CENSUS_FIELDS.len() && CENSUS_FIELDS.iter().all(|key|object.contains_key(*key)),"native helper census exact field set");
+ for key in CENSUS_FIELDS { ensure!(row[key]==helper["native"][key] && row[key].is_string(),"native helper census differs from authenticated helper: {key}"); }
+ ensure!(row["Id"]==helper["unit"] && row["InvocationID"]==helper["invocation_id"] && row["MainPID"].as_str()==Some(n(helper,"pid")?.to_string().as_str()),"native helper census crossed role/IID/PID");
+ Ok(())
+}
+fn compare_native_census(before:&Value,fresh:&Value,old:&Value,new:&Value,comparison:&mut Value)->Result<()> {
+ for field in ["native_before","native_after"] {
+  let a=before[field].as_object().context("native historical census missing")?;
+  let b=fresh[field].as_object().context("native fresh census missing")?;
+  let old_name=old["unit"].as_str().context("old native helper unit")?;
+  let new_name=new["unit"].as_str().context("new native helper unit")?;
+  ensure!(old_name==READER && new_name==ISSUER && old_name!=new_name && !a.contains_key(new_name) && !b.contains_key(old_name),"native handoff crossed or duplicate helper membership");
+  exact_helper_census(a.get(old_name).context("original helper census absent")?,old)?;
+  exact_helper_census(b.get(new_name).context("fresh helper census absent")?,new)?;
+  let foreign_a=a.keys().filter(|k|k.as_str()!=old_name).collect::<std::collections::BTreeSet<_>>();
+  let foreign_b=b.keys().filter(|k|k.as_str()!=new_name).collect::<std::collections::BTreeSet<_>>();
+  ensure!(foreign_a==foreign_b,"native handoff foreign census membership changed");
+  let out=comparison[field].as_object_mut().context("native comparison census absent")?;
+  ensure!(*out==*b,"native comparison altered before helper handoff");
+  ensure!(out.remove(new_name)==b.get(new_name).cloned() && out.insert(old_name.into(),a[old_name].clone()).is_none(),"native comparison exact helper substitution failed");
+  // Foreign native rows are retained byte-for-byte from the actual fresh scan.
+  // The existing complete guard policy independently validates every rollover.
+  for key in foreign_b {ensure!(out.get(key)==b.get(key),"native handoff altered a foreign census row");}
+ }
+ Ok(())
+}
 impl Handoff {
     pub(super) fn load(reader:&Bound, request:&memory::model::Request, view:&memory::VerifiedParentMemory,
         sources:&Value, clock:u64) -> Result<Self> {
@@ -191,7 +220,8 @@ impl Handoff {
         let actual=crate::fleet::charge136_retry0005::retained_attempt::actual(&self.retention)?;
         ensure!(actual==self.retained,"native actual retention changed before fresh projection");
         let semantic=crate::fleet::charge136_retry0005::retained_attempt::project(&self.retention,raw,&actual)?;
-        let compared=comparison(&self.before,&semantic,&self.old_helper,&self.new_helper)?;
+        let mut compared=comparison(&self.before,&semantic,&self.old_helper,&self.new_helper)?;
+        compare_native_census(&self.before,&semantic,&self.old_helper,&self.new_helper,&mut compared)?;
         epoch186::accounting::stable_guard_basis(&self.sources,&self.before,&compared)?;
         Ok((semantic,compared))
     }
@@ -215,6 +245,28 @@ mod tests {
         let mut after=base.clone(); after["native_pool_suballocations"][1]=new.clone();
         (base,after,old,new)
     }
+    #[test]
+    fn native_census_handoff_preserves_all_foreign_rows_and_rejects_extra_missing_or_crossed_helper() {
+      fn helper_row(unit:&str,iid:&str,pid:u64)->Value {
+       let mut native=serde_json::Map::new();for key in CENSUS_FIELDS {native.insert(key.into(),json!("value"));}
+       native.insert("Id".into(),json!(unit));native.insert("InvocationID".into(),json!(iid));native.insert("MainPID".into(),json!(pid.to_string()));
+       json!({"unit":unit,"invocation_id":iid,"pid":pid,"native":native})
+      }
+      let old=helper_row(READER,&"a".repeat(32),123);let new=helper_row(ISSUER,&"b".repeat(32),124);
+      let mut a=json!({"native_before":{},"native_after":{}});let mut b=a.clone();
+      for field in ["native_before","native_after"] {
+       a[field][READER]=old["native"].clone();a[field]["foreign.service"]=json!({"actual":"original"});
+       b[field][ISSUER]=new["native"].clone();b[field]["foreign.service"]=json!({"actual":"fresh"});
+      }
+      let originals=(a.clone(),b.clone());let mut compared=b.clone();compare_native_census(&a,&b,&old,&new,&mut compared).unwrap();
+      assert_eq!((a.clone(),b.clone()),originals);assert!(compared["native_after"].get(ISSUER).is_none());assert_eq!(compared["native_after"][READER],old["native"]);assert_eq!(compared["native_after"]["foreign.service"],b["native_after"]["foreign.service"]);
+      let mut extra=b.clone();extra["native_after"]["unexpected.service"]=json!({});assert!(compare_native_census(&a,&extra,&old,&new,&mut extra.clone()).is_err());
+      let mut missing=b.clone();missing["native_after"].as_object_mut().unwrap().remove("foreign.service");assert!(compare_native_census(&a,&missing,&old,&new,&mut missing.clone()).is_err());
+      for key in CENSUS_FIELDS {let mut changed=b.clone();changed["native_after"][ISSUER][key]=json!("crossed");assert!(compare_native_census(&a,&changed,&old,&new,&mut changed.clone()).is_err(),"{key}");}
+      let mut duplicate=b.clone();duplicate["native_after"][READER]=old["native"].clone();assert!(compare_native_census(&a,&duplicate,&old,&new,&mut duplicate.clone()).is_err());
+      let mut altered=b.clone();altered["native_after"]["foreign.service"]=json!({"tampered":true});assert!(compare_native_census(&a,&b,&old,&new,&mut altered).is_err());
+    }
+
     #[test]
     fn original_reader_collection_requires_genuine_prior_completion_and_no_replacement_role() {
         let proof=json!({"invocation_id":"a".repeat(32)});
