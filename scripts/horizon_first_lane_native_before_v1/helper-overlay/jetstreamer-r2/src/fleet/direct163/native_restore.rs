@@ -6,6 +6,7 @@ use super::*;
 use std::os::fd::{AsRawFd, FromRawFd};
 mod held;
 mod provenance;
+mod reader_handoff;
 
 pub(in crate::fleet) const ACTOR: &str = "horizon-epoch163-native-input-20261106-v1.service";
 pub(in crate::fleet) const ISSUER: &str =
@@ -496,20 +497,25 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         "native full genuine current reader/fleet/four-family chain crossed"
     );
     pressures(&storage::json(&to_bound(&current["observer"])?)?)?;
-    let (before, before_origin) = if let Some(original) = original_reader_before(s.current_reader_before.as_ref(), &s.memory_request, &view, now()?)? {
-        original
+    let historical=s.current_reader_before.as_ref().map(|reader|
+        reader_handoff::Handoff::load(reader,&s.memory_request,&view,&s.resource_accounting,now()?)).transpose()?;
+    let (before,before_origin)=if let Some(handoff)=&historical {
+        (handoff.before().clone(),handoff.origin().clone())
     } else {
-        (epoch186::accounting::protected_data_basis(&s.resource_accounting, now()?).await?,
+        (epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await?,
             json!({"kind":"new-complete-current-raw-builder-before-held-admission"}))
     };
-    let a = physical()?;
-    let after = epoch186::accounting::protected_data_basis(&s.resource_accounting, now()?).await?;
-    let b = physical()?;
-    epoch186::accounting::stable_guard_basis(&s.resource_accounting, &before, &after)?;
-    unchanged_claims(&before, &after)?;
-    let original = immutable(&s.memory_request.current_reader)?;
-    unchanged_claims(&immutable(&to_bound(&original["accounting"])?)?, &after)?;
-    let disk = fit(&p, &view, &selected, &after, &a, &b, &phase)?;
+    let a=physical()?;
+    let after=epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await?;
+    let b=physical()?;
+    let (semantic_after,comparison_after)=if let Some(handoff)=&historical {
+        handoff.project(&after)?
+    } else { (after.clone(),after.clone()) };
+    epoch186::accounting::stable_guard_basis(&s.resource_accounting,&before,&comparison_after)?;
+    unchanged_claims(&before,&comparison_after)?;
+    let original=immutable(&s.memory_request.current_reader)?;
+    unchanged_claims(&immutable(&to_bound(&original["accounting"])?)?,&comparison_after)?;
+    let disk=fit(&p,&view,&selected,&semantic_after,&a,&b,&phase)?;
     let end = now()?;
     ensure!(
         end.checked_sub(start).is_some_and(|n| n <= 90),
@@ -522,6 +528,12 @@ pub(in crate::fleet) async fn run() -> Result<()> {
             && end_data.evidence()["projection"] == selected.evidence()["projection"],
         "native final complete typed evidence changed"
     );
+    if let Some(handoff)=&historical {
+        handoff.revalidate(&s.memory_request,&end_view,now()?)?;
+        let (end_semantic,end_comparison)=handoff.project(&after)?;
+        ensure!(end_semantic==semantic_after && end_comparison==comparison_after,
+            "native historical semantic comparison changed before publication");
+    }
     ensure!(
         plan(&s.native_plan, &image)?.minimum_free_bytes == p.minimum_free_bytes
             && provenance::phases(&s)? == phase
@@ -532,13 +544,18 @@ pub(in crate::fleet) async fn run() -> Result<()> {
     let last = held::capture(&p, &s.native_plan)?;
     ensure!(first == last, "original held actor/ready/namespace changed");
     self_actor(&sb, &args[6])?;
+    ensure!(now()?.checked_sub(start).is_some_and(|age|age<=90),"native original transaction expired before resource publication");
     let nonce = env::var("INVOCATION_ID")?;
     let resource_proof = publish_named(
         &p.state,
         &json!({"schema":"epoch163-native-original-resource-evidence-v1",
         "issuer_spec":sb,"fixed_booking":s.native_booking,"resource_phase_ledger":s.current_phase_ledger,"legacy_phase_anchor":fixed(R24,R24_SHA),"visible_thread_takeover":provenance::takeover_binding(),
         "actual_held_actor":last,"original_download":download,"memory":view.evidence(),"DATA":selected.evidence(),
-        "raw_before":before,"raw_before_origin":before_origin,"raw_after":after,"physical_before":a,"physical_after":b,
+        "raw_before":before,"raw_before_origin":before_origin,"raw_after":after,
+        "semantic_after_retention_serde_sha256":storage::sha(&serde_json::to_vec(&semantic_after)?),
+        "historical_comparison_after_serde_sha256":storage::sha(&serde_json::to_vec(&comparison_after)?),
+        "historical_handoff":historical.as_ref().map(|h|h.evidence()),
+        "historical_comparison_only_not_raw_replacement":historical.is_some(),"physical_before":a,"physical_after":b,
         "admission_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,"r2_mutations":false}),
         &nonce,
         &format!("issuer-resource-proof-{nonce}.json"),
@@ -548,6 +565,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         held::capture(&p, &s.native_plan)? == last,
         "native actor changed before final publication"
     );
+    ensure!(now()?.checked_sub(start).is_some_and(|age|age<=90),"native original transaction expired before admission publication");
     let record = json!({"schema":"epoch163-native-input-admission-v2","admitted":true,"issuer":image,
         "plan":s.native_plan,"program":p.program,"download":p.download,"worker":p.worker,
         "actor_invocation_id":last["iid"],"actor_pid":last["pid"],"actor_start_ticks":last["start_ticks"],

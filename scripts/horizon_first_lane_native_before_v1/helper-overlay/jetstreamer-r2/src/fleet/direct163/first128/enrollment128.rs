@@ -749,6 +749,18 @@ pub(super) fn retained_protection(e: &Value, parent: &Value, active: bool) -> Re
 mod tests {
     use super::*;
     #[test]
+    fn canonical_parent_requires_exact_already_sealed_historical_worker_selection() {
+        let source=include_str!("fixtures/parent-prepared.service");
+        let finalized=source.lines().filter(|l|!l.starts_with("ConditionPathExists="))
+            .collect::<Vec<_>>().join("\n").replace("UNRESOLVED_NORMAL_RUNTIME_PLAN_PATH","/usr/local/lib/jetstreamer/test/plan.json")
+            .replace("UNRESOLVED_ACTUAL_RUNTIME_PLAN_SHA256",&"a".repeat(64))+"\n";
+        prepared_source(&finalized,PARENT128).unwrap();
+        let exact="Environment=JETSTREAMER_HISTORICAL_WORKER_V1_5_6=/usr/local/lib/jetstreamer/deploy-epoch163-singleton-20261104-v1/jetstreamer-historical-worker-v1-5-6";
+        assert!(prepared_source(&finalized.replace(exact,"Environment=JETSTREAMER_HISTORICAL_WORKER_V1_5_6=/tmp/foreign"),PARENT128).is_err());
+        assert!(prepared_source(&finalized.replace(&format!("{exact}\n"),""),PARENT128).is_err());
+        assert!(prepared_source(&finalized.replace(exact,&format!("{exact}\n{exact}")),PARENT128).is_err());
+    }
+    #[test]
     fn canonical_parent_template_keeps_horizon_group_and_every_isolation_line() {
         let original = include_str!("fixtures/parent-prepared.service");
         let finished = original

@@ -1,0 +1,16 @@
+{
+  "schema": "horizon-helper20-native-control-fixed-role-binding-v1",
+  "failed_execution": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/REGRESSION_native-r2-readonly_ORIGINAL_EXECUTION_V20.json",
+    "sha256": "cd2a9224deff727e7bd17794b24eb5b15a153319ae05f17cbf0c332afbfea1e4"
+  },
+  "cause": "Compiled retained transport test queries exact fixed v19 test role; successor wrapper incorrectly used v20 role. Production issuer and transport unchanged.",
+  "corrected_execution": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/REGRESSION_native-r2-readonly_ORIGINAL_EXECUTION_V20_FIXED_ROLE.json",
+    "sha256": "a4a7764fd555e61db22a9906d8f7b5b995335d3940c3426755483dcdfd3eb3a2"
+  },
+  "test_image_is_actual_sealed20": true,
+  "original19_evidence_unchanged": true,
+  "event_census_uses_actual_original_start_time_and_IID": true,
+  "no_replay_or_admission_or_source_change": true
+}

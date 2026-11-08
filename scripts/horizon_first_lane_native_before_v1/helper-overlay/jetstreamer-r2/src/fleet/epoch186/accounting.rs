@@ -688,6 +688,17 @@ fn helper_allocation() -> Result<Value> {
     )
 }
 
+/// Current caller only; not a JSON slot selector or a pool-budget exemption.
+pub(in crate::fleet) fn native163_current_helper() -> Result<Value> {
+    ensure!(std::env::args().nth(1).as_deref()==Some("admit-native163"),
+        "historical native helper capability command scope");
+    let helper=helper_allocation()?;
+    ensure!(helper["unit"]==crate::fleet::direct163::native_restore::ISSUER
+        && helper["memory_max_bytes"]==2u64<<30 && helper["data_reservation_bytes"]==0,
+        "historical native helper exact actual issuer slot");
+    Ok(helper)
+}
+
 fn pool_rows(
     expected: &[core::Owner],
     helper: &Value,

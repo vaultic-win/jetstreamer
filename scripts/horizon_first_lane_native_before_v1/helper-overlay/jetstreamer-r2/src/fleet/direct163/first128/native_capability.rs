@@ -2,8 +2,8 @@
 //! outcome, original restore completion and the finalizer's outer lifecycle.
 use super::*;
 pub(super) const FINALIZER: &str = "horizon-epoch163-native-input-finalize-20261107-v1.service";
-const FINALIZER_IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch163-native-input-tools-20261106-v7/native-input-finalize";
-const FINALIZER_SHA: &str = "58d4308877caac1be4178d4deedc954d4350b3ca177b0c8877d4409c85a981ff";
+const FINALIZER_IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-native163-finalizer-retained-exec-tools-20261108-v2/native-input-finalize";
+const FINALIZER_SHA: &str = "fdf4b9a93e5522e6a1dc34ed91f0612197d49970679cd7e8240511b5d603ba03";
 const NATIVE_IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-epoch163-native-input-tools-20261106-v7/native-input";
 const NATIVE_SHA: &str = "9e9de6bdcb149d08d17cc53ce4322577e4a1aab164a1ac848b04ae8426205850";
 const DOWNLOAD_IID: &str = "7e01ca99b80f4f629ff315a19f10b4a1";

@@ -1,6 +1,6 @@
 {
   "schema": "native128-root-template-config-v2-original-reader-before",
-  "output_directory": "/usr/local/lib/jetstreamer/horizon-visible-native163128-current0100-plan-20261108-v4",
+  "output_directory": "/usr/local/lib/jetstreamer/horizon-visible-native163128-current0200-plan-20261108-v6",
   "previous_phase_ledger": {
     "path": "/home/sol/.jetstreamer-private/epoch163-native-input-qa-20261106-v7/RESOURCE_PHASES_R24_NATIVE163_QA_DATA_BOOKED.json",
     "sha256": "0d95b4cfe5cde644d3b9105c32116598a8a7a449c14b9003f48e380bf6ad96da"
@@ -10,7 +10,7 @@
   "worker_image_path": "/usr/local/lib/jetstreamer/deploy-epoch163-singleton-20261104-v1/jetstreamer-historical-worker-v1-5-6",
   "ledger_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/ledger",
   "scratch_directory": "/home/sol/.jetstreamer-private/visible-native163128-20261107-v1/scratch",
-  "state_directory": "/var/lib/jetstreamer/horizon-epoch163-native-input-0100-20261108-v4",
+  "state_directory": "/var/lib/jetstreamer/horizon-epoch163-native-input-0200-20261108-v6",
   "snapshot": "/home/sol/.jetstreamer-private/visible-input163-staging-20261107-v1/compressed/snapshot-70415741-2aSbRXHXZJgT4bdrY34gWizngFB527wavw6Ar9KadzUY.tar.zst",
   "protected_existing_DATA_bytes": 5114649588372,
   "minimum_available_memory_bytes": 790890381312,
@@ -34,7 +34,7 @@
     "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/ROOT1800_ADDITIONAL4GiB_COMBINED_FIRST_LANE_QA_DATA_BOOKING.json",
     "sha256": "b52ef2d4f33f7b2ecabecaf953430783df654d77b3b15b2fc3b5fa31b8fbf804"
   },
-  "staging_directory": "/home/sol/.jetstreamer-private/visible-native163128-current0100-plan-staging-20261108-v4",
+  "staging_directory": "/home/sol/.jetstreamer-private/visible-native163128-current0200-plan-staging-20261108-v6",
   "expected_current": null,
   "expected_memory_program": {
     "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-parent-memory-selector-tools-20261107-v4/parent-memory",

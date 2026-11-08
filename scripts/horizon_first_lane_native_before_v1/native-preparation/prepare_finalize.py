@@ -4,8 +4,11 @@ import argparse
 import json
 import os
 from pathlib import Path
-from prepare_native128 import metadata, require, bound, save, TOOLS, FINAL_SHA
+from prepare_native128 import metadata, require, bound, save, TOOLS
 
+
+FINALIZER='/usr/local/lib/jetstreamer/horizon-native163-finalizer-retained-exec-tools-20261108-v2/native-input-finalize'
+FINAL_SHA='fdf4b9a93e5522e6a1dc34ed91f0612197d49970679cd7e8240511b5d603ba03'
 
 def main():
     parser=argparse.ArgumentParser()
@@ -47,7 +50,12 @@ def main():
     output=Path(args.output_directory)
     require(output.parent==Path('/usr/local/lib/jetstreamer') and not output.exists(), 'fresh normal-seal finalization destination required')
     final_b=save(stage,'finalization-plan.json',final,published_parent=output)
-    direct=[TOOLS+'/native-input-finalize',final_b['path'],'--plan-sha256',final_b['sha256'],'--self-sha256',FINAL_SHA]
+    qualified=json.loads(Path(FINALIZER).with_name('artifact-proof.json').read_text())
+    require(qualified['all_required_tests_passed'] and qualified['prod_clippy_passed'] and qualified['test_clippy_passed'] and qualified['actual_kernel_control_passed'] and qualified['production_artifact']['sha256']==FINAL_SHA,'actual qualified finalizer successor required')
+    require(hashlib.sha256(Path(FINALIZER).read_bytes()).hexdigest()==FINAL_SHA,'qualified finalizer bytes differ')
+    finalizer_seal=json.loads(Path(FINALIZER).with_name('deployment-seal-receipt.json').read_text())
+    require(finalizer_seal['destination']==str(Path(FINALIZER).parent) and any(x['name']=='native-input-finalize' and x['sha256']==FINAL_SHA for x in finalizer_seal['members']),'normally sealed finalizer successor required')
+    direct=[FINALIZER,final_b['path'],'--plan-sha256',final_b['sha256'],'--self-sha256',FINAL_SHA]
     props=['Type=exec','User=root','Group=root','Restart=no','KillMode=control-group',
         'MemoryAccounting=yes','MemoryMax=512M','MemorySwapMax=0','CPUQuota=100%','TasksMax=512',
         'NoNewPrivileges=yes','PrivateNetwork=yes','PrivateTmp=no','ProtectSystem=strict',
