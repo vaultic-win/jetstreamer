@@ -1,0 +1,29 @@
+{
+  "schema": "horizon-positive185-actual-fleet-composition-conflict-v1",
+  "original_actor_invocation_id": "af1829b8dbd34c8892af8f51b8eefa51",
+  "original_ready_started_at": 1794114512,
+  "original_hold_deadline": 1794115112,
+  "observed_at_unix": 1794115088,
+  "original_plan": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-continuation-20261108-v12/enrolled-fleet-source.json",
+    "sha256": "477ce6a6ad71d4200419f2cc014ffb625f8b3369ac91af3748c2d2837d4655e5"
+  },
+  "exact_original_cold185_expected_transition_matches_complete_plan": true,
+  "original_cold185_approved_append_fails_live145_suffix": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-continuation-20261108-v12/11-actual-enrolled-fleet-original-outcome.json",
+    "sha256": "7b872585a74096e38095d1a0929b67656c2055a305c9c185f94a923ad647b0a8"
+  },
+  "attempted_before_seven_suffix_fails_cold185_exact_history": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-continuation-20261108-v13/07-actual-enrolled-fleet-original-outcome.json",
+    "sha256": "3d48fd2627f02b476aa86ab00734c27e8ac2b7ddeafcb43e50f749670402a6d9"
+  },
+  "attempted_before_three_suffix_fails_cold185_exact_history": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-original0500-fleet-suffix3-control-20261108-v1/ORIGINAL-EXECUTION.json",
+    "sha256": "7eaa82ec17d35ff50a7472f0a4d1b238ca90c5dcee23b00c2e9f4020fc65e6bf"
+  },
+  "no_full_reader_or_release_claimed": true,
+  "no_actor_signal_restart_or_deadline_extension": true,
+  "next_action": "Qualify exact cold185/live145 compatibility composition; preserve original full native census, resources, raw lineage and both existing validators. No further same-clock retry.",
+  "target_replay_lanes": 5,
+  "actual_replay_lanes": 0
+}

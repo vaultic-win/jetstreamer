@@ -24,6 +24,8 @@ pub const PLANNER: &str = "/usr/local/lib/jetstreamer/horizon-positive185-curren
 pub const PLANNER_SHA: &str = "2c0d6af4189b56bbee54aa91a0f7307f2e9892b54c0e9b8efde8cce12314a355";
 pub const HELPER: &str = "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2";
 pub const HELPER_SHA: &str = "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470";
+pub const FLEET_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261108-v26/jetstreamer-r2";
+pub const FLEET_HELPER_SHA: &str = "22b50e2c72021de3f3484ad5ed74494ab80a496f5760703323f200362c7fcdb5";
 pub const NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-native-hooks-complete-supported-route-tools-20261105-v11/jetstreamer-r2";
 pub const NATIVE_SHA: &str = "0f1d171bc9fee7a1d06186e62b03e601d575bdcacfa30545cf0c084850f0934c";
 pub const DRIVER: &str =
@@ -499,4 +501,13 @@ fn main() {
         eprintln!("positive185 upstream original: {e:#}");
         std::process::exit(1)
     }
+}
+
+pub fn require_qualified_fleet_helper() -> Result<()> {
+    let r=role(FLEET_HELPER,FLEET_HELPER_SHA)?;
+    let proof=storage::json(&binding(&r["artifact"])?)?;
+    ensure!(proof["all_required_tests_passed"]==true && proof["genuine_current_complete_outer_adapter_passed"]==true
+        && proof["production_artifact"]["sha256"]==FLEET_HELPER_SHA && proof["replay_launch_authorized"]==false,"exact fleet helper26 genuine final qualification required before original admission");
+    storage::bytes(&fixed(FLEET_HELPER,FLEET_HELPER_SHA),128<<20,true)?;
+    Ok(())
 }

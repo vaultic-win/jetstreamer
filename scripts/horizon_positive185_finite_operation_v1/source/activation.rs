@@ -319,6 +319,7 @@ fn no_unbooked_native163(r: &mut process::Runner<'_>, raw: &Value) -> Result<()>
     Ok(())
 }
 pub fn start(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
+    require_qualified_fleet_helper()?;
     let reader_control = binding(&v["reader_lifecycle_control"])?;
     crate::persistent_reader::validate_control(r, &reader_control)?;
 
