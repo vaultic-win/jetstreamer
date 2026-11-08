@@ -308,6 +308,10 @@ pub fn assemble(spec: &Bound, root: &Path) -> Result<Bound> {
     storage::save(root, "positive-planner-request.json", &request)
 }
 
+fn bounded_pool_census_len(count: usize) -> bool {
+    (1..4096).contains(&count)
+}
+
 pub fn verify_closed_pool(r: &mut process::Runner<'_>, b: &Bound) -> Result<Value> {
     let closure = storage::json(b)?;
     ensure!(
@@ -319,7 +323,7 @@ pub fn verify_closed_pool(r: &mut process::Runner<'_>, b: &Bound) -> Result<Valu
         .as_array()
         .context("actual original QA census required")?;
     ensure!(
-        !rows.is_empty() && rows.len() < 1024,
+        bounded_pool_census_len(rows.len()),
         "bounded original QA unit census"
     );
     let mut observed = Vec::new();
@@ -538,4 +542,16 @@ pub fn require_qualified_fleet_helper() -> Result<()> {
     );
     storage::bytes(&fixed(FLEET_HELPER, FLEET_HELPER_SHA), 128 << 20, true)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod complete_pool_census_tests {
+    #[test]
+    fn real_campaign_history_fits_without_truncating_or_unbounding_census() {
+        assert!(super::bounded_pool_census_len(1027));
+        assert!(super::bounded_pool_census_len(4095));
+        assert!(!super::bounded_pool_census_len(0));
+        assert!(!super::bounded_pool_census_len(4096));
+        assert!(!super::bounded_pool_census_len(usize::MAX));
+    }
 }

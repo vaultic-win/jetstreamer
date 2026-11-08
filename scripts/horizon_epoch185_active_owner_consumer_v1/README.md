@@ -30,3 +30,10 @@ Failed earlier control/profile attempts remain in private evidence.
 These are bounded probe release qualifications. Fresh admission and guarded
 execution remain required; full epoch completion, verification and R2 readiness
 are separate gates. The probe ends 716 slots before the epoch boundary.
+
+Operation24 extends the finite history census from fewer than 1,024 to fewer
+than 4,096 entries after the real campaign history reached 1,027. Every entry
+still receives the same native unit/process/job check. Its 37 tests include the
+actual count and rejection of empty or oversized censuses. Strict builds, its
+own reader lifecycle, phase, start-request handoff and Root/sol/final2 profile
+controls passed. Operation23 and its failed pre-admission attempt are retained.
