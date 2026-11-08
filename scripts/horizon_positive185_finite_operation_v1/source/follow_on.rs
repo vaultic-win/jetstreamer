@@ -275,6 +275,13 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
         &json!({"ready":ready_bound,"original_native":native,"original_setup_deadline":deadline,"no_retry_or_renewal":true}),
     )?;
     reload_before_task(r, actor, iid, n(&ready, "pid")?, deadline)?;
+    let request_owner = start_request::Owner::from_ready(actor, iid, &ready, deadline)?;
+    let request_handoff = start_request::detach(r, &request_owner)?;
+    let request_handoff = storage::save(
+        r.root,
+        "original-start-request-handoff.json",
+        &request_handoff,
+    )?;
     let units = storage::json(&binding(&ctx["unit_seal"]["normal_seal"])?)?;
     let dir = PathBuf::from(text(&units, "destination")?);
     let envelope = binding(&ctx["envelope"])?;
@@ -481,7 +488,7 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     let context = storage::save(
         r.root,
         "actual-postreader-context.json",
-        &json!({"schema":"horizon-positive185-postreader-final-context-v1","qualified_route":ctx["qualified_route"],"task":task,"registration":registration,"actual_fleet":fleet_bound,"actual_fleet_plan":plan_bound,"original_reader":reader_bound,"original_reader_completion":cb,"normal_pool_booking":booking,"work_root":final_root}),
+        &json!({"schema":"horizon-positive185-postreader-final-context-v2","qualified_route":ctx["qualified_route"],"task":task,"registration":registration,"actual_fleet":fleet_bound,"actual_fleet_plan":plan_bound,"original_reader":reader_bound,"original_reader_completion":cb,"normal_pool_booking":booking,"work_root":final_root,"original_start_request_handoff":request_handoff}),
     )?;
     ensure!(
         now()? + 120 <= deadline,
@@ -621,7 +628,7 @@ fn reload_before_task(
 
 // Isolated real systemd start-pre control. No campaign actor, input or replay.
 pub fn qualify_held_reload(r: &mut process::Runner<'_>) -> Result<()> {
-    let actor = format!("horizon-positive185-held-reload-control-{}.service", r.iid);
+    let actor = format!("horizon-qualify-185-held-request-control-{}.service", r.iid);
     ensure!(unit_name(&actor), "held control unit syntax");
     let absent = r.native(&actor)?;
     ensure!(
@@ -682,6 +689,23 @@ pub fn qualify_held_reload(r: &mut process::Runner<'_>) -> Result<()> {
         .checked_add(600)
         .context("synthetic control-only budget")?;
     reload_before_task(r, &actor, iid, pid, deadline)?;
+    let ready = json!({"actor_unit":actor,"actor_invocation_id":iid,"pid":pid,
+        "start_ticks":start_request::process_start_ticks(u32::try_from(pid)?)?,
+        "started_at":deadline-600});
+    let owner = start_request::Owner::from_ready(&actor, iid, &ready, deadline)?;
+    let detached = start_request::detach(r, &owner)?;
+    let detached_bound = storage::save(
+        r.root,
+        "actual-control-start-request-detached.json",
+        &detached,
+    )?;
+    std::thread::sleep(Duration::from_millis(100));
+    let restored = start_request::restore(r, &owner, &detached)?;
+    let restored_bound = storage::save(
+        r.root,
+        "actual-control-start-request-restored.json",
+        &restored,
+    )?;
     let mut poll = libc::pollfd {
         fd: fd.0,
         events: libc::POLLIN,
@@ -728,7 +752,8 @@ pub fn qualify_held_reload(r: &mut process::Runner<'_>) -> Result<()> {
             && v["_UID"] == "0"
             && v["UNIT"] == actor
             && v["INVOCATION_ID"] == iid
-            && v["JOB_RESULT"] == "done"),
+            && v["JOB_RESULT"] == "done"
+            && v["JOB_ID"] == restored["restored_native"]["Job"]),
         "actual held control PID1 completion"
     );
     let result = storage::save(
@@ -737,6 +762,8 @@ pub fn qualify_held_reload(r: &mut process::Runner<'_>) -> Result<()> {
         &json!({
             "schema":"horizon-positive185-actual-held-start-job-reload-control-v1",
             "program":r.self_image,"before_native":native,"terminal_native":terminal,
+            "actual_start_request_detached":detached_bound,"actual_start_request_restored":restored_bound,
+            "same_original_actor_start_request_roundtrip_exercised":true,
             "original_PID1":rows,"actual_pre_task_reload_and_start_job_validator_exercised":true,
             "synthetic_control_budget_not_admission":true,"input_body_reads":0,
             "replay_launch_authorized":false,"publication_authorized":false

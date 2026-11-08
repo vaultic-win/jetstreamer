@@ -5,11 +5,21 @@ mod storage;
 mod process;
 mod transaction;
 mod events;
+#[path = "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs"]
+#[expect(dead_code, reason="the exact shared policy also exports producer-only detach; this consumer only restores")]
+mod start_request;
 use anyhow::{Context,Result,ensure};
 use serde::Deserialize;
 use serde_json::{Value,json};
 use std::{env,fs,os::unix::fs::MetadataExt,path::{Path,PathBuf},time::{SystemTime,UNIX_EPOCH}};
 use storage::Bound;
+const START_REQUEST_POLICY_SOURCE:&str="/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs";
+const START_REQUEST_POLICY_SHA:&str="7b28a430d3f4179759440bd679005a6231c638b6f808ce673e9933cf7281d4c6";
+impl start_request::Transport for process::Runner<'_>{
+    fn metadata(&mut self,label:&str,command:std::process::Command,limit:std::time::Duration)->Result<Value>{
+        self.run(label,command,limit)
+    }
+}
 pub fn now()->Result<u64>{Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())}
 pub fn n(v:&Value,key:&str)->Result<u64>{storage::n(v,key)}
 pub fn text<'a>(v:&'a Value,key:&str)->Result<&'a str>{v[key].as_str().with_context(||format!("missing string {key}"))}
@@ -33,6 +43,7 @@ pub struct ContextFile{
     pub schema:String,pub qualified_route:Bound,pub task:Bound,pub registration:Bound,
     pub actual_fleet:Bound,pub actual_fleet_plan:Bound,pub original_reader:Bound,
     pub original_reader_completion:Bound,pub normal_pool_booking:Bound,pub work_root:PathBuf,
+    pub original_start_request_handoff:Bound,
 }
 pub fn verify_role(role:&Role)->Result<()>{
     ensure!(role.image.path.file_name().and_then(|s|s.to_str())==Some("jetstreamer-r2")
@@ -60,6 +71,93 @@ pub fn verify_seal_member(seal:&Value,b:&Bound,mode:u32)->Result<()>{
         &&matches[0]["mode"]==format!("{mode:04o}"),"normal seal exact member/digest/mode");
     Ok(())
 }
+fn common_start_request_control(control:&Value)->Result<()>{
+    ensure!(control["schema"]=="horizon-positive185-actual-held-start-job-reload-control-v1"
+        &&control["actual_pre_task_reload_and_start_job_validator_exercised"]==true
+        &&control["same_original_actor_start_request_roundtrip_exercised"]==true
+        &&control["input_body_reads"]==0&&control["publication_authorized"]==false
+        &&control["replay_launch_authorized"]==false,
+        "common native start-request qualification scope or actual roundtrip missing");
+    let before=&control["before_native"];let terminal=&control["terminal_native"];
+    ensure!(storage::hex(text(before,"InvocationID")?,32)&&before["Id"]==terminal["Id"]
+        &&before["InvocationID"]==terminal["InvocationID"]
+        &&before["ActiveState"]=="activating"&&before["SubState"]=="start-pre"
+        &&terminal["MainPID"]=="0"&&terminal["ControlPID"]=="0"&&terminal["NRestarts"]=="0"
+        &&terminal["Job"]==""&&terminal["Result"]=="success"&&terminal["ExecMainStatus"]=="0",
+        "common request control changed native owner or lacks successful terminal drain");
+    let done=control["original_PID1"].as_array().context("common control original PID1 rows")?.iter()
+        .filter(|row|row["MESSAGE_ID"]=="39f53479d3a045ac8e11786248231fbf").collect::<Vec<_>>();
+    ensure!(done.len()==1&&done[0]["_PID"]=="1"&&done[0]["_UID"]=="0"
+        &&done[0]["UNIT"]==before["Id"]&&done[0]["INVOCATION_ID"]==before["InvocationID"]
+        &&done[0]["JOB_TYPE"]=="start"&&done[0]["JOB_RESULT"]=="done",
+        "common native control lacks one exact normal PID1 start-done");
+    Ok(())
+}
+fn validate_start_request_qualification(capability:&Value)->Result<()>{
+    let source=binding(&capability["original_start_request_policy_source"])?;
+    ensure!(source.path==Path::new(START_REQUEST_POLICY_SOURCE)&&source.sha256==START_REQUEST_POLICY_SHA,
+        "final executor and qualified native control require identical sealed request policy source");
+    storage::bytes(&source,1<<20,true)?;
+    let source_seal_bound=binding(&capability["original_start_request_policy_normal_seal"])?;
+    let source_seal=storage::json(&source_seal_bound)?;
+    verify_seal_member(&source_seal,&source,0o444)?;
+    let control=binding(&capability["actual_start_request_common_control"])?;
+    let seal=storage::json(&binding(&capability["start_request_common_control_normal_seal"])?)?;
+    verify_seal_member(&seal,&control,0o444)?;
+    let proof:Value=serde_json::from_slice(&storage::bytes(&control,4<<20,true)?)?;
+    common_start_request_control(&proof)?;
+    let completion_bound=binding(&capability["original_start_request_common_qualification"])?;
+    ensure!(completion_bound.path.parent()==control.path.parent(),
+        "common qualification and native control must share the same normal seal");
+    verify_seal_member(&seal,&completion_bound,0o444)?;
+    let completion:Value=serde_json::from_slice(&storage::bytes(&completion_bound,4<<20,true)?)?;
+    ensure!(completion["schema"]=="horizon-original-start-request-common-policy-qualified-v1"
+        &&completion["policy_source"]==json!(source)&&completion["policy_normal_seal"]==json!(source_seal_bound)
+        &&completion["actual_common_control"]["sha256"]==control.sha256
+        &&completion["bootstrap_image"]==proof["program"]
+        &&completion["actual_start_request_detached"]==proof["actual_start_request_detached"]
+        &&completion["actual_start_request_restored"]==proof["actual_start_request_restored"]
+        &&completion["all_four_strict_compiler_stages_passed"]==true
+        &&n(&completion,"ordinary_tests_passed")?>=32
+        &&completion["same_original_actor_start_request_roundtrip_exercised"]==true
+        &&completion["replacement_job_native_PID1_done"]==true
+        &&completion["common_policy_only"]==true&&completion["same_image_production_launch_qualified"]==false
+        &&completion["replay_launch_authorized"]==false&&completion["publication_authorized"]==false
+        &&completion["resource_credit_bytes"]==0,
+        "common qualification lost exact source/control linkage or exceeded its limited authority");
+    ensure!(storage::bytes(&binding(&completion["actual_common_control"])?,4<<20,false)?
+        ==storage::bytes(&control,4<<20,true)?,"sealed common control differs from actual original");
+    let graph=storage::json(&binding(&completion["source_and_exact_compiler_graph"])?)?;
+    ensure!(graph["actual_source_policy_normal_seal"]==json!(source_seal_bound)
+        &&graph["source"].as_array().context("common exact compiler source graph")?.iter()
+            .filter(|b|**b==json!(source)).count()==1,
+        "native qualification compiler graph lost exact common source seal");
+    let drained=storage::json(&binding(&completion["original_native_completion_and_drain"])?)?;
+    ensure!(drained["original_held_pid_absent"]==true&&drained["all_processes_and_cgroups_drained"]==true,
+        "common qualification original control process or cgroup not drained");
+    let bootstrap=binding(&completion["bootstrap_image"])?;
+    verify_seal_member(&storage::json(&binding(&completion["bootstrap_normal_seal"])?)?,&bootstrap,0o555)?;
+    // These original receipts remain hash-bound even though the common control
+    // is completed, and may never be reinterpreted as a launch admission.
+    let detached=storage::json(&binding(&proof["actual_start_request_detached"])?)?;
+    let restored=storage::json(&binding(&proof["actual_start_request_restored"])?)?;
+    ensure!(detached["schema"]=="horizon-original-held-start-request-detached-v1"
+        &&restored["schema"]=="horizon-original-held-start-request-restored-v1"
+        &&detached["owner"]==restored["owner"]
+        &&detached["owner"]["actor"]==proof["before_native"]["Id"]
+        &&detached["owner"]["invocation_id"]==proof["before_native"]["InvocationID"]
+        &&restored["before_native"]==detached["detached_native"]
+        &&detached["original_pidfd_alive_after"]==true&&restored["original_pidfd_alive_after"]==true
+        &&detached["no_actor_signal_restart_or_clock_renewal"]==true
+        &&restored["no_actor_signal_restart_or_clock_renewal"]==true,
+        "common control lost original same-process detach/restore evidence");
+    let job=text(&restored["restored_native"],"Job")?;
+    ensure!(!job.is_empty()&&job!=text(&detached["before_native"],"Job")?
+        &&proof["original_PID1"].as_array().context("common PID1 rows")?.iter()
+            .any(|row|row["JOB_RESULT"]=="done"&&row["JOB_ID"]==job),
+        "common control PID1done does not bind actual replacement request");
+    Ok(())
+}
 fn route_policy(route:&Route,capability:&Value,envelope:&Value,admission:&Value)->Result<()>{
     if route.purpose==Purpose::BoundedPrefixProbe{
         ensure!(route.driver.sha256=="0a7dddaaa5ae049a6a9f6ca103fd8463987d6aff52397a4ece09a43387107e1a"
@@ -82,7 +180,7 @@ fn route_policy(route:&Route,capability:&Value,envelope:&Value,admission:&Value)
 }
 pub fn validate_context(c:&ContextFile,route:&Route,self_image:&Bound,task:&Value,
     envelope:&Value,admission:&Value,at:u64)->Result<()>{
-    ensure!(c.schema=="horizon-positive185-postreader-final-context-v1"
+    ensure!(c.schema=="horizon-positive185-postreader-final-context-v2"
         &&route.schema=="horizon-positive185-final-qualified-route-v1","positive final scope");
     let iid=text(task,"actor_invocation_id")?;
     ensure!(storage::hex(iid,32)&&task["schema"]=="horizon-epoch185-genuine-native-startpre-task-v1"
@@ -102,7 +200,7 @@ pub fn validate_context(c:&ContextFile,route:&Route,self_image:&Bound,task:&Valu
         &&admission["full_reader_accepted"]==true&&admission["raw_obligations_preserved"]==true,
         "positive final changed exact admitted route/owner/clock/authority");
     let capability=storage::json(&route.capability_acceptance)?;
-    ensure!(capability["schema"]=="horizon-positive185-final-route-capability-v1"
+    ensure!(capability["schema"]=="horizon-positive185-final-route-capability-v2"
         &&capability["executor"]==json!(self_image)&&capability["helper"]==json!(route.helper.image)
         &&capability["driver"]==json!(route.driver)
         &&capability["scope"]=="one-original-post-reader-release-attempt"
@@ -110,6 +208,10 @@ pub fn validate_context(c:&ContextFile,route:&Route,self_image:&Bound,task:&Valu
         &&capability["all_raw_obligations_and_live_guards_preserved"]==true
         &&capability["original_writer_custody_supported"]==true,
         "Root route capability does not bind this exact finite executor/helper/driver");
+    validate_start_request_qualification(&capability)?;
+    let owner=start_request::Owner::from_ready(text(task,"actor_unit")?,iid,ready,
+        n(task,"original_setup_deadline_unix_seconds")?)?;
+    start_request::validate_detached(&storage::json(&c.original_start_request_handoff)?,&owner)?;
     if route.purpose==Purpose::BoundedPrefixProbe{
         ensure!(task["self_sha256"]=="0f1d171bc9fee7a1d06186e62b03e601d575bdcacfa30545cf0c084850f0934c",
             "current probe task was not captured by distinct qualified native1850f1d role");
@@ -255,5 +357,37 @@ mod tests{
         for name in ["guard.service;start other","--host=foreign","../other.service","guard service"]{
             assert!(!unit_name(name)||!name.starts_with("horizon-guard-185-capped-cold-"));
         }
+    }
+    #[test]fn context_v2_requires_explicit_bound_handoff(){
+        let bound=json!({"path":"/fixture/bound.json","sha256":"b".repeat(64)});
+        let mut context=json!({"schema":"horizon-positive185-postreader-final-context-v2",
+            "qualified_route":bound,"task":bound,"registration":bound,"actual_fleet":bound,
+            "actual_fleet_plan":bound,"original_reader":bound,"original_reader_completion":bound,
+            "normal_pool_booking":bound,"work_root":"/fixture/work",
+            "original_start_request_handoff":bound});
+        assert!(serde_json::from_value::<ContextFile>(context.clone()).is_ok());
+        context.as_object_mut().unwrap().remove("original_start_request_handoff");
+        assert!(serde_json::from_value::<ContextFile>(context).is_err());
+    }
+    #[test]fn common_request_control_rejects_missing_roundtrip_foreign_pid1_and_duplicate_done(){
+        let before=json!({"Id":"horizon-qualify-185-fixture.service","InvocationID":"a".repeat(32),
+            "ActiveState":"activating","SubState":"start-pre"});
+        let terminal=json!({"Id":before["Id"],"InvocationID":before["InvocationID"],
+            "MainPID":"0","ControlPID":"0","NRestarts":"0","Job":"","Result":"success","ExecMainStatus":"0"});
+        let done=json!({"MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","_PID":"1","_UID":"0",
+            "UNIT":before["Id"],"INVOCATION_ID":before["InvocationID"],"JOB_TYPE":"start","JOB_RESULT":"done"});
+        let proof=json!({"schema":"horizon-positive185-actual-held-start-job-reload-control-v1",
+            "actual_pre_task_reload_and_start_job_validator_exercised":true,
+            "same_original_actor_start_request_roundtrip_exercised":true,"input_body_reads":0,
+            "publication_authorized":false,"replay_launch_authorized":false,
+            "before_native":before,"terminal_native":terminal,"original_PID1":[done]});
+        common_start_request_control(&proof).unwrap();
+        let mut bad=proof.clone();bad["same_original_actor_start_request_roundtrip_exercised"]=json!(false);
+        assert!(common_start_request_control(&bad).is_err());
+        let mut bad=proof.clone();bad["original_PID1"][0]["INVOCATION_ID"]=json!("b".repeat(32));
+        assert!(common_start_request_control(&bad).is_err());
+        let mut bad=proof;let duplicate=bad["original_PID1"][0].clone();
+        bad["original_PID1"].as_array_mut().unwrap().push(duplicate);
+        assert!(common_start_request_control(&bad).is_err());
     }
 }

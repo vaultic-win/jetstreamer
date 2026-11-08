@@ -42,7 +42,7 @@ fn wait_pidfd(child:&mut std::process::Child,timeout:Duration)->Result<std::proc
     result
 }
 impl Runner<'_>{
-    fn run(&mut self,label:&str,mut cmd:Command,limit:Duration)->Result<Value>{
+    pub(super) fn run(&mut self,label:&str,mut cmd:Command,limit:Duration)->Result<Value>{
         ensure!(!label.contains('/')&&self.sequence<64,"finite child count/label");
         let left=self.deadline.min(self.pool_deadline).checked_duration_since(Instant::now()).context("original final deadline exhausted")?;
         let timeout=limit.min(left);ensure!(!timeout.is_zero(),"no original child budget");

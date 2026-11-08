@@ -7,6 +7,8 @@ mod follow_on;
 mod persistent_reader;
 mod process;
 mod reader_phase;
+#[path = "/usr/local/lib/jetstreamer/horizon-positive185-start-request-policy-source-20261108-v2/start_request.rs"]
+mod start_request;
 mod storage;
 mod timers;
 use anyhow::{Context, Result, ensure};
@@ -21,6 +23,11 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use storage::Bound;
+impl start_request::Transport for process::Runner<'_> {
+    fn metadata(&mut self, label: &str, command: Command, limit: Duration) -> Result<Value> {
+        self.run(label, command, limit)
+    }
+}
 pub const PLANNER: &str = "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v2/planner";
 pub const PLANNER_SHA: &str = "2c0d6af4189b56bbee54aa91a0f7307f2e9892b54c0e9b8efde8cce12314a355";
 pub const HELPER: &str = "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2";
@@ -33,8 +40,8 @@ pub const NATIVE_SHA: &str = "0f1d171bc9fee7a1d06186e62b03e601d575bdcacfa30545cf
 pub const DRIVER: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v10/epoch185-guarded-cold";
 pub const DRIVER_SHA: &str = "0a7dddaaa5ae049a6a9f6ca103fd8463987d6aff52397a4ece09a43387107e1a";
-pub const FINAL: &str = "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261107-v1/horizon-positive185-final";
-pub const FINAL_SHA: &str = "c71aaab50391ac6fde77e45a47e60b39e3ccf51e806ddb59544115f03d7cd21d";
+pub const FINAL: &str = "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v2/horizon-positive185-final";
+pub const FINAL_SHA: &str = "9d6a679c8098008ce296c95c5b88ff18c1a53a19b5bebb48e7f918c39453cfb1";
 pub const REGISTRY: &str =
     "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1";
 pub fn deny_original199(path: &Path) -> Result<()> {
@@ -475,6 +482,7 @@ fn run() -> Result<()> {
         sequence: 0,
     };
     match a[1].as_str() {
+        "qualify-positive185-start-request-handoff" => follow_on::qualify_held_reload(&mut r),
         "qualify-positive185-held-start-job-reload" => follow_on::qualify_held_reload(&mut r),
         "qualify-current-reader-start-phase" => reader_phase::qualify(&mut r),
         "read-current-original-between-guard-fires" => reader_phase::execute(&v, &mut r),

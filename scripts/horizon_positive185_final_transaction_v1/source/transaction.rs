@@ -107,6 +107,9 @@ pub fn execute(c:&ContextFile,route:&Route,own:&Bound,task:&Value,envelope:&Valu
     let iid=text(task,"actor_invocation_id")?;
     let ready=&task["ready"];let started=n(ready,"started_at")?;
     let setup_end=n(task,"original_setup_deadline_unix_seconds")?;
+    let request_owner=crate::start_request::Owner::from_ready(text(task,"actor_unit")?,iid,ready,setup_end)?;
+    let request_handoff=storage::json(&c.original_start_request_handoff)?;
+    crate::start_request::validate_detached(&request_handoff,&request_owner)?;
     ensure!(setup_end.checked_sub(now()?).is_some_and(|left|left>=120),
         "post-reader original600s setup cannot fund finite final attempt; no clock renewal");
     let setup_until=wall_limit(setup_end)?;
@@ -239,6 +242,12 @@ pub fn execute(c:&ContextFile,route:&Route,own:&Bound,task:&Value,envelope:&Valu
         "invocation_id":first_guard["guard_invocation_id"],"original_rows":journal,
         "original_raw_journal":process::bind_file(&journal_raw,1<<20)?}))?;
     first_guard_native(&r.native(guard)?,&r.native(timer)?,&first_guard,ready)?;
+    // All original reader/native/readability gates and the real first guard
+    // passed while Job was empty. Restore only the scheduler request for this
+    // same still-held process so PID1 emits its normal start-done at main entry.
+    // Runner retains the original final30s/pool deadlines for every command.
+    let restored_request=crate::start_request::restore(&mut r,&request_owner,&request_handoff)?;
+    let restored_request=source(r.root,"ORIGINAL_START_REQUEST_RESTORED.json",&restored_request)?;
     let issued=now()?;
     let expires=setup_end.min(n(admission,"expires_at")?).min(issued.checked_add(15).context("token expiry overflow")?);
     release_policy(started,setup_end,stamps,n(&first_guard,"sampled_at")?,issued,expires,issued)?;
@@ -271,6 +280,8 @@ pub fn execute(c:&ContextFile,route:&Route,own:&Bound,task:&Value,envelope:&Valu
         "schema":"horizon-positive185-original-postreader-release-authenticated-v1",
         "original_task":c.task,"original_registration":c.registration,"original_reader":c.original_reader,
         "original_reader_completion":c.original_reader_completion,"original_lifecycle":lifecycle_bound,
+        "original_start_request_handoff":c.original_start_request_handoff,
+        "actual_original_start_request_restored":restored_request,
         "original_ready_started_at":started,"original_setup_deadline":setup_end,
         "original_acceptance_sampled_at":stamps,"actual_original_main_entry":main_entered,
         "normal_token_seal":token_seal.receipt,"all_existing_metadata_clocks_preserved":true,
