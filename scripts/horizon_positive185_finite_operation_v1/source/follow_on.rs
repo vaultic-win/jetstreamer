@@ -274,6 +274,7 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
         "original-ready-native.json",
         &json!({"ready":ready_bound,"original_native":native,"original_setup_deadline":deadline,"no_retry_or_renewal":true}),
     )?;
+    reload_before_task(r, actor, iid, n(&ready, "pid")?, deadline)?;
     let units = storage::json(&binding(&ctx["unit_seal"]["normal_seal"])?)?;
     let dir = PathBuf::from(text(&units, "destination")?);
     let envelope = binding(&ctx["envelope"])?;
@@ -507,9 +508,87 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
     );
     Ok(())
 }
+
+fn held_owner(native: &Value, actor: &str, iid: &str, pid: u64) -> bool {
+    let pid_text = pid.to_string();
+    pid > 1
+        && storage::hex(iid, 32)
+        && native["Id"] == actor
+        && native["InvocationID"] == iid
+        && native["MainPID"] == "0"
+        && native["ControlPID"] == pid_text.as_str()
+        && native["NRestarts"] == "0"
+        && native["ActiveState"] == "activating"
+        && native["SubState"] == "start-pre"
+        && native["Job"] == ""
+}
+
+// Reader installation later reloads the manager. Clear only its display cache
+// before capturing the task/fleet, so that later reload cannot stale their raw
+// ExecStartPre timestamps. The native task still validates the complete command,
+// actual original PID/start ticks, image, limits and unchanged600s deadline.
+fn reload_before_task(
+    r: &mut process::Runner<'_>,
+    actor: &str,
+    iid: &str,
+    pid: u64,
+    deadline: u64,
+) -> Result<()> {
+    ensure!(
+        now()?.checked_add(360).is_some_and(|t| t < deadline),
+        "original setup cannot fund audited pre-task reload and remaining work"
+    );
+    let before = r.native(actor)?;
+    ensure!(
+        held_owner(&before, actor, iid, pid),
+        "original held owner before pre-task reload"
+    );
+    let timers_before = crate::timers::capture(r, "pre-task-before")?;
+    let mut command = Command::new("/usr/bin/systemctl");
+    command.arg("daemon-reload");
+    r.run("pre-task-one-reload", command, Duration::from_secs(15))?;
+    let timers_after = crate::timers::capture_after(r, "pre-task-after", &timers_before)?;
+    let audit = crate::timers::validate(&timers_before, &timers_after)?;
+    let after = r.native(actor)?;
+    ensure!(
+        before == after
+            && held_owner(&after, actor, iid, pid)
+            && now()?.checked_add(360).is_some_and(|t| t < deadline),
+        "original held owner or setup budget changed across pre-task reload"
+    );
+    storage::save(
+        r.root,
+        "original-pre-task-reload-owner-and-timers.json",
+        &json!({"before_native":before,"after_native":after,"timers_before":timers_before,"timers_after":timers_after,"timer_audit":audit,"original_setup_deadline":deadline,"no_signal_restart_or_clock_extension":true,"full_task_and_fleet_capture_must_follow_this_reload":true}),
+    )?;
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pre_task_reload_requires_the_same_original_held_pid_and_invocation() {
+        let iid = "a".repeat(32);
+        let actor = "horizon-qualify-185-test-only.service";
+        let original = json!({"Id":actor,"InvocationID":iid,"MainPID":"0","ControlPID":"1234","NRestarts":"0","ActiveState":"activating","SubState":"start-pre","Job":""});
+        assert!(held_owner(&original, actor, &iid, 1234));
+        assert!(!held_owner(&original, actor, &iid, 0));
+        assert!(!held_owner(&original, actor, &iid, 1235));
+        assert!(!held_owner(&original, "foreign.service", &iid, 1234));
+        assert!(!held_owner(&original, actor, &"b".repeat(32), 1234));
+        for (field, value) in [
+            ("MainPID", "4321"),
+            ("ControlPID", "0"),
+            ("NRestarts", "1"),
+            ("ActiveState", "active"),
+            ("SubState", "running"),
+            ("Job", "123/start"),
+        ] {
+            let mut changed = original.clone();
+            changed[field] = json!(value);
+            assert!(!held_owner(&changed, actor, &iid, 1234), "{field}");
+        }
+    }
     #[test]
     fn rebinding_is_simultaneous_and_retains_original_hash_literals() {
         let b = |n: &str| json!({"path":format!("/fixture/{n}"),"sha256":n.repeat(64)});

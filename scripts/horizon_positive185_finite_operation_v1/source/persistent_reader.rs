@@ -1,6 +1,8 @@
 //! Retain genuine inactive/dead original reader identity through an active,
 //! zero-process target. Production and metadata-native QA use this same path.
 use crate::*;
+#[path = "failed_reader_retirement.rs"]
+pub(crate) mod failed_retirement;
 pub const READER_UNIT: &str = "horizon-failed4-current-accounting-reader-20261104-v1.service";
 const FIELDS: &str = "Id,LoadState,FragmentPath,DropInPaths,Transient,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainCode,ExecMainStatus,ControlGroup,Job,NRestarts,Restart,Result,ActiveState,SubState,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic,ExecStart,Type,User,Group,RemainAfterExit,KillMode,MemoryAccounting,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,PrivateMounts,PrivateTmp,ProtectSystem,ProtectHome,PrivateNetwork,EnvironmentFiles,AppArmorProfile";
 #[derive(Clone, Copy)]

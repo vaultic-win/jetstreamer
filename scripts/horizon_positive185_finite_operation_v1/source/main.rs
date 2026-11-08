@@ -443,6 +443,9 @@ fn run() -> Result<()> {
         path: a[2].clone().into(),
         sha256: a[4].clone(),
     };
+    if a[1] == "reader-lifecycle-harmless-fail" {
+        return persistent_reader::failed_retirement::harmless_fail(&request, &own);
+    }
     if a[1] == "reader-lifecycle-harmless-exec" {
         return persistent_reader::harmless_exec(&request, &own);
     }
@@ -494,6 +497,12 @@ fn run() -> Result<()> {
             Ok(())
         }
         "qualify-positive185-reader-lifecycle" => persistent_reader::qualify(&mut r),
+        "qualify-positive185-failed-reader-retirement" => {
+            persistent_reader::failed_retirement::qualify(&mut r)
+        }
+        "retire-positive185-failed-reader" => {
+            persistent_reader::failed_retirement::execute(&v, &mut r)
+        }
         "qualify-positive185-profile" => activation::qualify(&v, &mut r),
         "start-positive185-original" => activation::start(&v, &mut r),
         "continue-positive185-original" => follow_on::continue_original(&v, &mut r),
