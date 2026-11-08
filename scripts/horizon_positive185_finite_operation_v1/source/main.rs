@@ -519,6 +519,12 @@ fn run() -> Result<()> {
         "qualify-positive185-failed-reader-retirement" => {
             persistent_reader::failed_retirement::qualify(&mut r)
         }
+        "qualify-positive185-successful-reader-retirement" => {
+            persistent_reader::successful_retirement::qualify(&mut r)
+        }
+        "retire-positive185-successful-reader" => {
+            persistent_reader::successful_retirement::execute(&v, &mut r)
+        }
         "retire-positive185-failed-reader" => {
             persistent_reader::failed_retirement::execute(&v, &mut r)
         }

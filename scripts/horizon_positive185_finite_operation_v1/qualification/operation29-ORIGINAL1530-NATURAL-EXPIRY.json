@@ -1,0 +1,76 @@
+{
+  "schema": "horizon-positive185-original-setup-expired-drained-event-v1",
+  "original_ready": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/original-ready-native.json",
+    "sha256": "56123fb7bdee7a4d4b552143cd93e07b0df868fe2e42f020f854a2c6ac3a46ce"
+  },
+  "original_activation": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/original-activation-context.json",
+    "sha256": "07b81dd373fc85d077d6b0d5d941ebe6c5639b150b8d0b02932d53fa680a5e22"
+  },
+  "original_invocation_id": "f3ba06c7d00044e3a462e1d3c45edb0e",
+  "original_setup_deadline": 1794152948,
+  "recorded_unix_seconds": 1794153520,
+  "original_setup_expired_without_renewal": true,
+  "original_process_absent": true,
+  "original_cgroup_empty": true,
+  "main_never_started": true,
+  "all_run_root_file_artifacts_absent": true,
+  "source_package_and_namespace_preserved": true,
+  "all_original_processes_and_descriptors_drained": true,
+  "original_outer_reaped": true,
+  "actual_original_deadline_failure": {
+    "at_unix_seconds": 1794152948,
+    "awaited_condition": "exact actor metadata, admission and first genuine timer guard; expiry stops this attempt",
+    "detail": "pre-start deadline expired; preserve attempt and re-admit distinct retry",
+    "elapsed_millis": 600740,
+    "epoch": 185,
+    "event": "failure",
+    "heartbeat_advances_work": false,
+    "last_substantive_progress_millis_ago": 600714,
+    "operation": "capped cold root-prefix qualification",
+    "phase": "pre-start readiness"
+  },
+  "actual_elapsed_millis_is_original_not_rounded_up": true,
+  "actual_original_start_request_detached": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/original-start-request-handoff.json",
+    "sha256": "45c3cd812deec9dd68df4b39773f0582d5e192f6384baf54cad5995782a09fe7"
+  },
+  "start_request_was_detached_so_no_synthetic_failed_JOB_RESULT_invented": true,
+  "run_root_metadata": [],
+  "token_destination": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/f3ba06c7d00044e3a462e1d3c45edb0e",
+  "token_destination_absent": true,
+  "actor": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "NRestarts": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainPID": "0",
+    "ControlGroup": "",
+    "Id": "horizon-qualify-185-capped-cold-positive-positive-1530-20261108-next.service",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "Job": "",
+    "InvocationID": "f3ba06c7d00044e3a462e1d3c45edb0e"
+  },
+  "original_driver_log": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-1530-20261108-next/private-stdout-stderr.log",
+    "sha256": "bf525881ccbcda239a12e05fc551a65efc248cd3ce9e40479a2220d3ed6fa853"
+  },
+  "successful_original_reader_completion": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/original-enrolled-reader-completion.json",
+    "sha256": "0f3b0531ee90149711f9f0a0b69cfb5b67ccc8090a28a175a70c2ae3c3782983"
+  },
+  "postreader_completed_successfully": true,
+  "final_control_root": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-f3ba06c7d00044e3a462e1d3c45edb0e",
+  "final_control_root_empty": true,
+  "actual_postreader_context_never_written": true,
+  "counter_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1530-original-r3-20261108-next/ROOT_ACTUAL1530_SUCCESSFUL_READER_SECOND_CENSUS_COUNT_REJECTION.json",
+    "sha256": "c299f6f2957d3914d19a7fd8da88bde27d6c2328d255f986402505a1ab028d63"
+  },
+  "successful_reader_retirement_pending": true,
+  "replay_launch_authorized": false,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0
+}

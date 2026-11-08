@@ -249,7 +249,10 @@ fn coherent_timer(
             "rejection":decision.as_ref().err().map(|e| format!("{e:#}")),
             "unset_pending_requires_metadata_requery":decision.as_ref().is_ok_and(|ready| !*ready),
             "raw_uint64_values_preserved":true,"no_timer_mutation_or_deadline_reset":true});
-        r.sequence = r.sequence.checked_add(1).context("timer evidence sequence overflow")?;
+        r.sequence = r
+            .sequence
+            .checked_add(1)
+            .context("timer evidence sequence overflow")?;
         storage::save(
             r.root,
             &format!("{:02}-timer-coherence-{side}.json", r.sequence),
@@ -565,7 +568,7 @@ mod tests {
     #[ignore = "Root-only actual disposable timer and normally sealed test image required"]
     fn native_disposable_original_oneshot_completion_yields_coherent_finite_clock() {
         let root = std::path::PathBuf::from(
-            std::env::var_os("OPERATION28_CONTROL_EVIDENCE")
+            std::env::var_os("OPERATION29_CONTROL_EVIDENCE")
                 .expect("fresh private Root evidence directory"),
         );
         crate::private(&root, true).unwrap();
@@ -581,8 +584,8 @@ mod tests {
             pool_deadline: end,
             sequence: 0,
         };
-        let name = "horizon-operation28-coherence-disposable-20261108-v1.timer";
-        let trigger = json!("horizon-operation28-coherence-disposable-20261108-v1.service");
+        let name = "horizon-operation29-coherence-disposable-20261108-v3.timer";
+        let trigger = json!("horizon-operation29-coherence-disposable-20261108-v3.service");
         let (_, actual, samples) =
             coherent_timer(&mut runner, name, &trigger, "native-control", true).unwrap();
         assert!(

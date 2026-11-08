@@ -4,7 +4,8 @@ use crate::*;
 pub(super) const PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
 // Root replaces ONLY this None after actual helper29 qualification+normal seal.
 // Source proposal presence grants no authority and invents no future digest.
-const QUALIFIED_SHA: Option<&str> = Some("51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f");
+const QUALIFIED_SHA: Option<&str> =
+    Some("51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f");
 
 fn selected(path: &str, sha: Option<&str>) -> Result<Bound> {
     let sha = sha.context("actual qualified postreader30 image SHA is unresolved")?;

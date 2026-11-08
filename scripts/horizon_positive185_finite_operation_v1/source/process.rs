@@ -13,6 +13,7 @@ use std::{
 pub const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 pub const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const OUTPUT_LIMIT: usize = 1 << 20;
+const MAX_METADATA_RECORDS: u32 = 16_384;
 pub struct Runner<'a> {
     pub root: &'a Path,
     pub self_image: &'a Bound,
@@ -87,7 +88,7 @@ impl Runner<'_> {
         allow_native_unit_absent: bool,
     ) -> Result<Value> {
         ensure!(
-            !label.contains('/') && self.sequence < 2048,
+            !label.contains('/') && self.sequence < MAX_METADATA_RECORDS,
             "finite child count/label"
         );
         let left = self
@@ -261,6 +262,69 @@ pub fn stdout_json(receipt: &Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn two_complete_maximum_censuses_and_bounded_coherence_fit() {
+        let two_complete_censuses = 2 * 4096u32;
+        let four_full_coherence_windows = 4 * 128 * 4u32;
+        let fixed_setup_seals_queries_and_finalization = 1024u32;
+        assert!(
+            two_complete_censuses
+                + four_full_coherence_windows
+                + fixed_setup_seals_queries_and_finalization
+                < MAX_METADATA_RECORDS
+        );
+        assert!(2 * 1189 + four_full_coherence_windows < MAX_METADATA_RECORDS);
+    }
+    #[test]
+    fn enlarged_budget_remains_finite_and_does_not_extend_expired_clock() {
+        let base =
+            std::env::temp_dir().join(format!("horizon-op29-counter-test-{}", std::process::id()));
+        let image = Bound {
+            path: "/usr/bin/true".into(),
+            sha256: "a".repeat(64),
+        };
+        let expired = Instant::now() - Duration::from_secs(1);
+        let mut runner = Runner {
+            root: &base,
+            self_image: &image,
+            iid: "counter-control",
+            deadline: expired,
+            pool_deadline: expired,
+            sequence: MAX_METADATA_RECORDS - 1,
+        };
+        assert!(
+            runner
+                .run(
+                    "expired",
+                    Command::new("/usr/bin/true"),
+                    Duration::from_secs(1)
+                )
+                .is_err()
+        );
+        assert_eq!(runner.sequence, MAX_METADATA_RECORDS - 1);
+        runner.sequence = MAX_METADATA_RECORDS;
+        assert!(
+            runner
+                .run(
+                    "exhausted",
+                    Command::new("/usr/bin/true"),
+                    Duration::from_secs(1)
+                )
+                .is_err()
+        );
+        runner.sequence = 0;
+        assert!(
+            runner
+                .run(
+                    "foreign/path",
+                    Command::new("/usr/bin/true"),
+                    Duration::from_secs(1)
+                )
+                .is_err()
+        );
+        assert_eq!(runner.deadline, expired);
+        assert_eq!(runner.pool_deadline, expired);
+    }
     #[test]
     fn bounded_capture_preserves_exact_bytes_and_rejects_overflow() {
         let original = b"original child bytes\n";
