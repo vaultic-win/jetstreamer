@@ -1,13 +1,13 @@
-//! Child of persistent_reader: retire only the preserved0630 failed reader or
+//! Child of persistent_reader: retire only the preserved0900 failed reader or
 //! this executable's harmless failed-control unit. No payload/artifact removal.
 use super::*;
-const FAILED_IID: &str = "0b21efad465648d49d73cb44f2707c12";
-const FAILED_PID: u64 = 3148187;
-const FAILED_GENERATION: &str = "positive-a89c476c915f4e8f910c14222f8fe4f6";
-const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0630-original-20261108-v16/1085-persistent-reader-native-original-outcome.json";
-const FAILED_CAPTURE_SHA: &str = "4fe6a8a42bdb61110f36f03ceef6762090d4810791519db9655949e0748ea681";
-const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-a89c476c915f4e8f910c14222f8fe4f6/spec.json";
-const SPEC_SHA: &str = "7e23cda111e88db7c4ab33f651f1cd12e82c0e3fb11dc64c0cc931025adec08a";
+const FAILED_IID: &str = "98d15a7a9691437da370d800125937b4";
+const FAILED_PID: u64 = 3242681;
+const FAILED_GENERATION: &str = "positive-8eef046c3ead415d9ad03ce6ee76e95c";
+const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0900-original-20261108-v19/1388-persistent-reader-native-original-outcome.json";
+const FAILED_CAPTURE_SHA: &str = "ebbff7db86a4420b933f1dc4e790c2ac644d329bf81d7709e5e003dfd558b2da";
+const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-8eef046c3ead415d9ad03ce6ee76e95c/spec.json";
+const SPEC_SHA: &str = "547ac7a813b8108227730756c5f547882605df97c7454d9bfa483a94a7e412f0";
 const CONTROL_PREFIX: &str = "horizon-positive185-reader-retirement-control-";
 
 fn failed_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {

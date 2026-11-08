@@ -1,0 +1,56 @@
+{
+  "actual_failed_original_pidfd_wait": {
+    "actual_original_pidfd_exit_event": true,
+    "not_a_new_resource_observation": true,
+    "original_iid": "e73d10eda7db411d97cdb0ffa2631548",
+    "original_pid": 3247646
+  },
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-retire-positive-retire-v20-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-positive185-reader-retirement-control-positive-retire-v20.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-failed-reader-retirement-control-20261108-v20/failed-reader-retirement-intent.json",
+    "sha256": "8e7ad1adb23a25787c066eeb41ae3d079210a7c3fefad7da7fa74d01a29f0e1b"
+  },
+  "only_failed_reader_reset": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-failed-reader-retirement-control-20261108-v20/failed-reader-original-PID1.json",
+    "sha256": "6fe2d5fc30fd539f8f2997ad714d732d7e41cc6d883e5bec891db4856fb96923"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-candidate-20261108-v20/operation",
+    "sha256": "ad266817fb9a3ec32ec9fed157053c683a1493c315d29728f9a9d10febc16c8c"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-failed-reader-retirement-native-control-v1",
+  "sealed_packages_and_failed_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-failed-reader-retirement-control-20261108-v20/failed-reader-retirement-timer-audit.json",
+    "sha256": "9e72a0919ca0d7c924377ffad6df65cf206337309bb07cb25d322f20014029b0"
+  }
+}
