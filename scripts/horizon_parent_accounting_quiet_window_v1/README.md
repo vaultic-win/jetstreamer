@@ -1,0 +1,7 @@
+# Parent accounting quiet window
+
+The original199 periodic guard ran during the20:30 parent-memory census, causing its required drained-state validation to fail. The successful full reader and failed census are retained. Only the terminal metadata census child was rearmed after its failure/journal/process/cgroup evidence was preserved; original replay/controller/guard/timer and protected data stayed untouched.
+
+The separately sealed21:00 guard adds a metadata-only `preflight-only` route through its existing checked quiet-window implementation. It authenticates the exact original guard/timer/controller, waits for natural completion, and requires at least10seconds before the next scheduled guard. The parent orchestration obtains this preflight before each exact child and requires8seconds still remaining at dispatch. Rust census and selector integrity checks remain in force. The preflight launches no command and grants no resource or replay authority.
+
+Four strict compiler stages and65 ordinary tests passed. Actual fresh native preflight, accounting/admission, guard and replay remain required. The first compiler failure from an incorrect helper-function name is preserved in the original QA generation; the corrected source was qualified in a distinct scope. Original retained DATA512MiB covers both scopes, raising the complete lower bound to5145788101268bytes; normal6GiB remains.

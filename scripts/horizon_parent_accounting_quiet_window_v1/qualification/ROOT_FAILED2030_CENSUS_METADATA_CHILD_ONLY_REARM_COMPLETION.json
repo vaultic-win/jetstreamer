@@ -1,0 +1,21 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "",
+  "after": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainPID": "0",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-original199-parent-memory-census-20261104-v1.service",
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "Job": "",
+    "InvocationID": ""
+  },
+  "original_journal_and_failure_receipts_preserved": true,
+  "resource_credit_bytes": 0
+}
