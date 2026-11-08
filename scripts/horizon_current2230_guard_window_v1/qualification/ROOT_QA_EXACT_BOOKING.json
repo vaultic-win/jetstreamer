@@ -1,0 +1,16 @@
+{
+  "new_retained_DATA_bytes": 536870912,
+  "previous_retained_DATA_lower_bound_bytes": 5152230552212,
+  "serial_compiler_no_extra_QA_pool": true,
+  "total_pool_bytes": 6442450944,
+  "window_compiler_or_test_bytes": 1073741824,
+  "overlapping_current_adapter_maximum_bytes": 2147483648,
+  "observer_bytes": 2147483648,
+  "status_bytes": 536870912,
+  "Root_bytes": 536870912,
+  "actual_QA_sum_bytes": 3221225472,
+  "ordinary8GiB_test_actor_may_overlap": false,
+  "total_overlap_memory_with_observer_status_Root_bytes": 6442450944,
+  "complete_DATA_bytes": 5152767423124,
+  "no_memory_or_DATA_credit": true
+}

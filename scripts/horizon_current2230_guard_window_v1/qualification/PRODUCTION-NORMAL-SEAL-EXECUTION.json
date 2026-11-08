@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-current2230-bound-guard-window-tools-20261108-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"cfeee0802ada7e4ac0a3de60d98e16ed1fa709632e91d97e054ccf866914d303\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}
