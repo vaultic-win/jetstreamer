@@ -1,0 +1,51 @@
+{
+  "schema": "horizon-actual-qualified-helper34-inherited-census-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2",
+    "sha256": "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/artifact-proof.json",
+    "sha256": "7d4e4128da8a2e889cbfa21dcb51246977c05ef77a72e69368ee267eb7b414e4"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/deployment-seal-receipt.json",
+    "sha256": "da4f0d619338bfc7e67cebe785d62ff1cc41da43136418041d50bb3b57cfeee0"
+  },
+  "source_and_recipes": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/source-and-recipes.json",
+    "sha256": "9d7f2565ab1f33c85bc3a0d6f9597806c28906e8eebe58d7225605619545772d"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+    "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+  },
+  "closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+    "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+  },
+  "actual2130_enrollment_composition_control": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ACTUAL2130-TRANSITION-ORIGINAL-EXECUTION.json",
+    "sha256": "5e44d13f05578943f0dc3b50bbab127db5188f63140b28f5202adb77c61e1d89"
+  },
+  "actual2300_historical_composition_controls": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/actual2300_composed_route_projects_both_sides_and_preserves_every_raw_row-ORIGINAL-EXECUTION.json",
+      "sha256": "b2561b1862955b3dbec48ba0f5541a657de314135b3993c3bcef691c39877b54"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/actual2300_history_or_raw_family_tampering_never_authorizes_projection-ORIGINAL-EXECUTION.json",
+      "sha256": "d6b9e2c9199084fab62f39310438042de029e94caacd53232d7ecc042be2e541"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles-ORIGINAL-EXECUTION.json",
+      "sha256": "26103b3b99858d93c5bb494c069ec93ee69dc8f1a5d8fd2242df09a4c822d20c"
+    }
+  ],
+  "actual2300_complete_outer": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ACTUAL2300-COMPLETE-OUTER-ORIGINAL-EXECUTION.json",
+    "sha256": "bbcc4643d381333327fb365e26b885e2b0bbb202a630f30b510eaa29c33f03b7"
+  },
+  "complete_DATA_lower_bound_bytes": 5160283615892,
+  "fresh_original_fleet_reader_guard_and_replay_still_required": true
+}

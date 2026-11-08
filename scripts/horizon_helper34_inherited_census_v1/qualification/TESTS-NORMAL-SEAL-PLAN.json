@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tests-20261108-v34",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/work/v31-helper-tests",
+      "name": "helper-tests",
+      "sha256": "b573982ee8e8177933de606a0771f13410b10ce66da12dcb9ac2c000db0dc03b",
+      "mode": 365
+    }
+  ]
+}

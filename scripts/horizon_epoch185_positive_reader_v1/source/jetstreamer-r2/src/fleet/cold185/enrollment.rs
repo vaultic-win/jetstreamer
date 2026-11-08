@@ -2,6 +2,8 @@
 //! Registration is not launch, full replay, verification or publication authority.
 use super::*;
 use std::collections::{BTreeMap, BTreeSet};
+#[path = "inherited_live145.rs"]
+mod inherited_live145;
 
 pub(in crate::fleet) const FIELD: &str = "epoch185_cold_startpre_registration";
 pub(in crate::fleet) const SCHEMA: &str = "horizon-epoch185-startpre-fleet-registration-v1";
@@ -918,7 +920,11 @@ impl FleetRoute {
         &self,
         actual: &BTreeMap<String, Value>,
     ) -> Result<BTreeMap<String, Value>> {
-        inherited_native_view(actual, &self.event, &self.aggregate["prior_fleet_value"])
+        let previous = inherited_live145::previous(
+            &self.aggregate["prior_fleet_plan_value"],
+            &self.aggregate["prior_fleet_value"],
+        )?;
+        inherited_native_view(actual, &self.event, &previous)
     }
     pub(in crate::fleet) fn validate_current(
         &self,
@@ -1632,3 +1638,7 @@ fn validate_retained_reader_bridge(
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "inherited_live145_tests.rs"]
+mod inherited_live145_tests;

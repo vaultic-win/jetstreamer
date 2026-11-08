@@ -1,0 +1,11 @@
+{
+  "exact_frozen_source_sha256": "9d7f2565ab1f33c85bc3a0d6f9597806c28906e8eebe58d7225605619545772d",
+  "labels": [
+    "clippy-prod",
+    "clippy-tests",
+    "test-build",
+    "release"
+  ],
+  "all29_externs_and_native210_and_native227_preserved": true,
+  "no_replay_or_publication_credit": true
+}
