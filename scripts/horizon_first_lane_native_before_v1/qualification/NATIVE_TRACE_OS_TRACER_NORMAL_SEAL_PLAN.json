@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-native163-syscall-tracer-tools-20261108-v1",
+  "members": [
+    {
+      "source": "/usr/bin/strace",
+      "name": "strace",
+      "sha256": "28f957c227012de0b18d1bd7fff2d396cb693ea60ed8013be68de071e84b5001",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/native-trace-control-v1/ACTUAL_EXTERNAL_PTRACE_CONTROL.json",
+      "name": "actual-kernel-control.json",
+      "sha256": "e62cf0f17a5247c05c28d24e4cb40d08347932954c7a48b30b08b9c0729126b2",
+      "mode": 292
+    }
+  ]
+}

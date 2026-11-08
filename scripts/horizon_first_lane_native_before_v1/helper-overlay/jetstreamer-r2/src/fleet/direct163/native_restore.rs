@@ -8,6 +8,7 @@ mod held;
 mod provenance;
 mod reader_handoff;
 mod held_candidate;
+mod native_trace;
 
 pub(in crate::fleet) const ACTOR: &str = "horizon-epoch163-native-input-20261106-v1.service";
 pub(in crate::fleet) const ISSUER: &str =
@@ -68,6 +69,8 @@ struct NativeSpec {
     download_unit: String,
     #[serde(default)]
     current_reader_before: Option<Bound>,
+    #[serde(default)]
+    capture_unpack_syscall_errors: bool,
 }
 fn fixed(path: &str, sha256: &str) -> Bound {
     Bound {
@@ -471,6 +474,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
     prepared_phase_fit(&p, &phase)?;
     let download = provenance::download(&s, &p)?;
     let first = held::capture(&p, &s.native_plan)?;
+    let mut native_diagnostic=native_trace::start(s.capture_unpack_syscall_errors,&p,&s.native_plan,&first)?;
     let start = now()?;
     let m = immutable(&s.memory_receipt)?;
     let d = immutable(&s.data_receipt)?;
@@ -545,6 +549,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
     );
     let last = held::capture(&p, &s.native_plan)?;
     ensure!(first == last, "original held actor/ready/namespace changed");
+    if let Some(trace)=&mut native_diagnostic {trace.validate_attached(&first)?;}
     self_actor(&sb, &args[6])?;
     ensure!(now()?.checked_sub(start).is_some_and(|age|age<=90),"native original transaction expired before resource publication");
     let nonce = env::var("INVOCATION_ID")?;
@@ -552,7 +557,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         &p.state,
         &json!({"schema":"epoch163-native-original-resource-evidence-v1",
         "issuer_spec":sb,"fixed_booking":s.native_booking,"resource_phase_ledger":s.current_phase_ledger,"legacy_phase_anchor":fixed(R24,R24_SHA),"visible_thread_takeover":provenance::takeover_binding(),
-        "actual_held_actor":last,"original_download":download,"memory":view.evidence(),"DATA":selected.evidence(),
+        "actual_held_actor":last,"original_download":download,"native_unpack_diagnostic":native_diagnostic.as_ref().map(|t|t.evidence()),"memory":view.evidence(),"DATA":selected.evidence(),
         "raw_before":before,"raw_before_origin":before_origin,"raw_after":after,
         "semantic_after_retention_serde_sha256":storage::sha(&serde_json::to_vec(&semantic_after)?),
         "historical_comparison_after_serde_sha256":storage::sha(&serde_json::to_vec(&comparison_after)?),
@@ -579,7 +584,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         "mapped_worker_image_required":true,"read_only_input_namespace_required":true,
         "mapped_worker_not_yet_started_or_verified":true,"snapshot_body_opened_by_issuer":false,
         "issuer_spec":sb,"fixed_booking":s.native_booking,"resource_phase_ledger":s.current_phase_ledger,"legacy_phase_anchor":fixed(R24,R24_SHA),"visible_thread_takeover":provenance::takeover_binding(),
-        "actual_held_actor":last,"original_download":download,"full_resource_evidence":resource_proof,
+        "actual_held_actor":last,"original_download":download,"native_unpack_diagnostic":native_diagnostic.as_ref().map(|t|t.evidence()),"full_resource_evidence":resource_proof,
         "effective_existing_memory_bytes":view.effective_total_bytes(),"effective_existing_DATA_bytes":selected.effective_protected_bytes(),
         "no_raw_memory_or_DATA_release_credit":true});
     publish(&p.state, &record, env::var("INVOCATION_ID")?.as_str())?;

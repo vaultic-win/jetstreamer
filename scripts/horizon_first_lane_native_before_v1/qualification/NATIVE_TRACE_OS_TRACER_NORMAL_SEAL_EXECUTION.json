@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-native163-syscall-tracer-tools-20261108-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"493279f7b49823866e1d2d41aa8b54607eb07d7131cbe754e7226d2251473a40\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}
