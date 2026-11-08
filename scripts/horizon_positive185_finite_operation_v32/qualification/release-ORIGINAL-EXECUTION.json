@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-current-operation-release-20261108-v32-enrollment32-r3.service; invocation ID: ce6719a0f7084a2a975e0f114606d8e3\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 4.505s\nCPU time consumed: 7.459s\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+}

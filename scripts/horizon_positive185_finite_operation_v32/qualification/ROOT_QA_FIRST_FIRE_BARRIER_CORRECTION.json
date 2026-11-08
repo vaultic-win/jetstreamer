@@ -1,0 +1,15 @@
+{
+  "schema": "operation32-native-first-fire-control-barrier-repair-v1",
+  "original_failed_test": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation32-enrollment32-qa-20261108-v2/ACTUAL-TIMER-COHERENCE-CONTROL-ORIGINAL-EXECUTION.json",
+    "sha256": "b02eef76e4cef206be65ab41470e61c178c551e733358287c1651a1bc62d4441"
+  },
+  "cause": "Test ran before initial1s timer fire; valid finite pre-fire deadline caused single capture. This is not the unset-while-oneshot-executes scenario.",
+  "changed_action": "Use distinct sealed v2 fixture and require actual original service activating with original nonzeroPID before dispatch; test accepts exact Root-owned disposable scope through test-only environment.",
+  "old_own_timer_stopped_after_inactive_success": true,
+  "all_originals_retained": true,
+  "same_operation32_DATA512_retained": true,
+  "complete_DATA_lower_bound_bytes": 5144714359444,
+  "normal6_retained": true,
+  "no_operational_actor_or_old_timer_mutation": true
+}

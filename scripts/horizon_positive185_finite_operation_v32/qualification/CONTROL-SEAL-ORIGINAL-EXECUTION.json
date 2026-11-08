@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/operation32-coherence-control-20261108-v2\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"fdfb18831647dd8610f10d18384f4eef411274407d28010e947f9a056e53d28e\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}
