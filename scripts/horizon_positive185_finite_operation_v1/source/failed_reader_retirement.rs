@@ -1,13 +1,15 @@
-//! Child of persistent_reader: retire only the preserved1030 failed reader or
+//! Child of persistent_reader: retire only the preserved1230 failed29 reader or
 //! this executable's harmless failed-control unit. No payload/artifact removal.
 use super::*;
-const FAILED_IID: &str = "57ecbc9cde4f4064acea33b698683d80";
-const FAILED_PID: u64 = 3283102;
-const FAILED_GENERATION: &str = "positive-431ff97cd75845a2be8bc86a655c5fee";
-const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1030-original-r3-20261108-v21-c2/1411-persistent-reader-native-original-outcome.json";
-const FAILED_CAPTURE_SHA: &str = "855d07257670c0d441c9ea055104e8af4b03244e9aab61335d1d826a49fc15c0";
-const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-431ff97cd75845a2be8bc86a655c5fee/spec.json";
-const SPEC_SHA: &str = "fafbe777e360072fcb9830e8bac15be8ffb744019705848e8a8344091ca487c9";
+const FAILED_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-active-owner-postreader-tools-20261108-v29/jetstreamer-r2";
+const FAILED_HELPER_SHA: &str = "aaa051c04688043b51576911f80cfb317ee868d0b03f52a0ca3dfc53bc50755a";
+const FAILED_IID: &str = "257e2b024a014fa89c16fff1799a98e8";
+const FAILED_PID: u64 = 3341744;
+const FAILED_GENERATION: &str = "positive-e23d5bdd40ed4a888e875d7a30de119c";
+const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1230-original-r3-20261108-v24/1475-persistent-reader-native-original-outcome.json";
+const FAILED_CAPTURE_SHA: &str = "a1c27e1e759bba792a814a46f2ee6a9caf9d627b372b675a65449cd9bafd9aa4";
+const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-e23d5bdd40ed4a888e875d7a30de119c/spec.json";
+const SPEC_SHA: &str = "a4f6b82ceeef8e8a5c464645073382dc0766f3e6f9fcf5659b7973b9a2d9a6d4";
 const CONTROL_PREFIX: &str = "horizon-positive185-reader-retirement-control-";
 
 fn failed_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {
@@ -78,7 +80,7 @@ fn permitted(i: &Installed) -> Result<()> {
     );
     match i.kind {
         Kind::Production => ensure!(
-            i.unit == READER_UNIT && i.argv.first().map(String::as_str) == Some(HELPER),
+            i.unit == READER_UNIT && i.argv.first().map(String::as_str) == Some(FAILED_HELPER),
             "only exact failed production reader role"
         ),
         Kind::Control => ensure!(
@@ -420,13 +422,13 @@ pub(crate) fn execute(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
         unit: READER_UNIT.into(),
         keeper: format!("horizon-positive185-reader-{FAILED_GENERATION}-retain.target"),
         argv: vec![
-            HELPER.into(),
+            FAILED_HELPER.into(),
             "read-failed4-current-accounting".into(),
             SPEC.into(),
             "--spec-sha256".into(),
             SPEC_SHA.into(),
             "--self-sha256".into(),
-            HELPER_SHA.into(),
+            FAILED_HELPER_SHA.into(),
         ],
         kind: Kind::Production,
         seal: process::bind_file(&package.join("deployment-seal-receipt.json"), 4 << 20)?,
@@ -570,7 +572,7 @@ mod tests {
         let mut i = Installed {
             unit: READER_UNIT.into(),
             keeper: "horizon-positive185-reader-test-retain.target".into(),
-            argv: vec![HELPER.into()],
+            argv: vec![FAILED_HELPER.into()],
             kind: Kind::Production,
             package: "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-test".into(),
             seal: fixed("/test/seal.json", &"a".repeat(64)),

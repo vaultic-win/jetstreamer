@@ -1,16 +1,16 @@
 //! A separately qualified post-enrollment reader. Prelaunch memory/DATA readers
 //! remain exact13; an unresolved successor pin never falls back to that image.
 use crate::*;
-pub(super) const PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-active-owner-postreader-tools-20261108-v29/jetstreamer-r2";
+pub(super) const PATH: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
 // Root replaces ONLY this None after actual helper29 qualification+normal seal.
 // Source proposal presence grants no authority and invents no future digest.
-const QUALIFIED_SHA: Option<&str> = Some("aaa051c04688043b51576911f80cfb317ee868d0b03f52a0ca3dfc53bc50755a");
+const QUALIFIED_SHA: Option<&str> = Some("51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f");
 
 fn selected(path: &str, sha: Option<&str>) -> Result<Bound> {
-    let sha = sha.context("actual qualified postreader29 image SHA is unresolved")?;
+    let sha = sha.context("actual qualified postreader30 image SHA is unresolved")?;
     ensure!(
         path == PATH && storage::hex(sha, 64) && sha != HELPER_SHA && sha != FLEET_HELPER_SHA,
-        "postreader29 cannot alias prelaunch13/fleet27 or an unknown image path/pin"
+        "postreader30 cannot alias prelaunch13/fleet27 or an unknown image path/pin"
     );
     Ok(fixed(path, sha))
 }
@@ -39,7 +39,7 @@ pub(super) fn role() -> Result<Value> {
             && proof["all_required_tests_passed"] == true
             && proof["genuine_current_complete_outer_adapter_passed"] == true
             && proof["replay_launch_authorized"] == false,
-        "postreader29 needs actual exact-image strict/native/complete-outer qualification"
+        "postreader30 needs actual exact-image strict/native/complete-outer qualification"
     );
     storage::bytes(&image, 128 << 20, true)?;
     Ok(role)

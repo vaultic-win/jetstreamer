@@ -1,0 +1,34 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "e9f58cb1656d1195f84b6007ab0ee68f3a3f99182be2d880c66e278fb4783b2f",
+  "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-ready-custody-helper-qa-20261108-v30/work/v30-jetstreamer-r2",
+      "name": "jetstreamer-r2",
+      "sha256": "51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f",
+      "bytes": 87003472,
+      "mode": "0555"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-ready-custody-helper-qa-20261108-v30/HELPER29-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "name": "artifact-proof.json",
+      "sha256": "b1c8fcb96fe316489ddc6e1bd4df756acafc6fc143721238debf2a0d30992960",
+      "bytes": 38975,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-ready-custody-helper-qa-20261108-v30/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "exact-source-and-recipes.json",
+      "sha256": "f9950a4771ebead0f0437267ca895d634611fbdcfa14c837b46a6ed79db3c333",
+      "bytes": 452697,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1794143509,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}
