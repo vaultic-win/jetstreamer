@@ -1,0 +1,815 @@
+//! Child of persistent_reader: retire only the preserved1630 successful30 reader or
+//! this executable's harmless successful-control unit. No payload/artifact removal.
+use super::*;
+const SUCCESSFUL_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
+const SUCCESSFUL_HELPER_SHA: &str =
+    "51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f";
+const SUCCESSFUL_IID: &str = "43dca2b7a35c42e6a67ed1c197be7cc4";
+const SUCCESSFUL_PID: u64 = 3497331;
+const SUCCESSFUL_GENERATION: &str = "positive-56e8732c576449908e19e099c954a61a";
+const SUCCESSFUL_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1630-original-r3-20261108-next/1953-persistent-reader-native-original-outcome.json";
+const SUCCESSFUL_CAPTURE_SHA: &str =
+    "2182398f49d9ef31bea47781d0f7eb297281f5096999d6d3dc3d7b7f324f9747";
+const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-56e8732c576449908e19e099c954a61a/spec.json";
+const SPEC_SHA: &str = "db945e093c756ee965d565f744e7be3db336598ecb7c665f20c9ab4007f34fa9";
+const CONTROL_PREFIX: &str = "horizon-positive185-reader-retirement-control-";
+const HELPER1800: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-typed-peer-postreader-tools-20261108-v31/jetstreamer-r2";
+const HELPER1800_SHA: &str = "25b0c4114639d74f5cc7136857b61437e77085cca190c5533d48a3734723bd0b";
+const ACTOR1800: &str =
+    "horizon-qualify-185-capped-cold-positive-positive-1800-20261108-next.service";
+const ACTOR1800_IID: &str = "c03a3715825a41cc9ae16c6c361bc302";
+const READER1800_IID: &str = "4654538cd74f412ba5a1108bb11c0ece";
+const READER1800_PID: u64 = 3557772;
+const ROOT1800: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1800-original-r3-20261108-next";
+
+fn successful_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {
+    ensure!(
+        storage::hex(iid, 32) && pid > 1 && pid <= i32::MAX as u64,
+        "exact successful reader owner shape"
+    );
+    let pid_text = pid.to_string();
+    ensure!(
+        n["Id"] == unit && n["InvocationID"] == iid && n["ExecMainPID"] == pid_text.as_str(),
+        "successful reader original owner/PID differs"
+    );
+    for (key, expected) in [
+        ("LoadState", "loaded"),
+        ("Transient", "no"),
+        ("MainPID", "0"),
+        ("ControlPID", "0"),
+        ("ControlGroup", ""),
+        ("Job", ""),
+        ("NRestarts", "0"),
+        ("Restart", "no"),
+        ("Result", "success"),
+        ("ExecMainCode", "1"),
+        ("ExecMainStatus", "0"),
+        ("ActiveState", "inactive"),
+        ("SubState", "dead"),
+        ("Type", "exec"),
+        ("User", "root"),
+        ("Group", "root"),
+        ("RemainAfterExit", "no"),
+    ] {
+        ensure!(
+            n[key] == expected,
+            "successful reader terminal property: {key}"
+        );
+    }
+    let start = text(n, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
+    let end = text(n, "ExecMainExitTimestampMonotonic")?.parse::<u64>()?;
+    ensure!(
+        start > 0 && end >= start,
+        "successful reader original exit clock"
+    );
+    Ok(())
+}
+fn unchanged_successful(expected: &Value, actual: &Value) -> Result<()> {
+    // Reload may clear display-only ExecStart timestamps/PID, while the
+    // independent command_matches/profile checks retain the exact command.
+    for field in FIELDS
+        .split(',')
+        .filter(|f| *f != "ExecStart" && *f != "FragmentPath")
+    {
+        ensure!(
+            actual[field] == expected[field],
+            "successful original changed: {field}"
+        );
+    }
+    Ok(())
+}
+fn permitted(i: &Installed) -> Result<()> {
+    ensure!(
+        i.package.parent() == Some(Path::new("/usr/local/lib/jetstreamer"))
+            && i.package
+                .file_name()
+                .and_then(|x| x.to_str())
+                .is_some_and(|s| s.starts_with("horizon-positive185-persistent-reader-")),
+        "fixed retired reader package namespace"
+    );
+    ensure!(
+        unit_name(&i.unit) && unit_name(&i.keeper) && i.keeper.ends_with("-retain.target"),
+        "retired reader/keeper names"
+    );
+    match i.kind {
+        Kind::Production => ensure!(
+            i.unit == READER_UNIT
+                && [SUCCESSFUL_HELPER, HELPER1800]
+                    .contains(&i.argv.first().context("retired reader image")?.as_str()),
+            "only exact successful production reader role"
+        ),
+        Kind::Control => ensure!(
+            i.unit.starts_with(CONTROL_PREFIX) && i.unit.ends_with(".service"),
+            "only harmless retirement control role"
+        ),
+    }
+    Ok(())
+}
+fn package(i: &Installed) -> Result<()> {
+    permitted(i)?;
+    storage::bytes(&i.seal, 4 << 20, true)?;
+    let seal = storage::json(&i.seal)?;
+    ensure!(
+        i.seal.path == i.package.join("deployment-seal-receipt.json")
+            && seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["sealer_sha256"] == process::SEALER_SHA
+            && seal["destination"] == i.package.to_string_lossy().as_ref(),
+        "retired reader package normal seal crossed"
+    );
+    let rows = seal["members"]
+        .as_array()
+        .context("normal reader package members")?;
+    ensure!(rows.len() == 2, "exact two reader package members");
+    for (name, expected) in [
+        (&i.unit, source(i.kind, &i.argv)?),
+        (&i.keeper, keeper_source(&i.unit)?),
+    ] {
+        let matches = rows
+            .iter()
+            .filter(|x| x["name"] == *name && x["mode"] == "0444")
+            .collect::<Vec<_>>();
+        ensure!(matches.len() == 1, "exact normally sealed member");
+        let member = Bound {
+            path: i.package.join(name),
+            sha256: text(matches[0], "sha256")?.into(),
+        };
+        ensure!(
+            storage::bytes(&member, 1 << 20, true)? == expected.as_bytes(),
+            "retired reader source differs"
+        );
+    }
+    Ok(())
+}
+fn link_shape(uid: u32, gid: u32, symlink: bool, actual: &Path, expected: &Path) -> Result<()> {
+    ensure!(
+        uid == 0 && gid == 0 && symlink && actual == expected,
+        "foreign or changed reader manager link"
+    );
+    Ok(())
+}
+fn link(i: &Installed, name: &str) -> Result<Value> {
+    ensure!(
+        name == i.unit || name == i.keeper,
+        "only declared two manager aliases"
+    );
+    let parent = Path::new("/etc/systemd/system");
+    let pm = fs::symlink_metadata(parent)?;
+    ensure!(
+        pm.is_dir()
+            && !pm.file_type().is_symlink()
+            && pm.uid() == 0
+            && pm.gid() == 0
+            && pm.mode() & 0o022 == 0,
+        "Root manager directory custody"
+    );
+    ensure!(
+        fs::symlink_metadata(Path::new("/run/systemd/system").join(name))
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+        "foreign runtime reader alias"
+    );
+    let path = parent.join(name);
+    let m = fs::symlink_metadata(&path)?;
+    let target = fs::read_link(&path)?;
+    link_shape(
+        m.uid(),
+        m.gid(),
+        m.file_type().is_symlink(),
+        &target,
+        &i.package.join(name),
+    )?;
+    Ok(
+        json!({"path":path,"target":target,"dev":m.dev(),"ino":m.ino(),"uid":m.uid(),
+        "gid":m.gid(),"ctime":m.ctime(),"ctime_nsec":m.ctime_nsec()}),
+    )
+}
+fn original_journal(r: &mut process::Runner<'_>, n: &Value) -> Result<Bound> {
+    let unit = text(n, "Id")?;
+    let iid = text(n, "InvocationID")?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let mut c = Command::new("/usr/bin/journalctl");
+    c.args([
+        "--all",
+        "--no-pager",
+        "-ojson",
+        "-n",
+        "64",
+        "_PID=1",
+        "_UID=0",
+        &format!("UNIT={unit}"),
+        &format!("INVOCATION_ID={iid}"),
+    ]);
+    let out = r.run("successful-reader-original-PID1", c, Duration::from_secs(5))?;
+    let raw: Vec<u8> = serde_json::from_value(out["stdout_bytes"].clone())?;
+    let rows = std::str::from_utf8(&raw)?
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let exit = text(n, "ExecMainExitTimestampMonotonic")?.parse::<u64>()?;
+    ensure!(
+        rows.iter().any(|x| x["_PID"] == "1"
+            && x["_UID"] == "0"
+            && x["UNIT"] == unit
+            && x["INVOCATION_ID"] == iid
+            && x["_BOOT_ID"] == boot
+            && x["MESSAGE"] == format!("{unit}: Deactivated successfully.")
+            && x["__MONOTONIC_TIMESTAMP"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|at| at >= exit)),
+        "actual same-boot original PID1 success absent"
+    );
+    storage::save(
+        r.root,
+        "successful-reader-original-PID1.json",
+        &json!({"unit":unit,"iid":iid,"rows":rows}),
+    )
+}
+fn inactive(n: &Value) -> Result<()> {
+    ensure!(
+        n["ActiveState"] == "inactive"
+            && n["Job"] == ""
+            && n.get("MainPID").is_none_or(|p| p == "0")
+            && n.get("ControlPID").is_none_or(|p| p == "0"),
+        "retired role not dormant"
+    );
+    Ok(())
+}
+fn cleanup(r: &mut process::Runner<'_>, i: &Installed, original: &Value) -> Result<Bound> {
+    package(i)?;
+    let iid = text(original, "InvocationID")?;
+    let pid = text(original, "ExecMainPID")?.parse::<u64>()?;
+    successful_shape(original, &i.unit, iid, pid)?;
+    let current = query(r, &i.unit)?;
+    profile(&current, i)?;
+    successful_shape(&current, &i.unit, iid, pid)?;
+    unchanged_successful(original, &current)?;
+    ensure!(
+        !Path::new(&format!("/proc/{pid}")).try_exists()?,
+        "original successful reader PID still exists"
+    );
+    control_group_empty(&i.unit)?;
+    let keeper = r.native(&i.keeper)?;
+    ensure!(
+        keeper["LoadState"] == "loaded"
+            && keeper["ActiveState"] == "active"
+            && keeper["SubState"] == "active"
+            && keeper["Job"] == ""
+            && storage::hex(text(&keeper, "InvocationID")?, 32),
+        "exact original keeper not active"
+    );
+    let keeper_cgroup = PathBuf::from(format!("/sys/fs/cgroup/system.slice/{}", i.keeper));
+    ensure!(!keeper_cgroup.try_exists()?, "keeper owns process cgroup");
+    let service_link = link(i, &i.unit)?;
+    let keeper_link = link(i, &i.keeper)?;
+    let journal = original_journal(r, &current)?;
+    let intent = storage::save(
+        r.root,
+        "successful-reader-retirement-intent.json",
+        &json!({"original_successful_native":current,"original_PID1_journal":journal,"package_seal":i.seal,
+        "keeper_native":keeper,"service_link":service_link,"keeper_link":keeper_link,
+        "original_PID_absent":true,"original_cgroup_empty":true,"only_empty_keeper_stop_authorized":true,
+        "only_two_exact_manager_links_authorized":true,"all_original_payloads_and_successful_output_preserved":true}),
+    )?;
+    let mut c = Command::new("/usr/bin/systemctl");
+    c.args(["stop", &i.keeper]);
+    r.run("stop-only-empty-reader-keeper", c, Duration::from_secs(5))?;
+    inactive(&r.native(&i.keeper)?)?;
+    ensure!(
+        !keeper_cgroup.try_exists()?,
+        "stopped keeper owns process cgroup"
+    );
+    let last = query(r, &i.unit)?;
+    profile(&last, i)?;
+    inactive(&last)?;
+    ensure!(
+        last["NRestarts"] == "0"
+            && last["ControlGroup"] == ""
+            && last["Result"] == "success"
+            && last["ExecMainStatus"] == "0",
+        "successful original no-new-claim after keeper stop"
+    );
+    if last["InvocationID"] == iid {
+        successful_shape(&last, &i.unit, iid, pid)?;
+        unchanged_successful(original, &last)?;
+    } else {
+        ensure!(
+            last["InvocationID"] == ""
+                && last["ExecMainPID"] == "0"
+                && last["ExecMainStartTimestampMonotonic"] == "0"
+                && last["ExecMainExitTimestampMonotonic"] == "0",
+            "only genuine cleared inactive success display after GC"
+        );
+    }
+    control_group_empty(&i.unit)?;
+    let timers_before = crate::timers::capture(r, "retire-reader-before")?;
+    ensure!(
+        link(i, &i.unit)? == service_link && link(i, &i.keeper)? == keeper_link,
+        "manager alias changed before unlink"
+    );
+    for name in [&i.unit, &i.keeper] {
+        fs::remove_file(Path::new("/etc/systemd/system").join(name))?;
+    }
+    fs::File::open("/etc/systemd/system")?.sync_all()?;
+    let mut c = Command::new("/usr/bin/systemctl");
+    c.arg("daemon-reload");
+    r.run(
+        "retire-reader-one-audited-reload",
+        c,
+        Duration::from_secs(15),
+    )?;
+    let timers_after = crate::timers::capture_after(r, "retire-reader-after", &timers_before)?;
+    let audit = crate::timers::validate(&timers_before, &timers_after)?;
+    let timer_proof = storage::save(
+        r.root,
+        "successful-reader-retirement-timer-audit.json",
+        &json!({"before":timers_before,"after":timers_after,"audit":audit}),
+    )?;
+    for name in [&i.unit, &i.keeper] {
+        for dir in ["/etc/systemd/system", "/run/systemd/system"] {
+            ensure!(
+                fs::symlink_metadata(Path::new(dir).join(name))
+                    .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+                "reader manager alias remains"
+            );
+        }
+        inactive(&r.native(name)?)?;
+        control_group_empty(name)?;
+    }
+    let final_reader = r.native(&i.unit)?;
+    let final_keeper = r.native(&i.keeper)?;
+    storage::save(
+        r.root,
+        "successful-reader-retirement-completion.json",
+        &json!({"schema":"horizon-positive185-successful-reader-manager-retirement-v1","intent":intent,
+        "original_PID1_journal":journal,"timer_audit":timer_proof,"final_reader_native":final_reader,
+        "final_keeper_native":final_keeper,"actual_two_owned_manager_aliases_removed":true,
+        "actual_same_shared_retirement_primitive_exercised":true,"only_successfully_completed_reader_retired":true,"reset_failed_called":false,
+        "only_zero_process_keeper_stopped":true,"sealed_packages_and_successful_namespaces_preserved":true,
+        "input_body_reads":0,"resource_credit_bytes":0,"replay_launch_authorized":false,
+        "publication_authorized":false,"program":r.self_image}),
+    )
+}
+fn control_proof(r: &process::Runner<'_>, b: &Bound) -> Result<()> {
+    ensure!(
+        b.path.file_name().and_then(|x| x.to_str()) == Some("completion.json")
+            && b.path.parent().and_then(Path::parent)
+                == Some(Path::new("/usr/local/lib/jetstreamer")),
+        "normally sealed retirement control required"
+    );
+    let seal = process::bind_file(
+        &b.path
+            .parent()
+            .context("control parent")?
+            .join("deployment-seal-receipt.json"),
+        4 << 20,
+    )?;
+    storage::bytes(b, 4 << 20, true)?;
+    storage::bytes(&seal, 4 << 20, true)?;
+    let s = storage::json(&seal)?;
+    ensure!(
+        s["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && s["sealer_sha256"] == process::SEALER_SHA
+            && s["destination"]
+                == b.path
+                    .parent()
+                    .context("control parent")?
+                    .to_string_lossy()
+                    .as_ref()
+            && s["members"]
+                .as_array()
+                .context("control seal members")?
+                .iter()
+                .filter(|x| x["name"] == "completion.json"
+                    && x["sha256"] == b.sha256
+                    && x["mode"] == "0444")
+                .count()
+                == 1,
+        "retirement control normal seal differs"
+    );
+    let p = storage::json(b)?;
+    ensure!(
+        p["schema"] == "horizon-positive185-successful-reader-retirement-native-control-v1"
+            && p["program"]["sha256"] == r.self_image.sha256
+            && p["actual_two_owned_manager_aliases_removed"] == true
+            && p["actual_same_shared_retirement_primitive_exercised"] == true
+            && p["input_body_reads"] == 0
+            && p["replay_launch_authorized"] == false,
+        "actual same-image retirement control missing"
+    );
+    ensure!(
+        p["actual_successful_original_pidfd_wait"]["actual_original_pidfd_exit_event"] == true,
+        "native retirement control did not exercise actual successful pidfd exit"
+    );
+    let own = role(
+        r.self_image.path.to_str().context("self image UTF8")?,
+        &r.self_image.sha256,
+    )?;
+    ensure!(
+        storage::json(&binding(&own["artifact"])?)?["all_required_tests_passed"] == true,
+        "final qualified image required before production retirement"
+    );
+    Ok(())
+}
+fn execute1630(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
+    ensure!(
+        v["schema"] == "positive185-retire-exact1630-successful-reader-v1",
+        "exact1630 successful retirement request"
+    );
+    let expiry = fixed(
+        "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1630-original-r3-20261108-next/ROOT_ACTUAL1630_ORIGINAL_SETUP_EXPIRED_AND_DRAINED.json",
+        "19b8a02bd3aa2f4a11be822c4d23d71d90a9e53a75739548b9df67e88c6500f2",
+    );
+    let ended = storage::json(&expiry)?;
+    ensure!(
+        ended["original_invocation_id"] == "56e8732c576449908e19e099c954a61a"
+            && ended["original_setup_deadline"] == 1794156381u64
+            && ended["main_never_started"] == true
+            && ended["token_destination_absent"] == true
+            && ended["original_process_absent"] == true
+            && ended["original_cgroup_empty"] == true
+            && ended["no_second_final_attempt"] == true
+            && now()? > 1794156381,
+        "exact successful1630reader no-final-consumer expiry"
+    );
+    let final_outcome = storage::json(&binding(&ended["final_original_outcome"])?)?;
+    ensure!(
+        final_outcome["exit_code"] == 1
+            && final_outcome["wait_error"].is_null()
+            && final_outcome["program"] == FINAL
+            && ended["final_control_root_empty"] == false
+            && ended["actual_postreader_context_never_written"] == false,
+        "actual failed original final consumer preserved and reaped"
+    );
+    control_proof(r, &binding(&v["native_retirement_control"])?)?;
+    let capture = fixed(SUCCESSFUL_CAPTURE, SUCCESSFUL_CAPTURE_SHA);
+    let raw = storage::json(&capture)?;
+    let expected_argv = [
+        "show",
+        READER_UNIT,
+        "--no-pager",
+        &format!("--property={FIELDS}"),
+    ];
+    ensure!(
+        raw["program"] == "/usr/bin/systemctl"
+            && raw["argv"] == json!(expected_argv)
+            && raw["exit_code"] == 0
+            && raw["wait_error"].is_null()
+            && raw["stdout_overflow"] == false
+            && raw["stdout_read_error"].is_null(),
+        "exact original successful reader metadata capture"
+    );
+    let bytes: Vec<u8> = serde_json::from_value(raw["stdout_bytes"].clone())?;
+    let original = parse(&bytes)?;
+    successful_shape(&original, READER_UNIT, SUCCESSFUL_IID, SUCCESSFUL_PID)?;
+    let package = Path::new("/usr/local/lib/jetstreamer").join(format!(
+        "horizon-positive185-persistent-reader-{SUCCESSFUL_GENERATION}"
+    ));
+    let i = Installed {
+        unit: READER_UNIT.into(),
+        keeper: format!("horizon-positive185-reader-{SUCCESSFUL_GENERATION}-retain.target"),
+        argv: vec![
+            SUCCESSFUL_HELPER.into(),
+            "read-failed4-current-accounting".into(),
+            SPEC.into(),
+            "--spec-sha256".into(),
+            SPEC_SHA.into(),
+            "--self-sha256".into(),
+            SUCCESSFUL_HELPER_SHA.into(),
+        ],
+        kind: Kind::Production,
+        seal: process::bind_file(&package.join("deployment-seal-receipt.json"), 4 << 20)?,
+        package,
+    };
+    let done = cleanup(r, &i, &original)?;
+    println!(
+        "{}",
+        json!({"actual_successful_reader_retirement":done,"no_replay_or_archive_authority":true})
+    );
+    Ok(())
+}
+fn expiry1800_shape(ended: &Value, at: u64) -> Result<()> {
+    ensure!(
+        ended["schema"]
+            == "horizon-positive185-original1800-expiry-and-failed-guard-timer-retirement-event-v1"
+            && ended["original_actor"]["Id"] == ACTOR1800
+            && ended["original_actor"]["InvocationID"] == ACTOR1800_IID
+            && ended["original_actor"]["MainPID"] == "0"
+            && ended["original_actor"]["ControlPID"] == "0"
+            && ended["original_actor"]["Job"] == ""
+            && ended["original_actor"]["NRestarts"] == "0"
+            && ended["original_setup_deadline"] == 1794161757u64
+            && at > 1794161757
+            && ended["original_control_PID_absent"] == true
+            && ended["token_absent"] == true
+            && ended["original_actor_unchanged"] == true
+            && ended["no_retry_or_clock_reset_or_actor_restart"] == true
+            && ended["only_new_failed_guard_timer_stopped"] == true
+            && ended["reset_failed_called"] == false
+            && ended["raw_memory_and_DATA_promises_preserved"] == true
+            && ended["resource_credit_bytes"] == 0
+            && ended["final_timer"]["ActiveState"] == "inactive"
+            && ended["final_timer"]["SubState"] == "dead"
+            && ended["final_timer"]["Job"] == "",
+        "exact1800 actor/failed-guard expiry without resource credit"
+    );
+    Ok(())
+}
+fn execute1800(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
+    let expiry = fixed(
+        &format!(
+            "{ROOT1800}/ROOT_ACTUAL1800_ORIGINAL_EXPIRED_FAILED_GUARD_TIMER_RETIRED_NO_CREDIT.json"
+        ),
+        "24e8285bf579d852693fbf5dd54fc003fdaac171bfd0bce4741b17bf8900a9c1",
+    );
+    let ended = storage::json(&expiry)?;
+    expiry1800_shape(&ended, now()?)?;
+    let actor = r.native(ACTOR1800)?;
+    ensure!(
+        actor["InvocationID"] == ACTOR1800_IID
+            && actor["MainPID"] == "0"
+            && actor["ControlPID"] == "0"
+            && actor["Job"] == ""
+            && actor["NRestarts"] == "0"
+            && actor["ActiveState"] == "failed",
+        "exact1800 expired actor changed or is active"
+    );
+    let failed = storage::json(&binding(&ended["original_final_failure"])?)?;
+    ensure!(
+        failed["original_setup_deadline"] == 1794161757u64
+            && failed["no_retry_clock_reset_fake_success_or_actor_restart"] == true,
+        "actual1800 final failure source crossed"
+    );
+    let outer = storage::json(&fixed(
+        &format!("{ROOT1800}/3310-actual-c71-one-original-final-original-outcome.json"),
+        "f993e51686d714eb5855be8afa8e706382f27faf4aec611775f88490b4984a2c",
+    ))?;
+    ensure!(
+        outer["program"] == FINAL
+            && outer["exit_code"] == 1
+            && outer["wait_error"].is_null()
+            && outer["no_retry_or_clock_reset"] == true,
+        "actual1800 original Final2 was not terminal and reaped"
+    );
+    let completion = storage::json(&fixed(
+        &format!("{ROOT1800}/original-enrolled-reader-completion.json"),
+        "0c42ccd7e806402662aa5d303c2ac4e1f2fc6fe0b20ddb08b4c40346c6d426a4",
+    ))?;
+    ensure!(
+        completion["invocation_id"] == READER1800_IID
+            && completion["program"] == json!(fixed(HELPER1800, HELPER1800_SHA))
+            && completion["original_outer_reaped"] == true
+            && completion["original_cgroup_empty"] == true
+            && completion["original_descriptors_drained"] == true,
+        "actual1800 successful reader lifecycle incomplete"
+    );
+    control_proof(r, &binding(&v["native_retirement_control"])?)?;
+    let capture = fixed(
+        &format!("{ROOT1800}/2020-persistent-reader-native-original-outcome.json"),
+        "9eaae6e4cf74c81e11fe05694919906a7312ecbcb0c4c7884fe3285164dcf179",
+    );
+    let raw = storage::json(&capture)?;
+    ensure!(
+        raw["program"] == "/usr/bin/systemctl"
+            && raw["exit_code"] == 0
+            && raw["wait_error"].is_null()
+            && raw["stdout_overflow"] == false
+            && raw["stdout_read_error"].is_null()
+            && raw["argv"]
+                == json!([
+                    "show",
+                    READER_UNIT,
+                    "--no-pager",
+                    format!("--property={FIELDS}")
+                ]),
+        "exact1800 successful original native capture changed"
+    );
+    let original = parse(&serde_json::from_value::<Vec<u8>>(
+        raw["stdout_bytes"].clone(),
+    )?)?;
+    successful_shape(&original, READER_UNIT, READER1800_IID, READER1800_PID)?;
+    ensure!(
+        completion["original_native"] == original,
+        "actual1800 native completion/capture crossed"
+    );
+    let generation = format!("positive-{ACTOR1800_IID}");
+    let package = Path::new("/usr/local/lib/jetstreamer").join(format!(
+        "horizon-positive185-persistent-reader-{generation}"
+    ));
+    let i = Installed {
+        unit: READER_UNIT.into(),
+        keeper: format!("horizon-positive185-reader-{generation}-retain.target"),
+        argv: vec![
+            HELPER1800.into(),
+            "read-failed4-current-accounting".into(),
+            format!(
+                "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-{ACTOR1800_IID}/spec.json"
+            ),
+            "--spec-sha256".into(),
+            "138a0e70b69ec3cbc0e89b390283e636233d290c61e1c3aa8dc47a0f112ea0dc".into(),
+            "--self-sha256".into(),
+            HELPER1800_SHA.into(),
+        ],
+        kind: Kind::Production,
+        seal: process::bind_file(&package.join("deployment-seal-receipt.json"), 4 << 20)?,
+        package,
+    };
+    let done = cleanup(r, &i, &original)?;
+    println!(
+        "{}",
+        json!({"actual_successful_reader_retirement":done,"exact1800_original":true,"no_replay_or_archive_authority":true})
+    );
+    Ok(())
+}
+pub(crate) fn execute(v: &Value, r: &mut process::Runner<'_>) -> Result<()> {
+    match text(v, "schema")? {
+        "positive185-retire-exact1630-successful-reader-v1" => execute1630(v, r),
+        "positive185-retire-exact1800-successful-reader-v1" => execute1800(v, r),
+        _ => anyhow::bail!("unknown successful-reader retirement target"),
+    }
+}
+pub(crate) fn qualify(r: &mut process::Runner<'_>) -> Result<()> {
+    let generation = format!("retire-{}", r.iid);
+    generation_check(&generation)?;
+    let declaration = storage::save(
+        r.root,
+        "harmless-successful-reader-control-spec.json",
+        &json!({"schema":"horizon-positive185-reader-lifecycle-harmless-child-v1","generation":generation}),
+    )?;
+    let published = seal(
+        r,
+        "harmless-successful-reader-control-spec",
+        &Path::new("/usr/local/lib/jetstreamer").join(format!(
+            "horizon-positive185-retirement-control-spec-{generation}"
+        )),
+        &[("spec.json", declaration)],
+    )?;
+    let spec = binding(&published["members"]["spec.json"])?;
+    let argv = vec![
+        r.self_image.path.display().to_string(),
+        "reader-lifecycle-harmless-exec".into(),
+        spec.path.display().to_string(),
+        "--request-sha256".into(),
+        spec.sha256,
+        "--self-sha256".into(),
+        r.self_image.sha256.clone(),
+    ];
+    let unit = format!("{CONTROL_PREFIX}{}.service", r.iid);
+    let i = install(r, &generation, unit, argv, Kind::Control)?;
+    let mut c = Command::new("/usr/bin/systemctl");
+    c.args(["start", &i.keeper]);
+    r.run(
+        "start-only-harmless-successful-reader-control",
+        c,
+        Duration::from_secs(5),
+    )?;
+    let observed = query(r, &i.unit)?;
+    profile(&observed, &i)?;
+    ensure!(
+        observed["ActiveState"] == "active" && observed["SubState"] == "running",
+        "actual harmless control running PID required"
+    );
+    let wait = wait_original_pid(r, &observed, Instant::now() + Duration::from_secs(8))?;
+    ensure!(
+        wait["actual_original_pidfd_exit_event"] == true,
+        "actual successful control pidfd path required"
+    );
+    let original = query(r, &i.unit)?;
+    profile(&original, &i)?;
+    let done = cleanup(r, &i, &original)?;
+    let mut proof = storage::json(&done)?;
+    proof["schema"] = json!("horizon-positive185-successful-reader-retirement-native-control-v1");
+    proof["actual_successful_original_pidfd_wait"] = wait;
+    let bound = storage::save(
+        r.root,
+        "actual-successful-reader-retirement-native-control.json",
+        &proof,
+    )?;
+    let published = seal(
+        r,
+        "successful-reader-retirement-control-completion",
+        &Path::new("/usr/local/lib/jetstreamer").join(format!(
+            "horizon-positive185-successful-reader-retirement-control-{}",
+            r.iid
+        )),
+        &[("completion.json", bound)],
+    )?;
+    println!("{}", published);
+    Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exact1800_retirement_rejects_active_changed_or_unexpired_original() {
+        let e = json!({"schema":"horizon-positive185-original1800-expiry-and-failed-guard-timer-retirement-event-v1",
+            "original_actor":{"Id":ACTOR1800,"InvocationID":ACTOR1800_IID,"MainPID":"0","ControlPID":"0","Job":"","NRestarts":"0"},
+            "original_setup_deadline":1794161757u64,"original_control_PID_absent":true,"token_absent":true,
+            "original_actor_unchanged":true,"no_retry_or_clock_reset_or_actor_restart":true,"only_new_failed_guard_timer_stopped":true,
+            "reset_failed_called":false,"raw_memory_and_DATA_promises_preserved":true,"resource_credit_bytes":0,
+            "final_timer":{"ActiveState":"inactive","SubState":"dead","Job":""}});
+        expiry1800_shape(&e, 1794161758).unwrap();
+        assert!(expiry1800_shape(&e, 1794161757).is_err());
+        for pointer in [
+            "/original_actor/MainPID",
+            "/original_actor/ControlPID",
+            "/original_actor/Job",
+            "/original_actor/InvocationID",
+        ] {
+            let mut changed = e.clone();
+            *changed.pointer_mut(pointer).unwrap() = json!("foreign-or-active");
+            assert!(expiry1800_shape(&changed, 1794161758).is_err());
+        }
+        for key in [
+            "token_absent",
+            "original_control_PID_absent",
+            "raw_memory_and_DATA_promises_preserved",
+        ] {
+            let mut changed = e.clone();
+            changed[key] = json!(false);
+            assert!(expiry1800_shape(&changed, 1794161758).is_err());
+        }
+    }
+    fn successful() -> Value {
+        json!({"Id":"test.service","InvocationID":"a".repeat(32),"ExecMainPID":"321", "LoadState":"loaded","Transient":"no",
+        "MainPID":"0","ControlPID":"0","ControlGroup":"","Job":"","NRestarts":"0","Restart":"no","Result":"success",
+        "ExecMainCode":"1","ExecMainStatus":"0","ActiveState":"inactive","SubState":"dead","Type":"exec","User":"root","Group":"root",
+        "RemainAfterExit":"no","ExecMainStartTimestampMonotonic":"1000","ExecMainExitTimestampMonotonic":"2000"})
+    }
+    #[test]
+    fn successful_reader_rejects_live_jobs_restarts_failure_and_crossed_owner() {
+        let a = successful();
+        successful_shape(&a, "test.service", &"a".repeat(32), 321).unwrap();
+        for (key, value) in [
+            ("MainPID", "2"),
+            ("ControlPID", "3"),
+            ("Job", "queued"),
+            ("NRestarts", "1"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("InvocationID", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            ("ExecMainPID", "322"),
+        ] {
+            let mut b = a.clone();
+            b[key] = json!(value);
+            assert!(
+                successful_shape(&b, "test.service", &"a".repeat(32), 321).is_err(),
+                "{key}"
+            );
+        }
+    }
+    #[test]
+    fn foreign_manager_link_custody_or_target_never_authorizes_unlink() {
+        let p = Path::new("/usr/local/lib/jetstreamer/qualified/member.service");
+        link_shape(0, 0, true, p, p).unwrap();
+        assert!(link_shape(1001, 0, true, p, p).is_err());
+        assert!(link_shape(0, 1001, true, p, p).is_err());
+        assert!(link_shape(0, 0, false, p, p).is_err());
+        assert!(link_shape(0, 0, true, Path::new("/etc/foreign"), p).is_err());
+    }
+    #[test]
+    fn authoritative_native_fields_never_borrow_display_only_reload_exception() {
+        let a = successful();
+        let mut b = a.clone();
+        b["ExecStart"] = json!("cleared-display-only");
+        unchanged_successful(&a, &b).unwrap();
+        b["ExecMainPID"] = json!("322");
+        assert!(unchanged_successful(&a, &b).is_err());
+        b = a.clone();
+        b["InvocationID"] = json!("b".repeat(32));
+        assert!(unchanged_successful(&a, &b).is_err());
+    }
+    #[test]
+    fn crossed_package_or_production_role_cannot_enter_retirement() {
+        let mut i = Installed {
+            unit: READER_UNIT.into(),
+            keeper: "horizon-positive185-reader-test-retain.target".into(),
+            argv: vec![SUCCESSFUL_HELPER.into()],
+            kind: Kind::Production,
+            package: "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-test".into(),
+            seal: fixed("/test/seal.json", &"a".repeat(64)),
+        };
+        permitted(&i).unwrap();
+        i.package = "/etc/systemd/system".into();
+        assert!(permitted(&i).is_err());
+        i.package = "/usr/local/lib/jetstreamer/foreign".into();
+        assert!(permitted(&i).is_err());
+        i.package = "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-test".into();
+        i.unit = "healthy-replay.service".into();
+        assert!(permitted(&i).is_err());
+        i.unit = READER_UNIT.into();
+        i.argv[0] = "/bin/false".into();
+        assert!(permitted(&i).is_err());
+    }
+    #[test]
+    fn dormant_role_cannot_hide_active_jobs_or_processes() {
+        let a = json!({"ActiveState":"inactive","Job":"","MainPID":"0","ControlPID":"0"});
+        inactive(&a).unwrap();
+        for key in ["Job", "MainPID", "ControlPID"] {
+            let mut b = a.clone();
+            b[key] = json!("1");
+            assert!(inactive(&b).is_err());
+        }
+    }
+}

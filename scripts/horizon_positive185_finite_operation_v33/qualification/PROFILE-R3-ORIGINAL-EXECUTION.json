@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"members\":{\"capability.json\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v33-fleet-order-r1-r3/capability.json\",\"sha256\":\"70366267e8b3c59c685abe5912e1809f5c83f5917c8959d77457e037acf91452\"},\"route.json\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v33-fleet-order-r1-r3/route.json\",\"sha256\":\"0d29a9d513a4d60b4c993cad4479053ad8872d5c8fb602fc723c6746ee84a625\"}},\"normal_seal\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v33-fleet-order-r1-r3/deployment-seal-receipt.json\",\"sha256\":\"988feaa29f2ed369bf996b5e2a41e89890728b39a6b61239038bdd7418c5d6d0\"}}\n",
+  "stderr": "Running as unit: horizon-positive185-profile-original-20261108-v33-fleet-order-r1-r3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 519ms\nCPU time consumed: 277ms\nMemory peak: 5.0M\nMemory swap peak: 0B\n"
+}

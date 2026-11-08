@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"audit\": \"/home/sol/.jetstreamer-private/r2-status-receipts/range-101-200-status-audit-20261108211932.json\", \"count\": 1, \"authenticated_readback\": true}\n",
+  "stderr": "Running as unit: horizon-visible-status185-fleet-order-and-control-review-event-20261108-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 4.233s\nCPU time consumed: 415ms\nMemory peak: 804.0K\nMemory swap peak: 0B\n"
+}

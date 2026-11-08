@@ -1,0 +1,18 @@
+{
+  "schema": "horizon-operation33-fleet-order-serial-normal6-booking-v1",
+  "previous_retained_DATA_lower_bound_bytes": 5145788101268,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "complete_DATA_lower_bound_bytes": 5146324972180,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_open_bytes": 0,
+  "actual_Helper32_consumer_library": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-chain128-typed-frame-library-20261107-v4/libhorizon_recovered_resource_frame_typed_bridge_v1.rlib",
+    "sha256": "7d62895a77825438d96356c70d821504ec06029124b209a89bd5e9acc738ec0c"
+  },
+  "original2100fleet_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2100-original-r3-20261108-next/1798-actual-enrolled-fleet-original-outcome.json",
+    "sha256": "89d99dad6485eefa9320b24f098928e6ed47b0677decfc7f5a4ff21a955dcd28"
+  },
+  "no_resource_credit": true,
+  "no_original_actor_retry": true
+}
