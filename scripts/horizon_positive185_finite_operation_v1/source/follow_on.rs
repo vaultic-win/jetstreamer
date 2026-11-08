@@ -520,7 +520,60 @@ fn held_owner(native: &Value, actor: &str, iid: &str, pid: u64) -> bool {
         && native["NRestarts"] == "0"
         && native["ActiveState"] == "activating"
         && native["SubState"] == "start-pre"
-        && native["Job"] == ""
+        && native["Job"].as_str().is_some_and(|s| {
+            s.parse::<u32>()
+                .is_ok_and(|id| id > 0 && id.to_string() == s)
+        })
+}
+
+fn unit_object(actor: &str) -> String {
+    let mut object = String::from("/org/freedesktop/systemd1/unit/");
+    for byte in actor.bytes() {
+        if byte.is_ascii_alphanumeric() {
+            object.push(char::from(byte));
+        } else {
+            use std::fmt::Write as _;
+            write!(object, "_{byte:02x}").expect("String formatting");
+        }
+    }
+    object
+}
+
+fn validate_job_output(raw: &[u8], actor: &str, job: &str) -> Result<()> {
+    let expected = format!(
+        "u {job}\n(so) {actor:?} {:?}\ns \"start\"\ns \"running\"\n",
+        unit_object(actor)
+    );
+    ensure!(
+        raw == expected.as_bytes(),
+        "exact held start-job owner/type/state"
+    );
+    Ok(())
+}
+
+fn held_start_job(r: &mut process::Runner<'_>, native: &Value, actor: &str) -> Result<Value> {
+    let job = text(native, "Job")?;
+    ensure!(
+        job.parse::<u32>()
+            .is_ok_and(|id| id > 0 && id.to_string() == job),
+        "canonical pending held job id"
+    );
+    let mut command = Command::new("/usr/bin/busctl");
+    command.args([
+        "--system",
+        "get-property",
+        "org.freedesktop.systemd1",
+        &format!("/org/freedesktop/systemd1/job/{job}"),
+        "org.freedesktop.systemd1.Job",
+        "Id",
+        "Unit",
+        "JobType",
+        "State",
+    ]);
+    let result = r.run("held-start-job", command, Duration::from_secs(5))?;
+    let raw: Vec<u8> = serde_json::from_value(result["stdout_bytes"].clone())?;
+    validate_job_output(&raw, actor, job)?;
+    Ok(result)
 }
 
 // Reader installation later reloads the manager. Clear only its display cache
@@ -543,6 +596,7 @@ fn reload_before_task(
         held_owner(&before, actor, iid, pid),
         "original held owner before pre-task reload"
     );
+    let before_job = held_start_job(r, &before, actor)?;
     let timers_before = crate::timers::capture(r, "pre-task-before")?;
     let mut command = Command::new("/usr/bin/systemctl");
     command.arg("daemon-reload");
@@ -556,11 +610,142 @@ fn reload_before_task(
             && now()?.checked_add(360).is_some_and(|t| t < deadline),
         "original held owner or setup budget changed across pre-task reload"
     );
+    let after_job = held_start_job(r, &after, actor)?;
     storage::save(
         r.root,
         "original-pre-task-reload-owner-and-timers.json",
-        &json!({"before_native":before,"after_native":after,"timers_before":timers_before,"timers_after":timers_after,"timer_audit":audit,"original_setup_deadline":deadline,"no_signal_restart_or_clock_extension":true,"full_task_and_fleet_capture_must_follow_this_reload":true}),
+        &json!({"before_native":before,"after_native":after,"before_start_job":before_job,"after_start_job":after_job,"timers_before":timers_before,"timers_after":timers_after,"timer_audit":audit,"original_setup_deadline":deadline,"no_signal_restart_or_clock_extension":true,"full_task_and_fleet_capture_must_follow_this_reload":true}),
     )?;
+    Ok(())
+}
+
+// Isolated real systemd start-pre control. No campaign actor, input or replay.
+pub fn qualify_held_reload(r: &mut process::Runner<'_>) -> Result<()> {
+    let actor = format!("horizon-positive185-held-reload-control-{}.service", r.iid);
+    ensure!(unit_name(&actor), "held control unit syntax");
+    let absent = r.native(&actor)?;
+    ensure!(
+        absent["LoadState"] == "not-found",
+        "fresh held control namespace"
+    );
+    let mut start = Command::new("/usr/bin/systemd-run");
+    start.args(["--no-block", "--service-type=oneshot", "--unit", &actor]);
+    for property in [
+        "User=sol",
+        "Group=horizon",
+        "Restart=no",
+        "RemainAfterExit=yes",
+        "MemoryMax=64M",
+        "MemorySwapMax=0",
+        "CPUQuota=100%",
+        "TasksMax=32",
+        "TimeoutStartSec=60",
+        "TimeoutStopSec=5",
+        "NoNewPrivileges=yes",
+        "ProtectSystem=strict",
+        "ProtectHome=yes",
+        "PrivateNetwork=yes",
+        "CapabilityBoundingSet=",
+        "AmbientCapabilities=",
+        "ExecStartPre=/usr/bin/sleep 30",
+    ] {
+        start.arg(format!("--property={property}"));
+    }
+    start.arg("/usr/bin/true");
+    r.run("start-original-held-control", start, Duration::from_secs(5))?;
+    let mut native = r.native(&actor)?;
+    for _ in 0..50 {
+        if native["SubState"] == "start-pre" && native["ControlPID"] != "0" {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+        native = r.native(&actor)?;
+    }
+    let iid = text(&native, "InvocationID")?;
+    let pid = text(&native, "ControlPID")?.parse::<u64>()?;
+    ensure!(
+        held_owner(&native, &actor, iid, pid),
+        "genuine held control owner"
+    );
+    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid as u32, 0) as i32 };
+    ensure!(fd >= 0, "actual held control pidfd");
+    struct Pidfd(i32);
+    impl Drop for Pidfd {
+        fn drop(&mut self) {
+            unsafe {
+                libc::close(self.0);
+            }
+        }
+    }
+    let fd = Pidfd(fd);
+    let deadline = now()?
+        .checked_add(600)
+        .context("synthetic control-only budget")?;
+    reload_before_task(r, &actor, iid, pid, deadline)?;
+    let mut poll = libc::pollfd {
+        fd: fd.0,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    ensure!(
+        unsafe { libc::poll(&mut poll, 1, 60000) } > 0 && poll.revents & libc::POLLIN != 0,
+        "original held control process completion"
+    );
+    let mut terminal = r.native(&actor)?;
+    for _ in 0..100 {
+        if terminal["SubState"] == "exited" {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+        terminal = r.native(&actor)?;
+    }
+    ensure!(
+        terminal["InvocationID"] == iid
+            && terminal["ActiveState"] == "active"
+            && terminal["SubState"] == "exited"
+            && terminal["MainPID"] == "0"
+            && terminal["ControlPID"] == "0"
+            && terminal["NRestarts"] == "0"
+            && terminal["Result"] == "success"
+            && terminal["ExecMainStatus"] == "0"
+            && terminal["Job"] == "",
+        "genuine held control completed without restart"
+    );
+    let mut journal = Command::new("/usr/bin/journalctl");
+    journal.args(["--all", "--no-pager", "-ojson", "-u", &actor]);
+    let original = r.run(
+        "original-held-control-PID1",
+        journal,
+        Duration::from_secs(5),
+    )?;
+    let raw: Vec<u8> = serde_json::from_value(original["stdout_bytes"].clone())?;
+    let rows = std::str::from_utf8(&raw)?
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        rows.iter().any(|v| v["_PID"] == "1"
+            && v["_UID"] == "0"
+            && v["UNIT"] == actor
+            && v["INVOCATION_ID"] == iid
+            && v["JOB_RESULT"] == "done"),
+        "actual held control PID1 completion"
+    );
+    let result = storage::save(
+        r.root,
+        "actual-held-reload-control.json",
+        &json!({
+            "schema":"horizon-positive185-actual-held-start-job-reload-control-v1",
+            "program":r.self_image,"before_native":native,"terminal_native":terminal,
+            "original_PID1":rows,"actual_pre_task_reload_and_start_job_validator_exercised":true,
+            "synthetic_control_budget_not_admission":true,"input_body_reads":0,
+            "replay_launch_authorized":false,"publication_authorized":false
+        }),
+    )?;
+    println!(
+        "{}",
+        json!({"actual_held_reload_control":result,"no_campaign_work":true})
+    );
     Ok(())
 }
 #[cfg(test)]
@@ -570,7 +755,7 @@ mod tests {
     fn pre_task_reload_requires_the_same_original_held_pid_and_invocation() {
         let iid = "a".repeat(32);
         let actor = "horizon-qualify-185-test-only.service";
-        let original = json!({"Id":actor,"InvocationID":iid,"MainPID":"0","ControlPID":"1234","NRestarts":"0","ActiveState":"activating","SubState":"start-pre","Job":""});
+        let original = json!({"Id":actor,"InvocationID":iid,"MainPID":"0","ControlPID":"1234","NRestarts":"0","ActiveState":"activating","SubState":"start-pre","Job":"39765815"});
         assert!(held_owner(&original, actor, &iid, 1234));
         assert!(!held_owner(&original, actor, &iid, 0));
         assert!(!held_owner(&original, actor, &iid, 1235));
@@ -583,10 +768,32 @@ mod tests {
             ("ActiveState", "active"),
             ("SubState", "running"),
             ("Job", "123/start"),
+            ("Job", ""),
+            ("Job", "0"),
+            ("Job", "01"),
+            ("Job", "-1"),
         ] {
             let mut changed = original.clone();
             changed[field] = json!(value);
             assert!(!held_owner(&changed, actor, &iid, 1234), "{field}");
+        }
+    }
+    #[test]
+    fn held_job_requires_exact_native_unit_start_type_running_state_and_id() {
+        let actor = "horizon-qualify-185-test-only.service";
+        let raw = format!(
+            "u 123\n(so) {actor:?} {:?}\ns \"start\"\ns \"running\"\n",
+            unit_object(actor)
+        );
+        assert!(validate_job_output(raw.as_bytes(), actor, "123").is_ok());
+        for changed in [
+            raw.replace("u 123", "u 124"),
+            raw.replace("\"start\"", "\"stop\""),
+            raw.replace("\"running\"", "\"waiting\""),
+            raw.replace("test-only", "foreign"),
+            raw.replace("unit/horizon", "unit/foreign"),
+        ] {
+            assert!(validate_job_output(changed.as_bytes(), actor, "123").is_err());
         }
     }
     #[test]

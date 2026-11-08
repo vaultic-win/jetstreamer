@@ -475,6 +475,7 @@ fn run() -> Result<()> {
         sequence: 0,
     };
     match a[1].as_str() {
+        "qualify-positive185-held-start-job-reload" => follow_on::qualify_held_reload(&mut r),
         "qualify-current-reader-start-phase" => reader_phase::qualify(&mut r),
         "read-current-original-between-guard-fires" => reader_phase::execute(&v, &mut r),
         "assemble-positive185" => {
