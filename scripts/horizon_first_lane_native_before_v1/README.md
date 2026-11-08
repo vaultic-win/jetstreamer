@@ -1,6 +1,6 @@
 # Original reader bracket and held first128 enrollment
 
-These overlays preserve the qualified helper21, node2 and guard2 source/dependency graph recorded in `qualification/`. They supplement the earlier witness reader and memory4/DATA4 source packages; they are not standalone Cargo projects.
+These overlays preserve the qualified helper22, node2 and guard2 source/dependency graph recorded in `qualification/`. They supplement the earlier witness reader and memory4/DATA4 source packages; they are not standalone Cargo projects.
 
 Native restore can explicitly select its genuine immutable full-reader accounting as a historical before bracket. Its exact Bound must match the actual opaque memory request. Qualification, original completion, both original raw reports and the original 300-second freshness clock remain mandatory. Admission still executes a fresh complete after-builder, both physical snapshots, all typed/source/claim comparisons and the unchanged 90/105/120-second deadlines. Omitting the opt-in retains the previous two-fresh-pass behavior.
 
@@ -29,3 +29,9 @@ The actual 02:00 native attempt passed the resource-pool handoff but failed `gua
 Helper21 passed four strict compiler stages, 2928 ordinary tests and nine native controls before normal sealing (SHA256 `2f6267998b9607cd9696e02137fcdf771e4c43d24e1f5fc157dab463e9ccc978`). Its extra QA reservation was closed after 599 original execution records and 584 terminal empty units were reconciled, retaining all DATA obligations. The operational full reader remains helper13. Actual native admission is still pending.
 
 No archive, sidecar or R2 object is changed by these source overlays. Actual restore/finalization, first128 capability, fresh admission/enrollment/guard/release, replay and all delivery checks remain required. Builds and restore actors do not count as useful replay lanes.
+
+The actual 02:30 issuer failed foreign census membership before admission. Source inspection identified the newly held native actor: complete discovery authenticates it during the issuer, after the original reader ran. Helper22 binds that exact original held capture, ready record, plan, booking and phase in a private capability. Only the authenticated helper substitution and newly held candidate may change comparison membership; all other differences fail with named diagnostics. Original reports, candidate128GiB/40GiB charges, foreign policy and clocks remain intact. No persisted fresh raw report is claimed for the failed attempt.
+
+First128 admission and held release now reproduce the original reader's authenticated retained136 projection on both fresh scans before semantic comparisons. Original raw reports remain separate, and the original projected brackets are reproduced and checked. This does not change helper/census policy or issue new resource credit.
+
+Helper22 passed four strict compiler stages, 2932 ordinary tests and nine native controls, then normal sealing (SHA256 `3c01f6242ae0b7fd86f2a8328db3f5fc1fcd160f094b2a9b7ad42eec3ab7f3a7`). Its extra QA closure reconciles 637 original execution records and 631 terminal empty units, including the qualified finite driver control and preserved failed compiler. Native admission and first128 operational execution remain pending; reader13 stays selected.

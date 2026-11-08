@@ -7,6 +7,7 @@ use std::os::fd::{AsRawFd, FromRawFd};
 mod held;
 mod provenance;
 mod reader_handoff;
+mod held_candidate;
 
 pub(in crate::fleet) const ACTOR: &str = "horizon-epoch163-native-input-20261106-v1.service";
 pub(in crate::fleet) const ISSUER: &str =
@@ -498,7 +499,8 @@ pub(in crate::fleet) async fn run() -> Result<()> {
     );
     pressures(&storage::json(&to_bound(&current["observer"])?)?)?;
     let historical=s.current_reader_before.as_ref().map(|reader|
-        reader_handoff::Handoff::load(reader,&s.memory_request,&view,&s.resource_accounting,now()?)).transpose()?;
+        reader_handoff::Handoff::load(reader,&s.memory_request,&view,&s.resource_accounting,now()?,
+            held_candidate::Candidate::load(&sb,&image,&s,&p,&first)?)).transpose()?;
     let (before,before_origin)=if let Some(handoff)=&historical {
         (handoff.before().clone(),handoff.origin().clone())
     } else {

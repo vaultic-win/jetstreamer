@@ -19,6 +19,7 @@ pub(super) struct Handoff {
     retained: Retained,
     old_helper: Value,
     new_helper: Value,
+    candidate: held_candidate::Candidate,
 }
 fn slot(raw: &Value) -> Result<&Value> {
     let rows=raw["native_pool_suballocations"].as_array().context("native handoff complete pool")?;
@@ -142,30 +143,79 @@ fn exact_helper_census(row:&Value,helper:&Value)->Result<()> {
  ensure!(row["Id"]==helper["unit"] && row["InvocationID"]==helper["invocation_id"] && row["MainPID"].as_str()==Some(n(helper,"pid")?.to_string().as_str()),"native helper census crossed role/IID/PID");
  Ok(())
 }
-fn compare_native_census(before:&Value,fresh:&Value,old:&Value,new:&Value,comparison:&mut Value)->Result<()> {
+fn exact_candidate_row(row:&Value,capture:&Value,exact_fields:bool,field:&str)->Result<()> {
+ let object=row.as_object().with_context(||format!("native candidate {field} row missing"))?;
+ if exact_fields {ensure!(object.len()==CENSUS_FIELDS.len(),"native candidate {field} exact12field set differs; actual={:?}",object.keys().collect::<Vec<_>>());}
+ for key in CENSUS_FIELDS {
+  ensure!(row[key].is_string() && row[key]==capture["native"][key],
+   "native candidate {field} differs from actual original held capture: key={key} expected={} actual={}",capture["native"][key],row[key]);
+ }
+ ensure!(row["Id"]==ACTOR && row["InvocationID"]==capture["iid"]
+  && row["MainPID"].as_str()==Some(n(capture,"pid")?.to_string().as_str()),"native candidate {field} role/IID/PID crossed");
+ Ok(())
+}
+fn foreign_membership(a:&serde_json::Map<String,Value>,b:&serde_json::Map<String,Value>,old_name:&str,new_name:&str,field:&str)->Result<()> {
+ let foreign_a=a.keys().filter(|k|k.as_str()!=old_name).cloned().collect::<std::collections::BTreeSet<_>>();
+ let foreign_b=b.keys().filter(|k|k.as_str()!=new_name && k.as_str()!=ACTOR).cloned().collect::<std::collections::BTreeSet<_>>();
+ let missing=foreign_a.difference(&foreign_b).cloned().collect::<Vec<_>>();
+ let unexpected=foreign_b.difference(&foreign_a).cloned().collect::<Vec<_>>();
+ ensure!(missing.is_empty() && unexpected.is_empty(),
+  "native handoff foreign {field} membership changed: missing={missing:?} unexpected={unexpected:?}; permitted_removed={old_name} permitted_added=[{new_name},{ACTOR}]");
+ Ok(())
+}
+fn compare_native_census(before:&Value,fresh:&Value,old:&Value,new:&Value,capture:&Value,comparison:&mut Value)->Result<()> {
  for field in ["native_before","native_after"] {
-  let a=before[field].as_object().context("native historical census missing")?;
-  let b=fresh[field].as_object().context("native fresh census missing")?;
+  let a=before[field].as_object().with_context(||format!("native historical {field} census missing"))?;
+  let b=fresh[field].as_object().with_context(||format!("native fresh {field} census missing"))?;
   let old_name=old["unit"].as_str().context("old native helper unit")?;
   let new_name=new["unit"].as_str().context("new native helper unit")?;
-  ensure!(old_name==READER && new_name==ISSUER && old_name!=new_name && !a.contains_key(new_name) && !b.contains_key(old_name),"native handoff crossed or duplicate helper membership");
+  ensure!(old_name==READER && new_name==ISSUER && old_name!=new_name && !a.contains_key(new_name) && !b.contains_key(old_name),
+   "native handoff {field} crossed or duplicate helper membership; original_keys={:?} fresh_keys={:?}",a.keys().collect::<Vec<_>>(),b.keys().collect::<Vec<_>>());
+  ensure!(!a.contains_key(ACTOR),"native candidate was already present in original {field}; no induction permitted");
   exact_helper_census(a.get(old_name).context("original helper census absent")?,old)?;
   exact_helper_census(b.get(new_name).context("fresh helper census absent")?,new)?;
-  let foreign_a=a.keys().filter(|k|k.as_str()!=old_name).collect::<std::collections::BTreeSet<_>>();
-  let foreign_b=b.keys().filter(|k|k.as_str()!=new_name).collect::<std::collections::BTreeSet<_>>();
-  ensure!(foreign_a==foreign_b,"native handoff foreign census membership changed");
+  exact_candidate_row(b.get(ACTOR).with_context(||format!("native candidate {field} absent; fresh_keys={:?}",b.keys().collect::<Vec<_>>()))?,capture,true,field)?;
+  foreign_membership(a,b,old_name,new_name,field)?;
   let out=comparison[field].as_object_mut().context("native comparison census absent")?;
-  ensure!(*out==*b,"native comparison altered before helper handoff");
+  ensure!(*out==*b,"native comparison altered before exact helper/candidate handoff");
   ensure!(out.remove(new_name)==b.get(new_name).cloned() && out.insert(old_name.into(),a[old_name].clone()).is_none(),"native comparison exact helper substitution failed");
-  // Foreign native rows are retained byte-for-byte from the actual fresh scan.
-  // The existing complete guard policy independently validates every rollover.
-  for key in foreign_b {ensure!(out.get(key)==b.get(key),"native handoff altered a foreign census row");}
+  ensure!(out.remove(ACTOR)==b.get(ACTOR).cloned(),"native comparison exact held candidate induction failed");
+  // Only comparison identity membership changes. Actual fresh census remains
+  // intact; foreign rows stay actual and existing guard policy validates them.
+  for key in b.keys().filter(|k|k.as_str()!=new_name && k.as_str()!=ACTOR) {
+   ensure!(out.get(key)==b.get(key),"native handoff altered a foreign {field} census row: {key}");
+  }
  }
  Ok(())
 }
+fn compare_discovery_membership(before:&Value,fresh:&Value,old:&Value,new:&Value,capture:&Value)->Result<()> {
+ for field in ["workload_discovery_before","workload_discovery_after"] {
+  let a=before[field].as_object().with_context(||format!("native historical {field} missing"))?;
+  let b=fresh[field].as_object().with_context(||format!("native fresh {field} missing"))?;
+  let old_name=old["unit"].as_str().context("historical discovery helper")?;
+  let new_name=new["unit"].as_str().context("fresh discovery helper")?;
+  ensure!(!a.contains_key(ACTOR) && !a.contains_key(new_name) && !b.contains_key(old_name)
+   && a.contains_key(old_name) && b.contains_key(new_name),"native {field} crossed/missing helper or previously present candidate");
+  exact_candidate_row(b.get(ACTOR).with_context(||format!("native held candidate missing in {field}; fresh_keys={:?}",b.keys().collect::<Vec<_>>()))?,capture,false,field)?;
+  for (name,helper,rows) in [(old_name,old,a),(new_name,new,b)] {
+   for key in CENSUS_FIELDS {
+    ensure!(rows[name][key].is_string() && rows[name][key]==helper["native"][key],
+     "native {field} actual helper discovery differs: unit={name} key={key}");
+   }
+  }
+  // Discovery contains a wider native property record. Bind every shared census
+  // field, and the same19 profile fields covered_held itself authenticates.
+  for key in ["Restart","MemoryAccounting","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec","TasksMax","User"] {
+   ensure!(b[ACTOR][key].is_string() && b[ACTOR][key]==capture["native"][key],"native candidate {field} discovery profile differs: {key}");
+  }
+  foreign_membership(a,b,old_name,new_name,field)?;
+ }
+ Ok(())
+}
+
 impl Handoff {
     pub(super) fn load(reader:&Bound, request:&memory::model::Request, view:&memory::VerifiedParentMemory,
-        sources:&Value, clock:u64) -> Result<Self> {
+        sources:&Value, clock:u64, candidate:held_candidate::Candidate) -> Result<Self> {
         // The preceding constructor authenticates original request/qualification,
         // reader completion/PID1 journal/drain and original300s freshness.
         ensure!(view.evidence()["request"]==json!(request),"native handoff genuine opaque request crossed");
@@ -177,9 +227,13 @@ impl Handoff {
         source_shape(&proof,&spec,sources,&request.reader_program.program)?;
         let original_before=immutable(&to_bound(&proof["accounting_before"])?)?;
         let old_helper=old_helper(&proof,&original_before,&before)?;
+        candidate.require_original_absent(&original_before)?;
+        candidate.require_original_absent(&before)?;
         // Raw originals independently preserve the identical actual helper.
         for key in ["original_raw_builder_before","original_raw_builder_after"] {
-            ensure!(slot(&immutable(&to_bound(&proof[key])?)?)?==&old_helper,"native original raw helper differs");
+            let raw=immutable(&to_bound(&proof[key])?)?;
+            ensure!(slot(&raw)?==&old_helper,"native original raw helper differs");
+            candidate.require_original_absent(&raw)?;
         }
         let retention_binding=to_bound(&proof["retention_plan"])?;
         let retention:RetentionPlan=serde_json::from_value(immutable(&retention_binding)?)?;
@@ -192,7 +246,7 @@ impl Handoff {
         original_retired(&proof,&old_helper,&completion)?;
         let new_helper=epoch186::accounting::native163_current_helper()?;
         Ok(Self{reader:reader.clone(),request:json!(request),before,origin,proof,completion,sources:sources.clone(),
-            retention_binding,retention,retained,old_helper,new_helper})
+            retention_binding,retention,retained,old_helper,new_helper,candidate})
     }
     pub(super) fn before(&self)->&Value { &self.before }
     pub(super) fn origin(&self)->&Value { &self.origin }
@@ -200,6 +254,7 @@ impl Handoff {
         json!({"schema":"epoch163-native-historical-reader-helper-comparison-v1","reader":self.reader,
             "original_completion":self.request["current_reader_acceptance"],"retention_plan":self.retention_binding,
             "original_helper":self.old_helper,"actual_issuer_helper":self.new_helper,
+            "exact_held_candidate_induction":self.candidate.evidence(),
             "normal_pool_bytes":NORMAL_POOL,"helper_bytes":SLOT,"helper_DATA_bytes":0,
             "comparison_only":true,"memory_credit_bytes":0,"DATA_credit_bytes":0,"physical_credit_bytes":0})
     }
@@ -211,17 +266,20 @@ impl Handoff {
             && epoch186::accounting::native163_current_helper()?==self.new_helper,"native handoff source/retention/actual issuer changed");
         let (before,origin)=original_reader_before(Some(&self.reader),request,view,clock)?.context("native before absent")?;
         ensure!(before==self.before && origin==self.origin,"native original before/clock changed");
+        self.candidate.revalidate()?;
         original_retired(&self.proof,&self.old_helper,&self.completion)
     }
     pub(super) fn project(&self,raw:&Value)->Result<(Value,Value)> {
         ensure!(epoch186::accounting::native163_current_helper()?==self.new_helper && slot(raw)?==&self.new_helper,
             "native fresh raw actual issuer helper changed/crossed");
         original_retired(&self.proof,&self.old_helper,&self.completion)?;
+        self.candidate.revalidate()?;
         let actual=crate::fleet::charge136_retry0005::retained_attempt::actual(&self.retention)?;
         ensure!(actual==self.retained,"native actual retention changed before fresh projection");
         let semantic=crate::fleet::charge136_retry0005::retained_attempt::project(&self.retention,raw,&actual)?;
         let mut compared=comparison(&self.before,&semantic,&self.old_helper,&self.new_helper)?;
-        compare_native_census(&self.before,&semantic,&self.old_helper,&self.new_helper,&mut compared)?;
+        compare_native_census(&self.before,&semantic,&self.old_helper,&self.new_helper,self.candidate.capture(),&mut compared)?;
+        compare_discovery_membership(&self.before,&semantic,&self.old_helper,&self.new_helper,self.candidate.capture())?;
         epoch186::accounting::stable_guard_basis(&self.sources,&self.before,&compared)?;
         Ok((semantic,compared))
     }
@@ -245,26 +303,87 @@ mod tests {
         let mut after=base.clone(); after["native_pool_suballocations"][1]=new.clone();
         (base,after,old,new)
     }
-    #[test]
-    fn native_census_handoff_preserves_all_foreign_rows_and_rejects_extra_missing_or_crossed_helper() {
+    fn census_fixture()->(Value,Value,Value,Value,Value) {
       fn helper_row(unit:&str,iid:&str,pid:u64)->Value {
        let mut native=serde_json::Map::new();for key in CENSUS_FIELDS {native.insert(key.into(),json!("value"));}
        native.insert("Id".into(),json!(unit));native.insert("InvocationID".into(),json!(iid));native.insert("MainPID".into(),json!(pid.to_string()));
        json!({"unit":unit,"invocation_id":iid,"pid":pid,"native":native})
       }
       let old=helper_row(READER,&"a".repeat(32),123);let new=helper_row(ISSUER,&"b".repeat(32),124);
-      let mut a=json!({"native_before":{},"native_after":{}});let mut b=a.clone();
-      for field in ["native_before","native_after"] {
+      let actor=helper_row(ACTOR,&"c".repeat(32),125);
+      let mut capture=json!({"iid":actor["invocation_id"],"pid":125,"start_ticks":199,"native":actor["native"]});
+      for key in ["Restart","MemoryAccounting","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec","TasksMax","User"] {capture["native"][key]=json!("actual-profile");}
+      let mut a=json!({"native_before":{},"native_after":{},"workload_discovery_before":{},"workload_discovery_after":{}});let mut b=a.clone();
+      for field in ["native_before","native_after","workload_discovery_before","workload_discovery_after"] {
        a[field][READER]=old["native"].clone();a[field]["foreign.service"]=json!({"actual":"original"});
        b[field][ISSUER]=new["native"].clone();b[field]["foreign.service"]=json!({"actual":"fresh"});
+       if field.starts_with("native_") {
+        let mut row=serde_json::Map::new();for key in CENSUS_FIELDS {row.insert(key.into(),capture["native"][key].clone());}
+        b[field][ACTOR]=Value::Object(row);
+       }else {b[field][ACTOR]=capture["native"].clone();}
       }
-      let originals=(a.clone(),b.clone());let mut compared=b.clone();compare_native_census(&a,&b,&old,&new,&mut compared).unwrap();
-      assert_eq!((a.clone(),b.clone()),originals);assert!(compared["native_after"].get(ISSUER).is_none());assert_eq!(compared["native_after"][READER],old["native"]);assert_eq!(compared["native_after"]["foreign.service"],b["native_after"]["foreign.service"]);
-      let mut extra=b.clone();extra["native_after"]["unexpected.service"]=json!({});assert!(compare_native_census(&a,&extra,&old,&new,&mut extra.clone()).is_err());
-      let mut missing=b.clone();missing["native_after"].as_object_mut().unwrap().remove("foreign.service");assert!(compare_native_census(&a,&missing,&old,&new,&mut missing.clone()).is_err());
-      for key in CENSUS_FIELDS {let mut changed=b.clone();changed["native_after"][ISSUER][key]=json!("crossed");assert!(compare_native_census(&a,&changed,&old,&new,&mut changed.clone()).is_err(),"{key}");}
-      let mut duplicate=b.clone();duplicate["native_after"][READER]=old["native"].clone();assert!(compare_native_census(&a,&duplicate,&old,&new,&mut duplicate.clone()).is_err());
-      let mut altered=b.clone();altered["native_after"]["foreign.service"]=json!({"tampered":true});assert!(compare_native_census(&a,&b,&old,&new,&mut altered).is_err());
+      (a,b,old,new,capture)
+    }
+    #[test]
+    fn exact_new_held_candidate_and_helper_induction_preserves_every_original_and_foreign_row() {
+      let (a,b,old,new,capture)=census_fixture();let originals=(a.clone(),b.clone());let mut compared=b.clone();
+      compare_native_census(&a,&b,&old,&new,&capture,&mut compared).unwrap();
+      compare_discovery_membership(&a,&b,&old,&new,&capture).unwrap();
+      assert_eq!((a.clone(),b.clone()),originals);
+      for field in ["native_before","native_after"] {
+       assert!(compared[field].get(ISSUER).is_none());assert!(compared[field].get(ACTOR).is_none());
+       assert_eq!(compared[field][READER],old["native"]);assert_eq!(compared[field]["foreign.service"],b[field]["foreign.service"]);
+      }
+      // Discovery/raw reports and all resource promises remain actual; this
+      // pure test cannot construct Candidate or Handoff runtime capabilities.
+      assert_eq!(compared["workload_discovery_after"],b["workload_discovery_after"]);
+    }
+    #[test]
+    fn candidate_induction_rejects_missing_crossed_changed_duplicate_or_unrelated_membership() {
+      let (a,b,old,new,capture)=census_fixture();
+      for field in ["native_before","native_after"] {
+       let mut extra=b.clone();extra[field]["unexpected.service"]=json!({});
+       let error=compare_native_census(&a,&extra,&old,&new,&capture,&mut extra.clone()).unwrap_err().to_string();
+       assert!(error.contains("unexpected.service") && error.contains("unexpected="),"{error}");
+       let mut missing=b.clone();missing[field].as_object_mut().unwrap().remove("foreign.service");
+       let error=compare_native_census(&a,&missing,&old,&new,&capture,&mut missing.clone()).unwrap_err().to_string();
+       assert!(error.contains("foreign.service") && error.contains("missing="),"{error}");
+       for key in CENSUS_FIELDS {
+        let mut changed=b.clone();changed[field][ACTOR][key]=json!("crossed");
+        assert!(compare_native_census(&a,&changed,&old,&new,&capture,&mut changed.clone()).is_err(),"candidate {field} {key}");
+        let mut helper=b.clone();helper[field][ISSUER][key]=json!("crossed");
+        assert!(compare_native_census(&a,&helper,&old,&new,&capture,&mut helper.clone()).is_err(),"helper {field} {key}");
+       }
+       let mut no_actor=b.clone();no_actor[field].as_object_mut().unwrap().remove(ACTOR);
+       assert!(compare_native_census(&a,&no_actor,&old,&new,&capture,&mut no_actor.clone()).is_err());
+       let mut present=a.clone();present[field][ACTOR]=b[field][ACTOR].clone();
+       assert!(compare_native_census(&present,&b,&old,&new,&capture,&mut b.clone()).is_err());
+       let mut extra_field=b.clone();extra_field[field][ACTOR]["foreign_field"]=json!("x");
+       assert!(compare_native_census(&a,&extra_field,&old,&new,&capture,&mut extra_field.clone()).is_err());
+       let mut duplicate=b.clone();duplicate[field][READER]=old["native"].clone();
+       assert!(compare_native_census(&a,&duplicate,&old,&new,&capture,&mut duplicate.clone()).is_err());
+      }
+      for key in ["iid","pid"] {let mut crossed=capture.clone();crossed[key]=json!("crossed");assert!(compare_native_census(&a,&b,&old,&new,&crossed,&mut b.clone()).is_err());}
+      let mut altered=b.clone();altered["native_after"]["foreign.service"]=json!({"tampered":true});
+      assert!(compare_native_census(&a,&b,&old,&new,&capture,&mut altered).is_err());
+    }
+    #[test]
+    fn candidate_induction_requires_both_complete_fresh_discoveries_and_no_foreign_membership_delta() {
+      let (a,b,old,new,capture)=census_fixture();
+      for field in ["workload_discovery_before","workload_discovery_after"] {
+       let mut extra=b.clone();extra[field]["unrelated.service"]=json!({});
+       assert!(compare_discovery_membership(&a,&extra,&old,&new,&capture).unwrap_err().to_string().contains("unrelated.service"));
+       let mut missing=b.clone();missing[field].as_object_mut().unwrap().remove("foreign.service");
+       assert!(compare_discovery_membership(&a,&missing,&old,&new,&capture).unwrap_err().to_string().contains("foreign.service"));
+       let mut no_actor=b.clone();no_actor[field].as_object_mut().unwrap().remove(ACTOR);
+       assert!(compare_discovery_membership(&a,&no_actor,&old,&new,&capture).is_err());
+       let mut present=a.clone();present[field][ACTOR]=b[field][ACTOR].clone();
+       assert!(compare_discovery_membership(&present,&b,&old,&new,&capture).is_err());
+       for key in CENSUS_FIELDS.into_iter().chain(["Restart","MemoryAccounting","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec","TasksMax","User"]) {
+        let mut changed=b.clone();changed[field][ACTOR][key]=json!("changed");
+        assert!(compare_discovery_membership(&a,&changed,&old,&new,&capture).is_err(),"{field} {key}");
+       }
+      }
     }
 
     #[test]

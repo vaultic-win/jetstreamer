@@ -1,6 +1,7 @@
 //! Child of fleet::direct163: new source-only bounded admission, not its192GiB
 //! route. Reuses qualified raw builders and original selection/drain validators.
 use super::*;
+mod semantic_projection;
 mod enrollment128;
 mod native_capability;
 mod current_phase;
@@ -325,9 +326,12 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         "bounded complete raw source tuple crossing"
     );
     pressures(&storage::json(&to_bound(&current["observer"])?)?)?;
-    let before = epoch186::accounting::protected_data_basis(&s.resource_accounting, now()?).await?;
+    let projection=semantic_projection::Projection::load(&s.memory_request,&view,&s.resource_accounting,now()?)?;
+    let raw_builder_before=epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await?;
+    let before=projection.project(&raw_builder_before)?;
     let p0 = physical()?;
-    let after = epoch186::accounting::protected_data_basis(&s.resource_accounting, now()?).await?;
+    let raw_builder_after=epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await?;
+    let after=projection.project(&raw_builder_after)?;
     let p1 = physical()?;
     epoch186::accounting::stable_guard_basis(&s.resource_accounting, &before, &after)?;
     unchanged_claims(&before, &after)?;
@@ -374,6 +378,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         &before, &after, candidate_memory128::Stage::Admission)?;
     ensure!(end_budget.evidence() == budget.evidence(), "composed native memory/DATA changed before admission");
     end_budget.host_fit(host_total)?;
+    projection.revalidate(&s.memory_request,&end_view,&s.resource_accounting,now()?)?;
     save(
         &s.output,
         &json!({"schema":"epoch163-first-output128-full-admission-v1","spec":sb,"self":image,
@@ -382,7 +387,7 @@ pub(in crate::fleet) async fn run() -> Result<()> {
         "complete_current_owner_accounting":true,"input_capability":policy["input_acceptance"],
         "memory_receipt":s.memory_receipt,"data_receipt":s.data_receipt,"original_inputs_and_resource_actors_drained":true,
         "minimum_free_bytes":disk-(768u64<<30),"required_initial_free_bytes":disk,"candidate_DATA_bytes":768u64<<30,
-        "current_phase_ledger":s.current_phase_ledger,"current_input_metadata":s.input_metadata,"native_finalizer_completion":s.native_finalizer_completion,"candidate_memory":budget.evidence(),"raw_before":before,"raw_after":after,"physical_before":p0,"physical_after":p1,"memory":view.evidence(),"DATA":selected.evidence(),
+        "current_phase_ledger":s.current_phase_ledger,"current_input_metadata":s.input_metadata,"native_finalizer_completion":s.native_finalizer_completion,"candidate_memory":budget.evidence(),"raw_before":before,"raw_after":after,"original_raw_builder_before":raw_builder_before,"original_raw_builder_after":raw_builder_after,"exact_retention_projection":projection.evidence(),"physical_before":p0,"physical_after":p1,"memory":view.evidence(),"DATA":selected.evidence(),
         "recorded_unix_seconds":end,"expires_unix_seconds":end+180,"maximum_runtime_seconds":3600,"maximum_replayed_slots":259,
         "attended_held_launch_only":true,"enrollment_and_actual_first_guard_before_release_required":true,
         "publication_authorized":false,"r2_mutations":false,"physical_credit_bytes":0}),

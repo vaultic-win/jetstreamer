@@ -55,13 +55,16 @@ pub(super) async fn run() -> Result<()> {
     } else {
         ensure!(integration::declared(&fleet_plan)?.is_some_and(|b|json!(b)==json!(s.enrollment)),"first128 release requires actual enrolled current fleet");
     }
-    let before=if let Some(h)=&held {
+    let projection=semantic_projection::Projection::load(&s.memory_request,&view,&s.resource_accounting,now()?)?;
+    let raw_builder_before=if let Some(h)=&held {
         epoch186::accounting::protected_data_basis_first128_held(&s.resource_accounting,now()?,h).await?
     } else { epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await? };
+    let before=projection.project(&raw_builder_before)?;
     let p0=physical()?;
-    let after=if let Some(h)=&held {
+    let raw_builder_after=if let Some(h)=&held {
         epoch186::accounting::protected_data_basis_first128_held(&s.resource_accounting,now()?,h).await?
     } else { epoch186::accounting::protected_data_basis(&s.resource_accounting,now()?).await? };
+    let after=projection.project(&raw_builder_after)?;
     let p1=physical()?;
     if let Some(h)=&held { epoch186::accounting::stable_guard_basis_first128_held(&s.resource_accounting,&before,&after,h)?; }
     else { epoch186::accounting::stable_guard_basis(&s.resource_accounting,&before,&after)?; }
@@ -118,8 +121,9 @@ pub(super) async fn run() -> Result<()> {
         &before,&after,candidate_memory128::Stage::Enrolled(&s.enrollment))? };
     ensure!(end_budget.evidence()==budget.evidence(),"composed native memory/DATA changed before release");
     end_budget.host_fit(host)?;
+    projection.revalidate(&s.memory_request,&end_view,&s.resource_accounting,now()?)?;
     capsule(&format!("release-{iid}.json"),&json!({"schema":"epoch163-first-output128-release-v1",
-        "spec":sb,"issuer":image,"retained_native128_budget_serde_sha256":storage::sha(&serde_json::to_vec(budget.evidence())?),"parent_invocation_id":iid,"parent_pid":pid,"plan":s.runtime_plan,
+        "spec":sb,"issuer":image,"original_raw_builder_before_serde_sha256":storage::sha(&serde_json::to_vec(&raw_builder_before)?),"original_raw_builder_after_serde_sha256":storage::sha(&serde_json::to_vec(&raw_builder_after)?),"exact_retention_projection":projection.evidence(),"retained_native128_budget_serde_sha256":storage::sha(&serde_json::to_vec(budget.evidence())?),"parent_invocation_id":iid,"parent_pid":pid,"plan":s.runtime_plan,
         "admission":e["admission"],"first_guard":first_guard,"enrollment":compact,
         "recorded_unix_seconds":now()?,"publication_authorized":false,"r2_mutations":false}))?;
     Ok(())
