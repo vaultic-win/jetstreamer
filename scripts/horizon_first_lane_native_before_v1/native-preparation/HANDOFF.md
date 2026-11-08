@@ -1,4 +1,6 @@
-# Midnight native128 namespace correction — source only
+# Native128 preparation and subsequent qualified corrections
+
+The current packet incorporates the normally sealed helper19 qualification. The issuer uses `PrivateNetwork=no` and the exact approved `EnvironmentFile=/etc/jetstreamer/horizon-r2.env`; the actor remains network-private. The actual read-only transport control passed. `prepare_finalize.py` uses `RemainAfterExit=no`; a persistent service plus keeper target must retain the genuine inactive/dead finalizer IID. The older source-only narrative below describes the original namespace correction; its helper15 and byte-identical-finalizer statements are historical. No template grants admission or permits a deadline extension.
 
 **Cause:** failed sealed2330 actor declared the identical scratch pathname in ReadWritePaths and TemporaryFileSystem. systemd255.4 sorts same-target mounts by enum priority, with MOUNT_READ_WRITE ahead of MOUNT_TMPFS; drop_duplicates retains the first. The rw host bind suppressed the intended tmpfs. The native tool then correctly rejected scratch's device equality with protected host DATA before ready.json. This was a launcher mount-specification bug, not a missing input or a reason to change integrity/resource gates.
 

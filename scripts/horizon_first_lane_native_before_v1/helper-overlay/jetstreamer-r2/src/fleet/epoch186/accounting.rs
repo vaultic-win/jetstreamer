@@ -4525,3 +4525,31 @@ mod native128_scoped_issuer_overlay_tests {
 pub(in crate::fleet) fn terminal_memory_discovery_stable(report: &Value) -> Result<bool> {
     live145_prefix::recorded_discovery_stable(report)
 }
+
+#[cfg(test)]
+mod native_readonly_r2_transport_tests {
+    use super::*;
+    #[tokio::test]
+    #[ignore = "Root actual future issuer sandbox with approved EnvironmentFile and network; GET/HEAD-only floor qualification, no native hold"]
+    async fn actual_native_issuer_transport_authenticates_bound_ready_floor_pairs_without_mutation()->Result<()> {
+        let binding:BoundFile=serde_json::from_str(&std::env::var("HORIZON_CLOSED_NATIVE_ORIGINAL_SPEC_BINDING")?)?;
+        let doc=input136::protected_json(&binding)?;
+        let sources:Sources=serde_json::from_value(doc["resource_accounting"].clone())?;
+        let floor=input136::protected_json(&sources.floor)?;
+        let iid=std::env::var("INVOCATION_ID")?;
+        let unit="horizon-first-lane-helper-regression-native-r2-readonly-20261108-v19.service";
+        let out=ProcessCommand::new("/usr/bin/systemctl").args(["show",unit,"--no-pager","--property=Id,InvocationID,PrivateNetwork,EnvironmentFiles,NoNewPrivileges,MemoryMax,MainPID"])
+            .env("LC_ALL","C").env_remove("SYSTEMD_HOST").env_remove("SYSTEMD_BUS_ADDRESS").env_remove("DBUS_SYSTEM_BUS_ADDRESS").output()?;
+        ensure!(out.status.success() && out.stderr.is_empty() && out.stdout.len()<65536,"actual native R2 transport property read");
+        let mut native=BTreeMap::new();
+        for line in std::str::from_utf8(&out.stdout)?.lines() {let (k,v)=line.split_once('=').context("native transport field framing")?;ensure!(native.insert(k,v).is_none(),"duplicate native transport field");}
+        ensure!(native.get("Id")==Some(&unit) && native.get("InvocationID")==Some(&iid.as_str()) && native.get("PrivateNetwork")==Some(&"no") && native.get("EnvironmentFiles")==Some(&"/etc/jetstreamer/horizon-r2.env (ignore_errors=no)") && native.get("NoNewPrivileges")==Some(&"yes") && native.get("MemoryMax")==Some(&"2147483648") && native.get("MainPID")==Some(&std::process::id().to_string().as_str()),"actual issuer-equivalent readonly R2 transport differs");
+        let r2=r2_config_from_env()?;ensure!(r2.bucket=="solana-archive-with-accounts-data","foreign authenticated floor bucket");
+        let client=s3_client(&r2);
+        let inventory=assembly144_admission::remote_floor_inventory(&client,&r2,&floor).await?;
+        ensure!(inventory.len()==floor["samples"].as_array().context("floor samples")?.len() && !inventory.is_empty(),"incomplete actual authenticated floor inventory");
+        ensure!(input136::protected_json(&sources.floor)?==floor,"original floor source changed");
+        println!("{}",json!({"read_only_floor_pairs_authenticated":inventory.len(),"native_actor_started":false,"admission_created":false,"remote_mutations":false}));
+        Ok(())
+    }
+}

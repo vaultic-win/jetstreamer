@@ -53,7 +53,7 @@ def main():
         'NoNewPrivileges=yes','PrivateNetwork=yes','PrivateTmp=no','ProtectSystem=strict',
         'ProtectHome=read-only','ReadWritePaths='+str(state),'CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE',
         'AmbientCapabilities=','TemporaryFileSystem=/tmp:ro /var/tmp:ro','RuntimeMaxSec=120s',
-        'RemainAfterExit=yes','UMask=0077']
+        'RemainAfterExit=no','UMask=0077']
     argv=['/usr/bin/systemd-run','--unit=horizon-epoch163-native-input-finalize-20261107-v1.service','--quiet']
     argv += ['--property='+p for p in props]+direct
     save(stage,'finalizer-argv.json',{'argv':argv,'direct_ExecStart_argv':direct,

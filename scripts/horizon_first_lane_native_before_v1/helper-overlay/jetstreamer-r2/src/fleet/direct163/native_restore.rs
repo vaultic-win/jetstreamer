@@ -180,7 +180,8 @@ fn self_actor(sb: &Bound, sha: &str) -> Result<Bound> {
             && n["MemoryMax"].as_str() == Some((2u64 << 30).to_string().as_str())
             && n["MemorySwapMax"] == "0"
             && n["NoNewPrivileges"] == "yes"
-            && n["PrivateNetwork"] == "yes"
+            && n["PrivateNetwork"] == "no"
+            && n["EnvironmentFiles"] == "/etc/jetstreamer/horizon-r2.env (ignore_errors=no)"
             && n["CPUQuotaPerSecUSec"] == "1s"
             && n["TasksMax"] == "512"
             && n["ActiveState"] == "active"
@@ -190,6 +191,9 @@ fn self_actor(sb: &Bound, sha: &str) -> Result<Bound> {
                 == format!("0::/system.slice/{ISSUER}"),
         "exact actual2GiB native issuer service"
     );
+    // Complete accounting authenticates remote floor pairs with GET/HEAD.
+    // Fail missing/invalid R2 configuration before any held actor capture.
+    let _readonly_r2 = r2_config_from_env()?;
     let args = vec![
         image.path.to_string_lossy().into_owned(),
         "admit-native163".into(),
@@ -699,5 +703,27 @@ mod original_reader_before_tests {
         assert!(exact_reader_before_binding(&crossed,&current).is_err());
         crossed=selected;crossed.path="/another/reader.json".into();
         assert!(exact_reader_before_binding(&crossed,&current).is_err());
+    }
+}
+
+#[cfg(test)]
+mod closed_native_original_inputs {
+    use super::*;
+    #[test]
+    #[ignore = "Root-only genuine normally sealed native spec and original completed downloader; no actor/admission"]
+    fn actual_closed_original_inputs_pass_all_native_plan_phase_and_download_gates_before_a_hold() -> Result<()> {
+        let binding: Bound = serde_json::from_str(&env::var("HORIZON_CLOSED_NATIVE_ORIGINAL_SPEC_BINDING")?)?;
+        let s: NativeSpec = serde_json::from_value(immutable(&binding)?)?;
+        ensure!(s.schema == "epoch163-native-restore-issuer-spec-v1", "actual native issuer spec");
+        let value=immutable(&s.native_plan)?;
+        let issuer=to_bound(&value["admission_program"])?;
+        let p=plan(&s.native_plan,&issuer)?;
+        let phase=provenance::phases(&s)?;
+        let _booked=booking(&s)?;
+        prepared_phase_fit(&p,&phase)?;
+        let download=provenance::download(&s,&p)?;
+        ensure!(download["snapshot_body_not_opened"]==true,"closed input metadata only");
+        ensure!(!p.admission.exists() && !p.state.join("initial-guard.json").exists() && !p.state.join("outcome.json").exists(),"no native admission/restore produced by static preflight");
+        Ok(())
     }
 }

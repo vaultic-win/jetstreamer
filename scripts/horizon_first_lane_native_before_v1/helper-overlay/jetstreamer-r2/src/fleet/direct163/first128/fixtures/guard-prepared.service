@@ -1,0 +1,27 @@
+[Unit]
+Description=Protect only private bounded128GiB epoch163 diagnostic
+ConditionPathExists=/UNRESOLVED_FIRST163128_DO_NOT_START
+OnFailure=horizon-stop-epoch163-first-output128-20261106-v1.service
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+MemoryAccounting=yes
+MemoryMax=2G
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+TimeoutStartSec=90
+TimeoutStopSec=15
+KillMode=control-group
+Restart=no
+RemainAfterExit=no
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=/var/lib/jetstreamer/epoch163-first-output128-20261106-v1/guard
+ExecStart=/usr/local/lib/jetstreamer/horizon-first-lane-witness-first163128-guard-tools-20261107-v2/first163128-guard check UNRESOLVED_ACTUAL_GUARD_PLAN_PATH --plan-sha256 UNRESOLVED_GUARD_PLAN_SHA256 --self-sha256 UNRESOLVED_ACTUAL_BOUNDED_GUARD_SHA256

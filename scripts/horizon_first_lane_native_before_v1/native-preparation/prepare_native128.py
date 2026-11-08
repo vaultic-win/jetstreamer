@@ -208,16 +208,16 @@ def main():
     actor_argv=[TOOLS+'/native-input',plan_b['path'],'--plan-sha256',plan_b['sha256'],'--self-sha256',NATIVE_SHA]
     issuer_argv=[issuer['path'],'admit-native163',spec_b['path'],'--spec-sha256',spec_b['sha256'],'--self-sha256',issuer['sha256']]
     common=['Type=exec','User=root','Group=root','Restart=no','KillMode=control-group','MemoryAccounting=yes',
-        'MemorySwapMax=0','TasksMax=512','NoNewPrivileges=yes','PrivateNetwork=yes','PrivateTmp=no',
+        'MemorySwapMax=0','TasksMax=512','NoNewPrivileges=yes','PrivateTmp=no',
         'ProtectSystem=strict','ProtectHome=read-only','CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_KILL CAP_SYS_PTRACE',
         'AmbientCapabilities=','RestrictSUIDSGID=yes','LockPersonality=yes','UMask=0077',
         'TimeoutStopSec=30s','SendSIGKILL=yes']
-    actor_properties=common+['MemoryMax=128G','CPUQuota=800%','RemainAfterExit=yes',
+    actor_properties=common+['PrivateNetwork=yes','MemoryMax=128G','CPUQuota=800%','RemainAfterExit=yes',
         'RuntimeMaxSec='+str(c['maximum_runtime_seconds']+120)+'s',
         'BindReadOnlyPaths='+c['snapshot']+' '+str(ledger),
         'ReadWritePaths='+str(state),
         'TemporaryFileSystem=/tmp:ro /var/tmp:ro '+str(scratch)+':rw,nosuid,nodev,exec,size=40G,nr_inodes=131072,mode=0700']
-    issuer_properties=common+['MemoryMax=2G','CPUQuota=100%','RemainAfterExit=yes','RuntimeMaxSec=95s',
+    issuer_properties=common+['PrivateNetwork=no','EnvironmentFile=/etc/jetstreamer/horizon-r2.env','MemoryMax=2G','CPUQuota=100%','RemainAfterExit=yes','RuntimeMaxSec=95s','AppArmorProfile=horizon-witness-test-deny199-20261107-v1',
         'ReadWritePaths='+str(state),'TemporaryFileSystem=/tmp:ro /var/tmp:ro']
     from pure_native_preflight import validate_actor_properties
     validate_actor_properties(plan,actor_properties,['TMPDIR='+str(scratch),'TMP='+str(scratch),'TEMP='+str(scratch)])

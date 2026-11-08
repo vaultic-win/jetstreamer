@@ -27,13 +27,22 @@ pub(super) fn native(name: &str) -> Result<Value> {
         out.status.success() && out.stderr.is_empty() && out.stdout.len() <= 65536,
         "bounded enrollment native query"
     );
-    let mut m = serde_json::Map::new();
-    for line in std::str::from_utf8(&out.stdout)?.lines() {
-        let (k, v) = line.split_once('=').context("native framing")?;
-        ensure!(
-            m.insert(k.into(), json!(v)).is_none(),
-            "duplicate bounded native field"
-        );
+    parse_native_fields(std::str::from_utf8(&out.stdout)?)
+}
+fn parse_native_fields(raw:&str)->Result<Value> {
+    let mut m=serde_json::Map::new();
+    let mut timers=Vec::new();
+    for line in raw.lines() {
+        let (key,value)=line.split_once('=').context("native framing")?;
+        if key=="TimersMonotonic" {
+            timers.push(value.to_owned());
+        } else {
+            ensure!(m.insert(key.into(),json!(value)).is_none(),"duplicate bounded native field");
+        }
+    }
+    if !timers.is_empty() {
+        ensure!(timers.len()<=2 && (timers.len()==1 || timers.iter().all(|v|v.starts_with("{ ") && v.ends_with(" }"))),"malformed bounded timer field multiplicity");
+        m.insert("TimersMonotonic".into(),json!(timers.join("\n")));
     }
     Ok(Value::Object(m))
 }
@@ -350,6 +359,7 @@ fn auxiliary(
 ) -> Result<()> {
     source(node, member)?;
     artifact(BOUNDED_GUARD_IMAGE, BOUNDED_GUARD_SHA)?;
+    let expected_caps=if unit==GUARD128 {"cap_dac_override cap_sys_ptrace"} else {"cap_dac_override"};
     let (cap, mode) = if unit == GUARD128 {
         ("2147483648", "check")
     } else {
@@ -374,8 +384,8 @@ fn auxiliary(
             && node["PrivateNetwork"] == "yes"
             && node["KillMode"] == "control-group"
             && node["Delegate"] == "no"
-            && node["CapabilityBoundingSet"] == "cap_dac_override"
-            && node["AmbientCapabilities"] == "cap_dac_override"
+            && node["CapabilityBoundingSet"] == expected_caps
+            && node["AmbientCapabilities"] == expected_caps
             && node["TimeoutStartUSec"] == "1min 30s"
             && node["MainPID"] == "0"
             && node["ControlPID"] == "0"
@@ -857,5 +867,34 @@ mod tests {
         let mut x = g;
         x["original_PID1_success_event"]["_PID"] = json!("2");
         assert!(original_guard(&x, &iid, &p).is_err());
+    }
+}
+
+#[cfg(test)]
+mod native_timer_fields_tests {
+    use super::*;
+    #[test]
+    fn repeated_timer_entries_preserve_each_event_while_scalar_duplicates_reject() {
+        let raw="Id=example.timer\nTimersMonotonic={ OnUnitInactiveUSec=30s ; next_elapse=31s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1s }\nUnit=example.service\n";
+        let v=parse_native_fields(raw).unwrap();
+        assert_eq!(v["Id"],"example.timer");
+        assert_eq!(v["TimersMonotonic"].as_str().unwrap().lines().count(),2);
+        assert!(parse_native_fields("Id=a\nId=b\n").is_err());
+        assert!(parse_native_fields("TimersMonotonic=\nTimersMonotonic=\n").is_err());
+        assert!(parse_native_fields(&(raw.to_owned()+"TimersMonotonic={ OnActiveUSec=2s ; next_elapse=2s }\n")).is_err());
+    }
+    #[test]
+    #[ignore = "Root-only actual existing timer formatter check; no first128 timer mutation or launch"]
+    fn actual_existing_timer_native_formatter_preserves_repeated_entries_and_exact_original_identity()->Result<()> {
+        let out=ProcessCommand::new("/usr/bin/systemctl").args(["show","jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer","--no-pager","--property=Id,InvocationID,TimersMonotonic,Unit"])
+            .env("LC_ALL","C").env_remove("SYSTEMD_HOST").env_remove("DBUS_SYSTEM_BUS_ADDRESS").env_remove("SYSTEMD_BUS_ADDRESS").output()?;
+        ensure!(out.status.success() && out.stderr.is_empty() && out.stdout.len()<65536,"actual existing timer metadata command");
+        let raw=std::str::from_utf8(&out.stdout)?;
+        ensure!(raw.lines().filter(|line|line.starts_with("TimersMonotonic=")).count()==2,"actual host formatter must expose two repeated properties");
+        let v=parse_native_fields(raw)?;
+        ensure!(v["Id"]=="jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer" && v["InvocationID"]=="97aeff8897434ed5ad89dd56c3fb17d1" && v["Unit"]=="jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service","actual original timer identity crossed");
+        let rows=v["TimersMonotonic"].as_str().context("actual timer rows")?.lines().collect::<Vec<_>>();
+        ensure!(rows.len()==2 && rows.iter().filter(|x|x.starts_with("{ OnActiveUSec=1s ; next_elapse=")).count()==1 && rows.iter().filter(|x|x.starts_with("{ OnUnitActiveUSec=30s ; next_elapse=")).count()==1,"actual host timer events dropped or changed");
+        Ok(())
     }
 }
