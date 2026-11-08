@@ -3,6 +3,7 @@
 //! snapshot hashing or archive publication. Existing qualified Rust owns all seals,
 //! native task/enrollment, complete reader and final original release transaction.
 mod activation;
+mod fleet_custody;
 mod follow_on;
 mod persistent_reader;
 mod postreader;
@@ -461,6 +462,9 @@ fn run() -> Result<()> {
     if a[1] == "reader-lifecycle-harmless-exec" {
         return persistent_reader::harmless_exec(&request, &own);
     }
+    if a[1] == "fleet-custody-harmless-writer" {
+        return fleet_custody::harmless_writer(&request, &own);
+    }
     if ["kernel-root-check", "kernel-sol-check"].contains(&a[1].as_str()) {
         return kernel_check(&a[1], &request);
     }
@@ -511,6 +515,7 @@ fn run() -> Result<()> {
             Ok(())
         }
         "qualify-positive185-reader-lifecycle" => persistent_reader::qualify(&mut r),
+        "qualify-positive185-enrolled-fleet-custody" => fleet_custody::qualify(&mut r),
         "qualify-positive185-failed-reader-retirement" => {
             persistent_reader::failed_retirement::qualify(&mut r)
         }

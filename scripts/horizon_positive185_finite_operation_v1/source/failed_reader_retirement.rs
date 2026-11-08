@@ -1,15 +1,15 @@
-//! Child of persistent_reader: retire only the preserved1230 failed29 reader or
+//! Child of persistent_reader: retire only the preserved1330 failed30 reader or
 //! this executable's harmless failed-control unit. No payload/artifact removal.
 use super::*;
-const FAILED_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-active-owner-postreader-tools-20261108-v29/jetstreamer-r2";
-const FAILED_HELPER_SHA: &str = "aaa051c04688043b51576911f80cfb317ee868d0b03f52a0ca3dfc53bc50755a";
-const FAILED_IID: &str = "257e2b024a014fa89c16fff1799a98e8";
-const FAILED_PID: u64 = 3341744;
-const FAILED_GENERATION: &str = "positive-e23d5bdd40ed4a888e875d7a30de119c";
-const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1230-original-r3-20261108-v24/1475-persistent-reader-native-original-outcome.json";
-const FAILED_CAPTURE_SHA: &str = "a1c27e1e759bba792a814a46f2ee6a9caf9d627b372b675a65449cd9bafd9aa4";
-const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-e23d5bdd40ed4a888e875d7a30de119c/spec.json";
-const SPEC_SHA: &str = "a4f6b82ceeef8e8a5c464645073382dc0766f3e6f9fcf5659b7973b9a2d9a6d4";
+const FAILED_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
+const FAILED_HELPER_SHA: &str = "51381649ca4a4b353c738d37435bbfc594a36077a01f5d3a510504e8341a670f";
+const FAILED_IID: &str = "eb59940840294679a4e03ce5dd32cca6";
+const FAILED_PID: u64 = 3380036;
+const FAILED_GENERATION: &str = "positive-cb35709d56014888a1b82931c2a20727";
+const FAILED_CAPTURE: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1330-original-r3-20261108-v26/1518-persistent-reader-native-original-outcome.json";
+const FAILED_CAPTURE_SHA: &str = "bb985f4f593f7fea9f31c116cfc5173d88746df2c65d92f4db98b8bac61df378";
+const SPEC: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-cb35709d56014888a1b82931c2a20727/spec.json";
+const SPEC_SHA: &str = "e36b4524e41e2333f3d3723f4d64aa76286597bcc0f9eea05e73e0c28fa8497b";
 const CONTROL_PREFIX: &str = "horizon-positive185-reader-retirement-control-";
 
 fn failed_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {

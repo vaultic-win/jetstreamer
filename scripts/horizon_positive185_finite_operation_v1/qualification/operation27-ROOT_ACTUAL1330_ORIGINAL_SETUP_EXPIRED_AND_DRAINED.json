@@ -1,0 +1,114 @@
+{
+  "schema": "horizon-positive185-original-setup-expired-drained-event-v1",
+  "original_ready": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1330-original-r3-20261108-v26/original-ready-native.json",
+    "sha256": "b8b7e164ac81b65eaa21c0c3bfbad8b07784dcccab3264479b95318f3634e70a"
+  },
+  "original_activation": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1330-original-r3-20261108-v26/original-activation-context.json",
+    "sha256": "c3d5969e876c2b73feeb6f070aecd44ab63b78cd7b64ac5480f24b58bda2f442"
+  },
+  "original_invocation_id": "cb35709d56014888a1b82931c2a20727",
+  "original_setup_deadline": 1794146129,
+  "recorded_unix_seconds": 1794146316,
+  "original_setup_expired_without_renewal": true,
+  "original_process_absent": true,
+  "original_cgroup_empty": true,
+  "main_never_started": true,
+  "all_run_root_file_artifacts_absent": true,
+  "source_package_and_namespace_preserved": true,
+  "original_outer_reaped": true,
+  "all_original_processes_and_descriptors_drained": true,
+  "native_task_registration_and_enrolled_fleet_history_preserved": true,
+  "start_request_was_detached_so_no_synthetic_failed_JOB_RESULT_invented": true,
+  "actual_original_deadline_failure": {
+    "at_unix_seconds": 1794146129,
+    "awaited_condition": "exact actor metadata, admission and first genuine timer guard; expiry stops this attempt",
+    "detail": "pre-start deadline expired; preserve attempt and re-admit distinct retry",
+    "elapsed_millis": 599457,
+    "epoch": 185,
+    "event": "failure",
+    "heartbeat_advances_work": false,
+    "last_substantive_progress_millis_ago": 599431,
+    "operation": "capped cold root-prefix qualification",
+    "phase": "pre-start readiness"
+  },
+  "actual_elapsed_millis_is_original_not_rounded_up": true,
+  "observed_private_log_phases": [
+    "pre-start readiness"
+  ],
+  "actual_original_start_request_detached": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1330-original-r3-20261108-v26/original-start-request-handoff.json",
+    "sha256": "ee3182e18b58fe9a57196197a989b10a15ecb3d1bd7bfa495156c846321fcf1a"
+  },
+  "run_root_metadata": [],
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0,
+  "replay_launch_authorized": false,
+  "actor": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "exit-code",
+    "NRestarts": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainPID": "0",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-qualify-185-capped-cold-positive-positive-1330-20261108-v26.service",
+    "LoadState": "loaded",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "Job": "",
+    "InvocationID": "cb35709d56014888a1b82931c2a20727"
+  },
+  "native_units": [
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "exit-code",
+      "NRestarts": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainPID": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-1330-20261108-v26.service",
+      "LoadState": "loaded",
+      "ActiveState": "failed",
+      "SubState": "failed",
+      "Job": "",
+      "InvocationID": "cb35709d56014888a1b82931c2a20727"
+    },
+    {
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "NRestarts": "0",
+      "ExecMainStartTimestampMonotonic": "0",
+      "ExecMainPID": "0",
+      "ExecMainStatus": "0",
+      "ControlGroup": "",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-1330-20261108-v26.service",
+      "LoadState": "loaded",
+      "ActiveState": "inactive",
+      "SubState": "dead",
+      "Job": "",
+      "InvocationID": ""
+    },
+    {
+      "Result": "success",
+      "Id": "horizon-guard-185-capped-cold-positive-positive-1330-20261108-v26.timer",
+      "LoadState": "loaded",
+      "ActiveState": "inactive",
+      "SubState": "dead",
+      "Job": "",
+      "InvocationID": ""
+    }
+  ],
+  "token_destination": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/cb35709d56014888a1b82931c2a20727",
+  "token_destination_absent": true,
+  "original_driver_log": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-1330-20261108-v26/private-stdout-stderr.log",
+    "sha256": "9fd5d4ec52540f9b755c65649796554aa1e40a99f1a7569eeb0ed87f800bf8bf"
+  },
+  "exact_failed_helper30_reader_retirement_pending": true
+}

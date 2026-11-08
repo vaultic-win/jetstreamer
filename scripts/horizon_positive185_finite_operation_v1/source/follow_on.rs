@@ -392,8 +392,19 @@ pub fn continue_from_activation(activation: &Bound, r: &mut process::Runner<'_>)
         .arg("fleet-reconcile")
         .arg(&plan_bound.path)
         .args(["--plan-sha256", &plan_bound.sha256]);
-    r.run("actual-enrolled-fleet", command, Duration::from_secs(65))?;
+    let fleet_writer_started = now()?;
+    let fleet_writer = r.run("actual-enrolled-fleet", command, Duration::from_secs(65))?;
     let fleet_bound = process::bind_file(&fleet_output, 16 << 20)?;
+    // The genuine fleet child completed. Close its exact writable output before
+    // captured141/current-reader consumers require immutable Root custody.
+    crate::fleet_custody::complete_enrolled(
+        r,
+        &fleet_bound,
+        &plan_bound,
+        iid,
+        &fleet_writer,
+        fleet_writer_started,
+    )?;
     let fleet = storage::json(&fleet_bound)?;
     ensure!(
         fleet["observer_receipt"] == old["observer"]["path"]
