@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"members\":{\"completion.json\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v31-driver11-r3-retry1/completion.json\",\"sha256\":\"93f3b776a84846a6463748bf0874143919b2819cd70e77d0bcd328eca217e633\"}},\"normal_seal\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v31-driver11-r3-retry1/deployment-seal-receipt.json\",\"sha256\":\"2884fbf5884bfa081474a65cb336c9a5ea810ba69d5e1f9fa9e842076ac62041\"}}\n",
+  "stderr": "Running as unit: horizon-positive185-reader-lifecycle-actual-20261108-v31-driver11-r3-retry1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 23.192s\nCPU time consumed: 1.283s\nMemory peak: 91.9M\nMemory swap peak: 0B\n"
+}

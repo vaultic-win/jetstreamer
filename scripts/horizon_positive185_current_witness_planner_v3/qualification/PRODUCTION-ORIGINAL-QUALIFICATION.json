@@ -1,0 +1,413 @@
+{
+  "schema": "horizon-positive185-current-witness-planner-qualified-artifact-v3",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/qa/planner",
+    "sha256": "3053400739e2370a7601abfb1b109db336b419ebfaa06283f369d314d023d5d2"
+  },
+  "actual_source_files": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/final_window.rs",
+      "sha256": "f0dc2cd82bc53d7d7c710b6c1ee3b866bb8507ea000f709887bba91806946d26"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/lineage.rs",
+      "sha256": "941e66b8c56a6a11f8562661298c23cc26cbb75fd1b9552889469a8a7bb2477e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/main.rs",
+      "sha256": "496e025f0d6460461e895e559b90ac841ac01f7e3d58a792ea413c4bb61d9511"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/positive.rs",
+      "sha256": "ab27561b41a622ccd63a07333d1b1e94a866b2bee07ebcb96b68cbc71338f55e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/resources.rs",
+      "sha256": "997c88a5d090fc0504f2d1a897cf3f8219979edf893d252ca008ee0bdbc52dc1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/actor.service",
+      "sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/envelope.json",
+      "sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/guard.service",
+      "sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/actor.service",
+      "sha256": "2e370ca591546667a0717417a4bf92e9ea8b3cf34456cbc9bb239d744e5b34d2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/envelope.json",
+      "sha256": "584b2f5ea2998d22a0bd09094aa83f4b6f4d104851c7064fc7a5e7424bed3f23"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/guard.service",
+      "sha256": "dfe6e68cc35cb5804172ca986a217bbc15f1ef0a46006340440727898ba25077"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/source/templates-driver11/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    }
+  ],
+  "exact_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "28af58971c6062fb2c4c6784340d385e0553264cd96d892e05291d419b03e245"
+  },
+  "ordinary_tests_passed": 23,
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": true,
+  "originals": [
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "7d63ba556a8de8dce463c3d8e11741ef7b1b69ea385920e96966777430cb8150"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-planner3-driver11-clippy-production-20261108-v1.service",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "InvocationID": ""
+      },
+      "original_PID1_success": {
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "PRIORITY": "6",
+        "_HOSTNAME": "dev-samjohnson",
+        "CODE_FILE": "src/core/unit.c",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "_UID": "0",
+        "_GID": "0",
+        "_COMM": "systemd",
+        "CODE_FUNC": "unit_log_success",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=369b05f;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2490a08244b;t=65fc8d6db8183;x=9b789d7a08ff011d",
+        "SYSLOG_FACILITY": "3",
+        "_TRANSPORT": "journal",
+        "__MONOTONIC_TIMESTAMP": "2512724173899",
+        "CODE_LINE": "6013",
+        "INVOCATION_ID": "074eb87274c44e12b2728e04ea18c24d",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "_PID": "1",
+        "_SYSTEMD_UNIT": "init.scope",
+        "MESSAGE": "horizon-positive185-planner3-driver11-clippy-production-20261108-v1.service: Deactivated successfully.",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794166063071532",
+        "__SEQNUM": "57258079",
+        "_RUNTIME_SCOPE": "system",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_SYSTEMD_SLICE": "-.slice",
+        "UNIT": "horizon-positive185-planner3-driver11-clippy-production-20261108-v1.service",
+        "TID": "1",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "__REALTIME_TIMESTAMP": "1794166063071619",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "e4e638749f7b67d8436af176517fe95cc4b77ebb1adfbffc565036248abeb980"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-planner3-driver11-clippy-tests-20261108-v1.service",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "InvocationID": ""
+      },
+      "original_PID1_success": {
+        "_EXE": "/usr/lib/systemd/systemd",
+        "INVOCATION_ID": "05e39f1ee3c9423a8b1d379fda0b0a05",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=369b062;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2490a0e0fb6;t=65fc8d6e16cee;x=a2beb0bad65d69bd",
+        "_COMM": "systemd",
+        "MESSAGE": "horizon-positive185-planner3-driver11-clippy-tests-20261108-v1.service: Deactivated successfully.",
+        "CODE_FUNC": "unit_log_success",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "CODE_FILE": "src/core/unit.c",
+        "UNIT": "horizon-positive185-planner3-driver11-clippy-tests-20261108-v1.service",
+        "SYSLOG_FACILITY": "3",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_GID": "0",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "__SEQNUM": "57258082",
+        "__REALTIME_TIMESTAMP": "1794166063459566",
+        "__MONOTONIC_TIMESTAMP": "2512724561846",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_RUNTIME_SCOPE": "system",
+        "_UID": "0",
+        "TID": "1",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "CODE_LINE": "6013",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "PRIORITY": "6",
+        "_TRANSPORT": "journal",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_PID": "1",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794166063459542",
+        "_HOSTNAME": "dev-samjohnson"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/test-build-ORIGINAL-EXECUTION.json",
+        "sha256": "7ef8ae23b1b6a1f32dfd63468eb81c0a8d618c0fce659728894a20f50b323527"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-planner3-driver11-test-build-20261108-v1.service",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "InvocationID": ""
+      },
+      "original_PID1_success": {
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "CODE_FUNC": "unit_log_success",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "MESSAGE": "horizon-positive185-planner3-driver11-test-build-20261108-v1.service: Deactivated successfully.",
+        "CODE_FILE": "src/core/unit.c",
+        "__REALTIME_TIMESTAMP": "1794166064242029",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_PID": "1",
+        "PRIORITY": "6",
+        "__SEQNUM": "57258085",
+        "_RUNTIME_SCOPE": "system",
+        "_GID": "0",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_HOSTNAME": "dev-samjohnson",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "__MONOTONIC_TIMESTAMP": "2512725344309",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=369b065;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2490a1a0035;t=65fc8d6ed5d6d;x=f49ffa44bf59cba7",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794166064242001",
+        "TID": "1",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "INVOCATION_ID": "4ff190b8c2d341ea868eba092b912bfe",
+        "_COMM": "systemd",
+        "_UID": "0",
+        "CODE_LINE": "6013",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "UNIT": "horizon-positive185-planner3-driver11-test-build-20261108-v1.service",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_TRANSPORT": "journal",
+        "SYSLOG_FACILITY": "3"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/release-ORIGINAL-EXECUTION.json",
+        "sha256": "12ee616f10ca310d28105c07dfea8bc4703abc4a2da19735f15351eb3bd7821d"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-planner3-driver11-release-20261108-v1.service",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "InvocationID": ""
+      },
+      "original_PID1_success": {
+        "_TRANSPORT": "journal",
+        "_SYSTEMD_UNIT": "init.scope",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "TID": "1",
+        "_GID": "0",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_COMM": "systemd",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=369b069;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2490a36d88b;t=65fc8d70a35c3;x=6ab3f9da65b1099f",
+        "UNIT": "horizon-positive185-planner3-driver11-release-20261108-v1.service",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_UID": "0",
+        "SYSLOG_FACILITY": "3",
+        "__MONOTONIC_TIMESTAMP": "2512727234699",
+        "__SEQNUM": "57258089",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "_SYSTEMD_SLICE": "-.slice",
+        "__REALTIME_TIMESTAMP": "1794166066132419",
+        "_RUNTIME_SCOPE": "system",
+        "CODE_LINE": "6013",
+        "CODE_FILE": "src/core/unit.c",
+        "CODE_FUNC": "unit_log_success",
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "MESSAGE": "horizon-positive185-planner3-driver11-release-20261108-v1.service: Deactivated successfully.",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794166066132402",
+        "_PID": "1",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_HOSTNAME": "dev-samjohnson",
+        "PRIORITY": "6",
+        "INVOCATION_ID": "933105e9508c4a5fb3ae2354008e8e43",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "_SYSTEMD_CGROUP": "/init.scope"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    },
+    {
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver11-current-witness-planner-qa-20261108-v3/ORDINARY-ORIGINAL-EXECUTION.json",
+        "sha256": "c588b19a617786c1b504677b0251fbd4baf8c1b3ba5b4ab39ed4cd974e65f4f8"
+      },
+      "original_native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-positive185-planner3-driver11-ordinary-20261108-v1.service",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Job": "",
+        "InvocationID": ""
+      },
+      "original_PID1_success": {
+        "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+        "__MONOTONIC_TIMESTAMP": "2512914379669",
+        "INVOCATION_ID": "df600cc06a2e4411a136545f6993ff6c",
+        "_COMM": "systemd",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=369b0ed;b=763ea84ca81f4dddad364b1ea2ba36dd;m=249155e7395;t=65fc8e231d0cd;x=be1c3ae44b23ea95",
+        "PRIORITY": "6",
+        "TID": "1",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+        "__REALTIME_TIMESTAMP": "1794166253277389",
+        "_HOSTNAME": "dev-samjohnson",
+        "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+        "UNIT": "horizon-positive185-planner3-driver11-ordinary-20261108-v1.service",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "SYSLOG_FACILITY": "3",
+        "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+        "_SOURCE_REALTIME_TIMESTAMP": "1794166253277380",
+        "_GID": "0",
+        "MESSAGE": "horizon-positive185-planner3-driver11-ordinary-20261108-v1.service: Deactivated successfully.",
+        "_TRANSPORT": "journal",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "__SEQNUM": "57258221",
+        "CODE_LINE": "6013",
+        "CODE_FILE": "src/core/unit.c",
+        "CODE_FUNC": "unit_log_success",
+        "_SELINUX_CONTEXT": "unconfined\n",
+        "_RUNTIME_SCOPE": "system",
+        "_PID": "1",
+        "_UID": "0",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "_SYSTEMD_SLICE": "-.slice"
+      },
+      "original_outer_reaped": true,
+      "original_cgroup_empty": true
+    }
+  ],
+  "sole_controller_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "operational_reader": "helper13",
+  "active_native_capture": "actual-qualified-helper32",
+  "actual_Helper32_binding": {
+    "schema": "horizon-actual-qualified-helper32-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/jetstreamer-r2",
+      "sha256": "7d93abb0ff24e187f648d3ba06a1be544d39528b28f46776f818dc409df21925"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/artifact-proof.json",
+      "sha256": "f906341d0a68fac71f5c9607cb92359e3c11ef31804b5434fc1e3a0d3f0c4b6a"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/deployment-seal-receipt.json",
+      "sha256": "610fbccb3ceb41089ba7e4547fd8a8d567d68ccfd98d449b9b4201bce516f527"
+    },
+    "source_and_recipes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver11-postreader-tools-20261108-v32/source-and-recipes.json",
+      "sha256": "6c74446f40ae0de30a50e28a0025ac6f2beee4bba41ce887c8b2db9cf7fb3935"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_ADDITIVE_DATA4_BOOKING.json",
+      "sha256": "4bef891750ab7364a212e9f9bd377f94698e1229c93c2bd20484ed5f0fba5124"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver11-helper-qa-20261108-v32/ROOT_EXTRA_QA6_CLOSED_NORMAL6_DATA4_RETAINED.json",
+      "sha256": "222be54763b1068a1bda2a4c68f5b50b9662d6e69731e9b078fe71daf21f90dd"
+    },
+    "actual_native_task_capture_and_postreader_same_image": true,
+    "complete_DATA_lower_bound_bytes": 5142030004884,
+    "fresh_original_guard_and_operational_reader_still_required": true
+  },
+  "actual_Driver11_positive_templates": true,
+  "historical_Driver10_templates_and_generic_native11_role_unchanged": true,
+  "actual_positive_route_capability_pending": true,
+  "no_replay_or_admission_authority": true
+}

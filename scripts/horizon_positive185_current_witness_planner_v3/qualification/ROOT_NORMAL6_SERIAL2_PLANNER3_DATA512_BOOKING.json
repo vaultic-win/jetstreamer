@@ -1,0 +1,20 @@
+{
+  "schema": "horizon-planner3-normal6-serial2-DATA512-booking-v1",
+  "normal_pool_bytes": 6442450944,
+  "serial_compiler_bytes": 2147483648,
+  "observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_overlap_bytes": 5368709120,
+  "new_extra_QA_memory_bytes": 0,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "previous_DATA_lower_bound_bytes": 5142566875796,
+  "complete_DATA_lower_bound_bytes": 5143103746708,
+  "prior_final3_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final3-driver11-qa-20261108-v1/ROOT_NORMAL6_FINAL3_SERIAL_QA_CLOSED_DATA_RETAINED.json",
+    "sha256": "6b652e5c9331bd30162194463cfecc3a8c19621bf9b316f1e5769802fa3632bc"
+  },
+  "all_old_memory_DATA_and_failed185_promises_retained": true,
+  "native_kernel_bounds_from_unit_creation": true,
+  "no_new_guard_bound_after_activation": true,
+  "no_replay_or_admission_or_resource_credit": true
+}

@@ -1,0 +1,14 @@
+{
+  "cause": "Post-test receipt wrapper used old1800 binary leaf; all four compiler stages and64 actual2000 tests already passed. Correct proof to actual2000 output, do not repeat tests or builds.",
+  "all_completed_originals_preserved": true,
+  "actual_program": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current2000-window-v1/work/horizon-current2000-guard-window",
+    "sha256": "29081814582c886ab4b4a388a9f91b2de265c42e54f9abdcb9f772969fa287ff"
+  },
+  "failed_wrapper_source": {
+    "path": "/tmp/current2000-window-root-source-v1/qualify-current2000-window-v1.py",
+    "sha256": "5874365a598cac348968d5d37452d24a4cdea3769e15ded6b86162d8b0016b67"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5144177488532
+}

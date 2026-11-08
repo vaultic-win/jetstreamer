@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Created symlink /etc/systemd/system/horizon-operation31-coherence-disposable-20261108-v1.service \u2192 /usr/local/lib/jetstreamer/operation31-coherence-control-20261108-v1/horizon-operation31-coherence-disposable-20261108-v1.service.\nCreated symlink /etc/systemd/system/horizon-operation31-coherence-disposable-20261108-v1.timer \u2192 /usr/local/lib/jetstreamer/operation31-coherence-control-20261108-v1/horizon-operation31-coherence-disposable-20261108-v1.timer.\n"
+}

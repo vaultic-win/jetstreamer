@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest successor_roles::actual_enrolled_fleet_role_control::actual_current_enrolled_fleet_uses_driver11_helper_and_preserves_historical_role ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.10s\n\n",
+  "stderr": "Running as unit: horizon-operation31-current-enrolled-fleet-native-20261108-v3.service; invocation ID: 89262fb0277d4c068e7f38dce0c2a871\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 104ms\nCPU time consumed: 104ms\nMemory peak: 4.1M\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,3 @@
+# Current20:00 bound resource guard
+
+This immutable guard binds the2026-11-08 20:00:22 UTC coordinated sample and dated private witness directory. All64 tests and four strict compiler stages passed with original native/PID1 completion evidence. Root corrected the successor test expected timestamp before compilation; a later packaging leaf error was preserved and corrected without repeating compilation or tests. Normal6GiB remains; the separate512MiB DATA phase raises retained DATA to5144177488532bytes. Actual original guard-window validation remains required before reader/memory/DATA execution. No replay admission or resource credit is granted.

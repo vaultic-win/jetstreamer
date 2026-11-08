@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"actual_successful_reader_retirement\":{\"path\":\"/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1800-successful31-reader-retirement-20261108-v31-r3/successful-reader-retirement-completion.json\",\"sha256\":\"7f540374459110903fefe1d474669418c6f52bcf34b24c20d8346d4c86125229\"},\"exact1800_original\":true,\"no_replay_or_archive_authority\":true}\n",
+  "stderr": "Running as unit: horizon-positive185-exact1800-successful-reader-retirement-20261108-v31-r3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 10.031s\nCPU time consumed: 945ms\nMemory peak: 24.1M\nMemory swap peak: 0B\n"
+}

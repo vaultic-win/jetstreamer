@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-positive185-planner3-driver11-release-20261108-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.853s\nCPU time consumed: 2.983s\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "horizon-epoch185-fixed-unexecuted-replay-planning-model-v1",
+  "epoch": 185,
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "authenticated_full_work_basis": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261105194538.json",
+    "sha256": "6dae466b92485611a652acb8f527b352191c0b64755468cdae06cce046fea3eb"
+  },
+  "full_replay_fixed_millis": 413404206,
+  "qualification_original_review": {
+    "path": "/home/sol/.jetstreamer-private/actual173022-visible-root-acceptance-20261108-v1/status-estimate-review173022.json",
+    "sha256": "22b318775efec63ec9b542d852ffbfe327cdaa3c299da8b280846ca5c635e146"
+  },
+  "qualification_anchor_utc": "2026-11-08T17:30:22Z",
+  "qualification_original_total_millis": 86400000,
+  "control_model_issued_at_utc": "2026-11-08T19:25:15Z",
+  "control_integration_allocation_millis": 7200000,
+  "control_allocation_is_inside_original24h_budget": true,
+  "bootstrap_millis": 3600000,
+  "verification_millis": 21600000,
+  "delivery_millis": 14400000,
+  "no_full_epoch_replay_has_started": true,
+  "qualification_or_control_clock_is_not_a_replay_lease": true,
+  "assumption": "Uncertain full-sidecar planning: retain the authenticated413404206ms full cold replay cost until actual full-route progress. Original24h full-route qualification allowance is anchored17:30:22 and wall elapsed is deducted, never reset; current2h planner/control/reader/admission allocation is a subset of that carried budget. Completed historical repair allowances are removed. Bootstrap, independent verification and delivery remain future costs. A bounded prefix probe is not complete-epoch progress. New actual full-route progress requires a separately reviewed measured model."
+}

@@ -1,0 +1,51 @@
+{
+  "actual_same_shared_retirement_primitive_exercised": true,
+  "actual_two_owned_manager_aliases_removed": true,
+  "final_keeper_native": {
+    "ActiveState": "inactive",
+    "Id": "horizon-positive185-reader-positive-c03a3715825a41cc9ae16c6c361bc302-retain.target",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "SubState": "dead"
+  },
+  "final_reader_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "",
+    "Job": "",
+    "LoadState": "not-found",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "input_body_reads": 0,
+  "intent": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1800-successful31-reader-retirement-20261108-v31-r3/successful-reader-retirement-intent.json",
+    "sha256": "aba77e02eff282d6220aefc62e2cfa87b9616468e8c79c547470f8c80cc282bc"
+  },
+  "only_successfully_completed_reader_retired": true,
+  "only_zero_process_keeper_stopped": true,
+  "original_PID1_journal": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1800-successful31-reader-retirement-20261108-v31-r3/successful-reader-original-PID1.json",
+    "sha256": "12e5dfe78c7d82653c173cafea07f47c6d96392262ccb0dcda070c7ec31ad27f"
+  },
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v31-driver11-r3/operation",
+    "sha256": "46c808938b4b1ab4d92456b1a28276c1acaadee95dca5f6fde71d10a497b643b"
+  },
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "reset_failed_called": false,
+  "resource_credit_bytes": 0,
+  "schema": "horizon-positive185-successful-reader-manager-retirement-v1",
+  "sealed_packages_and_successful_namespaces_preserved": true,
+  "timer_audit": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-exact1800-successful31-reader-retirement-20261108-v31-r3/successful-reader-retirement-timer-audit.json",
+    "sha256": "f588c0c87073105cbc3b14a62cf722d6410126b4331f7cb5cd718f91d0b69c67"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v31-driver11-r3\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"86310d9647726d32d5c2cac7dcf7406725875f8409dc4184ba1ca731fd8fa908\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

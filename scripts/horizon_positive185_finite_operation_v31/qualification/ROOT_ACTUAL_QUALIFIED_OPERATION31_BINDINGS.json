@@ -1,0 +1,34 @@
+{
+  "schema": "horizon-actual-qualified-operation31-driver11-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v31-driver11-r3/operation",
+    "sha256": "46c808938b4b1ab4d92456b1a28276c1acaadee95dca5f6fde71d10a497b643b"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v31-driver11-r3/artifact-proof.json",
+    "sha256": "ced34893251ee22dadc290e288894b220eaed51cc1e845bf2107ad94d660874f"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261108-v31-driver11-r3/deployment-seal-receipt.json",
+    "sha256": "569af154a7544e1637b42912dd0fc32692c7d2e3e8aeca5ddb4023800bebbb4d"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v31-driver11-r3-r3/route.json",
+    "sha256": "5e5e0efcc2b1c3718fb5df69dba7f077b42de636fd179ae536265c0e858cd3fc"
+  },
+  "capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v31-driver11-r3-r3/capability.json",
+    "sha256": "e3f73d62f16ce620f3d7ac6dce170becf8915f81e7b0920a5a98003eed4e574c"
+  },
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v31-driver11-r3-retry1/completion.json",
+    "sha256": "93f3b776a84846a6463748bf0874143919b2819cd70e77d0bcd328eca217e633"
+  },
+  "successful_reader_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v31-driver11-r3/completion.json",
+    "sha256": "da7b0016f82834f53c8781fb89a7a450aebeed040c253c7a4d567d64089097d6"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5143640617620,
+  "fresh_original_guard_and_admission_still_required": true
+}

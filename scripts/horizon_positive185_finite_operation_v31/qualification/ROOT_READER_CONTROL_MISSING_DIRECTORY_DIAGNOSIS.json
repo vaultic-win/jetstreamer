@@ -1,0 +1,18 @@
+{
+  "schema": "horizon-operation31-harmless-control-scope-repair-v1",
+  "failed_request": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation31-driver11-qa-20261108-v3/ACTUAL-READER-CONTROL-REQUEST.json",
+    "sha256": "a98c298f8fca1b275671c952e6ab97778c93213a53d9e5cf3dcc163d66252fcd"
+  },
+  "failed_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current-operation31-driver11-qa-20261108-v3/ACTUAL-READER-CONTROL-ORIGINAL-EXECUTION.json",
+    "sha256": "ceae88d1a9880333b31647fc3f241be24c1c8abc76a6d834515ad4d1c84689ad"
+  },
+  "cause": "The exact CLI requires an existing empty Root0700 operation_root; qualifier omitted its creation. Failure preceded native child creation.",
+  "distinct_retry_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-reader-control-20261108-v31-driver11-r3-retry1",
+  "original_attempt_preserved": true,
+  "existing_DATA512_booking_retained": true,
+  "normal6_retained": true,
+  "no_operational_actor_retry": true,
+  "no_resource_credit": true
+}
