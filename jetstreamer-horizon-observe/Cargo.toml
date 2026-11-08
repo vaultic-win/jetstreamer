@@ -148,9 +148,16 @@ path = "src/publication144_progress_bin.rs"
 name = "jetstreamer-append-cohort191-wrapper"
 path = "src/append_cohort191_wrapper.rs"
 
+[[bin]]
+name = "jetstreamer-snapshot92447542-cache"
+path = "src/snapshot92447542_cache_bin.rs"
+
 [dependencies]
 anyhow.workspace = true
+base64.workspace = true
+crc.workspace = true
 libc.workspace = true
+md-5.workspace = true
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["std"] }
 sha2.workspace = true
