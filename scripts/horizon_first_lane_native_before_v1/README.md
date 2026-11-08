@@ -1,6 +1,6 @@
 # Original reader bracket and held first128 enrollment
 
-These overlays preserve the qualified helper22, node2 and guard2 source/dependency graph recorded in `qualification/`. They supplement the earlier witness reader and memory4/DATA4 source packages; they are not standalone Cargo projects.
+These overlays preserve the qualified helper23, node2 and guard2 source/dependency graph recorded in `qualification/`. They supplement the earlier witness reader and memory4/DATA4 source packages; they are not standalone Cargo projects.
 
 Native restore can explicitly select its genuine immutable full-reader accounting as a historical before bracket. Its exact Bound must match the actual opaque memory request. Qualification, original completion, both original raw reports and the original 300-second freshness clock remain mandatory. Admission still executes a fresh complete after-builder, both physical snapshots, all typed/source/claim comparisons and the unchanged 90/105/120-second deadlines. Omitting the opt-in retains the previous two-fresh-pass behavior.
 
@@ -35,3 +35,7 @@ The actual 02:30 issuer failed foreign census membership before admission. Sourc
 First128 admission and held release now reproduce the original reader's authenticated retained136 projection on both fresh scans before semantic comparisons. Original raw reports remain separate, and the original projected brackets are reproduced and checked. This does not change helper/census policy or issue new resource credit.
 
 Helper22 passed four strict compiler stages, 2932 ordinary tests and nine native controls, then normal sealing (SHA256 `3c01f6242ae0b7fd86f2a8328db3f5fc1fcd160f094b2a9b7ad42eec3ab7f3a7`). Its extra QA closure reconciles 637 original execution records and 631 terminal empty units, including the qualified finite driver control and preserved failed compiler. Native admission and first128 operational execution remain pending; reader13 stays selected.
+
+The actual 03:00 attempt failed before admission because the new candidate's fleet census contains 38 properties, while the comparison expected the helper's 12-property shape. Accounting discovery and the held capture also use distinct producer shapes. Helper23 privately captures both complete actual producer views, authenticates the original held actor, compares their shared fields and revalidates both whole maps before use. Fresh candidate rows must match those exact snapshots in every field; missing, extra and changed properties fail closed. Original reports, foreign policy, candidate charges and deadlines remain intact. Regressions cover the real extended census shape and every changed or removed property.
+
+Helper23 passed four strict compiler stages, 2932 ordinary tests and nine native controls, then normal sealing (SHA256 `cd6c1ebfc214adb2623d342db39b808795ddcf958b15d8e42dbb0391dc705c5d`). Its extra QA closure reconciles 667 original execution records and 662 terminal empty units. The failed attempt and natural actor expiry are preserved; actual native admission remains pending.

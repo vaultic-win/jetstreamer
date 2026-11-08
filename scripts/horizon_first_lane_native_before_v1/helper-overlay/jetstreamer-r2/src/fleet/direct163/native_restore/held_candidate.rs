@@ -11,6 +11,8 @@ pub(super) struct Candidate {
     phase_binding: Bound,
     phase: Value,
     capture: Value,
+    native_census:Value,
+    discovery:Value,
 }
 fn bindings_shape(spec:&Value,pb:&Bound,booking:&Bound,phase:&Bound,capture:&Value)->Result<()> {
     ensure!(spec["schema"]=="epoch163-native-restore-issuer-spec-v1"
@@ -34,9 +36,10 @@ impl Candidate {
         bindings_shape(&spec,&s.native_plan,&s.native_booking,&s.current_phase_ledger,first)?;
         let plan_value=immutable(&s.native_plan)?;
         ensure!(plan_value==serde_json::to_value(p)?,"native candidate original plan crossed");
+        let (native_census,discovery)=epoch186::accounting::native163_candidate_views()?;
         let candidate=Self {spec_binding:sb.clone(),spec,issuer:issuer.clone(),native_plan:s.native_plan.clone(),plan:plan_value,
             booking_binding:s.native_booking.clone(),booked:booking(s)?,phase_binding:s.current_phase_ledger.clone(),
-            phase:provenance::phases(s)?,capture:first.clone()};
+            phase:provenance::phases(s)?,capture:first.clone(),native_census,discovery};
         candidate.revalidate()?;
         Ok(candidate)
     }
@@ -53,9 +56,24 @@ impl Candidate {
             && provenance::phases(&s)?==self.phase,"native candidate plan/booking/phase changed");
         prepared_phase_fit(&p,&self.phase)?;
         ensure!(held::capture(&p,&self.native_plan)?==self.capture,"native candidate actual held identity/ready/namespace changed");
+        let (native_census,discovery)=epoch186::accounting::native163_candidate_views()?;
+        ensure!(native_census==self.native_census && discovery==self.discovery,
+            "actual full native candidate census/discovery changed");
+        for row in [&self.native_census,&self.discovery] {
+            for (key,value) in row.as_object().context("candidate native producer shape")? {
+                if let Some(original)=self.capture["native"].get(key) {
+                    ensure!(original==value,"candidate original held capture differs from actual native producer: {key}");
+                }
+            }
+        }
         Ok(())
     }
-    pub(super) fn capture(&self)->&Value { &self.capture }
+    pub(super) fn capture(&self)->Value {
+        let mut view=self.capture.clone();
+        view["comparison_native_census"]=self.native_census.clone();
+        view["comparison_discovery"]=self.discovery.clone();
+        view
+    }
     pub(super) fn require_original_absent(&self,raw:&Value)->Result<()> {
         for field in ["native_before","native_after","workload_discovery_before","workload_discovery_after"] {
             let rows=raw[field].as_object().with_context(||format!("native candidate original {field} missing"))?;
@@ -66,6 +84,7 @@ impl Candidate {
     pub(super) fn evidence(&self)->Value {
         json!({"schema":"epoch163-native-original-held-candidate-induction-v1","issuer_spec":self.spec_binding,
             "native_plan":self.native_plan,"native_booking":self.booking_binding,"current_phase_ledger":self.phase_binding,
+            "full_native_census":self.native_census,"full_discovery":self.discovery,
             "actor_unit":ACTOR,"actor_invocation_id":self.capture["iid"],"actor_pid":self.capture["pid"],
             "actor_start_ticks":self.capture["start_ticks"],"ready":self.capture["ready"],
             "comparison_only":true,"memory_bytes_still_charged":MEMORY,"candidate_DATA_bytes_still_charged":SCRATCH,

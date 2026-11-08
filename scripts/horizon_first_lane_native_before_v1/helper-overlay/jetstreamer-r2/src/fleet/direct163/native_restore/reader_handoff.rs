@@ -145,7 +145,15 @@ fn exact_helper_census(row:&Value,helper:&Value)->Result<()> {
 }
 fn exact_candidate_row(row:&Value,capture:&Value,exact_fields:bool,field:&str)->Result<()> {
  let object=row.as_object().with_context(||format!("native candidate {field} row missing"))?;
- if exact_fields {ensure!(object.len()==CENSUS_FIELDS.len(),"native candidate {field} exact12field set differs; actual={:?}",object.keys().collect::<Vec<_>>());}
+ let producer=if exact_fields {"comparison_native_census"} else {"comparison_discovery"};
+ let expected=capture[producer].as_object().context("actual private candidate producer snapshot absent")?;
+ let actual_keys=object.keys().collect::<std::collections::BTreeSet<_>>();
+ let expected_keys=expected.keys().collect::<std::collections::BTreeSet<_>>();
+ ensure!(actual_keys==expected_keys,"native candidate {field} exact producer field set differs: expected={expected_keys:?} actual={actual_keys:?}");
+ for (key,value) in expected {
+  ensure!(object.get(key)==Some(value) && value.is_string(),
+    "native candidate {field} full producer field differs: key={key} expected={value} actual={}",row[key]);
+ }
  for key in CENSUS_FIELDS {
   ensure!(row[key].is_string() && row[key]==capture["native"][key],
    "native candidate {field} differs from actual original held capture: key={key} expected={} actual={}",capture["native"][key],row[key]);
@@ -278,8 +286,8 @@ impl Handoff {
         ensure!(actual==self.retained,"native actual retention changed before fresh projection");
         let semantic=crate::fleet::charge136_retry0005::retained_attempt::project(&self.retention,raw,&actual)?;
         let mut compared=comparison(&self.before,&semantic,&self.old_helper,&self.new_helper)?;
-        compare_native_census(&self.before,&semantic,&self.old_helper,&self.new_helper,self.candidate.capture(),&mut compared)?;
-        compare_discovery_membership(&self.before,&semantic,&self.old_helper,&self.new_helper,self.candidate.capture())?;
+        compare_native_census(&self.before,&semantic,&self.old_helper,&self.new_helper,&self.candidate.capture(),&mut compared)?;
+        compare_discovery_membership(&self.before,&semantic,&self.old_helper,&self.new_helper,&self.candidate.capture())?;
         epoch186::accounting::stable_guard_basis(&self.sources,&self.before,&compared)?;
         Ok((semantic,compared))
     }
@@ -314,13 +322,18 @@ mod tests {
       let mut capture=json!({"iid":actor["invocation_id"],"pid":125,"start_ticks":199,"native":actor["native"]});
       for key in ["Restart","MemoryAccounting","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec","TasksMax","User"] {capture["native"][key]=json!("actual-profile");}
       let mut a=json!({"native_before":{},"native_after":{},"workload_discovery_before":{},"workload_discovery_after":{}});let mut b=a.clone();
+      const FULL:&str="ActiveState,AmbientCapabilities,CPUQuotaPerSecUSec,CapabilityBoundingSet,ControlGroup,ControlPID,Delegate,ExecMainCode,ExecMainExitTimestamp,ExecMainPID,ExecMainStartTimestamp,ExecMainStatus,ExecStart,Group,Id,InvocationID,Job,KillMode,LoadState,MainPID,MemoryAccounting,MemoryHigh,MemoryMax,MemorySwapMax,NRestarts,NoNewPrivileges,PrivateNetwork,ProtectHome,ProtectSystem,ReadWritePaths,RemainAfterExit,Restart,Result,RuntimeMaxUSec,SubState,TasksMax,Type,User";
+      const DISCOVERY:&str="Id,LoadState,ActiveState,SubState,InvocationID,MainPID,NRestarts,Restart,Result,ExecMainStatus,ExecMainCode,ControlGroup,ExecStart,MemoryAccounting,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,TriggeredBy,Triggers,Unit,User,Type";
+      for (member,fields) in [("comparison_native_census",FULL),("comparison_discovery",DISCOVERY)] {
+       let mut row=serde_json::Map::new();for key in fields.split(',') {
+        row.insert(key.into(),capture["native"].get(key).cloned().unwrap_or(json!("actual-extended-property")));
+       }
+       capture[member]=Value::Object(row);
+      }
       for field in ["native_before","native_after","workload_discovery_before","workload_discovery_after"] {
        a[field][READER]=old["native"].clone();a[field]["foreign.service"]=json!({"actual":"original"});
        b[field][ISSUER]=new["native"].clone();b[field]["foreign.service"]=json!({"actual":"fresh"});
-       if field.starts_with("native_") {
-        let mut row=serde_json::Map::new();for key in CENSUS_FIELDS {row.insert(key.into(),capture["native"][key].clone());}
-        b[field][ACTOR]=Value::Object(row);
-       }else {b[field][ACTOR]=capture["native"].clone();}
+       b[field][ACTOR]=capture[if field.starts_with("native_") {"comparison_native_census"} else {"comparison_discovery"}].clone();
       }
       (a,b,old,new,capture)
     }
@@ -348,9 +361,13 @@ mod tests {
        let mut missing=b.clone();missing[field].as_object_mut().unwrap().remove("foreign.service");
        let error=compare_native_census(&a,&missing,&old,&new,&capture,&mut missing.clone()).unwrap_err().to_string();
        assert!(error.contains("foreign.service") && error.contains("missing="),"{error}");
-       for key in CENSUS_FIELDS {
+       for key in capture["comparison_native_census"].as_object().unwrap().keys() {
         let mut changed=b.clone();changed[field][ACTOR][key]=json!("crossed");
         assert!(compare_native_census(&a,&changed,&old,&new,&capture,&mut changed.clone()).is_err(),"candidate {field} {key}");
+        let mut removed=b.clone();removed[field][ACTOR].as_object_mut().unwrap().remove(key);
+        assert!(compare_native_census(&a,&removed,&old,&new,&capture,&mut removed.clone()).is_err(),"missing candidate {field} {key}");
+       }
+       for key in CENSUS_FIELDS {
         let mut helper=b.clone();helper[field][ISSUER][key]=json!("crossed");
         assert!(compare_native_census(&a,&helper,&old,&new,&capture,&mut helper.clone()).is_err(),"helper {field} {key}");
        }
@@ -379,7 +396,7 @@ mod tests {
        assert!(compare_discovery_membership(&a,&no_actor,&old,&new,&capture).is_err());
        let mut present=a.clone();present[field][ACTOR]=b[field][ACTOR].clone();
        assert!(compare_discovery_membership(&present,&b,&old,&new,&capture).is_err());
-       for key in CENSUS_FIELDS.into_iter().chain(["Restart","MemoryAccounting","MemoryMax","MemorySwapMax","CPUQuotaPerSecUSec","TasksMax","User"]) {
+       for key in capture["comparison_discovery"].as_object().unwrap().keys() {
         let mut changed=b.clone();changed[field][ACTOR][key]=json!("changed");
         assert!(compare_discovery_membership(&a,&changed,&old,&new,&capture).is_err(),"{field} {key}");
        }

@@ -699,6 +699,21 @@ pub(in crate::fleet) fn native163_current_helper() -> Result<Value> {
     Ok(helper)
 }
 
+/// The actual two distinct accounting producers for the sole held candidate.
+/// No caller-supplied row or namespace exemption enters this capability.
+pub(in crate::fleet) fn native163_candidate_views() -> Result<(Value,Value)> {
+    let helper=native163_current_helper()?;
+    let actor=crate::fleet::direct163::native_restore::ACTOR;
+    let census=crate::fleet::unit(actor)?;
+    let discovery=io::properties(actor)?;
+    ensure!(crate::fleet::direct163::native_restore::covered_held(actor,
+        string(&helper,"/unit")?,&discovery)?,"actual native candidate discovery not authenticated");
+    for (key,value) in discovery.as_object().context("actual candidate discovery map")? {
+        if let Some(other)=census.get(key) {ensure!(other==value,"actual native candidate producer views differ: {key}");}
+    }
+    Ok((census,discovery))
+}
+
 fn pool_rows(
     expected: &[core::Owner],
     helper: &Value,
