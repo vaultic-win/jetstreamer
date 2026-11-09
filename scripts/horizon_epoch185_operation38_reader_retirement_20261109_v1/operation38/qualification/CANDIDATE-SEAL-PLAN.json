@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-candidate-20261109-v38-driver12-helper35-r1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/qa/r3/planner",
+      "name": "operation",
+      "sha256": "c014b3d29ff2629ef0778975234fc92cc54be591d7e55d4f9d625bc5f9061fd8",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/STATIC-QUALIFIED-NATIVE-PENDING.json",
+      "name": "artifact-proof.json",
+      "sha256": "dfc25acfe2f0de1ad83dc3af9a58905d19345a7c89f5ef1616c2e58bf62cdd45",
+      "mode": 292
+    }
+  ]
+}

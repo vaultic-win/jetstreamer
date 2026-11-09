@@ -1,0 +1,18 @@
+{
+  "schema": "horizon-positive185-upstream-static-qualified-native-control-pending-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/qa/r3/planner",
+    "sha256": "c014b3d29ff2629ef0778975234fc92cc54be591d7e55d4f9d625bc5f9061fd8"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R3.json",
+    "sha256": "b67a60a2cc6c6a99165011c18d039f63296ac5b77093e9fc04c519626d7c1ed1"
+  },
+  "ordinary_tests_passed": 71,
+  "ignored_tests": 5,
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": false,
+  "replay_launch_authorized": false,
+  "publication_authorized": false
+}

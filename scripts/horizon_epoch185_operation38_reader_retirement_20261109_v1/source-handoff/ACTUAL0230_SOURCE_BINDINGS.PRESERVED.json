@@ -1,0 +1,47 @@
+{
+  "terminal": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/terminal.json",
+    "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b"
+  },
+  "completion": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-enrolled-reader-completion.json",
+    "sha256": "b832f47364d4ebce9276bb771d9948e340a6f30a37eec5b1eb7ac69cc74fde74"
+  },
+  "native_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/genuine-original-persistent-reader.json",
+    "sha256": "5eb4d1eba858c4616a2a806e68a80f2b711db485a09d5ed342eb788102d38414"
+  },
+  "outer_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-reader-keeper-start-outer.json",
+    "sha256": "71948e9eae6abfe519e6854377612c3c1a66b7dca988855c1530166a2ae30e35"
+  },
+  "original_final_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/3782-actual-c71-one-original-final-original-outcome.json",
+    "sha256": "c24c739b8b678ebf793e2c75665a043bbc17304a305269db2c9c48835ecc8219"
+  },
+  "reader_proof": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cda54fabbcad05ee9d1aba2d944926c5d0557b4662d1052fdf1f0a8e776b6c9e-cold185-da9b57fed9f04c9fa1b0c5dba1932488/proof.json",
+    "sha256": "6256ede849a9c9bedf6cf2c4ef98ab01c3ea88640698bd37b94a11e113fb8fd3"
+  },
+  "reader_package_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-da9b57fed9f04c9fa1b0c5dba1932488/deployment-seal-receipt.json",
+    "sha256": "443fe76ddac0c800907c0590ee63d319d3ac3e2b3125e5b5cceda5cda063025e"
+  },
+  "reader_PID1": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-enrolled-reader-PID1.json",
+    "sha256": "bfbd19759998853944a657ad42bc1e7441684a3b8cf1e80caba28442c41039f2"
+  },
+  "lifecycle": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/lifecycle.json",
+    "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8"
+  },
+  "reader_argv": [
+    "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2",
+    "read-failed4-current-accounting",
+    "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-da9b57fed9f04c9fa1b0c5dba1932488/spec.json",
+    "--spec-sha256",
+    "08a6ccbe0b9d83fccf24e3f18ef6dacb28ca78bb6b7e7edf4a57e1b467a3b07a",
+    "--self-sha256",
+    "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389"
+  ]
+}

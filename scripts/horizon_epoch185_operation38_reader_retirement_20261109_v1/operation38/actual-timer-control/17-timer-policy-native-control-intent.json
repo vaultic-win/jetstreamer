@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "show",
+    "horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+    "--no-pager",
+    "--property=Id,LoadState,InvocationID,FragmentPath,DropInPaths,RandomizedDelayUSec,FixedRandomDelay,AccuracyUSec,Unit,Persistent,RemainAfterElapse,WakeSystem"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "457ed3342ead4b0ba73b4126538af3b4",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 10000,
+  "wall_started_at": 1794198059
+}

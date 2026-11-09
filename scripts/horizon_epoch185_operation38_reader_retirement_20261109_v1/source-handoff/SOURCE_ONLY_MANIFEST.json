@@ -1,0 +1,576 @@
+{
+  "schema": "horizon-operation38-driver12-helper35-planner6-final6-source-only-v1",
+  "handoff": {
+    "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/HANDOFF.md",
+    "sha256": "79b6221185ffa2ad2309b91231da8c6af21d2ac564098ede4094f89d8d73f414",
+    "logical_bytes": 11885
+  },
+  "source": [
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/activation.rs",
+      "sha256": "616c2d6649415582cde37317c70f37504afd17595b8b8c0f7fe637a05a5a0537",
+      "logical_bytes": 28554
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/current_roles_native.rs",
+      "sha256": "bcfc6f3a4dd10c8261f2fa50cd79a8e45e93efc8c390cea92f264b4dac51efbd",
+      "logical_bytes": 1858
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a",
+      "logical_bytes": 150
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/driver_policy.rs",
+      "sha256": "97e285da0183e48c0d1f7f9c85630414e57f12003a38ed907a7326d0d44cd2aa",
+      "logical_bytes": 1881
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe",
+      "logical_bytes": 24041
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-reader-completion.json",
+      "sha256": "518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d",
+      "logical_bytes": 43229
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-timer-stop-completion.json",
+      "sha256": "f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138",
+      "logical_bytes": 855
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-timer-stop-intent.json",
+      "sha256": "7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef",
+      "logical_bytes": 2629
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-lifecycle.json",
+      "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8",
+      "logical_bytes": 11355
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-reader-completion.json",
+      "sha256": "b832f47364d4ebce9276bb771d9948e340a6f30a37eec5b1eb7ac69cc74fde74",
+      "logical_bytes": 43076
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-terminal.json",
+      "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b",
+      "logical_bytes": 7953
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075",
+      "logical_bytes": 26215
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8",
+      "logical_bytes": 4396
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78",
+      "logical_bytes": 36425
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/main.rs",
+      "sha256": "60d3d3395e7bee75d352549260588724e6813750e6efcc641d08a186e63b93cc",
+      "logical_bytes": 22895
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec",
+      "logical_bytes": 37050
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/postreader.rs",
+      "sha256": "deec7610aea1a24992f84d4f2950af91ce80a9ebc14c14604b8b6ea74f5c7e7d",
+      "logical_bytes": 6006
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c",
+      "logical_bytes": 13432
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc",
+      "logical_bytes": 1413
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/reader_phase.rs",
+      "sha256": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f",
+      "logical_bytes": 14938
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/run_layout.rs",
+      "sha256": "3a4348e3f3f3b5cd8ce4bae0bdb0eb0d136ca2580cb87165460d518d70e81fde",
+      "logical_bytes": 6662
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6",
+      "logical_bytes": 3132
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successful_reader_retirement.rs",
+      "sha256": "d7c6565b403f07a86f73721db4bc8325edb0d2f7e0ee3995ac5cffeb6141eb41",
+      "logical_bytes": 47616
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successful_reader_retirement_0230.rs",
+      "sha256": "61958c8cac21251de516acfcb431eec6d791baef0ffe857d6800e56819086195",
+      "logical_bytes": 19760
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successor_roles.rs",
+      "sha256": "dc21387799ec46dd8d3b50a6546bb71051d3ad3bf4b140fbe3a37e570a47ec1a",
+      "logical_bytes": 5474
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a",
+      "logical_bytes": 27457
+    }
+  ],
+  "packet_files": [
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL0230_SOURCE_BINDINGS.PRESERVED.json",
+      "sha256": "320a492b16e873b7b86e0d17a0bf1ae5d575d3e4cfc0a66b3b2301971907f6ad",
+      "logical_bytes": 2829
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_DRIVER12_BINDINGS.PRESERVED.json",
+      "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e",
+      "logical_bytes": 1540
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_FINAL6_BINDINGS.PRESERVED.json",
+      "sha256": "8ce00a5e570ae38716f810406afb581e49e8fcac7157f242555c744de808e2d6",
+      "logical_bytes": 1082
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_HELPER35_BINDINGS.PRESERVED.json",
+      "sha256": "7c292756432e2d1f798a494249dda901449da096552c55797ac249c04cae7ab6",
+      "logical_bytes": 3345
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_OPERATION37_BINDINGS.PRESERVED.json",
+      "sha256": "5d7b6da01f99ad4dcedb12f1c266d87a9ba9f6a32b8fdada783cb24e2b0a1f09",
+      "logical_bytes": 2748
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_PLANNER6_BINDINGS.PRESERVED.json",
+      "sha256": "0f8b9390fee8dbb5ea2cc3abf280f524e76cfc80a33690f4d45022d3bd2ff5e0",
+      "logical_bytes": 6766
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/FRESH_TIMER_CONTROL_SEAL_PLAN.NOT_EXECUTED.json",
+      "sha256": "8347a701ec15f990a26a0a5592ccfab08c13dd4dcd25e95470e4d491d52b58b6",
+      "logical_bytes": 1168
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/HANDOFF.md",
+      "sha256": "79b6221185ffa2ad2309b91231da8c6af21d2ac564098ede4094f89d8d73f414",
+      "logical_bytes": 11885
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/NATIVE_CONTROL_RECIPES.NOT_EXECUTED.json",
+      "sha256": "95e8e52dce279555430d18368db7c3062edc1b08a5a1790b3d88d054e52ab3f2",
+      "logical_bytes": 22393
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ROOT_ACTUAL_QUALIFIED_PLANNER6_BINDINGS.json",
+      "sha256": "0f8b9390fee8dbb5ea2cc3abf280f524e76cfc80a33690f4d45022d3bd2ff5e0",
+      "logical_bytes": 6766
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ROOT_PROGRESS.txt",
+      "sha256": "67638b8623766401adc6c2d767660a66209d4b6a4ca71afd7d96af744c41bfcc",
+      "logical_bytes": 426
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/SOURCE_AND_EXACT4_COMPILER_RECIPES.NOT_EXECUTED.json",
+      "sha256": "0a49042a7bde7fd0b0113039747e40404ecd2a7a77621c9f535a14806da94f6d",
+      "logical_bytes": 41357
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/SOURCE_ONLY_CANDIDATE.diff",
+      "sha256": "6539800d19df8deb3b2f239f9686afb7fca45e257d69fa2ef0d3290f97c3326a",
+      "logical_bytes": 105006
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/STATIC_CHECKS.json",
+      "sha256": "f8a1b80d7066455c9c3db967d4c68c800a4e6382b5ea864a6e36d9546e421d03",
+      "logical_bytes": 18863
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/controls/horizon-operation32-coherence-disposable-20261108-v38-r1.service",
+      "sha256": "b9fdbac9fff57ce4916f3923ad07f5b8fb68d7d12fb6b893ae52eef38a91625b",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/controls/horizon-operation32-coherence-disposable-20261108-v38-r1.timer",
+      "sha256": "32e98881054abe6ddcf009f030e483f7ef9c5e6496a6d98d96229d53211a4817",
+      "logical_bytes": 224
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-FAILED-RETIREMENT-CONTROL-REQUEST.TEMPLATE.json",
+      "sha256": "9bb7c4002eb191d8871cf07ccb6f8fbb6702ff20a42e0f70b6b150e480f91015",
+      "logical_bytes": 211
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-FLEET-CUSTODY-CONTROL-REQUEST.TEMPLATE.json",
+      "sha256": "0ae66d7f934a2d8a21b89e0f876ddab05124a97a9d2d9edc11dec8dcaf53cba1",
+      "logical_bytes": 231
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-HELD-RELOAD-CONTROL-REQUEST.TEMPLATE.json",
+      "sha256": "604274587a66e2b95234db580db5e87a6458666c3162d151f38fa45b9ce6c496",
+      "logical_bytes": 236
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-READER-CONTROL-REQUEST.TEMPLATE.json",
+      "sha256": "825e5d605b920b70e8f359da64124e9009605aa6e1279fb1389b57c7bfb86146",
+      "logical_bytes": 248
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-READER-PHASE-REQUEST.TEMPLATE.json",
+      "sha256": "6f8ed6174ba463581acfbad7990a05a1412f65c2275fad42191b4815c30f782a",
+      "logical_bytes": 238
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-RUN-LAYOUT-CONTROL-REQUEST.TEMPLATE.json",
+      "sha256": "d9bbf9305b7ac466135fd6357e5d0192d2d47a85e6602f194319a5bad94628c1",
+      "logical_bytes": 461
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/ACTUAL-SUCCESSFUL-RETIREMENT-CONTROL-NATIVE2-REQUEST.TEMPLATE.json",
+      "sha256": "e38e63841ef1875706fcb4fdd8df8a8f9e86af5a884edc299fb66eaec40ccf49",
+      "logical_bytes": 231
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/PROFILE-R3-REQUEST.TEMPLATE.json",
+      "sha256": "115bbc4c7ddacf7dcfaf1fa1288e1470394693ecd7ada8006481782e980ee385",
+      "logical_bytes": 968
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/requests/RETIRE-EXACT0230-SUCCESSFUL-READER.TEMPLATE.json",
+      "sha256": "e8bb5a3987edd5658569f53b486e031a1d6ff0561b0ffa489dfea8f5bfc1d328",
+      "logical_bytes": 440
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/activation.rs",
+      "sha256": "616c2d6649415582cde37317c70f37504afd17595b8b8c0f7fe637a05a5a0537",
+      "logical_bytes": 28554
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/current_roles_native.rs",
+      "sha256": "bcfc6f3a4dd10c8261f2fa50cd79a8e45e93efc8c390cea92f264b4dac51efbd",
+      "logical_bytes": 1858
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a",
+      "logical_bytes": 150
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/driver_policy.rs",
+      "sha256": "97e285da0183e48c0d1f7f9c85630414e57f12003a38ed907a7326d0d44cd2aa",
+      "logical_bytes": 1881
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe",
+      "logical_bytes": 24041
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-reader-completion.json",
+      "sha256": "518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d",
+      "logical_bytes": 43229
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-timer-stop-completion.json",
+      "sha256": "f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138",
+      "logical_bytes": 855
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0100-timer-stop-intent.json",
+      "sha256": "7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef",
+      "logical_bytes": 2629
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-lifecycle.json",
+      "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8",
+      "logical_bytes": 11355
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-reader-completion.json",
+      "sha256": "b832f47364d4ebce9276bb771d9948e340a6f30a37eec5b1eb7ac69cc74fde74",
+      "logical_bytes": 43076
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fixtures/original0230-terminal.json",
+      "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b",
+      "logical_bytes": 7953
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075",
+      "logical_bytes": 26215
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8",
+      "logical_bytes": 4396
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78",
+      "logical_bytes": 36425
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54",
+      "logical_bytes": 331
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00",
+      "logical_bytes": 220
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/main.rs",
+      "sha256": "60d3d3395e7bee75d352549260588724e6813750e6efcc641d08a186e63b93cc",
+      "logical_bytes": 22895
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec",
+      "logical_bytes": 37050
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/postreader.rs",
+      "sha256": "deec7610aea1a24992f84d4f2950af91ce80a9ebc14c14604b8b6ea74f5c7e7d",
+      "logical_bytes": 6006
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c",
+      "logical_bytes": 13432
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc",
+      "logical_bytes": 1413
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/reader_phase.rs",
+      "sha256": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f",
+      "logical_bytes": 14938
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/run_layout.rs",
+      "sha256": "3a4348e3f3f3b5cd8ce4bae0bdb0eb0d136ca2580cb87165460d518d70e81fde",
+      "logical_bytes": 6662
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6",
+      "logical_bytes": 3132
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successful_reader_retirement.rs",
+      "sha256": "d7c6565b403f07a86f73721db4bc8325edb0d2f7e0ee3995ac5cffeb6141eb41",
+      "logical_bytes": 47616
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successful_reader_retirement_0230.rs",
+      "sha256": "61958c8cac21251de516acfcb431eec6d791baef0ffe857d6800e56819086195",
+      "logical_bytes": 19760
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/successor_roles.rs",
+      "sha256": "dc21387799ec46dd8d3b50a6546bb71051d3ad3bf4b140fbe3a37e570a47ec1a",
+      "logical_bytes": 5474
+    },
+    {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a",
+      "logical_bytes": 27457
+    }
+  ],
+  "source_file_count": 40,
+  "source_logical_bytes": 442309,
+  "packet_logical_bytes_before_manifest": 672302,
+  "actual_qualified_role_bindings": {
+    "OPERATION37": {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_OPERATION37_BINDINGS.PRESERVED.json",
+      "sha256": "5d7b6da01f99ad4dcedb12f1c266d87a9ba9f6a32b8fdada783cb24e2b0a1f09",
+      "logical_bytes": 2748
+    },
+    "DRIVER12": {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_DRIVER12_BINDINGS.PRESERVED.json",
+      "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e",
+      "logical_bytes": 1540
+    },
+    "HELPER35": {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_HELPER35_BINDINGS.PRESERVED.json",
+      "sha256": "7c292756432e2d1f798a494249dda901449da096552c55797ac249c04cae7ab6",
+      "logical_bytes": 3345
+    },
+    "PLANNER6": {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_PLANNER6_BINDINGS.PRESERVED.json",
+      "sha256": "0f8b9390fee8dbb5ea2cc3abf280f524e76cfc80a33690f4d45022d3bd2ff5e0",
+      "logical_bytes": 6766
+    },
+    "FINAL6": {
+      "path": "/tmp/operation38-driver12-helper35-source-20261109-v1/ACTUAL_FINAL6_BINDINGS.PRESERVED.json",
+      "sha256": "8ce00a5e570ae38716f810406afb581e49e8fcac7157f242555c744de808e2d6",
+      "logical_bytes": 1082
+    }
+  },
+  "actual_operation38_program": null,
+  "actual_operation38_artifact_proof": null,
+  "actual_operation38_normal_seal": null,
+  "actual_operation38_native_qualification": null,
+  "all_current_production_role_pins_resolved_from_actual_qualification": true,
+  "readonly_source_parsing_passed": true,
+  "rust_compilers_tests_native_jobs_run_by_this_source_agent": false,
+  "resource_booking_credit_campaign_or_Git_actions_performed": false,
+  "root_next_action": "Book new retained code/source/control DATA and required memory, copy/hash-freeze exactsource and sixextern graph, execute four compilers and fresh same-image native controls, normally seal and qualify new Final6route before exact0230retirement and fresh launch."
+}

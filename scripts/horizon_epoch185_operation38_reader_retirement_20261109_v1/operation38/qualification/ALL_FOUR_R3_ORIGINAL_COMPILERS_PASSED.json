@@ -1,0 +1,14 @@
+{
+  "labels": [
+    "clippy-production",
+    "clippy-tests",
+    "test-build",
+    "release"
+  ],
+  "graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R3.json",
+    "sha256": "b67a60a2cc6c6a99165011c18d039f63296ac5b77093e9fc04c519626d7c1ed1"
+  },
+  "all_unchanged_externs_preserved": true,
+  "no_replay_or_publication": true
+}

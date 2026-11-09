@@ -1,0 +1,7 @@
+{
+  "schema": "horizon-positive185-run-layout-native-control-request-v1",
+  "operation_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-layout-control-20261109-v38-r1",
+  "generation": "positive-layout-v37-r1",
+  "layout_sol_run_root": "/home/sol/.jetstreamer-private/epoch185-positive-layout-control-run-20261109-v38-r1",
+  "layout_sol_control_root": "/home/sol/.jetstreamer-private/epoch185-positive-layout-control-control-20261109-v38-r1"
+}

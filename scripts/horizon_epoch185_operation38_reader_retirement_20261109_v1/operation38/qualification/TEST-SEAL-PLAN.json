@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tests-20261109-v38-driver12-helper35-r1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/qa/r3/planner-tests",
+      "name": "tests",
+      "sha256": "f33801fc4efd845ca30d1847207c178b3eda9786bc688d08e3b5d027f553f4d0",
+      "mode": 365
+    }
+  ]
+}

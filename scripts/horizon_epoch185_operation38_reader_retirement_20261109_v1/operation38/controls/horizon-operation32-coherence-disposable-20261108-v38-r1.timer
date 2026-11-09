@@ -1,0 +1,8 @@
+[Unit]
+Description=Operation30 disposable timer unset to finite control
+[Timer]
+OnActiveSec=1s
+OnUnitInactiveSec=2s
+AccuracySec=1us
+Unit=horizon-operation32-coherence-disposable-20261108-v38-r1.service
+RemainAfterElapse=yes

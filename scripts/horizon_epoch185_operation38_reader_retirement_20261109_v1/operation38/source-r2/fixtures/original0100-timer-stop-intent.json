@@ -1,0 +1,60 @@
+{
+  "actor": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "signal",
+    "NRestarts": "0",
+    "ExecMainPID": "0",
+    "ControlGroup": "",
+    "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "Job": "",
+    "InvocationID": "9568cb52af154f7d8fbd48e7571770fa"
+  },
+  "timer": {
+    "Unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.service",
+    "Result": "success",
+    "Id": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer",
+    "ActiveState": "active",
+    "SubState": "waiting",
+    "Job": "",
+    "InvocationID": "0785b9a4f1084b24b81a85dc7d8bb5b6"
+  },
+  "first_guard_failure": {
+    "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+    "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+  },
+  "original_receipt": {
+    "actor_invocation_id": "9568cb52af154f7d8fbd48e7571770fa",
+    "actor_pid": 3822292,
+    "actor_start_ticks": 253340426,
+    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+    "admission_sha256": "b42aae52403e98a619b3c1050bf27280963a09cb1d4b9e5c24b9087f5cbbdbc1",
+    "capacity_credit_bytes": 0,
+    "epoch": 185,
+    "failure": "No such file or directory (os error 2)",
+    "guard_invocation_id": "50a0f038091f4c578791c3720a85a72e",
+    "guard_start_monotonic_micros": 2533610289062,
+    "guard_start_native_property": "2533610289062",
+    "resource_sample": null,
+    "sampled_at": 1794186949,
+    "schema": "horizon-epoch185-native-guard-result-v4",
+    "success": false,
+    "timer_driven": true,
+    "timer_last_trigger_monotonic_micros": 2533610277861,
+    "timer_last_trigger_native_property": "4w 1d 7h 46min 50.277861s",
+    "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer"
+  },
+  "protected199_timer": {
+    "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+    "Result": "success",
+    "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+    "ActiveState": "active",
+    "SubState": "waiting",
+    "Job": "",
+    "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1"
+  },
+  "protected199_FD9": "/home/sol/.jetstreamer-private/epoch199-private-tail-20261017-v1/lane-a/private",
+  "reason": "Only newly created failed0100 actor guard timer; actor terminal with no Main and original guard positively tripped. Preserve all failure metadata, packages, guards and resource promises. No reset, unlink, restart, credit or retry."
+}

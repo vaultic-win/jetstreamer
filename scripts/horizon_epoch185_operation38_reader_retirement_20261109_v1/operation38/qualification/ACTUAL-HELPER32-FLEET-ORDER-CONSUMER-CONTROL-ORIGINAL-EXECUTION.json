@@ -1,0 +1,27 @@
+{
+  "argv": [
+    "systemd-run",
+    "--wait",
+    "--pipe",
+    "--service-type=exec",
+    "--unit=horizon-operation38-r1-actual-current-fleet-order-native-20261108-v3",
+    "-p",
+    "User=root",
+    "-p",
+    "MemoryMax=512M",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "TasksMax=128",
+    "-p",
+    "RuntimeMaxSec=30",
+    "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tests-20261109-v38-driver12-helper35-r1/tests",
+    "--ignored",
+    "--exact",
+    "--test-threads=1",
+    "fleet_order::tests::actual_original2100_failed_plan_repairs_without_dropping_any_role"
+  ],
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet_order::tests::actual_original2100_failed_plan_repairs_without_dropping_any_role ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.01s\n\n",
+  "stderr": "Running as unit: horizon-operation38-r1-actual-current-fleet-order-native-20261108-v3.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 10ms\nCPU time consumed: 10ms\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+}

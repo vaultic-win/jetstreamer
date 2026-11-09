@@ -1,0 +1,100 @@
+{
+  "horizon-guard145-prefix-shared72h-20261107-v8g1.timer": {
+    "identity_and_source": {
+      "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+      "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "InvocationID": "f6f2308db2dc47be8f470030fb587b90"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitActiveUSec=30s"
+    ],
+    "raw": "Unit=horizon-guard145-prefix-shared72h-20261107-v8g1.service\nTimersMonotonic={ OnUnitActiveUSec=30s ; next_elapse=4w 1d 10h 52min 3.710171s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 3.710171s\nLastTriggerUSecMonotonic=4w 1d 10h 51min 33.695351s\nId=horizon-guard145-prefix-shared72h-20261107-v8g1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer\nInvocationID=f6f2308db2dc47be8f470030fb587b90\n"
+  },
+  "horizon-guard145-prefix-real1328-20261106-v1.timer": {
+    "identity_and_source": {
+      "Unit": "horizon-guard145-prefix-real1328-20261106-v1.service",
+      "Id": "horizon-guard145-prefix-real1328-20261106-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/horizon-guard145-prefix-real1328-20261106-v1.timer",
+      "InvocationID": "8ea1b152bedb4db48f23a1f849b713ed"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitActiveUSec=30s"
+    ],
+    "raw": "Unit=horizon-guard145-prefix-real1328-20261106-v1.service\nTimersMonotonic={ OnUnitActiveUSec=30s ; next_elapse=4w 1d 10h 52min 17.101165s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=3w 5d 20h 24min 41.964544s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 17.101165s\nLastTriggerUSecMonotonic=4w 1d 10h 51min 47.086311s\nId=horizon-guard145-prefix-real1328-20261106-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/horizon-guard145-prefix-real1328-20261106-v1.timer\nInvocationID=8ea1b152bedb4db48f23a1f849b713ed\n"
+  },
+  "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer": {
+    "identity_and_source": {
+      "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+      "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitActiveUSec=30s"
+    ],
+    "raw": "Unit=jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service\nTimersMonotonic={ OnUnitActiveUSec=30s ; next_elapse=4w 1d 10h 52min 3.714779s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=3w 2d 5h 46min 51.141884s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 3.714779s\nLastTriggerUSecMonotonic=4w 1d 10h 51min 33.711044s\nId=jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer\nInvocationID=97aeff8897434ed5ad89dd56c3fb17d1\n"
+  },
+  "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer": {
+    "identity_and_source": {
+      "Unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service",
+      "Id": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "InvocationID": "b16b35497a944494ba7d1ef724025aa8"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitInactiveUSec=1min"
+    ],
+    "raw": "Unit=jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service\nTimersMonotonic={ OnUnitInactiveUSec=1min ; next_elapse=4w 1d 10h 52min 38.789516s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1w 5d 12h 59min 24.357261s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 38.789516s\nLastTriggerUSecMonotonic=4w 1d 10h 51min 38.702814s\nId=jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer\nInvocationID=b16b35497a944494ba7d1ef724025aa8\n"
+  },
+  "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer": {
+    "identity_and_source": {
+      "Unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service",
+      "Id": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "InvocationID": "bf71af016f7b4f3f8e593e3714fdc113"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitActiveUSec=2min"
+    ],
+    "raw": "Unit=jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service\nTimersMonotonic={ OnUnitActiveUSec=2min ; next_elapse=4w 1d 10h 52min 33.681950s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1w 6d 10h 29min 12.625104s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 33.681950s\nLastTriggerUSecMonotonic=4w 1d 10h 50min 33.660556s\nId=jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer\nInvocationID=bf71af016f7b4f3f8e593e3714fdc113\n"
+  },
+  "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer": {
+    "identity_and_source": {
+      "Unit": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.service",
+      "Id": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer",
+      "InvocationID": "b876cb4a2b7f4c72a1ffc51186c6889a"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitInactiveUSec=2min"
+    ],
+    "raw": "Unit=jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.service\nTimersMonotonic={ OnUnitInactiveUSec=2min ; next_elapse=4w 1d 10h 52min 35.345230s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1w 5d 12h 59min 24.109693s }\nNextElapseUSecMonotonic=4w 1d 10h 52min 35.345230s\nLastTriggerUSecMonotonic=4w 1d 10h 50min 35.244183s\nId=jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer\nInvocationID=b876cb4a2b7f4c72a1ffc51186c6889a\n"
+  },
+  "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer": {
+    "identity_and_source": {
+      "Unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service",
+      "Id": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "ActiveState": "active",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "InvocationID": "b55c21128f88449c8e60b64cb7366cd5"
+    },
+    "intervals": [
+      "{ OnActiveUSec=1s",
+      "{ OnUnitActiveUSec=5min"
+    ],
+    "raw": "Unit=jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service\nTimersMonotonic={ OnUnitActiveUSec=5min ; next_elapse=4w 1d 10h 53min 33.543177s }\nTimersMonotonic={ OnActiveUSec=1s ; next_elapse=1w 3d 21h 15min 40.081567s }\nNextElapseUSecMonotonic=4w 1d 10h 53min 33.543177s\nLastTriggerUSecMonotonic=4w 1d 10h 48min 33.528528s\nId=jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer\nActiveState=active\nFragmentPath=/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer\nInvocationID=b55c21128f88449c8e60b64cb7366cd5\n"
+  }
+}

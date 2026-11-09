@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+    "/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/TEST-SEAL-PLAN.json",
+    "--plan-sha256",
+    "3825983cc72df79b1350b7550ad17554012c9c2168e187b6786786ba922a7867",
+    "--self-sha256",
+    "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+  ],
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tests-20261109-v38-driver12-helper35-r1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"3825983cc72df79b1350b7550ad17554012c9c2168e187b6786786ba922a7867\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}
