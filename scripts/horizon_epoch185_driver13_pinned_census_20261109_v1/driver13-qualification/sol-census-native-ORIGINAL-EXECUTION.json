@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-driver13-sol-census-native-20261109-v1.service; invocation ID: bf87adbe21454490ace3e0d4c5405e56\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 31ms\nCPU time consumed: 31ms\nMemory peak: 1.8M\nMemory swap peak: 0B\n"
+}

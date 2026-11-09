@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"receipt\": \"/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109054235.json\", \"status\": {\"elapsed_execution_millis\": 1632000, \"epoch\": 185, \"estimated_remaining_millis\": 495471206, \"jet_size_bytes\": 0, \"phase\": \"verification\", \"sampled_at_utc\": \"2026-11-09T05:42:35Z\"}, \"control_remaining_millis\": 7184000, \"failed_original_failed_original_terminal_and_drained\": true}\n",
+  "stderr": "Running as unit: horizon-status185-explicit-control-review9-event-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.552s\nCPU time consumed: 292ms\nMemory peak: 760.0K\nMemory swap peak: 0B\n"
+}

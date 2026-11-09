@@ -1,0 +1,39 @@
+{
+  "schema": "horizon-helper36-driver13-fresh-QA5-booking-v1",
+  "owner": "/root",
+  "at_utc": "2026-11-09T05:44:46.512782+00:00",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER13_DATA4_BOOKING.json",
+    "sha256": "f707a14d33f3c26438767720bd6a9dd6f3c380f2e160a582d2ac8bc62564556a"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5181758452372,
+  "new_retained_DATA_bytes": 4294967296,
+  "complete_DATA_bytes": 5186053419668,
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA5_bytes": 5368709120,
+  "one_serial_compiler_bytes": 8589934592,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_external_pool_bytes": 11811160064,
+  "no_credit_from_old_QA_releases": true,
+  "all_previous_source_and_DATA_promises_retained": true,
+  "actual_qualified_driver13": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER13_BINDINGS.json",
+    "sha256": "0dfc3dfc08766d37a69ba47eb064b1424b008025fe87d61b8b3ce0e4090f865f"
+  },
+  "prior_driver13_compiler_phase_closed": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER13_PHASE_CLOSED_DATA4_RETAINED.json",
+    "sha256": "7e5470527df1790bce78ff444795d96f7db089a9ff16f911bd778068b5673650"
+  },
+  "current_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T053022Z-postcompletion154-v1.json",
+    "sha256": "9e5afe5b6b4f371b7a49e302425f9886d7795dbb389442ee18085bd8a6a5f0b9"
+  },
+  "retained_memory_total_including_old185_and_external_bytes": 493434068992,
+  "protected_existing_floor_bytes": 5217451979412,
+  "additional_retained_DATA_since0500_bytes": 8589934592,
+  "cleanup_and_holding_assessment": "Disk deficit0; no retirement/offload credit, preserve failed185 repair scratch. Independent163 work remains source-only, no competing compiler.",
+  "desired_replay_lanes": 5,
+  "useful_replay_lanes": 0,
+  "no_replay_or_publication_authority": true
+}

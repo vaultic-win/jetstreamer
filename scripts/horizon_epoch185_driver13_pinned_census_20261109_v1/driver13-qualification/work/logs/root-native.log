@@ -1,0 +1,10 @@
+
+running 5 tests
+test adapter::fragment_link_regressions::actual_normal_sealed_v9_links_pass_without_unit_activation ... ok
+test adapter::resource_census::native_controls::actual_native_complete_censuses_survive_unlink_and_owned_pid_exit ... ok
+test adapter::resource_census::pinned_inode_tests::actual_native_pinned_inode_census_charges_concurrent_unlinks ... ok
+test adapter::tests::actual_v11_actor_hook_arrays_are_readable_without_manage_unit_authority ... ok
+test adapter::tests::actual_v11_native_hook_arrays_and_timer_cadence_are_observed ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.09s
+

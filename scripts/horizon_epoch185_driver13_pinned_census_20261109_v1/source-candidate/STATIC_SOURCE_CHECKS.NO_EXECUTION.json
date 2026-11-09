@@ -1,0 +1,31 @@
+{
+  "only_changed_existing_file": "src/resource_census.rs",
+  "all_existing_test_names_preserved": [
+    "disappearing_child_requires_a_new_complete_pass",
+    "lost_or_replaced_root_never_gets_retry_credit",
+    "symlink_and_ceiling_errors_are_never_transient",
+    "perpetual_file_churn_hits_same_finite_retry_bound",
+    "missing_maps_requires_proven_exit_and_absent_membership",
+    "live_pid_without_maps_is_not_a_zero_usage_process",
+    "actual_native_complete_censuses_survive_unlink_and_owned_pid_exit"
+  ],
+  "new_control_names": [
+    "a_replaced_file_name_requires_a_new_complete_pass_and_counts_its_replacement",
+    "actual_native_pinned_inode_census_charges_concurrent_unlinks",
+    "every_discovered_account_can_unlink_after_pin_without_zero_charge",
+    "held_directory_does_not_hide_a_replaced_root_or_symlink",
+    "inode_pinned_before_unlink_is_charged_without_restarting_the_whole_tree",
+    "observed_replacement_above_ceiling_is_not_forgotten_by_a_later_retry",
+    "retries_read_a_fresh_directory_stream_instead_of_reusing_its_eof_offset",
+    "unlinked_pinned_inode_still_enforces_the_original_ceiling"
+  ],
+  "VMA_census_bytes_unchanged": true,
+  "all_callers_and_resource_policy_and_runtime_clocks_byte_identical": true,
+  "four_actual_R3_recipe_extern_arguments_preserved": true,
+  "no_build_test_book_deploy_launch_status_or_cadence_action": true,
+  "Rust_syntax_only_parse_passed": true,
+  "typecheck_Clippy_tests_not_run": true,
+  "seven_new_ordinary_controls_and_one_ignored_native": true,
+  "shared_original_8_attempt_30s_4M_64_bounds_unchanged": true,
+  "observed_growth_and_replacement_blocks_charged_before_retry": true
+}

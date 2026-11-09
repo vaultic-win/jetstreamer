@@ -1,0 +1,25 @@
+{
+  "schema": "horizon-current0600-parent-quiet-preflight-source-v1",
+  "root_QA_directory": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0600-window-20261109-v1",
+  "source_sha256": "94f6bf0a675c4652712dc4b73df2da2f5fe8dcc532411a004b16d5810d80c3ca",
+  "sample_utc": "2026-11-09T06:00:22Z",
+  "sample_unix": 1794204022,
+  "recipes": {
+    "clippy-prod": "compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+    "clippy-tests": "compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+    "test-build": "compiler-2-test-build-ARGV.UNSTARTED.json",
+    "release": "compiler-3-release-ARGV.UNSTARTED.json"
+  },
+  "guard_DATA_delta_bytes_requiring_Root_booking": 536870912,
+  "canonical_DATA_before_guard_booking_bytes": 5186053419668,
+  "minimum_complete_DATA_after_guard_booking_bytes": 5186590290580,
+  "qualification_not_run": true,
+  "source_base": "Actual accepted0230source; new0430 sample clock/output namespace only, no future observer pass or digest claimed.",
+  "prepared_only": true,
+  "root_actual_guard_booking": {
+    "path": "/home/sol/.jetstreamer-private/current0600-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0600_GUARD_DATA512_BOOKING.json",
+    "sha256": "97fc5f9412579beb90ca49b8a0a422870a44c3cce3de212124e3e20c870d5752"
+  },
+  "booking_not_created": false,
+  "future_observer_receipt_not_yet_present": true
+}

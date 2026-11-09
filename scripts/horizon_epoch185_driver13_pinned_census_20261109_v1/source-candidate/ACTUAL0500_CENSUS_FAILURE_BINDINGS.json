@@ -1,0 +1,11 @@
+{
+  "original_closed_log": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/private-stdout-stderr.log",
+    "sha256": "3a19ff12c0c083d156cd326a1d97ef788ae938f6d5841e4a5b9f66cb5c47b875"
+  },
+  "actual_failure_line": "{\"at_unix_seconds\":1794201803,\"awaited_condition\":\"awaiting actual parent bootstrap and canonical progress\",\"detail\":\"allocation census retry limit; no usage accepted: descendant disappeared during allocation census: /home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next/scratch/.historical-runtime/jetstreamer-historical-parent-VBsh07/jetstreamer-historical-v1.6.15-WBzde7/unpacked/accounts/79661924.1174279578\",\"elapsed_millis\":480140,\"epoch\":185,\"event\":\"failure\",\"heartbeat_advances_work\":false,\"last_substantive_progress_millis_ago\":473897,\"operation\":\"capped cold root-prefix qualification\",\"phase\":\"cold initialization\"}",
+  "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+  "Root_already_authenticated_status_at": "2026-11-09T05:24:51Z",
+  "no_new_live_resource_observation": true,
+  "Root_owns_status_and_cadence": true
+}
