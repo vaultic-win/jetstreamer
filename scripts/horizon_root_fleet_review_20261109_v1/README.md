@@ -1,7 +1,9 @@
 # Root operational fleet review
 
-Metadata-only Rust review of the complete101–200 campaign after the20:30 four-lane observation. It authenticates the complete ready-pair inventory and15 status-readback receipts, preserves all100 epoch rows and repair history, and reconciles prior and currently loaded Horizon units with stable replay/control identities.
+Metadata-only Rust reconciliation of the complete101–200 campaign. The review authenticates the ready-pair inventory and every status-readback receipt, preserves all100 epoch rows and repair history, and checks current producer/control identities against the complete loaded-unit census.
 
-This review neither samples resources nor mutates remote objects, producers or reservations. Native Frame/full Reader acceptance, a current memory target, operating-point promotion and replay admission remain separate gates.
+An ordinary replay that starts after a coordinated observation can enter through a separate exact transaction-phase event, admission and first-guard binding. The tool retains the original observer unchanged and makes no sampled progress or rate claim for the supplemental owner. It consumes the separately qualified Root four-lane operating review and its actual guard evidence; a fifth live producer does not promote the proven point automatically.
 
-Four compiler configurations, eight tests and the genuine native review passed. Qualification binds the original artifacts, failures and completed native invocation; the original macro/lint failures remain preserved. All tooling and output were charged to a separate OS allocation with zero additional DATA.
+The second runtime generation passed all four compiler configurations, eight tests and the genuine native100-row/16-status/five-replay reconciliation. Compiler and native callbacks use an explicit serial512MiB subdivision of the existing Root/status control allocation; no additional memory or DATA promise is inferred. The unadmitted extra-QA memory checks remain recorded.
+
+This review takes no resource observation and changes no remote object, producer or reservation. Native Frame/full Reader acceptance, a complete current RSS target and replay admission remain separate gates.

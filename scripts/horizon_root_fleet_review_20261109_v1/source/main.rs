@@ -10,7 +10,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 type R<T> = Result<T, Box<dyn std::error::Error>>;
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261109-v1/review";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261109-v2/review";
 const NOFOLLOW: i32 = 0x20000;
 const CLOEXEC: i32 = 0x80000;
 const FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainStatus,ControlGroup,Type,Job";
@@ -122,6 +122,11 @@ fn owner_observation(row: &Value, expected: &Value) -> R<()> {
     }
     need(row["useful_work"]["matching_markers"].as_u64().is_some_and(|x|x>0) && row["useful_work"]["last"]["transactions"].as_u64().is_some_and(|x|x>0),"actual useful replay required")
 }
+fn selected_operating_count(previous: u64, point: &Value) -> R<u64> {
+    let count=n(point,"proven_replay_count")?;
+    need(point["schema"]=="horizon-Root-expanded-standard-four-lane-operating-review-v1" && point["owner"]=="/root" && point["primary_thread"]=="01a1af2a-9ce8-76a2-8939-b2112bd38f53" && point["explicit_Root_operating_point_review"]==true && point["replay_admission_authorized"]==false && count==4 && count>=previous && count<=previous.checked_add(1).ok_or("count overflow")? && point["whole_four_owner_window_seconds"]==1800 && point["full_original_owner_and_worker_sets_unchanged"]==true && point["hard_memory_limit_and_OOM_delta_zero"]==true,"qualified explicit four-lane operating review required")?;
+    Ok(count)
+}
 fn run() -> R<()> {
     let argv=std::env::args().collect::<Vec<_>>();
     need(argv.len()==7 && argv[1]=="review" && argv[3]=="--plan-sha256" && argv[5]=="--self-sha256","review PLAN --plan-sha256 SHA --self-sha256 SHA")?;
@@ -151,6 +156,17 @@ fn run() -> R<()> {
         let pr=&status.get(&epoch).ok_or("replay status missing")?.0;
         need(pr["after_status"]["phase"]=="replay" && pr["owner_evidence"]["actual_producer"]["InvocationID"]==e["invocation_id"],"replay status owner mismatch")?;
     }
+    let supplemental=plan["supplemental_live_replays"].as_array().ok_or("explicit supplemental replay census required")?;
+    let mut supplemental_events=BTreeMap::new();
+    for e in supplemental {
+        let epoch=n(e,"epoch")?;need(epochs.insert(epoch) && !ready.contains(&epoch) && !observations.iter().any(|r|r["range"].as_str().and_then(|x|x.parse::<u64>().ok())==Some(epoch)),"supplement overlaps observer or ready pair")?;
+        let event=bound(&e["source_phase_event"])?;let admission=bound(&e["admission"])?;let guard=bound(&e["first_guard"])?;
+        need(event["schema"]=="horizon-singleton-first-target-transaction-phase-event-v1" && event["latest_target_progress"]["transactions"].as_u64().is_some_and(|x|x>0) && event["source_log"]["stdout_append_binding_verified"]==true && event["no_new_resource_sample"]==true && event["resource_admission_authorized"]==false && admission["owner"]=="/root" && admission["primary_thread"]==plan["primary_thread"] && e["admission"]==plan["complete_DATA_authority"] && guard["producer_invocation_id"]==e["invocation_id"] && guard["producer_stop_enabled"]==true && guard["trip_reason"].is_null() && guard["root_physical_observation_error"].is_null() && guard["worker_observation_error"].is_null(),"supplement genuine transaction/admission/guard proof")?;
+        let actual=native(s(e,"unit")?)?;owner_matches(&actual,e)?;
+        for(k,v)in event["producer_after"].as_object().ok_or("supplement event owner")? {need(actual[k]==*v,"supplement owner changed since phase event")?;}
+        let pr=&status.get(&epoch).ok_or("supplement status missing")?.0;need(pr["after_status"]["phase"]=="replay" && pr["owner_evidence"]["actual_producer"]["InvocationID"]==e["invocation_id"],"supplement replay status owner mismatch")?;
+        need(owner_before.insert(s(e,"unit")?.into(),actual).is_none(),"duplicate supplement owner")?;supplemental_events.insert(epoch,event);
+    }
     let controls=plan["stable_non_replay_owners"].as_array().ok_or("non-replay stable owners")?;
     let mut stable_controls=BTreeMap::new();
     for e in controls { let v=native(s(e,"unit")?)?; owner_matches(&v,e)?; need(stable_controls.insert(s(e,"unit")?.into(),v).is_none(),"duplicate control owner")?; }
@@ -179,9 +195,13 @@ fn run() -> R<()> {
         }
         if let Some(action)=plan["next_actions_by_epoch"].get(e.to_string().as_str()) { need(action.as_str().is_some_and(|x|!x.is_empty()) && !ready.contains(&e),"invalid Root next action override")?; row["next_action"]=action.clone(); }
         if epochs.contains(&e) {
-            let expected_owner=expected.iter().find(|x|x["epoch"]==e).ok_or("owner plan")?;
-            let observation=observations.iter().find(|x|x["range"].as_str().and_then(|x|x.parse::<u64>().ok())==Some(e)).ok_or("owner observation")?;
-            active.push(json!({"epoch":e,"phase":"replay","unit":owner_before[s(expected_owner,"unit")?],"observer":plan["observer"],"progress":observation["useful_work"],"scratch_path":observation["scratch_path"],"status_publication":row["status_publication"]}));
+            if let Some(expected_owner)=expected.iter().find(|x|x["epoch"]==e) {
+                let observation=observations.iter().find(|x|x["range"].as_str().and_then(|x|x.parse::<u64>().ok())==Some(e)).ok_or("owner observation")?;
+                active.push(json!({"epoch":e,"phase":"replay","unit":owner_before[s(expected_owner,"unit")?],"observer":plan["observer"],"progress":observation["useful_work"],"scratch_path":observation["scratch_path"],"status_publication":row["status_publication"],"in_current_observer":true}));
+            } else {
+                let owner=supplemental.iter().find(|x|x["epoch"]==e).ok_or("supplement owner")?;let event=&supplemental_events[&e];
+                active.push(json!({"epoch":e,"phase":"replay","unit":owner_before[s(owner,"unit")?],"source_phase_event":owner["source_phase_event"],"latest_target_progress":event["latest_target_progress"],"scratch_path":owner["scratch_path"],"status_publication":row["status_publication"],"in_current_observer":false,"measured_rate_claimed":false}));
+            }
         }
         if !ready.contains(&e) { backlog.push(json!({"epoch":e,"state":row["state"],"next_action":row["next_action"],"current_task":row["current_task"],"gate_evidence":row["gate_evidence"],"last_reconciled_at_utc":obs["recorded_at_utc"],"repair_closed":false,"prior_history_preserved_by":plan["previous_review"]})); }
         new_rows.push(row);
@@ -190,8 +210,14 @@ fn run() -> R<()> {
     for key in ["previous_review","observer","status_audit","inventory","complete_DATA_authority","next_observer_receipt"] { bound(&plan[key])?; }
     for (_,binding) in status.values() { bound(binding)?; }
     let previous_count=n(&prev,"proven_replay_count")?;
-    need(plan["proven_replay_count"]==previous_count,"this review cannot promote operating point")?;
-    let report=json!({"schema":"horizon-Root-complete-fleet-operational-review-v1","owner":"/root","primary_thread":plan["primary_thread"],"sampled_at_utc":obs["recorded_at_utc"],"recorded_unix_seconds":now()?,"previous_Root_operational_review":plan["previous_review"],"previous_qualified_fleet":prev["previous_qualified_fleet"],"observer":plan["observer"],"authenticated_inventory":plan["inventory"],"authenticated_status_audit":plan["status_audit"],"complete_DATA_authority":plan["complete_DATA_authority"],"complete_DATA_bytes":plan["complete_DATA_bytes"],"complete_projected_memory_bytes":plan["complete_projected_memory_bytes"],"normal_pool_bytes":plan["normal_pool_bytes"],"same_sample_conservative_free_DATA_bytes":obs["filesystem"]["conservative_available_bytes"],"ready_pairs":ready.len(),"remaining_epochs":100-ready.len(),"live_replay_count":active.len(),"proven_replay_count":previous_count,"current_memory_selected_target":{"valid":false,"reason":"Complete current native Frame/full Reader and qualified capacity calculator owner coverage remain pending; no current target inferred from history.","admission_authorized":false},"last_qualified_memory_selected_target":prev["last_qualified_memory_selected_target"],"expanded_fleet_window":{"qualified":false,"reason":"Current predecessor lacks epoch169; preserve proven3 until the later matching four-owner window and explicit guard/floor review."},"next_capacity_action":plan["next_capacity_action"],"next_observer_utc":plan["next_observer_utc"],"next_observer_receipt":plan["next_observer_receipt"],"actual_executing_replays":active,"metadata_unit_census":census,"currently_running_background_control_services":background,"stable_non_replay_owners":stable_controls,"epochs":new_rows,"open_repair_backlog":backlog,"all15_active_status_reports_authenticated_readback":status.len()==15,"authenticated_status_count":status.len(),"current_native_Frame_and_full_reader_acceptance_pending":true,"review_is_not_a_native_Frame_or_admission_receipt":true,"resource_credit_bytes":0,"holding_bytes_credited":0,"holding_prefix":"node_02/","remote_mutations":false,"replay_launch_authorized":false,"producer_mutations":false,"new_resource_observations":false});
+    let point=bound(&plan["operating_point"])?;let selected_count=selected_operating_count(previous_count,&point)?;
+    let point_now=bound(&point["observer"])?;let point_before=bound(&point["predecessor_observer"])?;
+    need(point_now["cadence"]["previous_sample_sha256"]==point["predecessor_observer"]["sha256"] && point_now["cadence"]["observed_interval_seconds"]==1800,"operating window predecessor mismatch")?;
+    let point_owners=point["current_native_producers"].as_object().ok_or("operating owner census")?;need(point_owners.len()==4,"operating owner census count")?;
+    for(epoch,unit)in point_owners {let e=epoch.parse::<u64>()?;let expected=json!({"epoch":e,"unit":unit["Id"],"invocation_id":unit["InvocationID"],"main_pid":unit["MainPID"]});for sample in [&point_before,&point_now] {let r=sample["replays"].as_array().ok_or("operating rows")?.iter().find(|x|x["range"]==epoch.as_str()).ok_or("operating row absent")?;owner_observation(r,&expected)?;}}
+    for g in point["fresh_genuine_guards"].as_array().ok_or("operating guard census")? {let sample=bound(&g["receipt"])?;need(sample["trip_reason"].is_null() && sample["producer_stop_enabled"]==true && sample["guard_sha256"]=="35dbd4826c8947f38d50dff049345e1c3d62450eb85e41e94e326880e1898fbc","operating guard proof changed")?;}
+    need(plan["proven_replay_count"]==selected_count,"explicit operating review differs from plan")?;
+    let report=json!({"schema":"horizon-Root-complete-fleet-operational-review-v1","owner":"/root","primary_thread":plan["primary_thread"],"sampled_at_utc":obs["recorded_at_utc"],"recorded_unix_seconds":now()?,"previous_Root_operational_review":plan["previous_review"],"previous_qualified_fleet":prev["previous_qualified_fleet"],"observer":plan["observer"],"authenticated_inventory":plan["inventory"],"authenticated_status_audit":plan["status_audit"],"complete_DATA_authority":plan["complete_DATA_authority"],"complete_DATA_bytes":plan["complete_DATA_bytes"],"complete_projected_memory_bytes":plan["complete_projected_memory_bytes"],"normal_pool_bytes":plan["normal_pool_bytes"],"same_sample_conservative_free_DATA_bytes":obs["filesystem"]["conservative_available_bytes"],"ready_pairs":ready.len(),"remaining_epochs":100-ready.len(),"live_replay_count":active.len(),"proven_replay_count":selected_count,"operating_point":plan["operating_point"],"current_memory_selected_target":{"valid":false,"reason":"Current sample does not cover supplemental170; current Frame/full Reader and capacity calculator owner coverage remain pending. No target inferred from history.","admission_authorized":false},"last_qualified_memory_selected_target":prev["last_qualified_memory_selected_target"],"expanded_fleet_window":{"qualified":false,"reason":"The fifth live owner is post-boundary supplemental evidence. Await the complete five-owner window; this review grants no further promotion or admission."},"next_capacity_action":plan["next_capacity_action"],"next_observer_utc":plan["next_observer_utc"],"next_observer_receipt":plan["next_observer_receipt"],"actual_executing_replays":active,"metadata_unit_census":census,"currently_running_background_control_services":background,"stable_non_replay_owners":stable_controls,"epochs":new_rows,"open_repair_backlog":backlog,"all15_active_status_reports_authenticated_readback":status.len()>=15,"all_active_status_reports_authenticated_readback":status.len() as u64==n(&plan,"expected_status_count")?,"authenticated_status_count":status.len(),"current_native_Frame_and_full_reader_acceptance_pending":true,"review_is_not_a_native_Frame_or_admission_receipt":true,"resource_credit_bytes":0,"holding_bytes_credited":0,"holding_prefix":"node_02/","remote_mutations":false,"replay_launch_authorized":false,"producer_mutations":false,"new_resource_observations":false});
     durable(Path::new(s(&plan,"output")?),&report)?;
     println!("{}",json!({"output":plan["output"],"ready_pairs":ready.len(),"remaining_epochs":100-ready.len(),"live_replay_count":epochs.len(),"authenticated_status_count":status.len(),"new_resource_observations":false,"remote_mutations":false,"resource_credit_bytes":0})); Ok(())
 }
