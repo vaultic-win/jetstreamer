@@ -14,6 +14,7 @@ pub mod ram_scratch_retire;
 mod ram_scratch_tree;
 pub mod routine_memory_target;
 pub mod snapshot92447542_cache;
+pub mod snapshot92447542_census;
 pub mod stopped203_check;
 pub mod stopped203_retire;
 mod stopped203_tree;

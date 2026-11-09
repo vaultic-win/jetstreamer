@@ -620,7 +620,7 @@ fn acquisition_terminal_values(unit: &str, v: &BTreeMap<String, String>) -> Resu
 // The path scanner remains authoritative for commands/cwd/root/exe. Also
 // compare inode numbers in maps and open FDs so file-bind aliases do not escape
 // the finite file-target census. Permission failures are never absence.
-fn inode_references(proc_root: &Path, device: u64, inode: u64) -> Result<Vec<String>> {
+pub(crate) fn inode_references(proc_root: &Path, device: u64, inode: u64) -> Result<Vec<String>> {
     let mut refs = Vec::new();
     for e in fs::read_dir(proc_root)? {
         let e = e?;
