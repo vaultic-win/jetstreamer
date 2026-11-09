@@ -1,5 +1,6 @@
 //! Two closed Ubuntu compiler-cache profiles. No source/runtime/data scope.
 use super::*;
+mod release_compiler;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
@@ -194,7 +195,8 @@ fn manifest_scoped(t: &Path, policy_root: &Path) -> Result<Manifest> {
         );
         let relative = p.strip_prefix(t)?;
         ensure!(
-            !forbidden(policy_root, &policy_root.join(relative), &n.kind),
+            !forbidden(policy_root, &policy_root.join(relative), &n.kind)
+                || release_compiler::qualified(policy_root, t, &p, &n)?,
             "archive/checkpoint/lock/source artifact found inside cache: {} ({})",
             relative.display(),
             n.kind
@@ -327,8 +329,17 @@ fn identity_match(path: &Path, expected: &Node) -> Result<()> {
     );
     Ok(())
 }
+fn retirement_nodes<'a>(t: &Path, current: &'a Manifest) -> Vec<(&'a PathBuf, &'a Node)> {
+    let mut nodes: Vec<_> = current.nodes.iter().collect();
+    if t == Path::new(RELEASE_DEPS) {
+        // Keep each compiler witness until its output is removed so every
+        // interrupted remainder retains the same positive classification.
+        nodes.sort_by_key(|(relative, _)| release_compiler::defer_depinfo(relative));
+    }
+    nodes
+}
 fn clear_files(t: &Path, current: &Manifest) -> Result<()> {
-    for (relative, n) in &current.nodes {
+    for (relative, n) in retirement_nodes(t, current) {
         if n.kind == "directory" {
             continue;
         }

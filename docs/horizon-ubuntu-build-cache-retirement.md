@@ -108,3 +108,25 @@ snapshot, archive, sidecar and lock artifacts beneath either crate directory
 still refuse the census. Rejections identify the offending relative path and
 node type. The initial 392a9 checker correctly performed no deletion; its
 overbroad substring refusal is preserved as failed check evidence.
+
+
+## Exact checkpoint-named release compiler outputs
+
+The shared release/deps profile also recognizes the first-level Cargo outputs
+of `jetstreamer_checkpoint_restore_probe` and
+`jetstreamer_epoch140_checkpoint_journal`. Recognition requires a 16-character
+lowercase hexadecimal Cargo ID and the complete exact generated dep-info record
+for the known source paths and output. Empty `.rmeta` placeholders require their
+paired Clippy record; executable outputs require the paired non-Clippy record
+and a valid bounded little-endian ELF64 x86_64 PIE container. The two crate names
+alone never make a file disposable. Nonempty metadata, `.rlib` exceptions,
+unknown crates, malformed IDs, nested nodes and symlinks remain rejected.
+
+This restores the previously qualified shared compiler classifier and adds the
+same ELF proof for the observed epoch140 journal binary. The failed older check
+is retained. A new checker still needs its own sealed deployment and fresh
+positive ledger before a separately bound retirement plan can run. Every existing
+source, Cargo lock, builder, process, staged-reference and inode gate remains.
+Dep-info witnesses are unlinked after their outputs so interrupted cleanup
+retains enough evidence to revalidate each remaining compiler pair. Other cache
+profiles keep their existing unlink order and protected-name rules.
