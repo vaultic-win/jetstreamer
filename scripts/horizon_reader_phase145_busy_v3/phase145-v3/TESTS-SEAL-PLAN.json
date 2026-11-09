@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-reader-phase145-busy-tests-20261109-v3",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/qa/planner-tests",
+      "name": "tests",
+      "sha256": "a09824648fd1315ab36894a66491aa5a2c13533d5bcb3c34f0f61c0ed74b7102",
+      "mode": 365
+    }
+  ]
+}

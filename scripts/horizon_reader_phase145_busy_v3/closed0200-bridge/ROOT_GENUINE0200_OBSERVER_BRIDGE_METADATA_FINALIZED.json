@@ -1,0 +1,68 @@
+{
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T020022Z-postcompletion154-v1.json",
+    "sha256": "e3fc848255d438d473e059cff501b7c62ff7b256ddb3a81645129fe747ff6b1a"
+  },
+  "metadata_finalization": {
+    "path": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/EXACT_GENERATED_METADATA_READONLY_FINALIZATION_RECEIPT.json",
+    "sha256": "5987dfe54848b9f823c0e368dcc1d2fbcad31e7b790682819aa6fd1e02886fec"
+  },
+  "original_writers_and_cgroups": [
+    {
+      "unit": "horizon-visible-primary-observer020022-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Id": "horizon-visible-primary-observer020022-20261109-v1.service",
+        "ActiveState": "active",
+        "SubState": "exited",
+        "InvocationID": "b36194f3b4804ab284baceacc4ac824e"
+      },
+      "original_PID1_completion": [
+        {
+          "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+          "CODE_FILE": "src/core/job.c",
+          "__MONOTONIC_TIMESTAMP": "2536299049898",
+          "JOB_RESULT": "done",
+          "_PID": "1",
+          "_GID": "0",
+          "MESSAGE": "Finished horizon-visible-primary-observer020022-20261109-v1.service - /usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe /usr/local/lib/jetstreamer/horizon-visible-primary-observer-020022-plan-20261109-v1/observer.json.",
+          "_HOSTNAME": "dev-samjohnson",
+          "CODE_FUNC": "job_emit_done_message",
+          "CODE_LINE": "796",
+          "_SELINUX_CONTEXT": "unconfined\n",
+          "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea",
+          "SYSLOG_FACILITY": "3",
+          "INVOCATION_ID": "b36194f3b4804ab284baceacc4ac824e",
+          "JOB_ID": "41025799",
+          "_SYSTEMD_UNIT": "init.scope",
+          "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a2157;b=763ea84ca81f4dddad364b1ea2ba36dd;m=24e873433aa;t=65fce540790e2;x=aedd22210529fc1",
+          "__REALTIME_TIMESTAMP": "1794189637947618",
+          "_COMM": "systemd",
+          "_RUNTIME_SCOPE": "system",
+          "_SYSTEMD_CGROUP": "/init.scope",
+          "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+          "_UID": "0",
+          "_SOURCE_REALTIME_TIMESTAMP": "1794189637947613",
+          "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+          "_TRANSPORT": "journal",
+          "SYSLOG_IDENTIFIER": "systemd",
+          "TID": "1",
+          "_SYSTEMD_SLICE": "-.slice",
+          "__SEQNUM": "57286999",
+          "PRIORITY": "6",
+          "JOB_TYPE": "start",
+          "_CAP_EFFECTIVE": "1ffffffffff",
+          "_EXE": "/usr/lib/systemd/systemd",
+          "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+          "UNIT": "horizon-visible-primary-observer020022-20261109-v1.service"
+        }
+      ]
+    }
+  ],
+  "no_Frame_or_reader_or_resource_selection_claim": true
+}

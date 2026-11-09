@@ -1,0 +1,9 @@
+{
+  "labels": [
+    "clippy-production",
+    "clippy-tests",
+    "test-build",
+    "release"
+  ],
+  "no_replay_or_publication": true
+}

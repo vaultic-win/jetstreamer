@@ -1,0 +1,27 @@
+{
+  "original_actor_unchanged": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "signal",
+    "NRestarts": "0",
+    "ExecMainPID": "0",
+    "ControlGroup": "",
+    "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "Job": "",
+    "InvocationID": "9568cb52af154f7d8fbd48e7571770fa"
+  },
+  "timer_after": {
+    "Unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.service",
+    "Result": "success",
+    "Id": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer",
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "Job": "",
+    "InvocationID": ""
+  },
+  "only_new_failed_guard_timer_stopped": true,
+  "all_originals_and_promises_preserved": true,
+  "no_retry_reset_unlink_restart_or_credit": true
+}

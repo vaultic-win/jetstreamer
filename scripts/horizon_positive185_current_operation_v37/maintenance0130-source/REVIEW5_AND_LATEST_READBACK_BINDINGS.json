@@ -1,0 +1,20 @@
+{
+  "model_binding_file": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/MODEL_BINDING.json",
+    "sha256": "47fc0f4f3179c9a20b9e8284cb5b9e4db18e7c145084bffb1cedc683c61d0fce"
+  },
+  "model": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+    "sha256": "08720c9def3712b29d4b3e8022e7e74134df4dc42655fa7eb5431d5555321b30"
+  },
+  "latest_readback": {
+    "path": "/home/sol/.jetstreamer-private/current0100-explicit-control-review5-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "7a7c7ad4ea2442d54767db440217c32c999361df2fcb55c5138db1809b5cea77"
+  },
+  "latest_sampled_at_utc": "2026-11-09T01:25:00Z",
+  "planning_deadline_utc": "2026-11-09T02:25:00Z",
+  "source_generated_from_actual0100": {
+    "path": "/home/sol/.jetstreamer-private/actual010022-visible-root-acceptance-20261109-v1/status_audit010022.py",
+    "sha256": "a90fbf3e4f51443929a4eba0d4b929ede0d917d2541a374bcc37f756aee7b709"
+  }
+}

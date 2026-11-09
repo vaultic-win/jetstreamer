@@ -1,0 +1,49 @@
+{
+  "schema": "horizon-actual-qualified-operation37-final4-layout-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261109-v37-final4-layout-r1/operation",
+    "sha256": "379dc9c4d61f29849c3832f3726073714e853da09b54759ea84bd1a126cd4305"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261109-v37-final4-layout-r1/artifact-proof.json",
+    "sha256": "c024cd88aded4362d6150b020abb18b4a4ab7b88860b22a3e730eb8252ebec4e"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-tools-20261109-v37-final4-layout-r1/deployment-seal-receipt.json",
+    "sha256": "4c45be44c4b038a5000c529f6b4e7421c22b590858b84e400faae03b42869832"
+  },
+  "qualified_route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v37-final4-layout-r1-r3/route.json",
+    "sha256": "41785b050e7b51358c9f9fc72c424c419379c0ad90319cce69431d796ff6bf48"
+  },
+  "capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v37-final4-layout-r1-r3/capability.json",
+    "sha256": "e61efac61d32357dd39d980f731b35c0b0236ff9da188e43bef9403b11844bce"
+  },
+  "reader_lifecycle_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v37-final4-layout-r1/completion.json",
+    "sha256": "28cf4e357ffcb8534656ce5da34b8a2a4512ad9242eb9560861495365ad5bc50"
+  },
+  "successful_reader_retirement_control": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-successful-reader-retirement-control-positive-success-retire-v37-final4-layout-r1/completion.json",
+    "sha256": "c0edc25eca50ea9b448292b58a7c32da91b745d85c9d68364cb0d4472b458ffe"
+  },
+  "actual_run_layout_control": {
+    "actual_Sol_scan_passed": true,
+    "no_input_or_replay": true,
+    "no_resource_credit": true,
+    "positive": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-layout-control-20261109-v37-r1/actual-Sol-run-layout-accepted.json",
+      "sha256": "3fd2a07dc124ca352c9f336bc752e3c50bf31ce187019bac41771eaa008a5e7a"
+    },
+    "preexisting_nonempty_symlink_foreign_rejected": true,
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-operation-candidate-20261109-v37-final4-layout-r1/operation",
+      "sha256": "379dc9c4d61f29849c3832f3726073714e853da09b54759ea84bd1a126cd4305"
+    },
+    "schema": "horizon-positive185-run-layout-qualified-control-v1"
+  },
+  "normal6_retained": true,
+  "complete_DATA_lower_bound_bytes": 5164578583188,
+  "fresh_original_guard_and_admission_still_required": true
+}
