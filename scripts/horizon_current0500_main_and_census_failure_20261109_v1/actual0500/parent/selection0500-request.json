@@ -1,0 +1,73 @@
+{
+  "baseline": {
+    "captured141": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/captured141-selection.json",
+      "sha256": "ee35abb867e73423dcb281331b9d0b1567fcf2027b5ed64918adc762e2c053cf"
+    },
+    "kind": "captured141-only"
+  },
+  "census": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/census.json",
+    "sha256": "2030dc0aee50655b694ead0c484e46bc5e38d3ec2e50561838008f7cad6e4c3c"
+  },
+  "completed_cached145": {
+    "census": {
+      "path": "/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v2/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/census.json",
+      "sha256": "f3e3e8ef2c4bf9ce0e58cc58c38c8b5511caa73ee8e4115f354b42d6b6adcd6e"
+    },
+    "registration": {
+      "path": "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-registration-current2230-20261107-v4/registration.json",
+      "sha256": "3f27e319da1f14fc1378588b341ea8ee842200520a39150319dce72d94ec05d8"
+    },
+    "registration_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-registration-current2230-20261107-v4/deployment-seal-receipt.json",
+      "sha256": "7d9adad01294b5f62c196ae4f84d46cb5f7081f4e55fec9c11e9bb14433d99ae"
+    },
+    "schema": "cached145-completed-parent-only-memory-request-v1"
+  },
+  "current": {
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+      "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json",
+      "sha256": "8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+    },
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+      "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+    }
+  },
+  "current_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+    "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+  },
+  "current_reader_acceptance": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-completion-20261109-v1/completion.json",
+    "sha256": "5cc844562486e8bc9d897d3738f810ce9ebd33d791e0ff973bb106cde21cbe83"
+  },
+  "reader_program": {
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+      "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-combined-history-qualification-20261109-v1/reader-qualified-artifact.json",
+      "sha256": "18770eba2d92c4a0b7f675a2ce3886a5ee84325fb0002456c91cb44dad9d3972"
+    }
+  },
+  "registration": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-registration-0500-native-parser-20261109-v1/registration.json",
+    "sha256": "bf744101f04cab83f5e4ff9f0d9a318ec2f1a2d8afc29e40fcb7ee876fce50d4"
+  },
+  "registration_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-registration-0500-native-parser-20261109-v1/deployment-seal-receipt.json",
+    "sha256": "f92ce553bd79c9878365c6ebed7a135e6b3a9fc14087ad48e3c122441732fe7f"
+  },
+  "schema": "terminal199-parent-only-memory-selection-request-v1"
+}

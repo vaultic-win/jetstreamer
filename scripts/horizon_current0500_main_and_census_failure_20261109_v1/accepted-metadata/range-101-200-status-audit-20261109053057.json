@@ -1,0 +1,131 @@
+{
+  "archive_mutations": false,
+  "authenticated_inventory_complete": true,
+  "current_frame_acceptance_pending": true,
+  "current_resource_control_incident": "Nov9 05:30 recovery. Useful replay0, waiting0,target5. Actual0500 Frame94916c39/fullReader13/parentmemory/DATA/Planner6/O38/H35 persistentreader/first Driver12 guard/token/Main all passed. Native185 IID722adc397ae24bb4b96d452783599f57 ran05:15:23..05:23:23 and exited1 in cold initialization: allocation census eight retries exhausted on disappearing unpacked/accounts child. No canonical transaction progress. Helper35 lifecycle captured before failure without restart. Final6 outer had independently expired22s postMain versus30s guard cadence, healthy worker then preserved. Root census repair and independent163 replacement work active. Last COMPLETE accepted resources now0500, superseding0230; actual0500 corrected getter executions accepted, early failed getter outputs preserved. Full185 complete parent route remains unqualified; bounded80351283/48GiB/14400s grants no complete archive/publication authority. Canonical DATA5177463485076 normal6GiB extraQA0. Original Review8 control deadline05:42:33 and original qualification anchor17:30:22+24h, full413404206ms/bootstrap1h/verification6h/delivery4h preserved, no native retry/reset. Otherhost200-300 three lanes and original199FDs untouched. Resources evaluated against fresh coordinated sample; no disk cleanup or offload credit claimed.",
+  "first_epoch": 101,
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+    "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+    "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+  },
+  "fresh_fleet_reconciliation_pending": true,
+  "fresh_resource_audit_pending": true,
+  "interruption_recovery": true,
+  "last_accepted_fleet_resource_clock": "2026-11-09T05:00:22Z",
+  "last_epoch": 200,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T053022Z-postcompletion154-v1.json",
+    "sha256": "9e5afe5b6b4f371b7a49e302425f9886d7795dbb389442ee18085bd8a6a5f0b9"
+  },
+  "outcomes": [
+    {
+      "epoch": 136,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-136.status-correction-20261109053057.json",
+        "sha256": "13c8e9f5d88cce99a485f5e86a3c8e284c23872f136a9d14c1922890cab92b98"
+      }
+    },
+    {
+      "epoch": 137,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-137.status-correction-20261109053057.json",
+        "sha256": "315b26ee33f308cdb44474f67bb93ca0bcac9dde803955f2526f85a88e000a21"
+      }
+    },
+    {
+      "epoch": 141,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-141.status-correction-20261109053057.json",
+        "sha256": "7493654e2abf8383b8686668fd14460f2a7966bf7f55b331ab55a39c9e467c78"
+      }
+    },
+    {
+      "epoch": 145,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-145.status-correction-20261109053057.json",
+        "sha256": "11de37199e405b19bd66c349a96d76c2a205053ba095bf0b78defa322ed03f61"
+      }
+    },
+    {
+      "epoch": 159,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-159.status-correction-20261109053057.json",
+        "sha256": "2e345ceba6625ed1fe0b3054f6c9d706e6987820fdb6cefeda0a5496ab3b9704"
+      }
+    },
+    {
+      "epoch": 161,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-161.status-correction-20261109053057.json",
+        "sha256": "b5cb4e3bc6ae4211b0fe4efd5528be7e4629332edecb00d136a784fc382a22a3"
+      }
+    },
+    {
+      "epoch": 163,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-163.status-correction-20261109053057.json",
+        "sha256": "8df69f759fdf6b2d7b2e1ac3648f6b1b6826cb5fac26ec583cbf9533b97080ef"
+      }
+    },
+    {
+      "epoch": 185,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109053057.json",
+        "sha256": "7d2b6f054eba1f412dfade49ace833a445cea380e753c2265ffcb3a8375a0905"
+      }
+    },
+    {
+      "epoch": 186,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-186.status-correction-20261109053057.json",
+        "sha256": "e6007a746ebfc1381795fee62bd0aeffb0c28ed9258f0850da9f8f0d0cb10043"
+      }
+    },
+    {
+      "epoch": 199,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-199.status-correction-20261109053057.json",
+        "sha256": "8f88a3b5518d8d6cc89af364626a292ef34bc4afd5d5956671fd7a2048753eee"
+      }
+    },
+    {
+      "epoch": 200,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-200.status-correction-20261109053057.json",
+        "sha256": "209b95b9167b2f7e3d31ff1c59551940a334a315131c516efcf98673b2d58e8d"
+      }
+    }
+  ],
+  "sampled_at_utc": "2026-11-09T05:30:57Z",
+  "schema": "horizon-range-status-event-correction-v1",
+  "sidecar_mutations": false,
+  "status_keys": {
+    "136": "epoch-136.epoch-status.json",
+    "137": "epoch-137.epoch-status.json",
+    "141": "epoch-141.epoch-status.json",
+    "145": "epoch-145.epoch-status.json",
+    "159": "epoch-159.epoch-status.json",
+    "161": "epoch-161.epoch-status.json",
+    "163": "epoch-163.epoch-status.json",
+    "185": "epoch-185.epoch-status.json",
+    "186": "epoch-186.epoch-status.json",
+    "199": "epoch-199.epoch-status.json",
+    "200": "epoch-200.epoch-status.json"
+  },
+  "unresolved_status_incidents": []
+}

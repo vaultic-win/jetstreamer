@@ -1,0 +1,38 @@
+{
+  "native_spec": {
+    "actor_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "sha256": "eb0be12a4ea3f8e031521b7e54c3a928048e6e82ddeb6455d2552d50ac63ca0b"
+    },
+    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/admission.json",
+      "sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5"
+    },
+    "current_task_status": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/status-readback.json",
+      "sha256": "a5193fefc2c9b41ded47ca8079152fdd84cc7a239bc17088e7d1af85e6858362"
+    },
+    "envelope": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0500-20261109-next/envelope.json",
+      "sha256": "ff8bd6e279fad04843692652ed2ed014455974bb1f8db3a7b00e6bacdb8605bd"
+    },
+    "expected_actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+    "guard_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "sha256": "0f4d097eba3d3f2018db711c79858427bcced0bae6ca0b91950c1da39f1a924c"
+    },
+    "mode": "task-start-pre",
+    "ready": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/ready-722adc397ae24bb4b96d452783599f57.json",
+      "sha256": "f9cfea99af99688c1d8cf991f08da2fa00bfa24b7f05f38860342ef99c29137f"
+    },
+    "schema": "horizon-epoch185-native-startpre-spec-v1",
+    "timer_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer",
+      "sha256": "daa58f2daba71e60f39a12be48ec87715970b36d68dddcff0ca9079cab6aca09"
+    }
+  },
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+  "schema": "horizon-epoch185-native-startpre-task-capture-v1"
+}

@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "list-timers",
+    "--all",
+    "--no-pager",
+    "--output=json"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 10000,
+  "wall_started_at": 1794201114
+}

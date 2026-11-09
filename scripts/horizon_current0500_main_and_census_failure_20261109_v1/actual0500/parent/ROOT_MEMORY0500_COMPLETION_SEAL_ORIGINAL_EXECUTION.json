@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stderr": "",
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-epoch163-selector0500-completion-20261109-v1\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"f4c4cc96bbc24a95300bb5c5cb7d38e010c2bda1a68f6c8145b58a26b5a8848d\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n"
+}

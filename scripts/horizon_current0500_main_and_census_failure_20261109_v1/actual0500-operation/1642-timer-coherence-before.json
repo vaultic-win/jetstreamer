@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/etc/systemd/system/rotate-console-password.timer",
+      "Id": "rotate-console-password.timer",
+      "InvocationID": "adedca04cddd46d785f5fe5540330d0d",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "rotate-console-password.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/etc/systemd/system/rotate-console-password.timer",
+        "source": {
+          "path": "/etc/systemd/system/rotate-console-password.timer",
+          "sha256": "b1a85232a27349fcef967d8c6a3ef6aaaa562d7296fbe27f506b8323e6524492"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/etc/systemd/system/rotate-console-password.timer",
+      "Id": "rotate-console-password.timer",
+      "InvocationID": "adedca04cddd46d785f5fe5540330d0d",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h",
+      "RemainAfterElapse": "yes",
+      "Unit": "rotate-console-password.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/etc/systemd/system/rotate-console-password.timer",
+        "source": {
+          "path": "/etc/systemd/system/rotate-console-password.timer",
+          "sha256": "b1a85232a27349fcef967d8c6a3ef6aaaa562d7296fbe27f506b8323e6524492"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 1848717778561,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794713856864902
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "rotate-console-password.timer",
+  "unset_pending_requires_metadata_requery": false
+}

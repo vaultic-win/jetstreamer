@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-census0500-plan-20261109-v3",
+  "members": [
+    {
+      "mode": 292,
+      "name": "spec.json",
+      "sha256": "99a76f18ca43fab835134c57bb63fb258f7e2cb5f774320c8e65952db3376987",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/completed145-current0500-census-spec-v2.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

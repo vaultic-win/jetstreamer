@@ -1,0 +1,31 @@
+{
+  "DATA_credit_bytes": 0,
+  "actual_native_capability": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-combined-history-qualification-20261109-v1/reader-native-capability.json",
+    "sha256": "864025be182b860a7a27ff20b562ec05f1c42d367260407ed2bea46e876e3919"
+  },
+  "actual_native_capability_passed": true,
+  "actual_source_QA_release_and_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/artifact-proof.json",
+    "sha256": "fb6f325b7ce2c62164a30ad9dedb0b044a9974f32383d85bcf647cc317e06429"
+  },
+  "all_required_tests_passed": true,
+  "deployment_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/deployment-seal-receipt.json",
+    "sha256": "4f4bf03154dff384075b9f1fcd6b1ff29b1d7b37e5a5604339b01371b5dafd5c"
+  },
+  "memory_credit_bytes": 0,
+  "prod_clippy_passed": true,
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+    "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+  },
+  "replay_launch_authorized": false,
+  "schema": "terminal199-parent-memory-qualified-artifact-v1",
+  "scope": "terminal199-parent-memory-current-reader",
+  "source_and_dependency_freeze": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/artifact-proof.json",
+    "sha256": "fb6f325b7ce2c62164a30ad9dedb0b044a9974f32383d85bcf647cc317e06429"
+  },
+  "test_clippy_passed": true
+}

@@ -1,0 +1,45 @@
+{
+  "current_frame": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/current-frame.json",
+    "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+  },
+  "current_full_reader": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/current-full-reader.json",
+    "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+  },
+  "epoch": 185,
+  "expires_at": 1794216225,
+  "fleet_owner": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/fleet-owner.json",
+    "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+  },
+  "full_reader_accepted": true,
+  "issued_at": 1794201105,
+  "memory_max_bytes": 51539607552,
+  "minimum_free_bytes": 5217451979412,
+  "ordinary_full_replay_authorized": false,
+  "phase": "verification",
+  "prefix_only": true,
+  "publication_authorized": false,
+  "raw_obligations_preserved": true,
+  "resource_credit_bytes": 0,
+  "root_acceptance": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/root-acceptance.json",
+    "sha256": "3e088677027b3dde428c2b7b99a17d2d280c2645c21a2ee8380f69638fe5a5e4"
+  },
+  "schema": "horizon-epoch185-root-accepted-native-admission-v1",
+  "status_readback": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/status-readback.json",
+    "sha256": "a5193fefc2c9b41ded47ca8079152fdd84cc7a239bc17088e7d1af85e6858362"
+  },
+  "task_owner": "Root",
+  "typed_data": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/typed-data.json",
+    "sha256": "9edb94c846b292aa258821b6de9f88dedefc75dac210f1393eb9be4ed0d32873"
+  },
+  "typed_memory": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/typed-memory.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service"
+}

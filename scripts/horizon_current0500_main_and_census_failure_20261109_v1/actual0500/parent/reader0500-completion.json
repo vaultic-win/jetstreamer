@@ -1,0 +1,35 @@
+{
+  "original_PID1_journal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-completion-20261109-v1/journal.json",
+    "sha256": "48bfb8a245a2ed3dd6052f599d067112ea607017629f6724501f10f0962b8592"
+  },
+  "original_cgroup_empty": true,
+  "original_descriptors_drained": true,
+  "original_drain": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-completion-20261109-v1/drain.json",
+    "sha256": "8766894357f0bca7b84ef01e9ad5dab0618172e7be9bddb9addaf6681b1288fc"
+  },
+  "original_native": {
+    "ActiveState": "inactive",
+    "ControlPID": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+    "InvocationID": "4c082612ad8f4124ad8db0d825b5423e",
+    "Job": "",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "dead"
+  },
+  "original_native_provenance": "Original invocation identity comes from the genuine Rust proof and original PID1 completion. Terminal fields come from the untouched collected native state; raw snapshots and journal remain preserved.",
+  "original_outer_reaped": true,
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+    "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+  },
+  "reader_proof": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+    "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+  },
+  "schema": "terminal199-parent-memory-original-reader-completion-v1"
+}

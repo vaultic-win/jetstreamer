@@ -1,0 +1,49 @@
+{
+  "actor_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "admission": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/admission.json",
+    "sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5"
+  },
+  "control_root": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next",
+  "guard_receipt_root": "/var/lib/jetstreamer/epoch185-cold-guard-v4",
+  "guard_service_path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "guard_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "limits": {
+    "log": 67108864,
+    "memory": 51539607552,
+    "metadata": 67108864,
+    "output": 137438953472,
+    "scratch": 412316860416,
+    "vmas": 4194304
+  },
+  "plan": {
+    "epoch_hashes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/epoch-hashes-185.txt",
+      "sha256": "9ef0d882bf9b530abcd77f8aae199a0c2057c06b32a1d738c7443e3e431606fa"
+    },
+    "ledger_directory": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3",
+    "maximum_runtime_seconds": 14400,
+    "minimum_free_bytes": 5217451979412,
+    "node": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-node",
+      "sha256": "e987401354f0cddbd838b71439768d6ed84baddfe8c0c2b484addec553db1887"
+    },
+    "run_root": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next",
+    "schema": "horizon-private-epoch185-capped-root-prefix-plan-v4",
+    "snapshot": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/snapshot-79919283-Hozk66F2tKQuhouHceuwU9xZzWaXksnBeU1JBysRBmmf.tar.zst",
+    "target_slot": 80351283,
+    "terminal_slot": 80351283,
+    "unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "worker": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/jetstreamer-historical-worker-v1-6-15"
+  },
+  "schema": "horizon-epoch185-guarded-cold-envelope-v4",
+  "self_program": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+  "self_sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e",
+  "setup_deadline_seconds": 600,
+  "timer_service": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0500-20261109-next/horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer",
+    "sha256": "daa58f2daba71e60f39a12be48ec87715970b36d68dddcff0ca9079cab6aca09"
+  },
+  "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer",
+  "token_root": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4"
+}

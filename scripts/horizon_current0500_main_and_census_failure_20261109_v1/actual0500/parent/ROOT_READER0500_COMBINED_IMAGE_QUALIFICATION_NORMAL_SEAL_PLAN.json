@@ -1,0 +1,18 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-combined-history-qualification-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "reader-native-capability.json",
+      "sha256": "864025be182b860a7a27ff20b562ec05f1c42d367260407ed2bea46e876e3919",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-new-image-native-capability.json"
+    },
+    {
+      "mode": 292,
+      "name": "reader-qualified-artifact.json",
+      "sha256": "18770eba2d92c4a0b7f675a2ce3886a5ee84325fb0002456c91cb44dad9d3972",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/reader0500-new-image-qualified-artifact.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

@@ -1,0 +1,24 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-producer-specs-722adc397ae24bb4b96d452783599f57",
+  "members": [
+    {
+      "mode": 292,
+      "name": "reader.json",
+      "sha256": "85285f56f0fc02b619502fbfceba27f7f304565211f31fec1c4effa5a4d8bb14",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/reader-spec-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "ack.json",
+      "sha256": "3e066a99af5adf2638f9bd12c55f230ebf91a274354cc2e58ebc49606491b924",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/ack-spec-source.json"
+    },
+    {
+      "mode": 292,
+      "name": "status.json",
+      "sha256": "59d137df8a130ec6adb85b9c2ef89396b0ccee41af1f1829abfed0486e6db2f7",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/status-spec-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

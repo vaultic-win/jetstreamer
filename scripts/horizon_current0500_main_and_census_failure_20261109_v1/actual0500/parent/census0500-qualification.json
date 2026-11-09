@@ -1,0 +1,31 @@
+{
+  "DATA_credit_bytes": 0,
+  "actual_native_capability": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/capture-execution.json",
+    "sha256": "43a66a83012976de501e0ab3530715521fbd223778580e95429c7e4cff7d78f1"
+  },
+  "actual_native_capability_passed": true,
+  "all_required_tests_passed": true,
+  "deployment_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-original199-parent-census-tools-20261107-v4/deployment-seal-receipt.json",
+    "sha256": "5466d5d987399c0c3681f46b87763e1fadac3b3772927b996cd8492d60ee92b6"
+  },
+  "memory_credit_bytes": 0,
+  "parent_library35_tests": {
+    "path": "/home/sol/.jetstreamer-private/terminal199-controller-directory-anchor-source-20261105-v1/ROOT_ALL35_PARENT_LIBRARY_TESTS_AND_CENSUSES_ACCEPTED.json",
+    "sha256": "f95f8f6917a35a9dd1dd4346a422ae9450685409e9edcd7bbe3123cce881790c"
+  },
+  "prod_clippy_passed": true,
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-original199-parent-census-tools-20261107-v4/parent-memory-census",
+    "sha256": "5e83d113490cab069fb125f823124d8cf8b80eb89e27159aa7c62ffb46920d13"
+  },
+  "replay_launch_authorized": false,
+  "schema": "terminal199-parent-memory-qualified-artifact-v1",
+  "scope": "terminal199-parent-only-memory-census",
+  "source_and_dependency_freeze": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-original199-parent-census-tools-20261107-v4/artifact-proof.json",
+    "sha256": "ca5ba84b850392cf01bac9bf0228f918e7414d9d74f91a9e4874a87ba75d0e53"
+  },
+  "test_clippy_passed": true
+}

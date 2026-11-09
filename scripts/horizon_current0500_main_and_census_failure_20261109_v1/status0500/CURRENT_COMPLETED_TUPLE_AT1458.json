@@ -1,0 +1,43 @@
+{
+  "DATA_original_completion_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/parent/ROOT_DATA0728_ORIGINAL_COMPLETION_NORMAL_SEAL_ACCEPTED.json",
+    "sha256": "55fd5301da00441a04a92b0cad8e66db28ab635e38e08545ab4c0c6336e15c56"
+  },
+  "acceptance": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/runtime/ROOT_ACTUAL0728_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
+    "sha256": "25a131ff63c267132845e25293b0c2f69e383d6e2c9387e3d6c886915a9beada"
+  },
+  "accepted_selector": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/runtime/accepted-frame-selector.json",
+    "sha256": "4ccc574f281bac61273d6283bda77268100bee2f621b7d10f64ed53092131b20"
+  },
+  "components": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/parent/ROOT_ACTUAL0728_MEMORY_AND_DATA_COMPONENTS_ACCEPTED_NOT_FULL163_ADMISSION.json",
+    "sha256": "bb23279adfc0d76773869731a77fc124edec439884d252645ce9467a50f6a451"
+  },
+  "effective_existing_DATA_bytes": 4202184371152,
+  "effective_existing_memory_bytes": 341795667968,
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261107T072809Z-cached145-loaded-terminal-reload-v1.json",
+    "sha256": "3a39fda182855135b500330974c4cc565cd01ba20e5d7bf17c6854556052be09"
+  },
+  "four_families": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/parent/ROOT_CURRENT_READER0728_FOUR_ORIGINAL_FAMILIES_ACCEPTED.json",
+    "sha256": "1095abc3c4e5b2ca1202af0075b246c2fefb851d3f9c8ebae01d3c86264bfd09"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261107T072809-cached145-original-terminal-reload-native-v1.json",
+    "sha256": "47023f0884c3cfd0a34fabc15e164148a041e4af530fbf16f6e4f3af62514633"
+  },
+  "memory_selection_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-offline-retained-input-contract-source-20261106-v1/r5/fresh0728-source/parent/ROOT_ACTUAL0728_PARENT_ONLY_SELECTION_ACCEPTED_NOT_REPLAY_ADMISSION.json",
+    "sha256": "caf3e28fbee146f4ec914c34834bcc1a12e6671796d305aa598188d11008c1d4"
+  },
+  "metadata_only_no_admission_or_new_resource_credit": true,
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261107T072809Z-postcompletion154-v1.json",
+    "sha256": "9569b6b7c76d8d32312717d5463d599683bd20f6c0c769fbd1163c61a1bdc4d9"
+  },
+  "sampled_at_utc": "2026-11-07T07:28:09Z",
+  "schema": "horizon-existing-completed-tuple-metadata-binding-v1"
+}

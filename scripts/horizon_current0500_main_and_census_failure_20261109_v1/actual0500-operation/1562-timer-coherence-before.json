@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+        "source": {
+          "path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+          "sha256": "af1877b2c5121a4a1cddf0937c155d3372386b1d348dca1852b5a2c3946f7d16"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+      "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+        "source": {
+          "path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+          "sha256": "af1877b2c5121a4a1cddf0937c155d3372386b1d348dca1852b5a2c3946f7d16"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547748711107,
+    "next_monotonic_usec": 2547778727177,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+  "unset_pending_requires_metadata_requery": false
+}

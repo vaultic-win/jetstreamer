@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/update-notifier-download.timer",
+      "Id": "update-notifier-download.timer",
+      "InvocationID": "ff431c90bf6b40ad9c98460a72860733",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "update-notifier-download.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/update-notifier-download.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/update-notifier-download.timer",
+          "sha256": "78f01ff5be8b01eee4c438d6a7971dcb9f34687cb75bd0d61f754eb5eb42ad22"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/update-notifier-download.timer",
+      "Id": "update-notifier-download.timer",
+      "InvocationID": "ff431c90bf6b40ad9c98460a72860733",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "update-notifier-download.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/update-notifier-download.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/update-notifier-download.timer",
+          "sha256": "78f01ff5be8b01eee4c438d6a7971dcb9f34687cb75bd0d61f754eb5eb42ad22"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2505963278616,
+    "next_monotonic_usec": 2592363292166,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "update-notifier-download.timer",
+  "unset_pending_requires_metadata_requery": false
+}

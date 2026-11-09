@@ -1,0 +1,12 @@
+{
+  "schema": "cached145-completed-parent-capture-request-v2",
+  "registration": {
+    "path": "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-registration-current2230-20261107-v4/registration.json",
+    "sha256": "3f27e319da1f14fc1378588b341ea8ee842200520a39150319dce72d94ec05d8"
+  },
+  "registration_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-completed145-parent-memory-registration-current2230-20261107-v4/deployment-seal-receipt.json",
+    "sha256": "7d9adad01294b5f62c196ae4f84d46cb5f7081f4e55fec9c11e9bb14433d99ae"
+  },
+  "census_path": "/var/lib/jetstreamer/horizon-completed145-parent-memory-census-v2/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/census.json"
+}

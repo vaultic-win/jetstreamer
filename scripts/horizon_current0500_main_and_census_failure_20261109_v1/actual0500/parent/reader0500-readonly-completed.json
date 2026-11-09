@@ -1,0 +1,214 @@
+{
+  "all_readonly": true,
+  "files": [
+    {
+      "after": {
+        "ctime_ns": 1794201077410508259,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037825,
+        "mode": 292,
+        "mtime_ns": 1794201024458321386,
+        "nlink": 1,
+        "size": 3096,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201024458321386,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037825,
+        "mode": 384,
+        "mtime_ns": 1794201024458321386,
+        "nlink": 1,
+        "size": 3096,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/captured141-selection-before.json",
+        "sha256": "34853d14b353c571e4e4fb60e0ada3b645735f42e55a57a035547c0235f8c9e4"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077410508259,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037828,
+        "mode": 292,
+        "mtime_ns": 1794201076996506784,
+        "nlink": 1,
+        "size": 3096,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201076996506784,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037828,
+        "mode": 384,
+        "mtime_ns": 1794201076996506784,
+        "nlink": 1,
+        "size": 3096,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/captured141-selection.json",
+        "sha256": "ee35abb867e73423dcb281331b9d0b1567fcf2027b5ed64918adc762e2c053cf"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077410508259,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037829,
+        "mode": 292,
+        "mtime_ns": 1794201076997506788,
+        "nlink": 1,
+        "size": 4537,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201076997506788,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037829,
+        "mode": 384,
+        "mtime_ns": 1794201076997506788,
+        "nlink": 1,
+        "size": 4537,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+        "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077413508270,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037824,
+        "mode": 292,
+        "mtime_ns": 1794201023481317973,
+        "nlink": 1,
+        "size": 3332583,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201023481317973,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037824,
+        "mode": 384,
+        "mtime_ns": 1794201023481317973,
+        "nlink": 1,
+        "size": 3332583,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-accounting-before.json",
+        "sha256": "b5296e6e4d20eeea26a0417dd70465214736f01464c1cc48567775e87f64145a"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077417508284,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037827,
+        "mode": 292,
+        "mtime_ns": 1794201076991506766,
+        "nlink": 1,
+        "size": 3332583,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201076991506766,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037827,
+        "mode": 384,
+        "mtime_ns": 1794201076991506766,
+        "nlink": 1,
+        "size": 3332583,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-accounting.json",
+        "sha256": "4dc0fd63a0cf1b0d628dab2401e31dada36ca9f6889a167caa32f2b5fe1fdfe6"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077420508295,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037826,
+        "mode": 292,
+        "mtime_ns": 1794201076983506738,
+        "nlink": 1,
+        "size": 1632184,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201076983506738,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037826,
+        "mode": 384,
+        "mtime_ns": 1794201076983506738,
+        "nlink": 1,
+        "size": 1632184,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-builder-after.json",
+        "sha256": "a15fb2ec21bc5aff0da3eaad6c46babe5e604b280cea87bec2275ebdb6c3d51a"
+      }
+    },
+    {
+      "after": {
+        "ctime_ns": 1794201077423508305,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037823,
+        "mode": 292,
+        "mtime_ns": 1794201023474317948,
+        "nlink": 1,
+        "size": 1632184,
+        "uid": 0
+      },
+      "before": {
+        "ctime_ns": 1794201023474317948,
+        "dev": 2304,
+        "gid": 0,
+        "ino": 8037823,
+        "mode": 384,
+        "mtime_ns": 1794201023474317948,
+        "nlink": 1,
+        "size": 1632184,
+        "uid": 0
+      },
+      "binding": {
+        "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/raw-builder-before.json",
+        "sha256": "71288530fb11ccf06366e64b7a5b10f7d031ae1d60d2dcde56d420f471341424"
+      }
+    }
+  ],
+  "memory_or_DATA_credit_bytes": 0,
+  "same_inode_bytes_digest_and_mtime": true,
+  "writer": {
+    "actual_reader": {
+      "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+      "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+    },
+    "original_invocation_id": "4c082612ad8f4124ad8db0d825b5423e",
+    "original_outer": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_FAILED4_READER0500_ORIGINAL_OUTER.json",
+      "sha256": "101094128aa35a4a1f5e71d1452ad109f3db4db69d38677585e6cfccb1f31ab5"
+    }
+  }
+}

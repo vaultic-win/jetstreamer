@@ -1,0 +1,19 @@
+{
+  "expected_actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+  "expected_actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "expected_ready": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/ready-722adc397ae24bb4b96d452783599f57.json",
+    "sha256": "f9cfea99af99688c1d8cf991f08da2fa00bfa24b7f05f38860342ef99c29137f"
+  },
+  "kind": "task_acknowledgment",
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task-acknowledgment.json",
+  "schema": "horizon-epoch185-task-status-bridge-spec-v1",
+  "status_readback": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0500-20261109-next/status-readback.json",
+    "sha256": "a5193fefc2c9b41ded47ca8079152fdd84cc7a239bc17088e7d1af85e6858362"
+  },
+  "task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  }
+}

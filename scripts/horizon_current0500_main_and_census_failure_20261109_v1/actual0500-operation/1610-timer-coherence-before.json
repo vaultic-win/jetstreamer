@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/motd-news.timer",
+      "Id": "motd-news.timer",
+      "InvocationID": "fa7a329583bd4360af5c7911384711f1",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "motd-news.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/motd-news.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/motd-news.timer",
+          "sha256": "f18dbd0f64344440d7d6e8f1ff302d26fe383921be2a3f13948a8e2e2545ee58"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/motd-news.timer",
+      "Id": "motd-news.timer",
+      "InvocationID": "fa7a329583bd4360af5c7911384711f1",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "motd-news.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/motd-news.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/motd-news.timer",
+          "sha256": "f18dbd0f64344440d7d6e8f1ff302d26fe383921be2a3f13948a8e2e2545ee58"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2538444570882,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794247350930049
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "motd-news.timer",
+  "unset_pending_requires_metadata_requery": false
+}

@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0500-20261109-next",
+  "members": [
+    {
+      "mode": 292,
+      "name": "envelope.json",
+      "sha256": "ff8bd6e279fad04843692652ed2ed014455974bb1f8db3a7b00e6bacdb8605bd",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/envelope.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

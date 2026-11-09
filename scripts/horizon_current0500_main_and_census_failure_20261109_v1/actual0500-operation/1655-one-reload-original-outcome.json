@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "daemon-reload"
+  ],
+  "cleanup_terminal_code": null,
+  "cleanup_terminal_signal": null,
+  "cleanup_wait_error": null,
+  "exit_code": 0,
+  "exit_signal": null,
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemctl",
+  "stderr_bytes": [],
+  "stderr_overflow": false,
+  "stderr_read_error": null,
+  "stdout_bytes": [],
+  "stdout_overflow": false,
+  "stdout_read_error": null,
+  "wait_error": null,
+  "wall_finished_at": 1794201114
+}

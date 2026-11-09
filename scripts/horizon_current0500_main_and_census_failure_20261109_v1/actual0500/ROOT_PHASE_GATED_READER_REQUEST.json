@@ -1,0 +1,12 @@
+{
+  "operation_root": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0500-reader-phase-20261109-v15",
+  "generation": "positive-reader-0500-v15",
+  "reader_spec": {
+    "path": "/usr/local/lib/jetstreamer/horizon-failed4-current-accounting-reader-plan-actual0500-20261109-v13/spec.json",
+    "sha256": "c31d19a72cda52ffebedae0276be091347b8513d0f664897083c1e26fb29dbea"
+  },
+  "reader_argv": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_READER0500_NATIVE_ARGV.json",
+    "sha256": "ea3638c8e39aef83444677ea1d0ffa5e459103a6dea00591f062de0d39d797e7"
+  }
+}

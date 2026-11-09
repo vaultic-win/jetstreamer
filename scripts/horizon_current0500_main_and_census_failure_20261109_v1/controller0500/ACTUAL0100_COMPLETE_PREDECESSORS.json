@@ -1,0 +1,38 @@
+{
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T010022Z-postcompletion154-v1.json",
+    "sha256": "877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T010022Z-witness-terminal145-v1.json",
+    "sha256": "2dbcf711a9eb34c42a3a7206145483468361b1f93720de0cbd7433fd1abceca8"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0100-fleet-plan-20261109-v1/fleet-plan.json",
+    "sha256": "546151f4dc05e7f482144b828ea79b265e5d2c015067d3c020cb645871d5e2ba"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T010022-witness-terminal145-chain128-v5.json",
+    "sha256": "4a9b82ae94e16fac25d394ab79a9f3aaf20a76b624da532ce9d836e9611b559c"
+  },
+  "selector": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0100-20261109-v1/accepted-frame-selector.json",
+    "sha256": "7018d86c52f97365bb663be8288a818c8d916173aefc38728da3afb769ab714d"
+  },
+  "memory": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846/select-1/selection.json",
+    "sha256": "6b2f4455f5f0bb5c44fbdf890174df42f9215e955355504d499f1883e6048d6f"
+  },
+  "DATA": {
+    "path": "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846/selection.json",
+    "sha256": "bfe61694d8f4a029048449d79b424ae83fcfb6c800054a01aebee7e44bcd8b7d"
+  },
+  "full_prelaunch_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846/proof.json",
+    "sha256": "6fbe00a3df7962e90191b4adba81a9aa8ec2a19edb411b938cefca94e546c7dd"
+  },
+  "actual_components_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0100-20261109-v1/parent/ROOT_ACTUAL0100_MEMORY_AND_DATA_COMPONENTS_ACCEPTED_NOT_FULL163_ADMISSION.json",
+    "sha256": "41253899d3568565ab9eb130af02562dc06dcd7f8b5458548cdab22f3a7333d1"
+  }
+}

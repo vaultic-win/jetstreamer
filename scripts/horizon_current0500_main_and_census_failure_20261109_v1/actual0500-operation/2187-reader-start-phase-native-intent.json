@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "show",
+    "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+    "--no-pager",
+    "--property=Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,Job,NRestarts,ExecMainCode,ExecMainStatus,ExecMainExitTimestampMonotonic,Result,Unit,TimersMonotonic,NextElapseUSecMonotonic"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201180
+}

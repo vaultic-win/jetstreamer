@@ -1,0 +1,16 @@
+{
+  "at": 1794201312,
+  "context": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/actual-postreader-context.json",
+    "sha256": "d1198427c0114ca4e6dee8dc994675f9285c85fe1e88add7ffb4360a232d62f2"
+  },
+  "no_retries_or_deadline_renewal": true,
+  "original_task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  },
+  "route": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-qualified-route-positive-profile-v38-driver12-helper35-r1-r3/route.json",
+    "sha256": "6cb073558ad5e38f7b842c5690c5c8f82ef530db2b77ab92b68be4a73004ea00"
+  }
+}

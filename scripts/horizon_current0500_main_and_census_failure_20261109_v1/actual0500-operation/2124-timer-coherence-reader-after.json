@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/apt-daily.timer",
+      "Id": "apt-daily.timer",
+      "InvocationID": "507745207d844d4eb0ecb6b792899c6f",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "apt-daily.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/apt-daily.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/apt-daily.timer",
+          "sha256": "0075e974af4e3a94757e219ba50ccb8348d4d1a8834d938f6cc9b1f4fd1db4e5"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/apt-daily.timer",
+      "Id": "apt-daily.timer",
+      "InvocationID": "507745207d844d4eb0ecb6b792899c6f",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "apt-daily.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/apt-daily.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/apt-daily.timer",
+          "sha256": "0075e974af4e3a94757e219ba50ccb8348d4d1a8834d938f6cc9b1f4fd1db4e5"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2510330197388,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794208827920200
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "apt-daily.timer",
+  "unset_pending_requires_metadata_requery": false
+}

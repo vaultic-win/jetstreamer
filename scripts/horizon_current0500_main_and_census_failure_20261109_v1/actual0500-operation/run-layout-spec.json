@@ -1,0 +1,6 @@
+{
+  "control_root": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next",
+  "no_input_or_replay": true,
+  "run_root": "/home/sol/.jetstreamer-private/capped-root-prefix-185-positive-positive-0500-20261109-next",
+  "schema": "horizon-positive185-empty-sol-run-layout-v1"
+}

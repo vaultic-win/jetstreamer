@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "get-property",
+    "org.freedesktop.systemd1",
+    "/org/freedesktop/systemd1/unit/horizon_2dpositive185_2dreader_2dcontrol_2dcontrol_2dpositive_2dreader_2dv38_2ddriver12_2dhelper35_2dr1_2eservice",
+    "org.freedesktop.systemd1.Service",
+    "EnvironmentFiles"
+  ],
+  "cleanup_terminal_code": null,
+  "cleanup_terminal_signal": null,
+  "cleanup_wait_error": null,
+  "exit_code": 0,
+  "exit_signal": null,
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/busctl",
+  "stderr_bytes": [],
+  "stderr_overflow": false,
+  "stderr_read_error": null,
+  "stdout_bytes": [
+    97,
+    40,
+    115,
+    98,
+    41,
+    32,
+    48,
+    10
+  ],
+  "stdout_overflow": false,
+  "stdout_read_error": null,
+  "wait_error": null,
+  "wall_finished_at": 1794201097
+}

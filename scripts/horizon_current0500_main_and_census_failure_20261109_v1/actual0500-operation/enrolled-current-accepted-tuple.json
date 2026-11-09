@@ -1,0 +1,23 @@
+{
+  "accepted_selector": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/enrolled-current-selector.json",
+    "sha256": "8a9274f86b99c578d010558570d43d0ddf8acf85f75c7f2f7d55cd643b7ec8b0"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-722adc397ae24bb4b96d452783599f57.json",
+    "sha256": "7ee6864597173c36a9c110eda06f38403644908a5fddef1e2a65a9f7b69d0540"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+    "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "original_same_sample_registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/registration.json",
+    "sha256": "f7cf512decd1f2d8f4d43d4e282209ed5b1f01260b50e06029112bef253a6a6b"
+  },
+  "resource_observation_clock_unchanged": true
+}

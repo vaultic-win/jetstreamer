@@ -1,0 +1,24 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch163-selector0500-completion-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "completion.json",
+      "sha256": "9a3c324ad98dc80739e37b4c4bcff1f7729f04e21f0333886b09e1ee34f4083a",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/memory0500-completion.json"
+    },
+    {
+      "mode": 292,
+      "name": "journal.json",
+      "sha256": "5c84609a94ff0a624951e16d749d110c44aad9eb27af2f25e1dd1fcde9b01312",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/selector0500-select-original-PID1.json"
+    },
+    {
+      "mode": 292,
+      "name": "drain.json",
+      "sha256": "1dd7f8bc04359033ea8de35b6da716f75eebd20757f29f1efe757314dda13cb2",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/selector0500-select-original-drain.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+      "Id": "systemd-tmpfiles-clean.timer",
+      "InvocationID": "32b5a91b7e34427fb8958141cd64d355",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "systemd-tmpfiles-clean.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+          "sha256": "5d0d5e43fba69a001527d4ef354971c9a089b64d7d88973f2c190f7d80b25c61"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+      "Id": "systemd-tmpfiles-clean.timer",
+      "InvocationID": "32b5a91b7e34427fb8958141cd64d355",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "systemd-tmpfiles-clean.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/systemd-tmpfiles-clean.timer",
+          "sha256": "5d0d5e43fba69a001527d4ef354971c9a089b64d7d88973f2c190f7d80b25c61"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2506557027449,
+    "next_monotonic_usec": 2592957045201,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "systemd-tmpfiles-clean.timer",
+  "unset_pending_requires_metadata_requery": false
+}

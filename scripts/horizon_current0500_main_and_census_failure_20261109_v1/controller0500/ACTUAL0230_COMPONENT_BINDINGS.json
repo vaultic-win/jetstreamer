@@ -1,0 +1,46 @@
+{
+  "phase_v3": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+    "sha256": "97fa74f882fed1301ecbe5ae8ffe9f44f1d016d87199c7a42995c372604e18d5"
+  },
+  "phase_six_original_native_success_and_drain": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_ALL_SIX_ORIGINALS_NATIVE_SUCCESS_AND_DRAIN.json",
+    "sha256": "215223c1c35ab6af7780cfd14157ee16ddd18be788e78af726dc7ad20d701a59"
+  },
+  "phase_v3_booking": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_NORMAL6_PHASE145_BUSY_DATA512_BOOKING.json",
+    "sha256": "cf2642db91b91d4bf19215c770cd2571a6ecbdf3ed7c0e5ae0cde27c8b3faa0a"
+  },
+  "guard0230_booking": {
+    "path": "/home/sol/.jetstreamer-private/current0230-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0230_GUARD_DATA512_BOOKING.json",
+    "sha256": "23cd3d03e7e2f67ce854c3b527f6be41e843daa1a97fc4680168f877f422107a"
+  },
+  "guard0230_accepted_QA": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0230-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+    "sha256": "24372aa697437fffb415e7b36aaa9aec7009f6f153a67b7df1e06ec3a136e50f"
+  },
+  "guard0230_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current0230-bound-guard-window-tools-20261109-v1/deployment-seal-receipt.json",
+    "sha256": "48b50349cf92c6b5c5fd60798ac5c9d7241fb11aeac62dfaa1724396ba9dfd9b"
+  },
+  "bridge0130_readonly_finalization": {
+    "path": "/home/sol/.jetstreamer-private/observer0130-closed-metadata-readonly-finalization-20261109-v1/ROOT_GENUINE0130_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+    "sha256": "84dc451cfaa65d5cc92dbbd4504d846a29dfcb2079877f7b6705264ec28fda2f"
+  },
+  "bridge0200_readonly_finalization": {
+    "path": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/ROOT_GENUINE0200_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+    "sha256": "38cef1e763cd862aa6534fcd4b153b9e37012aa751bcd69c909fa852b0280f8b"
+  },
+  "latest_Review6_authenticated_readback": {
+    "path": "/home/sol/.jetstreamer-private/current0200-phase-failure-explicit-control-review6-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "24f2ca1b11439fcf0f24b37bdc50070c31d15c9b87d1883b6ebcdb6273c50343"
+  },
+  "Review6_model_binding": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/MODEL_BINDING.json",
+    "sha256": "5fe8e275da45125061de491fba8278bc39df3e8f370f0c103513c1987bd401a7"
+  },
+  "phase_v3_crossfire_execution": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-CROSS-FIRE-PHASE-EXECUTION.json",
+    "sha256": "78e913bb50dcb3d819963aee48cbd19981dd2871166b83ed8de5bdc0ddf1b552"
+  }
+}

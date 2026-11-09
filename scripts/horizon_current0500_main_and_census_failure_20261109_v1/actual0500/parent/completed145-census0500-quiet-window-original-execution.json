@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-current0500-bound-guard-window-tools-20261109-v1/horizon-current0500-guard-window",
+    "preflight-only",
+    "completed145-census0500-quiet",
+    "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/completed145-census0500-quiet-window-plan.json",
+    "--spec-sha256",
+    "d5003b41cd386a7eb85667b904df978ad926311ccb435a148d6c7e8d56df96b0",
+    "--self-sha256",
+    "a95dfb9e3416fa66d4bf8abbbf173889e2ecbdff8ad0bdb684c04a91e7d9667f"
+  ],
+  "code": 0,
+  "stderr": "",
+  "stdout": "{\"command_launched\":false,\"metadata_only\":true,\"no_resource_or_replay_authority\":true,\"preflight\":{\"absolute_next_monotonic_usec\":2547778731613,\"bounded_wait_metadata\":[{\"absolute_next_monotonic_usec\":2547778731613,\"guard\":{\"TimersMonotonic_entries\":[],\"fields\":{\"ActiveState\":\"inactive\",\"ControlPID\":\"0\",\"ExecMainStatus\":\"0\",\"Id\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service\",\"InvocationID\":\"34039a1593364628b3036d7a966f0fc1\",\"Job\":\"\",\"LoadState\":\"loaded\",\"MainPID\":\"0\",\"NRestarts\":\"0\",\"Result\":\"success\",\"SubState\":\"dead\"}},\"remaining_usec\":27047416,\"sampled_monotonic_usec\":2547751684197,\"timer\":{\"TimersMonotonic_entries\":[[\"OnUnitActiveUSec\",30000000,2547778731613],[\"OnActiveUSec\",1000000,2008011141884]],\"fields\":{\"ActiveState\":\"active\",\"Id\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer\",\"InvocationID\":\"97aeff8897434ed5ad89dd56c3fb17d1\",\"Job\":\"\",\"LoadState\":\"loaded\",\"Result\":\"success\",\"SubState\":\"waiting\",\"Unit\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service\"}}}],\"controller\":{\"TimersMonotonic_entries\":[],\"fields\":{\"ActiveState\":\"active\",\"ControlPID\":\"0\",\"ExecMainStatus\":\"0\",\"Id\":\"jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service\",\"InvocationID\":\"dbf49bb1b72c42c584f2d3ac94259cb8\",\"Job\":\"\",\"LoadState\":\"loaded\",\"MainPID\":\"2467123\",\"NRestarts\":\"0\",\"Result\":\"success\",\"SubState\":\"running\"}},\"guard\":{\"TimersMonotonic_entries\":[],\"fields\":{\"ActiveState\":\"inactive\",\"ControlPID\":\"0\",\"ExecMainStatus\":\"0\",\"Id\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service\",\"InvocationID\":\"34039a1593364628b3036d7a966f0fc1\",\"Job\":\"\",\"LoadState\":\"loaded\",\"MainPID\":\"0\",\"NRestarts\":\"0\",\"Result\":\"success\",\"SubState\":\"dead\"}},\"no_guard_timer_or_controller_mutation\":true,\"schema\":\"horizon-original-completed-guard-window-preflight-v3-rust\",\"timer\":{\"TimersMonotonic_entries\":[[\"OnUnitActiveUSec\",30000000,2547778731613],[\"OnActiveUSec\",1000000,2008011141884]],\"fields\":{\"ActiveState\":\"active\",\"Id\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer\",\"InvocationID\":\"97aeff8897434ed5ad89dd56c3fb17d1\",\"Job\":\"\",\"LoadState\":\"loaded\",\"Result\":\"success\",\"SubState\":\"waiting\",\"Unit\":\"jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service\"}}}}\n"
+}

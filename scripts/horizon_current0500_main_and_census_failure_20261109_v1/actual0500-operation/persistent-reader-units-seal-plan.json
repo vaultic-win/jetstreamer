@@ -1,0 +1,18 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-722adc397ae24bb4b96d452783599f57",
+  "members": [
+    {
+      "mode": 292,
+      "name": "horizon-failed4-current-accounting-reader-20261104-v1.service",
+      "sha256": "e314ac137b0af4d934418c9ea2a2327a02e5a57b6329be1aa46aa959f135015f",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/horizon-failed4-current-accounting-reader-20261104-v1.service"
+    },
+    {
+      "mode": 292,
+      "name": "horizon-positive185-reader-positive-722adc397ae24bb4b96d452783599f57-retain.target",
+      "sha256": "fc1aa88966b45c3799c7f43e0977f4832c3c0025e4177af6c44bc48d72b46475",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/horizon-positive185-reader-positive-722adc397ae24bb4b96d452783599f57-retain.target"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

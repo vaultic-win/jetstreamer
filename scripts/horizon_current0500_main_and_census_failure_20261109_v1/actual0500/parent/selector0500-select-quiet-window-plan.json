@@ -1,0 +1,8 @@
+{
+  "not_launch_authority": true,
+  "request": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/selector0500-select-quiet-window-request.json",
+    "sha256": "09aa3b1193e8e0de3803863afcfe54de74154179364d7a32761b05ed7d1a6318"
+  },
+  "schema": "horizon-original-completed-guard-window-native-argv-plan-v1"
+}
