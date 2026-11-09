@@ -1,0 +1,21 @@
+{
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v4/horizon-positive185-final",
+    "sha256": "5d72377dabc3d0646d490be70a9415ad07cba2527c6c63e5d2a0f36b5940687b"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v4/artifact-proof.json",
+    "sha256": "bb3dd54b1e1e738aba4b3f07a217587d232fd67f61d2a9f434f9b291866a09c9"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v4/deployment-seal-receipt.json",
+    "sha256": "8d53a3f9b3cfc679d73653ccb3f6902f5e77e0effb4d20ebee009c1a91295bf8"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ROOT_NORMAL6_FINAL4_DATA512_BOOKING.json",
+    "sha256": "63b184909418721ffbfcbcd242a9616354291924bbf4e848ed7759cd6899c890"
+  },
+  "complete_DATA_bytes": 5163504841364,
+  "native_event_publication_controls_passed": true,
+  "actual_fresh_guard_and_native_launch_still_required": true
+}

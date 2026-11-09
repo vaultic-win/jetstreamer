@@ -1,0 +1,101 @@
+{
+  "schema": "horizon-positive185-final4-closed-write-qualified-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/work/planner",
+    "sha256": "5d72377dabc3d0646d490be70a9415ad07cba2527c6c63e5d2a0f36b5940687b"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "2102e5aa416ffa4e9ffbf7cc5a8862154afc96faf44ddcf68a153b734d9fbca5"
+  },
+  "actual_test_binary": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-tests-20261109-v4-closed-write/tests",
+    "sha256": "5f9452a6caf6c01cb978b86cb65e8cf4f356584e6eb6824e55ba19a6af76697b"
+  },
+  "ordinary_tests_passed": 28,
+  "ignored_tests": 4,
+  "all_four_ignored_native_publication_controls_passed": true,
+  "ordinary_and_native_originals": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/census-all-ORIGINAL-EXECUTION.json",
+      "sha256": "596e4972e94217d68d042728027517d9f5b8c43c72ba6319a299cd7fa2fe4bf0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/census-ignored-ORIGINAL-EXECUTION.json",
+      "sha256": "941bc826b64cb9101d8cb671b1b66d83de63ab53b3c4f2cd1904700125c49d7f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/ordinary-ORIGINAL-EXECUTION.json",
+      "sha256": "519ab916ebac251e85ecc6f24fe3ae62bff1bf0ef01f46fe4c6025ba009f0072"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-0-ORIGINAL-EXECUTION.json",
+      "sha256": "2f4a3cb3ffdd5675792762888ce39bd69d9d94079513f0e6e17ec78efd1320dd"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-1-ORIGINAL-EXECUTION.json",
+      "sha256": "58fee4a94dfb711ee666eb70782b7f8d82618ad575fb8de161e949f279479684"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-2-ORIGINAL-EXECUTION.json",
+      "sha256": "005ba4ec3fed959b86dad53051994ab63a361a1406e04c52a1490047853d473d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/native-3-ORIGINAL-EXECUTION.json",
+      "sha256": "4d3331dd74686861f12bd31838900a7f029cb4fe0d627921c58b5cf73ce16e65"
+    }
+  ],
+  "actual_census": [
+    "driver_policy::tests::exact_driver10_and11_roles_reject_crossed_and_unknown_images",
+    "events::publication_native_tests::actual_closed_failed_guard_remains_rejected_after_publication_repair",
+    "events::publication_native_tests::actual_closed_malformed_receipt_is_rejected_without_retry",
+    "events::publication_native_tests::actual_slow_writer_old_modify_binds_early_corrected_guard_waits_for_close",
+    "events::publication_native_tests::actual_unqualified_move_to_guard_name_does_not_publish_a_receipt",
+    "events::tests::every_original_watch_invalidation_fails_closed",
+    "events::tests::guard_publication_preserves_masks_and_requires_completed_writer",
+    "events::tests::incomplete_or_nonmatching_log_is_only_absent_wakeup",
+    "events::tests::malformed_event_names_and_lengths_still_fail_closed",
+    "events::tests::only_exact_invocation_guard_names_are_candidates",
+    "events::tests::truncated_and_overflow_events_fail_closed",
+    "process::tests::bounded_capture_preserves_exact_bytes_and_rejects_overflow",
+    "process::tests::pidfd_reaps_the_actual_original_finite_child",
+    "process::tests::pidfd_timeout_does_not_invent_a_successful_child",
+    "start_request::tests::canonical_job_ids_reject_empty_zero_signed_and_overflow",
+    "start_request::tests::handoff_preserves_every_non_job_native_field",
+    "start_request::tests::original_ready_requires_exact_owner_pid_start_and_600s_clock",
+    "start_request::tests::typed_start_request_rejects_foreign_owner_type_state_and_id",
+    "tests::common_request_control_rejects_missing_roundtrip_foreign_pid1_and_duplicate_done",
+    "tests::context_v2_requires_explicit_bound_handoff",
+    "tests::driver11_capture_cannot_borrow_old_role_or_claim_native_fire_already_passed",
+    "tests::driver11_is_only_the_exact_closed_bounded_prefix_role",
+    "tests::exact_normal_member_rejects_digest_mode_and_duplicate_claim",
+    "tests::mutable_native_namespace_never_accepts_command_injection",
+    "tests::negative2g_and_full_boundary_cannot_enter_current_probe",
+    "tests::old_checkpoint_driver_cannot_become_full_by_capability_boolean",
+    "transaction::tests::completed_guard_requires_actual_timer_monotonic_and_ready_binding",
+    "transaction::tests::formatted_native_first_guard_matches_exact_driver11_receipt",
+    "transaction::tests::irreducible30s_stage_budget_fails_before_timer_arm",
+    "transaction::tests::long_reader_then_late_original_proofs_fit_without_refresh",
+    "transaction::tests::main_entry_must_fit_original_four_clocks_and_token",
+    "transaction::tests::no_clock_renewal_future_capture_or_changed_setup"
+  ],
+  "actual_ignored_census": [
+    "events::publication_native_tests::actual_closed_failed_guard_remains_rejected_after_publication_repair",
+    "events::publication_native_tests::actual_closed_malformed_receipt_is_rejected_without_retry",
+    "events::publication_native_tests::actual_slow_writer_old_modify_binds_early_corrected_guard_waits_for_close",
+    "events::publication_native_tests::actual_unqualified_move_to_guard_name_does_not_publish_a_receipt"
+  ],
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": true,
+  "all_original_actors_terminal_and_drained": true,
+  "Driver11_and_qualified_helper_policy_unchanged": true,
+  "original_setup_final_token_clocks_unchanged": true,
+  "failed_guard_still_rejected": true,
+  "replay_launch_authorized": false,
+  "publication_authorized": false,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0,
+  "normal_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5163504841364
+}

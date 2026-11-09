@@ -1,0 +1,12 @@
+{
+  "labels": [
+    "clippy-production",
+    "clippy-tests",
+    "test-build",
+    "release"
+  ],
+  "graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final4-guard-publication-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "2102e5aa416ffa4e9ffbf7cc5a8862154afc96faf44ddcf68a153b734d9fbca5"
+  }
+}
