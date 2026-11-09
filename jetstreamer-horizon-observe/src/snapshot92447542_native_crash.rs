@@ -1163,8 +1163,8 @@ fn sdk_group(pid: u32, group: &str, stopped: bool) -> Result<Vec<SdkGroupMember>
             if stopped {
                 let s = status(tid)?;
                 ensure!(
-                    s.get("State")
-                        .is_some_and(|s| s.starts_with('T') || s.starts_with('t')),
+                    s.get("State").is_some_and(|s| s.starts_with('T'))
+                        && s.get("TracerPid").map(String::as_str) == Some("0"),
                     "SDK thread has not stopped"
                 );
             }
@@ -1202,6 +1202,7 @@ fn validate_sdk_members(members: &[SdkGroupMember]) -> Result<()> {
                 && capability(&s, "CapPrm")? == 0
                 && capability(&s, "CapAmb")? == 0
                 && s.get("NoNewPrivs").map(String::as_str) == Some("1")
+                && s.get("TracerPid").map(String::as_str) == Some("0")
                 && stat(member.pid)?.1 == member.start_ticks,
             "SDK stage writer kernel identity differs"
         );
@@ -1218,6 +1219,29 @@ fn stop_owned_sdk_group(child: &OwnedSdk, group: &str) -> Result<Vec<SdkGroupMem
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         live_owned_leader(child, group)?;
+        let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+        ensure!(
+            unsafe {
+                libc::waitid(
+                    libc::P_PID,
+                    pid,
+                    &mut info,
+                    libc::WSTOPPED | libc::WNOHANG | libc::WNOWAIT,
+                )
+            } == 0,
+            "owned SDK stop waitid failed"
+        );
+        if unsafe { info.si_pid() } != pid
+            || info.si_code != libc::CLD_STOPPED
+            || unsafe { info.si_status() } != libc::SIGSTOP
+        {
+            ensure!(
+                Instant::now() < deadline,
+                "owned SDK SIGSTOP completion not observed"
+            );
+            thread::sleep(Duration::from_millis(5));
+            continue;
+        }
         match sdk_group(pid, group, true) {
             Ok(members) => return Ok(members),
             Err(e)
@@ -1289,6 +1313,7 @@ impl CaseEnvironment<'_> {
             "actual_unit":self.gate.profile.unit,"actual_invocation_id":self.gate.profile.invocation_id,
             "actual_parent_pid":std::process::id(),"stage":held.stage,"stage_identity":held.stage_identity,
             "transport":"real-gcs","owned_unreaped_leader":held.leader,
+            "leader_stop_waitid_confirmed":true,"leader_stop_signal":"SIGSTOP",
             "stopped_group_members":current,"actual_writable_stage_descriptor":handle,
             "descriptor_body_read_or_duplicated":false,"resume_before_parent_exit":false}),
         )
