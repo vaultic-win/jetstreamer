@@ -130,3 +130,10 @@ source, Cargo lock, builder, process, staged-reference and inode gate remains.
 Dep-info witnesses are unlinked after their outputs so interrupted cleanup
 retains enough evidence to revalidate each remaining compiler pair. Other cache
 profiles keep their existing unlink order and protected-name rules.
+
+
+The paired Clippy dep-info accepts exactly the two observed complete records:
+`-D warnings` and `--no-deps -D warnings`, using Cargo's recorded Clippy separator.
+All source/output paths, blank lines, environment keys and remaining bytes must
+match. Unrecognized options or extra/missing records still reject; this does
+not parse or generally allow arbitrary Clippy argument strings.

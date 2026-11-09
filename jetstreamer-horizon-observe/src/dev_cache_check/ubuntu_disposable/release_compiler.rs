@@ -138,7 +138,14 @@ pub(super) fn qualified(
     };
     let stem = format!("{crate_name}-{id}");
     let (d_identity, d) = read_regular(&actual_root.join(format!("{stem}.d")), 4096, false)?;
-    let metadata = d == depinfo(crate_name, id, true).as_bytes();
+    let expected_metadata = depinfo(crate_name, id, true);
+    // Both complete generated records were observed in this fixed cache.
+    // No other Clippy argument, source, output or environment line is accepted.
+    let no_deps_metadata = expected_metadata.replace(
+        "# env-dep:CLIPPY_ARGS=-D",
+        "# env-dep:CLIPPY_ARGS=--no-deps__CLIPPY_HACKERY__-D",
+    );
+    let metadata = d == expected_metadata.as_bytes() || d == no_deps_metadata.as_bytes();
     let executable = d == depinfo(crate_name, id, false).as_bytes();
     ensure!(
         metadata || executable,

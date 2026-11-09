@@ -56,6 +56,22 @@ fn exact_observed_compiler_pairs_pass_the_existing_full_manifest_engine() {
         assert!(accepted(directory.path(), &output));
         let manifest = manifest_scoped(directory.path(), Path::new(RELEASE_DEPS)).unwrap();
         assert_eq!(manifest.nodes.len(), 3);
+        if metadata {
+            let observed_no_deps = fs::read_to_string(&d).unwrap().replace(
+                "# env-dep:CLIPPY_ARGS=-D",
+                "# env-dep:CLIPPY_ARGS=--no-deps__CLIPPY_HACKERY__-D",
+            );
+            fs::write(&d, observed_no_deps).unwrap();
+            assert!(accepted(directory.path(), &d));
+            assert!(accepted(directory.path(), &output));
+            assert_eq!(
+                manifest_scoped(directory.path(), Path::new(RELEASE_DEPS))
+                    .unwrap()
+                    .nodes
+                    .len(),
+                3
+            );
+        }
         for policy in [DEBUG_INCREMENTAL, "/private/other/target/release/deps"] {
             assert!(
                 !qualified(
@@ -121,6 +137,7 @@ fn paired_depinfo_requires_exact_crate_sources_target_and_complete_records() {
         good.replace(ID, "ffffffffffffffff"),
         good.clone() + "\nprivate-checkpoint.json:\n",
         good.replace("# env-dep:CLIPPY_CONF_DIR\n", ""),
+        good.replace("CLIPPY_ARGS=-D", "CLIPPY_ARGS=--all-targets -D"),
         "checkpoint state".into(),
     ] {
         fs::write(&d, bad).unwrap();
