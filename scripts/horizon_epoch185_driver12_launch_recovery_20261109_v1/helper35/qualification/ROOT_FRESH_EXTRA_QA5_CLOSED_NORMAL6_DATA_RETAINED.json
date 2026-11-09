@@ -1,0 +1,19 @@
+{
+  "schema": "horizon-helper35-original-QA5-closure-v1",
+  "actual_fresh_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+    "sha256": "0bd6004d1048cc35b23102e1cc7d0d3961517506425e2eff6c5aba4a5518e5ec"
+  },
+  "fresh_extra_QA5_bytes_before": 5368709120,
+  "fresh_extra_QA5_bytes_after": 0,
+  "all22_originals_terminal_success_and_drained": true,
+  "normal_pool_bytes": 6442450944,
+  "new_memory_credit_bytes": 0,
+  "complete_DATA_bytes": 5174242259604,
+  "all_source_and_DATA_promises_retained": true,
+  "prior_QA5_releases_not_added": true,
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/artifact-proof.json",
+    "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3"
+  }
+}

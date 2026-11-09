@@ -1,0 +1,58 @@
+{
+  "schema": "horizon-planner6-source-only-static-review-v1",
+  "changed_existing_leaves": [
+    "lineage.rs",
+    "final_window.rs",
+    "positive.rs"
+  ],
+  "actual_Driver12_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+    "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+  },
+  "actual_Helper35_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+    "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+  },
+  "historical_Driver10_Driver11_templates_byte_identical": true,
+  "historical_main_and_resource_storage_byte_identical": true,
+  "prelaunch13_pins_unchanged": true,
+  "exact_five_externs_in_all_four_recipes": true,
+  "new_ordinary_regression_tests_source_only": 5,
+  "expected_ordinary_after_previous27_not_an_observed_census": 32,
+  "Root_must_derive_actual_census": true,
+  "P6_not_booked": true,
+  "canonical_DATA_prior_to_P6_booking_bytes": 5174779130516,
+  "native_cloud_build_or_Git_actions": 0,
+  "Rust_parser_only_results": [
+    {
+      "path": "source/main.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "path": "source/resources.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "path": "source/storage.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "path": "source/positive.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "path": "source/final_window.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "path": "source/lineage.rs",
+      "static_Rust_parser_only_exit_code": 0,
+      "stderr": ""
+    }
+  ]
+}

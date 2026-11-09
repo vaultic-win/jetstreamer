@@ -1,0 +1,117 @@
+--- a/source/events.rs
++++ b/source/events.rs
+@@ -3,7 +3,7 @@
+ use anyhow::{Context,Result,ensure};
+ use serde_json::Value;
+ use std::{ffi::CString,fs::{self,OpenOptions},io::{Read,Write},os::unix::fs::{OpenOptionsExt,MetadataExt},
+-    path::Path,time::Instant};
++    path::Path,time::{Duration,Instant}};
+ #[derive(Debug,PartialEq,Eq)]
+ struct Event{name:String,mask:u32}
+ // Driver11 persists directly to the final guard filename, then closes its
+@@ -11,6 +11,12 @@
+ // therefore only a wakeup, never publication authority for this consumer.
+ fn guard_published(event:&Event)->bool{
+     event.mask&libc::IN_CLOSE_WRITE!=0&&event.mask&libc::IN_ISDIR==0
++}
++// poll() accepts integral milliseconds; never truncate a positive remainder.
++// This is only a kernel-wait timeout, never a renewed authentication deadline.
++fn event_poll_millis(left:Duration)->Result<i32>{
++    ensure!(!left.is_zero(),"original event deadline expired");
++    Ok(left.as_nanos().div_ceil(1_000_000).min(i32::MAX as u128)as i32)
+ }
+ pub struct Watch{fd:i32,guard_events:std::cell::Cell<usize>}
+ impl Drop for Watch{fn drop(&mut self){unsafe{libc::close(self.fd);}}}
+@@ -37,11 +43,22 @@
+         loop{
+             let left=until.checked_duration_since(Instant::now()).context("original event deadline expired")?;
+             let mut p=libc::pollfd{fd:self.fd,events:libc::POLLIN,revents:0};
+-            let r=unsafe{libc::poll(&mut p,1,left.as_millis().clamp(1,i32::MAX as u128)as i32)};
+-            if r<0&&std::io::Error::last_os_error().kind()==std::io::ErrorKind::Interrupted{continue}
+-            ensure!(r>0&&p.revents&libc::POLLIN!=0,"original event watch timeout/error");
++            let r=unsafe{libc::poll(&mut p,1,event_poll_millis(left)?)};
++            if r<0{
++                let error=std::io::Error::last_os_error();
++                if error.kind()==std::io::ErrorKind::Interrupted{continue}
++                return Err(error).context("original event watch poll failed")
++            }
++            // A kernel timeout can precede until, including capped/rounded waits.
++            // Recheck that same original Instant at the loop head; never renew it.
++            if r==0{continue}
++            ensure!(Instant::now()<until,"original event deadline expired");
++            ensure!(p.revents&libc::POLLIN!=0,"original event watch descriptor closed/error");
+             let mut bytes=[0u8;65536];let count=unsafe{libc::read(self.fd,bytes.as_mut_ptr().cast(),bytes.len())};
+-            ensure!(count>0,"event watch closed/read error");return parse_events(&bytes[..count as usize]);
++            ensure!(count>0,"event watch closed/read error");
++            let events=parse_events(&bytes[..count as usize])?;
++            ensure!(Instant::now()<until,"original event deadline expired");
++            return Ok(events);
+         }
+     }
+     pub fn guard(&self,root:&Path,actor:&str,iid:&str,admission:&str,until:Instant)->Result<(storage::Bound,Value)>{
+@@ -60,6 +77,7 @@
+                     &&clock.checked_sub(sampled).is_some_and(|age|age<=30)
+                     &&name==format!("guard-{}.json",text(&v,"guard_invocation_id")?),
+                     "genuine matching first guard failed or changed admission/identity");
++                ensure!(Instant::now()<until,"original event deadline expired");
+                 return Ok((b,v))
+             }
+         }
+@@ -81,7 +99,10 @@
+                 if value["actor_unit"]!=scope.actor||value["actor_invocation_id"]!=scope.iid{continue}
+                 match crate::post_main::receipt_policy(&value,&event.name,scope,now()?)? {
+                     crate::post_main::ReceiptDecision::WaitPrestart=>continue,
+-                    crate::post_main::ReceiptDecision::AcceptMain=>return Ok((b,value)),
++                    crate::post_main::ReceiptDecision::AcceptMain=>{
++                        ensure!(Instant::now()<until,"original event deadline expired");
++                        return Ok((b,value))
++                    },
+                 }
+             }
+         }
+@@ -182,6 +203,17 @@
+ #[cfg(test)]
+ mod tests{
+     use super::*;
++    #[test]fn event_poll_timeout_rounds_positive_remainders_up_without_renewing_deadline(){
++        assert!(event_poll_millis(Duration::ZERO).is_err());
++        assert_eq!(event_poll_millis(Duration::from_nanos(1)).unwrap(),1);
++        assert_eq!(event_poll_millis(Duration::from_millis(150)).unwrap(),150);
++        // This models the actual150ms test after its prestart event was parsed:
++        // floor149 would terminate early; the unchanged absolute deadline remains.
++        assert_eq!(event_poll_millis(Duration::from_nanos(149_500_001)).unwrap(),150);
++        assert_eq!(event_poll_millis(Duration::from_nanos(999_999)).unwrap(),1);
++        assert_eq!(event_poll_millis(Duration::from_nanos(1_000_001)).unwrap(),2);
++        assert_eq!(event_poll_millis(Duration::from_secs(u64::MAX)).unwrap(),i32::MAX);
++    }
+     #[test]fn only_exact_invocation_guard_names_are_candidates(){
+         assert!(guard_filename(&format!("guard-{}.json","a".repeat(32))));
+         for s in ["guard-../x.json","guard-a.json","token.json","guard-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.json"]{assert!(!guard_filename(s))}
+--- a/source/post_main_native_tests.rs
++++ b/source/post_main_native_tests.rs
+@@ -100,8 +100,23 @@
+     receipt["actor_pid"]=ready["pid"].clone();receipt["actor_start_ticks"]=ready["start_ticks"].clone();publish(&dir.0,&receipt);
+     let scope=GuardScope{actor:&actor,iid:&iid,admission:&admission,timer:&timer,ready:&ready,main:&main};
+     let deadline=Instant::now()+Duration::from_millis(150);
+-    assert!(watch.post_main_guard(&dir.0,&scope,deadline).is_err());
+-    assert!(Instant::now()>=deadline);assert!(!dir.0.join("lifecycle.json").exists());
++    let error=watch.post_main_guard(&dir.0,&scope,deadline).unwrap_err();
++    assert!(error.chain().any(|cause|cause.to_string()=="original event deadline expired"),
++        "expected original deadline expiry, not a receipt/poll/descriptor/custody failure: {error:#}");
++    assert!(Instant::now()>=deadline,"deadline error returned before the original Instant: {error:#}");
++    assert!(!dir.0.join("lifecycle.json").exists());
++    assert_eq!(start_ticks(main.pid).unwrap(),main.start_ticks);
++}
++#[test]
++#[ignore="Root native expired fixed deadline with queued CLOSE_WRITE; fixture only"]
++fn actual_queued_main_receipt_cannot_revive_an_expired_original_deadline() {
++    let dir=Sandbox::new("expired-queued-main");let watch=Watch::guard_directory(&dir.0).unwrap();
++    let(actor,iid,admission,timer,ready,main,receipt)=fixture();publish(&dir.0,&receipt);
++    let scope=GuardScope{actor:&actor,iid:&iid,admission:&admission,timer:&timer,ready:&ready,main:&main};
++    let expired=Instant::now().checked_sub(Duration::from_millis(1)).unwrap();
++    let error=watch.post_main_guard(&dir.0,&scope,expired).unwrap_err();
++    assert!(error.chain().any(|cause|cause.to_string()=="original event deadline expired"),"{error:#}");
++    assert!(!dir.0.join("lifecycle.json").exists());
+     assert_eq!(start_ticks(main.pid).unwrap(),main.start_ticks);
+ }
+ #[test]

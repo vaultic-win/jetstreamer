@@ -1,0 +1,154 @@
+{
+  "schema": "horizon-positive185-final6-closed-write-qualified-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/work/planner",
+    "sha256": "2ceb9bd082b7596a927f84b139d862c475166dc44f2042199170c583bea4a1b1"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "97120663955aad5180517ed203db78969951db7cfef6ab65639c45ceb02cc468"
+  },
+  "actual_test_binary": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-final-tests-20261109-v6-fixed-deadline/tests",
+    "sha256": "196f4d2797a83f225450483f86eaa0a8ce70afe03de839b890b8156454fc2ba5"
+  },
+  "ordinary_tests_passed": 38,
+  "ignored_tests": 10,
+  "all_ten_ignored_native_controls_passed": true,
+  "original_deadline_timeout_and_expired_queued_receipt_controls_passed": true,
+  "ordinary_and_native_originals": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/census-all-ORIGINAL-EXECUTION.json",
+      "sha256": "f7b5789b057a507e781297844290d6a448d3af0b3b2575ceba1b9cae6e3b47d9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/census-ignored-ORIGINAL-EXECUTION.json",
+      "sha256": "f0e35d6bbefce69a3a339d24defda6b7d8158cfbb65a6a7adb961f48dc0a1ba6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/ordinary-ORIGINAL-EXECUTION.json",
+      "sha256": "ae703ff8f5c3bf903fce936122fad749163ec0b2fd0b7b0e7c29a7da5a62ab32"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-0-ORIGINAL-EXECUTION.json",
+      "sha256": "b4f918133172d4c38c7f8d0d02cfd73a2c8d753690d8ada88ffe8b1aa57a24cb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-1-ORIGINAL-EXECUTION.json",
+      "sha256": "ce41cb98c034d44c4b24b78afe26d6efeb6ba20934562bd7eca044c124d18e19"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-2-ORIGINAL-EXECUTION.json",
+      "sha256": "74a2d2f236236dae21bf748795db375faab54253b7edaddfd6cfe550cfd08e32"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-3-ORIGINAL-EXECUTION.json",
+      "sha256": "39a8c9430314f4edd0b05bb9b60e9530f5031b6c9e080ccbf870b72a237565c1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-4-ORIGINAL-EXECUTION.json",
+      "sha256": "379588c34889973453a62f9e266efb05338c0a59de6b134ec18ad1a6a62db78c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-5-ORIGINAL-EXECUTION.json",
+      "sha256": "f0f6519fbbc42a0e7c142589f9a9e4c22fb924dbd3f02d430a317bcddadda9ff"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-6-ORIGINAL-EXECUTION.json",
+      "sha256": "03950cceac8ad0dd56b17e4799234a620ab297b5af4bcd2fb9dcf1adc40a2c0c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-7-ORIGINAL-EXECUTION.json",
+      "sha256": "b6860e16648c55762728b09a640c8e33289bb46fefebf2d137b3ba077f82c06e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-8-ORIGINAL-EXECUTION.json",
+      "sha256": "63f879baf09ef2e79289b26c7ea1e94c7ef85f8b8dbeae2e9b812f5a5fc51e4b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/native-9-ORIGINAL-EXECUTION.json",
+      "sha256": "4333bf4fa222ae92743699e0c81ad74871b83656d6b852a64edea16bdfd5ec45"
+    }
+  ],
+  "actual_census": [
+    "driver_policy::driver12_additive::actual_driver12_does_not_borrow_historical_or_crossed_pairs",
+    "driver_policy::tests::exact_driver10_and11_roles_reject_crossed_and_unknown_images",
+    "events::publication_native_tests::actual_closed_failed_guard_remains_rejected_after_publication_repair",
+    "events::publication_native_tests::actual_closed_malformed_receipt_is_rejected_without_retry",
+    "events::publication_native_tests::actual_slow_writer_old_modify_binds_early_corrected_guard_waits_for_close",
+    "events::publication_native_tests::actual_unqualified_move_to_guard_name_does_not_publish_a_receipt",
+    "events::tests::event_poll_timeout_rounds_positive_remainders_up_without_renewing_deadline",
+    "events::tests::every_original_watch_invalidation_fails_closed",
+    "events::tests::guard_publication_preserves_masks_and_requires_completed_writer",
+    "events::tests::incomplete_or_nonmatching_log_is_only_absent_wakeup",
+    "events::tests::malformed_event_names_and_lengths_still_fail_closed",
+    "events::tests::only_exact_invocation_guard_names_are_candidates",
+    "events::tests::truncated_and_overflow_events_fail_closed",
+    "post_main::native_controls::actual_closed_failed_main_guard_rejects_without_lifecycle_capture",
+    "post_main::native_controls::actual_closed_prestart_receipt_waits_then_closed_main_receipt_accepts",
+    "post_main::native_controls::actual_lifecycle_leaf_is0700_stable_and_rejects_alias_reuse_or_mode_change",
+    "post_main::native_controls::actual_postmain_guard_keeps_close_write_publication_semantics",
+    "post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture",
+    "post_main::native_controls::actual_queued_main_receipt_cannot_revive_an_expired_original_deadline",
+    "post_main::tests::exact_main_receipt_accepts_but_prestart_receipt_only_waits",
+    "post_main::tests::failed_guard_and_missing_failure_field_never_wait_or_capture",
+    "post_main::tests::kernel_stat_parser_uses_last_parenthesis_and_exact_pid",
+    "post_main::tests::lifecycle_output_uses_helper_root_and_never_registration_root",
+    "post_main::tests::main_pid_ticks_and_native_start_clock_cannot_be_crossed",
+    "post_main::tests::namespace_owner_admission_and_timer_crossing_fail_closed",
+    "post_main::tests::post_main_wait_retains_original22_pool_and600_second_deadlines",
+    "post_main::tests::stale_future_or_non_native_timer_clock_is_rejected",
+    "process::tests::bounded_capture_preserves_exact_bytes_and_rejects_overflow",
+    "process::tests::pidfd_reaps_the_actual_original_finite_child",
+    "process::tests::pidfd_timeout_does_not_invent_a_successful_child",
+    "start_request::tests::canonical_job_ids_reject_empty_zero_signed_and_overflow",
+    "start_request::tests::handoff_preserves_every_non_job_native_field",
+    "start_request::tests::original_ready_requires_exact_owner_pid_start_and_600s_clock",
+    "start_request::tests::typed_start_request_rejects_foreign_owner_type_state_and_id",
+    "tests::common_request_control_rejects_missing_roundtrip_foreign_pid1_and_duplicate_done",
+    "tests::context_v2_requires_explicit_bound_handoff",
+    "tests::driver11_capture_cannot_borrow_old_role_or_claim_native_fire_already_passed",
+    "tests::driver11_is_only_the_exact_closed_bounded_prefix_role",
+    "tests::exact_normal_member_rejects_digest_mode_and_duplicate_claim",
+    "tests::mutable_native_namespace_never_accepts_command_injection",
+    "tests::negative2g_and_full_boundary_cannot_enter_current_probe",
+    "tests::old_checkpoint_driver_cannot_become_full_by_capability_boolean",
+    "transaction::tests::completed_guard_requires_actual_timer_monotonic_and_ready_binding",
+    "transaction::tests::formatted_native_first_guard_matches_exact_driver11_receipt",
+    "transaction::tests::irreducible30s_stage_budget_fails_before_timer_arm",
+    "transaction::tests::long_reader_then_late_original_proofs_fit_without_refresh",
+    "transaction::tests::main_entry_must_fit_original_four_clocks_and_token",
+    "transaction::tests::no_clock_renewal_future_capture_or_changed_setup"
+  ],
+  "actual_ignored_census": [
+    "events::publication_native_tests::actual_closed_failed_guard_remains_rejected_after_publication_repair",
+    "events::publication_native_tests::actual_closed_malformed_receipt_is_rejected_without_retry",
+    "events::publication_native_tests::actual_slow_writer_old_modify_binds_early_corrected_guard_waits_for_close",
+    "events::publication_native_tests::actual_unqualified_move_to_guard_name_does_not_publish_a_receipt",
+    "post_main::native_controls::actual_closed_failed_main_guard_rejects_without_lifecycle_capture",
+    "post_main::native_controls::actual_closed_prestart_receipt_waits_then_closed_main_receipt_accepts",
+    "post_main::native_controls::actual_lifecycle_leaf_is0700_stable_and_rejects_alias_reuse_or_mode_change",
+    "post_main::native_controls::actual_postmain_guard_keeps_close_write_publication_semantics",
+    "post_main::native_controls::actual_prestart_only_wait_expires_without_clock_reset_or_capture",
+    "post_main::native_controls::actual_queued_main_receipt_cannot_revive_an_expired_original_deadline"
+  ],
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": true,
+  "all_original_actors_terminal_and_drained": true,
+  "Driver10_and_Driver11_historical_policy_preserved": true,
+  "Driver12_exact_pair_registered": true,
+  "qualified_helper_policy_unchanged": true,
+  "post_Main_guard_required": true,
+  "lifecycle_exact_namespace_and_writable_leaf_required": true,
+  "post_release22s_and_periodic30s_fit_limitation_retained": true,
+  "healthy_actor_untouched_on_post_release_failure": true,
+  "original_setup_final_token_clocks_unchanged": true,
+  "failed_guard_still_rejected": true,
+  "replay_launch_authorized": false,
+  "publication_authorized": false,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0,
+  "normal_pool_bytes": 6442450944,
+  "complete_DATA_bytes": 5175316001428
+}

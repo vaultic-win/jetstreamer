@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::direct163::native_restore::tests::root_atomic_publication_never_replaces_an_existing_admission ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-helper34-helper-native-publication-argv-v31-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 19ms\nCPU time consumed: 17ms\nMemory peak: 3.7M\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,28 @@
+{
+  "controls": [
+    "HELPER_ORDINARY_ARGV_V31-ORIGINAL-ARGV.json",
+    "ACTUAL2130-COMPLETE-OUTER-ORIGINAL-ARGV.json",
+    "ACTUAL2130-TRANSITION-ORIGINAL-ARGV.json",
+    "ACTUAL2300-COMPLETE-OUTER-ORIGINAL-ARGV.json",
+    "ACTUAL_CURRENT1830_COMPLETE_OUTER_ORIGINAL_ARGV-ORIGINAL-ARGV.json",
+    "ACTUAL_ORIGINAL1630_ALL_PEER_SOURCES_ARGV_V31-ORIGINAL-ARGV.json",
+    "ACTUAL_ORIGINAL185_TYPED_READY_ARGV_V31-ORIGINAL-ARGV.json",
+    "HELPER_CENSUS_ALL_ARGV_V31-ORIGINAL-ARGV.json",
+    "HELPER_CENSUS_IGNORED_ARGV_V31-ORIGINAL-ARGV.json",
+    "HELPER_NATIVE-PUBLICATION_ARGV_V31-ORIGINAL-ARGV.json",
+    "REGRESSION_actual-current-coordinator_R3_ARGV_V31-ORIGINAL-ARGV.json",
+    "REGRESSION_actual-terminal-discovery_R3_ARGV_V31-ORIGINAL-ARGV.json",
+    "REGRESSION_actual-terminal145_R3_ARGV_V31-ORIGINAL-ARGV.json",
+    "REGRESSION_genuine-current-outer_R3_ARGV_V31-ORIGINAL-ARGV.json",
+    "actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles-ORIGINAL-ARGV.json",
+    "actual2300_composed_route_projects_both_sides_and_preserves_every_raw_row-ORIGINAL-ARGV.json",
+    "actual2300_history_or_raw_family_tampering_never_authorizes_projection-ORIGINAL-ARGV.json"
+  ],
+  "all_new_originals_passed": true,
+  "old_pass_claims_not_copied": true,
+  "latest0230_complete_outer_still_required": true,
+  "test_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tests-20261109-v35/helper-tests",
+    "sha256": "077b4873e0c3a5738c5f4d9950137639d676a5ef2c1f952c349fd55f08695c13"
+  }
+}

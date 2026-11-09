@@ -1,0 +1,538 @@
+{
+  "schema": "horizon-planner6-current-source-and-exact4-v1",
+  "source": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/final_window.rs",
+      "sha256": "a30c4d0616afc8bd678cc6fd6060a7d3d6dfdb94b40bfcee345fcc843d18cc5c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/lineage.rs",
+      "sha256": "fe15c6ee2ee625f34d8a509799e9e788c64ae33a73f886ddc9992fb6f595b8f3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/main.rs",
+      "sha256": "496e025f0d6460461e895e559b90ac841ac01f7e3d58a792ea413c4bb61d9511"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/positive.rs",
+      "sha256": "8c16dde6c8fdc5875dc01249090fa170a06d2fc7005218f7fa065c34f7541e91"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/resources.rs",
+      "sha256": "997c88a5d090fc0504f2d1a897cf3f8219979edf893d252ca008ee0bdbc52dc1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/storage.rs",
+      "sha256": "50d6bbef5d3373bc5f95bf082ff29f79588b8b4ce444e6ba03dd70c02fa40071"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/actor.service",
+      "sha256": "30278ba3fdc7c5322f4f269e7aaac4400905a12bddf1f1aa13823b566dac9a51"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/envelope.json",
+      "sha256": "1eaeb843163f8decfe8101328713e95ec7b9e9c382324aec9279dbcce82ffac0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/guard.service",
+      "sha256": "c8f39e424dd6226266d177455e58434581f2526612e7ff8a74154ecd2fdc9a55"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/actor.service",
+      "sha256": "2e370ca591546667a0717417a4bf92e9ea8b3cf34456cbc9bb239d744e5b34d2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/admission.json",
+      "sha256": "073a6a13a543193c6da88238ce0d5f80502d5acd39929237d95abe62fbff9861"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/envelope.json",
+      "sha256": "584b2f5ea2998d22a0bd09094aa83f4b6f4d104851c7064fc7a5e7424bed3f23"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/guard.service",
+      "sha256": "dfe6e68cc35cb5804172ca986a217bbc15f1ef0a46006340440727898ba25077"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/guard.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/templates-driver11/task-spec.json",
+      "sha256": "22567a4994626bb0259b389b46a6eeb830274516a9cfb3ddcf0cba17df62109d"
+    }
+  ],
+  "recipes": {
+    "clippy-production": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-positive185-planner6-helper35-clippy-production-20261109-r2",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "Restart=no",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=2G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=400%",
+      "-p",
+      "TasksMax=128",
+      "-p",
+      "RuntimeMaxSec=600",
+      "-p",
+      "TimeoutStopSec=15",
+      "-p",
+      "KillMode=control-group",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "WorkingDirectory=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "LimitFSIZE=536870912",
+      "-p",
+      "LimitCORE=0",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+      "--crate-name",
+      "epoch185_retained_metadata_plan",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "--check-cfg",
+      "cfg(test)",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--emit=metadata",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/planner-clippy.rmeta"
+    ],
+    "clippy-tests": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-positive185-planner6-helper35-clippy-tests-20261109-r2",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "Restart=no",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=2G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=400%",
+      "-p",
+      "TasksMax=128",
+      "-p",
+      "RuntimeMaxSec=600",
+      "-p",
+      "TimeoutStopSec=15",
+      "-p",
+      "KillMode=control-group",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "WorkingDirectory=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "LimitFSIZE=536870912",
+      "-p",
+      "LimitCORE=0",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+      "--crate-name",
+      "epoch185_retained_metadata_plan",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "--check-cfg",
+      "cfg(test)",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--test",
+      "--emit=metadata",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/planner-tests-clippy.rmeta"
+    ],
+    "test-build": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-positive185-planner6-helper35-test-build-20261109-r2",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "Restart=no",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=2G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=400%",
+      "-p",
+      "TasksMax=128",
+      "-p",
+      "RuntimeMaxSec=600",
+      "-p",
+      "TimeoutStopSec=15",
+      "-p",
+      "KillMode=control-group",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "WorkingDirectory=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "LimitFSIZE=536870912",
+      "-p",
+      "LimitCORE=0",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "--crate-name",
+      "epoch185_retained_metadata_plan",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "--check-cfg",
+      "cfg(test)",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--test",
+      "--emit=link",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/planner-tests"
+    ],
+    "release": [
+      "systemd-run",
+      "--wait",
+      "--pipe",
+      "--service-type=exec",
+      "--unit=horizon-positive185-planner6-helper35-release-20261109-r2",
+      "-p",
+      "User=root",
+      "-p",
+      "Group=root",
+      "-p",
+      "Restart=no",
+      "-p",
+      "UMask=0022",
+      "-p",
+      "MemoryAccounting=yes",
+      "-p",
+      "MemoryHigh=2G",
+      "-p",
+      "MemoryMax=2G",
+      "-p",
+      "MemorySwapMax=0",
+      "-p",
+      "CPUQuota=400%",
+      "-p",
+      "TasksMax=128",
+      "-p",
+      "RuntimeMaxSec=600",
+      "-p",
+      "TimeoutStopSec=15",
+      "-p",
+      "KillMode=control-group",
+      "-p",
+      "NoNewPrivileges=yes",
+      "-p",
+      "PrivateNetwork=yes",
+      "-p",
+      "ProtectSystem=strict",
+      "-p",
+      "ProtectHome=read-only",
+      "-p",
+      "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+      "-p",
+      "AmbientCapabilities=CAP_DAC_OVERRIDE",
+      "-p",
+      "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+      "-p",
+      "ReadWritePaths=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "WorkingDirectory=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2",
+      "-p",
+      "LimitFSIZE=536870912",
+      "-p",
+      "LimitCORE=0",
+      "--setenv=TMPDIR=/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/tmp",
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "--crate-name",
+      "epoch185_retained_metadata_plan",
+      "--edition=2024",
+      "-Dwarnings",
+      "-C",
+      "debuginfo=0",
+      "-C",
+      "codegen-units=2",
+      "--check-cfg",
+      "cfg(test)",
+      "-L",
+      "dependency=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps",
+      "--extern",
+      "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "--extern",
+      "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "-C",
+      "opt-level=1",
+      "--emit=link",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/source-r2/main.rs",
+      "-o",
+      "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/planner"
+    ]
+  },
+  "extern_bindings": {
+    "serde=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib": {
+      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde-c096c92dd15927d9.rlib",
+      "sha256": "31b420026268199b24ea59f87b189a922a61897cd076bd85ef1912cce3508465"
+    },
+    "serde_json=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib": {
+      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "sha256": "04e761334e7390efe487adb436a1f0a7d1adcf832a6deff44c05a19cbd1b0772"
+    },
+    "sha2=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib": {
+      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
+    },
+    "libc=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib": {
+      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
+    },
+    "anyhow=/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+      "path": "/home/sol/.jetstreamer-private/completion156-correction-adapter-20261029-v1/compiler-target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
+    }
+  },
+  "actual_Driver12": {
+    "schema": "horizon-actual-qualified-driver12-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+      "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+      "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/deployment-seal-receipt.json",
+      "sha256": "f33a5e965b6574a1abc9fd1d8294844c16dca26fd50e9f84e81ccfc5f4cc026f"
+    },
+    "QA": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ALL37_AND_ROOT_SOL_NATIVE_CENSUS_CASES_ACCEPTED.json",
+      "sha256": "d20ea6bd7da6647a9a660e8cb40913c62ea2a6c365d5fc19ff7a63b68817ea15"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_DATA4_BOOKING.json",
+      "sha256": "ce37f28b24893c55364ed907fd8246d0617c95f4eb9f499e2d874ad17860de09"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_PHASE_CLOSED_DATA4_RETAINED.json",
+      "sha256": "f429be7ef0c8e08907c5d64cf042c24f9390f131dcac2d19eb06d6ae44316473"
+    },
+    "fresh_native_first_guard_and_downstream_registration_required": true
+  },
+  "actual_Helper35": {
+    "schema": "horizon-actual-qualified-helper35-driver12-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+      "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/artifact-proof.json",
+      "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/deployment-seal-receipt.json",
+      "sha256": "eb84418cb0a6bf2e79dfe42fe0b53deaa18d9cc8620863036959cb92453dbf12"
+    },
+    "source_and_recipes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/source-and-recipes.json",
+      "sha256": "2aa0af187d158995a5af022e21cdcccd8884d679f6d2c0bfbd66b7c322721ae8"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+      "sha256": "0bd6004d1048cc35b23102e1cc7d0d3961517506425e2eff6c5aba4a5518e5ec"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+      "sha256": "fed1f4bc098a4d96edcfec34a24a68ffb0dcda9f9bac8ae54111e8ea2084ff01"
+    },
+    "actual2130_enrollment_composition_control": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ACTUAL2130-TRANSITION-ORIGINAL-EXECUTION.json",
+      "sha256": "64f96078a707467f1b5cf48f5351ced12bce5e6d4d6413ef55e6ba62c592f4f2"
+    },
+    "actual2300_historical_composition_controls": [
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_composed_route_projects_both_sides_and_preserves_every_raw_row-ORIGINAL-EXECUTION.json",
+        "sha256": "599ea838819c68cef2456d43488dec59d22eec75cdf5ae4a0e4fba3eb60d916c"
+      },
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_history_or_raw_family_tampering_never_authorizes_projection-ORIGINAL-EXECUTION.json",
+        "sha256": "60cb4f98dd34d292f06790020a19411129fe692f833242c456042db2171af16b"
+      },
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles-ORIGINAL-EXECUTION.json",
+        "sha256": "01bb090bc8846e154be9c8a9ba10f16c254b790a22fe32e9b2b7b4b4cb20a919"
+      }
+    ],
+    "actual0230_complete_outer": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ACTUAL0230-COMPLETE-OUTER-ORIGINAL-EXECUTION.json",
+      "sha256": "75a03b8243f30f63257729d6ff7fa9653b79c1de626996961be0e94be2215cf3"
+    },
+    "actual_qualified_driver12": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER12_BINDINGS.json",
+      "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e"
+    },
+    "complete_DATA_lower_bound_bytes": 5174242259604,
+    "fresh_original_fleet_reader_guard_and_replay_still_required": true
+  },
+  "source_handoff": {
+    "path": "/tmp/planner6-driver12-helper35-source-20261109-v1/HANDOFF.md",
+    "sha256": "7c95543caa9595d9d596db38a48a016a2b5f599f4d054739c40c2f9d754cd07b"
+  },
+  "source_candidate_graph": {
+    "path": "/tmp/planner6-driver12-helper35-source-20261109-v1/SOURCE_AND_EXACT4_RECIPES.NOT_EXECUTED.json",
+    "sha256": "3f43ef39ff64b9160cdd3be3d849efb1069b23e64c518a276cfb65a02dab55c6"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/ROOT_NORMAL6_PLANNER6_DATA512_BOOKING.json",
+    "sha256": "a55c187d59b55fc502fa213da26b6343d59ad1cfebe3e0ec4c90c84f97315544"
+  },
+  "retained_first_compiler_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/clippy-production-ORIGINAL-EXECUTION.json",
+    "sha256": "5964c02f9f2eb31c09cee54d06cff8c69da6f1a99eabf8e0ec58890fe5811d29"
+  },
+  "correction": "Historical Helper34 SHA constant is test-only; its historical role regression remains active, current production role unchanged.",
+  "same_original_DATA512_booking": true
+}

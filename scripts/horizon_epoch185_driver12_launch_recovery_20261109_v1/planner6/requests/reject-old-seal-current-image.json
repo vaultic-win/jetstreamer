@@ -1,0 +1,85 @@
+{
+  "accepted_local_integrity_basis": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cohesive-capped-package-and-capability-source-20261105-v3/ROOT_ACCEPTED_LOCAL_INPUT_INTEGRITY_BASIS.json",
+    "sha256": "2b443e97fda9d67e71c6bad943305373d0131a2d2d6321509957784018b88866"
+  },
+  "accounting_role": {
+    "artifact": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch163-first-output128-shared-helper-tools-20261106-v3/artifact-proof.json",
+      "sha256": "46fce434c75f9781b72f7789b8f79dd5cda1125655b96338d7d0e3c6dfee1235"
+    },
+    "image": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch163-first-output128-shared-helper-tools-20261106-v3/jetstreamer-r2",
+      "sha256": "d54025dd48a0748deeb4fcc3845e48564aa7619e95485061d85e30e31dbc8a43"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch163-first-output128-shared-helper-tools-20261106-v3/deployment-seal-receipt.json",
+      "sha256": "e013288550b5f62585b0ae1e223a832732ea2a3830f17fa34f483ba5dee4bf12"
+    }
+  },
+  "complete_tuple": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current2300-reviewed-metadata-20261108-v1/CURRENT_COMPLETED_TUPLE_AT2300.json",
+    "sha256": "8ec1bd9057a9107a1e29b2d4d4bbdc0f6a8135f1d2d5188cef338d1ee536d356"
+  },
+  "full_reader_role": {
+    "artifact": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/artifact-proof.json",
+      "sha256": "fb6f325b7ce2c62164a30ad9dedb0b044a9974f32383d85bcf647cc317e06429"
+    },
+    "image": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+      "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/deployment-seal-receipt.json",
+      "sha256": "4f4bf03154dff384075b9f1fcd6b1ff29b1d7b37e5a5604339b01371b5dafd5c"
+    }
+  },
+  "generation": "planner6-2300-reject-old-seal-current-image",
+  "input_package_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cohesive-capped-inputs-20261105-v3/deployment-seal-receipt.json",
+    "sha256": "834b63769108b5b6f073a5ea9cfb7246464ae7f078dbdc978bcaab381e8e865e"
+  },
+  "native185_capture_role": {
+    "image": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+      "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+    },
+    "artifact": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/artifact-proof.json",
+      "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/deployment-seal-receipt.json",
+      "sha256": "da4f0d619338bfc7e67cebe785d62ff1cc41da43136418041d50bb3b57cfeee0"
+    }
+  },
+  "original_restore_receipt": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-offline-original-restore-receipt-20261107-v1/restore-receipt.json",
+    "sha256": "762f24a7660d221af370b4ea09c391bfeae075f4c5e2ca228dc980f316f75bf0"
+  },
+  "phase_ledger": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current2300-reviewed-metadata-20261108-v1/RESOURCE_PHASES_POSITIVE185_CURRENT2300.json",
+    "sha256": "964f435642cc99f62dfaa5d7ce9c9c9559a79d74ac8cef893f6e318fd4b888b3"
+  },
+  "profile": {
+    "actor_memory_bytes": 51539607552,
+    "estimated_useful_work_millis": 413404206,
+    "purpose": "bounded_native_probe",
+    "setup_deadline_seconds": 600,
+    "useful_runtime_seconds": 14400
+  },
+  "protected_exporter_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
+    "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
+  },
+  "reviewed_phase_ledger": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-current2300-reviewed-metadata-20261108-v1/ROOT_CURRENT2300_POSITIVE_PHASE_ACCEPTANCE.json",
+    "sha256": "27fec1e6b0affd2d5f14b333f12bd076b392c1006701a5f6dcece4bc61eac6ce"
+  },
+  "schema": "epoch185-positive-metadata-plan-request-v1",
+  "status_readback": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261108230109.json",
+    "sha256": "6831e63d046decaf1dc41df09088a8ec61415aafc5d39e74f4f45bbcb4fd84e9"
+  }
+}

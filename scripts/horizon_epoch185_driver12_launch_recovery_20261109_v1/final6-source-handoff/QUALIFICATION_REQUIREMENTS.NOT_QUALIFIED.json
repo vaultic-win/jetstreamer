@@ -1,0 +1,22 @@
+{
+  "source_only": true,
+  "new_compilers_run": false,
+  "new_test_image": null,
+  "new_normal_seal": null,
+  "new_booking": null,
+  "new_production_qualification": null,
+  "expected_ordinary_count": 38,
+  "expected_ignored_native_count": 10,
+  "require_all_four_exact_actual_compilers": true,
+  "require_full_actual_new_test_census_and_all38ordinary": true,
+  "require_all10ignored_native_controls": true,
+  "rerun_original_failing_fixed150ms_deadline_test": true,
+  "require_timeout_cause_and_original_elapsed_deadline": true,
+  "require_all_original_clock_and_close_write_controls": true,
+  "all600_30_15_22_second_clocks_unchanged": true,
+  "shared256_guard_event_limit_unchanged": true,
+  "Driver12_and_lifecycle_output_and_release_policy_byte_identical": true,
+  "preserve_prior_compiler37ordinary_native0to7_success_and_native8_failure": true,
+  "new_image_acceptance_requires_actual_normal_seals_and_consumer_integration": true,
+  "production_operations_performed": false
+}

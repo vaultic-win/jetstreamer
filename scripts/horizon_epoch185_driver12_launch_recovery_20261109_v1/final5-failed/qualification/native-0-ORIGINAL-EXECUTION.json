@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest events::publication_native_tests::actual_closed_failed_guard_remains_rejected_after_publication_repair ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.00s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final5-native-0-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 13ms\nCPU time consumed: 12ms\nMemory peak: 804.0K\nMemory swap peak: 0B\n"
+}

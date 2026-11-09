@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v6",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/work/planner",
+      "name": "horizon-positive185-final",
+      "sha256": "2ceb9bd082b7596a927f84b139d862c475166dc44f2042199170c583bea4a1b1",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/ARTIFACT-PROOF.json",
+      "name": "artifact-proof.json",
+      "sha256": "ed9b900f517332cbacc39ad043f83c186124f6a2c555a1d719e5e32ffd5f9626",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "name": "exact-source-and-recipes.json",
+      "sha256": "97120663955aad5180517ed203db78969951db7cfef6ab65639c45ceb02cc468",
+      "mode": 292
+    }
+  ]
+}

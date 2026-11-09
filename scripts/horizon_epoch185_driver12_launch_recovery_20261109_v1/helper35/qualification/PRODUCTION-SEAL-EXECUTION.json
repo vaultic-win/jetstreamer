@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"56a1fd694a36ce1049e80888b53716f96a4ccba018385b7ad635a7bdb82f1911\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

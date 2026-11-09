@@ -1,0 +1,16 @@
+{
+  "schema": "horizon-driver12-complete-census-original-test-acceptance-v1",
+  "ordinary_tests": 37,
+  "new_complete_census_tests": 6,
+  "ignored_tests": 4,
+  "actual_Root_census_and_owned_child_exit_native_passed": true,
+  "actual_Sol_census_and_owned_child_exit_native_passed": true,
+  "old_Root_Sol_native_metadata_controls_preserved": true,
+  "all_required_originals_passed": true,
+  "test_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-resource-census-tests-20261109-v12/tests",
+    "sha256": "a9d0073df7bb6b5b3745f67b262164be7d9f73fc9ba8e53d13056c36dd7df738"
+  },
+  "earlier_Root_transport_failure_did_not_execute_program": true,
+  "native_is_not_replay": true
+}

@@ -1,0 +1,21 @@
+{
+  "changed_files": [
+    "events.rs",
+    "post_main_native_tests.rs"
+  ],
+  "all_other_source_bytes_identical": true,
+  "actual_Driver12_source_graph_base": true,
+  "all_old_test_names_preserved": true,
+  "new_tests_written_not_run": true,
+  "exact_original150ms_timeout_and_elapsed_assertion_retained": true,
+  "all_four_recipes_preserve_actual_externs": true,
+  "original_failure_error_was_discarded_so_historical_poll0_not_proven": true,
+  "no_operational_action": true,
+  "Rust_syntax_only_parse_passed": true,
+  "compiler_Clippy_tests_not_run": true,
+  "declared_total_test_functions": 44,
+  "declared_ignored_tests": 10,
+  "unchanged_absolute_shared_start_request_tests": 4,
+  "expected_complete_ordinary_census": 38,
+  "expected_complete_ignored_census": 10
+}

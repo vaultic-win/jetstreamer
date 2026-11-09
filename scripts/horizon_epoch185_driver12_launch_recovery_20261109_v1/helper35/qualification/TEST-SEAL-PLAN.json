@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tests-20261109-v35",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/work/v31-helper-tests",
+      "name": "helper-tests",
+      "sha256": "077b4873e0c3a5738c5f4d9950137639d676a5ef2c1f952c349fd55f08695c13",
+      "mode": 365
+    }
+  ]
+}

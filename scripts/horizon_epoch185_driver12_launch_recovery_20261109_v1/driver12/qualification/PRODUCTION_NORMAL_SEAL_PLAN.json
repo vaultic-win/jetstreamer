@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/work/epoch185-guarded-cold",
+      "name": "epoch185-guarded-cold",
+      "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ACTUAL_DRIVER12_ARTIFACT_PROOF.json",
+      "name": "artifact-proof.json",
+      "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R3.json",
+      "name": "source-and-recipes.json",
+      "sha256": "822459e2b2eaade9d811d2948c90a025da34dfa16cf0344b21f4fc3e8b8b57bd",
+      "mode": 292
+    }
+  ]
+}

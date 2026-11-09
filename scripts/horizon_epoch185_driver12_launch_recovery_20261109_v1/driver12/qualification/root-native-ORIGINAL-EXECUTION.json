@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "Failed to find executable /usr/local/lib/jetstreamer/horizon-epoch185-native-trigger-tests-20261109-v11/tests: No such file or directory\n"
+}

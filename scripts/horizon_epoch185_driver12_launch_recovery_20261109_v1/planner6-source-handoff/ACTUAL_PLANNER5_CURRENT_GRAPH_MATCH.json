@@ -1,0 +1,9 @@
+{
+  "schema": "horizon-source-only-current-Planner5-exact-graph-match-v1",
+  "actual_current_graph": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/source-and-recipes.json",
+    "sha256": "c1b0e762c555628a2109f3692a09f02b4a53179db4ce9800d0b9006b306bb3dc"
+  },
+  "all_copied_source_and_template_hashes_match_actual_current_graph": true,
+  "raw_Planner5_proof_historical_labels_not_used_as_current_source_authority": true
+}

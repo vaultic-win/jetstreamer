@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::epoch186::accounting::live145_prefix::tests::actual_terminal_v8g1_retains_original_failure_last_token_and_all_debt ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.72s\n\n",
+  "stderr": "Running as unit: horizon-helper34-regression-actual-terminal145-r3-argv-v31-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 734ms\nCPU time consumed: 678ms\nMemory peak: 4.0M\nMemory swap peak: 0B\n"
+}

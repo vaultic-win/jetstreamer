@@ -1,0 +1,8 @@
+{
+  "all_four_compilers_passed": true,
+  "source_and_exact_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "97120663955aad5180517ed203db78969951db7cfef6ab65639c45ceb02cc468"
+  },
+  "no_replay_or_publication_authority": true
+}

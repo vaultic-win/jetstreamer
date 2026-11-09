@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-final-tests-20261109-v6-fixed-deadline",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-final6-postmain-fixed-deadline-qa-20261109-v1/work/planner-tests",
+      "name": "tests",
+      "sha256": "196f4d2797a83f225450483f86eaa0a8ce70afe03de839b890b8156454fc2ba5",
+      "mode": 365
+    }
+  ]
+}

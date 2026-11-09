@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest events::publication_native_tests::actual_slow_writer_old_modify_binds_early_corrected_guard_waits_for_close ... actual inotify: legacy MODIFY opened incomplete JSON; corrected guard bound exact bytes after CLOSE_WRITE\nok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.16s\n\n",
+  "stderr": "Running as unit: horizon-positive185-final6-native-2-20261109-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 172ms\nCPU time consumed: 18ms\nMemory peak: 2.0M\nMemory swap peak: 0B\n"
+}

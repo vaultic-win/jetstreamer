@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+    "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/CANDIDATE-SEAL-PLAN.json",
+    "--plan-sha256",
+    "baa920722a10202139878251b5a58a51c8581ec5306f2635d8d3eb0a1e1c2f76",
+    "--self-sha256",
+    "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+  ],
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-positive185-planner6-metadata-control-candidate-20261109-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"baa920722a10202139878251b5a58a51c8581ec5306f2635d8d3eb0a1e1c2f76\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

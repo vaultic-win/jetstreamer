@@ -1,0 +1,24 @@
+{
+  "schema": "horizon-helper35-driver12-fresh-QA5-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_DATA4_BOOKING.json",
+    "sha256": "ce37f28b24893c55364ed907fd8246d0617c95f4eb9f499e2d874ad17860de09"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5169947292308,
+  "new_retained_DATA_bytes": 4294967296,
+  "complete_DATA_bytes": 5174242259604,
+  "normal_pool_bytes": 6442450944,
+  "new_extra_QA5_bytes": 5368709120,
+  "one_serial_compiler_bytes": 8589934592,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_external_pool_bytes": 11811160064,
+  "no_credit_from_old_QA_releases": true,
+  "all_previous_source_and_DATA_promises_retained": true,
+  "actual_qualified_driver12": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER12_BINDINGS.json",
+    "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e"
+  },
+  "no_replay_or_publication_authority": true
+}

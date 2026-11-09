@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"665990aa5722b35cbe2972b44e51d007f7d98774c4eda6af3f4cde09f600c34b\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

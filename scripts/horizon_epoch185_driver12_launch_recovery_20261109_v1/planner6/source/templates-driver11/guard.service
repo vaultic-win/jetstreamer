@@ -1,0 +1,30 @@
+# SOURCE CANDIDATE: replace only __ACTUAL_ENVELOPE_SHA256__, then normal-seal. Keep this unit dormant throughout missing-token qualification.
+[Unit]
+Description=Epoch 185 missing-token qualification independent dormant guard promise
+[Service]
+Type=oneshot
+User=root
+Group=root
+Restart=no
+MemoryAccounting=yes
+MemoryMax=268435456
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+TimeoutStartSec=90
+TimeoutStopSec=15
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateNetwork=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=/var/lib/jetstreamer/epoch185-cold-guard-v4
+StandardOutput=append:/var/lib/jetstreamer/epoch185-cold-guard-v4/missing-token-20261106-v14.log
+StandardError=append:/var/lib/jetstreamer/epoch185-cold-guard-v4/missing-token-20261106-v14.log
+LimitFSIZE=67108864
+LimitCORE=0
+ExecStart=/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v11/epoch185-guarded-cold guard /usr/local/lib/jetstreamer/horizon-epoch185-missing-token-envelope-20261106-v14/envelope.json --plan-sha256 __ACTUAL_ENVELOPE_SHA256__ --self-sha256 bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2

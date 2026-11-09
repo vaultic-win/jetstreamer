@@ -1,0 +1,67 @@
+{
+  "schema": "horizon-epoch185-root-accepted-native-admission-v1",
+  "epoch": 185,
+  "unit": "horizon-qualify-185-capped-cold-missing-token-20261106-v14.service",
+  "task_owner": "Root",
+  "phase": "verification",
+  "issued_at": {
+    "$actual_root_binding": "admission.issued_at_original"
+  },
+  "expires_at": {
+    "$actual_root_binding": "admission.expires_at_original"
+  },
+  "minimum_free_bytes": 3503746342342,
+  "memory_max_bytes": 2147483648,
+  "prefix_only": true,
+  "ordinary_full_replay_authorized": false,
+  "publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "full_reader_accepted": {
+    "$actual_root_binding": "root_acceptance.actual_full_reader_accepted"
+  },
+  "raw_obligations_preserved": {
+    "$actual_root_binding": "root_acceptance.actual_raw_obligations_preserved"
+  },
+  "current_full_reader": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/current-full-reader.json",
+    "sha256": {
+      "$actual_root_binding": "current_full_reader.sha256"
+    }
+  },
+  "current_frame": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/current-frame.json",
+    "sha256": {
+      "$actual_root_binding": "current_frame.sha256"
+    }
+  },
+  "typed_memory": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/typed-memory.json",
+    "sha256": {
+      "$actual_root_binding": "typed_memory.sha256"
+    }
+  },
+  "typed_data": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/typed-data.json",
+    "sha256": {
+      "$actual_root_binding": "typed_data.sha256"
+    }
+  },
+  "fleet_owner": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/fleet-owner.json",
+    "sha256": {
+      "$actual_root_binding": "fleet_owner.sha256"
+    }
+  },
+  "status_readback": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/status-readback.json",
+    "sha256": {
+      "$actual_root_binding": "status_readback.sha256"
+    }
+  },
+  "root_acceptance": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/root-acceptance.json",
+    "sha256": {
+      "$actual_root_binding": "root_acceptance.sha256"
+    }
+  }
+}

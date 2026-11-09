@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::cold185::enrollment::inherited_live145_tests::actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3063 filtered out; finished in 0.26s\n\n",
+  "stderr": "Running as unit: horizon-helper34-actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles-20261108-v1-helper35-20261109.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 273ms\nCPU time consumed: 273ms\nMemory peak: 3.7M\nMemory swap peak: 0B\n"
+}

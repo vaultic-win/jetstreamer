@@ -1,0 +1,329 @@
+{
+  "schema": "horizon-positive185-planner6-driver12-helper35-qualified-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/qa/r2/planner",
+    "sha256": "fb29de082bf2fe070601eb1b5f7a5b34f80697dfcf6612ec37528f232fea97f9"
+  },
+  "actual_source_and_exact_recipes": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/SOURCE_AND_EXACT4_FROZEN_RECIPES_R2.json",
+    "sha256": "5b6e640ae9a7d25eeadfade67e77690c9f50265293e701f7ffeb05ba0ef8d745"
+  },
+  "ordinary_tests_passed": 32,
+  "ignored_tests": 0,
+  "all_four_compiler_stages_passed": true,
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "all_required_tests_passed": true,
+  "actual_Helper35": {
+    "schema": "horizon-actual-qualified-helper35-driver12-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+      "sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/artifact-proof.json",
+      "sha256": "37f368069ea7594369385d600c5618dc1b236e5c011d7ac2689eaede2a10fec3"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/deployment-seal-receipt.json",
+      "sha256": "eb84418cb0a6bf2e79dfe42fe0b53deaa18d9cc8620863036959cb92453dbf12"
+    },
+    "source_and_recipes": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/source-and-recipes.json",
+      "sha256": "2aa0af187d158995a5af022e21cdcccd8884d679f6d2c0bfbd66b7c322721ae8"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+      "sha256": "0bd6004d1048cc35b23102e1cc7d0d3961517506425e2eff6c5aba4a5518e5ec"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+      "sha256": "fed1f4bc098a4d96edcfec34a24a68ffb0dcda9f9bac8ae54111e8ea2084ff01"
+    },
+    "actual2130_enrollment_composition_control": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ACTUAL2130-TRANSITION-ORIGINAL-EXECUTION.json",
+      "sha256": "64f96078a707467f1b5cf48f5351ced12bce5e6d4d6413ef55e6ba62c592f4f2"
+    },
+    "actual2300_historical_composition_controls": [
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_composed_route_projects_both_sides_and_preserves_every_raw_row-ORIGINAL-EXECUTION.json",
+        "sha256": "599ea838819c68cef2456d43488dec59d22eec75cdf5ae4a0e4fba3eb60d916c"
+      },
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_history_or_raw_family_tampering_never_authorizes_projection-ORIGINAL-EXECUTION.json",
+        "sha256": "60cb4f98dd34d292f06790020a19411129fe692f833242c456042db2171af16b"
+      },
+      {
+        "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/actual2300_composed_inherited_view_rejects_missing_or_extra_unrelated_roles-ORIGINAL-EXECUTION.json",
+        "sha256": "01bb090bc8846e154be9c8a9ba10f16c254b790a22fe32e9b2b7b4b4cb20a919"
+      }
+    ],
+    "actual0230_complete_outer": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-driver12-consumer-helper-qa-20261109-v35/ACTUAL0230-COMPLETE-OUTER-ORIGINAL-EXECUTION.json",
+      "sha256": "75a03b8243f30f63257729d6ff7fa9653b79c1de626996961be0e94be2215cf3"
+    },
+    "actual_qualified_driver12": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER12_BINDINGS.json",
+      "sha256": "f8f5cad6a75a689ae70789c605beb084267212d7482244c0db6e2aba3613f96e"
+    },
+    "complete_DATA_lower_bound_bytes": 5174242259604,
+    "fresh_original_fleet_reader_guard_and_replay_still_required": true
+  },
+  "actual_Driver12": {
+    "schema": "horizon-actual-qualified-driver12-bindings-v1",
+    "program": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+      "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+    },
+    "qualification": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/artifact-proof.json",
+      "sha256": "5b08baacff6943fbc544dd05085b391bccda34e6963e0194ae4d05f41e6c937a"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/deployment-seal-receipt.json",
+      "sha256": "f33a5e965b6574a1abc9fd1d8294844c16dca26fd50e9f84e81ccfc5f4cc026f"
+    },
+    "QA": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_ALL37_AND_ROOT_SOL_NATIVE_CENSUS_CASES_ACCEPTED.json",
+      "sha256": "d20ea6bd7da6647a9a660e8cb40913c62ea2a6c365d5fc19ff7a63b68817ea15"
+    },
+    "booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_DATA4_BOOKING.json",
+      "sha256": "ce37f28b24893c55364ed907fd8246d0617c95f4eb9f499e2d874ad17860de09"
+    },
+    "closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-concurrent-storage-census-driver12-qa-20261109-v1/ROOT_NORMAL6_SERIAL2_DRIVER12_PHASE_CLOSED_DATA4_RETAINED.json",
+      "sha256": "f429be7ef0c8e08907c5d64cf042c24f9390f131dcac2d19eb06d6ae44316473"
+    },
+    "fresh_native_first_guard_and_downstream_registration_required": true
+  },
+  "actual2300_positive": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-ACCEPTED-CURRENT-HELPER35-ORIGINAL-EXECUTION.json",
+    "sha256": "02f1df87dc570c671d456e16de5b59b83d5228589a7e4dcef0ddad35ad5833ac"
+  },
+  "actual_metadata_controls": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "3eee6ebd7bde2d66bd054392de5b7df3b351de72b8a53e5fffce292244edbd05"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "b77d1abf8258269158b4c41b356622c0d840e111733b3b294c3ca060cc59d1c3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "788981d190bfe84b197d5a91241197154c2cb0f64aaa37124bdbe560ba675bbc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-release-ORIGINAL-EXECUTION.json",
+      "sha256": "40e2226a99895f1e50cdc28555d0a7035b9282b04a339347c5f848e40f52639d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-CANDIDATE-SEAL-ORIGINAL-EXECUTION.json",
+      "sha256": "d2f31ceaed044a6124cfd65258b2cdd12cea9e1ca8475edb2362bbe53aaf4070"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "dcb015196fde1899a696073e670b8e463b3cac400a0640505b6ebdd2d9bbb5f9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-ACCEPTED-CURRENT-HELPER35-ORIGINAL-EXECUTION.json",
+      "sha256": "02f1df87dc570c671d456e16de5b59b83d5228589a7e4dcef0ddad35ad5833ac"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-HISTORICAL-HELPER34-ORIGINAL-EXECUTION.json",
+      "sha256": "2a36af6fe2fef12c11a14c0c01e30398b91f7a5b6b694b5a1173457e108ebe92"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-CURRENT-PATH-OLD-SHA-ORIGINAL-EXECUTION.json",
+      "sha256": "b0d7dce6576b3b3786253bbe79c65e8a167081bba50e8bf015fab52d8f5913e7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-OLD-PATH-CURRENT-SHA-ORIGINAL-EXECUTION.json",
+      "sha256": "5a8e4d40f0a48d1cce3c6eaf6ef125637800a4d78936c1f5bb1fd229003922df"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-PRELAUNCH-AS-NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "9569fe589e50a6c079ab311a501648538588239e55cf058208a0562b3d3ca981"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-HELPER35-AS-PRELAUNCH-ORIGINAL-EXECUTION.json",
+      "sha256": "cd12e73f0ce18a67a771d89e24b739097f6276ef8c4df19e9872e86318acf1bb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-OLD-ARTIFACT-CURRENT-IMAGE-ORIGINAL-EXECUTION.json",
+      "sha256": "d8e8e9758da4a0086a99de8b4087c5c33bf6c4b83607002c3395ae407a4333a2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch185-helper35-current-witness-planner-qa-20261109-v6/R2-ACTUAL2300-REJECT-OLD-SEAL-CURRENT-IMAGE-ORIGINAL-EXECUTION.json",
+      "sha256": "33ef9dafcaabf868a9ba22ccaa850498a8e757b37bf29a3e916d54e93aac2177"
+    }
+  ],
+  "actual_terminal_states": [
+    {
+      "unit": "horizon-positive185-planner6-helper35-clippy-production-20261109-r2.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-positive185-planner6-helper35-clippy-tests-20261109-r2.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-positive185-planner6-helper35-test-build-20261109-r2.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-positive185-planner6-helper35-release-20261109-r2.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-positive185-planner6-helper34-ordinary-20261108-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-accepted-current-helper35-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "NRestarts": "0",
+        "ExecMainStatus": "0",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-historical-helper34-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-current-path-old-sha-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-old-path-current-sha-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-prelaunch-as-native-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-helper35-as-prelaunch-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-old-artifact-current-image-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    },
+    {
+      "unit": "horizon-planner6-2300-reject-old-seal-current-image-20261109-v1.service",
+      "native": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "NRestarts": "0",
+        "ExecMainStatus": "1",
+        "ControlGroup": "",
+        "Job": ""
+      }
+    }
+  ],
+  "all_original_actors_terminal_and_drained": true,
+  "metadata_controls_are_not_fresh_admission": true,
+  "historical_driver11_constructor_retained": true,
+  "current_driver12_templates_selected": true,
+  "current_helper35_sequence_selected": true,
+  "prelaunch13_role_distinct": true,
+  "original_clocks_memory_DATA_and_prefix_scope_preserved": true,
+  "replay_launch_authorized": false,
+  "publication_authorized": false
+}

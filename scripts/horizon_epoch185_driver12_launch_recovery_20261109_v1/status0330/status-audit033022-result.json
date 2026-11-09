@@ -1,0 +1,8 @@
+{
+  "audit": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/range-101-200-status-audit-20261109033231.json",
+    "sha256": "81f2e0b5ef799417466680b84a3fec3a14ee88ebc15445d98064321cbdb066fc"
+  },
+  "authenticated_readback": true,
+  "count": 11
+}

@@ -1,0 +1,185 @@
+{
+  "after_sha256": "680ae14dc3aaeb4611d4d09db687603fc3a1970f87c293f259e3cfdd1287ee90",
+  "after_status": {
+    "elapsed_execution_millis": 2008000,
+    "epoch": 185,
+    "estimated_remaining_millis": 504425206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T03:13:21Z"
+  },
+  "archive_publication_authorized": false,
+  "assumption": "Actual0230 got through genuineFrame/fullreader/resources/planner/actualSolrunlayout/enrolledH34/firstguard/token/Main. Main coldinitialized8min thenOWN5sresourceguardreportedENOENT, no canonicalprogress; zeroOOMcounters. ActualFinal4postMaincapture exposed prestartguard race andwrongoutputnamespace, qualifiedH34R2 captured lifecycle without restart, qualified terminalcapture succeeded after exactfailedtimerstop. Remaining allocation: Driver12 complete-census transient-file/PID repair plus ordinary/native tests15min; exactnewconsumerregistration/helper-Frame-CLI completeouter25min; Final5/O38/postMainreaderretirement qualification15min; freshscheduledtuple/fullreader/admission/nativeMain/earlybootstrap25min; contingency10min. Existingconsumerpins andnativeclocks remain until actuallyqualified replacements. Fullparentroute stillseparate. Explicit90minremaining is uncertainplanning from SAME19:25:15controlanchor INSIDE original17:30:22+24hqualification, notnativeleaseextension orfailedworkerrestart. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged, noresourceorfullreplaycredit.",
+  "before_body": "{\"elapsed_execution_millis\":1294000,\"epoch\":185,\"estimated_remaining_millis\":505139206,\"jet_size_bytes\":0,\"phase\":\"verification\",\"sampled_at_utc\":\"2026-11-09T03:01:27Z\"}\n",
+  "before_etag": "\"7991d18ad874f1961a434335efe52f33\"",
+  "before_sha256": "7d17cf2f7f9e84a21569fbf3eee1d5380640db4475444758c64c7fa234845a8f",
+  "before_status": {
+    "elapsed_execution_millis": 1294000,
+    "epoch": 185,
+    "estimated_remaining_millis": 505139206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T03:01:27Z"
+  },
+  "conditional_header": "If-Match",
+  "epoch": 185,
+  "estimate_parts_millis": {
+    "archive_close_full_plugin_boundary_verification_millis": 21600000,
+    "bootstrap_load_and_warmup_millis": 3600000,
+    "full_boundary_runtime_native_Frame_successor_and_fresh_admission_qualification_millis": 46021000,
+    "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+    "native_guard_directory_preparation_closed_write_event_and_reader_retirement_controls_millis": 5400000,
+    "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+  },
+  "estimated_remaining_millis": 504425206,
+  "key": "epoch-185.epoch-status.json",
+  "owner_evidence": {
+    "accepted_fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T023022Z-witness-terminal145-v1.json",
+      "sha256": "172c77e6f8a0a0d1772f2b0233505ac1027aebfea9ca4c90c5131eb1a3508fa6"
+    },
+    "actual0030_reader_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+      "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+    },
+    "actual0100_final3_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json",
+      "sha256": "3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"
+    },
+    "actual0100_first_guard_failure": {
+      "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+      "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+    },
+    "actual0200_capture_phase_failure": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+      "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+    },
+    "actual0200_original_pending_guard_sample": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0200-frame-capture-r4-20261109-v24/19-reader-start-phase-native-original-outcome.json",
+      "sha256": "4358d7e430728f52efc28901c63e59ab055a3e2855997f2a1b7a9afaceda7827"
+    },
+    "actual0230_closed_cold_initialization_failure_log": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0230-20261109-next/private-stdout-stderr.log",
+      "sha256": "1f8907233e6c3446619868554dea75399d14b0c1e7bfd1893fa565cbf5820928"
+    },
+    "actual0230_failed_after_Main_native": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainExitTimestamp": "Mon 2026-11-09 02:47:53 UTC",
+      "ExecMainPID": "3889589",
+      "ExecMainStartTimestamp": "Mon 2026-11-09 02:39:53 UTC",
+      "ExecMainStatus": "1",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "InvocationID": "da9b57fed9f04c9fa1b0c5dba1932488",
+      "MainPID": "0",
+      "MemoryPeak": "51539607552",
+      "NRestarts": "0",
+      "Result": "exit-code",
+      "SubState": "failed"
+    },
+    "actual_Helper34_QA5_closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+      "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+    },
+    "actual_Helper34_fresh_extraQA5_booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+      "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+    },
+    "actual_current_guarded_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+      "InvocationID": "9568cb52af154f7d8fbd48e7571770fa",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "signal",
+      "SubState": "failed"
+    },
+    "actual_fleet_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2300-original-r3-20261108-next/1867-actual-enrolled-fleet-original-outcome.json",
+      "sha256": "b07b76afe6c58aeaaf6cdc72322d9e2b153182e1f63b6d0c3f2bd189e08692d2"
+    },
+    "actual_original_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "exit-code",
+      "SubState": "failed"
+    },
+    "actual_review6_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+      "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+    },
+    "complete_current_DATA_bytes": 5165652325012,
+    "coordinated_observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T030022Z-postcompletion154-v1.json",
+      "sha256": "03a38c4dce0fd1f8d8fa8838b9b7d41d9ce225e71a5276fa354de6c357ed39ad"
+    },
+    "current_accepted_resource_frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T023022-witness-terminal145-chain128-v5.json",
+      "sha256": "30fb6b0ae48f865b052734c5d1db7ec6163f9e3fa6c72994aed81e3758675524"
+    },
+    "current_complete_DATA_authority": {
+      "path": "/home/sol/.jetstreamer-private/current0230-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0230_GUARD_DATA512_BOOKING.json",
+      "sha256": "23cd3d03e7e2f67ce854c3b527f6be41e843daa1a97fc4680168f877f422107a"
+    },
+    "current_complete_resources_pending": true,
+    "current_operator": "/root",
+    "current_phase": "verification",
+    "current_primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+    "current_shared_dependency": "Nov9 03:00 recovery. Actual0230 Frame/fullReader13/resources/planner/guardedMain passed. Main ran02:39:53..02:47:53coldinitialization, no canonicalprogress, then owninprocess5sresourceguardfailedENOENT; child_return_code:null,external_signal0. memory.events oom/oom_kill0,48GiBpeak alone notOOM. Driver11allocated filesystemwalk andcgroupPIDmaps accesses lackconcurrentdisappearancehandling/pathcontext; Rootdiagnosis/qualifiedreplacementneeded. Firstguards/Mainproved and lifecyclemetadata captured via qualifiedH34R2withoutactorrestart. OriginalFinal4postMaincapturefailurestaleControlPID andwrongoutputnamespacepreserved. No03guardbook/build orfullparentQA5/DATA35booking: liveactorprerequisiteproperlyrejectedafterfailure. CanonicalDATA5165652325012normal6extraQA0. CompleteFrame/resourcespredecessor0230genuine; no extra resourcepoll or nativeclockextension. Latest185failurestatusauthenticated02:51:35; Rootrepairactive,useful0target5. Review6sameoriginalanchors/full413404206/bootstrap1h/verification6h/delivery4h unchanged. Original199andotherhost200-300protected.",
+    "current_task": "Actual0230 Main ran02:39:53..02:47:53 in coldinitialization and then exited1 with No such file or directory(os error2) after480814ms; no canonical/transaction progress observed. Nativeunitfailed andallMain/ControlPIDs0/cgroupempty, originalIIDda9b57fed9f04c9fa1b0c5dba1932488 retained. ReportednativeMemoryPeak48GiB is an observation, not an OOM diagnosis. Root active diagnosis must inspect exactworkerresult/driverfilesystempath and kernel/native evidence before changing runtime/memory. Bothfirstguard andsubsequentMainguards succeeded; lifecycle captured through qualifiedH34withoutactorrestart. No retry/restart/reset/clockextension; rawfailedworker/scratch/logs/promises preserved. Useful0target5. Root attempted fullparentbuild booking but its liveactorprerequisite rejected; no booking or compiler started. CanonicalDATA5165652325012normal6extraQA0. OriginalReview6/fullunexecutedreplay/bootstrap/verification/delivery remain; failedboundedwarmup grantsno fullreplay credit. Actual0230 got through genuineFrame/fullreader/resources/planner/actualSolrunlayout/enrolledH34/firstguard/token/Main. Main coldinitialized8min thenOWN5sresourceguardreportedENOENT, no canonicalprogress; zeroOOMcounters. ActualFinal4postMaincapture exposed prestartguard race andwrongoutputnamespace, qualifiedH34R2 captured lifecycle without restart, qualified terminalcapture succeeded after exactfailedtimerstop. Remaining allocation: Driver12 complete-census transient-file/PID repair plus ordinary/native tests15min; exactnewconsumerregistration/helper-Frame-CLI completeouter25min; Final5/O38/postMainreaderretirement qualification15min; freshscheduledtuple/fullreader/admission/nativeMain/earlybootstrap25min; contingency10min. Existingconsumerpins andnativeclocks remain until actuallyqualified replacements. Fullparentroute stillseparate. Explicit90minremaining is uncertainplanning from SAME19:25:15controlanchor INSIDE original17:30:22+24hqualification, notnativeleaseextension orfailedworkerrestart. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged, noresourceorfullreplaycredit.",
+    "elapsed_time_basis": "Original0230Main02:39:53 with continuing Root recovery; failed producer is not represented as live",
+    "estimate_review": {
+      "path": "/home/sol/.jetstreamer-private/actual030022-visible-root-acceptance-20261109-v1/status-estimate-review030022.json",
+      "sha256": "6d5baf2c36c3723bfa0a6881e6c2d735a8e61578363cffe9e35410aa40530392"
+    },
+    "fixed_work_eta_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+      "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+    },
+    "immediate_Frame_predecessor": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T023022-witness-terminal145-chain128-v5.json",
+      "sha256": "30fb6b0ae48f865b052734c5d1db7ec6163f9e3fa6c72994aed81e3758675524"
+    },
+    "last_complete_resource_selector": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/accepted-frame-selector.json",
+      "sha256": "f384b20070c13796d84ff7ad349fed732e2fb949643d1489b1ec20ed4d700583"
+    },
+    "no_full_epoch_replay_started": true,
+    "previous_authenticated_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+      "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+    },
+    "previous_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109030127.json",
+      "sha256": "65ef322281a79355320d5700272ffab9ffa8c16fe1d15985ecc5c71114d21882"
+    },
+    "qualified_state_copy": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+      "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+    },
+    "qualified_witness": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+      "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+    },
+    "resource_credit_bytes": 0
+  },
+  "previous_receipt": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109030127.json",
+    "sha256": "65ef322281a79355320d5700272ffab9ffa8c16fe1d15985ecc5c71114d21882"
+  },
+  "replay_launch_authorized": false,
+  "resource_sample_claimed": false,
+  "sampled_at_utc": "2026-11-09T03:13:21Z",
+  "schema": "horizon-status-only-correction-v1"
+}

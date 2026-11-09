@@ -1,0 +1,20 @@
+{
+  "schema": "horizon-normal6-driver12-storage-census-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/current0230-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0230_GUARD_DATA512_BOOKING.json",
+    "sha256": "23cd3d03e7e2f67ce854c3b527f6be41e843daa1a97fc4680168f877f422107a"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5165652325012,
+  "new_retained_DATA_bytes": 4294967296,
+  "complete_DATA_bytes": 5169947292308,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "one_serial_compiler_bytes": 2147483648,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "total_overlap_memory_bytes": 5368709120,
+  "all_prior_DATA_retained": true,
+  "old_0230_failed_scratch_and_promises_retained": true,
+  "no_replay_or_resource_credit": true
+}
