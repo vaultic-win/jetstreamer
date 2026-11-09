@@ -360,3 +360,38 @@ disposition. Its result grants no check, eviction, restore, replay, or cloud
 mutation authority and credits zero campaign bytes reclaimed. Source tests and
 compilation do not qualify actual operational mount geometry; the route must
 execute under its independently admitted final service geometry.
+
+Actual service-exit controls live in the feature-gated native engine's
+`process_crash` child module. The three selected tests are
+`actual_prepare_warm_generation_session`, `actual_process_exit_or_native_case`,
+and `admitted_native_transport_worker`; the last is only an owned UID1000 child,
+not a standalone unbound test. These controls have no normal CLI route. Their
+source and compilation alone confer no native lifecycle qualification.
+
+Root invocations require separate
+`JETSTREAMER_SNAPSHOT92447542_CRASH_ADMISSION` and
+`JETSTREAMER_SNAPSHOT92447542_CRASH_ADMISSION_SHA256` environment bindings.
+The strict `native-crash-invocation-v1` document uses an independently sealed
+persistent Session plus a fresh existing EngineAdmission as `execution` with
+route `persistent-native-session-invocation`. The full schema names retain the
+`jetstreamer-snapshot92447542-` prefix. In addition to `action`, explicitly supply
+all optional bindings as objects or null and the required `hold_seconds` (zero
+without a hold), `actual_restore_runtime_seconds`, `attempt`, and
+`measured_initial_test_floor_rejection` fields. See the Rust definitions for the
+complete denied-unknown-field shapes.
+
+The persistent Session hash owns the durable operation; the fresh admission
+never replaces it. Real post-fsync phase witnesses precede process exit197.
+Recovery independently authenticates both the immediately preceding process
+and the original restore creator, their actual PID1 terminal/current closed
+properties, and the fresh current native owner. New downloads choose a new
+attempt suffix; recovery retains the original attempt. The warm seed is the
+full verified 8.894GB fixed-generation output retained from the genuine SDK
+roundtrip, with real production digest validation. Its local copy is labeled
+as a verified warm generation, while the SDK-live death case must use real GCS.
+Measured stricter test floors and faulty transport outputs remain distinct from
+campaign-floor breaches and matching-generation success. All original cache
+and state paths must be inaccessible to these isolated controls. Preserve the
+original consumer guards and retire only exact closed native-test aliases
+before fresh production consumer review. Completed isolated payload retirement
+requires its own exact-scope proof; it never credits original campaign bytes.

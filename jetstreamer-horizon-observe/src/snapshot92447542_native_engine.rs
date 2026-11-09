@@ -414,6 +414,10 @@ fn embedded_sources() -> BTreeMap<&'static str, String> {
             include_bytes!("snapshot92447542_mount_probe.rs").as_slice(),
         ),
         (
+            "jetstreamer-horizon-observe/src/snapshot92447542_native_crash.rs",
+            include_bytes!("snapshot92447542_native_crash.rs").as_slice(),
+        ),
+        (
             "jetstreamer-horizon-observe/src/snapshot92447542_native_engine.rs",
             include_bytes!("snapshot92447542_native_engine.rs").as_slice(),
         ),
@@ -1031,3 +1035,8 @@ fn actual_fixed_generation_full_engine_roundtrip() -> Result<()> {
     )?;
     Ok(())
 }
+
+// Actual process-exit/recovery controls have separate per-invocation admission
+// and persistent isolated-session authority. No normal CLI route exposes them.
+#[path = "snapshot92447542_native_crash.rs"]
+mod process_crash;
