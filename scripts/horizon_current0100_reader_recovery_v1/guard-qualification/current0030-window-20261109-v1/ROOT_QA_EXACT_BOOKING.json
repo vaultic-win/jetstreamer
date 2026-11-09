@@ -1,0 +1,25 @@
+{
+  "schema": "horizon-current0030-guard-window-normal6-DATA512-booking-v1",
+  "new_retained_DATA_bytes": 536870912,
+  "previous_retained_DATA_lower_bound_bytes": 5160820486804,
+  "complete_DATA_bytes": 5161357357716,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA5_closed_before_guard_build": true,
+  "actual_QA5_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+    "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+  },
+  "new_extra_QA_memory_bytes": 0,
+  "serial_compiler_bytes": 2147483648,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "unused_guard2330_DATA512_still_retained": true,
+  "no_credit_from_previous_closures": true,
+  "source_and_guard_not_qualified_yet": true,
+  "actual_previous_DATA_authority": {
+    "path": "/home/sol/.jetstreamer-private/current0000-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0000_GUARD_DATA512_BOOKING.json",
+    "sha256": "62e72470a3f02994e9ba1d1d8009503981f8b2afe76397365a8596085351d803"
+  },
+  "unused_guard2330_and_closed_guard0000_DATA_retained": true,
+  "guard0030_not_yet_qualified": true
+}

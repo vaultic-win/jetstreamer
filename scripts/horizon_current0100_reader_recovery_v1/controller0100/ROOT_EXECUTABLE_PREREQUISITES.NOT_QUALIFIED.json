@@ -1,0 +1,21 @@
+{
+  "source_only_not_runnable": true,
+  "smallest_next_reader_prerequisite": "Root diagnosis and genuine qualified retirement/drain of failed Reader13 alias0e271726da824c2bbbad552fc21598ae; never reset or reuse it from this packet",
+  "failed_reader_qualified_retirement": null,
+  "retained199_guard_native_stability_resolution": null,
+  "actual0100_guard_DATA512_booking": null,
+  "actual0100_guard_qualification_and_seal": null,
+  "actual0100_normal6_closure": null,
+  "existing_strict_role_manifest": {
+    "path": "/tmp/continuations0030-helper34-operation36-20261109-v1/ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+    "sha256": "805b3c51512bd3c7fe63c85a98b97db0cac4d661b1acc08cda7306335c652e89"
+  },
+  "current_actual_DATA": 5161357357716,
+  "proposed_guard_delta_only_if_actually_booked": 536870912,
+  "complete_DATA_after_only_that_booking": 5161894228628,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "observer0100_already_armed": true,
+  "no_observer_arm_source_provided": true,
+  "no0030_complete_resource_tuple": true
+}

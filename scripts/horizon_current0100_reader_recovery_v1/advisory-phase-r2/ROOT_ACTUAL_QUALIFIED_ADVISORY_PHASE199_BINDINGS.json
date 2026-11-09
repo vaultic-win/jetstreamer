@@ -1,0 +1,21 @@
+{
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase199-tools-20261109-v2/operation",
+    "sha256": "423a3377718939da2bd4c9afd91977a7142024a4e4456af1b912efad138016b2"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase199-tools-20261109-v2/artifact-proof.json",
+    "sha256": "2ad410e1cbd375f9ad0911dd85c34595b838e55b49c154508e1cc13680c24655"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase199-tools-20261109-v2/deployment-seal-receipt.json",
+    "sha256": "aca445f66c1affca6e24277f9c289d1d6ecaf0db296be9cb5c083085e45b64bf"
+  },
+  "complete_DATA_bytes": 5162967970452,
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ROOT_NORMAL6_PHASE199_DATA512_BOOKING.json",
+    "sha256": "72d2a05a99817bee64701ed6606e7f81f1fafbc36d640a04e6d0f69eb1145043"
+  },
+  "scope": "Only qualifier/read-original timing route; admission/assembly/replay commands refused",
+  "actual_reader_not_started": true
+}

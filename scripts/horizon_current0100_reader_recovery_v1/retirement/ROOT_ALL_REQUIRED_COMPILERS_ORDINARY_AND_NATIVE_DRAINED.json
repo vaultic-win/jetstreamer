@@ -1,0 +1,17 @@
+{
+  "proof": {
+    "path": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/r2-ALL_FOUR_AND_ORDINARY_PASSED.json",
+    "sha256": "ab859a0ce26dfc1036e3bf648a358a666af976bf817da345148c54bb683d2e75"
+  },
+  "native_control": {
+    "path": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/native-control-04aa5c8c664f45c3a3c47a3f2a2ed7a9/completion.json",
+    "sha256": "2da68663846d582440c318f5bf921b3ff7e435d4334e61fc7b57bfb8f00f9662"
+  },
+  "all_required_tests_passed": true,
+  "original_failed_native_control": {
+    "path": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/NATIVE-CONTROL-EXECUTION.json",
+    "sha256": "c9971b7ddf66f30a7239819f37c1bf8ef0e0b6f0a27e717e6e4964acc0162adb"
+  },
+  "changed_recovery": "First nestedsystemd-run failed ETOOMANYREFS before child existed. Retained original; r2 nativeouter uses LimitNOFILE1048576 inherited by child. Original productionreader unchanged.",
+  "no_replay_or_publication": true
+}

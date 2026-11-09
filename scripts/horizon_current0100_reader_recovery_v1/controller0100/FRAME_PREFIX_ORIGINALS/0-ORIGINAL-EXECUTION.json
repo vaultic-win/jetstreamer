@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0100-helper34-operation36-20261109-v1/capture-current0100-fleet.py"
+  ],
+  "code": 0,
+  "stdout": "0  Running as unit: horizon-first-lane-current0100-fleet-20261109-v1.service; invocation ID: 9c42b3899a0a449a8dd48a5a24fbda56\n\nGENUINE0100FLEET 9c42b3899a0a449a8dd48a5a24fbda56\n",
+  "stderr": ""
+}

@@ -1,0 +1,16 @@
+{
+  "readback": {
+    "path": "/home/sol/.jetstreamer-private/current0030-retained199-reader-failure-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "70e72406aa4c26e148df624e87d798863f7661de50512f6ee176a4747896d753"
+  },
+  "receipt": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109004420.json",
+    "sha256": "cddf4c1dd6ffc5cdd0b80e6463714d2dc5bc68dff5d204f86023baf7a3f90a45"
+  },
+  "sampled_at_utc": "2026-11-09T00:44:20Z",
+  "actual_DATA_bytes": 5161357357716,
+  "fixed_work_model": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review4-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW4.json",
+    "sha256": "4fe10f74670a446803e9dd151678f070dfe6137164301be555934d01d660cd45"
+  }
+}

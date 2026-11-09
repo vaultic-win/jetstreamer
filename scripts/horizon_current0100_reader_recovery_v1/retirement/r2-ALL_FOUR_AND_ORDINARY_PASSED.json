@@ -1,0 +1,14 @@
+{
+  "labels": [
+    "clippy-production",
+    "clippy-tests",
+    "build-tests",
+    "build-release"
+  ],
+  "production": {
+    "path": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/qa/r2-retirement",
+    "sha256": "09028027573f13bd18caa585d52330a66024037c53ed63ab9ce95ffcd01ce55a"
+  },
+  "all_required_tests_passed": true,
+  "no_replay_or_publication": true
+}

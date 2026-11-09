@@ -1,0 +1,18 @@
+[
+  {
+    "path": "/home/sol/.jetstreamer-private/actual003022-visible-root-acceptance-20261109-v1/status_audit003022.py",
+    "sha256": "b3053e17d1118ac4cefbf543ed7b2ed3bf8a475a24b98bf64b7793a66fa147be"
+  },
+  {
+    "path": "/home/sol/.jetstreamer-private/actual003022-visible-root-acceptance-20261109-v1/live145_metadata.py",
+    "sha256": "04aadff2ff7e26c29642bd9c8881510bc50a7241f5f84b6a60f159c360abc4df"
+  },
+  {
+    "path": "/home/sol/.jetstreamer-private/actual003022-visible-root-acceptance-20261109-v1/inventory003022-argv.json",
+    "sha256": "d58c34db7e70c4e9188a96474d8f2d4a1c7068cdeef2f7d73db97c97f1702dbf"
+  },
+  {
+    "path": "/home/sol/.jetstreamer-private/actual003022-visible-root-acceptance-20261109-v1/status-audit003022-argv.json",
+    "sha256": "3d508c7ef4886817752fce09092e69e5c1a55e824b262baadb36cda028f78ad7"
+  }
+]

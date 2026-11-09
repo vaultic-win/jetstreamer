@@ -1,0 +1,19 @@
+{
+  "schema": "horizon-current0100-parent-quiet-preflight-source-v1",
+  "root_QA_directory": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0100-window-20261109-v1",
+  "source_sha256": "7c9f0b15b0159f97740beff1b93fce47264c594852f3cc2403051e2f76d58357",
+  "sample_utc": "2026-11-09T01:00:22Z",
+  "sample_unix": 1794186022,
+  "recipes": {
+    "clippy-prod": "compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+    "clippy-tests": "compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+    "test-build": "compiler-2-test-build-ARGV.UNSTARTED.json",
+    "release": "compiler-3-release-ARGV.UNSTARTED.json"
+  },
+  "guard_DATA_delta_bytes_requiring_Root_booking": 536870912,
+  "canonical_DATA_before_guard_booking_bytes": 5161357357716,
+  "minimum_complete_DATA_after_guard_booking_bytes": 5161894228628,
+  "qualification_not_run": true,
+  "source_base": "actual Root0030 source; only numeric/current identity/testUTC advanced0100",
+  "prepared_only": true
+}

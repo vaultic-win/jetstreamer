@@ -1,0 +1,917 @@
+{
+  "schema": "horizon-current0100-reader-recovery-archive-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "archive": "advisory-phase-r2/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "sha256": "a24a1ab8e33b3e9d48ae646320f3ebe1de088648e87e3fd8a5b1b7179ba4ddea"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ARTIFACT-PROOF.json",
+      "archive": "advisory-phase-r2/ARTIFACT-PROOF.json",
+      "sha256": "2ad410e1cbd375f9ad0911dd85c34595b838e55b49c154508e1cc13680c24655"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ORDINARY-ORIGINAL-EXECUTION.json",
+      "archive": "advisory-phase-r2/ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "5c65e9089e0f9c5ce39df8eb8791f049dd53815c2eb75f4ce86b03efd8e990c3"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "archive": "advisory-phase-r2/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "sha256": "af0f10fc59e3ec99f6f4150ea7aac8328003755a96c2a9ae637b25770b1ea075"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/ROOT_NORMAL6_PHASE199_DATA512_BOOKING.json",
+      "archive": "advisory-phase-r2/ROOT_NORMAL6_PHASE199_DATA512_BOOKING.json",
+      "sha256": "72d2a05a99817bee64701ed6606e7f81f1fafbc36d640a04e6d0f69eb1145043"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "advisory-phase-r2/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "6d062ab89e8b396dae377a0142538d0b25db621ef571c7d43e6d0e9f6e470fff"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/source/main.rs",
+      "archive": "advisory-phase-r2/source/main.rs",
+      "sha256": "6246916cc8d875ea1be3642fd76b0b18ed22708b70dac08d252d9f74c2b9d916"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v2/source/reader_phase.rs",
+      "archive": "advisory-phase-r2/source/reader_phase.rs",
+      "sha256": "43fba21a45929d9e1c6aee9a5581f70668a142738ec1ffec3cc751db388d5b0b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "archive": "advisory-phase/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "sha256": "027e5481212033372a358eb2806d5ded2b44b0a5a89c05946e365bccc6bb76af"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ARTIFACT-PROOF.json",
+      "archive": "advisory-phase/ARTIFACT-PROOF.json",
+      "sha256": "70d91702521d3813f353a7a77e598f0e488862c486b13ba8ef90fb05d06b0362"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ORDINARY-ORIGINAL-EXECUTION.json",
+      "archive": "advisory-phase/ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "459767c820a5d6fe06ac784280386aea93ff973b27f0caba43032de3f253a4d9"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "archive": "advisory-phase/ROOT_ACTUAL_QUALIFIED_ADVISORY_PHASE199_BINDINGS.json",
+      "sha256": "99f95cadb3c0cfb0e21a776ec4bd29f46e21243f8b883fe01b3ca993e5fc78a4"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ROOT_NORMAL6_PHASE199_DATA512_BOOKING.json",
+      "archive": "advisory-phase/ROOT_NORMAL6_PHASE199_DATA512_BOOKING.json",
+      "sha256": "72d2a05a99817bee64701ed6606e7f81f1fafbc36d640a04e6d0f69eb1145043"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "advisory-phase/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "6ba3c2ac666521d843b691806002ac1e5f018270e5390b7efdc3cbda9f650379"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/source/main.rs",
+      "archive": "advisory-phase/source/main.rs",
+      "sha256": "6246916cc8d875ea1be3642fd76b0b18ed22708b70dac08d252d9f74c2b9d916"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/source/reader_phase.rs",
+      "archive": "advisory-phase/source/reader_phase.rs",
+      "sha256": "a2205ad6b74a6bf56cf17186f858c0b40ccbf49c6b57536be997cd307fbd2890"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/ACTUAL0000_PREDECESSORS.json",
+      "archive": "controller0030/ACTUAL0000_PREDECESSORS.json",
+      "sha256": "e26345a06a42e0149afdb6c5aaabc2e7a8d715c8c11b8903f90ec0a4f7705e4c"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/HANDOFF.md",
+      "archive": "controller0030/HANDOFF.md",
+      "sha256": "71409dbbe3e6c9758d0ebe3c54149ea714bfe64774d66ce21c52e20756412996"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "archive": "controller0030/HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "sha256": "244ceb1a04867fb9713c434f133cd4953187edee7873457ada08c5e46ac636d3"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/PARENT_SOURCE_BINDINGS.json",
+      "archive": "controller0030/PARENT_SOURCE_BINDINGS.json",
+      "sha256": "233edbada9b6f0efaf9b3793e0bcae64a69aadd3b630b70df8c4ff7d37b55a13"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/PREDECESSOR0000_HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "archive": "controller0030/PREDECESSOR0000_HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "sha256": "6635f526bd77bf27e20d7d2ada6a2e780b70d27a6e6f560ad0af787765b8cdc4"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/PREDECESSOR0000_ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "archive": "controller0030/PREDECESSOR0000_ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "sha256": "c36ed15a8e40ac4049b8d72c7c740cb362973321cb95985ee916e00fb44daae1"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/PREDECESSOR0000_ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "archive": "controller0030/PREDECESSOR0000_ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "sha256": "805b3c51512bd3c7fe63c85a98b97db0cac4d661b1acc08cda7306335c652e89"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/PREDECESSOR0000_next_operation_bindings.py",
+      "archive": "controller0030/PREDECESSOR0000_next_operation_bindings.py",
+      "sha256": "44c3789eeea2e318a4efac767aec102a0992819a7e21041142e0a00e646a1b0d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "archive": "controller0030/ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "sha256": "8a76f76564ede41d0058193a378679a74ab5d45c10bc21573d9d046f680d067b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "archive": "controller0030/ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "sha256": "805b3c51512bd3c7fe63c85a98b97db0cac4d661b1acc08cda7306335c652e89"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/SOURCE_ONLY_MANIFEST.json",
+      "archive": "controller0030/SOURCE_ONLY_MANIFEST.json",
+      "sha256": "68e700ca2611505ec6bae108c1738318ade66d9b46007b9e87aafed6bbab386d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/STATIC_CHECKS.json",
+      "archive": "controller0030/STATIC_CHECKS.json",
+      "sha256": "48e984838e3129ce9ed059156387330ff513b59de666b1885551be9b56350588"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/actual0000_predecessors.py",
+      "archive": "controller0030/actual0000_predecessors.py",
+      "sha256": "f8842464ac39fbc3eb8607746ba1a615c22baef59c0b0deaeabfcaea62ea489a"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/bind-actual0030-qualified-metadata-v1.py",
+      "archive": "controller0030/bind-actual0030-qualified-metadata-v1.py",
+      "sha256": "e8f9b486661b622935cf6019ea9b7853b03abfa3db260ef1c1f9b69ae608ae8b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/capture-current0030-fleet.py",
+      "archive": "controller0030/capture-current0030-fleet.py",
+      "sha256": "8cc3d5ec43fd4ee13d73c4c5323bd79c46ef704654cf39cac3339b9cf37ed809"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/check-current0030-helper27-genuine-outer-custody-r2.py",
+      "archive": "controller0030/check-current0030-helper27-genuine-outer-custody-r2.py",
+      "sha256": "4c2a494be1ccac9191a8379355c8ef91299259fc908b95c567b58d613a0d954b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/check-current0030-helper27-genuine-outer-v1.py",
+      "archive": "controller0030/check-current0030-helper27-genuine-outer-v1.py",
+      "sha256": "63f8dd0e2917495d076c80255e21f1ef9686bf136f2d73163fca7c184523fbaa"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/current0030_guard_addition.py",
+      "archive": "controller0030/current0030_guard_addition.py",
+      "sha256": "a33911511a0ca6a1f0acf9372750cd081209709e3518c6201926bacd81c87951"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/current_literal_adapter.py",
+      "archive": "controller0030/current_literal_adapter.py",
+      "sha256": "b84681d6aee364cd97024e82874c095bb3c9027bfe2df6f6eb8c0b7abc7c00c5"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/execute-current0030-cli-witness-v5-capture-only-r4.py",
+      "archive": "controller0030/execute-current0030-cli-witness-v5-capture-only-r4.py",
+      "sha256": "2c1e97996bfb68b85eff5700eb04bb5daeb2ac04829e8618443ca60cb02419d3"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/execute-current0030-cli-witness-v5-direct-hop-r4.py",
+      "archive": "controller0030/execute-current0030-cli-witness-v5-direct-hop-r4.py",
+      "sha256": "402143bfeda4a1b0aeb06287544164134b5cd0898df4ff5c4154f0d74e641099"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/execute-current0030-cli-witness-v5-r3.py",
+      "archive": "controller0030/execute-current0030-cli-witness-v5-r3.py",
+      "sha256": "721a4ef32933cf3fe6a43d04e8c881de24af4c08e8ce4153adff44a4cb23fca2"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/finalize-current0030-exact-metadata-direct-hop-r4.py",
+      "archive": "controller0030/finalize-current0030-exact-metadata-direct-hop-r4.py",
+      "sha256": "2b3aad465e2c798e86eb882db1f43aa7275a5278df0580ce53e2128a9a7a9114"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/finalize-current0030-exact-metadata-r3-v1.py",
+      "archive": "controller0030/finalize-current0030-exact-metadata-r3-v1.py",
+      "sha256": "5662d5665e8d16e27a25b1bae0db163944f111f1d8e990b3e85b1552ea3960ee"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/PRODUCTION_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "archive": "controller0030/guard/PRODUCTION_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "sha256": "53f8348f0aa0a2275b1ec2e1bca7d85275e23de0396cda600e85df88cf31cae8"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/ROOT_ACTUAL_GUARD0030_BOOKING_BINDING.json",
+      "archive": "controller0030/guard/ROOT_ACTUAL_GUARD0030_BOOKING_BINDING.json",
+      "sha256": "ac4b7de81f3ac1d177a4074393141fad3e13d8ccb7c3c8558457dd538240eb3f"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/SOURCE_ONLY_MANIFEST.json",
+      "archive": "controller0030/guard/SOURCE_ONLY_MANIFEST.json",
+      "sha256": "73bc23a02d5c0aa4adadbd181eff9693ed37262edb046c775f036d131ef2c3bd"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/TEST_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "archive": "controller0030/guard/TEST_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "sha256": "10d1dae79e96d4e74430f346ce9150fd4fa2e843576dbbbceb2cddaf9809c696"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/qualify-current0030-window-v1.py",
+      "archive": "controller0030/guard/qualify-current0030-window-v1.py",
+      "sha256": "09ddc27975da695fd327942bbb46764fb9b77c131455a578bf973ebd454ee095"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/all61-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/all61-ARGV.UNSTARTED.json",
+      "sha256": "a08be7adcb2dd97612fba28fd561c07d0fdf39cfc64016ffc1027be8b8e07ca7"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/census-all-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/census-all-ARGV.UNSTARTED.json",
+      "sha256": "2f61012f8c3cef34bee2b61934118cfefe4943724619ce5514fdc467543c5b54"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/census-ignored-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/census-ignored-ARGV.UNSTARTED.json",
+      "sha256": "1932d6d412570e23ef963816c194d150d0183577551a8d52da920d19938fc94b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+      "sha256": "113c29fb29847a20fc879442657120b1ca19750af1a058c9f0f0619b3a502e2b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+      "sha256": "28b483c286760ec43b091aae0b5eb9f6069e04fe12c397570cf1f227a6fa9dcf"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/compiler-2-test-build-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/compiler-2-test-build-ARGV.UNSTARTED.json",
+      "sha256": "f46f240a8e5fd502c903c103552a372d4cd05fff709a1a22d400e8ae4a672f82"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/recipes/compiler-3-release-ARGV.UNSTARTED.json",
+      "archive": "controller0030/guard/recipes/compiler-3-release-ARGV.UNSTARTED.json",
+      "sha256": "c0ced8072f9ca8d70a93d3a4a2e912de03c3ef9fd54e9ae311da90f58f3972dc"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/guard/source/main.rs",
+      "archive": "controller0030/guard/source/main.rs",
+      "sha256": "61ee3feca89e0d2dc6c01bfc0b69e53d001c8dbe16d091792e5125af6b6caa1f"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/invoke-positive185-current0030-next-operation-v1.py",
+      "archive": "controller0030/invoke-positive185-current0030-next-operation-v1.py",
+      "sha256": "6e573f9bb20bd98ea00cc9e74e29ac77859cd25b494bcf9dbf73228e1140cb2d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/ACTUAL0000_MAINTENANCE_SOURCE_BINDINGS.json",
+      "archive": "controller0030/maintenance/ACTUAL0000_MAINTENANCE_SOURCE_BINDINGS.json",
+      "sha256": "4e0a230c73dd0abdacd6646b0c06ee7c5c3ce2b37b223454cefa96b275c32bbb"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/CURRENT0000_EXACT_LITERAL_MAP.json",
+      "archive": "controller0030/maintenance/CURRENT0000_EXACT_LITERAL_MAP.json",
+      "sha256": "c319d7d2ebd4e367bb110016e86f77bb1442da6f3617939fd2ba2527ee49bb6d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/CURRENT0030_EXACT_LITERAL_MAP.json",
+      "archive": "controller0030/maintenance/CURRENT0030_EXACT_LITERAL_MAP.json",
+      "sha256": "d7276e136c5f36c3fea77741142bec2c07b303f5c0ca1ec962f4dfa8d286c0d2"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/PREDECESSOR0000_arm0000-next0030-v1.py",
+      "archive": "controller0030/maintenance/PREDECESSOR0000_arm0000-next0030-v1.py",
+      "sha256": "f08e3a75d623fe73068816b46ebdba8a88707955e603cd0dbe199e181af6da58"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/PREDECESSOR0000_maintain-first-lane0000-root-r2.py",
+      "archive": "controller0030/maintenance/PREDECESSOR0000_maintain-first-lane0000-root-r2.py",
+      "sha256": "9b5b1a7c6da56d8b5942611db689a88c0ea9bc37319bab16383c5b6a47d469b6"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/ROOT_ACTUAL_CURRENT0030_DATA_BINDING.json",
+      "archive": "controller0030/maintenance/ROOT_ACTUAL_CURRENT0030_DATA_BINDING.json",
+      "sha256": "ac4b7de81f3ac1d177a4074393141fad3e13d8ccb7c3c8558457dd538240eb3f"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/arm0030-next0100-v1.py",
+      "archive": "controller0030/maintenance/arm0030-next0100-v1.py",
+      "sha256": "3eb59786c25942f6b60ce39b2fbfc1b2f9d657f8def77f56b9d17ee597260c55"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/current_literal_adapter.py",
+      "archive": "controller0030/maintenance/current_literal_adapter.py",
+      "sha256": "89332be94a92b371927cd15cf6809c7c97efc418f8132a4b9f036ec750ad76b9"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/maintain-first-lane0030.py",
+      "archive": "controller0030/maintenance/maintain-first-lane0030.py",
+      "sha256": "181b8273bad8eeaead041dbd826911baa203bbddc9674fb78d4abd79c00258e3"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/predecessor0000-source/inventory000022-argv.json",
+      "archive": "controller0030/maintenance/predecessor0000-source/inventory000022-argv.json",
+      "sha256": "8ff4cccc503a4ad5f56dd3275e7066a4d7ab0b9637025570267e777253f73779"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/predecessor0000-source/live145_metadata.py",
+      "archive": "controller0030/maintenance/predecessor0000-source/live145_metadata.py",
+      "sha256": "699624b03cbceb50437194f2070a438db7503ec1611cf5be4beb5502b140eb6e"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/predecessor0000-source/status-audit000022-argv.json",
+      "archive": "controller0030/maintenance/predecessor0000-source/status-audit000022-argv.json",
+      "sha256": "457e4c5d975185c238e1ad32c01151deba6b0f58007f161c4d4ac9a15148e438"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/maintenance/predecessor0000-source/status_audit000022.py",
+      "archive": "controller0030/maintenance/predecessor0000-source/status_audit000022.py",
+      "sha256": "e7ddb7e6ba5c106d4081264488bc2c8b331536822551fe4cb5e5f0b94f09941a"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/next_operation_bindings.py",
+      "archive": "controller0030/next_operation_bindings.py",
+      "sha256": "39a439d342492881a19c27601e1303ec2bec6e6bc434f2d28a917a9f412b8d4d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/observer136_data.py",
+      "archive": "controller0030/observer136_data.py",
+      "sha256": "e72b2f7eadf5e4ada9141f7441d467fabb93d29d0c02c4336755f3058f33d308"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/parent/complete_parent_capture0030_witness_v1.py",
+      "archive": "controller0030/parent/complete_parent_capture0030_witness_v1.py",
+      "sha256": "3ac17828d046c7dc1f5fd656fcd48d93aa786151909b7c6c6514ca228abdc99d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/parent/run_data_after0030_witness_memory_v1.py",
+      "archive": "controller0030/parent/run_data_after0030_witness_memory_v1.py",
+      "sha256": "933f4a81f742bd2a4c60bccb3004742b1f73c51325eb10bc8d85368d87f151c1"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/prepare-current0030-cli-witness-v5-r2.py",
+      "archive": "controller0030/prepare-current0030-cli-witness-v5-r2.py",
+      "sha256": "edd9d86884f7f018f72d21855360199a11d6a45319eb44631fdd1f454b352008"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/prepare-current0030-cli-witness-v5.py",
+      "archive": "controller0030/prepare-current0030-cli-witness-v5.py",
+      "sha256": "f09fc6a388a4f93228457f106ecb7cd1dc5cd9e779410d2b34a420e4ebad6f01"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/prepare-current0030-continuations-v1.py",
+      "archive": "controller0030/prepare-current0030-continuations-v1.py",
+      "sha256": "f5c3e525ad3873c5c220e4fc4217b10c271bab1c8e4cd4ff8f6d8f734ad6f245"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/prepare-current0030-reader-fixture.py",
+      "archive": "controller0030/prepare-current0030-reader-fixture.py",
+      "sha256": "c7acfbef46f4979f067cca2c6429734076b270cd2890137ebdc5bd0f1796df07"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/prepare-positive185-current0030-reviewed-metadata-v1.py",
+      "archive": "controller0030/prepare-positive185-current0030-reviewed-metadata-v1.py",
+      "sha256": "808fa591945ec5863b5516e943dc5569b5ed0e6af62dd987026e11fe547fa0f6"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/qualified_bindings.py",
+      "archive": "controller0030/qualified_bindings.py",
+      "sha256": "2fe31a96bdd3d61c2126f49ee2820bae1925902dc967d04da18e25c1b8755b86"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/revalidate-helper27-current0030-normal-pool-v1.py",
+      "archive": "controller0030/revalidate-helper27-current0030-normal-pool-v1.py",
+      "sha256": "fe2fb3595b2368c351ec2b2b8b6337e41e281443ea3b89dce3cc4121d7982914"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/run-after-genuine0030-fleet-direct-hop-r2.py",
+      "archive": "controller0030/run-after-genuine0030-fleet-direct-hop-r2.py",
+      "sha256": "cf80f60cdbe846906a86aa237ceced0577e1eefe60a9a194a4d1acc1fe51d72d"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/run-complete0030-finite-chain-v1.py",
+      "archive": "controller0030/run-complete0030-finite-chain-v1.py",
+      "sha256": "3e6fde79ebd15ec6f054561501eb47000cc7d581eacc1fefb1301e7acb866456"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/run-current0030-finite-frame-prefix-only-v1.py",
+      "archive": "controller0030/run-current0030-finite-frame-prefix-only-v1.py",
+      "sha256": "ead4eba72a62fd85657e5bc426814c2b430105ffbdb5f9399a8e71b966ae7f84"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/run-current0030-reader13-parent-v4.py",
+      "archive": "controller0030/run-current0030-reader13-parent-v4.py",
+      "sha256": "0f5289e2b73befd8f155f06aa89122dc5ba806e4695f68ea43e85978a741281b"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/run-current0030-resource-tail-after-closed-frame-v1.py",
+      "archive": "controller0030/run-current0030-resource-tail-after-closed-frame-v1.py",
+      "sha256": "0d696449c688d873a60601420f8b0ff59afbd8460d94ee735b4a18f1992c7986"
+    },
+    {
+      "source": "/tmp/continuations0030-helper34-operation36-20261109-v1/validate-static-authority-before-setup.py",
+      "archive": "controller0030/validate-static-authority-before-setup.py",
+      "sha256": "903323886b18ce04a6a5ccb7dd055d3d6aeba3f1a263690079b91a877b62f22b"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/ACTUAL0000_PREDECESSORS.json",
+      "archive": "controller0100/ACTUAL0000_PREDECESSORS.json",
+      "sha256": "e26345a06a42e0149afdb6c5aaabc2e7a8d715c8c11b8903f90ec0a4f7705e4c"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/ACTUAL0030_FRAME_AND0000_RESOURCES_SPLIT.json",
+      "archive": "controller0100/ACTUAL0030_FRAME_AND0000_RESOURCES_SPLIT.json",
+      "sha256": "19d261543635f7209262c6a37f1fc1d3a3a8ae4f7cd6af65560d1ec81323185b"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/FAILED0030_READER_RETIREMENT_REQUIRED.NOT_QUALIFIED.json",
+      "archive": "controller0100/FAILED0030_READER_RETIREMENT_REQUIRED.NOT_QUALIFIED.json",
+      "sha256": "734a2c045cf97156555a1d1a5bb472050ea537c72dfcb35cc6c6f7ded2c97017"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/FRAME_PREFIX_ORIGINALS/0-ORIGINAL-EXECUTION.json",
+      "archive": "controller0100/FRAME_PREFIX_ORIGINALS/0-ORIGINAL-EXECUTION.json",
+      "sha256": "6982bce002e4bf1887264b8fb665363257b48604f8e52a6a692342a74ba5f6bb"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/FRAME_PREFIX_ORIGINALS/1-ORIGINAL-EXECUTION.json",
+      "archive": "controller0100/FRAME_PREFIX_ORIGINALS/1-ORIGINAL-EXECUTION.json",
+      "sha256": "f1776ea4572ca6cfcdbaba2a13cbd68f34c8a525b3d7a231fdc5813f3b39291a"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/FRAME_PREFIX_ORIGINALS/2-ORIGINAL-EXECUTION.json",
+      "archive": "controller0100/FRAME_PREFIX_ORIGINALS/2-ORIGINAL-EXECUTION.json",
+      "sha256": "03c09049dc40cc69bfff74199483b14296dc352369cbb9d5d3b3cad37f416849"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/FRAME_PREFIX_ORIGINALS/3-ORIGINAL-EXECUTION.json",
+      "archive": "controller0100/FRAME_PREFIX_ORIGINALS/3-ORIGINAL-EXECUTION.json",
+      "sha256": "1e5c84675a048cfe9d20650877408808224a7b38f9891361fb9eb243fa81d909"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/HANDOFF.md",
+      "archive": "controller0100/HANDOFF.md",
+      "sha256": "a3f7e45ae04364b62031b74454d662057bf4753d64401bd26f9e1e8a755c1c6e"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "archive": "controller0100/HELPER27_BINDINGS_REQUIRED.NOT_QUALIFIED.json",
+      "sha256": "a0862e3062bd269c269d976ce1010b9e2c6de2e4e06c00f895db9c494c2dc191"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/LATEST_AUTHENTICATED0030_FAILURE_READBACK.json",
+      "archive": "controller0100/LATEST_AUTHENTICATED0030_FAILURE_READBACK.json",
+      "sha256": "d70bff5a86e8e704643efd02f41d79df110e989557f963cd15630e940bc0d03e"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/PARENT_SOURCE_BINDINGS.json",
+      "archive": "controller0100/PARENT_SOURCE_BINDINGS.json",
+      "sha256": "7a16ac4a5a0173ee3766151c41ce7be0eba2be6587ef0379b85d645f1bdc5a5c"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "archive": "controller0100/ROOT_ACTUAL_QUALIFIED_HELPER27_BINDINGS.json",
+      "sha256": "ee192f7c66ef9c08d984084329fea5bf9c64b478709a67150a944e2c4fd49819"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "archive": "controller0100/ROOT_ACTUAL_QUALIFIED_NEXT_OPERATION_BINDINGS.json",
+      "sha256": "805b3c51512bd3c7fe63c85a98b97db0cac4d661b1acc08cda7306335c652e89"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/ROOT_EXECUTABLE_PREREQUISITES.NOT_QUALIFIED.json",
+      "archive": "controller0100/ROOT_EXECUTABLE_PREREQUISITES.NOT_QUALIFIED.json",
+      "sha256": "3d342355ef6cc0f139254ed64f1e996211bd33a66328a0b9b0b01252e9b1ecd0"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/SOURCE_ONLY_MANIFEST.json",
+      "archive": "controller0100/SOURCE_ONLY_MANIFEST.json",
+      "sha256": "b4e3e4f0800915944eedc3eb5b09101c02936fdb902212c3174d0b6f398e3ca6"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/STATIC_CHECKS.NO_EXECUTION.json",
+      "archive": "controller0100/STATIC_CHECKS.NO_EXECUTION.json",
+      "sha256": "887be184436a081ebdea3b6da05bc5dbec5ec1fc8ddc0e75bc9b84eff07db012"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/actual0000_predecessors.py",
+      "archive": "controller0100/actual0000_predecessors.py",
+      "sha256": "f8842464ac39fbc3eb8607746ba1a615c22baef59c0b0deaeabfcaea62ea489a"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/actual_split_predecessors.py",
+      "archive": "controller0100/actual_split_predecessors.py",
+      "sha256": "9092c7d553ea9cd217933585e66117b2fd2cd33f9293acf12455cf6092091fea"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/bind-actual0100-qualified-metadata-v1.py",
+      "archive": "controller0100/bind-actual0100-qualified-metadata-v1.py",
+      "sha256": "a5ae78154e6de5f4b7a49507f852bf230ae86d4f12afba33d9be9177ccc0d1ee"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/capture-current0100-fleet.py",
+      "archive": "controller0100/capture-current0100-fleet.py",
+      "sha256": "0b022fc1a4eb8c202f5deb01e0ffc55314d8f806a6d533b37d5c91d895836d6f"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/check-current0100-helper27-genuine-outer-v1.py",
+      "archive": "controller0100/check-current0100-helper27-genuine-outer-v1.py",
+      "sha256": "5a47a954433aeb521ddefefeb4fa758a0aff7c36f90317f35cd2e5931507bf46"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/current0030_guard_addition.py",
+      "archive": "controller0100/current0030_guard_addition.py",
+      "sha256": "d05c3dc95f22ea28531532e6bf1fa1e8db4b917177db958c55bda13d24ca5ac4"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/current0100_guard_addition.py",
+      "archive": "controller0100/current0100_guard_addition.py",
+      "sha256": "266ec3cc1424d3fc1c425fa3a9ccf18c9caa361cab7e27bca8aaf5c30867eaca"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/current_literal_adapter.py",
+      "archive": "controller0100/current_literal_adapter.py",
+      "sha256": "132b81f02df71aec8a24243a8d4d3ac60e5ba528be30c5ae013fae0fee752a8a"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/execute-current0100-cli-witness-v5-direct-hop-r4.py",
+      "archive": "controller0100/execute-current0100-cli-witness-v5-direct-hop-r4.py",
+      "sha256": "aa38ec86ee0a1969155664062b13ae51c0e0d88b1f96d8e9ef477c0b59118e3c"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/failed0030_reader_dependency.py",
+      "archive": "controller0100/failed0030_reader_dependency.py",
+      "sha256": "6f80978a083145ced3037f530735a6d6e4551cd23cf41b80556bfeaf80995ee5"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/finalize-current0100-exact-metadata-direct-hop-r4.py",
+      "archive": "controller0100/finalize-current0100-exact-metadata-direct-hop-r4.py",
+      "sha256": "0e0c6a50b833231d6f6392f7e09f4675b00a76d35d735741e934271a066171ec"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/PRODUCTION_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "archive": "controller0100/guard/PRODUCTION_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "sha256": "795309084e13524c9be16cbe9d3c2ff4b22fd291fb649cbd19eb2029fd167556"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/ROOT_ACTUAL_GUARD0030_BOOKING_BINDING.json",
+      "archive": "controller0100/guard/ROOT_ACTUAL_GUARD0030_BOOKING_BINDING.json",
+      "sha256": "ac4b7de81f3ac1d177a4074393141fad3e13d8ccb7c3c8558457dd538240eb3f"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/ROOT_ACTUAL_GUARD0100_BOOKING_BINDING.json",
+      "archive": "controller0100/guard/ROOT_ACTUAL_GUARD0100_BOOKING_BINDING.json",
+      "sha256": "dbfac0505627c6157fd017485d1ae4f6cf86d19682d920ac2da1e217107696f4"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/SOURCE_ONLY_MANIFEST.json",
+      "archive": "controller0100/guard/SOURCE_ONLY_MANIFEST.json",
+      "sha256": "8d9980eaefbfd726b2a1e199a8292ad879f7f4437f11ff9503699dbfb7dd6c18"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/TEST_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "archive": "controller0100/guard/TEST_NORMAL_SEAL_PLAN.UNSTARTED.json",
+      "sha256": "d584f2752de26aa3f781c3c3678a51be64d0aeab9b6f8608d877a05d732fc2ba"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/qualify-current0100-window-v1.py",
+      "archive": "controller0100/guard/qualify-current0100-window-v1.py",
+      "sha256": "679027c2506d4cf2e42519ace5eadb730f1340e6a63d8d129c2ebcc01fec5f4f"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/all61-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/all61-ARGV.UNSTARTED.json",
+      "sha256": "8b0b955694beef0026b0b4a2ca5ce0bab2a3cc5437350054ffef0490536759ab"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/census-all-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/census-all-ARGV.UNSTARTED.json",
+      "sha256": "57537486f0e62053d8de9be3fa96b9c73013567fafe62d16004441e85fe5fa87"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/census-ignored-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/census-ignored-ARGV.UNSTARTED.json",
+      "sha256": "06c2b9533ce626279ba572a6131767ce1878a0f2ad515bd444c66b5f8684cb9c"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/compiler-0-clippy-prod-ARGV.UNSTARTED.json",
+      "sha256": "aac4c20a554a0e5db2236749ea438efdcb770c77dceecd9b1d52f71173c85093"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/compiler-1-clippy-tests-ARGV.UNSTARTED.json",
+      "sha256": "856ebd6db3bcd89a87115706e06c4def9094dba9fc538c98fa0cb04483947b4f"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/compiler-2-test-build-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/compiler-2-test-build-ARGV.UNSTARTED.json",
+      "sha256": "a25a7fd78c2be5dbf21c15e804f7d745f13648798a8afe67ec8ed2e9a5aa8f55"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/recipes/compiler-3-release-ARGV.UNSTARTED.json",
+      "archive": "controller0100/guard/recipes/compiler-3-release-ARGV.UNSTARTED.json",
+      "sha256": "cf3dab8794c88b986641b32915a439e9b90154dac7fb0b55b32cb0eb8effb8e3"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/guard/source/main.rs",
+      "archive": "controller0100/guard/source/main.rs",
+      "sha256": "7c9f0b15b0159f97740beff1b93fce47264c594852f3cc2403051e2f76d58357"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/invoke-positive185-current0100-next-operation-v1.py",
+      "archive": "controller0100/invoke-positive185-current0100-next-operation-v1.py",
+      "sha256": "1f1302ecc1cb5da49fb145534af2079f59423f61b34758daf27d6804ce4b9a34"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/ACTUAL0030_MAINTENANCE_SOURCE_BINDINGS.json",
+      "archive": "controller0100/maintenance/ACTUAL0030_MAINTENANCE_SOURCE_BINDINGS.json",
+      "sha256": "423623f8a5348d9893db5369aca05662d65e8645a7ca026af3e040599d011fe4"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/CURRENT0100_EXACT_LITERAL_MAP.json",
+      "archive": "controller0100/maintenance/CURRENT0100_EXACT_LITERAL_MAP.json",
+      "sha256": "3937a0d95255681ee67f80220a35b7f13dac30ab91dd879d67e7d14f98336502"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/ROOT_ACTUAL_CURRENT0100_DATA_BINDING.json",
+      "archive": "controller0100/maintenance/ROOT_ACTUAL_CURRENT0100_DATA_BINDING.json",
+      "sha256": "01b3127f69e44fa11e0f804e4a66454e3af1192dc195a30b380c3e261b6bb1bd"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/arm0100-next0130-v1.py",
+      "archive": "controller0100/maintenance/arm0100-next0130-v1.py",
+      "sha256": "40d1ac5ecb4b4e7731a6d574f6181c3617daa7857ecb763a8ed9b1c6ef55bcbb"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/current_literal_adapter.py",
+      "archive": "controller0100/maintenance/current_literal_adapter.py",
+      "sha256": "5652454e2aaea311a6cca1e2723594e018bea55e168b3f6394946686bc523dac"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/maintenance/maintain-first-lane0100.py",
+      "archive": "controller0100/maintenance/maintain-first-lane0100.py",
+      "sha256": "6cbfe9624120421df1c6cd426111ee3d03952b3c0c8d9d761be5c7161d94aaa0"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/next_operation_bindings.py",
+      "archive": "controller0100/next_operation_bindings.py",
+      "sha256": "d326952376dcca6c4b013f5548aeb4365e252927c9255138d669dd3d5bbeb91a"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/observer136_data.py",
+      "archive": "controller0100/observer136_data.py",
+      "sha256": "e72b2f7eadf5e4ada9141f7441d467fabb93d29d0c02c4336755f3058f33d308"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/parent/complete_parent_capture0100_witness_v1.py",
+      "archive": "controller0100/parent/complete_parent_capture0100_witness_v1.py",
+      "sha256": "353e12a72e473a70e4942832b3894291e5ccc53df3c91c07d45da010be2d7c81"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/parent/run_data_after0100_witness_memory_v1.py",
+      "archive": "controller0100/parent/run_data_after0100_witness_memory_v1.py",
+      "sha256": "1cb589c3e7e04f08e2760ee3dd8c601e4094ed49d18a9bd7c8c7f41c5bcb253c"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/prepare-current0100-cli-witness-v5.py",
+      "archive": "controller0100/prepare-current0100-cli-witness-v5.py",
+      "sha256": "876fbd8f346ac49b17a93a1323c75e130c6a082985127b3ab21e2e9b12a614ca"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/prepare-current0100-continuations-v1.py",
+      "archive": "controller0100/prepare-current0100-continuations-v1.py",
+      "sha256": "2c1fac3694d41fa67254ee26c7a35f1f8b463a6dc6041b2e3e2f0d9fe0790fd7"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/prepare-current0100-reader-fixture.py",
+      "archive": "controller0100/prepare-current0100-reader-fixture.py",
+      "sha256": "5764259152236ed4c7df388e8301e40243c5ba9814cfb3a70f1a82225fb5e3b6"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/prepare-positive185-current0100-reviewed-metadata-v1.py",
+      "archive": "controller0100/prepare-positive185-current0100-reviewed-metadata-v1.py",
+      "sha256": "dea913fb26776f1e23feb3deb64abc959c7e1696c5e97563a9db7fac7d65a0eb"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/prior0030_qualified_bindings.py",
+      "archive": "controller0100/prior0030_qualified_bindings.py",
+      "sha256": "2fe31a96bdd3d61c2126f49ee2820bae1925902dc967d04da18e25c1b8755b86"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/qualified_bindings.py",
+      "archive": "controller0100/qualified_bindings.py",
+      "sha256": "e527e23a954508b7faeff7d1a2218001ef1e3ce4f0e38cb097117d047a3c8880"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/revalidate-helper27-current0100-normal-pool-v1.py",
+      "archive": "controller0100/revalidate-helper27-current0100-normal-pool-v1.py",
+      "sha256": "616c42e85f38370f5b6e6b0c6897543056887cef8a55a1dc7ef43e2a6b341e40"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/run-complete0100-finite-chain-v1.py",
+      "archive": "controller0100/run-complete0100-finite-chain-v1.py",
+      "sha256": "357b9fae6e019226b719bebb8395f69b7280cbd0c20c9a234e6c20dd3a030310"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/run-current0100-finite-frame-prefix-only-v1.py",
+      "archive": "controller0100/run-current0100-finite-frame-prefix-only-v1.py",
+      "sha256": "33bcd7a681b4548ee94f8e452e2507685f8c8311f9f801aeb6949a5fed48cbe5"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/run-current0100-reader13-parent-v4.py",
+      "archive": "controller0100/run-current0100-reader13-parent-v4.py",
+      "sha256": "d0d207a6187444bd1eff71c2aa612f5d86441613dbc40e0c8ee0f2cf9521e2b3"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/run-current0100-resource-tail-after-closed-frame-v1.py",
+      "archive": "controller0100/run-current0100-resource-tail-after-closed-frame-v1.py",
+      "sha256": "c72ea1b2ecf58f4170c0bec20b8f5d9be93b1b9041754c1bbf54832096e5728a"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/run-reader-phase199-r2-and-original-tail-v1.py",
+      "archive": "controller0100/run-reader-phase199-r2-and-original-tail-v1.py",
+      "sha256": "1b144cb4fb6abfaf6e8d69fde01a4d2741ca9bbe935b42ce1d79208571e8a668"
+    },
+    {
+      "source": "/tmp/continuations0100-helper34-operation36-20261109-v1/validate-static-authority-before-setup.py",
+      "archive": "controller0100/validate-static-authority-before-setup.py",
+      "sha256": "903323886b18ce04a6a5ccb7dd055d3d6aeba3f1a263690079b91a877b62f22b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0030-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "archive": "guard-qualification/current0030-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "sha256": "89bbe2888478c42434b93bd1444a210b7bbd0ab782dc6e0ef0803239de3215b6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0030-window-20261109-v1/source/main.rs",
+      "archive": "guard-qualification/current0030-window-20261109-v1/source/main.rs",
+      "sha256": "61ee3feca89e0d2dc6c01bfc0b69e53d001c8dbe16d091792e5125af6b6caa1f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0030-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "archive": "guard-qualification/current0030-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": "1d25332138a8724845b7bd6cad1f50d0b22f31dfdfb0ab8c48f71afa72a6c00b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0100-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "archive": "guard-qualification/current0100-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "sha256": "6f9d7c361642a199573f4774747c89ba0b692aa0b1f2f4f01624967605612392"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0100-window-20261109-v1/source/main.rs",
+      "archive": "guard-qualification/current0100-window-20261109-v1/source/main.rs",
+      "sha256": "7c9f0b15b0159f97740beff1b93fce47264c594852f3cc2403051e2f76d58357"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0100-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "archive": "guard-qualification/current0100-window-20261109-v1/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": "c442388298a59e4754a797ba198441c271790a6d97d9dd59e4d7db0f19f452b5"
+    },
+    {
+      "source": "/tmp/root-build-reader-phase199-exact-four-r1.py",
+      "archive": "operator-source/root-build-reader-phase199-exact-four-r1.py",
+      "sha256": "086872aff01f65523c9c5f2e96921d3d0aaf665f14c685f0485557fbe32d419c"
+    },
+    {
+      "source": "/tmp/root-build-reader-phase199-exact-four-r2.py",
+      "archive": "operator-source/root-build-reader-phase199-exact-four-r2.py",
+      "sha256": "e19e3f2731f5b6b78464c02c7e662b29c0a24b607f7ba9f94302eb7689b2ec22"
+    },
+    {
+      "source": "/tmp/root-build-retire0030-exact4-r1.py",
+      "archive": "operator-source/root-build-retire0030-exact4-r1.py",
+      "sha256": "3b32cf342aa6bac4fe98bf203eac7c9faaea965907ed9410b62940ffafcb774c"
+    },
+    {
+      "source": "/tmp/root-build-retire0030-exact4-r2.py",
+      "archive": "operator-source/root-build-retire0030-exact4-r2.py",
+      "sha256": "77f1bf7ed687b832c2e141b524cba0219f1bf5bfcb7b72eb891f71a0af67938d"
+    },
+    {
+      "source": "/tmp/root-final-retire0030-r2.py",
+      "archive": "operator-source/root-final-retire0030-r2.py",
+      "sha256": "625ceba50677a97cc6e38718c583425111417c63ebb24429b662eb66f2cf160d"
+    },
+    {
+      "source": "/tmp/root-prepare-reader-phase-recovery-v1.py",
+      "archive": "operator-source/root-prepare-reader-phase-recovery-v1.py",
+      "sha256": "6c301ecc58ffbd6dde6ff84a3d448eeb2a8ec73b03ce25a42b4f482bf6dd732f"
+    },
+    {
+      "source": "/tmp/root-qualify-reader-phase199-v1.py",
+      "archive": "operator-source/root-qualify-reader-phase199-v1.py",
+      "sha256": "ef00877279aa2c560b314b279329580570a5f4a25a8ce8a6ec62ce928cfe2559"
+    },
+    {
+      "source": "/tmp/root-qualify-reader-phase199-v2.py",
+      "archive": "operator-source/root-qualify-reader-phase199-v2.py",
+      "sha256": "9ebba1d74fb522cf2a76364df8e7b2366497002b4f9ee8e5240e1d2fe4c17467"
+    },
+    {
+      "source": "/tmp/root-seal-retire0030-candidate-r1.py",
+      "archive": "operator-source/root-seal-retire0030-candidate-r1.py",
+      "sha256": "9365eafb4b2ef544e31817363abc6eafc0501be238ca989f3d3635612607e691"
+    },
+    {
+      "source": "/tmp/root-seal-retire0030-candidate-r2.py",
+      "archive": "operator-source/root-seal-retire0030-candidate-r2.py",
+      "sha256": "aa69b1f16b6d8babd0527c79a15e43e6ad1e0e3b92f698a960355fd8f0fd77e0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0100-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0100_GUARD_DATA512_BOOKING.json",
+      "archive": "qualification/ROOT_NORMAL6_CURRENT0100_GUARD_DATA512_BOOKING.json",
+      "sha256": "6f9d7c361642a199573f4774747c89ba0b692aa0b1f2f4f01624967605612392"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current-reader-phase199-recovery-qa-20261109-v1/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "archive": "retained-failures/current-reader-phase199-recovery-qa-20261109-v1/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+      "sha256": "027e5481212033372a358eb2806d5ded2b44b0a5a89c05946e365bccc6bb76af"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/NATIVE-CONTROL-EXECUTION.json",
+      "archive": "retained-failures/current0030-failed-reader-retirement-qa-20261109-v1/NATIVE-CONTROL-EXECUTION.json",
+      "sha256": "c9971b7ddf66f30a7239819f37c1bf8ef0e0b6f0a27e717e6e4964acc0162adb"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0100-reader-phase-20261109-v15/09-reader-start-phase-native-original-outcome.json",
+      "archive": "retained-failures/epoch185-positive-upstream-current0100-reader-phase-20261109-v15/09-reader-start-phase-native-original-outcome.json",
+      "sha256": "8895230867838f3b7f8ec3bf53d364d006eb19f5f4a3a701207ad0f7e3fd4388"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/ACTUAL-RETIREMENT-EXECUTION.json",
+      "archive": "retirement/ACTUAL-RETIREMENT-EXECUTION.json",
+      "sha256": "cad52cec8c6d3e8592fb33baebcf58967df0c3b26038a4345de271bd4f2644d5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/NATIVE-CONTROL-EXECUTION.json",
+      "archive": "retirement/NATIVE-CONTROL-EXECUTION.json",
+      "sha256": "c9971b7ddf66f30a7239819f37c1bf8ef0e0b6f0a27e717e6e4964acc0162adb"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_TRANSIENT0030_READER_RETIREMENT.json",
+      "archive": "retirement/ROOT_ACTUAL_QUALIFIED_TRANSIENT0030_READER_RETIREMENT.json",
+      "sha256": "f766dfebfe20887b0a4d81b27bfaba00fa7cd0df0625b53a24c0f7415e196596"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/ROOT_ALL_REQUIRED_COMPILERS_ORDINARY_AND_NATIVE_DRAINED.json",
+      "archive": "retirement/ROOT_ALL_REQUIRED_COMPILERS_ORDINARY_AND_NATIVE_DRAINED.json",
+      "sha256": "8c79f70fb19277598ed738e241bc58c65ffddaa3d7be7148dfb89534205a813a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/ROOT_NORMAL6_RETIRE0030_DATA512_BOOKING.json",
+      "archive": "retirement/ROOT_NORMAL6_RETIRE0030_DATA512_BOOKING.json",
+      "sha256": "4e729362e8737196c4239d96477aa93651ad44af4052667c8905d7f4695b5b53"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "retirement/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "1c56624baa406ad729ee805eb145db9968e273242c81a26d5423f89048d5a947"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/actual-retirement/completion.json",
+      "archive": "retirement/actual-retirement/completion.json",
+      "sha256": "4d4b544da8a817671099bcc78c7f4aec1b5e7b447d2639b05a684f2a1180b093"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/r2-ALL_FOUR_AND_ORDINARY_PASSED.json",
+      "archive": "retirement/r2-ALL_FOUR_AND_ORDINARY_PASSED.json",
+      "sha256": "ab859a0ce26dfc1036e3bf648a358a666af976bf817da345148c54bb683d2e75"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/r2-NATIVE-CONTROL-EXECUTION.json",
+      "archive": "retirement/r2-NATIVE-CONTROL-EXECUTION.json",
+      "sha256": "7ade63f2c056655decf0f7f043716248734aa656e35ee747bd72654fd23133a7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/r2-ORDINARY-ORIGINAL-EXECUTION.json",
+      "archive": "retirement/r2-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "2784857c524d0d0ee45f4b80ff3e318c2c560f5a52d670e3ad6e62aeda1b58a2"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/r2-SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "retirement/r2-SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "d8f5c89f6c97fe72451e2dcb05ad74b255ff3548f7e99940eaff65c62e292896"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/source/main-r2.rs",
+      "archive": "retirement/source/main-r2.rs",
+      "sha256": "db98c39c6df7cac8484ce277681e6fe61008bb5c7377d4b3e15ed64cf4f4a36e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0030-failed-reader-retirement-qa-20261109-v1/source/main.rs",
+      "archive": "retirement/source/main.rs",
+      "sha256": "506f0be87795a0880c47300e81038772a3992a0c5644726ee24597d2af7451e8"
+    }
+  ],
+  "no_archive_or_sidecar_mutation": true,
+  "operational_success_not_inferred": true
+}

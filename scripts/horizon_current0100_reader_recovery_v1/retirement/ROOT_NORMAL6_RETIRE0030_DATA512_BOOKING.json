@@ -1,0 +1,20 @@
+{
+  "schema": "horizon-exact0030-transient-reader-retirement-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/current0030-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0030_GUARD_DATA512_BOOKING.json",
+    "sha256": "89bbe2888478c42434b93bd1444a210b7bbd0ab782dc6e0ef0803239de3215b6"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5161357357716,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5161894228628,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "one_serial_compiler_or_native_control_bytes": 536870912,
+  "ordinary_observer_bytes": 2147483648,
+  "Root_and_status_bytes": 536870912,
+  "protected_guard_and_remaining_normal_bytes": 3221225472,
+  "no_prior_charge_released": true,
+  "no_replay_or_publication_authority": true,
+  "recorded_at_utc": "2026-11-09T00:49:20.877840+00:00"
+}

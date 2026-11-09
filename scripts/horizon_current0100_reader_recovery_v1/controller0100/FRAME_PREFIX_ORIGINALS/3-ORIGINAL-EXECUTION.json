@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0100-helper34-operation36-20261109-v1/finalize-current0100-exact-metadata-direct-hop-r4.py"
+  ],
+  "code": 0,
+  "stdout": "Finalized 3 exact original JSON files; genuine CLI capture and drained payload accepted\n",
+  "stderr": ""
+}

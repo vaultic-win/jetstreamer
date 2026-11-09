@@ -1,0 +1,22 @@
+{
+  "schema": "horizon-current0030-source-only-static-review-v1",
+  "Python_AST_and_JSON_parse": true,
+  "strict_Root_validator_function_ASTs_unchanged_except_outer_booking_wrapper": true,
+  "real_H34_P5_O36_manifest_and_program_pins_unchanged": true,
+  "fresh_guard_source_65tests_unexecuted_expectedUTC_corrected": true,
+  "actual0000_Frame_and_memory_DATA_predecessors": true,
+  "new_transition_observation_bridge": [],
+  "prior0000_retains_actual2330_history": true,
+  "stale_runtime_packet_paths_absent": true,
+  "parent_source_hashes_match": true,
+  "maintenance_uses_actual0000_resource_tuple_instead_of_legacy0728": true,
+  "pure_ETA_AST_unchanged": true,
+  "maintenance_review4_default_and_latest001549_event": true,
+  "next_observer_calendar": "2026-11-09 01:00:22 UTC",
+  "current_sample_unix": 1794184222,
+  "strict_start_before_utc": "2026-11-09T00:45:22Z",
+  "new_guard_DATA_delta_not_booked_bytes": 536870912,
+  "canonical_DATA_prior_bytes": 5160820486804,
+  "canonical_DATA_after_new_guard_bytes": 5161357357716,
+  "operational_native_build_test_seal_R2_actions": 0
+}
