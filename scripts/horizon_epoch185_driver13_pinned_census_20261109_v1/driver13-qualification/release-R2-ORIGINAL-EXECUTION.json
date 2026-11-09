@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-epoch185-empty-hook-adapter-release-native-trigger-pinned-census-20261109-v1-r3-setup-r2.service; invocation ID: 23294e6de63a43f38814108978fe916a\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 7.067s\nCPU time consumed: 7.036s\nMemory peak: 736.0K\nMemory swap peak: 0B\n"
+}

@@ -1,0 +1,54 @@
+
+running 48 tests
+test adapter::fragment_link_regressions::actual_normal_sealed_v9_links_pass_without_unit_activation ... ignored, Reads the actual Root-sealed dormant v9 unit sources and manager links; no activation or mutation.
+test adapter::fragment_link_regressions::exact_manager_name_and_absolute_sealed_target_are_required ... ok
+test adapter::fragment_link_regressions::foreign_manager_namespaces_and_raw_path_aliases_are_rejected ... ok
+test adapter::fragment_link_regressions::relative_and_lexically_normalized_targets_do_not_gain_authority ... ok
+test adapter::native_empty_hooks::tests::canonical_unit_path_escapes_all_separators ... ok
+test adapter::native_empty_hooks::tests::exact_empty_array_is_required ... ok
+test adapter::native_empty_hooks::tests::object_reply_cannot_cross_unit_or_type ... ok
+test adapter::resource_census::native_controls::actual_native_complete_censuses_survive_unlink_and_owned_pid_exit ... ignored, Root-booked actual Root/Sol transient filesystem and exited owned child in its native cgroup; no replay
+test adapter::resource_census::pinned_inode_tests::a_replaced_file_name_requires_a_new_complete_pass_and_counts_its_replacement ... ok
+test adapter::resource_census::pinned_inode_tests::actual_native_pinned_inode_census_charges_concurrent_unlinks ... ignored, Root/Sol-booked real openat/fdopendir and another-thread unlink; isolated files only
+test adapter::resource_census::pinned_inode_tests::every_discovered_account_can_unlink_after_pin_without_zero_charge ... ok
+test adapter::resource_census::pinned_inode_tests::held_directory_does_not_hide_a_replaced_root_or_symlink ... ok
+test adapter::resource_census::pinned_inode_tests::inode_pinned_before_unlink_is_charged_without_restarting_the_whole_tree ... ok
+test adapter::resource_census::pinned_inode_tests::retries_read_a_fresh_directory_stream_instead_of_reusing_its_eof_offset ... ok
+test adapter::resource_census::pinned_inode_tests::unlinked_pinned_inode_still_enforces_the_original_ceiling ... ok
+test adapter::resource_census::tests::disappearing_child_requires_a_new_complete_pass ... ok
+test adapter::resource_census::tests::live_pid_without_maps_is_not_a_zero_usage_process ... ok
+test adapter::resource_census::tests::lost_or_replaced_root_never_gets_retry_credit ... ok
+test adapter::resource_census::tests::missing_maps_requires_proven_exit_and_absent_membership ... ok
+test adapter::resource_census::tests::perpetual_file_churn_hits_same_finite_retry_bound ... ok
+test adapter::resource_census::tests::symlink_and_ceiling_errors_are_never_transient ... ok
+test adapter::tests::actual1800_formatted_timer_trigger_is_exact_and_raw_guard_start_stays_raw ... ok
+test adapter::tests::actual_allocation_walk_rejects_symlink_and_limit ... ok
+test adapter::tests::actual_iid_enrollment_requires_numeric_eta_and_root_owner ... ok
+test adapter::tests::actual_receipt_collision_preserves_original ... ok
+test adapter::tests::actual_v11_actor_hook_arrays_are_readable_without_manage_unit_authority ... ignored, Exact unprivileged actor metadata capability; no activation
+test adapter::tests::actual_v11_native_hook_arrays_and_timer_cadence_are_observed ... ignored, Root-booked read-only queries of genuine installed v11 metadata; no activation
+test adapter::tests::admission_never_grants_full_replay_publication_or_credit ... ok
+test adapter::tests::bootstrap_and_private_root_are_exact ... ok
+test adapter::tests::current_reader_owner_and_expiry_are_mandatory ... ok
+test adapter::tests::each_resource_bound_is_enforced_independently ... ok
+test adapter::tests::exact_epoch185_plan_and_prefix_are_accepted ... ok
+test adapter::tests::exact_gate_requires_actual_iid_and_ready_identity ... ok
+test adapter::tests::false_or_nontimer_guard_cannot_open_gate ... ok
+test adapter::tests::focused_command_cannot_borrow_full_cohort_flags ... ok
+test adapter::tests::foreign_epoch_unit_is_rejected ... ok
+test adapter::tests::gate_expiry_and_stale_first_fire_are_rejected ... ok
+test adapter::tests::guard_must_follow_readiness_and_original_clock ... ok
+test adapter::tests::historical_floor_cannot_be_lowered ... ok
+test adapter::tests::logging_heartbeat_does_not_reset_progress_clock ... {"at_unix_seconds":1794202812,"awaited_condition":"awaiting a test condition","detail":"fixture","elapsed_millis":9,"epoch":185,"event":"phase start","heartbeat_advances_work":false,"last_substantive_progress_millis_ago":0,"operation":"capped cold root-prefix qualification","phase":"fixture"}
+ok
+test adapter::tests::logging_redacts_sensitive_urls_and_tokens ... ok
+test adapter::tests::native_timer_activation_retains_exact_five_and_ninety_second_bounds ... ok
+test adapter::tests::native_timer_timespan_overflow_zero_and_infinity_never_become_trigger ... ok
+test adapter::tests::native_timer_timespan_rejects_malformed_unsupported_and_nonintegral_values ... ok
+test adapter::tests::parent_digest_and_package_cannot_be_substituted ... ok
+test adapter::tests::prefix_rejects_wrong_worker_runtime_or_hash ... ok
+test adapter::tests::runtime_and_memory_stop_ceiling_cannot_be_widened ... ok
+test adapter::tests::terminal_suffix_cannot_be_promoted_to_prefix ... ok
+
+test result: ok. 43 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-pinned-census-tests-20261109-v13",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/work/guarded-cold-tests",
+      "name": "tests",
+      "sha256": "fcc92da4b3662f4b4f9c65bd4207971b834f0cc4c725960c8d836ea57c65a902",
+      "mode": 365
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES_R2.json",
+      "name": "source-and-recipes.json",
+      "sha256": "66ae08526329adc4dbe34677176f0816dbc197046ef8a1943277f9588b7ace8f",
+      "mode": 292
+    }
+  ]
+}
