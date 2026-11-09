@@ -6,6 +6,10 @@ use std::io::Write;
 const PARENT: &str = "/home/ubuntu/.jetstreamer-private";
 const CONFIG: &str = "/home/ubuntu/.config/gcloud";
 
+fn bound_ref(b: &Bound) -> Value {
+    json!({"path":b.path,"sha256":b.sha256})
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Admission {
@@ -554,7 +558,7 @@ pub(super) fn run(path: &str, admission_sha: &str, self_sha: &str) -> Result<()>
         &output_parent.join("operational-mount-intent.json"),
         &json!({
             "schema":"jetstreamer-snapshot92447542-operational-mount-intent-v1",
-            "admission":admission,"profile":a.profile,"original":before,
+            "admission":bound_ref(&admission),"profile":bound_ref(&a.profile),"original":before,
             "cache_sentinel":cache.path.join(&name),"state_sentinel":state.path.join(&name),
             "collision_witness":state.path.join(&collision),"sentinel_sha256":sha(&bytes),
             "collision_sha256":sha(foreign),"shared_retirement_lock_may_be_created":true,
@@ -605,9 +609,9 @@ pub(super) fn run(path: &str, admission_sha: &str, self_sha: &str) -> Result<()>
     );
     persist(
         &a.output,
-        &json!({"schema":"jetstreamer-snapshot92447542-operational-mount-result-v1", "admission":admission,
-        "profile":a.profile,"normal_build":a.normal_build,"full_source_manifest":a.full_source_manifest,
-        "self_binary":a.self_binary,"owner_before":owner_before,"owner_after":owner_after,
+        &json!({"schema":"jetstreamer-snapshot92447542-operational-mount-result-v1", "admission":bound_ref(&admission),
+        "profile":bound_ref(&a.profile),"normal_build":bound_ref(&a.normal_build),"full_source_manifest":bound_ref(&a.full_source_manifest),
+        "self_binary":bound_ref(&a.self_binary),"owner_before":owner_before,"owner_after":owner_after,
         "mounts_before":mounts_before,"mounts_after":mounts_after,"original_before":before,"original_after":after,
         "sentinel_original":source,"sentinel_moved":moved,"sentinel_returned":returned,"sentinel_sha256":sha(&bytes),
         "collision_preserved":true,"collision_errno":libc::EEXIST,"sentinels_removed":true,
