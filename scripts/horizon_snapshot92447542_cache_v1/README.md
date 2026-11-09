@@ -157,3 +157,34 @@ failed-transfer/floor/timeout/size/collision control, isolated same-engine
 restore round trip, independently accepted lifecycle qualification and fresh
 operational admissions remain required. No qualification flag or original
 cache provenance rule is weakened by this test.
+
+## Read-only staged-consumer discovery
+
+`jetstreamer-snapshot92447542-census` captures the actual system/user unit
+inputs, lexical aliases and raw parent-path scanner matches without exclusions.
+It also records exact process-path and original-inode references without reading
+the snapshot body. Every captured input and alias is rechecked; changed directory
+enrollment rejects the capture. Source bytes are saved by SHA-256 under a private
+`unit-inputs` directory for independent launcher/environment/template/plan review.
+An empty literal scanner result does not establish a complete semantic readset.
+
+Run only as the actual MainPID of a separately admitted Root `Type=exec` service
+with 512 MiB memory, zero swap, CPU200%, Tasks128, RuntimeMaxSec180,
+NoNewPrivileges, ProtectSystem=strict and ProtectHome=read-only. The sole explicit
+writable path must be the Root0700 result directory. The binary accepts two
+arguments: a Root-immutable admission JSON path and its independent SHA-256.
+Admission fields are `schema` =
+`jetstreamer-snapshot92447542-consumer-census-admission-v1`, `self_binary` (`Bound`
+to the canonical Root-immutable binary), `issued_unix_seconds`,
+`expires_unix_seconds` (positive validity at most180 seconds), `unit`, actual
+`invocation_id`, actual `expected_exec_start`, and `output` (new `census.json`
+inside that result directory). Gate useful work until the actual service identity
+and admission are bound. Metadata capture requires DAC_OVERRIDE and SYS_PTRACE;
+it never starts/stops another service, changes a guard, contacts cloud storage,
+or authorizes cache check, eviction, restore or replay.
+
+The finite roots include installed system/user units, local/vendor systemd
+roots, runtime transient/control/attached units and generator roots. Actual
+manager load paths must still be reconciled with that enrollment. Referenced
+external scripts, environment files and sealed plans remain independent source
+review inputs; the census explicitly records `interpretation_complete: false`.

@@ -167,3 +167,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[[bin]]
+name = "jetstreamer-snapshot92447542-census"
+path = "src/snapshot92447542_census_bin.rs"
