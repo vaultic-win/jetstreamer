@@ -1,0 +1,31 @@
+{
+  "schema": "horizon-current0430-actual-helper27-bindings-v1",
+  "program_directory": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261108-v27",
+  "qualification": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER27-PRODUCTION-ORIGINAL-QUALIFICATION.json",
+    "sha256": "a4b2642374db4519e37664da612a07abfff3a45057c0bdc0084561feff316fc6"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/HELPER_EXACT4_COMPILER_RECIPES_AND_SOURCE_V27_WITH_NATIVE_CONTROL.json",
+    "sha256": "96f7a0a135582192303ef50181e093faec6af61a0251464b04e646c9e29c8315"
+  },
+  "normal_pool_closure": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/ROOT_HELPER27_CURRENT0430_NORMAL_POOL_REVALIDATED_CLOSURE_R2.json",
+    "sha256": "6ee464d689ab4d7c8e86b1034602862dffb76e6a7db5b9f332ec68909a96a84d"
+  },
+  "replay_launch_authorized": false,
+  "new_memory_or_DATA_credit_bytes": 0,
+  "genuine_current_Frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T043022-witness-terminal145-chain128-v5.json",
+    "sha256": "55fda127febcffca00788cb6023a494f7c31e88a65eb0cdaba58d2dbc5e9ea83"
+  },
+  "current_complete_outer": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/REGRESSION_CURRENT0430_R2_genuine-current-outer_ORIGINAL_EXECUTION_V27.json",
+    "sha256": "fc2aa943a99f758a08ea0db6c281e18bc1ff8dfd40658d97623e4c2052a6ca01"
+  },
+  "historical_helper_image_qualification_unchanged": true,
+  "actual_current_successor_authority": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0430-20261109-v1/ROOT_CURRENT0430_COMPLETE_QUALIFIED_SUCCESSOR_AUTHORITY.json",
+    "sha256": "6ae5b55140765eaf67f075fd6d1afe10641aa93ddd2abd9c427cec7df08998c3"
+  }
+}

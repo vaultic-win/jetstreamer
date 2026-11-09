@@ -1,0 +1,17 @@
+{
+  "schema": "horizon-normal6-current0500-guard-booking-v1",
+  "owner": "/root",
+  "previous": {
+    "path": "/home/sol/.jetstreamer-private/current0430-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0430_GUARD_DATA512_BOOKING.json",
+    "sha256": "39ee316c4ef8af051b47278835c069a2d05602d0bc26dec4eee9e829e22b39ce"
+  },
+  "previous_retained_DATA_lower_bound_bytes": 5176926614164,
+  "new_retained_DATA_bytes": 536870912,
+  "complete_DATA_bytes": 5177463485076,
+  "normal_pool_bytes": 6442450944,
+  "extra_QA_bytes": 0,
+  "one_serial_compiler_bytes": 536870912,
+  "concurrent_operation38_native_control_ceiling_bytes": 536870912,
+  "all_failed_original_actor_and_DATA_promises_retained": true,
+  "no_replay_or_resource_credit": true
+}

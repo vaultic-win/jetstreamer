@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "\nrunning 1 test\ntest fleet::epoch186::evidence::recovered_resource_frame_adapter::current_terminal145_image_registration_tests::complete_outer::genuine_current_terminal145_capture_reaches_complete_outer_adapter_and_rejects_tampering ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3057 filtered out; finished in 16.69s\n\n",
+  "stderr": "Running as unit: horizon-first-lane-helper-regression-current0430-genuine-current-outer-20261109-v27-custody-r2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 16.726s\nCPU time consumed: 16.719s\nMemory peak: 4.2M\nMemory swap peak: 0B\n"
+}

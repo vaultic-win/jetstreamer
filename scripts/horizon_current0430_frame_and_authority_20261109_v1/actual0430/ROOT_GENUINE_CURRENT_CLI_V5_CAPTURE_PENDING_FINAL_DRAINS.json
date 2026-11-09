@@ -1,0 +1,44 @@
+{
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T043022-witness-terminal145-chain128-v5.json",
+    "sha256": "55fda127febcffca00788cb6023a494f7c31e88a65eb0cdaba58d2dbc5e9ea83"
+  },
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-chain128-frame-plan-20261109-v5/plan.json",
+    "sha256": "ce54d3b774cb9483cbde048aaebcd4af34739373247d3471cbdc75ec3c431b03"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T043022Z-witness-terminal145-v1.json",
+    "sha256": "1f7ef15795bf4ec32c53a70fb4650cc6c3fd2d894cb0b70d22fd13db61aeb73f"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-fleet-plan-20261109-v1-r4/fleet-plan.json",
+    "sha256": "516908cd210cb412cc693f6d0cb3cca627f8d57dee70aec9ff74dbc33bccb36f"
+  },
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T043022Z-postcompletion154-v1.json",
+    "sha256": "11fa170d36aa749232c5bf88f5954687529efd430442b186ed68c434bf8ff834"
+  },
+  "actual_completed_writer": {
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "NRestarts": "0",
+    "ExecMainPID": "3927581",
+    "ExecMainStatus": "0",
+    "ControlGroup": "",
+    "Id": "horizon-first-lane-current0430-chain128-witness-frame-capture-r4-20261109-v5.service",
+    "ActiveState": "active",
+    "SubState": "exited",
+    "InvocationID": "8d6c82fea53e40a18a41bdbbca1cb175"
+  },
+  "CLI_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-chain128-witness-frame-cli-tools-20261107-v5/jetstreamer-horizon-frame",
+    "sha256": "70b82a16f8c5d71257305a0873440deccf8746f78b09fc33ee23f5c691e29fe4"
+  },
+  "original_final_drains_pending": true,
+  "complete_reader_pending": true,
+  "replay_launch_authorized": false,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0
+}
