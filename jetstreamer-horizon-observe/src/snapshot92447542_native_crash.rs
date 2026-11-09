@@ -317,6 +317,11 @@ impl Gate {
                     && invocation.hold_seconds <= a.maximum_run_seconds.saturating_sub(30),
                 "live-owner hold is a separate finite admitted producer"
             );
+        } else {
+            ensure!(
+                invocation.hold_seconds == 0,
+                "hold seconds require an admitted hold phase"
+            );
         }
         let actual = fs::canonicalize("/proc/self/exe")?;
         let (h, m) = evidence::hash_file(&actual, 256 << 20)?;

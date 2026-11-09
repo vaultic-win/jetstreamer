@@ -395,3 +395,12 @@ and state paths must be inaccessible to these isolated controls. Preserve the
 original consumer guards and retire only exact closed native-test aliases
 before fresh production consumer review. Completed isolated payload retirement
 requires its own exact-scope proof; it never credits original campaign bytes.
+
+The mount probe reads its complete profile with a separate2MiB bound; the shared
+retention reader keeps its64KiB contract. Its mount scope follows mount-ID parent
+ancestry below the actual common-parent descriptor. Older tmpfs mounts covered
+by that parent bind remain recorded as covered lower mounts. Every visible
+protected sibling also requires an O_PATH/no-follow descriptor whose mount ID
+matches its exact read-only mask and whose inode/custody matches admission.
+No file body is read through these sibling descriptors. Cyclic ancestry,
+unbound masks, reachable writable submounts and all cache/state submounts reject.

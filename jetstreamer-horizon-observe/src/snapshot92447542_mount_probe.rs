@@ -110,7 +110,10 @@ fn mounts(text: &str) -> Result<Vec<Mount>> {
 }
 fn fd_mount(dir: &Directory) -> Result<u64> {
     dir.validate()?;
-    let text = fs::read_to_string(format!("/proc/self/fdinfo/{}", dir.file.as_raw_fd()))?;
+    file_mount(&dir.file)
+}
+fn file_mount(file: &File) -> Result<u64> {
+    let text = fs::read_to_string(format!("/proc/self/fdinfo/{}", file.as_raw_fd()))?;
     let rows: Vec<_> = text
         .lines()
         .filter_map(|l| l.strip_prefix("mnt_id:\t"))
@@ -120,6 +123,19 @@ fn fd_mount(dir: &Directory) -> Result<u64> {
         "descriptor mount identity missing/ambiguous"
     );
     Ok(rows[0].parse()?)
+}
+fn below_mount(rows: &[Mount], mut id: u64, ancestor: u64) -> Result<bool> {
+    let mut visited = BTreeSet::new();
+    loop {
+        if id == ancestor {
+            return Ok(true);
+        }
+        ensure!(visited.insert(id), "cycle in mount ancestry");
+        let Some(row) = rows.iter().find(|r| r.id == id) else {
+            return Ok(false);
+        };
+        id = row.parent;
+    }
 }
 fn enrollment(a: &Admission) -> Result<()> {
     ensure!(
@@ -161,7 +177,12 @@ fn scoped_mounts<'a>(
         "wrong common writable mount"
     );
     for path in siblings.keys() {
-        let exact: Vec<_> = rows.iter().filter(|m| m.point == *path).collect();
+        let mut exact = Vec::new();
+        for row in rows.iter().filter(|m| m.point == *path) {
+            if below_mount(rows, row.id, common)? {
+                exact.push(row);
+            }
+        }
         ensure!(
             exact.len() == 1 && exact[0].options.contains("ro"),
             "sibling lacks exact read-only mount"
@@ -169,7 +190,7 @@ fn scoped_mounts<'a>(
     }
     let mut scoped = Vec::new();
     for row in rows {
-        if row.point.starts_with(PARENT) {
+        if row.point.starts_with(PARENT) && below_mount(rows, row.id, common)? {
             ensure!(
                 !row.point.starts_with(CACHE_ROOT) && !row.point.starts_with(STATE),
                 "submount over operational cache/state would invalidate leaf rename proof"
@@ -198,6 +219,31 @@ fn topology(
         "cache/state are not on the same actual writable mount"
     );
     let scoped = scoped_mounts(&rows, common, &a.protected_siblings)?;
+    let mut descriptors = BTreeMap::new();
+    for (path, identity) in &a.protected_siblings {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(path)?;
+        ensure!(
+            DirectoryIdentity::of(&file.metadata()?) == *identity,
+            "opened protected sibling differs from admission"
+        );
+        let id = file_mount(&file)?;
+        ensure!(
+            scoped
+                .iter()
+                .any(|m| m.id == id && m.point == *path && m.options.contains("ro")),
+            "actual sibling descriptor bypasses read-only mask"
+        );
+        descriptors.insert(path.clone(), id);
+    }
+    let mut covered_lower = Vec::new();
+    for row in rows.iter().filter(|m| m.point.starts_with(PARENT)) {
+        if !below_mount(&rows, row.id, common)? {
+            covered_lower.push(row);
+        }
+    }
     let ro = |path: &Path| -> Result<()> {
         let resolved = rows
             .iter()
@@ -213,7 +259,7 @@ fn topology(
     ro(Path::new("/home/ubuntu"))?;
     ro(Path::new("/etc"))?;
     Ok(
-        json!({"mountinfo_sha256":sha(text.as_bytes()),"common_mount_id":common,"cache_mount_id":fd_mount(cache)?,"state_mount_id":fd_mount(state)?,"protected_sibling_count":a.protected_siblings.len(),"private_parent_mounts":scoped}),
+        json!({"mountinfo_sha256":sha(text.as_bytes()),"common_mount_id":common,"cache_mount_id":fd_mount(cache)?,"state_mount_id":fd_mount(state)?,"protected_sibling_count":a.protected_siblings.len(),"private_parent_mounts":scoped,"protected_sibling_descriptor_mounts":descriptors,"covered_lower_mounts":covered_lower}),
     )
 }
 fn native(a: &Admission, p: &Profile) -> Result<Value> {
@@ -683,6 +729,22 @@ mod tests {
                 .len(),
             2
         );
+        let covered = format!(
+            "{good}88 1 0:67 / {} rw - tmpfs tmpfs rw\n",
+            sibling.display()
+        );
+        assert_eq!(
+            scoped_mounts(&mounts(&covered).unwrap(), 123, &siblings)
+                .unwrap()
+                .len(),
+            2
+        );
+        let cycle = format!(
+            "{good}88 89 0:67 / {} rw - tmpfs tmpfs rw\n89 88 0:67 / {}/nested ro - tmpfs tmpfs rw\n",
+            sibling.display(),
+            sibling.display()
+        );
+        assert!(scoped_mounts(&mounts(&cycle).unwrap(), 123, &siblings).is_err());
         assert!(scoped_mounts(&mounts(&base).unwrap(), 123, &siblings).is_err());
         for point in [
             sibling.join("nested"),
