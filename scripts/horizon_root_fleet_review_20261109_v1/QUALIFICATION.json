@@ -1,89 +1,100 @@
 {
-  "schema": "horizon-Root-fleet-operational-review-qualification-v3",
+  "schema": "horizon-Root-fleet-operational-review-qualification-v4",
   "source": {
     "main.rs": {
       "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/main.rs",
-      "sha256": "9a00dad81ecf0247880687a9f071dea3c609a00da73430de44757612498a54c1"
+      "sha256": "4f31fc3a31f9c901e0448db47cb21f530b01cc3ffb96d5d61c3104599d0f7330"
     },
     "memory_target.rs": {
       "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/memory_target.rs",
       "sha256": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
     }
   },
-  "actual_originals": {
-    "PREDECESSOR_TRACKED_QUALIFICATION_V2.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/PREDECESSOR_TRACKED_QUALIFICATION_V2.json",
-      "sha256": "b0de7b0b34250efb59b41622115abe2aaf004e2bcbfbfc6aa96ffdae0b51eda9"
+  "originals": {
+    "PREDECESSOR_TRACKED_QUALIFICATION_V3.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/PREDECESSOR_TRACKED_QUALIFICATION_V3.json",
+      "sha256": "7c34e5445c628414d76f046ef75beae82be98f4799e7a32e885fb20438e07360"
     },
-    "ROOT_V5_EXISTING_NORMAL8_CONTROL_SUBALLOCATION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V5_EXISTING_NORMAL8_CONTROL_SUBALLOCATION.json",
-      "sha256": "856d98d73ac2f038ec8acca58fbedd490fdfdd4041dc603a5c29a1cb38e0d373"
+    "ROOT_V6_EXISTING_NORMAL8_CONTROL_SUBALLOCATION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V6_EXISTING_NORMAL8_CONTROL_SUBALLOCATION.json",
+      "sha256": "3d92c67eefd91316bc2ce91e2e7651c75afe29d442ee143c2d9958e90e969b46"
     },
-    "ROOT_V5_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V5_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json",
-      "sha256": "9c470619d39590fb20c7903f6dbd7d1490e0467ab94646dd27e8c7aeb7c37423"
+    "ROOT_V6_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V6_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json",
+      "sha256": "dadf48d6f4a6c4ecb0d95775ccf3284b1fc63233932147ad2562d1108cf3da10"
     },
-    "ROOT_V5_CONTROL_CALLBACK_QA_DRAINED.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V5_CONTROL_CALLBACK_QA_DRAINED.json",
-      "sha256": "9c611a8edd5abe4f1a123b57110d74baa69eb029abbd9fc9c9ca4df6827b149f"
+    "ROOT_V6_CONTROL_CALLBACK_QA_DRAINED.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V6_CONTROL_CALLBACK_QA_DRAINED.json",
+      "sha256": "2172bcd817436b5502028cfd41d971dd4b5c5a183bcfe10c6ac08dab50edb545"
     },
-    "SOURCE-V5-SEAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SOURCE-V5-SEAL-EXECUTION.json",
-      "sha256": "5c81f93184b11d2ba9234c75c8630ee0e8a113496d7263d2df3d7144d11cf675"
+    "SOURCE-V6-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SOURCE-V6-SEAL-EXECUTION.json",
+      "sha256": "2062fc2b14935b3763652628c597901fb4166b00283fd9f954a2626015352231"
     },
-    "RUNTIME-V3-SEAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/RUNTIME-V3-SEAL-EXECUTION.json",
-      "sha256": "b6b952f33ed6acfd78c7640525a44addacf44a47b1bcd1ed911b74ddf65909a3"
+    "RUNTIME-V4-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/RUNTIME-V4-SEAL-EXECUTION.json",
+      "sha256": "3b3865ed1e8ec5d68d1fdb2ad64264cbad9b0a517ea1971c17456c3a9bccaf8c"
     },
-    "production-V5-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/production-V5-ORIGINAL-EXECUTION.json",
-      "sha256": "ebe0ca121871c1ad9e0cef20ed16643d37448f95c67c4c3f3e955625cf21b6a8"
+    "production-V6-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/production-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "451fec3c16760852d1904fbd48ea1f8079eec67dc89ce0c3fcaf801328bab0d0"
     },
-    "build-tests-V5-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/build-tests-V5-ORIGINAL-EXECUTION.json",
-      "sha256": "fd16a420f389ef180582fc6b598e2ca5805d21c01ebf56121af79363dd11d7da"
+    "build-tests-V6-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/build-tests-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "34556d2eefc461a99334e9f7b5c987ebf8ad9ddedd4f8d65831164a13977d053"
     },
-    "clippy-production-V5-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-production-V5-ORIGINAL-EXECUTION.json",
-      "sha256": "9a0fddabb03e5dc4169a6697c64fb7c1f08b8db72d329abff9363476cc3701e3"
+    "clippy-production-V6-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-production-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "d2fdfbe7e32df8faaed90628d03499d0a57442e44f0174c99b6850441187cfa5"
     },
-    "clippy-tests-V5-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-tests-V5-ORIGINAL-EXECUTION.json",
-      "sha256": "bb90e690c0839e21a712b56bf143f73525e071367c3f968dbba5c9fe4e48254b"
+    "clippy-tests-V6-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-tests-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "0c70e3c87d89cc1f4f1dd60391f95047fe12cd050ea1fc2f123210f66a7f7597"
     },
-    "SANDBOXED-TESTS-V5-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SANDBOXED-TESTS-V5-ORIGINAL-EXECUTION.json",
-      "sha256": "8398ad7c20a749e72597d5775f7ceb99d3d5dd807b6fa9bae2a321e8c2d885d1"
+    "SANDBOXED-TESTS-V6-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SANDBOXED-TESTS-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "e7033c824674d48b1114eaa0d1cb697d5a40eb98c3e58afc673511b60cb5d9a7"
     },
-    "ACTUAL-PLAN-223022-V3.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ACTUAL-PLAN-223022-V3.json",
-      "sha256": "0e1ca6f8ecd586d18cf36ca3a2dd66777f1cf8aa085b5c748733bc53e478b064"
+    "ROOT_EXPLICIT_STANDARD_FIVE_LANE_OPERATING_REVIEW_230022.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXPLICIT_STANDARD_FIVE_LANE_OPERATING_REVIEW_230022.json",
+      "sha256": "8fe3ad62e4386e8133cadfb64ea21b63fa92a4d258c9393d6bd52cf78c21ded7"
     },
-    "NATIVE-REVIEW-223022-V3-ORIGINAL-EXECUTION.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-223022-V3-ORIGINAL-EXECUTION.json",
-      "sha256": "6906290378b7f4bad620271c123ed98983bb4813761fc4369ec6ad8c996e1f41"
+    "ACTUAL-PLAN-230022-V4.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ACTUAL-PLAN-230022-V4.json",
+      "sha256": "485bfa0721ad5f7c57ef078f398a953d5d03b28e5faba549cc556006056e26be"
     },
-    "ROOT_223022_NATIVE_V3_DRAINED_EXISTING_NORMAL8_RESTORED.json": {
-      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_223022_NATIVE_V3_DRAINED_EXISTING_NORMAL8_RESTORED.json",
-      "sha256": "56c140990982d4b37b338fb13799220aea49ff58323967f35ea5c7871fc94c95"
+    "ROOT_230022_V4_PRENATIVE_OPERATOR_FAILURE_PRESERVED.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_230022_V4_PRENATIVE_OPERATOR_FAILURE_PRESERVED.json",
+      "sha256": "11bacff5d76041d7152db320322d9b2e4e9b064d3d1187992f398e215a9d43d9"
+    },
+    "ROOT_230022_V4_EXISTING_CONTROL_SCOPE_CORRECTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_230022_V4_EXISTING_CONTROL_SCOPE_CORRECTION.json",
+      "sha256": "5b2375debede50dfe47e41a037c4c6243ba85e64ef7616bf3c296582d7e16c1b"
+    },
+    "NATIVE-REVIEW-230022-V4-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-230022-V4-ORIGINAL-EXECUTION.json",
+      "sha256": "061fe323c54355a2791e83d4fdd9ae68835682e69b6a34049886871b266b0370"
+    },
+    "ROOT_230022_NATIVE_V4_DRAINED_EXISTING_NORMAL8_RESTORED.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_230022_NATIVE_V4_DRAINED_EXISTING_NORMAL8_RESTORED.json",
+      "sha256": "062bbdb6cac166130305f1c4a6d68a24925ebdbc867ad25f9d86c9d5bb0c89bd"
     }
   },
-  "four_compilers_21_tests_and_actual_full_native_review_passed": true,
-  "accepted_fleet": {
-    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_223022_RUST_V3.json",
-    "sha256": "743cd6c6b577f3110583ba3f8256c54e1a3242b005c55e9d47bebdc7cdcbb90c"
-  },
   "runtime": {
-    "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261109-v3/review",
-    "sha256": "561d79ae2b3ddfb6eb3c8d70104789347f716af177ac42706ec17860ae30f598"
+    "path": "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261109-v4/review",
+    "sha256": "2010984c6ea3e2ad0228bcea2d23d6e0b16dd2f44e73bc330474c4848f06120c"
   },
-  "observed_production_replays": 5,
-  "supplemental_production_replays": 0,
-  "current_memory_target_valid": true,
-  "current_memory_selected_target": 16,
-  "proven_operating_point": 4,
-  "expanded_window_qualified": false,
-  "native_Frame_and_full_Reader_acceptance_claimed": false,
+  "accepted_fleet": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_230022_RUST_V4.json",
+    "sha256": "f6e16ee0816845a192a2742bacadb9ada9c7de0334bb919f0bffaea99487f823"
+  },
+  "four_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 24,
+  "actual100row_16status_5owner_native_review_passed": true,
+  "proven_operating_point": 5,
+  "current_memory_target": 16,
+  "native_Frame_and_full_Reader_pending": true,
+  "additional_memory_or_DATA_bytes": 0,
   "resource_credit_bytes": 0,
   "replay_or_remote_mutations": false
 }
