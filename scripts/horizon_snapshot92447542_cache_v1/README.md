@@ -188,3 +188,63 @@ roots, runtime transient/control/attached units and generator roots. Actual
 manager load paths must still be reconciled with that enrollment. Referenced
 external scripts, environment files and sealed plans remain independent source
 review inputs; the census explicitly records `interpretation_complete: false`.
+
+## Exact condition-blocked consumer contract
+
+The consumer review uses schema
+`jetstreamer-snapshot92447542-finite-consumer-readset-review-v2` and an exact
+compiled registry of18 reviewed units: the original acquisition, eight other-slot
+downloaders, five importers and four namespace probes. A prefix match is not an
+admission. Each canonical fragment, program path/hash and effective ExecStart argv
+must equal its registered envelope. Importers retain the frozen image/main pins;
+probes bind their script and actual canonical `/bin/sh` interpreter separately.
+
+A canonical regular `fragment` remains a `Bound`. A manager-installed symlink is
+bound separately by `installed_fragment`: `path`, exact absolute `raw_target`,
+full `Identity`, and ordered `parents` (`path`, `DirectoryIdentity`) through `/`.
+Every parent must remain canonical, Root-owned and protected from group/other
+writes. The link and target are independently rechecked. Direct regular fragments
+have no alias binding. Every effective drop-in, exact negative-condition guard
+and existing immutable marker is still bound; condition resets and unknown
+staged parent references still reject. Runtime guards under `/run` apply only
+while present and require fresh qualification after reboot.
+
+Each consumer additionally supplies `program`, optional probe `interpreter`,
+`native_commands` and `declared_environment` bindings. The command evidence
+contains `unit` and all seven actual D-Bus `raw_typed_properties`, with type
+`a(sasbttttuii)`: one ExecStart tuple and empty other hooks. Omitted CLI arrays are
+not synthesized. Declared environment evidence contains `unit` and
+`property_digests` for Environment, EnvironmentFiles, PassEnvironment,
+UnsetEnvironment, ExecSearchPath, WorkingDirectory, RootDirectory and RootImage;
+each value records the actual D-Bus `type` and SHA-256 of its raw `--json=short`
+response. These are current declared properties, not a historical interpreter
+execution witness. The loaded typed Unit.Conditions must include the exact
+non-trigger, negated marker condition.
+
+Each per-unit source readset uses schema
+`jetstreamer-snapshot92447542-source-readset-v2`, binds `unit`,
+`fragment_sha256`, ordered `source_evidence`, `effective_argv`,
+`expanded_inputs_reviewed: true`, and nonempty
+`potential_program_readset_evidence` (immutable `Bound` source reviews).
+`scope` is exactly
+`potential-program-inputs-separate-from-condition-blocked-admitted-reads`.
+`currently_admitted_compressed_cache_reads` is `[]` only under the authenticated
+condition-blocked scope; `guard_sha256` and `guard_marker_sha256` bind that scope.
+`historical_loader_execution_qualified` remains false. This represents potential
+application/loader inputs explicitly and never claims a dormant program has no
+possible I/O.
+
+The independent foreground command
+`BIN review-consumers ADMISSION ADMISSION_SHA SELF_SHA` runs the same private
+consumer proof as production without constructing a production Plan. Its strict
+Root-immutable admission uses schema
+`jetstreamer-snapshot92447542-consumer-review-admission-v1`, positive validity
+at most180 seconds (`issued_unix_seconds`, `expires_unix_seconds`), `self_binary`
+and `consumer_review` bindings, actual `unit`/`invocation_id`/
+`expected_exec_start`, and a new `consumer-review.json` output. Use the census
+service's admitted512MiB/Swap0/CPU200%/Tasks128/Runtime180/strict/NNP profile and
+only its private output directory writable. The actual MainPID must exec the
+normal sealed helper. This command reads metadata and source/code evidence;
+it does not read the snapshot body, contact cloud storage, mutate old units,
+or qualify lifecycle, eviction, restoration or replay. Existing production
+check/evict/restore admission and lifecycle gates remain required.

@@ -277,6 +277,13 @@ struct Consumer {
     dropins: Vec<Bound>,
     #[serde(default)]
     importer: Option<Bound>,
+    program: Bound,
+    #[serde(default)]
+    interpreter: Option<Bound>,
+    #[serde(default)]
+    installed_fragment: Option<consumer_contract::InstalledFragment>,
+    native_commands: Bound,
+    declared_environment: Bound,
 }
 fn root_bound_file(b: &Bound, max: u64, immutable: bool) -> Result<Vec<u8>> {
     ensure!(
@@ -699,11 +706,16 @@ fn condition_resets(bytes: &[u8]) -> Result<()> {
     }
     Ok(())
 }
+#[path = "snapshot92447542_consumer_contract.rs"]
+mod consumer_contract;
 fn consumer_proof(p: &Plan) -> Result<Value> {
-    let raw = evidence::bound_json(&p.consumer_review)?;
+    consumer_proof_core(&p.consumer_review, &p.source_identity)
+}
+fn consumer_proof_core(review_binding: &Bound, source_identity: &Identity) -> Result<Value> {
+    let raw = evidence::bound_json(review_binding)?;
     let review: ConsumerReview = serde_json::from_value(raw)?;
     ensure!(
-        review.schema == "jetstreamer-snapshot92447542-finite-consumer-readset-review-v1"
+        review.schema == "jetstreamer-snapshot92447542-finite-consumer-readset-review-v2"
             && review.cache_path == Path::new(CACHE_ROOT).join(NAME)
             && !review.reviewed_sources.is_empty(),
         "missing exact finite source/readset review"
@@ -727,20 +739,14 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
         let v = evidence::properties(&c.unit, UNIT_PROPERTIES)?;
         terminal_values(&c.unit, &v)?;
         ensure!(
-            v == c.expected_properties
-                && v.get("FragmentPath").map(PathBuf::from) == Some(c.fragment.path.clone()),
+            v == c.expected_properties,
             "consumer native envelope changed"
         );
+        let installed = consumer_contract::installed(c, &v)?;
+        let (native, argv) = consumer_contract::native(c)?;
         let rs = evidence::bound_json(&c.readset)?;
-        ensure!(
-            rs["schema"] == "jetstreamer-snapshot92447542-source-readset-v1"
-                && rs["unit"] == c.unit
-                && rs["fragment_sha256"] == c.fragment.sha256
-                && rs["source_evidence"] == serde_json::to_value(&sources)?
-                && rs["compressed_cache_reads"] == json!([])
-                && rs["expanded_inputs_reviewed"] == true,
-            "unreviewed consumer readset/expansion"
-        );
+        consumer_contract::readset(c, &rs, &sources, &argv)?;
+        consumer_contract::program(c, &argv, &sources)?;
         if c.kind == "acquisition" {
             acquisition_terminal_values(&c.unit, &v)?;
             ensure!(
@@ -757,26 +763,6 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
                     .any(|x| x == format!("ConditionPathExists=!{CACHE_ROOT}/{HISTORICAL}")),
                 "original acquisition condition changed"
             );
-        } else {
-            ensure!(
-                c.kind == "retired-importer"
-                    && [
-                        "horizon-publish-233-",
-                        "horizon-publish-235-",
-                        "horizon-publish-237-",
-                        "horizon-publish-245-"
-                    ]
-                    .iter()
-                    .any(|x| c.unit.starts_with(x)),
-                "unknown importer envelope"
-            );
-            let importer = c.importer.as_ref().context("importer image missing")?;
-            ensure!(
-                importer.sha256 == IMPORTER_SHA
-                    && sources.iter().any(|x| x["sha256"] == IMPORTER_MAIN_SHA),
-                "unrecognized deployed importer/readset"
-            );
-            root_bound_file(importer, 256 << 20, true)?;
         }
         // No fragment is ignored merely because its old process ended. Require
         // an independently sealed nonlaunchable disposition at the exact unit.
@@ -814,16 +800,18 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
             "duplicate excluded fragment"
         );
         excluded.extend(expected_dropins);
-        owners.push(json!({"unit":c.unit,"native":v,"fragment_sha256":c.fragment.sha256,"readset_sha256":c.readset.sha256,"guard_sha256":c.guard.sha256,"marker_sha256":c.guard_marker.sha256}));
+        owners.push(json!({"unit":c.unit,"native":v,"installed_fragment":installed,"typed_native_envelope":native,"fragment_sha256":c.fragment.sha256,"readset_sha256":c.readset.sha256,"guard_sha256":c.guard.sha256,"marker_sha256":c.guard_marker.sha256}));
     }
     ensure!(acquisition, "original acquisition disposition missing");
-    let roots = [
-        Path::new("/etc/systemd/system"),
-        Path::new("/run/systemd/transient"),
-        Path::new("/run/systemd/system"),
-        Path::new("/usr/lib/systemd/system"),
-        Path::new("/home/ubuntu/.config/systemd/user"),
-    ];
+    ensure!(
+        names == consumer_contract::registered_units()?,
+        "finite consumer set missing/unknown units"
+    );
+    let roots: Vec<_> = crate::snapshot92447542_census::ROOTS
+        .iter()
+        .map(Path::new)
+        .collect();
+    let load_paths = crate::snapshot92447542_census::load_paths()?;
     let mut missing = Vec::new();
     // Parent masks are relevant too. Every resulting fragment needs the finite
     // authenticated readset/guard disposition above; unknown fragments reject.
@@ -839,8 +827,8 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
     );
     let inode_refs = inode_references(
         Path::new("/proc"),
-        p.source_identity.device,
-        p.source_identity.inode,
+        source_identity.device,
+        source_identity.inode,
     )?;
     ensure!(inode_refs.is_empty(), "live inode aliases: {inode_refs:?}");
     let scan = process_references::scan(Path::new("/proc"), &Path::new(CACHE_ROOT).join(NAME))?;
@@ -857,6 +845,17 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
             evidence::properties(&c.unit, UNIT_PROPERTIES)? == c.expected_properties,
             "consumer changed during census"
         );
+        let installed_after = consumer_contract::installed(c, &c.expected_properties)?;
+        ensure!(
+            owners
+                .iter()
+                .find(|v| v["unit"] == c.unit)
+                .context("consumer before image missing")?["installed_fragment"]
+                == installed_after,
+            "installed fragment parent/link changed during census"
+        );
+        let (_, argv) = consumer_contract::native(c)?;
+        consumer_contract::program(c, &argv, &sources)?;
         root_bound_file(&c.fragment, 1 << 20, false)?;
         root_bound_file(&c.guard, 1 << 20, true)?;
         evidence::bound_json(&c.guard_marker)?;
@@ -864,6 +863,10 @@ fn consumer_proof(p: &Plan) -> Result<Value> {
             root_bound_file(dropin, 1 << 20, false)?;
         }
     }
+    ensure!(
+        crate::snapshot92447542_census::load_paths()? == load_paths,
+        "consumer unit load paths changed"
+    );
     Ok(
         json!({"source_evidence":sources,"consumers":owners,"exact_live_path_scan":scan,"exact_inode_alias_references":inode_refs,"quarantine_live_path_scan":qs,"staged_references":staged,"missing_inactive_aliases":missing,"excluded_only_authenticated_nonlaunchable_fragments":excluded}),
     )
@@ -1696,6 +1699,13 @@ fn restore(
 pub fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     let args: Vec<_> = env::args().skip(1).collect();
+    if args.first().is_some_and(|x| x == "review-consumers") {
+        ensure!(
+            args.len() == 4,
+            "usage: BIN review-consumers ADMISSION ADMISSION_SHA SELF_SHA"
+        );
+        return consumer_contract::run_review(&args[1], &args[2], &args[3]);
+    }
     ensure!(
         matches!(args.len(), 6 | 7) && args[1] == "--plan-sha256" && args[3] == "--self-sha256",
         "usage: BIN PLAN --plan-sha256 HASH --self-sha256 HASH check | evict CHECK_SHA | restore CHECK_SHA"

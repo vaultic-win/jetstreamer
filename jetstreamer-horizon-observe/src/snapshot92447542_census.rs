@@ -27,7 +27,7 @@ use {
 };
 const CACHE: &str = "/home/ubuntu/.jetstreamer-private/qualification-later-snapshots";
 const NAME: &str = "snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst";
-const ROOTS: &[&str] = &[
+pub(crate) const ROOTS: &[&str] = &[
     "/etc/systemd/system",
     "/run/systemd/transient",
     "/run/systemd/system",
@@ -273,7 +273,7 @@ fn validate_capture(c: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn load_paths() -> Result<Value> {
+pub(crate) fn load_paths() -> Result<Value> {
     let mut observed = BTreeMap::new();
     for (kind, args) in [
         ("system", vec!["unit-paths"]),
@@ -303,29 +303,42 @@ fn load_paths() -> Result<Value> {
     Ok(serde_json::to_value(observed)?)
 }
 fn owner(a: &Admission) -> Result<Value> {
+    native_owner(
+        &a.unit,
+        &a.invocation_id,
+        &a.expected_exec_start,
+        a.output.parent().context("output parent missing")?,
+    )
+}
+pub(crate) fn native_owner(
+    unit: &str,
+    invocation_id: &str,
+    expected_exec_start: &str,
+    output_parent: &Path,
+) -> Result<Value> {
     ensure!(
-        a.unit.ends_with(".service")
-            && a.unit
+        unit.ends_with(".service")
+            && unit
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-            && a.invocation_id.len() == 32
-            && a.invocation_id
+            && invocation_id.len() == 32
+            && invocation_id
                 .bytes()
                 .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
         "invalid owner binding"
     );
     let p = evidence::properties(
-        &a.unit,
+        &unit,
         "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,ControlGroup,ExecStart,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,ProtectSystem,ProtectHome,ReadWritePaths",
     )?;
     for (k, v) in [
-        ("Id", a.unit.as_str()),
+        ("Id", unit),
         ("ActiveState", "active"),
         ("SubState", "running"),
-        ("InvocationID", a.invocation_id.as_str()),
+        ("InvocationID", invocation_id),
         ("NRestarts", "0"),
         ("ControlPID", "0"),
-        ("ExecStart", a.expected_exec_start.as_str()),
+        ("ExecStart", expected_exec_start),
         ("MemoryMax", "536870912"),
         ("MemorySwapMax", "0"),
         ("CPUQuotaPerSecUSec", "2s"),
@@ -342,16 +355,11 @@ fn owner(a: &Admission) -> Result<Value> {
     }
     ensure!(
         p["MainPID"] == std::process::id().to_string()
-            && p["ReadWritePaths"]
-                == a.output
-                    .parent()
-                    .context("output parent missing")?
-                    .to_str()
-                    .context("output parent UTF8")?
-            && env::var("INVOCATION_ID")? == a.invocation_id,
+            && p["ReadWritePaths"] == output_parent.to_str().context("output parent UTF8")?
+            && env::var("INVOCATION_ID")? == invocation_id,
         "census owner/write scope mismatch"
     );
-    let group = format!("/system.slice/{}", a.unit);
+    let group = format!("/system.slice/{}", unit);
     ensure!(
         p["ControlGroup"] == group
             && fs::read_to_string("/proc/self/cgroup")? == format!("0::{group}\n"),
