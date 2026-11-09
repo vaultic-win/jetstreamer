@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0000-helper34-operation36-20261109-v1/revalidate-helper27-current0000-normal-pool-v1.py"
+  ],
+  "code": 0,
+  "stdout": "Revalidated normal6GiB; historical extra6GiB release is not credited again; records 1331 original execution records and 1451 terminal/empty original units; retained all DATA and normal6GiB\n",
+  "stderr": ""
+}

@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stdout": "",
+  "stderr": "error: refusing to replace existing destination: /usr/local/lib/jetstreamer/horizon-current0000-bound-guard-window-tests-20261109-v1\n"
+}

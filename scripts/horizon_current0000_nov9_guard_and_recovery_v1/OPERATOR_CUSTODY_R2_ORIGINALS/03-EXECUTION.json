@@ -1,0 +1,9 @@
+{
+  "argv": [
+    "/usr/bin/python3",
+    "/tmp/continuations0000-helper34-operation36-20261109-v1/prepare-current0000-continuations-v1.py"
+  ],
+  "code": 1,
+  "stdout": "",
+  "stderr": "Traceback (most recent call last):\n  File \"/tmp/continuations0000-helper34-operation36-20261109-v1/prepare-current0000-continuations-v1.py\", line 28, in <module>\n    prepared_parent = json.loads(Path('/tmp/continuations0000-operation35-v1/PARENT_SOURCE_BINDINGS.json').read_text())\n                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/pathlib.py\", line 1029, in read_text\n    with self.open(mode='r', encoding=encoding, errors=errors) as f:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/pathlib.py\", line 1015, in open\n    return io.open(self, mode, buffering, encoding, errors, newline)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nFileNotFoundError: [Errno 2] No such file or directory: '/tmp/continuations0000-operation35-v1/PARENT_SOURCE_BINDINGS.json'\n"
+}

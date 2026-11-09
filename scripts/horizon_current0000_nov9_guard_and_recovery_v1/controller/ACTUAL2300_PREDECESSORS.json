@@ -1,0 +1,30 @@
+{
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T230022Z-postcompletion154-v1.json",
+    "sha256": "0bcd7ebd07e97f94eb592cb04bf92541ef4c66246657998788a68b94c5960212"
+  },
+  "fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261108T230022Z-witness-terminal145-v1.json",
+    "sha256": "4587d110a43837d2f935f62ace9d76eadff459a0230365a533e626b84a5a5dda"
+  },
+  "fleet_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current2300-fleet-plan-20261108-v1/fleet-plan.json",
+    "sha256": "b5beb5994251d878388d49ac3918cd8f94fe4422317cb5d37fba77d4d5665653"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261108T230022-witness-terminal145-chain128-v5.json",
+    "sha256": "abf2964b3204d25bf8d6dbed2b50ff1fe2bf0d2a6e9275ce78de2c88ed2ef1b0"
+  },
+  "memory": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/0bcd7ebd07e97f94eb592cb04bf92541ef4c66246657998788a68b94c5960212/select-1/selection.json",
+    "sha256": "97372b4b574a17c0f83d55b040b516a52fedc369542b3996cbe94305f572a5de"
+  },
+  "DATA": {
+    "path": "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/0bcd7ebd07e97f94eb592cb04bf92541ef4c66246657998788a68b94c5960212/selection.json",
+    "sha256": "e7559d66be0a33ed04e5505f9ac055830b2fb08bf1dcd7a1ed0b8e39377608fe"
+  },
+  "selector": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current2300-20261108-v1/accepted-frame-selector.json",
+    "sha256": "bc682a9ce614e0cb0efbb9be5eff66bde72230ef4c5c3287a76a59361ab2e6b1"
+  }
+}
