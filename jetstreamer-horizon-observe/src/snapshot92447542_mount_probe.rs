@@ -391,7 +391,7 @@ fn lineage(a: &Admission) -> Result<()> {
         "mount probe normal build lineage differs"
     );
     let m: Value =
-        serde_json::from_slice(&root_bound_file(&a.full_source_manifest, 4 << 20, true)?)?;
+        serde_json::from_slice(&root_bound_file(&a.full_source_manifest, 8 << 20, true)?)?;
     let members = m["tracked_source_files"]
         .as_array()
         .context("source members missing")?;
@@ -522,6 +522,13 @@ pub(super) fn run(path: &str, admission_sha: &str, self_sha: &str) -> Result<()>
     let parent = Directory::open(Path::new(PARENT), &a.parent_identity)?;
     let cache = Directory::open(Path::new(CACHE_ROOT), &a.cache_identity)?;
     let state = Directory::open(Path::new(STATE), &a.state_identity)?;
+    ensure!(
+        a.cache_identity.device == 66305
+            && a.cache_identity.uid == 1000
+            && a.cache_identity.gid == 1000
+            && a.cache_identity.mode == 0o40700,
+        "operational cache directory custody differs"
+    );
     let before = protected(&a, &cache)?;
     let mounts_before = topology(&a, &parent, &cache, &state)?;
     ensure!(

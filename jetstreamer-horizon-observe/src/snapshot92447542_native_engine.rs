@@ -470,7 +470,7 @@ fn lineage(bound: &Bound, harness_sha: &str) -> Result<EngineLineage> {
         "native harness build differs"
     );
     let manifest: Value =
-        serde_json::from_slice(&root_bound_file(&l.full_source_manifest, 4 << 20, true)?)?;
+        serde_json::from_slice(&root_bound_file(&l.full_source_manifest, 8 << 20, true)?)?;
     ensure!(
         build["full_source_manifest"]
             == json!({"path":l.full_source_manifest.path,"sha256":l.full_source_manifest.sha256}),
