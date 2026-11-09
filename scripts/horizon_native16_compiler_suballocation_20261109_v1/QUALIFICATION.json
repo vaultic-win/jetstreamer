@@ -1,0 +1,84 @@
+{
+  "schema": "horizon-native16-compiler-suballocation-qualification-v1",
+  "source": {
+    "path": "/home/sol/workspace/jetstreamer/scripts/horizon_native16_compiler_suballocation_20261109_v1/source/main.rs",
+    "sha256": "cbd4dc890cee9f57f02bd89b4c391e749344e9384ddf43df23ef8f0ac8289ea8"
+  },
+  "originals": {
+    "ROOT_EXISTING_NORMAL8_CALLBACK_SUBALLOCATION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/ROOT_EXISTING_NORMAL8_CALLBACK_SUBALLOCATION.json",
+      "sha256": "bbfc26558e2382e4860df455bc1cb9fb3f3d41cf873af4ff734424e45f68cb9a"
+    },
+    "SOURCE-COMPILER-LIBRARY-FREEZE.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+      "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+    },
+    "SOURCE-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-SEAL-EXECUTION.json",
+      "sha256": "79ddff0127e9ed8dd1e6a6484ae573f68b6bcda662864e84e670fe9bc074a6bc"
+    },
+    "RUNTIME-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/RUNTIME-SEAL-EXECUTION.json",
+      "sha256": "dfb46825b986bfc0d015ff3766b74a6bcaba755b6e699c3eb86317d94a0651c0"
+    },
+    "production-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/production-ORIGINAL-EXECUTION.json",
+      "sha256": "2af494cc80932d7144c5f8ed49708de492f7cb55467678043d4c5098d80e7d4b"
+    },
+    "build-tests-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "3975c329211274a10dcd4062b902c66553e9682bb46f2dea02b6a4a6322c7d34"
+    },
+    "clippy-production-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "ee920595bf9987e7f26a989e845411986dc9b20eeb3d8f977731569214202145"
+    },
+    "clippy-tests-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "443d28371622c0838674c136ee3873d6168a5af95289773ad7fdb67f19c5ace6"
+    },
+    "TESTS-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "09a357112cade86c5af4ef16e59042fa0987e04ff8ce80c4390c1e5ad5812815"
+    },
+    "ROOT_COMPILER_CALLBACKS_DRAINED.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/ROOT_COMPILER_CALLBACKS_DRAINED.json",
+      "sha256": "4d23edb5457fae07a6820fadb463dcead70650fddcec2583726ccf6154dd6fa1"
+    },
+    "ACTUAL-PLAN.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/ACTUAL-PLAN.json",
+      "sha256": "6c8fd959d05fbb4f6571b28bce6284556a7acbdadec365607481d3bad28badd7"
+    },
+    "PLAN-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/PLAN-SEAL-EXECUTION.json",
+      "sha256": "852d4a086ba1253d1e3b2aad1e8cc3bc062cb2ca6a04f0b412ed6f5cfe261827"
+    },
+    "NATIVE-CHECK-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/NATIVE-CHECK-ORIGINAL-EXECUTION.json",
+      "sha256": "a76e251093dfa59c9afecf919f7e6f678cbf3747c6ed6a285059498ee4ee9d71"
+    },
+    "ROOT_ACTUAL_EXISTING_NATIVE16_POOL_CURRENT_CHECK.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/ROOT_ACTUAL_EXISTING_NATIVE16_POOL_CURRENT_CHECK.json",
+      "sha256": "de9f3d51237651b49d022ae0afbf9206966d07c625003e2c7023eed7ad48ff85"
+    },
+    "ROOT_NATIVE_CURRENT_CHECK_DRAINED.json": {
+      "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/ROOT_NATIVE_CURRENT_CHECK_DRAINED.json",
+      "sha256": "40ac68ae65970ab7aec9e2846ca4e89ed9a46c9bc403f32510c37f1bb9b4c2ac"
+    }
+  },
+  "runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-native16-suballocation-tools-20261109-v1/check",
+    "sha256": "2e2a74caa764b39c38062bbcbf42098cd586a745aaee19e1c07e217c3ca64b28"
+  },
+  "four_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 8,
+  "actual_current_native_check_passed": true,
+  "Root_subsequent_compiler_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/ROOT_EXISTING_NATIVE16_COMPILER8_DATA12_BOOKING.json",
+    "sha256": "ce493df4f6b1fb4098c081b75c4d5870b7d4c0df19d64a2c56ff3189e0f26239"
+  },
+  "resource_credit_bytes": 0,
+  "new_memory_promise_bytes": 0,
+  "raw_suballocations_removed": 0,
+  "replay_or_remote_mutations": false
+}
