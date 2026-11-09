@@ -1,0 +1,31 @@
+{
+  "qualified_helper_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-combined-witness-terminal145-helper-tools-20261107-v13/jetstreamer-r2",
+    "sha256": "d00ee6ad4076c32b90a416efc9236208cd7ee8b64e572d5ad830c9a709eac470"
+  },
+  "completed145_capture_request_v2": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/completed145-capture-request-v2.json",
+    "sha256": "3ea06193d3ae14b56fafa9890199104df111202212a6ccaf395485b8e06486d8"
+  },
+  "completed145_census_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-completed145-parent-census-tools-20261107-v4/cached145-census",
+    "sha256": "723066815ebf090ec42777b0b9ea7991b0f0d1804c0b126341f9e92c3126f331"
+  },
+  "completed145_selector_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-parent-memory-selector-tools-20261107-v4/parent-memory",
+    "sha256": "4b65f8504f8b058fa83b6f5d6654ac948d502d7d0a00861d6d3d56505b822cc2"
+  },
+  "completed145_DATA_selector_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/ended183-data",
+    "sha256": "85f374198bd5418bfa269faf01c9751b50f30a94a0cb0c0cc9a9b8b18133d243"
+  },
+  "current_inventory": {
+    "path": "/home/sol/.jetstreamer-private/actual023022-visible-root-acceptance-20261109-v1/inventory023022.json",
+    "sha256": "d91eafe37ac889e5784be7f3f76ed39d42e3b5d550190ce70387dfa0357f2a7c"
+  },
+  "qualified_current_guard_program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-current0230-bound-guard-window-tools-20261109-v1/horizon-current0230-guard-window",
+    "sha256": "134d5aadd216a41f2702a68c7850572c61e659b3504f2220ef590f13c27f6ec3"
+  },
+  "current_capacity_receipt": null
+}

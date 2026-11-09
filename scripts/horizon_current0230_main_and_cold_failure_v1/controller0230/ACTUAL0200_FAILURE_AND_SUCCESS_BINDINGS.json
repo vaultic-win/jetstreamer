@@ -1,0 +1,22 @@
+{
+  "failed_capture_phase": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+    "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+  },
+  "successful_fleet": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/ROOT_CURRENT0200_FLEET_ORIGINAL_SUCCESS.json",
+    "sha256": "b54e52a92c250474ed1cf3d7d5070b7cdfaa0a1d858cd5e401e3e2a0e97fe920"
+  },
+  "successful_capability": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capability-ORIGINAL-NATIVE-PID1.json",
+    "sha256": "8bd7265dadf01d8cbc438b1d171e87565ce7246da78988a4232212c77ed89af5"
+  },
+  "finite_outer": {
+    "path": "/tmp/continuations0200-final4-operation37-source-20261109-v1/OPERATOR_ORIGINALS/02-EXECUTION.json",
+    "sha256": "d27043699493b12241b001a02afe8fdd1cb268cfa3bf58f82283f09751acf4d8"
+  },
+  "no0200_Frame_reader_or_actor": true,
+  "original0200_startup_cutoff_expired": true,
+  "useful_replays_at_assignment": 0,
+  "target_replays": 5
+}

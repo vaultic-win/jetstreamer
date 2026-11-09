@@ -1,0 +1,30 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-readable-originals-final-da9b57fed9f04c9fa1b0c5dba1932488",
+  "members": [
+    {
+      "mode": 292,
+      "name": "fleet.json",
+      "sha256": "90a640528f231efc9a4a9af226e975f0a50b2d4075eec65c99a27abf90f9a9ce",
+      "source": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-da9b57fed9f04c9fa1b0c5dba1932488.json"
+    },
+    {
+      "mode": 292,
+      "name": "reader.json",
+      "sha256": "6256ede849a9c9bedf6cf2c4ef98ab01c3ea88640698bd37b94a11e113fb8fd3",
+      "source": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cda54fabbcad05ee9d1aba2d944926c5d0557b4662d1052fdf1f0a8e776b6c9e-cold185-da9b57fed9f04c9fa1b0c5dba1932488/proof.json"
+    },
+    {
+      "mode": 292,
+      "name": "task.json",
+      "sha256": "3bd55c699b9eea0b5ae4839c8d8b8acee9d3c44ba6e776d03c6ae2e29064b5d6",
+      "source": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/task.json"
+    },
+    {
+      "mode": 292,
+      "name": "status.json",
+      "sha256": "13b56e28aeb1d559e13de07056bee50cab3a6bd7a8eb455847be42c4a954c0af",
+      "source": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0230-20261109-next/status-readback.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

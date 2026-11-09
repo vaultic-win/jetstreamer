@@ -1,0 +1,25 @@
+{
+  "observation_bridge": [
+    {
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T013022Z-postcompletion154-v1.json",
+        "sha256": "fa22ccada8e92460fa52cdbf7fd9ef7184db3e6a1eaef2a8da10706999976ab6"
+      }
+    },
+    {
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T020022Z-postcompletion154-v1.json",
+        "sha256": "e3fc848255d438d473e059cff501b7c62ff7b256ddb3a81645129fe747ff6b1a"
+      }
+    }
+  ],
+  "last_complete_Frame_and_resources": "0100",
+  "actual0130_readonly_finalization": {
+    "path": "/home/sol/.jetstreamer-private/observer0130-closed-metadata-readonly-finalization-20261109-v1/ROOT_GENUINE0130_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+    "sha256": "84dc451cfaa65d5cc92dbbd4504d846a29dfcb2079877f7b6705264ec28fda2f"
+  },
+  "actual0200_readonly_finalization": {
+    "path": "/home/sol/.jetstreamer-private/observer0200-closed-metadata-readonly-finalization-20261109-v1/ROOT_GENUINE0200_OBSERVER_BRIDGE_METADATA_FINALIZED.json",
+    "sha256": "38cef1e763cd862aa6534fcd4b153b9e37012aa751bcd69c909fa852b0280f8b"
+  }
+}

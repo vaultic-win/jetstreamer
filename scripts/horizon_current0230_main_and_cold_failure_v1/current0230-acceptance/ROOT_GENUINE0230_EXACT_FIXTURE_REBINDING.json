@@ -1,0 +1,26 @@
+{
+  "prior_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0100-20261109-v1/ROOT_GENUINE_CURRENT_CLI_V5_CAPTURE_ACCEPTED.json",
+    "sha256": "8c1813b19ff124bbf550ac0e07ca3be2bdaa369d4c7373089960acd3cf0f45ea"
+  },
+  "current_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/ROOT_GENUINE_CURRENT_CLI_V5_CAPTURE_ACCEPTED.json",
+    "sha256": "dab8c749335d2b8166d35919c3a165a6d67184f8fcef4aa52f7013dd724e9bd9"
+  },
+  "counts": {
+    "observer": 1,
+    "fleet": 1,
+    "fleet_plan": 1,
+    "frame": 1
+  },
+  "fixture": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/GENUINE0230_ACCOUNTING_ADAPTER_SOURCE_BUNDLE.json",
+    "sha256": "f6cb0fa7e5232cdc2d77734b4662acfb26f140d8f54886839d32f1ca43eca192"
+  },
+  "manifest": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/GENUINE0230_OUTER_ADAPTER_FIXTURE_MANIFEST.json",
+    "sha256": "a994e86d3e32d76c46147fb62db5c6343265e14b4a8cc96026e9b343d9da57f4"
+  },
+  "native_reader_clock_started": false,
+  "replay_launch_authorized": false
+}

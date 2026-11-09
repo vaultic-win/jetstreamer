@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-fleet-spec-da9b57fed9f04c9fa1b0c5dba1932488",
+  "members": [
+    {
+      "mode": 292,
+      "name": "spec.json",
+      "sha256": "628ab9c396dbfd4c072ff976270bcdc93d5c373ecdaba97c5009f59af2a0a00e",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/fleet-spec-source.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

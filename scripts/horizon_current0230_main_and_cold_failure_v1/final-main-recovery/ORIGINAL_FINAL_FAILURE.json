@@ -1,0 +1,11 @@
+{
+  "at": 1794191993,
+  "error": "original finite metadata child failed: capture-cold185-lifecycle",
+  "no_retry_clock_reset_fake_success_or_actor_restart": true,
+  "original_setup_deadline": 1794192384,
+  "original_task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/task.json",
+    "sha256": "3bd55c699b9eea0b5ae4839c8d8b8acee9d3c44ba6e776d03c6ae2e29064b5d6"
+  },
+  "token_may_have_been_committed_preserve_actual_state": true
+}

@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/lifecycle.json\n",
+  "stderr": "Running as unit: horizon-positive185-lifecycle-main-recovery-da9b57fe-r2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 247ms\nCPU time consumed: 223ms\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+}

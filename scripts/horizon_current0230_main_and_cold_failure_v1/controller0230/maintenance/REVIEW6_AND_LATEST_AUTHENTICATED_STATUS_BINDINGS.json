@@ -1,0 +1,16 @@
+{
+  "model_binding": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/MODEL_BINDING.json",
+    "sha256": "5fe8e275da45125061de491fba8278bc39df3e8f370f0c103513c1987bd401a7"
+  },
+  "latest185readback": {
+    "path": "/home/sol/.jetstreamer-private/current0200-phase-failure-explicit-control-review6-status-event-20261109-v1/AUTHENTICATED-READBACK.json",
+    "sha256": "24f2ca1b11439fcf0f24b37bdc50070c31d15c9b87d1883b6ebcdb6273c50343"
+  },
+  "latest185sampled_at_utc": "2026-11-09T02:17:49Z",
+  "latest_all11audit": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/range-101-200-status-audit-20261109020930.json",
+    "sha256": "f1dc7bae1f5635bf58c142df66088551c931c252742d7d99b28a5974909b63b9"
+  },
+  "complete_DATA_bytes": 5165652325012
+}

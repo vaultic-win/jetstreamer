@@ -1,0 +1,20 @@
+{
+  "fleet_acceptance": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/fleet-acceptance.json",
+    "sha256": "6daab24f1e04cb6c93ed7410a8543dff216d34dcc92eea795224a857b4e5f31c"
+  },
+  "original_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/cda54fabbcad05ee9d1aba2d944926c5d0557b4662d1052fdf1f0a8e776b6c9e-cold185-da9b57fed9f04c9fa1b0c5dba1932488/proof.json",
+    "sha256": "6256ede849a9c9bedf6cf2c4ef98ab01c3ea88640698bd37b94a11e113fb8fd3"
+  },
+  "original_reader_completion": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0230-original-r3-20261109-next/original-enrolled-reader-completion.json",
+    "sha256": "b832f47364d4ebce9276bb771d9948e340a6f30a37eec5b1eb7ac69cc74fde74"
+  },
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/reader-acceptance.json",
+  "registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/registration.json",
+    "sha256": "08169e0010780d2fd6c20cdb330ea98cb48b97af2cbc24a1171f61be697ec813"
+  },
+  "schema": "horizon-epoch185-complete-current-reader-acceptance-spec-v1"
+}
