@@ -1,0 +1,33 @@
+{
+  "schema": "horizon-actual-qualified-planner5-helper34-bindings-v1",
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/planner",
+    "sha256": "e771306216e1436e3904ab2c11622597298c61c4083a4a7a1b485278bdb139e1"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/artifact-proof.json",
+    "sha256": "fe9a419c8a5af9004af7b10f98bb6411641aa7179de2f13cdce1f2fc2a012e10"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/deployment-seal-receipt.json",
+    "sha256": "82857a930ff9023c7eddfb1f969e289d8f661501dd56c57eb4141d942bb3102b"
+  },
+  "source_and_recipes": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/source-and-recipes.json",
+    "sha256": "c1b0e762c555628a2109f3692a09f02b4a53179db4ce9800d0b9006b306bb3dc"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper34-current-witness-planner-qa-20261108-v5/ROOT_NORMAL6_SERIAL_PLANNER5_DATA512_BOOKING.json",
+    "sha256": "aa419015ac6f11792dcdd493911b3abe390d41c173b113c00349b21ec682fa6c"
+  },
+  "actual_Helper34": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_ACTUAL_QUALIFIED_HELPER34_BINDINGS.json",
+    "sha256": "5c9413e19e5a5a4f6e54780d069c3ac56a308bb341bd0884c65eb098d507a0d9"
+  },
+  "actual2300_positive": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-helper34-current-witness-planner-qa-20261108-v5/ACTUAL2300-ACCEPTED-CURRENT-HELPER34-ORIGINAL-EXECUTION.json",
+    "sha256": "ae4078213510a17e09fc817aae2274f68d1d99047aa82af3a8f41090cf821997"
+  },
+  "all_six_actual2300_metadata_controls_passed": true,
+  "fresh_resource_and_admission_still_required": true
+}

@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"members\":{\"completion.json\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v36-helper34-planner5-r1/completion.json\",\"sha256\":\"f7fdf35509a8c13ecdd5e8a0d9f4dabcf2e7eba9ae6eb4c162437bfcb15fc254\"}},\"normal_seal\":{\"path\":\"/usr/local/lib/jetstreamer/horizon-positive185-reader-lifecycle-kernel-control-control-positive-reader-v36-helper34-planner5-r1/deployment-seal-receipt.json\",\"sha256\":\"752b0d70a35946013e224d8fd41157e83e6ee824d18e3ba42871c46f3ea85be3\"}}\n",
+  "stderr": "Running as unit: horizon-positive185-reader-lifecycle-actual-20261108-v36-helper34-planner5-r1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 24.303s\nCPU time consumed: 1.308s\nMemory peak: 91.9M\nMemory swap peak: 0B\n"
+}

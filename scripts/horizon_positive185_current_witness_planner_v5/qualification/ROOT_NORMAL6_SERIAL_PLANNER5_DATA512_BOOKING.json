@@ -1,0 +1,23 @@
+{
+  "schema": "horizon-normal6-serial2-additive-DATA512-booking-v1",
+  "role": "PLANNER5",
+  "normal_pool_bytes": 6442450944,
+  "serial_compiler_bytes": 2147483648,
+  "observer_bytes": 2147483648,
+  "Root_and_status_bytes": 1073741824,
+  "new_extra_QA_memory_bytes": 0,
+  "new_additive_retained_DATA_bytes": 536870912,
+  "previous_DATA_lower_bound_bytes": 5158673003156,
+  "complete_DATA_lower_bound_bytes": 5159209874068,
+  "latest_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261108T233022Z-postcompletion154-v1.json",
+    "sha256": "0584f1edd888aefb5fb4edd68bba2f59533fa3cc6ced3987bb50e0a0764b89c2"
+  },
+  "fresh_helper34_QA5_still_charged_until_actual_closure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+    "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+  },
+  "no_credit_or_lease_or_clock_reset": true,
+  "native_kernel_bounds_before_first_instruction": true,
+  "source_and_builds_not_yet_qualified": true
+}

@@ -1,0 +1,13 @@
+[Unit]
+Description=Operation30 disposable original completion control
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/jetstreamer/operation32-coherence-control-20261108-v2/disposable-oneshot
+TimeoutStartSec=12s
+MemoryMax=16M
+TasksMax=4
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=

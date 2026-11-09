@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-planner5-metadata-control-candidate-20261108-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-helper34-current-witness-planner-qa-20261108-v5/qa/planner",
+      "name": "planner",
+      "sha256": "e771306216e1436e3904ab2c11622597298c61c4083a4a7a1b485278bdb139e1",
+      "mode": 365
+    }
+  ]
+}

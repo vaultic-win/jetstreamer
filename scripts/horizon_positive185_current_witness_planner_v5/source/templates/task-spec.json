@@ -1,0 +1,52 @@
+{
+  "schema": "horizon-epoch185-native-startpre-task-capture-v1",
+  "native_spec": {
+    "schema": "horizon-epoch185-native-startpre-spec-v1",
+    "actor_unit": "horizon-qualify-185-capped-cold-missing-token-20261106-v14.service",
+    "expected_actor_invocation_id": {
+      "$actual_root_binding": "pid1.actor.InvocationID"
+    },
+    "envelope": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-envelope-20261106-v14/envelope.json",
+      "sha256": {
+        "$actual_root_binding": "materialized.envelope.sha256"
+      }
+    },
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/admission.json",
+      "sha256": {
+        "$actual_root_binding": "materialized.admission.sha256"
+      }
+    },
+    "actor_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-qualify-185-capped-cold-missing-token-20261106-v14.service",
+      "sha256": {
+        "$actual_root_binding": "materialized.actor_source.sha256"
+      }
+    },
+    "guard_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-guard-185-capped-cold-missing-token-20261106-v14.service",
+      "sha256": {
+        "$actual_root_binding": "materialized.guard_source.sha256"
+      }
+    },
+    "timer_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-native-units-20261106-v14/horizon-guard-185-capped-cold-missing-token-20261106-v14.timer",
+      "sha256": "3d572b74dab6f3e36f1ef88cc0a9a614740af92fcc3f0fe42a9de85370370c57"
+    },
+    "ready": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-missing-token-20261106-v14/ready-__ACTUAL_IID__.json",
+      "sha256": {
+        "$actual_root_binding": "actual_original_ready_bytes.sha256"
+      }
+    },
+    "current_task_status": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-missing-token-current-evidence-20261106-v14/status-readback.json",
+      "sha256": {
+        "$actual_root_binding": "status_readback.sha256"
+      }
+    },
+    "mode": "task-start-pre"
+  },
+  "output": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/__ACTUAL_IID__/task.json"
+}

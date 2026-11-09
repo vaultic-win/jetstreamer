@@ -1,0 +1,381 @@
+{
+  "schema": "horizon-tracked-source-and-qualification-manifest-v1",
+  "members": [
+    {
+      "path": "README.md",
+      "sha256": "61d2d9fc1ba7b2243b6141f3b9a6ffa561ced9136612012bfab9af8af2bcf3a8"
+    },
+    {
+      "path": "qualification/ACTUAL-ENROLLED-FLEET32-ROLE-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "a0ed12cefa0c83998a1c0efe2fe8663a53bae3efec93b8cb1d941c0f6abb1bcc"
+    },
+    {
+      "path": "qualification/ACTUAL-ENROLLED-FLEET32-ROLE-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "d64b51c41832a980c41b5618ebe76a33137cefa44fc428589be0a52ce1e80c90"
+    },
+    {
+      "path": "qualification/ACTUAL-FAILED-RETIREMENT-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "421d7fdb34a6443df9f2c9b13d0b6e0fd8f4e44decedc87ad6c97ee726286b6b"
+    },
+    {
+      "path": "qualification/ACTUAL-FAILED-RETIREMENT-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "5c736fce49f3863810b2f3004b9c2cc049ae8ec761592887dbe8e6065827b91c"
+    },
+    {
+      "path": "qualification/ACTUAL-FAILED-RETIREMENT-CONTROL-REQUEST.json",
+      "sha256": "75a647683a27516d6f3d7f07b596a2606d0f79987c1a1f76b2eaba76aa5eb108"
+    },
+    {
+      "path": "qualification/ACTUAL-FLEET-CUSTODY-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "17d7a1c05df2916e3bfd8f37cff88958e2e7bcbb376aa415fddaec500d0ed059"
+    },
+    {
+      "path": "qualification/ACTUAL-FLEET-CUSTODY-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "93d56f07b1718f58181e4b8c32c118a00a8ff5c3982878593e764e94372434a8"
+    },
+    {
+      "path": "qualification/ACTUAL-FLEET-CUSTODY-CONTROL-REQUEST.json",
+      "sha256": "261b50910527217c828d175ad38c24e21a34654daae703e48cfbd11bfa551f2f"
+    },
+    {
+      "path": "qualification/ACTUAL-HELD-RELOAD-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "c48748be260c3b4cba49636d3f493cf9a5b372dff23c12079f66b9b65140b6ea"
+    },
+    {
+      "path": "qualification/ACTUAL-HELD-RELOAD-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "5f28d55f4fc2ace8819ed33811684ed742cb634be3b1aef37da9bb68464320ca"
+    },
+    {
+      "path": "qualification/ACTUAL-HELD-RELOAD-CONTROL-REQUEST.json",
+      "sha256": "a304770fbc2b3629a5098e8960e400aac8bf0f5a2ec952c375212b57602055b3"
+    },
+    {
+      "path": "qualification/ACTUAL-HELPER32-FLEET-ORDER-CONSUMER-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "b895abc9c81a1e695011f44d2ce390fb7ea5289e547c6e5e32cdc1bb24317bca"
+    },
+    {
+      "path": "qualification/ACTUAL-HELPER32-FLEET-ORDER-CONSUMER-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "64a868256d9fcab7e0a1985218f4cb1d34e51fe8a0205045e7754f4d602e7e52"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "895fc757be9c974efadd6ebbecfc640c47b07638e968a4840472fe236f6d5865"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "a6258e99e508a37887f57fade8f73771c2d75bd2d26cb4db76c93c18e82328fa"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-CONTROL-REQUEST.json",
+      "sha256": "b60abce2c2195250b427ffc35ebe2476e5b411f43a17ca2706357d90e0bd36e0"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-PHASE-ORIGINAL-ARGV.json",
+      "sha256": "e1b65bf1ed7a0719c3d2e724fe02811a6ff818f3bb99d9c186548ca49c51171d"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-PHASE-ORIGINAL-EXECUTION.json",
+      "sha256": "d9142b968c39761b03b284f369c76efc11876ce6ee7dc3d881686085ec921ccc"
+    },
+    {
+      "path": "qualification/ACTUAL-READER-PHASE-REQUEST.json",
+      "sha256": "48c5664948e19dc65b066de6910c83dc4d24ec4d793b5542c1886a5c32351285"
+    },
+    {
+      "path": "qualification/ACTUAL-SUCCESSFUL-RETIREMENT-CONTROL-NATIVE2-ORIGINAL-ARGV.json",
+      "sha256": "2333ce57c098088461adaf8aa9c0b34734d0e86e4dc175224b7c938a931a13e7"
+    },
+    {
+      "path": "qualification/ACTUAL-SUCCESSFUL-RETIREMENT-CONTROL-NATIVE2-ORIGINAL-EXECUTION.json",
+      "sha256": "e1ba6fbeba55ae172949d88e13c76744e91644aef2b49ac0d9afea0b745fe366"
+    },
+    {
+      "path": "qualification/ACTUAL-SUCCESSFUL-RETIREMENT-CONTROL-NATIVE2-REQUEST.json",
+      "sha256": "41620eb8eb67178762391cb86fdd3b82c71ac066704e5530a402cae4874bc8cd"
+    },
+    {
+      "path": "qualification/ACTUAL-TIMER-COHERENCE-CONTROL-ORIGINAL-ARGV.json",
+      "sha256": "df3d108f00c0b7d26d7a1a5469e86ea761dc0ccbfec119bf29d4fbee260fad9a"
+    },
+    {
+      "path": "qualification/ACTUAL-TIMER-COHERENCE-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "37f3bf5aa6e18d53613b49d31f98d621fd91e420d782b81b1f22422fe56a991c"
+    },
+    {
+      "path": "qualification/ACTUAL-TIMER-COHERENCE-ORIGINAL-LIFECYCLE.json",
+      "sha256": "e5038827f7e8b2a3dcd94969d116adb05f736e27ee1f11f41538bd1e49140784"
+    },
+    {
+      "path": "qualification/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "sha256": "57931f878de05646ef7738198d0a22c1ba98b0685f64067612d4d48057c287bf"
+    },
+    {
+      "path": "qualification/CANDIDATE-SEAL-ORIGINAL-ARGV.json",
+      "sha256": "c3b8acc5a34a9b85e0b5a0a79b88f65f75d665b4ac6c3af3783b805a9c8581a2"
+    },
+    {
+      "path": "qualification/CANDIDATE-SEAL-ORIGINAL-EXECUTION.json",
+      "sha256": "d754fafc68cb4bce0b6e15fabcdcf4e772fc2774245b706ab66c13a56713eb18"
+    },
+    {
+      "path": "qualification/CANDIDATE-SEAL-PLAN.json",
+      "sha256": "fdf7fe0f04dd29212b9ab802cda35f2fb332ff479e373421682872be24c651eb"
+    },
+    {
+      "path": "qualification/CONTROL-FIRST-ORIGINAL-FIRE-BARRIER.json",
+      "sha256": "309ea084b5cdd850332dcccb88136843eba7e5b14f7cc92a06974ffaa79e66d3"
+    },
+    {
+      "path": "qualification/CONTROL-FIRST-TIMER-START-ORIGINAL-ARGV.json",
+      "sha256": "a172ac6dd98b864463ebad91449e0b7e99bfab33c166dfb8c019a000a416d107"
+    },
+    {
+      "path": "qualification/CONTROL-FIRST-TIMER-START-ORIGINAL-EXECUTION.json",
+      "sha256": "85bbf1c2a7508fbdbbe6ca055846cf61127e0a80998d8769c4e9bc490a71c6c9"
+    },
+    {
+      "path": "qualification/CONTROL-LINK-ORIGINAL-ARGV.json",
+      "sha256": "4df76488e7cb9bb76b8b40e64a263788df0f69d216a49334b95f5ae5bfcf01b1"
+    },
+    {
+      "path": "qualification/CONTROL-LINK-ORIGINAL-EXECUTION.json",
+      "sha256": "76a0980b69c2d73f9a96cc6f1e2c9f57cece9bd2a5fb81e12122470275eed675"
+    },
+    {
+      "path": "qualification/CONTROL-OWN-TIMER-STOP-ORIGINAL-ARGV.json",
+      "sha256": "a0a164adf3294a849b24ce948e392ff6475fa84c611ae26beabec36deddd942e"
+    },
+    {
+      "path": "qualification/CONTROL-OWN-TIMER-STOP-ORIGINAL-EXECUTION.json",
+      "sha256": "85bbf1c2a7508fbdbbe6ca055846cf61127e0a80998d8769c4e9bc490a71c6c9"
+    },
+    {
+      "path": "qualification/CONTROL-SEAL-ORIGINAL-ARGV.json",
+      "sha256": "dd83dd84552899c1863ba5e7a7e91e6917879b8321079663b725c7e0557f4c5f"
+    },
+    {
+      "path": "qualification/CONTROL-SEAL-ORIGINAL-EXECUTION.json",
+      "sha256": "a3d2783bd2e4a6f0683bc8368594cb56ac6acf23a650be437de5657094f3cf30"
+    },
+    {
+      "path": "qualification/CONTROL-SEAL-PLAN.json",
+      "sha256": "332f87cbc6ce30bf4d6063ede13911a6a8eb11b6e904ea62eafca3649ebb8608"
+    },
+    {
+      "path": "qualification/ORDINARY-ORIGINAL-ARGV.json",
+      "sha256": "e5f788fae4775f132b8f9e65710fcfd8795c7fa3f3d984c5c7a047de44f1738a"
+    },
+    {
+      "path": "qualification/ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "eac280c52124d8385c33ecbe6b09744eda84ba964a507ee698e5e7957097a2e5"
+    },
+    {
+      "path": "qualification/PRODUCTION-NORMAL-SEAL-EXECUTION.json",
+      "sha256": "0352e55e136021240b106ac09c6165358be0883505173b38c2ec536933935219"
+    },
+    {
+      "path": "qualification/PRODUCTION-NORMAL-SEAL-PLAN.json",
+      "sha256": "63c7588bddbe4b11816b423c5e48457b4c21b1e857fa1ef36be0c2d35c9e0111"
+    },
+    {
+      "path": "qualification/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "1ef1cce242de7aa86bf678d9b27e281eb79889a6deb4b4621acb4200d053fe02"
+    },
+    {
+      "path": "qualification/PROFILE-R3-ORIGINAL-ARGV.json",
+      "sha256": "3077810b3d7a296e8573f8ceb2b4c3daa627d44a63b2c7a595b8a30e07bcece7"
+    },
+    {
+      "path": "qualification/PROFILE-R3-ORIGINAL-EXECUTION.json",
+      "sha256": "07802137f7c01be1cea3bf4fc68543f16960e3b7d6cea246c65aaa3df1818411"
+    },
+    {
+      "path": "qualification/PROFILE-R3-REQUEST.json",
+      "sha256": "da6af7da5a018fbdd14e902e67e9ca351c23fc6d22182fec3224fa8786c8de61"
+    },
+    {
+      "path": "qualification/ROOT_ACTUAL_QUALIFIED_OPERATION36_BINDINGS.json",
+      "sha256": "71f2431f38a3d9ed0aef9b222f32e94701742c9b8c6a93f9a541342e445fe1c3"
+    },
+    {
+      "path": "qualification/ROOT_NORMAL6_SERIAL_OPERATION36_DATA512_BOOKING.json",
+      "sha256": "cfb57926bab8f34291e091b4cd2ffc9a09db05ec8795c076dc49e4807ba1033b"
+    },
+    {
+      "path": "qualification/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "1193add740c8a3586301fbcdbfa93cb58f7d2976e1b9cac1fac497e7ee1d3dcf"
+    },
+    {
+      "path": "qualification/STATIC-QUALIFIED-NATIVE-PENDING.json",
+      "sha256": "e669cdd5d0b14bdeaebe965e26c94e75d5a042d253b14ca987f9944255aab34a"
+    },
+    {
+      "path": "qualification/TEST-SEAL-ORIGINAL-ARGV.json",
+      "sha256": "77ef01416d885b059ea891846e45670e970c96c5a4af3713eeb325556ba04984"
+    },
+    {
+      "path": "qualification/TEST-SEAL-ORIGINAL-EXECUTION.json",
+      "sha256": "237948849981884d66de328c180b9235712109cdffc3aa9f6c2ca9af92073e17"
+    },
+    {
+      "path": "qualification/TEST-SEAL-PLAN.json",
+      "sha256": "8a5810b898a4f63f1875ba2bb8bfee9fd58e42e6d319cf0fc8f79190d92fa32a"
+    },
+    {
+      "path": "qualification/clippy-production-ORIGINAL-ARGV.json",
+      "sha256": "c70f65d4ba08053f13ebebc8f259179f4ac56a779a1648e908d82a039162db21"
+    },
+    {
+      "path": "qualification/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "791d147a8ae64247fd316164b75967ea33f591f4d08ea3a92e18a8686a0c37f6"
+    },
+    {
+      "path": "qualification/clippy-tests-ORIGINAL-ARGV.json",
+      "sha256": "ab3fb903e5b9a86ceb3789d24104f50b1b078f15cfd43b622b1d529431e6b7c6"
+    },
+    {
+      "path": "qualification/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "e10423df67d61f01e791836a6c8030d58582c9e55c09d06ff28dc2a7e4bd0ce4"
+    },
+    {
+      "path": "qualification/release-ORIGINAL-ARGV.json",
+      "sha256": "640a47190c6d15dde491059df2de33ac77de6d968240437897d422900472b023"
+    },
+    {
+      "path": "qualification/release-ORIGINAL-EXECUTION.json",
+      "sha256": "406c9714f27a8a5f141be3d499bccea116e8ada7fa4be38b86c076de94a3e567"
+    },
+    {
+      "path": "qualification/test-build-ORIGINAL-ARGV.json",
+      "sha256": "b651d26623a9e3b912afad74d1575c396a09407c092201c7c2506f58f9b623be"
+    },
+    {
+      "path": "qualification/test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "9f4fc9df62852f71c9800c41ff5c37a5f0547a798400c9ac7cfe46f5829f8e78"
+    },
+    {
+      "path": "source/activation.rs",
+      "sha256": "8d1d969e77d811cab07978518f73e88cb1c64aa51a2649c5315e9a94a2aa9f1a"
+    },
+    {
+      "path": "source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a"
+    },
+    {
+      "path": "source/driver_policy.rs",
+      "sha256": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118"
+    },
+    {
+      "path": "source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe"
+    },
+    {
+      "path": "source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075"
+    },
+    {
+      "path": "source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8"
+    },
+    {
+      "path": "source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78"
+    },
+    {
+      "path": "source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee"
+    },
+    {
+      "path": "source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c"
+    },
+    {
+      "path": "source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575"
+    },
+    {
+      "path": "source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54"
+    },
+    {
+      "path": "source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00"
+    },
+    {
+      "path": "source/main.rs",
+      "sha256": "d65dafed23f45c9ed26996c4231325a6c0c55a9e8274d3c163183671f2bdc7b4"
+    },
+    {
+      "path": "source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec"
+    },
+    {
+      "path": "source/postreader.rs",
+      "sha256": "87fc229858e13581c759997ac6bddce844804454536d2eb3f3a46c9f0fb9f4e2"
+    },
+    {
+      "path": "source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c"
+    },
+    {
+      "path": "source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc"
+    },
+    {
+      "path": "source/reader_phase.rs",
+      "sha256": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f"
+    },
+    {
+      "path": "source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6"
+    },
+    {
+      "path": "source/successful_reader_retirement.rs",
+      "sha256": "7c5d33fc0581982970673282f1867fab2895e498c60cd2ea7aaa2a0e9b5b2d85"
+    },
+    {
+      "path": "source/successor_roles.rs",
+      "sha256": "4a3b8562ddc95c1710bb5b056b8c20d1e41c2d132076564af853f3da7ec3f1e9"
+    },
+    {
+      "path": "source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a"
+    }
+  ]
+}
