@@ -1024,6 +1024,220 @@ fn stage_identity_for(cache: &Path, attempt: &str) -> Result<Option<DirectoryIde
         Err(e) => Err(e.into()),
     }
 }
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct StageHandle {
+    pid: u32,
+    start_ticks: u64,
+    descriptor: u32,
+    path: PathBuf,
+    identity: Identity,
+    flags: u64,
+}
+
+fn descriptor_flags(path: &Path) -> Result<u64> {
+    let mut bytes = Vec::new();
+    File::open(path)?
+        .take((16 << 10) + 1)
+        .read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= 16 << 10, "oversized SDK descriptor info");
+    let text = std::str::from_utf8(&bytes)?;
+    let rows: Vec<_> = text
+        .lines()
+        .filter_map(|s| s.strip_prefix("flags:"))
+        .collect();
+    ensure!(rows.len() == 1, "ambiguous SDK descriptor flags");
+    Ok(u64::from_str_radix(rows[0].trim(), 8)?)
+}
+
+// Inspect only /proc descriptor metadata; never duplicate or read the download.
+// The caller separately authenticates the live SDK/group and the admitted stage.
+fn stage_handle(pid: u32, descriptor: u32, stage: &Directory) -> Result<Option<StageHandle>> {
+    stage.validate()?;
+    let before = stat(pid)?;
+    let path = PathBuf::from(format!("/proc/{pid}/fd/{descriptor}"));
+    let target = fs::read_link(&path)?;
+    if target.parent() != Some(stage.path.as_path())
+        || !matches!(target.file_name().and_then(|s| s.to_str()), Some(s) if s == NAME || s == format!("{NAME}_.gstmp"))
+    {
+        return Ok(None);
+    }
+    let flags = descriptor_flags(&PathBuf::from(format!("/proc/{pid}/fdinfo/{descriptor}")))?;
+    if !matches!(
+        flags as i32 & libc::O_ACCMODE,
+        libc::O_WRONLY | libc::O_RDWR
+    ) {
+        return Ok(None);
+    }
+    let opened = fs::metadata(&path)?;
+    let named = fs::symlink_metadata(&target)?;
+    let same_inode = |m: &fs::Metadata| {
+        m.is_file()
+            && m.dev() == stage.identity.device
+            && m.ino() == opened.ino()
+            && m.uid() == stage.identity.uid
+            && m.gid() == stage.identity.gid
+            && m.nlink() == 1
+            && m.mode() & 0o7777 == 0o600
+            && m.len() > 0
+            && m.len() <= SIZE + SLACK
+    };
+    ensure!(
+        same_inode(&opened) && same_inode(&named),
+        "unsafe SDK stage handle"
+    );
+    ensure!(stat(pid)? == before, "SDK descriptor owner changed");
+    stage.validate()?;
+    Ok(Some(StageHandle {
+        pid,
+        start_ticks: before.1,
+        descriptor,
+        path: target,
+        identity: Identity::of(&opened),
+        flags,
+    }))
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct SdkGroupMember {
+    pid: u32,
+    start_ticks: u64,
+    thread_ids: Vec<u32>,
+}
+
+// An unreaped Child retains its original PGID authority. Never stop a group
+// identified only by an old numeric PID or by a previously persisted witness.
+fn live_owned_leader(child: &OwnedSdk, group: &str) -> Result<u32> {
+    let pid = child.0.as_ref().context("SDK already reaped")?.id();
+    ensure!(
+        pid > 1
+            && pid != std::process::id()
+            && unsafe { libc::getpgrp() } != pid as i32
+            && !child.exited()?
+            && stat(pid)?.0 == pid
+            && cgroup(pid)? == group,
+        "SDK group no longer belongs to the live unreaped child"
+    );
+    Ok(pid)
+}
+
+fn sdk_group(pid: u32, group: &str, stopped: bool) -> Result<Vec<SdkGroupMember>> {
+    let mut members = Vec::new();
+    let mut processes = 0usize;
+    for entry in fs::read_dir("/proc")? {
+        let entry = entry?;
+        let Some(candidate) = entry
+            .file_name()
+            .to_str()
+            .and_then(|s| s.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        processes += 1;
+        ensure!(processes <= 8192, "SDK process census bound exceeded");
+        let identity = match stat(candidate) {
+            Ok(v) => v,
+            Err(e)
+                if e.downcast_ref::<std::io::Error>()
+                    .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                continue
+            }
+            Err(e) => return Err(e),
+        };
+        if identity.0 != pid {
+            continue;
+        }
+        ensure!(
+            cgroup(candidate)? == group,
+            "foreign member joined owned SDK group"
+        );
+        let mut tids = Vec::new();
+        for task in fs::read_dir(format!("/proc/{candidate}/task"))? {
+            let task = task?;
+            let tid = task
+                .file_name()
+                .to_str()
+                .context("SDK thread name")?
+                .parse::<u32>()?;
+            if stopped {
+                let s = status(tid)?;
+                ensure!(
+                    s.get("State")
+                        .is_some_and(|s| s.starts_with('T') || s.starts_with('t')),
+                    "SDK thread has not stopped"
+                );
+            }
+            tids.push(tid);
+            ensure!(tids.len() <= 512, "SDK thread census bound exceeded");
+        }
+        tids.sort_unstable();
+        ensure!(
+            !tids.is_empty() && stat(candidate)? == identity,
+            "SDK member changed during census"
+        );
+        members.push(SdkGroupMember {
+            pid: candidate,
+            start_ticks: identity.1,
+            thread_ids: tids,
+        });
+        ensure!(members.len() <= 128, "SDK group census bound exceeded");
+    }
+    members.sort_by_key(|p| p.pid);
+    ensure!(
+        members.iter().any(|p| p.pid == pid),
+        "SDK leader absent from its owned group"
+    );
+    Ok(members)
+}
+
+fn validate_sdk_members(members: &[SdkGroupMember]) -> Result<()> {
+    for member in members {
+        let s = status(member.pid)?;
+        ids(&s, "Uid", 1000)?;
+        ids(&s, "Gid", 1000)?;
+        ensure!(
+            s.get("Groups").is_some_and(String::is_empty)
+                && capability(&s, "CapEff")? == 0
+                && capability(&s, "CapPrm")? == 0
+                && capability(&s, "CapAmb")? == 0
+                && s.get("NoNewPrivs").map(String::as_str) == Some("1")
+                && stat(member.pid)?.1 == member.start_ticks,
+            "SDK stage writer kernel identity differs"
+        );
+    }
+    Ok(())
+}
+
+fn stop_owned_sdk_group(child: &OwnedSdk, group: &str) -> Result<Vec<SdkGroupMember>> {
+    let pid = live_owned_leader(child, group)?;
+    ensure!(
+        unsafe { libc::kill(-(pid as i32), libc::SIGSTOP) } == 0,
+        "cannot stop the owned SDK group"
+    );
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        live_owned_leader(child, group)?;
+        match sdk_group(pid, group, true) {
+            Ok(members) => return Ok(members),
+            Err(e)
+                if e.to_string() == "SDK thread has not stopped" && Instant::now() < deadline =>
+            {
+                thread::sleep(Duration::from_millis(5));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+struct HeldSdkStage {
+    leader: u32,
+    group: Vec<SdkGroupMember>,
+    handle: StageHandle,
+    stage: PathBuf,
+    stage_identity: DirectoryIdentity,
+}
+
 struct CaseEnvironment<'a> {
     gate: &'a Gate,
     session: &'a Session,
@@ -1038,8 +1252,148 @@ struct CaseEnvironment<'a> {
     case_floor: Cell<Option<u64>>,
     observation_counter: Cell<u32>,
     mutation_applied: Cell<bool>,
+    held_sdk_stage: RefCell<Option<HeldSdkStage>>,
 }
 impl CaseEnvironment<'_> {
+    fn held_stage_witness(&self) -> Result<Option<Value>> {
+        let binding = self
+            .held_sdk_stage
+            .borrow()
+            .as_ref()
+            .map(|held| (held.stage.clone(), held.stage_identity.clone()));
+        let Some((path, identity)) = binding else {
+            return Ok(None);
+        };
+        let stage = Directory::open(&path, &identity)?;
+        Ok(Some(self.validate_held_sdk_stage(&stage)?))
+    }
+
+    fn validate_held_sdk_stage(&self, stage: &Directory) -> Result<Value> {
+        let held = self.held_sdk_stage.borrow();
+        let held = held
+            .as_ref()
+            .context("actual held SDK stage handle missing")?;
+        ensure!(
+            stage.path == held.stage && stage.identity == held.stage_identity,
+            "held SDK stage binding changed"
+        );
+        let current = sdk_group(held.leader, &self.gate.profile.control_group, true)?;
+        ensure!(current == held.group, "stopped SDK membership changed");
+        validate_sdk_members(&current)?;
+        let handle = stage_handle(held.handle.pid, held.handle.descriptor, stage)?
+            .context("SDK stage descriptor closed before actual parent exit")?;
+        ensure!(handle == held.handle, "held SDK stage descriptor changed");
+        Ok(
+            json!({"schema":"jetstreamer-snapshot92447542-held-real-sdk-stage-v1",
+            "session_sha256":self.session_bound.sha256,"admission_sha256":self.gate.bound.sha256,
+            "actual_unit":self.gate.profile.unit,"actual_invocation_id":self.gate.profile.invocation_id,
+            "actual_parent_pid":std::process::id(),"stage":held.stage,"stage_identity":held.stage_identity,
+            "transport":"real-gcs","owned_unreaped_leader":held.leader,
+            "stopped_group_members":current,"actual_writable_stage_descriptor":handle,
+            "descriptor_body_read_or_duplicated":false,"resume_before_parent_exit":false}),
+        )
+    }
+
+    fn hold_sdk_stage_for_exit(&self, child: &OwnedSdk, stage: &Directory) -> Result<()> {
+        ensure!(
+            self.session.transport == Transport::RealGcs,
+            "SDK handle-at-death case requires real-gcs transport"
+        );
+        ensure!(
+            self.gate.invocation.actual_restore_runtime_seconds >= 90,
+            "SDK handle wait requires a ninety-second restore budget"
+        );
+        let group = &self.gate.profile.control_group;
+        let pid = live_owned_leader(child, group)?;
+        let start = stat(pid)?;
+        let deadline = Instant::now() + Duration::from_secs(30);
+        let (writer, fd) = loop {
+            self.native()?;
+            ensure!(
+                live_owned_leader(child, group)? == pid && stat(pid)? == start,
+                "SDK leader changed before stage handle"
+            );
+            ensure!(
+                Instant::now() < deadline,
+                "real SDK writable stage handle was not reached"
+            );
+            ensure!(
+                free_bytes(&stage.path)?
+                    >= self.case_floor.get().context("restore booking missing")?,
+                "protected free-space floor crossed while awaiting SDK handle"
+            );
+            ensure!(
+                staged_bytes(stage)? <= SIZE + SLACK,
+                "restore staging bound exceeded while awaiting SDK handle"
+            );
+            let members = sdk_group(pid, group, false)?;
+            validate_sdk_members(&members)?;
+            let mut found = None;
+            for member in members {
+                let mut descriptors = 0;
+                for entry in fs::read_dir(format!("/proc/{}/fd", member.pid))? {
+                    let entry = entry?;
+                    let fd = entry
+                        .file_name()
+                        .to_str()
+                        .context("SDK descriptor name")?
+                        .parse::<u32>()?;
+                    descriptors += 1;
+                    ensure!(descriptors <= 4096, "SDK descriptor census bound exceeded");
+                    match stage_handle(member.pid, fd, stage) {
+                        Ok(Some(_)) => {
+                            found = Some((member.pid, fd));
+                            break;
+                        }
+                        Ok(None) => (),
+                        Err(e)
+                            if e.downcast_ref::<std::io::Error>()
+                                .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
+                        {
+                            ()
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                if found.is_some() {
+                    break;
+                }
+            }
+            if let Some(found) = found {
+                break found;
+            }
+            thread::sleep(Duration::from_millis(20));
+        };
+        let members = stop_owned_sdk_group(child, group)?;
+        validate_sdk_members(&members)?;
+        let handle = stage_handle(writer, fd, stage)?
+            .context("SDK stage handle closed before group stopped")?;
+        ensure!(
+            members
+                .iter()
+                .any(|m| m.pid == writer && m.start_ticks == handle.start_ticks),
+            "stage writer escaped the stopped SDK group"
+        );
+        self.held_sdk_stage.replace(Some(HeldSdkStage {
+            leader: pid,
+            group: members,
+            handle,
+            stage: stage.path.clone(),
+            stage_identity: stage.identity.clone(),
+        }));
+        // No SIGCONT: the verified writer and its open descriptor remain stopped
+        // through exit197. OwnedSdk Drop kills/reaps on any failed gate instead.
+        let witness = self.validate_held_sdk_stage(stage)?;
+        persist(
+            &self
+                .gate
+                .result_parent()?
+                .join("actual-held-sdk-stage.json"),
+            &witness,
+        )?;
+        Ok(())
+    }
+
     fn native(&self) -> Result<Value> {
         let profile = self.gate.native()?;
         self.cache.validate()?;
@@ -1393,6 +1747,13 @@ impl Environment for CaseEnvironment<'_> {
                 .join(format!("actual-transfer-child-{pid}.json")),
             &json!({"schema":"jetstreamer-snapshot92447542-native-transfer-child-v1","session_sha256":self.session_bound.sha256,"parent_invocation_id":self.gate.profile.invocation_id,"transport":self.session.transport,"actual_child":witness,"fresh_GCS_body_transfer":self.session.transport==Transport::RealGcs,"verified_warm_generation_transfer":self.session.transport==Transport::VerifiedWarmCopy}),
         )?;
+        if self.gate.invocation.exit_after_phase.as_deref() == Some("RestoreChildSpawned")
+            || self.gate.invocation.hold_after_phase.as_deref() == Some("RestoreChildSpawned")
+        {
+            let stage_identity = DirectoryIdentity::of(&fs::symlink_metadata(&stage)?);
+            let stage_directory = Directory::open(&stage, &stage_identity)?;
+            self.hold_sdk_stage_for_exit(&owned, &stage_directory)?;
+        }
         Ok(owned)
     }
     fn after_phase(&self, phase: Phase) -> Result<()> {
@@ -1404,14 +1765,24 @@ impl Environment for CaseEnvironment<'_> {
         self.phases.borrow_mut().push(name.clone());
         let exits = self.gate.invocation.exit_after_phase.as_deref() == Some(name.as_str());
         let stage_identity = stage_identity_for(&self.cache.path, &self.gate.invocation.attempt)?;
+        let held_stage = self.held_stage_witness()?;
+        if phase == Phase::RestoreChildSpawned
+            && (exits || self.gate.invocation.hold_after_phase.as_deref() == Some(name.as_str()))
+        {
+            ensure!(
+                held_stage.is_some(),
+                "actual SDK handle missing at requested death phase"
+            );
+        }
         persist(
             &self
                 .gate
                 .result_parent()?
                 .join(format!("phase-{index:03}.json")),
-            &json!({"schema":"jetstreamer-snapshot92447542-native-process-phase-v1","session_sha256":self.session_bound.sha256,"admission_sha256":self.gate.bound.sha256,"actual_unit":self.gate.profile.unit,"actual_invocation_id":self.gate.profile.invocation_id,"actual_main_pid":std::process::id(),"actual_start_identity":self.gate.start_identity,"phase":name,"owned_transfer_children":*self.children.borrow(),"stage_identity":stage_identity,"elapsed_millis":self.gate.start.elapsed().as_millis(),"will_exit_code":if exits||self.gate.invocation.hold_after_phase.as_deref()==Some(name.as_str()){Some(EXIT_CODE)}else{None},"will_hold_live_owner":self.gate.invocation.hold_after_phase.as_deref()==Some(name.as_str()),"ordinary_modeled_interruption":false,"lifecycle_qualification":false}),
+            &json!({"schema":"jetstreamer-snapshot92447542-native-process-phase-v1","session_sha256":self.session_bound.sha256,"admission_sha256":self.gate.bound.sha256,"actual_unit":self.gate.profile.unit,"actual_invocation_id":self.gate.profile.invocation_id,"actual_main_pid":std::process::id(),"actual_start_identity":self.gate.start_identity,"phase":name,"owned_transfer_children":*self.children.borrow(),"stage_identity":stage_identity,"held_real_sdk_stage":held_stage,"elapsed_millis":self.gate.start.elapsed().as_millis(),"will_exit_code":if exits||self.gate.invocation.hold_after_phase.as_deref()==Some(name.as_str()){Some(EXIT_CODE)}else{None},"will_hold_live_owner":self.gate.invocation.hold_after_phase.as_deref()==Some(name.as_str()),"ordinary_modeled_interruption":false,"lifecycle_qualification":false}),
         )?;
         if exits {
+            self.held_stage_witness()?;
             std::process::exit(EXIT_CODE);
         }
         if self.gate.invocation.hold_after_phase.as_deref() == Some(name.as_str()) {
@@ -1428,8 +1799,10 @@ impl Environment for CaseEnvironment<'_> {
             let until = Instant::now() + Duration::from_secs(self.gate.invocation.hold_seconds);
             while Instant::now() < until {
                 self.gate.native()?;
+                self.held_stage_witness()?;
                 thread::sleep(Duration::from_millis(200));
             }
+            self.held_stage_witness()?;
             std::process::exit(EXIT_CODE);
         }
         self.apply_mutation(phase)
@@ -1480,6 +1853,14 @@ fn case_environment<'a>(g: &'a Gate, s: &'a Session, b: &'a Bound) -> Result<Cas
             && s.attempt_prefix == format!("slot92447542-restore-crash-{}-", s.case_id),
         "persistent native authority differs from fresh invocation"
     );
+    if g.invocation.exit_after_phase.as_deref() == Some("RestoreChildSpawned")
+        || g.invocation.hold_after_phase.as_deref() == Some("RestoreChildSpawned")
+    {
+        ensure!(
+            s.transport == Transport::RealGcs && g.invocation.actual_restore_runtime_seconds >= 90,
+            "SDK handle-at-death requires real-gcs transport and a ninety-second restore budget"
+        );
+    }
     if !g.invocation.attempt.is_empty() {
         ensure!(
             g.invocation.attempt.starts_with(&s.attempt_prefix)
@@ -1530,6 +1911,7 @@ fn case_environment<'a>(g: &'a Gate, s: &'a Session, b: &'a Bound) -> Result<Cas
         case_floor: Cell::new(None),
         observation_counter: Cell::new(0),
         mutation_applied: Cell::new(false),
+        held_sdk_stage: RefCell::new(None),
     };
     e.native()?;
     e.history()?;
@@ -1865,4 +2247,139 @@ fn actual_process_exit_or_native_case() -> Result<()> {
         &json!({"schema":"jetstreamer-snapshot92447542-native-process-case-result-v1","persistent_session":{"path":bound.path,"sha256":bound.sha256},"fresh_invocation_admission":{"path":g.bound.path,"sha256":g.bound.sha256},"actual_unit":g.profile.unit,"actual_invocation_id":g.profile.invocation_id,"actual_main_pid":std::process::id(),"normal_helper_lineage_sha256":session.engine_lineage.sha256,"native_harness_sha256":session.test_binary.sha256,"uri":URI,"generation":GENERATION,"source_bytes":SIZE,"source_digests":session.source_digests,"input":"genuine verified warm fixed-generation object; never a tiny fixture","transport":session.transport,"mutation":session.mutation,"expected_rejection_kind":g.invocation.expected_rejection,"expected_rejection_observed":error,"previous_invocation_disposition":g.invocation.predecessor.as_ref().map(|b|json!({"path":b.path,"sha256":b.sha256})),"original_attempt_disposition":g.invocation.attempt_origin.as_ref().map(|b|json!({"path":b.path,"sha256":b.sha256})),"phases":*e.phases.borrow(),"children":*e.children.borrow(),"before":g.before,"after":after,"actual_process_exit_this_invocation":false,"modeled_process_interruption":false,"modeled_space_observation":false,"original_cache_body_read":false,"lifecycle_qualification":false,"production_eviction_authorized":false}),
     )?;
     Ok(())
+}
+
+// Small kernel controls for the observer/stop primitives. They make no Session,
+// fixed-generation, SDK-transfer, crash-frontier or lifecycle acceptance claim.
+#[cfg(test)]
+mod stage_handle_tests {
+    use super::*;
+
+    fn stage(path: &Path) -> Result<Directory> {
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
+        Directory::open(path, &DirectoryIdentity::of(&fs::symlink_metadata(path)?))
+    }
+
+    #[test]
+    fn writable_descriptor_requires_the_exact_private_single_link_stage_file() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let directory = stage(root.path())?;
+        let destination = root.path().join(NAME);
+        let mut writer = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .mode(0o600)
+            .open(&destination)?;
+        writer.write_all(b"kernel observer control")?;
+        writer.sync_all()?;
+        let pid = std::process::id();
+        let fd: u32 = writer.as_raw_fd().try_into()?;
+        let observed =
+            stage_handle(pid, fd, &directory)?.context("writable stage handle absent")?;
+        assert_eq!(observed.identity.inode, writer.metadata()?.ino());
+        let reader = File::open(&destination)?;
+        assert!(stage_handle(pid, reader.as_raw_fd().try_into()?, &directory)?.is_none());
+        let foreign = tempfile::tempdir()?;
+        assert!(stage_handle(pid, fd, &stage(foreign.path())?)?.is_none());
+        fs::hard_link(&destination, root.path().join("foreign-alias"))?;
+        assert!(stage_handle(pid, fd, &directory).is_err());
+        fs::remove_file(root.path().join("foreign-alias"))?;
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o644))?;
+        assert!(stage_handle(pid, fd, &directory).is_err());
+        fs::set_permissions(&destination, fs::Permissions::from_mode(0o600))?;
+        drop(writer);
+        assert!(stage_handle(pid, fd, &directory).is_err());
+        Ok(())
+    }
+
+    fn owned_writer(destination: &Path) -> Result<OwnedSdk> {
+        let mut command = Command::new("/usr/bin/bash");
+        command
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .args([
+                "--noprofile",
+                "--norc",
+                "-c",
+                "umask 077; exec 9>\"$1\"; printf 'kernel stage control' >&9; IFS= read -r held",
+                "owned-kernel-stage-control",
+            ])
+            .arg(destination)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setpgid(0, 0) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let child = OwnedSdk(Some(command.spawn()?));
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            ensure!(!child.exited()?, "kernel stage control child exited early");
+            if fs::metadata(destination).is_ok_and(|m| m.len() > 0) {
+                return Ok(child);
+            }
+            ensure!(
+                Instant::now() < deadline,
+                "kernel stage control writer timed out"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn owned_group_stop_retains_the_descriptor_and_resume_invalidates_the_stop_proof() -> Result<()>
+    {
+        let root = tempfile::tempdir()?;
+        let directory = stage(root.path())?;
+        let mut child = owned_writer(&root.path().join(NAME))?;
+        let group = cgroup(std::process::id())?;
+        let pid = live_owned_leader(&child, &group)?;
+        let members = stop_owned_sdk_group(&child, &group)?;
+        let before =
+            stage_handle(pid, 9, &directory)?.context("stopped writer descriptor absent")?;
+        assert_eq!(sdk_group(pid, &group, true)?, members);
+        assert_eq!(stage_handle(pid, 9, &directory)?.as_ref(), Some(&before));
+        ensure!(
+            unsafe { libc::kill(-(pid as i32), libc::SIGCONT) } == 0,
+            "resume kernel control"
+        );
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while sdk_group(pid, &group, true).is_ok() {
+            ensure!(
+                Instant::now() < deadline,
+                "resume did not invalidate stopped-thread proof"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        child.finish()?;
+        assert!(stage_handle(pid, 9, &directory).is_err());
+        assert!(live_owned_leader(&child, &group).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn foreign_group_and_replaced_stage_refuse_before_claiming_a_held_handle() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let directory = stage(root.path())?;
+        let child = owned_writer(&root.path().join(NAME))?;
+        let group = cgroup(std::process::id())?;
+        let pid = live_owned_leader(&child, &group)?;
+        assert!(stop_owned_sdk_group(&child, "/foreign-control-group").is_err());
+        assert!(!status(pid)?["State"].starts_with('T'));
+        let parent = tempfile::tempdir()?;
+        let moved = parent.path().join("preserved-stage");
+        fs::rename(root.path(), &moved)?;
+        fs::create_dir(root.path())?;
+        fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700))?;
+        assert!(stage_handle(pid, 9, &directory).is_err());
+        // Drop kills/reaps this still-unreaped owned group even on a refusal.
+        drop(child);
+        assert!(fs::metadata(format!("/proc/{pid}")).is_err());
+        Ok(())
+    }
 }

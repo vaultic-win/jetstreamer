@@ -52,7 +52,7 @@ The test-only Cargo feature `snapshot92447542-native-sdk-tests` adds exactly
 `snapshot92447542_cache::native_sdk::actual_uid1000_sdk_metadata_profile`.
 Compile the native test harness with this feature, then run that exact test
 with `--exact --test-threads=1` under its separately admitted Root systemd
-service. Ordinary builds and the existing twelve module tests use features
+service. Ordinary builds and the ordinary module tests use features
 `[]`; do not enable the native feature in normal test selection or production.
 This control calls the same private `metadata_core` and `sdk_command` used by
 production. It does not construct a production `Plan`. Its successful lookup
@@ -404,3 +404,33 @@ protected sibling also requires an O_PATH/no-follow descriptor whose mount ID
 matches its exact read-only mask and whose inode/custody matches admission.
 No file body is read through these sibling descriptors. Cyclic ancestry,
 unbound masks, reachable writable submounts and all cache/state submounts reject.
+
+## Real SDK handle at process death
+
+The separate `snapshot92447542-native-lifecycle-tests` harness supports persistent
+isolated Sessions and independently admitted process exits. Requesting exit or
+hold at `RestoreChildSpawned` requires `real-gcs` transport and a restore budget
+of at least 90 seconds. A local warm-copy child cannot satisfy this case.
+
+Before that phase can be accepted, the harness waits at most 30 seconds for an
+actual writable SDK descriptor to the fixed snapshot name or its `_.gstmp`
+file inside the admitted stage. It checks the file's inode, private custody,
+single link, nonzero bounded length, descriptor flags, process start identity,
+and actual SDK process group and cgroup. It never reads or duplicates the body.
+The still-unreaped child retains the authority for a single group `SIGSTOP`.
+Every observed group thread must then be stopped, and the stage binding and
+writer descriptor must remain identical through the durable phase witness and
+immediately before the parent's exit 197. A live-owner hold repeats those checks.
+There is no `SIGCONT` on this successful path. Failed gates use the existing
+owned-child kill/reap cleanup.
+
+The phase witness includes `held_real_sdk_stage`; its separate private witness
+is `actual-held-sdk-stage.json`. Neither proves terminal child containment.
+Capture the actual parent's exit and systemd `KillMode=control-group` terminal
+evidence, and prove no descendant or retained stage/inode reference remains
+before admitting recovery. Never signal a numeric PGID from an old receipt.
+
+The native feature's `process_crash::stage_handle_tests::` selection exercises
+only the descriptor and owned-group primitives with disposable kernel controls.
+Those small files, shell children and passing tests are not a fixed-generation
+GCS transfer, an R04 process-death acceptance, or operational cleanup authority.
