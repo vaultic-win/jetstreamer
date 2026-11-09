@@ -1,0 +1,26 @@
+{
+  "observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+    "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+  },
+  "host_total_bytes": 810902843392,
+  "total_reserved_bytes": 799432196096,
+  "positive_uncovered_delta_bytes": 4912365568,
+  "headroom_bytes": 11470647296,
+  "complete_retained_DATA_bytes": 5177463485076,
+  "normal_external_pool_bytes": 6442450944,
+  "extra_QA6_closure": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/ROOT_HELPER27_CURRENT0500_NORMAL_POOL_REVALIDATED_CLOSURE_R2.json",
+    "sha256": "96cb1fd170d246e448c953802e7d00c745126f41ed35687df0f27914dc53da71"
+  },
+  "same_end_accounting": {
+    "before": {
+      "other_with_kernel_bytes": 42728112128
+    },
+    "after": {
+      "other_with_kernel_bytes": 42730938368
+    }
+  },
+  "no_new_resource_observation": true,
+  "no_new_credit_or_replay": true
+}

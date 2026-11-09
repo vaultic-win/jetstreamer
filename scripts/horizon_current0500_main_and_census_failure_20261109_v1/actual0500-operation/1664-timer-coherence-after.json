@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1s",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "InvocationID": "b55c21128f88449c8e60b64cb7366cd5",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+          "sha256": "2c2486d9f478cfa541ae88f86ac91310e6afa55f2cb64383065e9eb7cdbdc919"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1s",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+      "InvocationID": "b55c21128f88449c8e60b64cb7366cd5",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+          "sha256": "2c2486d9f478cfa541ae88f86ac91310e6afa55f2cb64383065e9eb7cdbdc919"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547718688954,
+    "next_monotonic_usec": 2547776841798,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer",
+  "unset_pending_requires_metadata_requery": false
+}

@@ -1,0 +1,22 @@
+{
+  "no_retry_or_renewal": true,
+  "original_native": {
+    "ActiveState": "activating",
+    "ControlPID": "3947934",
+    "ExecMainStartTimestampMonotonic": "0",
+    "ExecMainStatus": "0",
+    "Id": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "InvocationID": "722adc397ae24bb4b96d452783599f57",
+    "Job": "41247183",
+    "LoadState": "loaded",
+    "MainPID": "0",
+    "NRestarts": "0",
+    "Result": "success",
+    "SubState": "start-pre"
+  },
+  "original_setup_deadline": 1794201715,
+  "ready": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/ready-722adc397ae24bb4b96d452783599f57.json",
+    "sha256": "f9cfea99af99688c1d8cf991f08da2fa00bfa24b7f05f38860342ef99c29137f"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1s",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "InvocationID": "bf71af016f7b4f3f8e593e3714fdc113",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+          "sha256": "5076dfcf0a4c509e2f3c38e0962560939148df098eebb0b15723a37c22670ee5"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1s",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+      "InvocationID": "bf71af016f7b4f3f8e593e3714fdc113",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+          "sha256": "5076dfcf0a4c509e2f3c38e0962560939148df098eebb0b15723a37c22670ee5"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547776866089,
+    "next_monotonic_usec": 2547787394738,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer",
+  "unset_pending_requires_metadata_requery": false
+}

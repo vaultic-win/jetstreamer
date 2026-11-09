@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "--wait",
+    "--pipe",
+    "--service-type=exec",
+    "--unit",
+    "horizon-positive185-upstream-positive-0500-20261109-next-fleet",
+    "--property=User=root",
+    "--property=Group=root",
+    "--property=Restart=no",
+    "--property=MemoryMax=2G",
+    "--property=MemorySwapMax=0",
+    "--property=CPUQuota=100%",
+    "--property=TasksMax=512",
+    "--property=RuntimeMaxSec=60",
+    "--property=NoNewPrivileges=yes",
+    "--property=PrivateNetwork=no",
+    "--property=EnvironmentFile=/etc/jetstreamer/horizon-r2.env",
+    "--property=CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "--property=AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "/usr/local/lib/jetstreamer/horizon-epoch185-driver12-postreader-tools-20261109-v35/jetstreamer-r2",
+    "fleet-reconcile",
+    "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-722adc397ae24bb4b96d452783599f57/spec.json",
+    "--plan-sha256",
+    "3d65e5093eb5f3d59fba7061613e2eef95b60ca5490faf4a146eb338e5b1da87"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemd-run",
+  "timeout_millis": 65000,
+  "wall_started_at": 1794201127
+}

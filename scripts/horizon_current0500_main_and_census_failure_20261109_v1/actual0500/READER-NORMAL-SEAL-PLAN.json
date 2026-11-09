@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-failed4-current-accounting-reader-plan-actual0500-20261109-v13",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/FAILED4_READER_ACTUAL0500_SPEC.json",
+      "name": "spec.json",
+      "sha256": "c31d19a72cda52ffebedae0276be091347b8513d0f664897083c1e26fb29dbea",
+      "mode": 292
+    }
+  ]
+}

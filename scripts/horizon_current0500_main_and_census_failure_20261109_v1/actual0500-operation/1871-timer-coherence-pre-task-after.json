@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1ms",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "sha256": "43583c12dee0e736e7b9ab8380282423cbe6c36eb8f3e53fe3f97fdef9f5dffb"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1ms",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "sha256": "43583c12dee0e736e7b9ab8380282423cbe6c36eb8f3e53fe3f97fdef9f5dffb"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547776865333,
+    "next_monotonic_usec": 2547787384571,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+  "unset_pending_requires_metadata_requery": false
+}

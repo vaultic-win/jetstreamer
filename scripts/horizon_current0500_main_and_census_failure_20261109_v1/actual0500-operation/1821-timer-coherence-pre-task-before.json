@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+      "Id": "dpkg-db-backup.timer",
+      "InvocationID": "eb3a9508dd79480299ff51eaf366036d",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "dpkg-db-backup.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+          "sha256": "2e0dd766329313bfabd86b1acbd40069510afcfef3935cdea010168b503afde1"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+      "Id": "dpkg-db-backup.timer",
+      "InvocationID": "eb3a9508dd79480299ff51eaf366036d",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "yes",
+      "Unit": "dpkg-db-backup.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/dpkg-db-backup.timer",
+          "sha256": "2e0dd766329313bfabd86b1acbd40069510afcfef3935cdea010168b503afde1"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2529064057952,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794268800000000
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "dpkg-db-backup.timer",
+  "unset_pending_requires_metadata_requery": false
+}

@@ -1,0 +1,757 @@
+{
+  "all_existing_pending_deadlines_unchanged_or_qualified_original_events": true,
+  "no_timer_mutation_or_reset": true,
+  "results": [
+    {
+      "after": {
+        "activates": "apt-daily-upgrade.service",
+        "last": 1794119185136134,
+        "left": 1794205314449424,
+        "next": 1794205314449424,
+        "passed": 2465846238414,
+        "unit": "apt-daily-upgrade.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2465846238414,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794205314449424
+      },
+      "before": {
+        "activates": "apt-daily-upgrade.service",
+        "last": 1794119185136134,
+        "left": 1794204325591057,
+        "next": 1794204325591057,
+        "passed": 2465846238414,
+        "unit": "apt-daily-upgrade.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2465846238414,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794204325591057
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "apt-daily-upgrade.timer"
+    },
+    {
+      "after": {
+        "activates": "apt-daily.service",
+        "last": 1794163669095107,
+        "left": 1794216397491719,
+        "next": 1794216397491719,
+        "passed": 2510330197388,
+        "unit": "apt-daily.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2510330197388,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794216397491719
+      },
+      "before": {
+        "activates": "apt-daily.service",
+        "last": 1794163669095107,
+        "left": 1794240658330404,
+        "next": 1794240658330404,
+        "passed": 2510330197388,
+        "unit": "apt-daily.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2510330197388,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794240658330404
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "apt-daily.timer"
+    },
+    {
+      "after": {
+        "activates": "certbot.service",
+        "last": 1794183175957124,
+        "left": 1794247938677741,
+        "next": 1794247938677741,
+        "passed": 2529837059405,
+        "unit": "certbot.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2529837059405,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794247938677741
+      },
+      "before": {
+        "activates": "certbot.service",
+        "last": 1794183175957124,
+        "left": 1794247601317886,
+        "next": 1794247601317886,
+        "passed": 2529837059405,
+        "unit": "certbot.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2529837059405,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794247601317886
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "certbot.timer"
+    },
+    {
+      "after": {
+        "activates": "dpkg-db-backup.service",
+        "last": 1794182402955671,
+        "left": 1794268800000000,
+        "next": 1794268800000000,
+        "passed": 2529064057952,
+        "unit": "dpkg-db-backup.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2529064057952,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794268800000000
+      },
+      "before": {
+        "activates": "dpkg-db-backup.service",
+        "last": 1794182402955671,
+        "left": 1794268800000000,
+        "next": 1794268800000000,
+        "passed": 2529064057952,
+        "unit": "dpkg-db-backup.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2529064057952,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794268800000000
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "dpkg-db-backup.timer"
+    },
+    {
+      "after": {
+        "activates": "e2scrub_all.service",
+        "last": 1794107401676716,
+        "left": 1794712202715306,
+        "next": 1794712202715306,
+        "passed": 2454062778996,
+        "unit": "e2scrub_all.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2454062778996,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794712202715306
+      },
+      "before": {
+        "activates": "e2scrub_all.service",
+        "last": 1794107401676716,
+        "left": 1794712235862191,
+        "next": 1794712235862191,
+        "passed": 2454062778996,
+        "unit": "e2scrub_all.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2454062778996,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794712235862191
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "e2scrub_all.timer"
+    },
+    {
+      "after": {
+        "activates": "fstrim.service",
+        "last": 1794183289061139,
+        "left": 1794788271816260,
+        "next": 1794788271816260,
+        "passed": 2529950163421,
+        "unit": "fstrim.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2529950163421,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794788271816260
+      },
+      "before": {
+        "activates": "fstrim.service",
+        "last": 1794183289061139,
+        "left": 1794790146988910,
+        "next": 1794790146988910,
+        "passed": 2529950163421,
+        "unit": "fstrim.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2529950163421,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794790146988910
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "fstrim.timer"
+    },
+    {
+      "after": {
+        "activates": "fwupd-refresh.service",
+        "last": 1794201114866690,
+        "left": null,
+        "next": null,
+        "passed": 2547775968970,
+        "unit": "fwupd-refresh.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547775968970,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794204037034847
+      },
+      "before": {
+        "activates": "fwupd-refresh.service",
+        "last": 1794198185503478,
+        "left": 1794201935267166,
+        "next": 1794201935267166,
+        "passed": 2544846605758,
+        "unit": "fwupd-refresh.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2544846605758,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794201935267166
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "fwupd-refresh.timer"
+    },
+    {
+      "after": {
+        "activates": "horizon-guard145-prefix-real1328-20261106-v1.service",
+        "last": 1794201089298626,
+        "left": 1794201119322898,
+        "next": 1794201119322898,
+        "passed": 2547750400907,
+        "unit": "horizon-guard145-prefix-real1328-20261106-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547750400907,
+        "next_monotonic_usec": 2547780425178,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "horizon-guard145-prefix-real1328-20261106-v1.service",
+        "last": 1794201089298626,
+        "left": 1794201119322898,
+        "next": 1794201119322898,
+        "passed": 2547750400907,
+        "unit": "horizon-guard145-prefix-real1328-20261106-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547750400907,
+        "next_monotonic_usec": 2547780425178,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "horizon-guard145-prefix-real1328-20261106-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+        "last": 1794201087608825,
+        "left": 1794201115746814,
+        "next": 1794201115746814,
+        "passed": 2547748711107,
+        "unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547748711107,
+        "next_monotonic_usec": 2547776849094,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+        "last": 1794201087608825,
+        "left": 1794201117624897,
+        "next": 1794201117624897,
+        "passed": 2547748711107,
+        "unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547748711107,
+        "next_monotonic_usec": 2547778727177,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer"
+    },
+    {
+      "after": {
+        "activates": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.service",
+        "last": 1794200998280148,
+        "left": 1794201115761480,
+        "next": 1794201115761480,
+        "passed": 2547659382429,
+        "unit": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547659382429,
+        "next_monotonic_usec": 2547776863760,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.service",
+        "last": 1794200998280148,
+        "left": 1794201118380992,
+        "next": 1794201118380992,
+        "passed": 2547659382429,
+        "unit": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547659382429,
+        "next_monotonic_usec": 2547779483272,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "jetstreamer-adaptive-reserve-controller-rebind-155-156-20261023-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service",
+        "last": 1794201059763203,
+        "left": 1794201115739475,
+        "next": 1794201115739475,
+        "passed": 2547720865485,
+        "unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547720865485,
+        "next_monotonic_usec": 2547776841755,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service",
+        "last": 1794201059763203,
+        "left": 1794201119848568,
+        "next": 1794201119848568,
+        "passed": 2547720865485,
+        "unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547720865485,
+        "next_monotonic_usec": 2547780950848,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+        "last": 1794201087625377,
+        "left": 1794201115744113,
+        "next": 1794201115744113,
+        "passed": 2547748727658,
+        "unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547748727658,
+        "next_monotonic_usec": 2547776846393,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+        "last": 1794201087625377,
+        "left": 1794201117629333,
+        "next": 1794201117629333,
+        "passed": 2547748727658,
+        "unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547748727658,
+        "next_monotonic_usec": 2547778731613,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service",
+        "last": 1794200997542046,
+        "left": 1794201115754177,
+        "next": 1794201115754177,
+        "passed": 2547658644330,
+        "unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547658644330,
+        "next_monotonic_usec": 2547776856457,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.service",
+        "last": 1794200997542046,
+        "left": 1794201117560932,
+        "next": 1794201117560932,
+        "passed": 2547658644330,
+        "unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547658644330,
+        "next_monotonic_usec": 2547778663212,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "jetstreamer-adaptive-reserve-memory152-recovery-20261024-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service",
+        "last": 1794201057586673,
+        "left": 1794201115739518,
+        "next": 1794201115739518,
+        "passed": 2547718688954,
+        "unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547718688954,
+        "next_monotonic_usec": 2547776841798,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.service",
+        "last": 1794201057586673,
+        "left": 1794201357612265,
+        "next": 1794201357612265,
+        "passed": 2547718688954,
+        "unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547718688954,
+        "next_monotonic_usec": 2548018714545,
+        "next_realtime_usec": 0
+      },
+      "reason": "protective-unchanged-or-fired",
+      "unit": "jetstreamer-adaptive-reserve-package-rebind-198-20261021-v1.timer"
+    },
+    {
+      "after": {
+        "activates": "logrotate.service",
+        "last": 1794182402956343,
+        "left": 1794268800000000,
+        "next": 1794268800000000,
+        "passed": 2529064058625,
+        "unit": "logrotate.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2529064058625,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794268800000000
+      },
+      "before": {
+        "activates": "logrotate.service",
+        "last": 1794182402956343,
+        "left": 1794268800000000,
+        "next": 1794268800000000,
+        "passed": 2529064058625,
+        "unit": "logrotate.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2529064058625,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794268800000000
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "logrotate.timer"
+    },
+    {
+      "after": {
+        "activates": "man-db.service",
+        "last": 1794186752878457,
+        "left": 1794289063580672,
+        "next": 1794289063580672,
+        "passed": 2533413980737,
+        "unit": "man-db.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2533413980737,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794289063580672
+      },
+      "before": {
+        "activates": "man-db.service",
+        "last": 1794186752878457,
+        "left": 1794279324596777,
+        "next": 1794279324596777,
+        "passed": 2533413980737,
+        "unit": "man-db.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2533413980737,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794279324596777
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "man-db.timer"
+    },
+    {
+      "after": {
+        "activates": "mdcheck_start.service",
+        "last": 1793511323925669,
+        "left": 1796572996086493,
+        "next": 1796572996086493,
+        "passed": 1857985027949,
+        "unit": "mdcheck_start.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 1857985027949,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1796572996086493
+      },
+      "before": {
+        "activates": "mdcheck_start.service",
+        "last": 1793511323925669,
+        "left": 1796566011014518,
+        "next": 1796566011014518,
+        "passed": 1857985027949,
+        "unit": "mdcheck_start.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 1857985027949,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1796566011014518
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "mdcheck_start.timer"
+    },
+    {
+      "after": {
+        "activates": "mdmonitor-oneshot.service",
+        "last": 1794198185502127,
+        "left": 1794294539563119,
+        "next": 1794294539563119,
+        "passed": 2544846604407,
+        "unit": "mdmonitor-oneshot.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2544846604407,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794294539563119
+      },
+      "before": {
+        "activates": "mdmonitor-oneshot.service",
+        "last": 1794198185502127,
+        "left": 1794342091779947,
+        "next": 1794342091779947,
+        "passed": 2544846604407,
+        "unit": "mdmonitor-oneshot.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2544846604407,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794342091779947
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "mdmonitor-oneshot.timer"
+    },
+    {
+      "after": {
+        "activates": "motd-news.service",
+        "last": 1794191783468602,
+        "left": 1794247541356408,
+        "next": 1794247541356408,
+        "passed": 2538444570882,
+        "unit": "motd-news.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2538444570882,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794247541356408
+      },
+      "before": {
+        "activates": "motd-news.service",
+        "last": 1794191783468602,
+        "left": 1794247350930049,
+        "next": 1794247350930049,
+        "passed": 2538444570882,
+        "unit": "motd-news.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2538444570882,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794247350930049
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "motd-news.timer"
+    },
+    {
+      "after": {
+        "activates": "rotate-console-password.service",
+        "last": 1793502056676280,
+        "left": 1794712706088365,
+        "next": 1794712706088365,
+        "passed": 1848717778561,
+        "unit": "rotate-console-password.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 1848717778561,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794712706088365
+      },
+      "before": {
+        "activates": "rotate-console-password.service",
+        "last": 1793502056676280,
+        "left": 1794713856864902,
+        "next": 1794713856864902,
+        "passed": 1848717778561,
+        "unit": "rotate-console-password.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 1848717778561,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794713856864902
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "rotate-console-password.timer"
+    },
+    {
+      "after": {
+        "activates": "sysstat-collect.service",
+        "last": 1794201000000928,
+        "left": 1794201600000000,
+        "next": 1794201600000000,
+        "passed": 2547661103209,
+        "unit": "sysstat-collect.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2547661103209,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794201600000000
+      },
+      "before": {
+        "activates": "sysstat-collect.service",
+        "last": 1794201000000928,
+        "left": 1794201600000000,
+        "next": 1794201600000000,
+        "passed": 2547661103209,
+        "unit": "sysstat-collect.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2547661103209,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794201600000000
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "sysstat-collect.timer"
+    },
+    {
+      "after": {
+        "activates": "sysstat-summary.service",
+        "last": 1794182823214143,
+        "left": 1794269220000000,
+        "next": 1794269220000000,
+        "passed": 2529484316425,
+        "unit": "sysstat-summary.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2529484316425,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794269220000000
+      },
+      "before": {
+        "activates": "sysstat-summary.service",
+        "last": 1794182823214143,
+        "left": 1794269220000000,
+        "next": 1794269220000000,
+        "passed": 2529484316425,
+        "unit": "sysstat-summary.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2529484316425,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1794269220000000
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "sysstat-summary.timer"
+    },
+    {
+      "after": {
+        "activates": "systemd-tmpfiles-clean.service",
+        "last": 1794159895925168,
+        "left": 1794246295942921,
+        "next": 1794246295942921,
+        "passed": 2506557027449,
+        "unit": "systemd-tmpfiles-clean.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2506557027449,
+        "next_monotonic_usec": 2592957045201,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "systemd-tmpfiles-clean.service",
+        "last": 1794159895925168,
+        "left": 1794246295942921,
+        "next": 1794246295942921,
+        "passed": 2506557027449,
+        "unit": "systemd-tmpfiles-clean.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2506557027449,
+        "next_monotonic_usec": 2592957045201,
+        "next_realtime_usec": 0
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "systemd-tmpfiles-clean.timer"
+    },
+    {
+      "after": {
+        "activates": "update-notifier-download.service",
+        "last": 1794159302176335,
+        "left": 1794245702189886,
+        "next": 1794245702189886,
+        "passed": 2505963278616,
+        "unit": "update-notifier-download.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2505963278616,
+        "next_monotonic_usec": 2592363292166,
+        "next_realtime_usec": 0
+      },
+      "before": {
+        "activates": "update-notifier-download.service",
+        "last": 1794159302176335,
+        "left": 1794245702189886,
+        "next": 1794245702189886,
+        "passed": 2505963278616,
+        "unit": "update-notifier-download.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2505963278616,
+        "next_monotonic_usec": 2592363292166,
+        "next_realtime_usec": 0
+      },
+      "reason": "unchanged-earlier-or-fired",
+      "unit": "update-notifier-download.timer"
+    },
+    {
+      "after": {
+        "activates": "update-notifier-motd.service",
+        "last": 1794151603572447,
+        "left": 1795201272788917,
+        "next": 1795201272788917,
+        "passed": 2498264674727,
+        "unit": "update-notifier-motd.timer"
+      },
+      "after_native_clocks": {
+        "last_trigger_monotonic_usec": 2498264674727,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1795201272788917
+      },
+      "before": {
+        "activates": "update-notifier-motd.service",
+        "last": 1794151603572447,
+        "left": 1795114848256500,
+        "next": 1795114848256500,
+        "passed": 2498264674727,
+        "unit": "update-notifier-motd.timer"
+      },
+      "before_native_clocks": {
+        "last_trigger_monotonic_usec": 2498264674727,
+        "next_monotonic_usec": 0,
+        "next_realtime_usec": 1795114848256500
+      },
+      "reason": "named-OS-randomization-within-bound",
+      "unit": "update-notifier-motd.timer"
+    }
+  ],
+  "schema": "horizon-positive185-finite-original-reload-timer-audit-v1"
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-status185-current0500-running-tools-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-current0500-running-lifecycle-status-source-20261109-v1/status185-current0500-running.py",
+      "name": "status.py",
+      "sha256": "ef49b7a9f996c24b63a7c533f0726d9bc5fb40db844fbf663f42aa7bf8fb1317",
+      "mode": 292
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1h",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/fstrim.timer",
+      "Id": "fstrim.timer",
+      "InvocationID": "0125c6c019ae4adbbad1c5f706fcff48",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h 40min",
+      "RemainAfterElapse": "yes",
+      "Unit": "fstrim.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/fstrim.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/fstrim.timer",
+          "sha256": "699161252ffaa35a0272aae055e51332df694ff4d28c39f8b666d47ecced3397"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1h",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/fstrim.timer",
+      "Id": "fstrim.timer",
+      "InvocationID": "0125c6c019ae4adbbad1c5f706fcff48",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1h 40min",
+      "RemainAfterElapse": "yes",
+      "Unit": "fstrim.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/fstrim.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/fstrim.timer",
+          "sha256": "699161252ffaa35a0272aae055e51332df694ff4d28c39f8b666d47ecced3397"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2529950163421,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794788271816260
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "fstrim.timer",
+  "unset_pending_requires_metadata_requery": false
+}

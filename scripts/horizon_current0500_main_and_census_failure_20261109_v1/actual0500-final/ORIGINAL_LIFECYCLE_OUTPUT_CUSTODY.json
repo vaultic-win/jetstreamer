@@ -1,0 +1,13 @@
+{
+  "device": 2304,
+  "fresh_exact_leaf_created_once": true,
+  "gid": 0,
+  "inode": 4456550,
+  "mode": 448,
+  "no_resource_credit": true,
+  "parent": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2",
+  "parent_device": 2304,
+  "parent_inode": 4456545,
+  "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57",
+  "uid": 0
+}

@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "show",
+    "motd-news.timer",
+    "--no-pager",
+    "--property=Id,LoadState,InvocationID,FragmentPath,DropInPaths,RandomizedDelayUSec,FixedRandomDelay,AccuracyUSec,Unit,Persistent,RemainAfterElapse,WakeSystem"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/systemctl",
+  "timeout_millis": 10000,
+  "wall_started_at": 1794201169
+}

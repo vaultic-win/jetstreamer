@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/man-db.timer",
+      "Id": "man-db.timer",
+      "InvocationID": "2d496a3f3db9414f9fce6fac34a44859",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "man-db.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/man-db.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/man-db.timer",
+          "sha256": "3a3a1ca2ab2c92fe74bae1257e4c666e5dd0a31f441221dfa809bc0cf6540774"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/man-db.timer",
+      "Id": "man-db.timer",
+      "InvocationID": "2d496a3f3db9414f9fce6fac34a44859",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "12h",
+      "RemainAfterElapse": "yes",
+      "Unit": "man-db.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/man-db.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/man-db.timer",
+          "sha256": "3a3a1ca2ab2c92fe74bae1257e4c666e5dd0a31f441221dfa809bc0cf6540774"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2533413980737,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794284238850582
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "man-db.timer",
+  "unset_pending_requires_metadata_requery": false
+}

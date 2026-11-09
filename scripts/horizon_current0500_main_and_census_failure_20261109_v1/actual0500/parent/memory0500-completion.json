@@ -1,0 +1,21 @@
+{
+  "exec_main_status": 0,
+  "invocation_id": "20320069758746988e3a99a265e12693",
+  "original_PID1_journal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch163-selector0500-completion-20261109-v1/journal.json",
+    "sha256": "5c84609a94ff0a624951e16d749d110c44aad9eb27af2f25e1dd1fcde9b01312"
+  },
+  "original_cgroup_empty": true,
+  "original_descriptors_drained": true,
+  "original_drain": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch163-selector0500-completion-20261109-v1/drain.json",
+    "sha256": "1dd7f8bc04359033ea8de35b6da716f75eebd20757f29f1efe757314dda13cb2"
+  },
+  "original_outer_reaped": true,
+  "receipt": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "result": "success",
+  "schema": "epoch163-parent-memory-selector-original-completion-v1"
+}

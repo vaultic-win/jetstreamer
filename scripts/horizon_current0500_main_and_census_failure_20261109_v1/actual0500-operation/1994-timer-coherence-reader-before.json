@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "InvocationID": "b16b35497a944494ba7d1ef724025aa8",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+          "sha256": "8d29acedb1e52954499f2a9bb7312cd11fe322bb91c5efd026ae77dc8b010f3e"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1us",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "Id": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+      "InvocationID": "b16b35497a944494ba7d1ef724025aa8",
+      "LoadState": "loaded",
+      "Persistent": "no",
+      "RandomizedDelayUSec": "0",
+      "RemainAfterElapse": "no",
+      "Unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+        "source": {
+          "path": "/run/systemd/transient/jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+          "sha256": "8d29acedb1e52954499f2a9bb7312cd11fe322bb91c5efd026ae77dc8b010f3e"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2547787382288,
+    "next_monotonic_usec": 2547847487669,
+    "next_realtime_usec": 0
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "jetstreamer-adaptive-reserve-controller-rebind-183-184-20261023-v1.timer",
+  "unset_pending_requires_metadata_requery": false
+}

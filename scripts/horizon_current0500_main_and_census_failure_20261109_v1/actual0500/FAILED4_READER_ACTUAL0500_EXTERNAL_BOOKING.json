@@ -1,0 +1,51 @@
+{
+  "DATA_credit_bytes": 0,
+  "accepted_tuple": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_ACTUAL0500_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
+    "sha256": "2bd1c5ed9d1e37f49d779c0701f882f2d36358ba841f9d8f86c3ce23934129d9"
+  },
+  "accounting_sources_serde_json_sha256": "6df2b8021d6079ec7e05acefc894c33a28d74bc5d0d774d048f3f14181b915c4",
+  "current": {
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+      "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+    },
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+      "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json",
+      "sha256": "8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+    }
+  },
+  "expires_unix_seconds": 1794201554,
+  "memory_credit_bytes": 0,
+  "memory_max_bytes": 2147483648,
+  "output_directory": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079",
+  "prior_memory": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch136-suffix-accounting-projections-20261027-v1/prior-memory.json",
+    "sha256": "7b6e9a72fe89964d94ba22afe2a5320ed9ae401d2a624eaa01be9a57c772568a"
+  },
+  "recorded_unix_seconds": 1794200954,
+  "replay_launch_authorized": false,
+  "resource_arithmetic": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/CURRENT0500_SAME_END_READER_BOOKING_ARITHMETIC.json",
+    "sha256": "8b2b02b7e3703ea980f2b65aba9b60bbf35b08ca023e7ff96ecd4350ef1daf13"
+  },
+  "retention_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch136-hourly-charge-trace-retry-0005-plan-20261102-v3/plan.json",
+    "sha256": "2a7046f0eb59c6ce8ae3a03d073ed5fe555c66a0c477164d8e92f5014591f5cd"
+  },
+  "schema": "failed4-current-accounting-reader-external-booking-v1",
+  "terminal_legacy_memory_closure": {
+    "path": "/usr/local/lib/jetstreamer/horizon-terminal-legacy-memory-closure-20261030-v1/closure.json",
+    "sha256": "3f9f1063d55a0075a8f85af80818ae45c28d2f854e19a1edc641f00719bf4ca9"
+  },
+  "total_external_qualification_bytes": 6442450944,
+  "unit": "horizon-failed4-current-accounting-reader-20261104-v1.service"
+}

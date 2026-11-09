@@ -1,0 +1,24 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-visible050022-status-continuation-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/actual050022-visible-root-acceptance-20261109-v1/status_audit050022.py",
+      "name": "status_audit050022.py",
+      "sha256": "99fc6433b27785b270e533203e5fc1bde68e820c2f0f07834aa963e06b6437f6",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/actual050022-visible-root-acceptance-20261109-v1/audit_contract_r1.py",
+      "name": "audit_contract_r1.py",
+      "sha256": "f691a929bd1f7e6b94210f4751836b02050f8213e45214e0d09e253d0cfdf82f",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/actual050022-visible-root-acceptance-20261109-v1/live145_metadata.py",
+      "name": "live145_metadata.py",
+      "sha256": "a3b64d2e58cbd16f9b36fbbef7a40798cba6a2b5007b781753fa41b83d14c924",
+      "mode": 292
+    }
+  ]
+}

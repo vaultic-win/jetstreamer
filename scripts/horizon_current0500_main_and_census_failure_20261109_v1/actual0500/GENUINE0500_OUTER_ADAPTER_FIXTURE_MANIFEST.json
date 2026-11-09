@@ -1,0 +1,11 @@
+{
+  "reader_spec": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/GENUINE0500_ACCOUNTING_ADAPTER_SOURCE_BUNDLE.json",
+    "sha256": "0771d986a1296731586857f4b43bb236397b3e5f53ff9efb74f50a14124d9078"
+  },
+  "frame": {
+    "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+    "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+  },
+  "reader_spec_role": "Static accounting Sources fixture only; production adapter at original capture clock; no operational full-reader activation"
+}

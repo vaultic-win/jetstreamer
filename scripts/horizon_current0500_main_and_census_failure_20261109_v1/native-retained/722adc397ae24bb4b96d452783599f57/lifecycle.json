@@ -1,0 +1,232 @@
+{
+  "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+  "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+  "candidate_DATA_bytes": 549890031616,
+  "epoch": 185,
+  "fresh_admission_authorized": false,
+  "guard_floor_bytes": 5217451979412,
+  "limits": {
+    "log": 67108864,
+    "memory": 51539607552,
+    "metadata": 67108864,
+    "output": 137438953472,
+    "scratch": 412316860416,
+    "vmas": 4194304
+  },
+  "prestart_fleet_acceptance": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/fleet-acceptance.json",
+    "sha256": "fe016fccdbc55b78c570d640a527532eb0a4c692b4e928f0cefaa7699ecbdc97"
+  },
+  "prestart_reader_acceptance": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/reader-acceptance.json",
+    "sha256": "e5adc999c585af3034ee0c708f4c193cc827511e6e5cf0051f632241146fcac8"
+  },
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-722adc397ae24bb4b96d452783599f57.json",
+    "sha256": "7ee6864597173c36a9c110eda06f38403644908a5fddef1e2a65a9f7b69d0540"
+  },
+  "previous_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-722adc397ae24bb4b96d452783599f57/spec.json",
+    "sha256": "3d65e5093eb5f3d59fba7061613e2eef95b60ca5490faf4a146eb338e5b1da87"
+  },
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "ready_pid": 3947934,
+  "ready_start_ticks": 254777663,
+  "ready_started_at": 1794201115,
+  "registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/registration.json",
+    "sha256": "f7cf512decd1f2d8f4d43d4e282209ed5b1f01260b50e06029112bef253a6a6b"
+  },
+  "release": {
+    "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+    "first_guard": {
+      "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-302f13f17a7a47218f7329abe4ee7c23.json",
+      "sha256": "0d587f6ee086ea6e0b29583160d17435fdd88e0bb73b7d27693f4b574969e6a5"
+    },
+    "first_guard_value": {
+      "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+      "actor_pid": 3947934,
+      "actor_start_ticks": 254777663,
+      "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "admission_sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5",
+      "capacity_credit_bytes": 0,
+      "epoch": 185,
+      "failure": null,
+      "guard_invocation_id": "302f13f17a7a47218f7329abe4ee7c23",
+      "guard_start_monotonic_micros": 2547983286064,
+      "guard_start_native_property": "2547983286064",
+      "resource_sample": {
+        "free_bytes": 6946146283520,
+        "maximum_process_vmas": 67,
+        "memory_bytes": 2363392,
+        "metadata_allocated_bytes": 16384,
+        "output_allocated_bytes": 4096,
+        "scratch_allocated_bytes": 8192
+      },
+      "sampled_at": 1794201322,
+      "schema": "horizon-epoch185-native-guard-result-v4",
+      "success": true,
+      "timer_driven": true,
+      "timer_last_trigger_monotonic_micros": 2547983266191,
+      "timer_last_trigger_native_property": "4w 1d 11h 46min 23.266191s",
+      "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer"
+    },
+    "original_start_event": {
+      "CODE_FILE": "src/core/job.c",
+      "CODE_FUNC": "job_emit_done_message",
+      "CODE_LINE": "796",
+      "INVOCATION_ID": "722adc397ae24bb4b96d452783599f57",
+      "JOB_ID": "41253509",
+      "JOB_RESULT": "done",
+      "JOB_TYPE": "start",
+      "MESSAGE": "Started horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service - Epoch 185 original positive600s setup and bounded checkpoint-prefix replay.",
+      "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+      "PRIORITY": "6",
+      "SYSLOG_FACILITY": "3",
+      "SYSLOG_IDENTIFIER": "systemd",
+      "TID": "1",
+      "UNIT": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+      "_CAP_EFFECTIVE": "1ffffffffff",
+      "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+      "_COMM": "systemd",
+      "_EXE": "/usr/lib/systemd/systemd",
+      "_GID": "0",
+      "_HOSTNAME": "dev-samjohnson",
+      "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+      "_PID": "1",
+      "_RUNTIME_SCOPE": "system",
+      "_SELINUX_CONTEXT": "unconfined\n",
+      "_SOURCE_REALTIME_TIMESTAMP": "1794201323260829",
+      "_SYSTEMD_CGROUP": "/init.scope",
+      "_SYSTEMD_SLICE": "-.slice",
+      "_SYSTEMD_UNIT": "init.scope",
+      "_TRANSPORT": "journal",
+      "_UID": "0",
+      "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a533b;b=763ea84ca81f4dddad364b1ea2ba36dd;m=2513fb3ee83;t=65fd10c874bbb;x=bd387a4744d82bbd",
+      "__MONOTONIC_TIMESTAMP": "2547984363139",
+      "__REALTIME_TIMESTAMP": "1794201323260859",
+      "__SEQNUM": "57299771",
+      "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea"
+    },
+    "released_at": 1794201323,
+    "seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/722adc397ae24bb4b96d452783599f57/deployment-seal-receipt.json",
+      "sha256": "8dfec42ba95ca6b518741dc418f92cb95a0ee2bfdfde162285f903c3b931e45c"
+    },
+    "seal_value": {
+      "created_unix_seconds": 1794201322,
+      "destination": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/722adc397ae24bb4b96d452783599f57",
+      "members": [
+        {
+          "bytes": 3005,
+          "mode": "0444",
+          "name": "token.json",
+          "sha256": "4f1f4951976ce85f0655a858ff59a303c125c119716eeabc66c33fb0fd7c7bf7",
+          "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/original-token-source.json"
+        }
+      ],
+      "plan_sha256": "14c71e9b709bba55684cfd84cb31dbd34450318727c6a2a1b78b3192583d6430",
+      "publication_authorized": false,
+      "r2_mutations": false,
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "schema": "jetstreamer-sealed-deployment-receipt-v1",
+      "sealer_sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+    },
+    "token": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/722adc397ae24bb4b96d452783599f57/token.json",
+      "sha256": "4f1f4951976ce85f0655a858ff59a303c125c119716eeabc66c33fb0fd7c7bf7"
+    },
+    "token_value": {
+      "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+      "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "admission_sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5",
+      "current_reader_native_acceptance": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-722adc397ae24bb4b96d452783599f57/readable-reader-acceptance.json",
+        "sha256": "68b73e46a3fbb54af74793a727f45a6324187edcd353fc584de4f7b923121099"
+      },
+      "driver_sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e",
+      "epoch": 185,
+      "expires_at": 1794201337,
+      "fleet_enrollment": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-722adc397ae24bb4b96d452783599f57/readable-fleet-acceptance.json",
+        "sha256": "9209f2e0be3e83305a0b3f2fd4ba3e5d37d3ef3171404560dfcfc32f7cdc4832"
+      },
+      "guard_result": {
+        "actor_invocation_id": "722adc397ae24bb4b96d452783599f57",
+        "actor_pid": 3947934,
+        "actor_start_ticks": 254777663,
+        "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+        "admission_sha256": "e07d88bc90d5cfe472bdb64f26fb34963f5ff92bc505ee344a23917b0b8921c5",
+        "capacity_credit_bytes": 0,
+        "epoch": 185,
+        "failure": null,
+        "guard_invocation_id": "302f13f17a7a47218f7329abe4ee7c23",
+        "guard_start_monotonic_micros": 2547983286064,
+        "guard_start_native_property": "2547983286064",
+        "resource_sample": {
+          "free_bytes": 6946146283520,
+          "maximum_process_vmas": 67,
+          "memory_bytes": 2363392,
+          "metadata_allocated_bytes": 16384,
+          "output_allocated_bytes": 4096,
+          "scratch_allocated_bytes": 8192
+        },
+        "sampled_at": 1794201322,
+        "schema": "horizon-epoch185-native-guard-result-v4",
+        "success": true,
+        "timer_driven": true,
+        "timer_last_trigger_monotonic_micros": 2547983266191,
+        "timer_last_trigger_native_property": "4w 1d 11h 46min 23.266191s",
+        "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer"
+      },
+      "guard_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.service",
+      "issued_at": 1794201322,
+      "ready_pid": 3947934,
+      "ready_sha256": "f9cfea99af99688c1d8cf991f08da2fa00bfa24b7f05f38860342ef99c29137f",
+      "ready_start_ticks": 254777663,
+      "schema": "horizon-epoch185-native-gate-v4",
+      "status_readback": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-722adc397ae24bb4b96d452783599f57/readable-status-readback.json",
+        "sha256": "94a7732d0770b376a9de5cbea18bf2d4a5e94c4317f1f17f7f2fa09cbe3fdf72"
+      },
+      "task_acknowledgment": {
+        "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-views-722adc397ae24bb4b96d452783599f57/readable-task-acknowledgment.json",
+        "sha256": "31356da1c53653dc19f0cd9d39cd5124e0c521a7995a7086ef759d14fa425964"
+      },
+      "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0500-20261109-next.timer"
+    }
+  },
+  "released_actor": {
+    "actual_argv": [
+      "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+      "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0500-20261109-next/envelope.json",
+      "--plan-sha256",
+      "ff8bd6e279fad04843692652ed2ed014455974bb1f8db3a7b00e6bacdb8605bd",
+      "--self-sha256",
+      "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e"
+    ],
+    "cgroup": "0::/system.slice/horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+    "device": 2304,
+    "inode": 7218515,
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-guarded-adapter-v12/epoch185-guarded-cold",
+    "pid": 3961564,
+    "sha256": "b437ada8808ceae8d80a699fa2114446c735d7e72ae4d616fdead4646bb3082e",
+    "start_ticks": 254798434
+  },
+  "resource_credit_bytes": 0,
+  "sampled_at": 1794201727,
+  "schema": "horizon-epoch185-native-retained-lifecycle-v2",
+  "self_sha256": "5059c749d74f59711ce5ed9642dd2383a4a3b4bb21e3338ff5c1dce77a5a47fa",
+  "setup_deadline_at": 1794201715,
+  "spec": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-final-readable-specs-722adc397ae24bb4b96d452783599f57/lifecycle.json",
+    "sha256": "527fc70259fa1692174533594f1be69c27ab13ca0c2096ec61d378fdd889d8f7"
+  },
+  "task": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/722adc397ae24bb4b96d452783599f57/task.json",
+    "sha256": "364915751ba88c4451d9c4d79d38a522ded7633bc55a2b8c279ad2d1032ac239"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "Root_bytes": 536870912,
+  "actual_memory_selection": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "all_compilers_drained": true,
+  "argv": [
+    "/usr/bin/systemd-run",
+    "--wait",
+    "--pipe",
+    "--unit=horizon-epoch183-ended-DATA-select-20261105-v1.service",
+    "--service-type=exec",
+    "-p",
+    "User=root",
+    "-p",
+    "Group=root",
+    "-p",
+    "Restart=no",
+    "-p",
+    "MemoryAccounting=yes",
+    "-p",
+    "MemoryHigh=2G",
+    "-p",
+    "MemoryMax=2G",
+    "-p",
+    "MemorySwapMax=0",
+    "-p",
+    "CPUQuota=100%",
+    "-p",
+    "TasksMax=512",
+    "-p",
+    "RuntimeMaxSec=600",
+    "-p",
+    "TimeoutStopSec=15",
+    "-p",
+    "PrivateNetwork=yes",
+    "-p",
+    "ProtectSystem=strict",
+    "-p",
+    "ProtectHome=read-only",
+    "-p",
+    "NoNewPrivileges=yes",
+    "-p",
+    "CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE",
+    "-p",
+    "ReadWritePaths=/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079",
+    "-p",
+    "TemporaryFileSystem=/tmp:ro /var/tmp:ro",
+    "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/ended183-data",
+    "select",
+    "/usr/local/lib/jetstreamer/horizon-ended183-DATA-selection0500-plan-20261109-v1/plan.json",
+    "--plan-sha256",
+    "38ff5123b611f6a3fe2152bb9b79cd70a34571ea351de0b012899a2c1126f5e2",
+    "--self-sha256",
+    "85f374198bd5418bfa269faf01c9751b50f30a94a0cb0c0cc9a9b8b18133d243",
+    "--output",
+    "/var/lib/jetstreamer/horizon-ended183-DATA-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/selection.json"
+  ],
+  "current": {
+    "fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T050022Z-witness-terminal145-v1.json",
+      "sha256": "1a330c37645d7a1c0bdce6cef2861ba6a445cfd0bec08e411df5906dc60fd583"
+    },
+    "fleet_plan": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-current0500-fleet-plan-20261109-v1/fleet-plan.json",
+      "sha256": "8e7141bc68802af127583727dffd3fa5760236211081c903ab66aaca9c77106a"
+    },
+    "frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T050022-witness-terminal145-chain128-v5.json",
+      "sha256": "94916c3997a2d733563acf2b4ea41b8af4c77186a55ef32473c0333d22e135b8"
+    },
+    "observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T050022Z-postcompletion154-v1.json",
+      "sha256": "ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079"
+    }
+  },
+  "current_capacity": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_CURRENT0500_READONLY_POOL_CAPACITY.json",
+    "sha256": "eb0a053722c237cc1190bf9ed005ba991743cf69b41887ada9b8311ed4fc4f86"
+  },
+  "margin_bytes": 536870912,
+  "native_memory_bytes": 2147483648,
+  "native_outer_booking_seconds": [
+    600,
+    630,
+    665
+  ],
+  "no_full_replay_admission": true,
+  "normal_pool_bytes": 6442450944,
+  "one_routine2GiB_may_overlap": true,
+  "qualified_completed145_DATA_tools": {
+    "artifact_proof": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/artifact-proof.json",
+      "sha256": "fe55f3501741e2e5c7d6ba580304a613664e7a3020a9efb07d36c76dd8aafbf1"
+    },
+    "normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-first-lane-witness-ended183-DATA-selector-tools-20261107-v4/deployment-seal-receipt.json",
+      "sha256": "fd371453cdae57f642d1a040f3db075b3e720aa90fa9e19078a3193e88363840"
+    }
+  }
+}

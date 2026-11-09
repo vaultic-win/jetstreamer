@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-original199-parent-memory-registration-0500-native-parser-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "registration.json",
+      "sha256": "bf744101f04cab83f5e4ff9f0d9a318ec2f1a2d8afc29e40fcb7ee876fce50d4",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/registration0500.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

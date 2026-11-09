@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/mdcheck_start.timer",
+      "Id": "mdcheck_start.timer",
+      "InvocationID": "6887dd5c4c204c17be7c4ff7ec8dc8fe",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1d",
+      "RemainAfterElapse": "yes",
+      "Unit": "mdcheck_start.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/mdcheck_start.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/mdcheck_start.timer",
+          "sha256": "c73715ad2139bfe39919db7fc55f118f606a00a74ff8d2984c58baf0a27e63e9"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/mdcheck_start.timer",
+      "Id": "mdcheck_start.timer",
+      "InvocationID": "6887dd5c4c204c17be7c4ff7ec8dc8fe",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1d",
+      "RemainAfterElapse": "yes",
+      "Unit": "mdcheck_start.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/mdcheck_start.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/mdcheck_start.timer",
+          "sha256": "c73715ad2139bfe39919db7fc55f118f606a00a74ff8d2984c58baf0a27e63e9"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 1857985027949,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1796519224222655
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "mdcheck_start.timer",
+  "unset_pending_requires_metadata_requery": false
+}

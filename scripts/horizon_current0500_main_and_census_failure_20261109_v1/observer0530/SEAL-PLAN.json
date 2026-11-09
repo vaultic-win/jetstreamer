@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-visible-primary-observer-053022-plan-20261109-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/visible-primary-next-observer-053022-20261109-v1/observer.json",
+      "name": "observer.json",
+      "sha256": "cddfaf6d46d6fe821afa61702e1c1b7cb18f8a29ce2c7b63bc621fa683ef378b",
+      "mode": 292
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "get-property",
+    "org.freedesktop.systemd1",
+    "/org/freedesktop/systemd1/unit/horizon_2dpositive185_2dreader_2dcontrol_2dcontrol_2dpositive_2dreader_2dv38_2ddriver12_2dhelper35_2dr1_2eservice",
+    "org.freedesktop.systemd1.Service",
+    "EnvironmentFiles"
+  ],
+  "no_retry_or_clock_reset": true,
+  "original_iid": "positive-0500-20261109-next",
+  "program": "/usr/bin/busctl",
+  "timeout_millis": 5000,
+  "wall_started_at": 1794201097
+}

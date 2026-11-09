@@ -1,0 +1,602 @@
+{
+  "absolute_next_monotonic_usec": 2547778731613,
+  "bounded_wait_metadata": [
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 10028133,
+      "sampled_monotonic_usec": 2547738690123,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 9016316,
+      "sampled_monotonic_usec": 2547739701940,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 8004307,
+      "sampled_monotonic_usec": 2547740713949,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 6992258,
+      "sampled_monotonic_usec": 2547741725998,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 5980358,
+      "sampled_monotonic_usec": 2547742737898,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 4968406,
+      "sampled_monotonic_usec": 2547743749850,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 3956406,
+      "sampled_monotonic_usec": 2547744761850,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 2944445,
+      "sampled_monotonic_usec": 2547745773811,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 1932457,
+      "sampled_monotonic_usec": 2547746785799,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "absolute_next_monotonic_usec": 2547748718256,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "31af22ab42bb42bbbb06616f2f95c09c",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 920559,
+      "sampled_monotonic_usec": 2547747797697,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    },
+    {
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "activating",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "34039a1593364628b3036d7a966f0fc1",
+          "Job": "41246033",
+          "LoadState": "loaded",
+          "MainPID": "3942426",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "start"
+        }
+      },
+      "sampled_monotonic_usec": 2547748812020,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547748718256
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "running",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      },
+      "wait_reason": "original guard is running; no launch authority"
+    },
+    {
+      "absolute_next_monotonic_usec": 2547778731613,
+      "guard": {
+        "TimersMonotonic_entries": [],
+        "fields": {
+          "ActiveState": "inactive",
+          "ControlPID": "0",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "34039a1593364628b3036d7a966f0fc1",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead"
+        }
+      },
+      "remaining_usec": 29406100,
+      "sampled_monotonic_usec": 2547749325513,
+      "timer": {
+        "TimersMonotonic_entries": [
+          [
+            "OnUnitActiveUSec",
+            30000000,
+            2547778731613
+          ],
+          [
+            "OnActiveUSec",
+            1000000,
+            2008011141884
+          ]
+        ],
+        "fields": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "Result": "success",
+          "SubState": "waiting",
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      }
+    }
+  ],
+  "controller": {
+    "TimersMonotonic_entries": [],
+    "fields": {
+      "ActiveState": "active",
+      "ControlPID": "0",
+      "ExecMainStatus": "0",
+      "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+      "Job": "",
+      "LoadState": "loaded",
+      "MainPID": "2467123",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running"
+    }
+  },
+  "guard": {
+    "TimersMonotonic_entries": [],
+    "fields": {
+      "ActiveState": "inactive",
+      "ControlPID": "0",
+      "ExecMainStatus": "0",
+      "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+      "InvocationID": "34039a1593364628b3036d7a966f0fc1",
+      "Job": "",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "dead"
+    }
+  },
+  "no_guard_timer_or_controller_mutation": true,
+  "schema": "horizon-original-completed-guard-window-preflight-v3-rust",
+  "timer": {
+    "TimersMonotonic_entries": [
+      [
+        "OnUnitActiveUSec",
+        30000000,
+        2547778731613
+      ],
+      [
+        "OnActiveUSec",
+        1000000,
+        2008011141884
+      ]
+    ],
+    "fields": {
+      "ActiveState": "active",
+      "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+      "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+      "Job": "",
+      "LoadState": "loaded",
+      "Result": "success",
+      "SubState": "waiting",
+      "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+    }
+  }
+}

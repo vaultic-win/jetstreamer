@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/e2scrub_all.timer",
+      "Id": "e2scrub_all.timer",
+      "InvocationID": "b021b7607b9048e9a4383fa25f44ee48",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1min",
+      "RemainAfterElapse": "yes",
+      "Unit": "e2scrub_all.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/e2scrub_all.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/e2scrub_all.timer",
+          "sha256": "23f20fb6edc9fd54bf4754ef4311f88cba45ba65c6aecfa1885e8fb99531c211"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/e2scrub_all.timer",
+      "Id": "e2scrub_all.timer",
+      "InvocationID": "b021b7607b9048e9a4383fa25f44ee48",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1min",
+      "RemainAfterElapse": "yes",
+      "Unit": "e2scrub_all.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/e2scrub_all.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/e2scrub_all.timer",
+          "sha256": "23f20fb6edc9fd54bf4754ef4311f88cba45ba65c6aecfa1885e8fb99531c211"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2454062778996,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1794712202715306
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "e2scrub_all.timer",
+  "unset_pending_requires_metadata_requery": false
+}

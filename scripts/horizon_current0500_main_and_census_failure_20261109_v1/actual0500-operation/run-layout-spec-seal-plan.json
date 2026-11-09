@@ -1,0 +1,12 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-run-layout-positive-0500-20261109-next",
+  "members": [
+    {
+      "mode": 292,
+      "name": "spec.json",
+      "sha256": "ec7a6f08d16d7db72b1cf20250bce18c2a0063babe73b70f43ef99999b3b74dc",
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0500-original-r3-20261109-next/run-layout-spec.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

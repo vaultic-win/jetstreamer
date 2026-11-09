@@ -1,0 +1,33 @@
+{
+  "actual_census": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-census-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/capture-1/census.json",
+    "sha256": "2030dc0aee50655b694ead0c484e46bc5e38d3ec2e50561838008f7cad6e4c3c"
+  },
+  "actual_original_reader_completion": {
+    "path": "/usr/local/lib/jetstreamer/horizon-parent-memory-reader0500-completion-20261109-v1/completion.json",
+    "sha256": "5cc844562486e8bc9d897d3738f810ce9ebd33d791e0ff973bb106cde21cbe83"
+  },
+  "actual_selection": {
+    "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/select-1/selection.json",
+    "sha256": "c3592d090473020369d5058c39a91f811b559358ee8494e6fab5117a7a3281f6"
+  },
+  "all_original_raw_sources_preserved": true,
+  "completed145_parent_retirement_bytes": 206158430208,
+  "completed145_registered_request": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/completed145-actual0500-selection-request-v2.json",
+    "sha256": "1bea23e221ae623092723191d37382812d40a96587785a600bae84a55de1bf15"
+  },
+  "current_tuple": {
+    "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/ROOT_ACTUAL0500_NATIVE_FRAME_READER_CONTRACT_ACCEPTED.json",
+    "sha256": "2bd1c5ed9d1e37f49d779c0701f882f2d36358ba841f9d8f86c3ce23934129d9"
+  },
+  "effective_total_memory_promises_bytes": 430083301376,
+  "fresh_eligibility_enrollment_and_full163_admission_remain_required": true,
+  "original199_parent_retirement_bytes": 206158430208,
+  "original_reader": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/ea34a52eef04e6038d7c0862b6ec17503efaaa8594f48a262ffc69c3a5206079/proof.json",
+    "sha256": "d986be1eafbe34c7e628989361ec8afd9fa8472c6db7a832c9afdee46e30b373"
+  },
+  "raw_total_memory_promises_bytes": 1049632333824,
+  "retained_original199_DATA_bytes": 824633720832
+}

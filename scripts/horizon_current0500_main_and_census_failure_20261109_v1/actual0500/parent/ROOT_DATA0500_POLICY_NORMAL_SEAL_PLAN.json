@@ -1,0 +1,18 @@
+{
+  "destination": "/usr/local/lib/jetstreamer/horizon-ended183-DATA-policy-0500-20261109-v1",
+  "members": [
+    {
+      "mode": 292,
+      "name": "policy.json",
+      "sha256": "c0085c72b6704d33aff687691d55a6814602c715251430baaa32a4dbbff1538a",
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/data0500-policy.json"
+    },
+    {
+      "mode": 292,
+      "name": "inventory.json",
+      "sha256": "d91eafe37ac889e5784be7f3f76ed39d42e3b5d550190ce70387dfa0357f2a7c",
+      "source": "/home/sol/.jetstreamer-private/actual050022-visible-root-acceptance-20261109-v1/inventory050022.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

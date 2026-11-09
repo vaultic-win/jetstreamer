@@ -1,0 +1,18 @@
+{
+  "Root_metadata_bytes": 536870912,
+  "all_compilers_drained": true,
+  "argv": [
+    "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+    "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0500-20261109-v1/parent/ROOT_MEMORY0500_COMPLETION_NORMAL_SEAL_PLAN.json",
+    "--plan-sha256",
+    "f4c4cc96bbc24a95300bb5c5cb7d38e010c2bda1a68f6c8145b58a26b5a8848d",
+    "--self-sha256",
+    "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+  ],
+  "native_outer_booking_seconds": [
+    60,
+    70,
+    95
+  ],
+  "normal_pool_bytes": 6442450944
+}

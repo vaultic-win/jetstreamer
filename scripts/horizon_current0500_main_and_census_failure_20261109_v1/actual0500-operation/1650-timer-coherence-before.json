@@ -1,0 +1,65 @@
+{
+  "accepted": true,
+  "attempt": 0,
+  "finite_actual_deadline": true,
+  "no_timer_mutation_or_deadline_reset": true,
+  "policy_after": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/update-notifier-motd.timer",
+      "Id": "update-notifier-motd.timer",
+      "InvocationID": "c0afdd0344de42fc9ef37539f317786e",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1w",
+      "RemainAfterElapse": "yes",
+      "Unit": "update-notifier-motd.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/update-notifier-motd.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/update-notifier-motd.timer",
+          "sha256": "7e5fa1f167ad72cf1bd0421d72ca3017ccb5a62f98d91ec3f9e25efd46c2a9ef"
+        }
+      }
+    ]
+  },
+  "policy_before": {
+    "native": {
+      "AccuracyUSec": "1min",
+      "DropInPaths": "",
+      "FixedRandomDelay": "no",
+      "FragmentPath": "/usr/lib/systemd/system/update-notifier-motd.timer",
+      "Id": "update-notifier-motd.timer",
+      "InvocationID": "c0afdd0344de42fc9ef37539f317786e",
+      "LoadState": "loaded",
+      "Persistent": "yes",
+      "RandomizedDelayUSec": "1w",
+      "RemainAfterElapse": "yes",
+      "Unit": "update-notifier-motd.service",
+      "WakeSystem": "no"
+    },
+    "sources": [
+      {
+        "declared_path": "/usr/lib/systemd/system/update-notifier-motd.timer",
+        "source": {
+          "path": "/usr/lib/systemd/system/update-notifier-motd.timer",
+          "sha256": "7e5fa1f167ad72cf1bd0421d72ca3017ccb5a62f98d91ec3f9e25efd46c2a9ef"
+        }
+      }
+    ]
+  },
+  "raw_native_clocks": {
+    "last_trigger_monotonic_usec": 2498264674727,
+    "next_monotonic_usec": 0,
+    "next_realtime_usec": 1795114848256500
+  },
+  "raw_uint64_values_preserved": true,
+  "rejection": null,
+  "unit": "update-notifier-motd.timer",
+  "unset_pending_requires_metadata_requery": false
+}
