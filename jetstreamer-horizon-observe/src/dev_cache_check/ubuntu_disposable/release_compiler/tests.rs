@@ -158,6 +158,7 @@ fn metadata_placeholder_must_be_empty_and_executable_must_have_real_elf_tables()
     fs::write(&output, &good).unwrap();
     fs::set_permissions(&output, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(accepted(directory.path(), &d));
+    assert!(!accepted(directory.path(), &output));
 }
 
 #[test]

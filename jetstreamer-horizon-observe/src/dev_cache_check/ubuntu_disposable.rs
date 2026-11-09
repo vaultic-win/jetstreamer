@@ -721,8 +721,15 @@ mod tests {
         fs::write(d.path().join("new.o"), b"new valid work").unwrap();
         assert!(subset(&manifest(d.path()).unwrap(), &before).is_err());
         fs::remove_file(d.path().join("new.o")).unwrap();
+        // Keep the original inode allocated: immediate directory recreation
+        // may otherwise reuse it and fail to construct a replacement fixture.
+        let original = File::open(d.path().join("generation")).unwrap();
         fs::remove_dir(d.path().join("generation")).unwrap();
         fs::create_dir(d.path().join("generation")).unwrap();
+        assert_ne!(
+            original.metadata().unwrap().ino(),
+            fs::metadata(d.path().join("generation")).unwrap().ino()
+        );
         assert!(subset(&manifest(d.path()).unwrap(), &before).is_err());
     }
     #[test]
