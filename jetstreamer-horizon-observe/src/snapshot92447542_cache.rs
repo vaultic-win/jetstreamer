@@ -1149,23 +1149,23 @@ fn stop_owned_sdk(owned: &mut Option<OwnedSdk>) -> Result<()> {
     }
     Ok(())
 }
-fn sdk_command(p: &Plan) -> Result<Command> {
+fn sdk_command(gcloud: &Bound) -> Result<Command> {
     ensure!(
-        p.gcloud.path.is_absolute()
-            && p.gcloud.path.starts_with("/home/linuxbrew/.linuxbrew")
-            && p.gcloud.path.file_name().is_some_and(|x| x == "gcloud")
-            && p.gcloud.path.canonicalize()? == p.gcloud.path,
+        gcloud.path.is_absolute()
+            && gcloud.path.starts_with("/home/linuxbrew/.linuxbrew")
+            && gcloud.path.file_name().is_some_and(|x| x == "gcloud")
+            && gcloud.path.canonicalize()? == gcloud.path,
         "SDK must be the exact canonical Homebrew gcloud"
     );
-    let (h, m) = evidence::hash_file(&p.gcloud.path, 16 << 20)?;
+    let (h, m) = evidence::hash_file(&gcloud.path, 16 << 20)?;
     ensure!(
-        h == p.gcloud.sha256
+        h == gcloud.sha256
             && matches!(m.uid(), 0 | 1000)
             && m.mode() & 0o022 == 0
             && m.mode() & 0o111 != 0,
         "installed SDK digest/custody changed"
     );
-    let mut c = Command::new(&p.gcloud.path);
+    let mut c = Command::new(&gcloud.path);
     c.env_clear()
         .env("PATH", "/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin")
         .env("HOME", "/home/ubuntu")
@@ -1198,7 +1198,21 @@ fn sdk_command(p: &Plan) -> Result<Command> {
     Ok(c)
 }
 fn metadata(p: &Plan) -> Result<Vec<u8>> {
-    let mut c = sdk_command(p)?;
+    metadata_core(&p.gcloud, |_, _| Ok(()))
+}
+// Native qualification observes the actual SDK child at spawn and immediately
+// before owned-group shutdown. Production uses this identical metadata engine
+// with a no-op witness; no qualification Plan or snapshot body is fabricated.
+#[derive(Clone, Copy)]
+enum SdkWitnessPoint {
+    Spawned,
+    BeforeReap,
+}
+fn metadata_core(
+    gcloud: &Bound,
+    mut witness: impl FnMut(u32, SdkWitnessPoint) -> Result<()>,
+) -> Result<Vec<u8>> {
+    let mut c = sdk_command(gcloud)?;
     c.args([
         "storage",
         "objects",
@@ -1212,6 +1226,14 @@ fn metadata(p: &Plan) -> Result<Vec<u8>> {
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
     let mut child = OwnedSdk(Some(c.spawn()?));
+    let pid = child.0.as_ref().context("SDK child missing")?.id();
+    if let Err(error) = witness(pid, SdkWitnessPoint::Spawned) {
+        // Cleanup precedes propagation, including a failed native /proc witness.
+        child
+            .finish()
+            .context("SDK witness failure cleanup failed")?;
+        return Err(error);
+    }
     let process = child.0.as_mut().context("SDK child missing")?;
     let out = process.stdout.take().context("SDK stdout missing")?;
     let err = process.stderr.take().context("SDK stderr missing")?;
@@ -1235,6 +1257,12 @@ fn metadata(p: &Plan) -> Result<Vec<u8>> {
             "SDK metadata timeout"
         );
         thread::sleep(Duration::from_millis(25));
+    }
+    if let Err(error) = witness(pid, SdkWitnessPoint::BeforeReap) {
+        child
+            .finish()
+            .context("SDK final witness failure cleanup failed")?;
+        return Err(error);
     }
     let status = child.finish()?;
     // Do not join a pipe reader indefinitely if an SDK descendant escaped its
@@ -1265,7 +1293,7 @@ fn metadata(p: &Plan) -> Result<Vec<u8>> {
         "SDK metadata failed (private stderr withheld)"
     );
     validate_metadata(&serde_json::from_slice::<Value>(&bytes)?)?;
-    sdk_command(p)?;
+    sdk_command(gcloud)?;
     Ok(bytes)
 }
 #[derive(Deserialize)]
@@ -1558,7 +1586,7 @@ fn restore(
     let mut owned_sdk: Option<OwnedSdk> = None;
     let transfer = (|| -> Result<(Identity, Digests)> {
         guard(&dir, &a, start, r.maximum_runtime_seconds)?;
-        let mut command = sdk_command(p)?;
+        let mut command = sdk_command(&p.gcloud)?;
         command
             .args([
                 "storage",
@@ -2087,3 +2115,9 @@ mod retained_metadata_fixture {
         reader.join().unwrap();
     }
 }
+
+// A native SDK control must be explicitly selected. The ordinary module test
+// inventory remains unchanged and cannot make an authenticated cloud call.
+#[cfg(all(test, feature = "snapshot92447542-native-sdk-tests"))]
+#[path = "snapshot92447542_native_sdk.rs"]
+mod native_sdk;
