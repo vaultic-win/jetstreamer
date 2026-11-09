@@ -1,0 +1,40 @@
+[Unit]
+Description=Restore generation-pinned Horizon bootstrap slot 95039516 for continuous epochs 220-223
+ConditionFileIsExecutable=/var/lib/jetstreamer/horizon-snapshot-restore-b431781/restore_bound_gcs_snapshot.py
+ConditionPathIsDirectory=/home/ubuntu/.jetstreamer-private/qualification-later-snapshots
+ConditionPathIsDirectory=/home/ubuntu/.jetstreamer-private/adaptive-220-232-v1/lane-a/config/gcloud
+ConditionPathExists=!/home/ubuntu/.jetstreamer-private/qualification-later-snapshots/snapshot-95039516-9TaEWfKXJYo2a5UYx3HuE72aGa8FVXJzHCVzQjvF6HDG.tar.zst
+ConditionPathExists=!/home/ubuntu/.jetstreamer-private/qualification-later-snapshots/bootstrap-95039516-restore-receipt.json
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/.jetstreamer-private/qualification-later-snapshots
+Environment="HOME=/home/ubuntu"
+Environment="PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="CLOUDSDK_CONFIG=/home/ubuntu/.jetstreamer-private/adaptive-220-232-v1/lane-a/config/gcloud"
+ExecStart=/var/lib/jetstreamer/horizon-snapshot-restore-b431781/restore_bound_gcs_snapshot.py --gcloud-bin=/home/linuxbrew/.linuxbrew/bin/gcloud --gcloud-account=sam.johnson@anza.xyz --billing-project=principal-lane-200702 --versioned-uri=gs://mainnet-beta-ledger-us-ny5/95039516/snapshot-95039516-9TaEWfKXJYo2a5UYx3HuE72aGa8FVXJzHCVzQjvF6HDG.tar.zst#1631142081757813 --destination=/home/ubuntu/.jetstreamer-private/qualification-later-snapshots/snapshot-95039516-9TaEWfKXJYo2a5UYx3HuE72aGa8FVXJzHCVzQjvF6HDG.tar.zst --expected-size=9145935336 --expected-crc32c=YsIO8w== --expected-md5=HidR33mV/Zie29unbWaVZQ== --receipt=/home/ubuntu/.jetstreamer-private/qualification-later-snapshots/bootstrap-95039516-restore-receipt.json --filesystem=/ --minimum-free-bytes=6597069766656
+Restart=no
+TimeoutStartSec=3h
+CPUQuota=800%
+MemoryMax=8589934592
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/home/ubuntu/.jetstreamer-private/qualification-later-snapshots /home/ubuntu/.jetstreamer-private/adaptive-220-232-v1/lane-a/config/gcloud
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=horizon-restore-next-bootstrap-95039516-v1

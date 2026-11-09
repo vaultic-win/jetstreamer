@@ -12,7 +12,7 @@ members = [
 # Historical consensus workers are separate workspaces pinned to their exact
 # Rust toolchains. Their current-toolchain protocol facade is consumed only as
 # a path dependency.
-exclude = ["historical-runtime"]
+exclude = ["historical-runtime", "tools/horizon-old220-peers"]
 
 [workspace.package]
 edition = "2024"
