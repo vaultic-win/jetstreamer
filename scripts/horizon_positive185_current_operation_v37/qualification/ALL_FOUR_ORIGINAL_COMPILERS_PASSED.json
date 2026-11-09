@@ -1,0 +1,14 @@
+{
+  "labels": [
+    "clippy-production",
+    "clippy-tests",
+    "test-build",
+    "release"
+  ],
+  "graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "d490b5e6695fd81c44b4a0b848b41cda50ddbd2e7eb9633c72977b96450b90b2"
+  },
+  "all_unchanged_externs_preserved": true,
+  "no_replay_or_publication": true
+}

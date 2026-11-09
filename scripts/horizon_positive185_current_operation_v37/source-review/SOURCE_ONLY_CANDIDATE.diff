@@ -1,0 +1,1476 @@
+--- actual-operation36/activation.rs
++++ source/activation.rs
+@@ -1,4 +1,6 @@
+ use crate::*;
++#[path = "run_layout.rs"]
++pub(crate) mod run_layout;
+ fn owned_sol(path: &Path) -> Result<()> {
+     fs::DirBuilder::new().mode(0o700).create(path)?;
+     let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())?;
+@@ -466,9 +468,8 @@
+     }
+     let runroot = PathBuf::from(text(&templates["envelope"]["plan"], "run_root")?);
+     let control = PathBuf::from(text(&templates["envelope"], "control_root")?);
+-    for p in [&runroot, &control] {
+-        owned_sol(p)?;
+-    }
++    run_layout::prepare(&runroot, &control)?;
++    run_layout::prove_access(r, &runroot, &control)?;
+     for p in [
+         PathBuf::from(REGISTRY),
+         PathBuf::from(text(&templates["envelope"], "guard_receipt_root")?),
+--- /dev/null
++++ source/fixtures/original0100-reader-completion.json
+@@ -0,0 +1,1101 @@
++{
++  "actual_advisory_start_phase": {
++    "actual_monotonic_usec": 2533479801927,
++    "earlier_metadata_wait_samples": [
++      {
++        "actual_monotonic_usec": 2533467019504,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533444953647",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "9aa17be129c742e7996d59a237ef530b",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 27.220432s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 34.904184s }",
++            "{ OnActiveUSec=1s ; next_elapse=4w 1d 7h 44min 27.220432s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533467532018,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533468042857,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533468553657,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533469064383,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533469575124,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533470085919,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533470596632,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533471107513,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533471618174,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533472128867,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533472640008,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533473150808,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533473661497,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533474172279,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533474683004,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533475193734,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533475704406,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533476215174,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533476727054,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533477239554,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533477750353,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533478260945,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533478771651,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      },
++      {
++        "actual_monotonic_usec": 2533479282379,
++        "guard": {
++          "ActiveState": "failed",
++          "ControlGroup": "",
++          "ControlPID": "0",
++          "ExecMainCode": "1",
++          "ExecMainExitTimestampMonotonic": "2533467305901",
++          "ExecMainStatus": "1",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++          "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++          "Job": "",
++          "LoadState": "loaded",
++          "MainPID": "0",
++          "NRestarts": "0",
++          "Result": "exit-code",
++          "SubState": "failed",
++          "TimersMonotonic": []
++        },
++        "timer": {
++          "ActiveState": "active",
++          "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++          "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++          "Job": "",
++          "LoadState": "loaded",
++          "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++          "Result": "success",
++          "SubState": "waiting",
++          "TimersMonotonic": [
++            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++            "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++          ],
++          "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++        }
++      }
++    ],
++    "failed_guard_is_not_safety_coverage": true,
++    "guard": {
++      "ActiveState": "failed",
++      "ControlGroup": "",
++      "ControlPID": "0",
++      "ExecMainCode": "1",
++      "ExecMainExitTimestampMonotonic": "2533467305901",
++      "ExecMainStatus": "1",
++      "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
++      "InvocationID": "bf0a78c181474424b38362be4ccb1225",
++      "Job": "",
++      "LoadState": "loaded",
++      "MainPID": "0",
++      "NRestarts": "0",
++      "Result": "exit-code",
++      "SubState": "failed",
++      "TimersMonotonic": []
++    },
++    "guard_exit_monotonic_usec": 2533467305901,
++    "new_resource_samples": 0,
++    "next_guard_deadline_monotonic_usec": 2533497240990,
++    "no_guard_or_timer_mutation": true,
++    "replay_launch_authorized": false,
++    "schema": "horizon-current-reader-advisory-native-start-phase-v1",
++    "timer": {
++      "ActiveState": "active",
++      "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
++      "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
++      "Job": "",
++      "LoadState": "loaded",
++      "NextElapseUSecMonotonic": "4w 1d 7h 44min 57.240990s",
++      "Result": "success",
++      "SubState": "waiting",
++      "TimersMonotonic": [
++        "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 7h 44min 57.240990s }",
++        "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
++      ],
++      "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
++    }
++  },
++  "actual_keeper_native": {
++    "ActiveState": "active",
++    "Id": "horizon-positive185-reader-positive-9568cb52af154f7d8fbd48e7571770fa-retain.target",
++    "InvocationID": "2686a56bb7324c9c84a75be13695727f",
++    "Job": "",
++    "LoadState": "loaded",
++    "SubState": "active"
++  },
++  "actual_original_native_execution_record": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/genuine-original-persistent-reader.json",
++    "sha256": "f80f1eda5ddeeedc01356bd7fd009a0bf5e089b32e97bf541e69b5beeeef8724"
++  },
++  "actual_original_outer_execution": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-reader-keeper-start-outer.json",
++    "sha256": "58081bf1e25b31837d2ccda0c3bdd3a3e8a54f9a6d08321576bce55978a56316"
++  },
++  "before_native_preserved": {
++    "ActiveState": "inactive",
++    "AmbientCapabilities": "cap_dac_override cap_sys_ptrace",
++    "AppArmorProfile": "horizon-witness-test-deny199-20261107-v1",
++    "CPUQuotaPerSecUSec": "1s",
++    "CapabilityBoundingSet": "cap_dac_override cap_sys_ptrace",
++    "ControlGroup": "",
++    "ControlPID": "0",
++    "DropInPaths": "",
++    "EnvironmentFiles": "/etc/jetstreamer/horizon-r2.env (ignore_errors=no)",
++    "ExecMainCode": "0",
++    "ExecMainExitTimestampMonotonic": "0",
++    "ExecMainPID": "0",
++    "ExecMainStartTimestampMonotonic": "0",
++    "ExecMainStatus": "0",
++    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2 ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2 read-failed4-current-accounting /usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-9568cb52af154f7d8fbd48e7571770fa/spec.json --spec-sha256 39ca0f00c63908887eee3fcaf8a4b1898f49aa192a056919bbc0b38d8ee805dd --self-sha256 dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
++    "FragmentPath": "/etc/systemd/system/horizon-failed4-current-accounting-reader-20261104-v1.service",
++    "Group": "root",
++    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
++    "InvocationID": "",
++    "Job": "",
++    "KillMode": "control-group",
++    "LoadState": "loaded",
++    "MainPID": "0",
++    "MemoryAccounting": "yes",
++    "MemoryHigh": "2147483648",
++    "MemoryMax": "2147483648",
++    "MemorySwapMax": "0",
++    "NRestarts": "0",
++    "NoNewPrivileges": "yes",
++    "PrivateMounts": "no",
++    "PrivateNetwork": "no",
++    "PrivateTmp": "no",
++    "ProtectHome": "no",
++    "ProtectSystem": "no",
++    "RemainAfterExit": "no",
++    "Restart": "no",
++    "Result": "success",
++    "RuntimeMaxUSec": "10min",
++    "SubState": "dead",
++    "TasksMax": "512",
++    "Transient": "no",
++    "Type": "exec",
++    "User": "root"
++  },
++  "invocation_id": "d7392886345a460996fa632037bb5a2c",
++  "no_IID_reconstruction_or_deadline_renewal": true,
++  "normal_unit_package_seal": {
++    "path": "/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-9568cb52af154f7d8fbd48e7571770fa/deployment-seal-receipt.json",
++    "sha256": "41f49ddf825001c2db6662ea7afd60152fce93c5013e4bfa41b4e291351d2237"
++  },
++  "original_ExecStart_argv": [
++    "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2",
++    "read-failed4-current-accounting",
++    "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-9568cb52af154f7d8fbd48e7571770fa/spec.json",
++    "--spec-sha256",
++    "39ca0f00c63908887eee3fcaf8a4b1898f49aa192a056919bbc0b38d8ee805dd",
++    "--self-sha256",
++    "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389"
++  ],
++  "original_PID1_journal": {
++    "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-enrolled-reader-PID1.json",
++    "sha256": "d28e339c3f2bc9392cc7f73c11b7b3a0e725951fcbc4fee72d711209ac6c19f8"
++  },
++  "original_PID1_success_event": {
++    "CODE_FILE": "src/core/unit.c",
++    "CODE_FUNC": "unit_log_success",
++    "CODE_LINE": "6013",
++    "INVOCATION_ID": "d7392886345a460996fa632037bb5a2c",
++    "MESSAGE": "horizon-failed4-current-accounting-reader-20261104-v1.service: Deactivated successfully.",
++    "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
++    "PRIORITY": "6",
++    "SYSLOG_FACILITY": "3",
++    "SYSLOG_IDENTIFIER": "systemd",
++    "TID": "1",
++    "UNIT": "horizon-failed4-current-accounting-reader-20261104-v1.service",
++    "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
++    "_CAP_EFFECTIVE": "1ffffffffff",
++    "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
++    "_COMM": "systemd",
++    "_EXE": "/usr/lib/systemd/systemd",
++    "_GID": "0",
++    "_HOSTNAME": "dev-samjohnson",
++    "_MACHINE_ID": "59498204047045e4a428419acee7df19",
++    "_PID": "1",
++    "_RUNTIME_SCOPE": "system",
++    "_SELINUX_CONTEXT": "unconfined\n",
++    "_SOURCE_REALTIME_TIMESTAMP": "1794186931548507",
++    "_SYSTEMD_CGROUP": "/init.scope",
++    "_SYSTEMD_SLICE": "-.slice",
++    "_SYSTEMD_UNIT": "init.scope",
++    "_TRANSPORT": "journal",
++    "_UID": "0",
++    "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a13f8;b=763ea84ca81f4dddad364b1ea2ba36dd;m=24de5e3d441;t=65fcdb2b73178;x=8e8602159d59941e",
++    "__MONOTONIC_TIMESTAMP": "2533592650817",
++    "__REALTIME_TIMESTAMP": "1794186931548536",
++    "__SEQNUM": "57283576",
++    "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea"
++  },
++  "original_cgroup_empty": true,
++  "original_descriptors_drained": true,
++  "original_native": {
++    "ActiveState": "inactive",
++    "AmbientCapabilities": "cap_dac_override cap_sys_ptrace",
++    "AppArmorProfile": "horizon-witness-test-deny199-20261107-v1",
++    "CPUQuotaPerSecUSec": "1s",
++    "CapabilityBoundingSet": "cap_dac_override cap_sys_ptrace",
++    "ControlGroup": "",
++    "ControlPID": "0",
++    "DropInPaths": "",
++    "EnvironmentFiles": "/etc/jetstreamer/horizon-r2.env (ignore_errors=no)",
++    "ExecMainCode": "1",
++    "ExecMainExitTimestampMonotonic": "2533592650621",
++    "ExecMainPID": "3825939",
++    "ExecMainStartTimestampMonotonic": "2533479855063",
++    "ExecMainStatus": "0",
++    "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2 ; argv[]=/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2 read-failed4-current-accounting /usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-9568cb52af154f7d8fbd48e7571770fa/spec.json --spec-sha256 39ca0f00c63908887eee3fcaf8a4b1898f49aa192a056919bbc0b38d8ee805dd --self-sha256 dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389 ; ignore_errors=no ; start_time=[Mon 2026-11-09 01:13:38 UTC] ; stop_time=[Mon 2026-11-09 01:15:31 UTC] ; pid=3825939 ; code=exited ; status=0 }",
++    "FragmentPath": "/etc/systemd/system/horizon-failed4-current-accounting-reader-20261104-v1.service",
++    "Group": "root",
++    "Id": "horizon-failed4-current-accounting-reader-20261104-v1.service",
++    "InvocationID": "d7392886345a460996fa632037bb5a2c",
++    "Job": "",
++    "KillMode": "control-group",
++    "LoadState": "loaded",
++    "MainPID": "0",
++    "MemoryAccounting": "yes",
++    "MemoryHigh": "2147483648",
++    "MemoryMax": "2147483648",
++    "MemorySwapMax": "0",
++    "NRestarts": "0",
++    "NoNewPrivileges": "yes",
++    "PrivateMounts": "no",
++    "PrivateNetwork": "no",
++    "PrivateTmp": "no",
++    "ProtectHome": "no",
++    "ProtectSystem": "no",
++    "RemainAfterExit": "no",
++    "Restart": "no",
++    "Result": "success",
++    "RuntimeMaxUSec": "10min",
++    "SubState": "dead",
++    "TasksMax": "512",
++    "Transient": "no",
++    "Type": "exec",
++    "User": "root"
++  },
++  "original_outer_reaped": true,
++  "original_process_wait": {
++    "actual_original_pidfd_exit_event": true,
++    "not_a_new_resource_observation": true,
++    "original_iid": "d7392886345a460996fa632037bb5a2c",
++    "original_pid": 3825939
++  },
++  "original_setup_deadline_checked_without_renewal": 1794187343,
++  "program": {
++    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2",
++    "sha256": "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389"
++  },
++  "reader_proof": {
++    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846-cold185-9568cb52af154f7d8fbd48e7571770fa/proof.json",
++    "sha256": "1636ad546e4817917196b7eec0f9474c98adb5d912c1ed3fa16b072948500531"
++  },
++  "schema": "terminal199-parent-memory-original-reader-completion-v1",
++  "unit": "horizon-failed4-current-accounting-reader-20261104-v1.service"
++}
+--- /dev/null
++++ source/fixtures/original0100-timer-stop-completion.json
+@@ -0,0 +1,27 @@
++{
++  "original_actor_unchanged": {
++    "MainPID": "0",
++    "ControlPID": "0",
++    "Result": "signal",
++    "NRestarts": "0",
++    "ExecMainPID": "0",
++    "ControlGroup": "",
++    "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
++    "ActiveState": "failed",
++    "SubState": "failed",
++    "Job": "",
++    "InvocationID": "9568cb52af154f7d8fbd48e7571770fa"
++  },
++  "timer_after": {
++    "Unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.service",
++    "Result": "success",
++    "Id": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer",
++    "ActiveState": "inactive",
++    "SubState": "dead",
++    "Job": "",
++    "InvocationID": ""
++  },
++  "only_new_failed_guard_timer_stopped": true,
++  "all_originals_and_promises_preserved": true,
++  "no_retry_reset_unlink_restart_or_credit": true
++}--- /dev/null
++++ source/fixtures/original0100-timer-stop-intent.json
+@@ -0,0 +1,60 @@
++{
++  "actor": {
++    "MainPID": "0",
++    "ControlPID": "0",
++    "Result": "signal",
++    "NRestarts": "0",
++    "ExecMainPID": "0",
++    "ControlGroup": "",
++    "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
++    "ActiveState": "failed",
++    "SubState": "failed",
++    "Job": "",
++    "InvocationID": "9568cb52af154f7d8fbd48e7571770fa"
++  },
++  "timer": {
++    "Unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.service",
++    "Result": "success",
++    "Id": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer",
++    "ActiveState": "active",
++    "SubState": "waiting",
++    "Job": "",
++    "InvocationID": "0785b9a4f1084b24b81a85dc7d8bb5b6"
++  },
++  "first_guard_failure": {
++    "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
++    "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
++  },
++  "original_receipt": {
++    "actor_invocation_id": "9568cb52af154f7d8fbd48e7571770fa",
++    "actor_pid": 3822292,
++    "actor_start_ticks": 253340426,
++    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
++    "admission_sha256": "b42aae52403e98a619b3c1050bf27280963a09cb1d4b9e5c24b9087f5cbbdbc1",
++    "capacity_credit_bytes": 0,
++    "epoch": 185,
++    "failure": "No such file or directory (os error 2)",
++    "guard_invocation_id": "50a0f038091f4c578791c3720a85a72e",
++    "guard_start_monotonic_micros": 2533610289062,
++    "guard_start_native_property": "2533610289062",
++    "resource_sample": null,
++    "sampled_at": 1794186949,
++    "schema": "horizon-epoch185-native-guard-result-v4",
++    "success": false,
++    "timer_driven": true,
++    "timer_last_trigger_monotonic_micros": 2533610277861,
++    "timer_last_trigger_native_property": "4w 1d 7h 46min 50.277861s",
++    "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer"
++  },
++  "protected199_timer": {
++    "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
++    "Result": "success",
++    "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
++    "ActiveState": "active",
++    "SubState": "waiting",
++    "Job": "",
++    "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1"
++  },
++  "protected199_FD9": "/home/sol/.jetstreamer-private/epoch199-private-tail-20261017-v1/lane-a/private",
++  "reason": "Only newly created failed0100 actor guard timer; actor terminal with no Main and original guard positively tripped. Preserve all failure metadata, packages, guards and resource promises. No reset, unlink, restart, credit or retry."
++}--- actual-operation36/main.rs
++++ source/main.rs
+@@ -470,6 +470,9 @@
+     }
+     if a[1] == "fleet-custody-harmless-writer" {
+         return fleet_custody::harmless_writer(&request, &own);
++    }
++    if a[1] == "kernel-sol-run-layout-check" {
++        return activation::run_layout::sol_check(&request, &own);
+     }
+     if ["kernel-root-check", "kernel-sol-check"].contains(&a[1].as_str()) {
+         return kernel_check(&a[1], &request);
+@@ -521,6 +524,7 @@
+             );
+             Ok(())
+         }
++        "qualify-positive185-run-layout" => activation::run_layout::qualify(&v, &mut r),
+         "qualify-positive185-reader-lifecycle" => persistent_reader::qualify(&mut r),
+         "qualify-positive185-enrolled-fleet-custody" => fleet_custody::qualify(&mut r),
+         "qualify-positive185-failed-reader-retirement" => {
+--- /dev/null
++++ source/run_layout.rs
+@@ -0,0 +1,77 @@
++//! Create and verify the exact empty Sol run layout before any actor activation.
++//! Metadata-only scan; no existing actor, ledger, payload, guard or timer mutation.
++use super::*;
++const CHILDREN: [&str; 4] = ["scratch", "ledger", "output", "receipts"];
++fn directory(path: &Path, empty: bool) -> Result<()> {
++    let m=fs::symlink_metadata(path)?;
++    ensure!(m.is_dir() && !m.file_type().is_symlink() && path.canonicalize()?==path
++        && m.uid()==1001 && m.gid()==1003 && m.mode()&0o777==0o700,"exact Sol0700 run layout directory");
++    if empty { ensure!(fs::read_dir(path)?.next().is_none(),"run layout child must remain initially empty"); }
++    Ok(())
++}
++fn inspect(run: &Path, control: &Path) -> Result<()> {
++    directory(run,false)?;directory(control,true)?;
++    let names=fs::read_dir(run)?.map(|e|Ok(e?.file_name().to_string_lossy().into_owned())).collect::<Result<std::collections::BTreeSet<_>>>()?;
++    ensure!(names==CHILDREN.iter().map(|s|s.to_string()).collect::<std::collections::BTreeSet<_>>(),"run layout has missing or foreign children");
++    for name in CHILDREN {directory(&run.join(name),true)?;}
++    Ok(())
++}
++pub(super) fn prepare(run: &Path, control: &Path) -> Result<()> {
++    // owned_sol is create-new: existing directories/symlinks are never repaired in place.
++    owned_sol(run)?;owned_sol(control)?;
++    for name in CHILDREN {owned_sol(&run.join(name))?;}
++    inspect(run,control)
++}
++pub(crate) fn sol_check(spec: &Bound, own: &Bound) -> Result<()> {
++    ensure!(unsafe{libc::geteuid()}==1001 && unsafe{libc::getegid()}==1003,"actual Sol:horizon scan");
++    let v=storage::json(spec)?;
++    ensure!(v["schema"]=="horizon-positive185-empty-sol-run-layout-v1" && v["no_input_or_replay"]==true,"run layout scan scope");
++    let run=Path::new(text(&v,"run_root")?);let control=Path::new(text(&v,"control_root")?);
++    inspect(run,control)?;
++    for path in std::iter::once(run.to_path_buf()).chain(std::iter::once(control.to_path_buf())).chain(CHILDREN.iter().map(|s|run.join(s))) {
++        let c=std::ffi::CString::new(path.as_os_str().as_encoded_bytes())?;
++        ensure!(unsafe{libc::access(c.as_ptr(),libc::R_OK|libc::W_OK|libc::X_OK)}==0,"actual Sol directory read/write/traverse access");
++        fs::File::open(&path)?;
++        let _=fs::read_dir(&path)?.collect::<std::io::Result<Vec<_>>>()?;
++    }
++    let status=fs::read_to_string("/proc/self/status")?;
++    let cap=status.lines().find(|l|l.starts_with("CapEff:")).context("scan CapEff")?.split_whitespace().nth(1).context("scan caps")?;
++    ensure!(u64::from_str_radix(cap,16)?==0 && status.lines().any(|l|l=="NoNewPrivs:\t1"),"unprivileged layout scan");
++    println!("{}",json!({"schema":"horizon-positive185-empty-sol-run-layout-scan-v1","program":own,"spec":spec,"actual_sol_uid":1001,"actual_horizon_gid":1003,"all_four_children_empty_and_accessible":true,"effective_capabilities":0,"no_input_or_replay":true}));
++    Ok(())
++}
++pub(super) fn prove_access(r: &mut process::Runner<'_>,run: &Path,control: &Path) -> Result<Bound> {
++    inspect(run,control)?;
++    let spec=storage::save(r.root,"run-layout-spec.json",&json!({"schema":"horizon-positive185-empty-sol-run-layout-v1","run_root":run,"control_root":control,"no_input_or_replay":true}))?;
++    let dest=Path::new("/usr/local/lib/jetstreamer").join(format!("horizon-positive185-run-layout-{}",r.iid));
++    let sealed=seal(r,"run-layout-spec",&dest,&[("spec.json",spec)])?;
++    let sb=binding(&sealed["members"]["spec.json"])?;
++    let mut c=Command::new("/usr/bin/systemd-run");
++    c.args(["--wait","--pipe","--service-type=exec","--unit",&format!("horizon-positive185-run-layout-{}",r.iid)]);
++    for prop in ["User=sol","Group=horizon","AppArmorProfile=horizon-witness-test-deny199-20261107-v1","Restart=no","MemoryMax=64M","MemorySwapMax=0","CPUQuota=100%","TasksMax=64","RuntimeMaxSec=30","TimeoutStopSec=2","KillMode=control-group","UMask=0077","NoNewPrivileges=yes","ProtectSystem=strict","ProtectHome=read-only","PrivateTmp=yes","PrivateDevices=yes","PrivateNetwork=yes","CapabilityBoundingSet=","AmbientCapabilities=","LimitNOFILE=1048576:1048576"] {c.arg(format!("--property={prop}"));}
++    c.arg(format!("--property=WorkingDirectory={}",run.display()));
++    c.arg(format!("--property=ReadWritePaths={} {}",run.display(),control.display()));
++    c.arg(&r.self_image.path).arg("kernel-sol-run-layout-check").arg(&sb.path).args(["--request-sha256",&sb.sha256,"--self-sha256",&r.self_image.sha256]);
++    let raw=r.run("actual-Sol-empty-run-layout-scan",c,Duration::from_secs(35))?;
++    let result=process::stdout_json(&raw)?;
++    ensure!(result["spec"]==json!(sb) && result["program"]==json!(r.self_image) && result["all_four_children_empty_and_accessible"]==true,"actual original layout child result");
++    inspect(run,control)?;
++    storage::save(r.root,"actual-Sol-run-layout-accepted.json",&json!({"spec":sb,"actual_original":raw,"result":result,"no_resource_credit_or_replay":true}))
++}
++pub(crate) fn qualify(v: &Value,r: &mut process::Runner<'_>) -> Result<()> {
++    let run=PathBuf::from(text(v,"layout_sol_run_root")?);let control=PathBuf::from(text(v,"layout_sol_control_root")?);
++    for path in [&run,&control] {ensure!(path.parent()==Some(Path::new("/home/sol/.jetstreamer-private")) && path.file_name().and_then(|s|s.to_str()).is_some_and(|s|s.starts_with("epoch185-positive-layout-control-")),"disjoint disposable layout-control roots");}
++    prepare(&run,&control)?;let positive=prove_access(r,&run,&control)?;
++    ensure!(prepare(&run,&control).is_err(),"existing layout cannot be reused");
++    let scratch=run.join("scratch");let probe=scratch.join("qualification-only-nonempty");
++    fs::OpenOptions::new().create_new(true).write(true).open(&probe)?;
++    ensure!(inspect(&run,&control).is_err(),"nonempty child must reject");fs::remove_file(&probe)?;
++    fs::remove_dir(&scratch)?;std::os::unix::fs::symlink(&control,&scratch)?;
++    ensure!(inspect(&run,&control).is_err(),"symlink child must reject");fs::remove_file(&scratch)?;owned_sol(&scratch)?;
++    let c=std::ffi::CString::new(scratch.as_os_str().as_encoded_bytes())?;
++    ensure!(unsafe{libc::chown(c.as_ptr(),0,0)}==0,"foreign-owner negative setup");
++    ensure!(inspect(&run,&control).is_err(),"foreign child owner must reject");
++    ensure!(unsafe{libc::chown(c.as_ptr(),1001,1003)}==0,"restore disposable control custody");inspect(&run,&control)?;
++    println!("{}",json!({"schema":"horizon-positive185-run-layout-qualified-control-v1","program":r.self_image,"positive":positive,"actual_Sol_scan_passed":true,"preexisting_nonempty_symlink_foreign_rejected":true,"no_input_or_replay":true,"no_resource_credit":true}));
++    Ok(())
++}
+--- actual-operation36/successful_reader_retirement.rs
++++ source/successful_reader_retirement.rs
+@@ -1,4 +1,4 @@
+-//! Child of persistent_reader: retire only the preserved1630 successful30 reader or
++//! Child of persistent_reader: retire only exact preserved successful readers or
+ //! this executable's harmless successful-control unit. No payload/artifact removal.
+ use super::*;
+ const SUCCESSFUL_HELPER: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-ready-custody-postreader-tools-20261108-v30/jetstreamer-r2";
+@@ -22,6 +22,25 @@
+ const READER1800_PID: u64 = 3557772;
+ const ROOT1800: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual1800-original-r3-20261108-next";
+
++// Exact newly observed0100 successful reader; historical1630/1800 routes stay separate.
++const ACTOR0100: &str = "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service";
++const ACTOR0100_IID: &str = "9568cb52af154f7d8fbd48e7571770fa";
++const READER0100_IID: &str = "d7392886345a460996fa632037bb5a2c";
++const READER0100_PID: u64 = 3825939;
++const ROOT0100: &str = "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next";
++const HELPER0100: &str = "/usr/local/lib/jetstreamer/horizon-epoch185-inherited-census-postreader-tools-20261108-v34/jetstreamer-r2";
++const HELPER0100_SHA: &str = "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389";
++fn installed0100() -> Installed {
++ let package=PathBuf::from("/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-9568cb52af154f7d8fbd48e7571770fa");
++ Installed {unit:READER_UNIT.into(),keeper:"horizon-positive185-reader-positive-9568cb52af154f7d8fbd48e7571770fa-retain.target".into(),
++ argv:vec![HELPER0100.into(),"read-failed4-current-accounting".into(),"/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-reader-9568cb52af154f7d8fbd48e7571770fa/spec.json".into(),"--spec-sha256".into(),"39ca0f00c63908887eee3fcaf8a4b1898f49aa192a056919bbc0b38d8ee805dd".into(),"--self-sha256".into(),HELPER0100_SHA.into()],kind:Kind::Production,
++ seal:fixed("/usr/local/lib/jetstreamer/horizon-positive185-persistent-reader-positive-9568cb52af154f7d8fbd48e7571770fa/deployment-seal-receipt.json","41f49ddf825001c2db6662ea7afd60152fce93c5013e4bfa41b4e291351d2237"),package}
++}
++fn exact0100_installed(i: &Installed) -> bool {
++ let expected=installed0100();
++ matches!(i.kind,Kind::Production) && i.unit==expected.unit && i.keeper==expected.keeper && i.argv==expected.argv && i.package==expected.package && i.seal==expected.seal
++}
++
+ fn successful_shape(n: &Value, unit: &str, iid: &str, pid: u64) -> Result<()> {
+     ensure!(
+         storage::hex(iid, 32) && pid > 1 && pid <= i32::MAX as u64,
+@@ -93,9 +112,9 @@
+     );
+     match i.kind {
+         Kind::Production => ensure!(
+-            i.unit == READER_UNIT
++            (i.unit == READER_UNIT
+                 && [SUCCESSFUL_HELPER, HELPER1800]
+-                    .contains(&i.argv.first().context("retired reader image")?.as_str()),
++                    .contains(&i.argv.first().context("retired reader image")?.as_str())) || exact0100_installed(i),
+             "only exact successful production reader role"
+         ),
+         Kind::Control => ensure!(
+@@ -626,6 +645,7 @@
+     match text(v, "schema")? {
+         "positive185-retire-exact1630-successful-reader-v1" => execute1630(v, r),
+         "positive185-retire-exact1800-successful-reader-v1" => execute1800(v, r),
++        "positive185-retire-exact0100-successful-reader-v1" => execute0100(v, r),
+         _ => anyhow::bail!("unknown successful-reader retirement target"),
+     }
+ }
+@@ -698,6 +718,46 @@
+     println!("{}", published);
+     Ok(())
+ }
++fn terminal0100_shape(intent: &Value, stopped: &Value, guard: &Value) -> Result<()> {
++ let actor=&intent["actor"]; let before=&intent["timer"];let after=&stopped["timer_after"];
++ ensure!(actor["Id"]==ACTOR0100 && actor["InvocationID"]==ACTOR0100_IID && actor["MainPID"]=="0" && actor["ExecMainPID"]=="0" && actor["ControlPID"]=="0" && actor["ControlGroup"]=="" && actor["Job"]=="" && actor["NRestarts"]=="0" && actor["Result"]=="signal" && actor["ActiveState"]=="failed","exact0100 original terminal without Main");
++ ensure!(stopped["original_actor_unchanged"]==*actor && stopped["only_new_failed_guard_timer_stopped"]==true && stopped["all_originals_and_promises_preserved"]==true && stopped["no_retry_reset_unlink_restart_or_credit"]==true,"exact owned0100 timer stop completion");
++ ensure!(before["Id"]=="horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.timer" && before["InvocationID"]=="0785b9a4f1084b24b81a85dc7d8bb5b6" && before["Unit"]=="horizon-guard-185-capped-cold-positive-positive-0100-20261109-next.service" && after["Id"]==before["Id"] && after["Unit"]==before["Unit"] && after["ActiveState"]=="inactive" && after["Job"]=="","exact owned0100 timer identity and stopped state");
++ ensure!(intent["original_receipt"]==*guard && guard["schema"]=="horizon-epoch185-native-guard-result-v4" && guard["actor_unit"]==ACTOR0100 && guard["actor_invocation_id"]==ACTOR0100_IID && guard["guard_invocation_id"]=="50a0f038091f4c578791c3720a85a72e" && guard["timer_driven"]==true && guard["success"]==false && guard["failure"]=="No such file or directory (os error 2)" && guard["capacity_credit_bytes"]==0,"exact actual first guard failure; never success");
++ Ok(())
++}
++fn execute0100(v: &Value,r: &mut process::Runner<'_>) -> Result<()> {
++ let intent_binding=fixed("/home/sol/.jetstreamer-private/current0100-original-failure-and-owned-timer-stop-20261109-v1/STOP_ONLY_NEW_FAILED0100_TIMER_INTENT.json","7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef");let stopped_binding=fixed("/home/sol/.jetstreamer-private/current0100-original-failure-and-owned-timer-stop-20261109-v1/EXACT_OWNED_TIMER_STOP_COMPLETION.json","f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138");let guard_binding=fixed("/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json","430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac");
++ let intent=storage::json(&intent_binding)?;let stopped=storage::json(&stopped_binding)?;let guard=storage::json(&guard_binding)?;
++ terminal0100_shape(&intent,&stopped,&guard)?;
++ ensure!(intent["first_guard_failure"]==json!(guard_binding),"exact0100 guard failure source digest");
++ let actor=query(r,ACTOR0100)?;
++ ensure!(intent["actor"].as_object().context("recorded terminal0100 actor")?.iter().all(|(k,value)|actor[k]==*value) && actor["ExecMainStartTimestampMonotonic"]=="0","original0100 remains terminal/noMain");
++ let timer=r.native(text(&intent["timer"],"Id")?)?;
++ ensure!(stopped["timer_after"].as_object().context("recorded stopped0100 timer")?.iter().all(|(k,value)|timer[k]==*value),"only original owned0100 timer remains stopped");
++ let failed=storage::json(&fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json","3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"))?;
++ ensure!(failed["program"]=="/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v3/horizon-positive185-final" && failed["exit_code"]==1 && failed["exit_signal"].is_null() && failed["wait_error"].is_null() && failed["no_retry_or_clock_reset"]==true,"actual original Final3 ended; no current final consumer");
++ let completion_binding=fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-enrolled-reader-completion.json","518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d");let completion=storage::json(&completion_binding)?;
++ ensure!(completion_binding.path.parent()==Some(Path::new(ROOT0100)) && completion["schema"]=="terminal199-parent-memory-original-reader-completion-v1" && completion["unit"]==READER_UNIT && completion["original_process_wait"]["actual_original_pidfd_exit_event"]==true && completion["original_process_wait"]["original_iid"]==READER0100_IID && completion["original_process_wait"]["original_pid"]==READER0100_PID,"exact0100 genuine completion and original pidfd path");
++ ensure!(completion["invocation_id"]==READER0100_IID && completion["program"]==json!(fixed(HELPER0100,HELPER0100_SHA)) && completion["original_outer_reaped"]==true && completion["original_cgroup_empty"]==true && completion["original_descriptors_drained"]==true,"actual0100 successful reader completion");
++ let record_binding=fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/genuine-original-persistent-reader.json","f80f1eda5ddeeedc01356bd7fd009a0bf5e089b32e97bf541e69b5beeeef8724");let record=storage::json(&record_binding)?;
++ ensure!(completion["actual_original_native_execution_record"]==json!(record_binding) && record["lifecycle"]["original_native"]==completion["original_native"] && record["reader_proof"]==completion["reader_proof"] && record["original_unit_package_seal"]==completion["normal_unit_package_seal"],"genuine0100 persistent-reader install/completion linkage");
++ let original=&completion["original_native"];successful_shape(original,READER_UNIT,READER0100_IID,READER0100_PID)?;
++ let i=installed0100();
++ ensure!(completion["normal_unit_package_seal"]==json!(i.seal) && completion["original_ExecStart_argv"]==json!(i.argv),"exact0100 sealed argv/keeper/package");
++ let proof=storage::json(&fixed("/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846-cold185-9568cb52af154f7d8fbd48e7571770fa/proof.json","1636ad546e4817917196b7eec0f9474c98adb5d912c1ed3fa16b072948500531"))?;
++ ensure!(proof["image"]==completion["program"] && proof["invocation_id"]==READER0100_IID && proof["unit"]==READER_UNIT && completion["reader_proof"]==json!(fixed("/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/877f2be4fed85ee236d5bcecadb512d0034335e3e851eedd9d2add2c57c49846-cold185-9568cb52af154f7d8fbd48e7571770fa/proof.json","1636ad546e4817917196b7eec0f9474c98adb5d912c1ed3fa16b072948500531")),"exact0100 successful reader payload proof");
++ let pid1=storage::json(&fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-enrolled-reader-PID1.json","d28e339c3f2bc9392cc7f73c11b7b3a0e725951fcbc4fee72d711209ac6c19f8"))?;ensure!(pid1["unit"]==READER_UNIT && pid1["invocation_id"]==READER0100_IID && pid1["original_rows"].as_array().context("original0100 PID1 rows")?.contains(&completion["original_PID1_success_event"]),"exact0100 original PID1 journal event membership");
++ ensure!(completion["original_PID1_journal"]==json!(fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-enrolled-reader-PID1.json","d28e339c3f2bc9392cc7f73c11b7b3a0e725951fcbc4fee72d711209ac6c19f8")) && completion["original_PID1_success_event"]["_PID"]=="1" && completion["original_PID1_success_event"]["INVOCATION_ID"]==READER0100_IID,"exact0100 successful original PID1 source");
++ let outer=storage::json(&fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-reader-keeper-start-outer.json","58081bf1e25b31837d2ccda0c3bdd3a3e8a54f9a6d08321576bce55978a56316"))?;
++ ensure!(completion["actual_original_outer_execution"]==json!(fixed("/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/original-reader-keeper-start-outer.json","58081bf1e25b31837d2ccda0c3bdd3a3e8a54f9a6d08321576bce55978a56316")) && completion["actual_keeper_native"]["Id"]==i.keeper && outer["program"]=="/usr/bin/systemctl" && outer["argv"]==json!(["start",i.keeper]) && outer["exit_code"]==0 && outer["wait_error"].is_null() && outer["no_retry_or_clock_reset"]==true,"exact0100 original keeper invocation completed");
++ control_proof(r,&binding(&v["native_retirement_control"])?)?;
++ let context=storage::save(r.root,"exact0100-successful-reader-retirement-context.json",&json!({"completion":completion_binding,"record":record_binding,"first_guard_failure":guard_binding,"owned_timer_stop":stopped_binding,"actor_terminal_noMain":actor,"all_raw_promises_preserved":true,"resource_credit_bytes":0}))?;
++ let done=cleanup(r,&i,original)?;
++ println!("{}",json!({"actual_successful_reader_retirement":done,"exact0100_original":true,"context":context,"no_replay_or_archive_authority":true}));
++ Ok(())
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -812,4 +872,35 @@
+             assert!(inactive(&b).is_err());
+         }
+     }
+-}
++
++ // Exact0100 source regressions over preserved genuine metadata fixtures.
++
++ #[test] fn actual0100_successful_reader_fixture_preserves_native_argv_and_package() {
++  let completion:Value=serde_json::from_str(include_str!("fixtures/original0100-reader-completion.json")).unwrap();
++  successful_shape(&completion["original_native"],READER_UNIT,READER0100_IID,READER0100_PID).unwrap();
++  let i=installed0100();
++  assert_eq!(completion["original_ExecStart_argv"],json!(i.argv));
++  assert_eq!(completion["normal_unit_package_seal"],json!(i.seal));
++  assert_eq!(completion["program"],json!(fixed(HELPER0100,HELPER0100_SHA)));
++  assert_eq!(completion["original_process_wait"]["actual_original_pidfd_exit_event"],true);
++  assert_eq!(completion["original_outer_reaped"],true);
++  assert_eq!(completion["original_cgroup_empty"],true);
++  assert_eq!(completion["original_descriptors_drained"],true);
++ }
++
++ #[test] fn recorded_terminal_guard_failure_stop_is_distinct_from_success_or_another_original() {
++  let intent:Value=serde_json::from_str(include_str!("fixtures/original0100-timer-stop-intent.json")).unwrap();
++  let stop:Value=serde_json::from_str(include_str!("fixtures/original0100-timer-stop-completion.json")).unwrap();
++  let guard=intent["original_receipt"].clone();terminal0100_shape(&intent,&stop,&guard).unwrap();
++  for pointer in ["/actor/InvocationID","/actor/MainPID","/actor/ExecMainPID"] {let mut bad=intent.clone();*bad.pointer_mut(pointer).unwrap()=json!("changed");assert!(terminal0100_shape(&bad,&stop,&guard).is_err());}
++  let mut bad=guard.clone();bad["success"]=json!(true);assert!(terminal0100_shape(&intent,&stop,&bad).is_err());
++  let mut bad=stop;bad["timer_after"]["ActiveState"]=json!("active");assert!(terminal0100_shape(&intent,&bad,&guard).is_err());
++ }
++ #[test] fn exact0100_permit_rejects_crossed_argv_package_keeper_and_seal() {
++  assert!(exact0100_installed(&installed0100()));permitted(&installed0100()).unwrap();
++  let mut i=installed0100();i.argv[2]="/crossed/spec.json".into();assert!(!exact0100_installed(&i));assert!(permitted(&i).is_err());
++  let mut i=installed0100();i.keeper="foreign-retain.target".into();assert!(!exact0100_installed(&i));assert!(permitted(&i).is_err());
++  let mut i=installed0100();i.seal.sha256="0".repeat(64);assert!(!exact0100_installed(&i));assert!(permitted(&i).is_err());
++  let mut i=installed0100();i.package=PathBuf::from("/usr/local/lib/jetstreamer/foreign");assert!(!exact0100_installed(&i));assert!(permitted(&i).is_err());
++ }
++}
+--- actual-operation36/successor_roles.rs
++++ source/successor_roles.rs
+@@ -5,6 +5,8 @@
+ pub const HELPER34_SHA: Option<&str> = Some("dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389");
+ const FINAL3_PATH: &str = "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261108-v3/horizon-positive185-final";
+ const FINAL3_SHA: Option<&str> = Some("47fb5d1fd85e6a19ff31cc493bd4eb660441f4f8f08d6b238b62316d87f50f84");
++const FINAL4_PATH: &str = "/usr/local/lib/jetstreamer/horizon-positive185-final-transaction-tools-20261109-v4/horizon-positive185-final";
++const FINAL4_SHA: Option<&str> = Some("5d72377dabc3d0646d490be70a9415ad07cba2527c6c63e5d2a0f36b5940687b");
+ const PLANNER5_PATH: &str = "/usr/local/lib/jetstreamer/horizon-positive185-current-witness-planner-tools-20261108-v5/planner";
+ const PLANNER5_SHA: Option<&str> = Some("e771306216e1436e3904ab2c11622597298c61c4083a4a7a1b485278bdb139e1");
+ fn required(path: &str, sha: Option<&str>, name: &str) -> Result<Bound> {
+@@ -13,7 +15,9 @@
+     Ok(fixed(path, sha))
+ }
+ pub fn final_image() -> Result<Bound> {
+-    required(FINAL3_PATH, FINAL3_SHA, "Final3")
++    let selected=required(FINAL4_PATH, FINAL4_SHA, "Final4")?;
++    ensure!(selected.path!=Path::new(FINAL3_PATH) && Some(selected.sha256.as_str())!=FINAL3_SHA,"current Final4 must not alias historical Final3");
++    Ok(selected)
+ }
+ pub fn planner_image() -> Result<Bound> {
+     required(PLANNER5_PATH, PLANNER5_SHA, "Planner5")

@@ -1,0 +1,367 @@
+{
+  "schema": "horizon-operation37-actual-qualification-archive-v1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fleet_custody.rs",
+      "archive": "source/fleet_custody.rs",
+      "sha256": "399595ecb1c4422bfe8bd4302e4d603eb8d43410648fbe578154a5fde42c7075"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v5.service",
+      "sha256": "fb0b7163bf872c1946201c081dd3caa409717baeb0dc5fba0ff8eeb7df37bb54"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v4.timer",
+      "sha256": "7af598dc482a18590eb4b601a989ae233332cc3b6c756e3847cb5634f4d103d8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fleet_order.rs",
+      "archive": "source/fleet_order.rs",
+      "sha256": "78344b4936a907e0c7d03908017c9201beca8c7820a7d4c4c08f682c288ba3f8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/postreader.rs",
+      "archive": "source/postreader.rs",
+      "sha256": "87fc229858e13581c759997ac6bddce844804454536d2eb3f3a46c9f0fb9f4e2"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v3.service",
+      "sha256": "316aa5a0debf59f37e63d8b65e4b8b5900a652ce96dfce6caa2b9d8133746ddc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v2.service",
+      "sha256": "2509ef72b600b12c68d764e088ed82011aced6edffad3218851003f522dea3c6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v3.timer",
+      "sha256": "cc48d8a47a77333ad1e51f710862245ad09c6f08184ad4ac6dc367e871908074"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/timers.rs",
+      "archive": "source/timers.rs",
+      "sha256": "8785ec899c44aadd29b468972cdbe997095e0055564cb6644164fa34f0ece13a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/disposable-oneshot.rs",
+      "archive": "source/disposable-oneshot.rs",
+      "sha256": "26a8140733ed00a568f5faf0a86c17d20135a7d8683ef5152a64c18ea3df057a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/storage.rs",
+      "archive": "source/storage.rs",
+      "sha256": "a4e4f0e02efc57ee3975215ce860b7bd5830f3ad88fc9c44f30a7e8346505fa6"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "archive": "source/horizon-operation31-coherence-disposable-20261108-v1.timer",
+      "sha256": "85ee8fb753f1d09fa42c4fe1e81558f264669dae811347f0548aaa0bc0b192e7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/follow_on.rs",
+      "archive": "source/follow_on.rs",
+      "sha256": "a485c2cdfcf93475c6c5df6ce43ab25c5f2deade5043c0c6e8f4c026239e5b78"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/process.rs",
+      "archive": "source/process.rs",
+      "sha256": "fa26bed67fdf9154df69ee74e34d1657278619b69ef6d194cab5cddf4629306c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/failed_reader_retirement.rs",
+      "archive": "source/failed_reader_retirement.rs",
+      "sha256": "fada54cb9136e73817c2006883c37118eadf1c6b81b5c9d25731742cbe82d6fe"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/reader_phase.rs",
+      "archive": "source/reader_phase.rs",
+      "sha256": "2c449a7ad19e6ec3eb11f86587c80982eb6fff186ec8ab16786aa7c5e64b149f"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/activation.rs",
+      "archive": "source/activation.rs",
+      "sha256": "f0c95bd96fb0216d98db341530a99a64be7f55b051c99c977fd1332553f98090"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/persistent_reader.rs",
+      "archive": "source/persistent_reader.rs",
+      "sha256": "1eb6ebaf5d72485189981beaf9a22955ba1ef45656078685bf11874f502f9dec"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v4.service",
+      "sha256": "8bb21e8d7a6bdddfe8a898842e1fdfeee2d396e4c9169b732dfb4726cb50cec5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/main.rs",
+      "archive": "source/main.rs",
+      "sha256": "8c9e1f7bb90cc84039666ba7306e3dd3a5809ef38747e809cd155577020baa6b"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v1.timer",
+      "sha256": "a6d5cd174e37db260f79ca36411d61625764bc17e706fbdb9407dc36eb77c561"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v5.timer",
+      "sha256": "f1abafdb9d8ce1f39412e404d035f52561dbd562d0bcc6fc9c3488fa3a235e00"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/successful_reader_retirement.rs",
+      "archive": "source/successful_reader_retirement.rs",
+      "sha256": "2fc3e45f35c67d69ce74ca100a77b9d3022fc663fc7fa3ba0223fbcb1444adc3"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "archive": "source/horizon-operation30-coherence-disposable-20261108-v1.service",
+      "sha256": "97ce751a00d707fcb844ff0614833c97ac20ddf858697cc6ebdc797608177eee"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/driver_policy.rs",
+      "archive": "source/driver_policy.rs",
+      "sha256": "abe40ce1dfbd1ae9f65f53a518681768c39e386200fd79e44f6c48a04961a118"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/reader-argv-template.json",
+      "archive": "source/reader-argv-template.json",
+      "sha256": "457a60b6310a93db3851b8b462a8927f860e6bd6f4a4293636e0f4525f2453bc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v1.service",
+      "sha256": "b2f547cc1ced55d6b61411465f1c5fd276b6f08ee67d5d260ac7ceaa9fc644bc"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/successor_roles.rs",
+      "archive": "source/successor_roles.rs",
+      "sha256": "dedc396d2c8b95b9da53ccdeeac5cfc7f93cb471faf5fe8d30bd5184787bd64a"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "archive": "source/horizon-operation32-coherence-disposable-20261108-v2.timer",
+      "sha256": "005166e2223e80cde6bcaacdb17d3243fa2d788116b583011576a6019c213b4d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "archive": "source/horizon-operation30-coherence-disposable-20261108-v1.timer",
+      "sha256": "f42c5555bfa6736ed4885f5be30019a4621f01b3576b4dcd946ec8bd28def96c"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "archive": "source/horizon-operation31-coherence-disposable-20261108-v1.service",
+      "sha256": "925454c200bb1b57608e6bedbcf0acaad67a290d086f40c7999ece7aa7849575"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/run_layout.rs",
+      "archive": "source/run_layout.rs",
+      "sha256": "3a4348e3f3f3b5cd8ce4bae0bdb0eb0d136ca2580cb87165460d518d70e81fde"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-timer-stop-intent.json",
+      "archive": "source/fixtures/original0100-timer-stop-intent.json",
+      "sha256": "7beb96e85a3926f91640c53e6574903777db194039fa31dc0815d80b24f0d6ef"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-timer-stop-completion.json",
+      "archive": "source/fixtures/original0100-timer-stop-completion.json",
+      "sha256": "f402f674baa2a5474065cc6ff370f5bc971c78062e7a7942691e112892f8b138"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/source/fixtures/original0100-reader-completion.json",
+      "archive": "source/fixtures/original0100-reader-completion.json",
+      "sha256": "518e3459830e841f089e9e768f759e2e67af5647343b6f0621728643ffff189d"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "archive": "qualification/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+      "sha256": "d490b5e6695fd81c44b4a0b848b41cda50ddbd2e7eb9633c72977b96450b90b2"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ROOT_NORMAL6_OPERATION37_DATA512_BOOKING.json",
+      "archive": "qualification/ROOT_NORMAL6_OPERATION37_DATA512_BOOKING.json",
+      "sha256": "4a3035f075a3828ebb174ac0627b0ec7946d0f77c9903940191d8296084f1d55"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "archive": "qualification/PRODUCTION-ORIGINAL-QUALIFICATION.json",
+      "sha256": "c024cd88aded4362d6150b020abb18b4a4ab7b88860b22a3e730eb8252ebec4e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_OPERATION37_BINDINGS.json",
+      "archive": "qualification/ROOT_ACTUAL_QUALIFIED_OPERATION37_BINDINGS.json",
+      "sha256": "5d7b6da01f99ad4dcedb12f1c266d87a9ba9f6a32b8fdada783cb24e2b0a1f09"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "archive": "qualification/ALL_FOUR_ORIGINAL_COMPILERS_PASSED.json",
+      "sha256": "88b8a428dc0aa780d81d83a10bf397cc15a90c6bc011677f73157005fe396671"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ALL_ELEVEN_ORIGINAL_NATIVE_CONTROLS_PASSED.json",
+      "archive": "qualification/ALL_ELEVEN_ORIGINAL_NATIVE_CONTROLS_PASSED.json",
+      "sha256": "f492cb958249230c95d3408e016f47d1c79b482bd1347b8e16cbbd197b1301c0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/RETIRE-EXACT0100-SUCCESSFUL-READER-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/RETIRE-EXACT0100-SUCCESSFUL-READER-ORIGINAL-EXECUTION.json",
+      "sha256": "7596605e60fd98cc58685aca3566e254adbe21ebc87e9d9a4ec716327fb643e1"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-operation37-final4-layout-qa-20261109-v1/ACTUAL-RUN-LAYOUT-CONTROL-ORIGINAL-EXECUTION.json",
+      "archive": "qualification/ACTUAL-RUN-LAYOUT-CONTROL-ORIGINAL-EXECUTION.json",
+      "sha256": "a45cd5a131bd396d22ac81a6ce26ec55e3a41f558766423968acc431e1212fc3"
+    },
+    {
+      "source": "/tmp/root-build-operation37-exact-four-r1.py",
+      "archive": "operator-source/root-build-operation37-exact-four-r1.py",
+      "sha256": "7140a285baf605776647ecc9248a07a30c27851566f270554a7dacb95f98096a"
+    },
+    {
+      "source": "/tmp/root-qualify-operation37-native-r1.py",
+      "archive": "operator-source/root-qualify-operation37-native-r1.py",
+      "sha256": "c6acac4748cc0c40690f840acf72bbcb3e62e535d1cc8928383d46734fabd60e"
+    },
+    {
+      "source": "/tmp/root-final-operation37-r1.py",
+      "archive": "operator-source/root-final-operation37-r1.py",
+      "sha256": "0740e9c8b78f190179593263c80916c76dd7242c362fb096526fb8c4cf2328d8"
+    },
+    {
+      "source": "/tmp/root-finish-current0200-guard-tests-r3.py",
+      "archive": "operator-source/root-finish-current0200-guard-tests-r3.py",
+      "sha256": "6a94def4c1487d1b072457561024de4ec4d3077b938050fe1da3559311bca02a"
+    },
+    {
+      "source": "/tmp/root-arm0130-next0200-v1.py",
+      "archive": "operator-source/root-arm0130-next0200-v1.py",
+      "sha256": "01e0bc1b4ebaec6ad542458017d54de47d0839da8585ca4cebfc33ee489e9822"
+    },
+    {
+      "source": "/tmp/operation37-final4-directories-and-reader-retirement-source-20261109-v1/HANDOFF.md",
+      "archive": "SOURCE_HANDOFF_NOT_OPERATIONAL_AUTHORITY.md",
+      "sha256": "e094973ab574ec3db4d63438213c955e7312600d8111868a64e788238902aacc"
+    },
+    {
+      "source": "/tmp/operation37-final4-directories-and-reader-retirement-source-20261109-v1/ROOT_NATIVE_CONTROL_RECIPES.NOT_EXECUTED.json",
+      "archive": "source-review/ROOT_NATIVE_CONTROL_RECIPES.NOT_EXECUTED.json",
+      "sha256": "2890424b7a6bf17f72e4cba6205ce451dcc134230ed1e80458906b3da796b61e"
+    },
+    {
+      "source": "/tmp/operation37-final4-directories-and-reader-retirement-source-20261109-v1/SOURCE_ONLY_CANDIDATE.diff",
+      "archive": "source-review/SOURCE_ONLY_CANDIDATE.diff",
+      "sha256": "ff9ba37cfa2ee31640f64cbac9af2650a96784169087f3e48b536798842bd2c2",
+      "original_bytes_sha256": "dfabca41da64b6c32abd25a00e6f46039b8ca7bc24718a9d787a41dd94ad15cb",
+      "archive_normalization": "Only trailing whitespace in review diff removed; original bytes retained at source path."
+    },
+    {
+      "source": "/tmp/operation37-final4-directories-and-reader-retirement-source-20261109-v1/STATIC_CHECKS.json",
+      "archive": "source-review/STATIC_CHECKS.json",
+      "sha256": "64cd6c2257c9e5ba35cfc63608523a558ed5dea44ae13a4bcddf508f59cd8898"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1/source/main.rs",
+      "archive": "guard0200/current0200-window-20261109-v1/source/main.rs",
+      "sha256": "2870c05aff3ea9e04ca57a8846b2969dd424da7452c7f630f7743b7988b4ba96"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "archive": "guard0200/current0200-window-20261109-v1/ROOT_QA_EXACT_BOOKING.json",
+      "sha256": "99b935ab6545017bb4f38fc8652b973d00fdc2b9f775f6a67b54347a0f7de9ce"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1/all61-ORIGINAL-EXECUTION.json",
+      "archive": "guard0200/current0200-window-20261109-v1/all61-ORIGINAL-EXECUTION.json",
+      "sha256": "cc16000760d168fbb25eefa94e402252c66a2974cf7f075d80af42248d3d7b24"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1-root-r2/source/main.rs",
+      "archive": "guard0200/current0200-window-20261109-v1-root-r2/source/main.rs",
+      "sha256": "caf77e1108563e25a4eb0bcee6d7f989655bb4eb97b0169dd735e9695aed3111"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1-root-r2/ROOT_QA_EXACT_BOOKING.json",
+      "archive": "guard0200/current0200-window-20261109-v1-root-r2/ROOT_QA_EXACT_BOOKING.json",
+      "sha256": "99b935ab6545017bb4f38fc8652b973d00fdc2b9f775f6a67b54347a0f7de9ce"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1-root-r2/all61-ORIGINAL-EXECUTION.json",
+      "archive": "guard0200/current0200-window-20261109-v1-root-r2/all61-ORIGINAL-EXECUTION.json",
+      "sha256": "04596d13eef8a6db42e576f9033e867cc203afc4a7173ed40353111ad94ae724"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/combined-runtime/current0200-window-20261109-v1-root-r2/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "archive": "guard0200/current0200-window-20261109-v1-root-r2/work/ARTIFACT_PROOF_BEFORE_SEAL.json",
+      "sha256": "0301cb436941726ef74052b6639d7c7e4ead743a5b12c1b50301e61daa26a790"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_DISPOSABLE_CREDENTIAL_CACHE_REMOVED.json",
+      "archive": "epoch167-authenticated-metadata/R2_DISPOSABLE_CREDENTIAL_CACHE_REMOVED.json",
+      "sha256": "805d438fa5ab98d3856b796db4cba588826c1056c98fc6aa5596d225fea72119"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/ROOT_EXACT_SOURCE_METADATA_ACCEPTED_NOT_INPUT_OR_REPLAY.json",
+      "archive": "epoch167-authenticated-metadata/ROOT_EXACT_SOURCE_METADATA_ACCEPTED_NOT_INPUT_OR_REPLAY.json",
+      "sha256": "7a5238b3f47054e837b132068da234acaa080562b5f92a69ea9cc71094d684f0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/ORIGINAL_AUTHENTICATED_METADATA_RESULT.json",
+      "archive": "epoch167-authenticated-metadata/ORIGINAL_AUTHENTICATED_METADATA_RESULT.json",
+      "sha256": "98d3b944de374b57d1aa14ae929e5df5158452836840c410f84b65cd49dc4dbd"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_AUTHENTICATED_SOURCE_METADATA.json",
+      "archive": "epoch167-authenticated-metadata/R2_AUTHENTICATED_SOURCE_METADATA.json",
+      "sha256": "2b830b40c58f5d1ea1c28932af7bcd89295cb31e0e1894ee26ca48d9f4eeb84e"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_ORIGINAL_AUTHENTICATED_METADATA_RESULT.json",
+      "archive": "epoch167-authenticated-metadata/R2_ORIGINAL_AUTHENTICATED_METADATA_RESULT.json",
+      "sha256": "a31bd50792933d6262c486110e7eb84a312cfe2398ec9218bdf50894158eb9e7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/ROOT_FINITE_NORMAL6_METADATA_SUBALLOCATION_AND_INTENT.json",
+      "archive": "epoch167-authenticated-metadata/ROOT_FINITE_NORMAL6_METADATA_SUBALLOCATION_AND_INTENT.json",
+      "sha256": "2f7b9c100f27125289c2d735a01bb9c9ccb592819cc730dfc963212b139d61a5"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch167-exact-source-authenticated-metadata-20261109-v1/R2_DISPOSABLE_CACHE_RECOVERY_INTENT.json",
+      "archive": "epoch167-authenticated-metadata/R2_DISPOSABLE_CACHE_RECOVERY_INTENT.json",
+      "sha256": "a9b02fddf238300357228703500429640f1060d094679fcf2f988ccfbb06f33d"
+    },
+    {
+      "source": "/tmp/continuations0130-final4-operation37-required-source-20261109-v1/maintenance/current_literal_adapter.py",
+      "archive": "maintenance0130-source/current_literal_adapter.py",
+      "sha256": "98bd8a9bd51c08907b38cf24c14ae78b02195aad17dd61942a28f590b9cc83fe"
+    },
+    {
+      "source": "/tmp/continuations0130-final4-operation37-required-source-20261109-v1/maintenance/CURRENT0130_EXACT_LITERAL_MAP.json",
+      "archive": "maintenance0130-source/CURRENT0130_EXACT_LITERAL_MAP.json",
+      "sha256": "e0ca0246c486abf2d6c39cbccaf98eefa92d81bf798e153f92c87f9e63b9522b"
+    },
+    {
+      "source": "/tmp/continuations0130-final4-operation37-required-source-20261109-v1/maintenance/REVIEW5_AND_LATEST_READBACK_BINDINGS.json",
+      "archive": "maintenance0130-source/REVIEW5_AND_LATEST_READBACK_BINDINGS.json",
+      "sha256": "67c65a445a411b2a8edaa4d4ea898a95d2cfc53b857c5d7697d4b1d500377427"
+    },
+    {
+      "source": "/tmp/continuations0130-final4-operation37-required-source-20261109-v1/maintenance/ROOT_ACTUAL_CURRENT0130_DATA_BINDING.json",
+      "archive": "maintenance0130-source/ROOT_ACTUAL_CURRENT0130_DATA_BINDING.json",
+      "sha256": "ff22efdd49babd04fe0327481b1c9e44aa8f36ec9bb417bdb5d9d3b6bf34afa1"
+    },
+    {
+      "source": "/tmp/continuations0130-final4-operation37-required-source-20261109-v1/maintenance/maintain-first-lane0130.py",
+      "archive": "maintenance0130-source/maintain-first-lane0130.py",
+      "sha256": "325e3250c00a5754cc15a6f5287af227e7f6bc0daa059eddd741753e557695d0"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/current0200-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0200_GUARD_DATA512_BOOKING.json",
+      "archive": "qualification/ROOT_NORMAL6_CURRENT0200_GUARD_DATA512_BOOKING.json",
+      "sha256": "99b935ab6545017bb4f38fc8652b973d00fdc2b9f775f6a67b54347a0f7de9ce"
+    }
+  ]
+}
