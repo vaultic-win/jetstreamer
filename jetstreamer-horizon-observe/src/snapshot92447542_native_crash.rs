@@ -1231,7 +1231,7 @@ fn stop_owned_sdk_group(child: &OwnedSdk, group: &str) -> Result<Vec<SdkGroupMem
             } == 0,
             "owned SDK stop waitid failed"
         );
-        if unsafe { info.si_pid() } != pid
+        if u32::try_from(unsafe { info.si_pid() }).ok() != Some(pid)
             || info.si_code != libc::CLD_STOPPED
             || unsafe { info.si_status() } != libc::SIGSTOP
         {
