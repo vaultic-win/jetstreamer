@@ -1,0 +1,61 @@
+{
+  "schema": "horizon-Root-fleet-operational-review-qualification-v1",
+  "actual_originals": {
+    "ROOT_OS_ONLY_QA2_BOOKING.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_OS_ONLY_QA2_BOOKING.json",
+      "sha256": "0c86e4eae601d5fc622f269458b38153572c64d1405deafeb85fd8276914eb17"
+    },
+    "ROOT_REVISION3_SAME_OS_ONLY_QA.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_REVISION3_SAME_OS_ONLY_QA.json",
+      "sha256": "5d65b84918dd454aa33ba8872ae7789313938998dbee75994f422d02a2a48c8e"
+    },
+    "SOURCE-V3-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SOURCE-V3-SEAL-EXECUTION.json",
+      "sha256": "3919e301ed0090c7acadd686bf7581475130607698928944d567e71aef2b8fcf"
+    },
+    "RUNTIME-SEAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/RUNTIME-SEAL-EXECUTION.json",
+      "sha256": "894091a74a5459f9bf829a0767207cea9344a4f8611650cd0c8af7f6bef59a1c"
+    },
+    "ROOT_ACTUAL_NATIVE_SUCCESS_DRAIN_AND_NORMAL7_RESTORED.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_ACTUAL_NATIVE_SUCCESS_DRAIN_AND_NORMAL7_RESTORED.json",
+      "sha256": "99511fd960d4eaf5c4f4f0b57594cb4d931de9901e5f85ee7b3760ecd9da6863"
+    },
+    "NATIVE-REVIEW-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-ORIGINAL-EXECUTION.json",
+      "sha256": "e0113c0f2a934454b8f8c4abe3924734d5a2c65976607ad75faeb34190d817d0"
+    },
+    "production-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/production-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "e2cf951d5def1af133923d25975d9b78dda10803bac2b8e6768f424d3aa71b24"
+    },
+    "build-tests-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/build-tests-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "1d2ab25654fd2635977653c7976e72ecaa1523a416012b6d5a0c36620dc52779"
+    },
+    "clippy-production-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-production-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "50513c689a7ffa64b52f5e0296b1bfc1106119a67765bf8ebc73f3683e14f9a5"
+    },
+    "clippy-tests-V3-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-tests-V3-ORIGINAL-EXECUTION.json",
+      "sha256": "9c8c461e1eb9dee4f3c5ced2d7e5bb8f4b36a6cdcc5a62acf3123fdb5c573d1f"
+    },
+    "SANDBOXED-TESTS-ORIGINAL-EXECUTION.json": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SANDBOXED-TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "cddc8901e5bf27f44fc69170452a2cbb039bdb51ebc7a6760e1b76fdc6ae367d"
+    }
+  },
+  "source": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/main-v3.rs",
+    "sha256": "dacfdcb84a0bb00088e40cde8edb96d2fa687f19c4a4b0dd94173ef0f5307c15"
+  },
+  "original_compiler_library_freeze": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json",
+    "sha256": "9840d2514e47716b71c911094403fbe10004e854b60bebff19612c2c6fece81e"
+  },
+  "four_compilers_eight_tests_and_native_review_passed": true,
+  "native_Frame_and_full_Reader_acceptance_claimed": false,
+  "resource_credit_bytes": 0,
+  "replay_or_remote_mutations": false
+}
