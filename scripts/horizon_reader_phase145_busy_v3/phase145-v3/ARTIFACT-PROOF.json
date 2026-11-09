@@ -1,0 +1,119 @@
+{
+  "schema": "horizon-readonly-advisory-phase199-static-qualified-v1",
+  "production_artifact": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/qa/planner",
+    "sha256": "267231b1daf19b5c8b958dc718357552c619147b4ace56c8eb781360c700f237"
+  },
+  "exact_source_and_compiler_graph": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+    "sha256": "d8cf83b5fbf4b1b8673af968a4a9c0ba44ab0d3bed03907c64d7f15e43ebdd8f"
+  },
+  "all_required_tests_passed": true,
+  "native_phase_pending": false,
+  "scope": "Only qualifier/read-original timing route; admission/assembly/replay commands refused",
+  "prod_clippy_passed": true,
+  "test_clippy_passed": true,
+  "primary_pending_job_is_wait_only": true,
+  "all_original_clocks_unchanged": true,
+  "actual_pending_job_sample": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/source/original0200-pending145-sample.json",
+    "sha256": "377a8df041c3e7fddbd1427d2db5ba593cd35209e3bfbf13076d230de2d21281"
+  },
+  "ordinary_tests_passed": 68,
+  "ignored_tests": 3,
+  "genuine_native_advisory_phase": {
+    "actual_native_phase": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-advisory-phase145-busy-qualification-20261109-v3/actual-reader-start-phase.json",
+      "sha256": "e3a657f8b26bf23fe36722092f1753358d4fbc02755cc4ba48ab65d6805245da"
+    },
+    "actual_timing": {
+      "actual_monotonic_usec": 2537488977927,
+      "earlier_metadata_wait_samples": [],
+      "failed_guard_is_not_safety_coverage": true,
+      "guard": {
+        "ActiveState": "failed",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainCode": "1",
+        "ExecMainExitTimestampMonotonic": "2537486799070",
+        "ExecMainStatus": "1",
+        "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+        "InvocationID": "6d9a978eb3904494b79d9d664a571f65",
+        "Job": "",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "exit-code",
+        "SubState": "failed",
+        "TimersMonotonic": []
+      },
+      "guard_exit_monotonic_usec": 2537486799070,
+      "new_resource_samples": 0,
+      "next_guard_deadline_monotonic_usec": 2537516750180,
+      "no_guard_or_timer_mutation": true,
+      "replay_launch_authorized": false,
+      "retained199_advisory_phase": {
+        "exact_native_pair_preserved": true,
+        "guard": {
+          "ActiveState": "inactive",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainCode": "1",
+          "ExecMainExitTimestampMonotonic": "2537486851567",
+          "ExecMainStatus": "0",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service",
+          "InvocationID": "61526f576211487ba5fe6f5328079c9e",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "success",
+          "SubState": "dead",
+          "TimersMonotonic": []
+        },
+        "no_guard_or_timer_mutation": true,
+        "quiet_phase_is_not_rollover_or_replay_authority": true,
+        "timer": {
+          "ActiveState": "active",
+          "Id": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.timer",
+          "InvocationID": "97aeff8897434ed5ad89dd56c3fb17d1",
+          "Job": "",
+          "LoadState": "loaded",
+          "NextElapseUSecMonotonic": "4w 1d 8h 51min 56.755131s",
+          "Result": "success",
+          "SubState": "waiting",
+          "TimersMonotonic": [
+            "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 8h 51min 56.755131s }",
+            "{ OnActiveUSec=1s ; next_elapse=3w 2d 5h 46min 51.141884s }"
+          ],
+          "Unit": "jetstreamer-adaptive-reserve-epoch199-backfill-20261102-v1.service"
+        }
+      },
+      "schema": "horizon-current-reader-advisory-native-start-phase-v1",
+      "timer": {
+        "ActiveState": "active",
+        "Id": "horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+        "InvocationID": "f6f2308db2dc47be8f470030fb587b90",
+        "Job": "",
+        "LoadState": "loaded",
+        "NextElapseUSecMonotonic": "4w 1d 8h 51min 56.750180s",
+        "Result": "success",
+        "SubState": "waiting",
+        "TimersMonotonic": [
+          "{ OnUnitActiveUSec=30s ; next_elapse=4w 1d 8h 51min 56.750180s }",
+          "{ OnActiveUSec=1s ; next_elapse=3w 6d 14h 15min 32.757954s }"
+        ],
+        "Unit": "horizon-guard145-prefix-shared72h-20261107-v8g1.service"
+      }
+    },
+    "reader_launched": false,
+    "replay_launch_authorized": false,
+    "resource_samples": 0
+  },
+  "actual_native_phase_execution": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ACTUAL-NATIVE-PHASE-EXECUTION.json",
+    "sha256": "0c05f57c54434f86d428f1439f3a17f3fd1e283cb16e46beefe83945e7dc9004"
+  },
+  "no_snapshot_equality_relaxed": true,
+  "no_guard_or_timer_mutation": true
+}

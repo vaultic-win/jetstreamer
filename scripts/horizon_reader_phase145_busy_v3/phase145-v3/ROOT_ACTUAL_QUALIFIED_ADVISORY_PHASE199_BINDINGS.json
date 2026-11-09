@@ -1,0 +1,21 @@
+{
+  "program": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase145-busy-tools-20261109-v3/operation",
+    "sha256": "267231b1daf19b5c8b958dc718357552c619147b4ace56c8eb781360c700f237"
+  },
+  "qualification": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase145-busy-tools-20261109-v3/artifact-proof.json",
+    "sha256": "a7f1cb5889729fff6f6fa8b5e1209f90a74c22d3d93621824d37ddbf2a40df50"
+  },
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-reader-phase145-busy-tools-20261109-v3/deployment-seal-receipt.json",
+    "sha256": "a0a3c858683b6ff477e5f79a3d283513c40b039d43c9d5143aac9dfdfd42fb74"
+  },
+  "complete_DATA_bytes": 5165115454100,
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/current-reader-phase145-busy-recovery-qa-20261109-v3/ROOT_NORMAL6_PHASE145_BUSY_DATA512_BOOKING.json",
+    "sha256": "cf2642db91b91d4bf19215c770cd2571a6ecbdf3ed7c0e5ae0cde27c8b3faa0a"
+  },
+  "scope": "Only qualifier/read-original timing route; admission/assembly/replay commands refused",
+  "actual_reader_not_started": true
+}

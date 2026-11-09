@@ -1,0 +1,163 @@
+{
+  "after_sha256": "68927829fe69f76dc16f0f5ed11d6241a60a67b7db64ae7da0d14f4afadc3bab",
+  "after_status": {
+    "elapsed_execution_millis": 310594538,
+    "epoch": 185,
+    "estimated_remaining_millis": 507757206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T02:17:49Z"
+  },
+  "archive_publication_authorized": false,
+  "assumption": "Actual02 finitechain passed strict qualified37/Final4 metadata authority and realfleet; realFrame capability passed. O26 capture-phase failed while the unchanged145 periodicguard was activating with pendingJob41040174. Its query rejects Job before its intended active-guard wait branch. No02Frame/reader/actor/Main ran; no retry after original02:15:22 cutoff. Root will repair this finite readonly phase wait to classify exact busy guard states as waiting, retain strict settled guard/timer identity and all2-4s/25s gates, qualify native negatives, and integrate phase successor. Remaining planning allocation: timing source and ordinary/native qualification15min, next02:30 guard/current metadata preparation10min, fresh finite Frame/reader/admission/originalMain25min, contingency10min. Final4/Operation37/guard0200 actual qualification and exact0100retirement remain completed and not repeated. Fullboundary/publicationstillunqualified. Original24h qualification and full unexecuted replay costs unchanged; no native lease change.",
+  "before_body": "{\"elapsed_execution_millis\":310095538,\"epoch\":185,\"estimated_remaining_millis\":508256206,\"jet_size_bytes\":0,\"phase\":\"verification\",\"sampled_at_utc\":\"2026-11-09T02:09:30Z\"}\n",
+  "before_etag": "\"a3ed1cc09202b6326ec89ec19dab487e\"",
+  "before_sha256": "60625c1a3cf91770fc0c4a5a65d5613cfd8af055d3fc48389eebf11bc52f2bd5",
+  "before_status": {
+    "elapsed_execution_millis": 310095538,
+    "epoch": 185,
+    "estimated_remaining_millis": 508256206,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-09T02:09:30Z"
+  },
+  "conditional_header": "If-Match",
+  "epoch": 185,
+  "estimate_parts_millis": {
+    "archive_close_full_plugin_boundary_verification_millis": 21600000,
+    "bootstrap_load_and_warmup_millis": 3600000,
+    "full_boundary_runtime_native_Frame_successor_and_fresh_admission_qualification_millis": 51177000,
+    "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+    "native_guard_directory_preparation_closed_write_event_and_reader_retirement_controls_millis": 3576000,
+    "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+  },
+  "estimated_remaining_millis": 507757206,
+  "key": "epoch-185.epoch-status.json",
+  "owner_evidence": {
+    "accepted_fleet": {
+      "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T010022Z-witness-terminal145-v1.json",
+      "sha256": "2dbcf711a9eb34c42a3a7206145483468361b1f93720de0cbd7433fd1abceca8"
+    },
+    "actual0030_reader_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+      "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+    },
+    "actual0100_final3_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json",
+      "sha256": "3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"
+    },
+    "actual0100_first_guard_failure": {
+      "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+      "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+    },
+    "actual0200_capture_phase_failure": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+      "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+    },
+    "actual0200_original_pending_guard_sample": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0200-frame-capture-r4-20261109-v24/19-reader-start-phase-native-original-outcome.json",
+      "sha256": "4358d7e430728f52efc28901c63e59ab055a3e2855997f2a1b7a9afaceda7827"
+    },
+    "actual_Helper34_QA5_closure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+      "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+    },
+    "actual_Helper34_fresh_extraQA5_booking": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+      "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+    },
+    "actual_current_guarded_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "ExecMainPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+      "InvocationID": "9568cb52af154f7d8fbd48e7571770fa",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "signal",
+      "SubState": "failed"
+    },
+    "actual_fleet_failure": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2300-original-r3-20261108-next/1867-actual-enrolled-fleet-original-outcome.json",
+      "sha256": "b07b76afe6c58aeaaf6cdc72322d9e2b153182e1f63b6d0c3f2bd189e08692d2"
+    },
+    "actual_original_actor_terminal": {
+      "ActiveState": "failed",
+      "ControlGroup": "",
+      "ControlPID": "0",
+      "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+      "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+      "Job": "",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "exit-code",
+      "SubState": "failed"
+    },
+    "actual_review6_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+      "sha256": "12f903138485d1bd73326bec9792a2c228fa5d0dddeb072c2f4abc1a55e26c35"
+    },
+    "complete_current_DATA_bytes": 5164578583188,
+    "coordinated_observer": {
+      "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T020022Z-postcompletion154-v1.json",
+      "sha256": "e3fc848255d438d473e059cff501b7c62ff7b256ddb3a81645129fe747ff6b1a"
+    },
+    "current_accepted_resource_frame": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T010022-witness-terminal145-chain128-v5.json",
+      "sha256": "4a9b82ae94e16fac25d394ab79a9f3aaf20a76b624da532ce9d836e9611b559c"
+    },
+    "current_complete_DATA_authority": {
+      "path": "/home/sol/.jetstreamer-private/current0200-guard-window-booking-20261109-v1/ROOT_NORMAL6_CURRENT0200_GUARD_DATA512_BOOKING.json",
+      "sha256": "99b935ab6545017bb4f38fc8652b973d00fdc2b9f775f6a67b54347a0f7de9ce"
+    },
+    "current_complete_resources_pending": true,
+    "current_operator": "/root",
+    "current_phase": "verification",
+    "current_primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+    "current_shared_dependency": "Nov9 02:00 continuation. Last genuine Frame and complete resources0100; actual0130 observer bridge required to02. Actual Final4/Operation37 qualified and normally sealed; exact successful0100 Helper34 reader retirement completed using qualified37, no reset or credit; do not repeat. Operation36 actor failed beforeMain and owned failed0100 timer remains stopped. Reader13 advisoryphase199v2 from first attempt preserves original2-4s and25s clocks. Actual0200guard accepted root-r2 QA/R3correct sealedtestimage65passed; all original failed attempts retained, one guard booking. Canonical DATA5164578583188 normal6extraQA0 includes Final4/Operation37/guard0200DATA512eachonce; guard0130unbooked. Review5 deadline02:25:00 from original19:25:15controlanchor;17:30:22+24hqualification/fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged. Latest185 predecessor authenticated0130audit01:37:09 supersedes01:25event. Useful0target5 at assignment, all fresh admission/enrollment/firstguard/Main gates remain; original199protected and otherhost200-300unchanged. Exact167source metadata authenticated; no167body/replay acquired.",
+    "current_task": "Actual02 finitechain passed strict qualified37/Final4 metadata authority and realfleet; realFrame capability passed. O26 capture-phase failed while the unchanged145 periodicguard was activating with pendingJob41040174. Its query rejects Job before its intended active-guard wait branch. No02Frame/reader/actor/Main ran; no retry after original02:15:22 cutoff. Root will repair this finite readonly phase wait to classify exact busy guard states as waiting, retain strict settled guard/timer identity and all2-4s/25s gates, qualify native negatives, and integrate phase successor. Remaining planning allocation: timing source and ordinary/native qualification15min, next02:30 guard/current metadata preparation10min, fresh finite Frame/reader/admission/originalMain25min, contingency10min. Final4/Operation37/guard0200 actual qualification and exact0100retirement remain completed and not repeated. Fullboundary/publicationstillunqualified. Original24h qualification and full unexecuted replay costs unchanged; no native lease change.",
+    "estimate_review": {
+      "path": "/home/sol/.jetstreamer-private/actual020022-visible-root-acceptance-20261109-v1/status-estimate-review020022.json",
+      "sha256": "1de7229b3f98ba68f1990c30fe1d29a2ae331a85d33dc282d812a354b633cf22"
+    },
+    "fixed_work_eta_model": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+      "sha256": "12f903138485d1bd73326bec9792a2c228fa5d0dddeb072c2f4abc1a55e26c35"
+    },
+    "immediate_Frame_predecessor": {
+      "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T010022-witness-terminal145-chain128-v5.json",
+      "sha256": "4a9b82ae94e16fac25d394ab79a9f3aaf20a76b624da532ce9d836e9611b559c"
+    },
+    "last_complete_resource_selector": {
+      "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0100-20261109-v1/accepted-frame-selector.json",
+      "sha256": "7018d86c52f97365bb663be8288a818c8d916173aefc38728da3afb769ab714d"
+    },
+    "no_full_epoch_replay_started": true,
+    "previous_authenticated_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+      "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+    },
+    "previous_owner_evidence": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109020930.json",
+      "sha256": "2a6c1800df3959578d2789358bb17f96a48183f15031d1476b72ff7e8ac7db6c"
+    },
+    "qualified_state_copy": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+      "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+    },
+    "qualified_witness": {
+      "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+      "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+    }
+  },
+  "previous_receipt": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261109020930.json",
+    "sha256": "2a6c1800df3959578d2789358bb17f96a48183f15031d1476b72ff7e8ac7db6c"
+  },
+  "replay_launch_authorized": false,
+  "resource_sample_claimed": false,
+  "sampled_at_utc": "2026-11-09T02:17:49Z",
+  "schema": "horizon-status-only-correction-v1"
+}

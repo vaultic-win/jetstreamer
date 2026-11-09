@@ -1,0 +1,39 @@
+{
+  "schema": "horizon-exact-closed-generated-metadata-readonly-finalization-v1",
+  "files": [
+    {
+      "binding": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261109T020022Z-postcompletion154-v1.json",
+        "sha256": "e3fc848255d438d473e059cff501b7c62ff7b256ddb3a81645129fe747ff6b1a"
+      },
+      "before": {
+        "dev": 2304,
+        "ino": 2761621,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 307888,
+        "mode": 420,
+        "mtime_ns": 1794189637939187594,
+        "ctime_ns": 1794189637939187594
+      },
+      "after": {
+        "dev": 2304,
+        "ino": 2761621,
+        "uid": 0,
+        "gid": 0,
+        "nlink": 1,
+        "size": 307888,
+        "mode": 292,
+        "mtime_ns": 1794189637939187594,
+        "ctime_ns": 1794190986206228111
+      },
+      "same_path_inode_bytes_digest_and_mtime": true
+    }
+  ],
+  "all_scoped_files_readonly": true,
+  "actual_closed_file_count": 1,
+  "no_original_payload_path_inode_or_history_change": true,
+  "memory_credit_bytes": 0,
+  "DATA_credit_bytes": 0
+}
