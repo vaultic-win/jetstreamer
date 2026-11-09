@@ -1799,10 +1799,29 @@ fn actual_process_exit_or_native_case() -> Result<()> {
             }
         }
     })();
-    ensure!(
-        g.invocation.exit_after_phase.is_none(),
-        "requested actual process-exit frontier was not reached"
-    );
+    if let Err(error) = &attempt {
+        let message = format!("{error:#}");
+        persist(
+            &g.result_parent()?.join("native-operation-error.json"),
+            &json!({"schema":"jetstreamer-snapshot92447542-native-operation-error-v1",
+                "persistent_session":{"path":bound.path,"sha256":bound.sha256},
+                "fresh_invocation_admission":{"path":g.bound.path,"sha256":g.bound.sha256},
+                "actual_unit":g.profile.unit,"actual_invocation_id":g.profile.invocation_id,
+                "actual_main_pid":std::process::id(),"operation_error":message,
+                "requested_exit_phase":g.invocation.exit_after_phase,
+                "expected_rejection":g.invocation.expected_rejection,
+                "completed_phases":*e.phases.borrow(),"lifecycle_qualification":false}),
+        )
+        .with_context(|| format!("persist native diagnostic for original error: {message}"))?;
+    }
+    if let Some(phase) = &g.invocation.exit_after_phase {
+        return match attempt {
+            Err(error) => Err(error).with_context(|| {
+                format!("native operation failed before actual exit phase {phase}")
+            }),
+            Ok(()) => bail!("requested actual process-exit frontier {phase} was not reached"),
+        };
+    }
     let error = match attempt {
         Ok(()) => {
             ensure!(
@@ -1812,11 +1831,9 @@ fn actual_process_exit_or_native_case() -> Result<()> {
             None
         }
         Err(err) => {
-            let expected = g
-                .invocation
-                .expected_rejection
-                .as_ref()
-                .context("unexpected native case failure")?;
+            let Some(expected) = g.invocation.expected_rejection.as_ref() else {
+                return Err(err).context("unexpected native case failure");
+            };
             let text = err.to_string();
             ensure!(
                 expected.matches(&text),
