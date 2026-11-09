@@ -1,0 +1,36 @@
+{
+  "schema": "horizon-failed74-actor-future-complete-qualification-bindings-v1",
+  "actual_originals": {
+    "ROOT_EXACT_SOURCE_COMPILER_AND_LIBRARY_FREEZE.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/ROOT_EXACT_SOURCE_COMPILER_AND_LIBRARY_FREEZE.json",
+      "sha256": "7b93f0d027bdef306ab937ce197f6196dae4a3246ae6ae03990e99ccba115e57"
+    },
+    "ROOT_FOUR_COMPILERS_EIGHT_TESTS_NORMAL_SEAL_NATIVE_PENDING.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/ROOT_FOUR_COMPILERS_EIGHT_TESTS_NORMAL_SEAL_NATIVE_PENDING.json",
+      "sha256": "60f3d782077c1328904efe3145288f3a8d1dbc6b19a38c10352807ba1ff971e9"
+    },
+    "NATIVE_CHECK_ORIGINAL_EXECUTION.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/NATIVE_CHECK_ORIGINAL_EXECUTION.json",
+      "sha256": "0f948f48a4ff2ba16d263d90ad4429f91b63cfc761d206384fff3a47b4f2be87"
+    },
+    "NATIVE_END_ORIGINAL_EXECUTION.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/NATIVE_END_ORIGINAL_EXECUTION.json",
+      "sha256": "8f3c67833298d4f3ee9832494badd91aeea0aefa08ad135e47a8895e10a6506d"
+    },
+    "NATIVE_CHECK_ACTUAL_PID1_DRAIN.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/NATIVE_CHECK_ACTUAL_PID1_DRAIN.json",
+      "sha256": "2ad9f91e98e6e18b1230289e417a2f544132a524480b244ee7103ce96ec5f874"
+    },
+    "NATIVE_END_ACTUAL_PID1_DRAIN.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/NATIVE_END_ACTUAL_PID1_DRAIN.json",
+      "sha256": "024adccc70b8a8d578990b0ada9d07b4ea78d82ae1698e5a4884a581297143e4"
+    },
+    "ROOT_NATIVE512_CLOSED_ACTOR_FUTURE_SELECTION_COMPLETE.json": {
+      "path": "/home/sol/.jetstreamer-private/failed74-actor-future-qualification-20261109-v1/ROOT_NATIVE512_CLOSED_ACTOR_FUTURE_SELECTION_COMPLETE.json",
+      "sha256": "9d6904601ef93d04c2f25ef983a8570f40f8f0b7a706c19da287d13ec8904fae"
+    }
+  },
+  "four_compilers_eight_tests_native_check_end_and_drain_passed": true,
+  "no_physical_file_retirement": true,
+  "new_replay_admission_authorized": false
+}

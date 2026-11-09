@@ -1,0 +1,34 @@
+{
+  "plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch145-prefix-extractor-plan-shared72h-20261107-v8g1/plan.json",
+    "sha256": "c1a7b5fcad8aa850be48a811fdfa7f703aa162d615070689fbba68f8f025dcf3"
+  },
+  "watchdog": {
+    "path": "/home/sol/.jetstreamer-private/epoch145-prefix-extract-shared72h-20261107-v8g1-state/watchdog-failure.json",
+    "sha256": "e3ad88d3386f3dfe4051ad230d9610f0b495e3cac8219411143df64fb6f30741"
+  },
+  "terminal": {
+    "path": "/home/sol/.jetstreamer-private/actual193022-visible-root-acceptance-20261109-v1/ROOT_ORIGINAL145_TERMINAL_FAILURE_AND_NO_RELEASE.json",
+    "sha256": "00298147c0c204fcd957814ec33f8bdddf1ab1faf34dd21f9b76949a7690afa2"
+  },
+  "raw": {
+    "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json",
+    "sha256": "d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274"
+  },
+  "anchor": {
+    "path": "/home/sol/.jetstreamer-private/failed4-combined-current-reader-control-20261109-v1/revision2/ROOT_QA2_CLOSED_NORMAL6_DATA_RETAINED.json",
+    "sha256": "28cb41447c42484cbae85d9aa7535b91a42fcce15a8d8cb913791ccfc7f8b1f2"
+  },
+  "actor_fragment": {
+    "path": "/run/systemd/transient/horizon-extract145-prefix-shared72h-20261107-v8g1.service",
+    "sha256": "a77780b6b938d08ddc704cd70cffa8a1c18c842dbd613c224a3533b3820b82ea"
+  },
+  "guard_fragment": {
+    "path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.service",
+    "sha256": "1319c59f388957e5a0057ef7908292ecd0611e92ca4c37a938d874a888cb643e"
+  },
+  "timer_fragment": {
+    "path": "/run/systemd/transient/horizon-guard145-prefix-shared72h-20261107-v8g1.timer",
+    "sha256": "af1877b2c5121a4a1cddf0937c155d3372386b1d348dca1852b5a2c3946f7d16"
+  }
+}
