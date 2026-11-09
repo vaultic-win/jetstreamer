@@ -410,6 +410,10 @@ fn embedded_sources() -> BTreeMap<&'static str, String> {
             include_bytes!("snapshot92447542_lifecycle_engine.rs").as_slice(),
         ),
         (
+            "jetstreamer-horizon-observe/src/snapshot92447542_mount_probe.rs",
+            include_bytes!("snapshot92447542_mount_probe.rs").as_slice(),
+        ),
+        (
             "jetstreamer-horizon-observe/src/snapshot92447542_native_engine.rs",
             include_bytes!("snapshot92447542_native_engine.rs").as_slice(),
         ),

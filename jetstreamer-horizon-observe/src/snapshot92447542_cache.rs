@@ -877,19 +877,19 @@ fn rename_noreplace(from: &Directory, old: &str, to: &Directory, new: &str) -> R
     to.validate()?;
     let a = component(old)?;
     let b = component(new)?;
-    ensure!(
-        unsafe {
-            libc::renameat2(
-                from.file.as_raw_fd(),
-                a.as_ptr(),
-                to.file.as_raw_fd(),
-                b.as_ptr(),
-                libc::RENAME_NOREPLACE,
-            )
-        } == 0,
-        "no-clobber rename failed (same writable mount required): {}",
-        std::io::Error::last_os_error()
-    );
+    let result = unsafe {
+        libc::renameat2(
+            from.file.as_raw_fd(),
+            a.as_ptr(),
+            to.file.as_raw_fd(),
+            b.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("no-clobber rename failed (same writable mount required)");
+    }
     from.sync()?;
     to.sync()?;
     Ok(())
@@ -912,6 +912,8 @@ fn unlink_at(dir: &Directory, name: &str, expected: &Identity) -> Result<()> {
 }
 #[path = "snapshot92447542_lifecycle_engine.rs"]
 mod lifecycle_engine;
+#[path = "snapshot92447542_mount_probe.rs"]
+mod mount_probe;
 
 struct ProductionLifecycle<'a> {
     plan: &'a Plan,
@@ -1717,6 +1719,13 @@ fn cleanup_attempt(dir: &mut Directory) -> Result<()> {
 pub fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     let args: Vec<_> = env::args().skip(1).collect();
+    if args.first().is_some_and(|x| x == "probe-mounts") {
+        ensure!(
+            args.len() == 4,
+            "usage: BIN probe-mounts ADMISSION ADMISSION_SHA SELF_SHA"
+        );
+        return mount_probe::run(&args[1], &args[2], &args[3]);
+    }
     if args.first().is_some_and(|x| x == "review-consumers") {
         ensure!(
             args.len() == 4,
@@ -1904,7 +1913,13 @@ mod tests {
         fs::write(src.join("cache"), b"original").unwrap();
         fs::write(dst.join("quarantine"), b"foreign").unwrap();
         let original = Identity::of(&fs::metadata(src.join("cache")).unwrap());
-        assert!(rename_noreplace(&source, "cache", &private, "quarantine").is_err());
+        let collision = rename_noreplace(&source, "cache", &private, "quarantine").unwrap_err();
+        assert_eq!(
+            collision
+                .downcast_ref::<std::io::Error>()
+                .and_then(std::io::Error::raw_os_error),
+            Some(libc::EEXIST)
+        );
         assert_eq!(fs::read(dst.join("quarantine")).unwrap(), b"foreign");
         fs::remove_file(dst.join("quarantine")).unwrap();
         rename_noreplace(&source, "cache", &private, "quarantine").unwrap();

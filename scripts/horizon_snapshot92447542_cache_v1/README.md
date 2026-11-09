@@ -326,3 +326,37 @@ entry; it does not extend the finite runtime or permit a restarted invocation.
 
 These are source candidates until their real admitted completion receipts exist.
 No lifecycle qualification or additional retirement is established by this code.
+
+The normal helper also exposes `probe-mounts ADMISSION ADMISSION_SHA SELF_SHA`.
+This separately admitted finite route tests only IID-named disposable sentinels
+between the exact operational cache and state directories. It requires an actual
+Root MainPID/IID, features[] normal build/source lineage, 512MiB/Swap0/CPU200%/
+CPUs56–63/Tasks128/180s service, strict system and read-only home, and kernel
+capabilities `0x800e3`. Its only explicit writable paths are the common private
+parent, the original SDK configuration, and a private result directory under
+`/var/lib/jetstreamer`. Every other immediate private-parent child must be enrolled
+by identity and mounted read-only, including all descendant mounts; symlink or new
+unbound siblings reject. This scope is independent of the read-only census route.
+
+Admission schema `jetstreamer-snapshot92447542-operational-mount-admission-v1`
+binds a <=180-second start window, `self_binary`, `normal_build`,
+`full_source_manifest`, `profile`, `parent_identity`, `cache_identity`,
+`state_identity`, `protected_siblings` (absolute path to directory-style
+identity), `original_snapshot`, and `output`. The profile uses schema
+`jetstreamer-snapshot92447542-operational-mount-profile-v1` and binds `unit`,
+`invocation_id`, and the complete `expected_properties` map checked by the route.
+All documents and the normal executable must be independently Root-sealed.
+The source manifest binding must be the original binding used in the normal
+build completion; an identical copy at another path does not replace it.
+
+The probe authenticates descriptor mount IDs and mount options, the complete
+sibling enrollment, and original snapshot/receipt identities before and after.
+It takes the shared retirement lock (creating only that Root-owned bookkeeping
+file if absent), fsyncs an intent before sentinel creation, requires real EEXIST
+for a preserved destination collision, performs forward and reverse no-replace
+rename with fsync and inode/content checks, and removes only its exact owned
+sentinels. On failure, exact sentinel state and intent are retained for reviewed
+disposition. Its result grants no check, eviction, restore, replay, or cloud
+mutation authority and credits zero campaign bytes reclaimed. Source tests and
+compilation do not qualify actual operational mount geometry; the route must
+execute under its independently admitted final service geometry.
