@@ -1,0 +1,162 @@
+{
+  "actor_invocation_id": "da9b57fed9f04c9fa1b0c5dba1932488",
+  "epoch": 185,
+  "fresh_admission_authorized": false,
+  "lifecycle": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/lifecycle.json",
+    "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8"
+  },
+  "memory_and_DATA_retained": true,
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-positive185-original-da9b57fed9f04c9fa1b0c5dba1932488.json",
+    "sha256": "90a640528f231efc9a4a9af226e975f0a50b2d4075eec65c99a27abf90f9a9ce"
+  },
+  "previous_plan": {
+    "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-enrolled-fleet-da9b57fed9f04c9fa1b0c5dba1932488/spec.json",
+    "sha256": "2618335430809eb2c80cf06efd6002463d02d38e8ace8ba2ece0f5cf92562362"
+  },
+  "publication_authorized": false,
+  "registration": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-startpre-registrations-20261105-v1/da9b57fed9f04c9fa1b0c5dba1932488/registration.json",
+    "sha256": "08169e0010780d2fd6c20cdb330ea98cb48b97af2cbc24a1171f61be697ec813"
+  },
+  "resource_credit_bytes": 0,
+  "sampled_at": 1794193473,
+  "schema": "horizon-epoch185-native-terminal-retention-v2",
+  "self_sha256": "dda7f44b24b7d9475c654efea20e2230f8374df9640b3e0bf724e7edac44c389",
+  "spec": {
+    "path": "/usr/local/lib/jetstreamer/horizon-positive185-terminal-capture-da9b57fe-r1/spec.json",
+    "sha256": "deb882b9ed9121377c4fd8978941abf4706302a7f2504ed59390f05df9bdf9b7"
+  },
+  "terminal_context": {
+    "actor_cgroup_drained": true,
+    "actor_invocation_id": "da9b57fed9f04c9fa1b0c5dba1932488",
+    "actor_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-native-units-positive-0230-20261109-next/horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "sha256": "c148f1c7cd82667368a1315f6b3a9f03e299ba18e51d115151f2fed77f6a654e"
+    },
+    "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+    "admission": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-current-evidence-positive-0230-20261109-next/admission.json",
+      "sha256": "10f8c943e395278c9759d00a554ebb7242039e6962a785de119e4c973a45848b"
+    },
+    "cgroup_empty": true,
+    "cgroup_populated": false,
+    "envelope": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-positive-envelope-positive-0230-20261109-next/envelope.json",
+      "sha256": "b6e9cc3eb80135643ec6e07d370089b147cb943c72943f30eba04e0d6a469a26"
+    },
+    "guard_cgroup_drained": true,
+    "guard_unit": "horizon-guard-185-capped-cold-positive-positive-0230-20261109-next.service",
+    "memory_and_DATA_promises_retained": true,
+    "original_ready": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0230-20261109-next/ready-da9b57fed9f04c9fa1b0c5dba1932488.json",
+      "sha256": "bde117c0a4bbb9ccdd4220748d478b2a58d7e8cedbb2a3d23ea491764a4a86d0"
+    },
+    "original_start_event": {
+      "CODE_FILE": "src/core/job.c",
+      "CODE_FUNC": "job_emit_done_message",
+      "CODE_LINE": "796",
+      "INVOCATION_ID": "da9b57fed9f04c9fa1b0c5dba1932488",
+      "JOB_ID": "41071800",
+      "JOB_RESULT": "done",
+      "JOB_TYPE": "start",
+      "MESSAGE": "Started horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service - Epoch 185 original positive600s setup and bounded checkpoint-prefix replay.",
+      "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+      "PRIORITY": "6",
+      "SYSLOG_FACILITY": "3",
+      "SYSLOG_IDENTIFIER": "systemd",
+      "TID": "1",
+      "UNIT": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+      "_CAP_EFFECTIVE": "1ffffffffff",
+      "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+      "_COMM": "systemd",
+      "_EXE": "/usr/lib/systemd/systemd",
+      "_GID": "0",
+      "_HOSTNAME": "dev-samjohnson",
+      "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+      "_PID": "1",
+      "_RUNTIME_SCOPE": "system",
+      "_SELINUX_CONTEXT": "unconfined\n",
+      "_SOURCE_REALTIME_TIMESTAMP": "1794191993165001",
+      "_SYSTEMD_CGROUP": "/init.scope",
+      "_SYSTEMD_SLICE": "-.slice",
+      "_SYSTEMD_UNIT": "init.scope",
+      "_TRANSPORT": "journal",
+      "_UID": "0",
+      "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a2cef;b=763ea84ca81f4dddad364b1ea2ba36dd;m=24f1395f7a3;t=65fcee06954db;x=41b78d9fb3df67d1",
+      "__MONOTONIC_TIMESTAMP": "2538654267299",
+      "__REALTIME_TIMESTAMP": "1794191993165019",
+      "__SEQNUM": "57289967",
+      "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea"
+    },
+    "original_terminal_event": {
+      "CODE_FILE": "src/core/unit.c",
+      "CODE_FUNC": "unit_log_failure",
+      "CODE_LINE": "6024",
+      "INVOCATION_ID": "da9b57fed9f04c9fa1b0c5dba1932488",
+      "MESSAGE": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service: Failed with result 'exit-code'.",
+      "MESSAGE_ID": "d9b373ed55a64feb8242e02dbe79a49c",
+      "PRIORITY": "4",
+      "SYSLOG_FACILITY": "3",
+      "SYSLOG_IDENTIFIER": "systemd",
+      "TID": "1",
+      "UNIT": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "UNIT_RESULT": "exit-code",
+      "_BOOT_ID": "763ea84ca81f4dddad364b1ea2ba36dd",
+      "_CAP_EFFECTIVE": "1ffffffffff",
+      "_CMDLINE": "/usr/lib/systemd/systemd --system --deserialize=46 serial",
+      "_COMM": "systemd",
+      "_EXE": "/usr/lib/systemd/systemd",
+      "_GID": "0",
+      "_HOSTNAME": "dev-samjohnson",
+      "_MACHINE_ID": "59498204047045e4a428419acee7df19",
+      "_PID": "1",
+      "_RUNTIME_SCOPE": "system",
+      "_SELINUX_CONTEXT": "unconfined\n",
+      "_SOURCE_REALTIME_TIMESTAMP": "1794192477879778",
+      "_SYSTEMD_CGROUP": "/init.scope",
+      "_SYSTEMD_SLICE": "-.slice",
+      "_SYSTEMD_UNIT": "init.scope",
+      "_TRANSPORT": "journal",
+      "_UID": "0",
+      "__CURSOR": "s=7f76387dd96140468b39dcf01e726fea;i=36a2f06;b=763ea84ca81f4dddad364b1ea2ba36dd;m=24f307a20cb;t=65fcefd4d7e03;x=b9aaff6702b7a20c",
+      "__MONOTONIC_TIMESTAMP": "2539138982091",
+      "__REALTIME_TIMESTAMP": "1794192477879811",
+      "__SEQNUM": "57290502",
+      "__SEQNUM_ID": "7f76387dd96140468b39dcf01e726fea"
+    },
+    "publication_authorized": false,
+    "ready_value": {
+      "actor_invocation_id": "da9b57fed9f04c9fa1b0c5dba1932488",
+      "actor_unit": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+      "admission_sha256": "10f8c943e395278c9759d00a554ebb7242039e6962a785de119e4c973a45848b",
+      "driver_sha256": "bdadc547439d2dbba11797f715c1741772dad693cd54073ac273132a7ba096f2",
+      "epoch": 185,
+      "metadata_and_prerequisites_validated": true,
+      "pid": 3875937,
+      "schema": "horizon-epoch185-worker-ready-v4",
+      "start_ticks": 253844525,
+      "started_at": 1794191784
+    },
+    "release_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/da9b57fed9f04c9fa1b0c5dba1932488/deployment-seal-receipt.json",
+      "sha256": "fb72a9cab12f2e11e5790df8775dc51845914ef8b626117f163fd7d3c949cfac"
+    },
+    "release_token": {
+      "path": "/usr/local/lib/jetstreamer/horizon-epoch185-cold-gates-v4/da9b57fed9f04c9fa1b0c5dba1932488/token.json",
+      "sha256": "88f40a7be1df5ed9046fa5a33803a00c0513e3baf4f7e0ffae5f286104411871"
+    },
+    "resource_credit_bytes": 0,
+    "schema": "horizon-epoch185-genuine-drained-terminal-context-v2",
+    "terminal_actor_exit_status": "1",
+    "terminal_actor_result": "exit-code",
+    "terminal_at": 1794192477,
+    "terminal_guard_exit_status": "1",
+    "terminal_guard_result": "exit-code",
+    "timer_cgroup_drained": true,
+    "timer_inactive": true,
+    "timer_unit": "horizon-guard-185-capped-cold-positive-positive-0230-20261109-next.timer"
+  }
+}

@@ -890,6 +890,46 @@
       "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0230-20261109-v1/accepted-frame-selector.json",
       "archive": "current0230-acceptance/accepted-frame-selector.json",
       "sha256": "f384b20070c13796d84ff7ad349fed732e2fb949643d1489b1ec20ed4d700583"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_ARGV.json",
+      "archive": "terminal-recovery/ROOT_TERMINAL_CAPTURE_R1_ARGV.json",
+      "sha256": "12ecfd98267464a5f466c89858b39037f4ab34543f2466ba6800bda0488760f1"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_EXECUTION.json",
+      "archive": "terminal-recovery/ROOT_TERMINAL_CAPTURE_R1_EXECUTION.json",
+      "sha256": "eb12642622b678b04cc6b674b5036dfff99ffd24f32233a30d77cda7658b4fd8"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_SEAL_PLAN.json",
+      "archive": "terminal-recovery/ROOT_TERMINAL_CAPTURE_R1_SEAL_PLAN.json",
+      "sha256": "4d614b115ff0727ba94e78d15e074b778e548e4cc0c59f22ebc48e3bc7ef5daf"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_SPEC.json",
+      "archive": "terminal-recovery/ROOT_TERMINAL_CAPTURE_R1_SPEC.json",
+      "sha256": "deb882b9ed9121377c4fd8978941abf4706302a7f2504ed59390f05df9bdf9b7"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_SEAL_EXECUTION.json",
+      "archive": "terminal-recovery/ROOT_TERMINAL_CAPTURE_R1_SEAL_EXECUTION.json",
+      "sha256": "4bca50578f56a9e4622e9c850a66ef4507dc613d5fd1619173eafe45ee9653b1"
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_ORIGINAL_TERMINAL_CAPTURED_NO_CREDIT.json",
+      "archive": "terminal-recovery/ROOT_ORIGINAL_TERMINAL_CAPTURED_NO_CREDIT.json",
+      "sha256": "f86d98ab107a8c481af2090038634bae7b6e167bd08257a674b133cb62ae5a4e"
+    },
+    {
+      "source": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/terminal.json",
+      "archive": "actual-lifecycle/terminal.json",
+      "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b"
+    },
+    {
+      "source": "/tmp/root-capture0230-terminal-r1.py",
+      "archive": "operator-source/root-capture0230-terminal-r1.py",
+      "sha256": "711bc3c533a323a9adcd2e6da40956b6cfe6b5f20920a19e2ce0a8075929f86b"
     }
   ],
   "not_replay_or_publication_authority": true

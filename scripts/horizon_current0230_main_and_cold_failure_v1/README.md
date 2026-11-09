@@ -9,3 +9,5 @@ At 02:47:53 UTC the in-process five-second resource guard reported ENOENT and st
 The running status was authenticated at 02:45:13 and corrected to active Root repair after failure at 02:51:35. The current inventory remains 70 ready pairs and 30 missing. This archive is evidence of the actual attempt, not launch authority, successful replay, a canonical archive, fresh resource credit or a qualification claim for the proposed repair.
 
 `SOURCE_MANIFEST.json` binds the archived bytes to original host paths. Operator sources are historical evidence, not commands to replay blindly.
+
+After native failure and empty-cgroup checks, Root stopped only this failed actor’s exact owned timer. The existing qualified Helper34 then captured the original post-Main terminal lifecycle with zero memory or DATA credit. No retained input or scratch data was deleted.

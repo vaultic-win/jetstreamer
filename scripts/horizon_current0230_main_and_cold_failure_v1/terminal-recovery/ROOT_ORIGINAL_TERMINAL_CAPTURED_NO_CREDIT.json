@@ -1,0 +1,25 @@
+{
+  "terminal": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/terminal.json",
+    "sha256": "f073eb6ce0ef97f261f205e8910ef1ed22840fc7b7e74622f46a87619a0bcf1b"
+  },
+  "lifecycle": {
+    "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/lifecycle.json",
+    "sha256": "4c00568288c78290418cfe40485e2c180066aecece5ef3920e899d370514b1f8"
+  },
+  "original_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/26-capture-cold185-lifecycle-original-outcome.json",
+    "sha256": "bb0090610dd514d36e419f7ed07c96cd288e004553ebaec2dddd4356cd45a302"
+  },
+  "first_recovery_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_MAIN_LIFECYCLE_RECOVERY_R1_EXECUTION.json",
+    "sha256": "192641188d9031f3cd825184ebdb047eb1d6d62f3564459fc985ede4ebd4f9c4"
+  },
+  "actual_recovery": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_EXECUTION.json",
+    "sha256": "eb12642622b678b04cc6b674b5036dfff99ffd24f32233a30d77cda7658b4fd8"
+  },
+  "same_actor_invocation_id": "da9b57fed9f04c9fa1b0c5dba1932488",
+  "no_signal_reset_replay_restart_or_clock_change": true,
+  "full_epoch_replay_or_publication_qualified": false
+}

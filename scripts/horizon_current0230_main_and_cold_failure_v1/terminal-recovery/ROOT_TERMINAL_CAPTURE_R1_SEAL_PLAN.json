@@ -1,0 +1,12 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-positive185-terminal-capture-da9b57fe-r1",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-da9b57fed9f04c9fa1b0c5dba1932488/ROOT_TERMINAL_CAPTURE_R1_SPEC.json",
+      "name": "spec.json",
+      "sha256": "deb882b9ed9121377c4fd8978941abf4706302a7f2504ed59390f05df9bdf9b7",
+      "mode": 292
+    }
+  ]
+}
