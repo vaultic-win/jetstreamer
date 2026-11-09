@@ -1,0 +1,11 @@
+from pathlib import Path
+import ast
+p=Path('/tmp/continuations0430-driver12-helper35-final6-source-20261109-v1');s=(p/'capture-current0430-fleet.py').read_text();start=s.index('# Add exact observed0230');end=s.index("save('fleet-plan.json', fp)",start)
+s=s[:start]+'''# The accepted fleet8 publisher requires exact inherited policy equality.
+# Preserve its raw policy; actual0230 terminal and new qualified roles are
+# retained in a separate current repair-context receipt, never a fabricated
+# accepted fleet-policy projection.
+repair_paths=['/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/da9b57fed9f04c9fa1b0c5dba1932488/terminal.json','/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_OPERATION38_BINDINGS.json','/home/sol/.jetstreamer-private/epoch185-operation38-driver12-helper35-qa-20261109-v1/ROOT_ACTUAL_EXACT0230_SUCCESSFUL_READER_RETIRED.json']
+save('ROOT_CURRENT0430_REPAIR_CONTEXT_SEPARATE_FROM_RAW_FLEET_POLICY.json',dict(observer=b(o),original_policy=b(old),evidence=[b(Path(f))for f in repair_paths],current_replay_lanes=0,raw_inherited_policy_unchanged=True,full_current_resource_or_admission_acceptance_pending=True,no_authority_or_credit=True))
+'''+s[end:]
+s=s.replace("save('fleet-plan.json', fp)","save('fleet-plan-r4.json', fp)").replace("p / 'fleet-plan.json'","p / 'fleet-plan-r4.json'").replace('horizon-first-lane-current0430-fleet-plan-20261109-v1\'','horizon-first-lane-current0430-fleet-plan-20261109-v1-r4\'').replace('horizon-first-lane-current0430-fleet-20261109-v1.service','horizon-first-lane-current0430-fleet-20261109-v1-r4.service').replace("'FLEET-SEAL-PLAN.json'","'FLEET-R4-SEAL-PLAN.json'").replace("'FLEET-SEAL-EXECUTION.json'","'FLEET-R4-SEAL-EXECUTION.json'").replace("save('FLEET-ORIGINAL-ARGV.json', a)","save('FLEET-R4-ORIGINAL-ARGV.json', a)").replace("save('FLEET-ORIGINAL-EXECUTION.json',","save('FLEET-R4-ORIGINAL-EXECUTION.json',").replace("'fleet.stdout'","'fleet-r4.stdout'").replace("'fleet.stderr'","'fleet-r4.stderr'").replace('ROOT_CURRENT0430_FLEET_ORIGINAL_SUCCESS','ROOT_CURRENT0430_FLEET_R4_ORIGINAL_SUCCESS');ast.parse(s);(p/'capture-current0430-fleet-r4.py').write_text(s)

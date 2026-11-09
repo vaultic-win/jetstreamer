@@ -1,0 +1,1 @@
+Root current0430source in preparation. Only capture-current0430-fleet.py is ready; no complete Frame/resource/launchchain exists yet. Existing fleet capture reused with explicit currentclock/namespace, actual0230predecessor and additive terminal185/currentqualification evidence. Runonlyafter actual0430observer/statusmaintenance completed. No future0430digest or admission claimed.

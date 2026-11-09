@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-visible043022-status-continuation-20261109-v1\",\"member_count\":3,\"outcome\":\"created\",\"plan_sha256\":\"13602d47158cefe0d639ee9e9a1072b00ae4e253b9998d933b3fc6b5157348e0\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+  "stderr": ""
+}

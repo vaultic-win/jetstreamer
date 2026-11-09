@@ -1,0 +1,18 @@
+{
+  "schema": "jetstreamer-sealed-deployment-plan-v1",
+  "destination": "/usr/local/lib/jetstreamer/horizon-first-lane-current0430-chain128-frame-plan-20261109-v5",
+  "members": [
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0430-20261109-v1/frame-plan-v4.json",
+      "name": "plan.json",
+      "sha256": "ce54d3b774cb9483cbde048aaebcd4af34739373247d3471cbdc75ec3c431b03",
+      "mode": 292
+    },
+    {
+      "source": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0430-20261109-v1/transition-v4.json",
+      "name": "transition.json",
+      "sha256": "d602ffd9e0b82615151770160a7a7a1261c1233324ecd6a6cc9def95921ccb2c",
+      "mode": 292
+    }
+  ]
+}
