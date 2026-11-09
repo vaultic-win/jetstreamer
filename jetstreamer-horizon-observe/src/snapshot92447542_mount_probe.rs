@@ -302,10 +302,30 @@ fn native(a: &Admission, p: &Profile) -> Result<Value> {
             && env::var("INVOCATION_ID")? == p.invocation_id,
         "mount owner identity differs"
     );
-    let actual = evidence::properties(
-        &p.unit,
-        &expected.keys().cloned().collect::<Vec<_>>().join(","),
-    )?;
+    // Complete sibling masks exceed the shared retention reader's 64KiB cap.
+    // Keep that shared contract unchanged; this finite, separately admitted
+    // route permits at most 2MiB and still compares the complete exact map.
+    let response = Command::new("/usr/bin/systemctl")
+        .args([
+            "show",
+            &p.unit,
+            "--no-pager",
+            "--property",
+            &expected.keys().cloned().collect::<Vec<_>>().join(","),
+        ])
+        .output()?;
+    ensure!(
+        response.status.success() && response.stdout.len() <= 2 << 20,
+        "operational mount properties unavailable or oversized"
+    );
+    let mut actual = BTreeMap::new();
+    for line in std::str::from_utf8(&response.stdout)?.lines() {
+        let (key, value) = line.split_once('=').context("malformed mount property")?;
+        ensure!(
+            actual.insert(key.to_owned(), value.to_owned()).is_none(),
+            "duplicate mount property"
+        );
+    }
     ensure!(
         actual == *expected,
         "actual mount service differs from sealed profile"
