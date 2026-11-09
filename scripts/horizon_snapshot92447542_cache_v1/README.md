@@ -248,3 +248,81 @@ normal sealed helper. This command reads metadata and source/code evidence;
 it does not read the snapshot body, contact cloud storage, mutate old units,
 or qualify lifecycle, eviction, restoration or replay. Existing production
 check/evict/restore admission and lifecycle gates remain required.
+
+## Shared engine and recovery candidate
+
+The normal helper's private `lifecycle_engine` now owns the complete check,
+eviction, restoration, guard and durable recovery flows. Production wrappers
+retain the fixed-generation Plan, history, consumer, metadata, digest, SDK and
+restore-admission gates. The production factory cannot choose fixture data.
+The engine holds one lifecycle lock for each operation.
+
+`BIN ORIGINAL_PLAN --plan-sha256 ORIGINAL_PLAN_SHA --self-sha256 HELPER_SHA
+restore-recover CHECK_SHA RECOVERY_ADMISSION RECOVERY_SHA` reconciles an old
+attempt under a separate, fresh Root-immutable recovery capability. Keep the
+original Plan byte-identical. Recovery authenticates its actual prior owner,
+original PID1 terminal evidence, exact intent and optional stage inode, and the
+current admitted MainPID/IID. It cannot download or launch replay. An intent-only
+interruption or registered abandoned stage can be reconciled; nonempty
+unregistered or substituted stages remain preserved. A matching published
+payload can reconcile its receipt and clean a remaining registered stage only
+under that fresh recovery authority. Stage cleanup accepts the exact documented
+UID1000-to-Root custody freeze across an interruption, while rejecting changed
+inodes, modes and reverse ownership transitions.
+
+The opt-in feature `snapshot92447542-native-lifecycle-tests` also enables the
+existing SDK native feature. It is excluded from ordinary tests and normal
+production builds. Seven Root-only `lifecycle_engine::full_engine_fixtures`
+tests run the full transactions with bounded fixture data, real owned UID1000
+child transports, durable interruption models and transfer/collision faults.
+They require a separate actual native admission and preserve their fixture roots
+on success or failure. Their journals use a distinct fixture schema, omit cloud
+generation claims and cannot count as real service-crash, measured-host-floor,
+SDK-profile or full-generation qualification.
+
+The separately selected native test is
+`snapshot92447542_cache::native_engine::actual_fixed_generation_full_engine_roundtrip`.
+It acquires the genuine fixed generation into an isolated cache, verifies all
+payload digests, and calls shared check -> evict -> restore with the actual SDK.
+It never reads or retires the original cache. A passing result establishes only
+that isolated full-generation control. Final operational mount geometry and the
+complete independently reviewed crash/recovery/failure matrix remain required.
+
+Both native routes use `JETSTREAMER_SNAPSHOT92447542_ENGINE_ADMISSION` and its
+independent `_SHA256` variable. The strict admission schema is
+`jetstreamer-snapshot92447542-native-engine-admission-v1`. Fields are `route`
+(`bounded-full-engine-fixture-models` or
+`fixed-generation-isolated-full-engine-roundtrip`), `issued_unix_seconds`,
+`expires_unix_seconds` (positive start window at most300 seconds), `test_binary`,
+`engine_lineage`, `profile`, `fixture_root`, `fixture_identity`,
+`maximum_fixture_bytes`, `output`, `protected_floor_bytes`, `fleet`,
+`protected_owners`, `gcloud`, and `maximum_run_seconds`. Bounds use the existing
+canonical Root-immutable `Bound` format; protected owners use actual `unit`,
+`invocation_id`, `exec_start`. The fleet's sample must precede issuance by less
+than1800 seconds; every live fleet owner and its current growth floor remain
+protected. The isolated fixture root is an exact fresh UID/GID1000 mode0700
+child named `qualification-snapshot92447542-native-engine-*` below the private
+root. Output is a new Root-private `native-engine-result.json`. Fixture models
+have a16MiB allocation bound; the real roundtrip reserves `2*SIZE+2*SLACK`.
+
+The strict engine lineage schema
+`jetstreamer-snapshot92447542-normal-engine-lineage-v1` binds `helper`,
+`normal_build`, `harness_compile`, `full_source_manifest` and `source_evidence`.
+Those five evidence members bind cache.rs, lifecycle_engine.rs, native_engine.rs,
+the observe Cargo.toml and this README. Actual normal artifacts must have
+features[]/profile.test=false/fatLTO/codegen1; the genuine compile-only harness
+receipt must bind both native features, profile.test=true and the same complete
+source manifest. No source or fixture flag substitutes for those receipts.
+
+The actual Root Type=exec native profile uses512MiB, Swap0, CPU200%, CPUs56-63,
+Tasks128, finite separately booked runtime at most7200 seconds, strict system,
+read-only home, NNP and KillMode=control-group. Full flow needs CHOWN as well as
+DAC_OVERRIDE/KILL/SETGID/SETUID/SYS_PTRACE: exact parent mask `0x800e3`. Only the
+private fixture root, private result directory and original gcloud config are
+explicitly writable. Quarantine the original cache and state with exact
+`InaccessiblePaths`. SDK children still drop to UID/GID1000, empty groups and
+zero effective/permitted/ambient capabilities. A fresh short admission books
+entry; it does not extend the finite runtime or permit a restarted invocation.
+
+These are source candidates until their real admitted completion receipts exist.
+No lifecycle qualification or additional retirement is established by this code.

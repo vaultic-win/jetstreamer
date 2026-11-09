@@ -910,6 +910,316 @@ fn unlink_at(dir: &Directory, name: &str, expected: &Identity) -> Result<()> {
     ensure!(dir.absent(name)?, "quarantine remains");
     Ok(())
 }
+#[path = "snapshot92447542_lifecycle_engine.rs"]
+mod lifecycle_engine;
+
+struct ProductionLifecycle<'a> {
+    plan: &'a Plan,
+    cache: &'a Directory,
+    state: &'a Directory,
+    bindings: lifecycle_engine::Bindings,
+    object: lifecycle_engine::ObjectSpec,
+    check_sha: &'a str,
+    recovery: Option<Bound>,
+}
+impl<'a> ProductionLifecycle<'a> {
+    fn new(
+        plan: &'a Plan,
+        plan_sha: &str,
+        self_sha: &str,
+        check_sha: &'a str,
+        cache: &'a Directory,
+        state: &'a Directory,
+        recovery: Option<Bound>,
+    ) -> Self {
+        Self {
+            plan,
+            cache,
+            state,
+            bindings: lifecycle_engine::Bindings::production(plan, plan_sha, self_sha),
+            object: lifecycle_engine::ObjectSpec::fixed_generation(),
+            check_sha,
+            recovery,
+        }
+    }
+}
+impl lifecycle_engine::Environment for ProductionLifecycle<'_> {
+    fn cache(&self) -> &Directory {
+        self.cache
+    }
+    fn state(&self) -> &Directory {
+        self.state
+    }
+    fn source_identity(&self) -> &Identity {
+        &self.plan.source_identity
+    }
+    fn bindings(&self) -> &lifecycle_engine::Bindings {
+        &self.bindings
+    }
+    fn object(&self) -> &lifecycle_engine::ObjectSpec {
+        &self.object
+    }
+    fn history(&self) -> Result<Value> {
+        historical(self.cache)
+    }
+    fn consumers(&self) -> Result<Value> {
+        consumer_proof(self.plan)
+    }
+    fn metadata(&self) -> Result<Vec<u8>> {
+        metadata(self.plan)
+    }
+    fn restore_request(&self) -> Option<lifecycle_engine::RestoreRequest> {
+        self.plan
+            .restore
+            .as_ref()
+            .map(|r| lifecycle_engine::RestoreRequest {
+                attempt: r.attempt.clone(),
+                maximum_runtime_seconds: r.maximum_runtime_seconds,
+                admission_sha256: r.admission.sha256.clone(),
+            })
+    }
+    fn restore_admission(&self, verified: &str) -> Result<lifecycle_engine::Booking> {
+        let r = self
+            .plan
+            .restore
+            .as_ref()
+            .context("restore admission required")?;
+        let a = admission(self.plan, r, &self.bindings.self_sha256, verified)?;
+        Ok(lifecycle_engine::Booking {
+            protected_floor_bytes: a.protected_floor_bytes,
+            owner: Owner {
+                unit: a.owner_unit,
+                invocation_id: a.owner_invocation_id,
+                exec_start: a.owner_exec_start,
+            },
+            protected_owners: a.protected_owners,
+        })
+    }
+    fn guard_owners(&self, a: &lifecycle_engine::Booking) -> Result<()> {
+        owner(&a.owner.unit, &a.owner.invocation_id, &a.owner.exec_start)?;
+        for x in &a.protected_owners {
+            owner(&x.unit, &x.invocation_id, &x.exec_start)?;
+        }
+        Ok(())
+    }
+    fn spawn_download(&self, destination: &Path) -> Result<OwnedSdk> {
+        let mut command = sdk_command(&self.plan.gcloud)?;
+        command
+            .args([
+                "storage",
+                "cp",
+                "--no-clobber",
+                "--quiet",
+                "--account=sam.johnson@anza.xyz",
+                "--billing-project=principal-lane-200702",
+                URI,
+            ])
+            .arg(destination);
+        Ok(OwnedSdk(Some(command.spawn()?)))
+    }
+    fn authorize_recovery(
+        &self,
+        prior: &Value,
+        stage: Option<&DirectoryIdentity>,
+    ) -> Result<Value> {
+        let bound = self
+            .recovery
+            .as_ref()
+            .context("fresh independent restore-recovery capability required")?;
+        let bytes = root_bound_file(bound, 1 << 20, true)?;
+        let a: RestoreRecoveryAdmission = serde_json::from_slice(&bytes)?;
+        let r = self
+            .plan
+            .restore
+            .as_ref()
+            .context("restore plan required for recovery")?;
+        let intent = self.state.path.join(format!("{}-intent.json", r.attempt));
+        ensure!(
+            a.schema == "jetstreamer-snapshot92447542-restore-attempt-recovery-admission-v1"
+                && a.route == "reconcile-owned-attempt-only"
+                && a.issued_unix_seconds <= now()?
+                && now()? <= a.expires_unix_seconds
+                && a.expires_unix_seconds > a.issued_unix_seconds
+                && a.expires_unix_seconds - a.issued_unix_seconds <= 180
+                && a.helper_sha256 == self.bindings.self_sha256
+                && a.original_plan_sha256 == self.bindings.operation_sha256
+                && a.check_sha256 == self.check_sha
+                && a.generation == GENERATION
+                && a.attempt == r.attempt
+                && a.attempt_identity.as_ref() == stage
+                && a.original_attempt_intent.path == intent
+                && reference(&intent)?
+                    == json!({"path":a.original_attempt_intent.path,"sha256":a.original_attempt_intent.sha256}),
+            "wrong/stale/broadened restore recovery authority"
+        );
+        ensure!(
+            evidence::bound_json(&a.original_attempt_intent)? == *prior,
+            "recovery intent differs"
+        );
+        let original: Owner = serde_json::from_value(prior["original_owner"].clone())?;
+        ensure!(
+            original != a.current_owner,
+            "recovery cannot impersonate the prior invocation"
+        );
+        let disposition: RestoreOwnerDisposition = serde_json::from_slice(&root_bound_file(
+            &a.original_owner_disposition,
+            1 << 20,
+            true,
+        )?)?;
+        ensure!(
+            disposition.schema
+                == "jetstreamer-snapshot92447542-original-restore-owner-disposition-v1"
+                && disposition.original_owner == original
+                && disposition.attempt_intent.path == intent
+                && disposition.attempt_intent.sha256 == a.original_attempt_intent.sha256
+                && disposition.attempt_identity.as_ref() == stage,
+            "prior attempt ownership disposition differs"
+        );
+        let old_properties = || -> Result<BTreeMap<String, String>> {
+            let actual = evidence::properties(
+                &original.unit,
+                &disposition
+                    .current_properties
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )?;
+            ensure!(
+                actual == disposition.current_properties,
+                "prior invocation current envelope changed"
+            );
+            terminal_values(&original.unit, &actual)?;
+            ensure!(
+                actual.get("Restart").map(String::as_str) == Some("no"),
+                "prior owner may automatically relaunch"
+            );
+            Ok(actual)
+        };
+        ensure!(
+            safe_unit(&original.unit)
+                && original.invocation_id.len() == 32
+                && original
+                    .invocation_id
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                && !original.exec_start.is_empty(),
+            "invalid prior owner binding"
+        );
+        let before = old_properties()?;
+        let events = root_bound_file(&disposition.terminal_pid1_events, 4 << 20, true)?;
+        let events: Vec<Value> = std::str::from_utf8(&events)?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<std::result::Result<_, _>>()?;
+        ensure!(
+            !events.is_empty()
+                && events.iter().all(|v| v["_PID"] == "1"
+                    && v["UNIT"] == original.unit
+                    && v["INVOCATION_ID"] == original.invocation_id)
+                && events.iter().any(|v| matches!(
+                    v["CODE_FUNC"].as_str(),
+                    Some("unit_log_success" | "unit_log_failure")
+                )),
+            "original PID1 terminal events do not prove this invocation ended"
+        );
+        let current = owner(
+            &a.current_owner.unit,
+            &a.current_owner.invocation_id,
+            &a.current_owner.exec_start,
+        )?;
+        ensure!(
+            current["MainPID"].as_str() == Some(std::process::id().to_string().as_str())
+                && env::var("INVOCATION_ID")? == a.current_owner.invocation_id,
+            "recovery authority is not this actual MainPID/IID"
+        );
+        let current_pid = std::process::id().to_string();
+        for (key, want) in [
+            ("Id", a.current_owner.unit.as_str()),
+            ("ActiveState", "active"),
+            ("SubState", "running"),
+            ("InvocationID", a.current_owner.invocation_id.as_str()),
+            ("MainPID", current_pid.as_str()),
+            ("NRestarts", "0"),
+            ("Type", "exec"),
+            ("MemoryMax", "536870912"),
+            ("MemorySwapMax", "0"),
+            ("CPUQuotaPerSecUSec", "2s"),
+            ("NoNewPrivileges", "yes"),
+            ("ProtectSystem", "strict"),
+            ("ProtectHome", "read-only"),
+            ("KillMode", "control-group"),
+        ] {
+            ensure!(
+                a.current_properties.get(key).map(String::as_str) == Some(want),
+                "recovery required property differs: {key}"
+            );
+        }
+        ensure!(
+            matches!(
+                a.current_properties.get("User").map(String::as_str),
+                Some("" | "root")
+            ) && matches!(
+                a.current_properties.get("Group").map(String::as_str),
+                Some("" | "root")
+            ) && matches!(
+                a.current_properties.get("TasksMax").map(String::as_str),
+                Some("128" | "512")
+            ) && matches!(
+                a.current_properties
+                    .get("RuntimeMaxUSec")
+                    .map(String::as_str),
+                Some("3min" | "180s")
+            ),
+            "recovery identity/resource profile differs"
+        );
+        let actual_current = evidence::properties(
+            &a.current_owner.unit,
+            &a.current_properties
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(","),
+        )?;
+        ensure!(
+            actual_current == a.current_properties
+                && old_properties()? == before
+                && now()? <= a.expires_unix_seconds,
+            "recovery owner raced or expired"
+        );
+        Ok(
+            json!({"admission":{"path":bound.path,"sha256":bound.sha256},"original_owner_disposition":{"path":a.original_owner_disposition.path,"sha256":a.original_owner_disposition.sha256},"original_owner":original,"original_terminal_properties":before,"current_owner":actual_current,"attempt_identity":stage,"scope":"owned prior stage reconciliation only; no source mutation, fresh download or replay authority"}),
+        )
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestoreRecoveryAdmission {
+    schema: String,
+    route: String,
+    issued_unix_seconds: u64,
+    expires_unix_seconds: u64,
+    helper_sha256: String,
+    original_plan_sha256: String,
+    check_sha256: String,
+    generation: String,
+    attempt: String,
+    attempt_identity: Option<DirectoryIdentity>,
+    original_attempt_intent: Bound,
+    original_owner_disposition: Bound,
+    current_owner: Owner,
+    current_properties: BTreeMap<String, String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestoreOwnerDisposition {
+    schema: String,
+    original_owner: Owner,
+    attempt_intent: Bound,
+    attempt_identity: Option<DirectoryIdentity>,
+    current_properties: BTreeMap<String, String>,
+    terminal_pid1_events: Bound,
+}
 fn check(
     p: &Plan,
     plan_sha: &str,
@@ -917,53 +1227,59 @@ fn check(
     cache: &Directory,
     state: &Directory,
 ) -> Result<()> {
-    ensure!(p.restore.is_none(), "check cannot carry restore admission");
-    for n in [
-        "eviction-intent",
-        "moved",
-        "unlink-intent",
-        "evicted",
-        "restored",
-    ] {
-        ensure!(state.absent(&state_name(n))?, "lifecycle already started");
-    }
-    let history = historical(cache)?;
-    let before = consumer_proof(p)?;
-    let current_metadata = metadata(p)?;
-    println!("slot92447542 check hash started bytes={SIZE}");
-    let (identity, digests, physical) =
-        hash_at(cache, NAME, Some(&p.source_identity), None, || Ok(()))?;
-    let after = consumer_proof(p)?;
-    ensure!(
-        before["consumers"] == after["consumers"],
-        "consumer owner changed during hash"
-    );
-    historical(cache)?;
-    persist(
-        &state.path.join(state_name("check")),
-        &json!({"schema":"jetstreamer-snapshot92447542-check-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"source_identity":identity,"digests":digests,"physical_bytes":physical,"historical_receipt":history,"authenticated_generation_metadata":serde_json::from_slice::<Value>(&current_metadata)?,"authenticated_generation_metadata_sha256":sha(&current_metadata),"consumer_review_sha256":p.consumer_review.sha256,"qualification_sha256":p.qualification.sha256,"proof":after,"local_retirement_authorized":false,"remote_mutations":false,"r2_mutations":false}),
-    )?;
-    println!("slot92447542 independent check receipt durable");
-    Ok(())
+    lifecycle_engine::run_check(&ProductionLifecycle::new(
+        p, plan_sha, self_sha, "", cache, state, None,
+    ))
 }
-fn checked(state: &Directory, check_sha: &str, self_sha: &str) -> Result<Value> {
-    let c = evidence::bound_json(&Bound {
-        path: state.path.join(state_name("check")),
-        sha256: check_sha.into(),
-    })?;
-    ensure!(
-        c["schema"] == "jetstreamer-snapshot92447542-check-v1"
-            && c["self_sha256"] == self_sha
-            && c["remote_mutations"] == false
-            && c["r2_mutations"] == false,
-        "wrong check receipt"
-    );
-    let d: Digests = serde_json::from_value(c["digests"].clone())?;
-    validate_digests(&d, None)?;
-    Ok(c)
+fn evict(
+    p: &Plan,
+    plan_sha: &str,
+    self_sha: &str,
+    check_sha: &str,
+    cache: &Directory,
+    state: &Directory,
+) -> Result<()> {
+    lifecycle_engine::run_evict(
+        &ProductionLifecycle::new(p, plan_sha, self_sha, check_sha, cache, state, None),
+        check_sha,
+    )
 }
-// The only accepted missing-file recovery frontier is a durable unlink intent
-// bound to a prior moved proof. Absence after a mere move/eviction intent fails.
+fn restore(
+    p: &Plan,
+    plan_sha: &str,
+    self_sha: &str,
+    check_sha: &str,
+    cache: &Directory,
+    state: &Directory,
+) -> Result<()> {
+    lifecycle_engine::run_restore(
+        &ProductionLifecycle::new(p, plan_sha, self_sha, check_sha, cache, state, None),
+        check_sha,
+    )
+}
+fn restore_recover(
+    p: &Plan,
+    plan_sha: &str,
+    self_sha: &str,
+    check_sha: &str,
+    cache: &Directory,
+    state: &Directory,
+    recovery: Bound,
+) -> Result<()> {
+    lifecycle_engine::run_recover_restore(
+        &ProductionLifecycle::new(
+            p,
+            plan_sha,
+            self_sha,
+            check_sha,
+            cache,
+            state,
+            Some(recovery),
+        ),
+        check_sha,
+    )
+}
+
 fn recovery_frontier(source: bool, quarantine: bool, moved: bool, unlink: bool) -> Result<()> {
     ensure!(
         !(source && quarantine),
@@ -980,115 +1296,6 @@ fn recovery_frontier(source: bool, quarantine: bool, moved: bool, unlink: bool) 
     );
     Ok(())
 }
-fn evict(
-    p: &Plan,
-    plan_sha: &str,
-    self_sha: &str,
-    check_sha: &str,
-    cache: &Directory,
-    state: &Directory,
-) -> Result<()> {
-    ensure!(p.restore.is_none(), "evict cannot carry restore admission");
-    let c = checked(state, check_sha, self_sha)?;
-    ensure!(
-        c["plan_sha256"] == plan_sha
-            && c["source_identity"] == serde_json::to_value(&p.source_identity)?
-            && c["consumer_review_sha256"] == p.consumer_review.sha256
-            && c["qualification_sha256"] == p.qualification.sha256,
-        "check/evidence/plan changed"
-    );
-    let wanted = c["digests"]["sha256"]
-        .as_str()
-        .context("verified SHA missing")?;
-    let q = format!("{PREFIX}-quarantine");
-    let intent = state.path.join(state_name("eviction-intent"));
-    let moved = state.path.join(state_name("moved"));
-    let unlink = state.path.join(state_name("unlink-intent"));
-    let done = state.path.join(state_name("evicted"));
-    historical(cache)?;
-    consumer_proof(p)?;
-    let fresh_metadata = metadata(p)?;
-    let auth = json!({"schema":"jetstreamer-snapshot92447542-eviction-intent-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"source_identity":p.source_identity,"verified_sha256":wanted,"quarantine":state.path.join(&q),"cache_directory":p.cache_directory,"receipt_directory":p.receipt_directory});
-    if !absent(&done)? {
-        ensure!(
-            load(&done)?["intent"] == auth
-                && cache.absent(NAME)?
-                && state.absent(&q)?
-                && state.absent(&state_name("restored"))?,
-            "completed eviction state conflicts"
-        );
-        println!("slot92447542 eviction already complete");
-        return Ok(());
-    }
-    let source = !cache.absent(NAME)?;
-    let quarantined = !state.absent(&q)?;
-    let has_moved = !absent(&moved)?;
-    let has_unlink = !absent(&unlink)?;
-    if absent(&intent)? {
-        ensure!(
-            source && !quarantined && !has_moved && !has_unlink,
-            "foreign markers/unknown initial state"
-        );
-        hash_at(cache, NAME, Some(&p.source_identity), Some(wanted), || {
-            Ok(())
-        })?;
-        historical(cache)?;
-        consumer_proof(p)?;
-        persist(&intent, &auth)?;
-    } else {
-        ensure!(load(&intent)? == auth, "conflicting eviction intent");
-    }
-    recovery_frontier(source, quarantined, has_moved, has_unlink)?;
-    if source {
-        hash_at(cache, NAME, Some(&p.source_identity), Some(wanted), || {
-            Ok(())
-        })?;
-        consumer_proof(p)?;
-        rename_noreplace(cache, NAME, state, &q)?;
-    }
-    if !state.absent(&q)? {
-        ensure!(cache.absent(NAME)?, "source reappeared after quarantine");
-        let (i, d, physical) = hash_at(state, &q, None, Some(wanted), || Ok(()))?;
-        ensure!(
-            i.renamed_from(&p.source_identity),
-            "substituted quarantine preserved; original identity differs"
-        );
-        let proof = json!({"schema":"jetstreamer-snapshot92447542-moved-v1","intent":reference(&intent)?,"source_identity":p.source_identity,"quarantine_identity":i,"digests":d,"physical_bytes":physical});
-        persist_same(&moved, &proof)?;
-        let permission = json!({"schema":"jetstreamer-snapshot92447542-unlink-intent-v1","intent":reference(&intent)?,"moved":reference(&moved)?,"quarantine_identity":i,"verified_sha256":wanted});
-        persist_same(&unlink, &permission)?;
-        historical(cache)?;
-        consumer_proof(p)?;
-        metadata(p)?;
-        cache.validate()?;
-        state.validate()?;
-        ensure!(cache.absent(NAME)?, "source reappeared before unlink");
-        unlink_at(state, &q, &i)?;
-    }
-    let mp = load(&moved)?;
-    let up = load(&unlink)?;
-    ensure!(
-        mp["intent"] == reference(&intent)?
-            && up["moved"] == reference(&moved)?
-            && up["intent"] == reference(&intent)?
-            && up["quarantine_identity"] == mp["quarantine_identity"]
-            && up["verified_sha256"] == wanted,
-        "unbound moved/unlink recovery proof"
-    );
-    historical(cache)?;
-    consumer_proof(p)?;
-    ensure!(
-        cache.absent(NAME)? && state.absent(&q)?,
-        "retirement absence failed"
-    );
-    persist(
-        &done,
-        &json!({"schema":"jetstreamer-snapshot92447542-evicted-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"intent":auth,"moved":reference(&moved)?,"unlink_intent":reference(&unlink)?,"source_absent":true,"quarantine_absent":true,"removed_logical_bytes":SIZE,"removed_original_st_blocks_bytes":c["physical_bytes"],"filesystem_available_bytes_after":free_bytes(&cache.path)?,"fresh_generation_metadata_sha256":sha(&fresh_metadata),"historical_receipt_unchanged":true,"restore_requires_fresh_admission":true,"remote_mutations":false,"r2_mutations":false}),
-    )?;
-    println!("slot92447542 exact quarantine retirement complete bytes={SIZE}");
-    Ok(())
-}
-
 fn free_bytes(path: &Path) -> Result<u64> {
     let p = CString::new(path.as_os_str().as_bytes())?;
     let mut s = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -1326,7 +1533,7 @@ struct Admission {
     owner_exec_start: String,
     protected_owners: Vec<Owner>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Owner {
     unit: String,
@@ -1443,25 +1650,6 @@ fn staged_bytes(d: &Directory) -> Result<u64> {
     }
     Ok(bytes)
 }
-fn guard(d: &Directory, a: &Admission, start: Instant, maximum: u64) -> Result<()> {
-    ensure!(
-        start.elapsed().as_secs() < maximum,
-        "restore runtime exhausted"
-    );
-    ensure!(
-        free_bytes(&d.path)? >= a.protected_floor_bytes,
-        "protected free-space floor crossed"
-    );
-    ensure!(
-        staged_bytes(d)? <= SIZE + SLACK,
-        "restore staging bound exceeded"
-    );
-    owner(&a.owner_unit, &a.owner_invocation_id, &a.owner_exec_start)?;
-    for x in &a.protected_owners {
-        owner(&x.unit, &x.invocation_id, &x.exec_start)?;
-    }
-    Ok(())
-}
 fn chown(file: &File, uid: u32, gid: u32) -> Result<()> {
     ensure!(
         unsafe { libc::fchown(file.as_raw_fd(), uid, gid) } == 0,
@@ -1483,10 +1671,19 @@ fn cleanup_attempt(dir: &mut Directory) -> Result<()> {
         refs.references.is_empty(),
         "temporary still referenced; preserve it for inspection"
     );
+    ensure!(
+        inode_references(Path::new("/proc"), dir.identity.device, dir.identity.inode)?.is_empty(),
+        "temporary directory inode still referenced"
+    );
+    // Complete and validate the owned enrollment before unlinking any member.
+    // Per-file inode scans also find retained FD/map aliases whose visible
+    // names no longer point below the staging path.
+    staged_bytes(dir)?;
     freeze_stage(dir)?;
-    for e in fs::read_dir(&dir.path)? {
-        let e = e?;
-        let m = fs::symlink_metadata(e.path())?;
+    let mut members = Vec::new();
+    for entry in fs::read_dir(&dir.path)? {
+        let entry = entry?;
+        let m = fs::symlink_metadata(entry.path())?;
         ensure!(
             m.is_file()
                 && m.nlink() == 1
@@ -1494,208 +1691,29 @@ fn cleanup_attempt(dir: &mut Directory) -> Result<()> {
                 && matches!(m.uid(), 0 | 1000),
             "foreign temporary retained"
         );
-        unlink_at(
-            dir,
-            e.file_name().to_str().context("temporary filename")?,
-            &Identity::of(&m),
-        )?;
+        let name = entry
+            .file_name()
+            .to_str()
+            .context("temporary filename")?
+            .to_owned();
+        component(&name)?;
+        let identity = Identity::of(&m);
+        ensure!(
+            inode_references(Path::new("/proc"), identity.device, identity.inode)?.is_empty(),
+            "temporary payload inode alias still referenced"
+        );
+        members.push((name, identity));
+    }
+    members.sort_by(|a, b| a.0.cmp(&b.0));
+    for (name, identity) in members {
+        unlink_at(dir, &name, &identity)?;
     }
     dir.validate()?;
     fs::remove_dir(&dir.path)?;
     File::open(dir.path.parent().context("attempt parent")?)?.sync_all()?;
     Ok(())
 }
-fn restore(
-    p: &Plan,
-    plan_sha: &str,
-    self_sha: &str,
-    check_sha: &str,
-    cache: &Directory,
-    state: &Directory,
-) -> Result<()> {
-    let r = p.restore.as_ref().context("restore admission required")?;
-    let c = checked(state, check_sha, self_sha)?;
-    let verified = c["digests"]["sha256"]
-        .as_str()
-        .context("verified SHA missing")?;
-    let evicted = load(&state.path.join(state_name("evicted")))?;
-    ensure!(
-        evicted["schema"] == "jetstreamer-snapshot92447542-evicted-v1"
-            && evicted["check_sha256"] == check_sha
-            && evicted["self_sha256"] == self_sha
-            && state.absent(&format!("{PREFIX}-quarantine"))?,
-        "matching eviction proof missing"
-    );
-    historical(cache)?;
-    let completed = state.path.join(state_name("restored"));
-    let publish_intent = state
-        .path
-        .join(format!("{}-publish-intent.json", r.attempt));
-    if !cache.absent(NAME)? {
-        ensure!(
-            !absent(&publish_intent)?,
-            "canonical destination collision without this restore publication intent"
-        );
-        let pi = load(&publish_intent)?;
-        ensure!(
-            pi["self_sha256"] == self_sha
-                && pi["plan_sha256"] == plan_sha
-                && pi["check_sha256"] == check_sha
-                && pi["verified_sha256"] == verified,
-            "foreign publication intent"
-        );
-        let (i, d, _) = hash_at(cache, NAME, None, Some(verified), || Ok(()))?;
-        let before: Identity = serde_json::from_value(pi["identity"].clone())?;
-        ensure!(
-            i.renamed_from(&before) && i.uid == 0 && i.gid == 0 && i.mode & 0o7777 == 0o444,
-            "restored destination identity differs"
-        );
-        let receipt = json!({"schema":"jetstreamer-snapshot92447542-restored-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"uri":URI,"generation":GENERATION,"new_identity":i,"digests":d,"publication_intent":reference(&publish_intent)?,"original_historical_receipt_preserved":true,"consumers_must_bind_new_receipt":true,"remote_mutations":false,"r2_mutations":false});
-        persist_same(&completed, &receipt)?;
-        println!("slot92447542 matching restored destination reconciled");
-        return Ok(());
-    }
-    ensure!(
-        absent(&completed)?,
-        "restore receipt exists but destination disappeared"
-    );
-    let a = admission(p, r, self_sha, verified)?;
-    ensure!(
-        free_bytes(&cache.path)?
-            >= a.protected_floor_bytes
-                .checked_add(SIZE + SLACK)
-                .context("restore reservation overflow")?,
-        "full restore does not fit above protected floor"
-    );
-    consumer_proof(p)?;
-    let before_metadata = metadata(p)?;
-    let attempt = cache.path.join(format!(".{}", r.attempt));
-    ensure!(
-        absent(&attempt)?,
-        "restore attempt already exists; preserve and inspect its failure journal"
-    );
-    let intent = state.path.join(format!("{}-intent.json", r.attempt));
-    let intent_value = json!({"schema":"jetstreamer-snapshot92447542-restore-attempt-intent-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"attempt":attempt,"verified_sha256":verified,"admission_sha256":r.admission.sha256,"metadata_before_sha256":sha(&before_metadata)});
-    persist(&intent, &intent_value)?;
-    fs::create_dir(&attempt)?;
-    fs::set_permissions(&attempt, fs::Permissions::from_mode(0o700))?;
-    let adir = File::open(&attempt)?;
-    chown(&adir, 1000, 1000)?;
-    adir.sync_all()?;
-    cache.sync()?;
-    let aid = DirectoryIdentity::of(&adir.metadata()?);
-    let mut dir = Directory::open(&attempt, &aid)?;
-    let start = Instant::now();
-    let mut owned_sdk: Option<OwnedSdk> = None;
-    let transfer = (|| -> Result<(Identity, Digests)> {
-        guard(&dir, &a, start, r.maximum_runtime_seconds)?;
-        let mut command = sdk_command(&p.gcloud)?;
-        command
-            .args([
-                "storage",
-                "cp",
-                "--no-clobber",
-                "--quiet",
-                "--account=sam.johnson@anza.xyz",
-                "--billing-project=principal-lane-200702",
-                URI,
-            ])
-            .arg(attempt.join(NAME));
-        owned_sdk = Some(OwnedSdk(Some(command.spawn()?)));
-        let child = owned_sdk.as_mut().context("owned SDK missing")?;
-        let mut heartbeat = Instant::now();
-        loop {
-            guard(&dir, &a, start, r.maximum_runtime_seconds)?;
-            if child.exited()? {
-                break;
-            }
-            if heartbeat.elapsed() >= Duration::from_secs(60) {
-                println!(
-                    "slot92447542 transfer heartbeat staged_bytes={}",
-                    staged_bytes(&dir)?
-                );
-                heartbeat = Instant::now();
-            }
-            thread::sleep(Duration::from_secs(1));
-        }
-        ensure!(
-            child.finish()?.success(),
-            "exact-generation transfer failed"
-        );
-        let remaining = process_references::scan(Path::new("/proc"), &attempt)?;
-        ensure!(
-            remaining.references.is_empty(),
-            "SDK descendant remains after leader reap"
-        );
-        freeze_stage(&mut dir)?;
-        let file = dir.open_file(NAME)?;
-        let m = file.metadata()?;
-        ensure!(
-            m.is_file() && m.uid() == 1000 && m.gid() == 1000 && m.nlink() == 1 && m.len() == SIZE,
-            "unsafe SDK output"
-        );
-        chown(&file, 0, 0)?;
-        file.set_permissions(fs::Permissions::from_mode(0o444))?;
-        file.sync_all()?;
-        dir.sync()?;
-        let (i, d, _) = hash_at(&dir, NAME, None, Some(verified), || {
-            guard(&dir, &a, start, r.maximum_runtime_seconds)
-        })?;
-        let after_metadata = metadata(p)?;
-        validate_metadata(&serde_json::from_slice::<Value>(&after_metadata)?)?;
-        guard(&dir, &a, start, r.maximum_runtime_seconds)?;
-        historical(cache)?;
-        consumer_proof(p)?;
-        let pi = json!({"schema":"jetstreamer-snapshot92447542-restore-publish-intent-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"attempt_intent":reference(&intent)?,"identity":i,"verified_sha256":verified,"metadata_before_sha256":sha(&before_metadata),"metadata_after_sha256":sha(&after_metadata),"admission_sha256":r.admission.sha256});
-        persist(&publish_intent, &pi)?;
-        ensure!(cache.absent(NAME)?, "destination appeared during transfer");
-        rename_noreplace(&dir, NAME, cache, NAME)?;
-        Ok((i, d))
-    })();
-    match transfer {
-        Ok((i, d)) => {
-            let after = Identity::of(&fs::symlink_metadata(cache.path.join(NAME))?);
-            ensure!(after.renamed_from(&i), "published inode differs");
-            let receipt = json!({"schema":"jetstreamer-snapshot92447542-restored-v1","self_sha256":self_sha,"plan_sha256":plan_sha,"check_sha256":check_sha,"uri":URI,"generation":GENERATION,"new_identity":after,"digests":d,"publication_intent":reference(&publish_intent)?,"original_historical_receipt_preserved":true,"consumers_must_bind_new_receipt":true,"remote_mutations":false,"r2_mutations":false});
-            persist(&completed, &receipt)?;
-            cleanup_attempt(&mut dir)?;
-            println!("slot92447542 restore committed with new inode receipt");
-            Ok(())
-        }
-        Err(error) => {
-            // The transport owner lives outside the transfer closure. Drop is
-            // too late here: it would run only after recording and cleaning the
-            // failed attempt. Reap its exact group before claiming shutdown.
-            stop_owned_sdk(&mut owned_sdk)?;
-            let refs = process_references::scan(Path::new("/proc"), &attempt)?;
-            ensure!(
-                refs.references.is_empty(),
-                "SDK descendant still references failed attempt; preserve it"
-            );
-            let failed = state
-                .path
-                .join(format!("{}-failure-intent.json", r.attempt));
-            persist(
-                &failed,
-                &json!({"schema":"jetstreamer-snapshot92447542-restore-failure-intent-v1","attempt_intent":reference(&intent)?,"owned_SDK_group_checked_stopped_and_leader_reaped_before_cleanup":true,"attempt_identity":dir.identity,"canonical_destination_absent":cache.absent(NAME)?,"new_receipt_absent":absent(&completed)?,"error_class":"transfer-or-integrity-or-capacity-gate-failed"}),
-            )?;
-            ensure!(
-                cache.absent(NAME)? && absent(&completed)?,
-                "publication boundary crossed; preserve stage for receipt recovery"
-            );
-            cleanup_attempt(&mut dir)?;
-            persist(
-                &state
-                    .path
-                    .join(format!("{}-failure-completion.json", r.attempt)),
-                &json!({"schema":"jetstreamer-snapshot92447542-restore-failure-cleaned-v1","failure_intent":reference(&failed)?,"owned_temporary_absent":absent(&attempt)?,"canonical_destination_absent":true,"new_receipt_absent":true}),
-            )?;
-            Err(error)
-        }
-    }
-}
 
-/// One foreground operation; no recurring observation, retry loop or replay.
 pub fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     let args: Vec<_> = env::args().skip(1).collect();
@@ -1707,8 +1725,8 @@ pub fn run() -> Result<()> {
         return consumer_contract::run_review(&args[1], &args[2], &args[3]);
     }
     ensure!(
-        matches!(args.len(), 6 | 7) && args[1] == "--plan-sha256" && args[3] == "--self-sha256",
-        "usage: BIN PLAN --plan-sha256 HASH --self-sha256 HASH check | evict CHECK_SHA | restore CHECK_SHA"
+        matches!(args.len(), 6 | 7 | 9) && args[1] == "--plan-sha256" && args[3] == "--self-sha256",
+        "usage: BIN PLAN --plan-sha256 HASH --self-sha256 HASH check | evict CHECK_SHA | restore CHECK_SHA | restore-recover CHECK_SHA RECOVERY_ADMISSION RECOVERY_SHA"
     );
     let self_path = fs::read_link("/proc/self/exe")?;
     let (self_sha, m) = evidence::hash_file(&self_path, 256 << 20)?;
@@ -1728,21 +1746,40 @@ pub fn run() -> Result<()> {
     private_dir(Path::new(STATE))?;
     let state = Directory::open(Path::new(STATE), &p.receipt_directory)?;
     let cache = Directory::open(Path::new(CACHE_ROOT), &p.cache_directory)?;
-    let _lock = lock(&state.path)?;
     match args[5].as_str() {
         "check" => {
             ensure!(args.len() == 6, "check takes no extra operand");
             check(&p, &args[2], &self_sha, &cache, &state)
         }
-        "evict" | "restore" => {
+        "evict" | "restore" | "restore-recover" => {
             ensure!(
-                args.len() == 7 && is_sha(&args[6]),
+                args.len() >= 7 && is_sha(&args[6]),
                 "exact check digest required"
             );
-            if args[5] == "evict" {
-                evict(&p, &args[2], &self_sha, &args[6], &cache, &state)
+            if args[5] == "restore-recover" {
+                ensure!(
+                    args.len() == 9 && is_sha(&args[8]),
+                    "fresh independent recovery admission and digest required"
+                );
+                restore_recover(
+                    &p,
+                    &args[2],
+                    &self_sha,
+                    &args[6],
+                    &cache,
+                    &state,
+                    Bound {
+                        path: args[7].clone().into(),
+                        sha256: args[8].clone(),
+                    },
+                )
             } else {
-                restore(&p, &args[2], &self_sha, &args[6], &cache, &state)
+                ensure!(args.len() == 7, "exact check digest required");
+                if args[5] == "evict" {
+                    evict(&p, &args[2], &self_sha, &args[6], &cache, &state)
+                } else {
+                    restore(&p, &args[2], &self_sha, &args[6], &cache, &state)
+                }
             }
         }
         _ => bail!("unsupported fixed lifecycle mode"),
@@ -2131,3 +2168,7 @@ mod retained_metadata_fixture {
 #[cfg(all(test, feature = "snapshot92447542-native-sdk-tests"))]
 #[path = "snapshot92447542_native_sdk.rs"]
 mod native_sdk;
+
+#[cfg(all(test, feature = "snapshot92447542-native-lifecycle-tests"))]
+#[path = "snapshot92447542_native_engine.rs"]
+mod native_engine;

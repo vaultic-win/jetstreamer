@@ -10,6 +10,8 @@ documentation.workspace = true
 keywords.workspace = true
 
 [features]
+# Separately admitted complete-engine native controls; never ordinary defaults.
+snapshot92447542-native-lifecycle-tests = ["snapshot92447542-native-sdk-tests"]
 # Explicit Root-only metadata control; never enabled in ordinary test selection.
 snapshot92447542-native-sdk-tests = []
 # Diagnostic CPU allocation released by the exact reserve-stopped epoch 225.
