@@ -1,0 +1,1500 @@
+{
+  "scope": "Actual compiler-free uploader main recipe captured after same-process namespace seeding. No whole-image match, compiler lease, new memory/future release/Frame/Reader/replay authority.",
+  "qualification": {
+    "ACTUAL-SAME-NAMESPACE-SEED-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ACTUAL-SAME-NAMESPACE-SEED-PLAN.json",
+        "sha256": "ac6e7eb2cade7e4eb039bce584c3f017c294ad22c0b68cffdd9f4cb857e63fae"
+      },
+      "document": {
+        "schema": "horizon-uploader-Cargo-same-namespace-seed-plan-v1",
+        "owner": "/root",
+        "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+        "source_fingerprints": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint",
+        "destination_fingerprints": "/home/sol/workspace/jetstreamer/target/release/.fingerprint",
+        "working_directory": "/home/sol/workspace/jetstreamer",
+        "compiler_execution_authorized": false,
+        "build_script_execution_authorized": false,
+        "replay_admission_authorized": false,
+        "native_cap_bytes": 536870912,
+        "target_tmpfs_max_bytes": 100663296,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "cp": {
+          "path": "/usr/bin/cp",
+          "sha256": "95cdd604fdf0a292e349d27d1a80170ca0913bd3bbd9d2c0fcfc6c8adaebe2f0"
+        },
+        "wrapper": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0"
+        },
+        "sentinels": [
+          {
+            "relative": "libc-c95189006321647c/build-script-build-script-build",
+            "sha256": "eccbc73b7de12a25f0f69e54ad6e7566cd73d1c6ce016368390caa4c91796ab9"
+          },
+          {
+            "relative": "libc-c95189006321647c/dep-build-script-build-script-build",
+            "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab"
+          }
+        ]
+      }
+    },
+    "ARTIFACT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ARTIFACT.json",
+        "sha256": "31520ff5d0e8b88fdfd210665a9b5c8fd1eca17dde44ba974f9555043c26613c"
+      },
+      "document": {
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1/main.rs",
+          "sha256": "a7a40b62016b1686f0cc8d02dce0f1f4eb0d571b84209b2cab64ba89fec5b968"
+        },
+        "predecessor_graph": {
+          "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+          "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+        },
+        "actual_direct_externs": {
+          "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+          },
+          "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+            "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+          },
+          "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+            "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+          }
+        },
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 8,
+        "shared_budget_ending_authorized": false,
+        "native_census_pending": true
+      }
+    },
+    "NATIVE-V5-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/NATIVE-V5-ORIGINAL-ARGV.json",
+        "sha256": "6d4dba4eb8d24c0e85d696b99b8fe1a676ece6cfb8a939af7041402c1ad1ffb7"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-same-namespace-capture-20261110-v5",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=90",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp /usr/lib/x86_64-linux-gnu/libselinux.so.1 /usr/lib/x86_64-linux-gnu/libacl.so.1.1.2302 /usr/lib/x86_64-linux-gnu/libattr.so.1.1.2502 /usr/lib/x86_64-linux-gnu/libpcre2-8.so.0.11.2 /usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1/chain",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "-p",
+        "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+        "-p",
+        "BindReadOnlyPaths=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+        "-p",
+        "BindReadOnlyPaths=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-fingerprint-sentinel-views-20261110-v1/sentinel-0:/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/libc-c95189006321647c/build-script-build-script-build",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-fingerprint-sentinel-views-20261110-v1/sentinel-1:/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/libc-c95189006321647c/dep-build-script-build-script-build",
+        "-p",
+        "Environment=CARGO_LOG=cargo::core::compiler::fingerprint=info",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1/chain",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-same-namespace-seed-plan-20261110-v1/plan.json",
+        "--plan-sha256",
+        "ac6e7eb2cade7e4eb039bce584c3f017c294ad22c0b68cffdd9f4cb857e63fae",
+        "--self-sha256",
+        "79a685a65e3daa1300a8b391d762e8b21516441b6ab68196f214c28f171ec9d2"
+      ]
+    },
+    "NATIVE-V5-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/NATIVE-V5-ORIGINAL-EXECUTION.json",
+        "sha256": "45382fbe998250b42456c548e1af26393cd3f45d788971db53da658dd480a66d"
+      },
+      "document": {
+        "code": 101,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-same-namespace-capture-20261110-v5.service\nsame-namespace fingerprint seed start iid=f1228aac84a447ae8228c1533cbef602; no compiler/buildscript execution authorized\nsame-namespace fingerprint seed verified iid=f1228aac84a447ae8228c1533cbef602; exec compiler-free Cargo\nwarning: failed to save last-use data\nThis may prevent cargo from accurately tracking what is being used in its global cache. This information is used for automatically removing unused data in the cache.\n\nunable to open database file\n\nCaused by:\n  Error code 14: unable to open database file\n   0.478648054s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: changed \"/home/sol/workspace/jetstreamer/jetstreamer-r2/src/fleet/publication144_history.rs\"\n   0.478660494s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint:           (vs) \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/jetstreamer-r2-e0b97ea02470d442/dep-bin-jetstreamer-r2\"\n   0.478663834s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1792765243, nanos: 616187829 } < FileTime { seconds: 1792825073, nanos: 100067202 }\n   0.478866205s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: fingerprint dirty for jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2)/Build/TargetInner { name: \"jetstreamer-r2\", doc: true, ..: with_path(\"/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs\", Edition2024) }\n   0.478874795s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/jetstreamer-r2-e0b97ea02470d442/dep-bin-jetstreamer-r2\", reference_mtime: FileTime { seconds: 1792765243, nanos: 616187829 }, stale: \"/home/sol/workspace/jetstreamer/jetstreamer-r2/src/fleet/publication144_history.rs\", stale_mtime: FileTime { seconds: 1792825073, nanos: 100067202 } }))\n       Fresh libc v0.2.189\n       Fresh unicode-ident v1.0.24\n       Fresh proc-macro2 v1.0.106\n       Fresh quote v1.0.45\n       Fresh syn v2.0.117\n       Fresh cfg-if v1.0.4\n       Fresh bytes v1.11.1\n       Fresh pin-project-lite v0.2.17\n       Fresh futures-core v0.3.32\n       Fresh tokio-macros v2.7.0\n       Fresh mio v1.2.0\n       Fresh socket2 v0.6.3\n       Fresh itoa v1.0.18\n       Fresh zeroize v1.8.2\n       Fresh tokio v1.52.3\n       Fresh jobserver v0.1.34\n       Fresh find-msvc-tools v0.1.9\n       Fresh shlex v1.3.0\n       Fresh cc v1.2.61\n       Fresh subtle v2.6.1\n       Fresh once_cell v1.21.4\n       Fresh fnv v1.0.7\n       Fresh typenum v1.20.0\n       Fresh futures-sink v0.3.32\n       Fresh slab v0.4.12\n       Fresh tokio-util v0.7.18\n       Fresh http v1.4.0\n       Fresh futures-task v0.3.32\n       Fresh futures-util v0.3.32\n       Fresh http-body v1.0.1\n       Fresh tracing-core v0.1.36\n       Fresh tracing-attributes v0.1.31\n       Fresh version_check v0.9.5\n       Fresh tracing v0.1.44\n       Fresh getrandom v0.2.17\n       Fresh http v0.2.12\n       Fresh autocfg v1.5.0\n       Fresh generic-array v0.14.7\n       Fresh http-body v0.4.6\n       Fresh synstructure v0.13.2\n       Fresh powerfmt v0.2.0\n       Fresh deranged v0.5.8\n       Fresh num-traits v0.2.19\n       Fresh http-body-util v0.1.3\n       Fresh num-conv v0.2.1\n       Fresh untrusted v0.9.0\n       Fresh time-core v0.1.8\n       Fresh either v1.15.0\n       Fresh outref v0.5.2\n       Fresh vsimd v0.8.0\n       Fresh base64-simd v0.8.0\n       Fresh bytes-utils v0.1.4\n       Fresh time v0.3.47\n       Fresh num-integer v0.1.46\n       Fresh zerofrom-derive v0.1.7\n       Fresh cmake v0.1.58\n       Fresh ryu v1.0.23\n       Fresh pin-utils v0.1.0\n       Fresh dunce v1.0.5\n       Fresh fs_extra v1.3.0\n       Fresh aws-smithy-types v1.8.0\n       Fresh zerofrom v0.1.7\n       Fresh yoke-derive v0.8.2\n       Fresh crypto-common v0.1.7\n       Fresh block-buffer v0.10.4\n       Fresh stable_deref_trait v1.2.1\n       Fresh equivalent v1.0.2\n       Fresh yoke v0.8.2\n       Fresh digest v0.10.7\n       Fresh aws-smithy-async v1.2.14\n       Fresh zerovec-derive v0.11.3\n       Fresh aws-smithy-runtime-api-macros v1.0.0\n       Fresh percent-encoding v2.3.2\n       Fresh hashbrown v0.17.0\n       Fresh indexmap v2.14.0\n       Fresh aws-smithy-runtime-api v1.12.3\n       Fresh zerovec v0.11.6\n       Fresh rand_core v0.6.4\n       Fresh displaydoc v0.2.5\n       Fresh smallvec v1.15.1\n       Fresh aws-lc-sys v0.40.0\n       Fresh rustls-pki-types v1.14.1\n       Fresh try-lock v0.2.5\n       Fresh tower-service v0.3.3\n       Fresh want v0.3.1\n       Fresh aws-lc-rs v1.16.3\n       Fresh httparse v1.10.1\n       Fresh ring v0.17.14\n       Fresh futures-channel v0.3.32\n       Fresh const-oid v0.9.6\n       Fresh der v0.6.1\n       Fresh rustls-webpki v0.103.13\n       Fresh tinystr v0.8.3\n       Fresh atomic-waker v1.1.2\n       Fresh writeable v0.6.3\n       Fresh litemap v0.8.2\n       Fresh base64ct v1.8.3\n       Fresh log v0.4.29\n       Fresh spki v0.6.0\n       Fresh icu_locale_core v2.2.0\n       Fresh h2 v0.4.13\n       Fresh rustls v0.23.40\n       Fresh zerotrie v0.2.4\n       Fresh potential_utf v0.1.5\n       Fresh hybrid-array v0.4.11\n       Fresh utf8_iter v1.0.4\n       Fresh openssl-probe v0.2.1\n       Fresh rustls-native-certs v0.8.3\n       Fresh icu_collections v2.2.0\n       Fresh icu_provider v2.2.0\n       Fresh hyper v1.9.0\n       Fresh pkcs8 v0.9.0\n       Fresh rustls-webpki v0.101.7\n       Fresh sct v0.7.1\n       Fresh ff v0.12.1\n       Fresh crypto-bigint v0.4.9\n       Fresh sync_wrapper v1.0.2\n       Fresh cpufeatures v0.2.17\n       Fresh base16ct v0.1.1\n       Fresh cmov v0.5.3\n       Fresh memchr v2.8.0\n       Fresh tower-layer v0.3.3\n       Fresh base64 v0.22.1\n       Fresh ipnet v2.12.0\n       Fresh hyper-util v0.1.20\n       Fresh tower v0.5.3\n       Fresh ctutils v0.4.2\n       Fresh sec1 v0.3.0\n       Fresh group v0.12.1\n       Fresh rustls v0.21.12\n       Fresh crc32fast v1.5.0\n       Fresh icu_normalizer_data v2.2.0\n       Fresh getrandom v0.3.4\n       Fresh icu_properties_data v2.2.0\n       Fresh zerocopy v0.8.48\n       Fresh crypto-common v0.2.1\n       Fresh block-buffer v0.12.0\n       Fresh tokio-rustls v0.26.4\n       Fresh h2 v0.3.27\n       Fresh hmac v0.12.1\n       Fresh socket2 v0.5.10\n       Fresh httpdate v1.0.3\n       Fresh const-oid v0.10.2\n       Fresh semver v1.0.28\n       Fresh rustc_version v0.4.1\n       Fresh digest v0.11.2\n       Fresh hyper v0.14.32\n       Fresh rfc6979 v0.3.1\n       Fresh hyper-rustls v0.27.9\n       Fresh ppv-lite86 v0.2.21\n       Fresh icu_properties v2.2.0\n       Fresh rand_core v0.9.5\n       Fresh icu_normalizer v2.2.0\n       Fresh aws-smithy-eventstream v0.60.20\n       Fresh tokio-rustls v0.24.1\n       Fresh elliptic-curve v0.12.3\n       Fresh aho-corasick v1.1.4\n       Fresh sha2 v0.10.9\n       Fresh signature v1.6.4\n       Fresh form_urlencoded v1.2.2\n       Fresh regex-syntax v0.8.10\n       Fresh regex-automata v0.4.14\n       Fresh ecdsa v0.14.8\n       Fresh hyper-rustls v0.24.2\n       Fresh idna_adapter v1.2.2\n       Fresh rand_chacha v0.9.0\n       Fresh aws-credential-types v1.2.14\n       Fresh aws-smithy-http v0.63.6\n       Fresh hex v0.4.3\n       Fresh cpufeatures v0.3.0\n       Fresh fastrand v2.4.1\n       Fresh bitflags v2.13.2\n       Fresh crc-catalog v2.5.0\n       Fresh crc v3.4.0\n       Fresh sha2 v0.11.0\n       Fresh rand v0.9.4\n       Fresh idna v1.1.0\n       Fresh aws-smithy-http-client v1.1.12\n       Fresh p256 v0.11.1\n       Fresh regex v1.12.3\n       Fresh rustversion v1.0.22\n       Fresh hmac v0.13.0\n       Fresh crypto-bigint v0.5.5\n       Fresh aws-smithy-observability v0.2.6\n       Fresh aws-smithy-schema v0.1.0\n       Fresh foldhash v0.1.5\n       Fresh allocator-api2 v0.2.21\n       Fresh hashbrown v0.15.5\n       Fresh aws-types v1.3.16\n       Fresh aws-smithy-runtime v1.11.1\n       Fresh aws-sigv4 v1.4.3\n       Fresh crc-fast v1.6.0\n       Fresh url v2.5.8\n       Fresh serde_core v1.0.229\n       Fresh aws-smithy-http v0.62.6\n       Fresh sha1 v0.10.6\n       Fresh md-5 v0.10.6\n       Fresh syn v3.0.3\n       Fresh uuid v1.23.1\n       Fresh linux-raw-sys v0.12.1\n       Fresh iri-string v0.7.12\n       Fresh xmlparser v0.13.6\n       Fresh aws-smithy-xml v0.60.15\n       Fresh tower-http v0.6.8\n       Fresh rustix v1.1.4\n       Fresh aws-runtime v1.7.3\n       Fresh serde_derive v1.0.229\n       Fresh aws-smithy-checksums v0.63.12\n       Fresh getrandom v0.4.2\n       Fresh lru v0.12.5\n       Fresh zmij v1.0.21\n       Fresh rustls-platform-verifier v0.7.0\n       Fresh aws-smithy-json v0.61.9\n       Fresh regex-lite v0.1.9\n       Fresh aws-sdk-s3 v1.119.0\n       Fresh reqwest v0.13.3\n       Fresh serde_json v1.0.150\n       Fresh tempfile v3.27.0\n       Fresh serde v1.0.229\n       Fresh anyhow v1.0.102\n       Fresh base64 v0.23.1\n       Dirty jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2): the file `jetstreamer-r2/src/fleet/publication144_history.rs` has changed (1792825073.100067202s, 16h 37m 10s after last build at 1792765243.616187829s)\n   Compiling jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2)\n     Running `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name jetstreamer_r2 --edition=2024 jetstreamer-r2/src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C lto -C codegen-units=1 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=17fc98a0f5c90fa0 -C extra-filename=-e0b97ea02470d442 --out-dir /home/sol/workspace/jetstreamer/target/release/deps -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --extern anyhow=/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib --extern aws_credential_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib --extern aws_sdk_s3=/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib --extern aws_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib --extern base64=/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib --extern futures_util=/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib --extern libc=/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib --extern md5=/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib --extern reqwest=/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib --extern serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib --extern serde_json=/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib --extern sha2=/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib --extern tempfile=/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib --extern tokio=/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib --extern url=/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib -L native=/home/sol/workspace/jetstreamer/target/release/build/ring-f1ef47f68a3a2332/out -L native=/home/sol/workspace/jetstreamer/target/release/build/aws-lc-sys-c0f468b561a15d48/out`\nHORIZON_COMPILER_INTERCEPTED: argv captured; no compiler, build script or linker was executed\nerror: could not compile `jetstreamer-r2` (bin \"jetstreamer-r2\")\n\nCaused by:\n  process didn't exit successfully: `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name jetstreamer_r2 --edition=2024 jetstreamer-r2/src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C lto -C codegen-units=1 --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=17fc98a0f5c90fa0 -C extra-filename=-e0b97ea02470d442 --out-dir /home/sol/workspace/jetstreamer/target/release/deps -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --extern anyhow=/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib --extern aws_credential_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib --extern aws_sdk_s3=/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib --extern aws_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib --extern base64=/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib --extern futures_util=/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib --extern libc=/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib --extern md5=/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib --extern reqwest=/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib --extern serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib --extern serde_json=/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib --extern sha2=/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib --extern tempfile=/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib --extern tokio=/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib --extern url=/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib -L native=/home/sol/workspace/jetstreamer/target/release/build/ring-f1ef47f68a3a2332/out -L native=/home/sol/workspace/jetstreamer/target/release/build/aws-lc-sys-c0f468b561a15d48/out` (exit status: 86)\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=101\nService runtime: 1.343s\nCPU time consumed: 1.313s\nMemory peak: 5.2M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ROOT_CLOSED_UPLOADER_CARGO_SEED_CHAIN_V1_WORK_RETIREMENT_COMPLETE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_SEED_CHAIN_V1_WORK_RETIREMENT_COMPLETE.json",
+        "sha256": "96096be41fc725ffcd997f86359e64b4cfe76dd9f68955ecf02910a578088221"
+      },
+      "document": {
+        "intent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_SEED_CHAIN_V1_WORK_RETIREMENT_INTENT.json",
+          "sha256": "4c55cbd1876547a187186d48628afa1dff432170022e726820dfc71ed007b260"
+        },
+        "physical_bytes_reclaimed": 23867392,
+        "filesystem_available_before_bytes": 6344791113728,
+        "filesystem_available_after_bytes": 6338963402752,
+        "DATA_promise_credit_bytes": 0,
+        "sources_receipts_all_sealed_runtimes_and_external_libraries_retained": true,
+        "completed_unix_seconds": 1794313481,
+        "no_remote_mutation": true
+      }
+    },
+    "ROOT_CLOSED_UPLOADER_CARGO_SEED_CHAIN_V1_WORK_RETIREMENT_INTENT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_SEED_CHAIN_V1_WORK_RETIREMENT_INTENT.json",
+        "sha256": "4c55cbd1876547a187186d48628afa1dff432170022e726820dfc71ed007b260"
+      },
+      "document": {
+        "schema": "horizon-closed-duplicate-metadata-compiler-output-retirement-v1",
+        "recorded_unix_seconds": 1794313469,
+        "files": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/build-tests",
+            "identity": [
+              64512,
+              111286599,
+              7228680,
+              1794313202158006533,
+              1794313202159006539
+            ],
+            "sha256": "38072aa47623c3c2ba47ac57d2ad89840479e3524c56d11cdb64c9c4b6ab40c1",
+            "bytes": 7228680,
+            "physical_bytes": 7225344
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/clippy-production",
+            "identity": [
+              64512,
+              111284402,
+              4708592,
+              1794313202844010266,
+              1794313202845010272
+            ],
+            "sha256": "4969f2d3ded0981b5983225b2eac92ae620d250ef27dbb39dd75ad755a5256e7",
+            "bytes": 4708592,
+            "physical_bytes": 4710400
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/clippy-tests",
+            "identity": [
+              64512,
+              111287018,
+              7228680,
+              1794313203426013433,
+              1794313203427013438
+            ],
+            "sha256": "d5c75bc5da16e0e600307a9e2d47a8c3a24b9a9043b9529985c3944b5747a67e",
+            "bytes": 7228680,
+            "physical_bytes": 7225344
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/production",
+            "identity": [
+              64512,
+              111286568,
+              4705240,
+              1794313201635003687,
+              1794313201637003698
+            ],
+            "sha256": "79a685a65e3daa1300a8b391d762e8b21516441b6ab68196f214c28f171ec9d2",
+            "bytes": 4705240,
+            "physical_bytes": 4706304
+          }
+        ],
+        "units": {
+          "horizon-uploader-cargo-seed-chain-production-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-seed-chain-production-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-seed-chain-build-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-seed-chain-build-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-seed-chain-clippy-production-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-seed-chain-clippy-production-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-seed-chain-clippy-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-seed-chain-clippy-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-seed-chain-ordinary-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-seed-chain-ordinary-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          }
+        },
+        "retained_evidence": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ARTIFACT.json",
+            "sha256": "31520ff5d0e8b88fdfd210665a9b5c8fd1eca17dde44ba974f9555043c26613c"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_QUALIFIED_NATIVE_PENDING.json",
+            "sha256": "d267bee91327602b7b8c326dcc345e73087372de545079a4c727c5cc0ef1cc46"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SOURCE-SEAL-EXECUTION.json",
+            "sha256": "f53595694dc76d77dd698437d71066bda9ae4472a2959ba052dc353619a24f8c"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/RUNTIME-SEAL-EXECUTION.json",
+            "sha256": "5ef116ee72d0bc157f0c3b9f9f26113c854fcaaee0632cccb5564828fad674b9"
+          },
+          {
+            "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1/chain",
+            "sha256": "79a685a65e3daa1300a8b391d762e8b21516441b6ab68196f214c28f171ec9d2"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/production-ORIGINAL-EXECUTION.json",
+            "sha256": "f574817f5c8db77db170ceeae338f21eb72dc04775e269121c813fe485119725"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "5a880f7d4f56bd9d2e85a4e1f7adc98145defab7d12eb332f316007e657d840f"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+            "sha256": "d9a025b879795f8140576c83f6abf140816cb65082f1fac27ecd0fd89b288556"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "31e1f2717b4dccea4b9ca163a51c5d0a927b0a632f8e1adf7af527d277248789"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ordinary-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "3bdf6f2b9782dc745e6fed4a8629f2e90d74e14d27067629b19d617c71b8dbde"
+          }
+        ],
+        "existing_reference_scanner": {
+          "path": "/home/sol/workspace/jetstreamer/scripts/retire_historical_replay_scratch.py",
+          "sha256": "84e5c1b3e97c692f4771da2d369fd13f5d0bd7f7572ac2bb2234eb0799643ca5"
+        },
+        "all_required_sources_receipts_runtimes_and_external_library_graphs_retained": true,
+        "no_current_or_staged_consumer": true,
+        "complete_DATA_promise_credit_bytes": 0,
+        "archive_or_snapshot_files_selected": false,
+        "remote_mutations": false
+      }
+    },
+    "ROOT_GENUINE_SAME_NAMESPACE_CAPTURE_OUTCOME_V5.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_GENUINE_SAME_NAMESPACE_CAPTURE_OUTCOME_V5.json",
+        "sha256": "575a8dfbb6c46bf2ffd84ee6e29c14d421a993ac11666f07804c77b46c4d21ff"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/NATIVE-V5-ORIGINAL-EXECUTION.json",
+          "sha256": "45382fbe998250b42456c548e1af26393cd3f45d788971db53da658dd480a66d"
+        },
+        "actual_native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "101",
+          "Id": "horizon-uploader-cargo-same-namespace-capture-20261110-v5.service",
+          "InvocationID": "f1228aac84a447ae8228c1533cbef602"
+        },
+        "actual_wrapper_receipts": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779231.json",
+            "sha256": "0730fd9f90c080ad8524d54e30b4d09f2568203395eed21a8ea442db58a9daa6"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779233.json",
+            "sha256": "384478876c43cb1e4e3b75da429609d9fc2354e63646d9908a27f1e911bb5f60"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779232.json",
+            "sha256": "28ce375166beaf9b4d0e9eb44ffd1773229039b71d0a0d1a7b5ddba797f4c1f9"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779237.json",
+            "sha256": "b5cc1c9c1aa454d7a844caa2ffdfdc20d66322953292762d917d1bbb61c90e56"
+          }
+        ],
+        "uploader_main_compilation_requests": 1,
+        "compiler_or_buildscript_or_linker_executed": false,
+        "whole_image_provenance_qualified": false,
+        "new_resource_credit_bytes": 0
+      }
+    },
+    "ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json",
+        "sha256": "acf6b2d24a9c3c6ce9e9524cbbd2149fd2a109a3a7025a14c86c608784cc7251"
+      },
+      "document": {
+        "parent_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "native_pool_bytes": 17179869184,
+        "all_committed_existing_native_bytes": 13757317120,
+        "one_serial_compiler_or_native_bytes": 536870912,
+        "total_native_with_callback_bytes": 14294188032,
+        "remaining_native_bytes": 2885681152,
+        "retained173_metadata_DATA_bytes": 67108864,
+        "actual_metadata_bytes_before": 10981530,
+        "new_maximum_artifact_bytes": 27262976,
+        "new_hard_memory_or_DATA_promise_bytes": 0,
+        "scope": "Four strict compilers/eight tests and finite compiler-free Cargo interception wrapper qualification inside separate512MiB native16 callback. The chain seeds fingerprint metadata then verifies sentinels and execs exactly the compiler-free Cargo command in the SAME private tmpfs namespace; it never authorizes rustc/buildscript/linker. Existing qualified interception and kernel execution prohibition remain mandatory. All historical native4.5,8control,guard256,OS64 and full16 retained; no extra8/ending/replay authority. Original cancelled profile48 and selected154 DATA ending remain consumed once. Future compiler source/sandbox/guard/booked lease still required."
+      }
+    },
+    "ROOT_QUALIFIED_NATIVE_PENDING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_QUALIFIED_NATIVE_PENDING.json",
+        "sha256": "d267bee91327602b7b8c326dcc345e73087372de545079a4c727c5cc0ef1cc46"
+      },
+      "document": {
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 8,
+        "all_compiler_slots_drained": true,
+        "runtime": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1/chain",
+          "sha256": "79a685a65e3daa1300a8b391d762e8b21516441b6ab68196f214c28f171ec9d2"
+        },
+        "active_extra_native_callback_bytes": 0,
+        "all_original_native_pool_allocations_retained": true,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "shared_future_ending_or_replay_admission_authorized": false
+      }
+    },
+    "ROOT_SAME_NATIVE512_METADATA64_CAPTURE_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ROOT_SAME_NATIVE512_METADATA64_CAPTURE_BOOKING.json",
+        "sha256": "344a71ee7a8dd002878c141f1283f8702cf988577440a9833d50e4d446fd0038"
+      },
+      "document": {
+        "parent_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "current_fleet": {
+          "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_120022_RUST_V8.json",
+          "sha256": "0058a64974071da84dccd2045ce025693609b801328701bea479e927e7a95208"
+        },
+        "all_native_existing_commitments_bytes": 13757317120,
+        "separate_serial_callback_bytes": 536870912,
+        "total_native_during_callback_bytes": 14294188032,
+        "metadata_DATA_bound_bytes": 67108864,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "unchanged_noexec_and_intercept_gates": true,
+        "correction": "Seed and Cargo exec share one main-process namespace. Exact byte-identical sentinel views normalize legacy664 only inside read-only namespace; originals untouched. No compiler/buildscript/linker authority."
+      }
+    },
+    "RUNTIME-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/RUNTIME-SEAL-EXECUTION.json",
+        "sha256": "5ef116ee72d0bc157f0c3b9f9f26113c854fcaaee0632cccb5564828fad674b9"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"2dc7696b17544af99cc19b189bfa6bf142987fe9f2012694ee94005f18700ee1\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "RUNTIME-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/RUNTIME-SEAL-PLAN.json",
+        "sha256": "2dc7696b17544af99cc19b189bfa6bf142987fe9f2012694ee94005f18700ee1"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-tools-20261110-v1",
+        "members": [
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/production",
+            "name": "chain",
+            "sha256": "79a685a65e3daa1300a8b391d762e8b21516441b6ab68196f214c28f171ec9d2",
+            "mode": 365
+          },
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ARTIFACT.json",
+            "name": "artifact-proof.json",
+            "sha256": "31520ff5d0e8b88fdfd210665a9b5c8fd1eca17dde44ba974f9555043c26613c",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "SAME-NAMESPACE-PLAN-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SAME-NAMESPACE-PLAN-SEAL-EXECUTION.json",
+        "sha256": "0d0cd38cf03a339cee7e6b289d08832fc2d6f92bd1b1abe0b186f5cfc8979e81"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-same-namespace-seed-plan-20261110-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"032831e5c76f934b33d79c3a35447cc02d6ca2abea6a888aa231fe0ec2ae7a9f\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "SAME-NAMESPACE-PLAN-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SAME-NAMESPACE-PLAN-SEAL-PLAN.json",
+        "sha256": "032831e5c76f934b33d79c3a35447cc02d6ca2abea6a888aa231fe0ec2ae7a9f"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-same-namespace-seed-plan-20261110-v1",
+        "members": [
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ACTUAL-SAME-NAMESPACE-SEED-PLAN.json",
+            "name": "plan.json",
+            "sha256": "ac6e7eb2cade7e4eb039bce584c3f017c294ad22c0b68cffdd9f4cb857e63fae",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "SENTINEL-VIEWS-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SENTINEL-VIEWS-SEAL-EXECUTION.json",
+        "sha256": "c8dc853b9f855d520843e18c4ed91521036fde17555e444ce2dc5d68894393cc"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-fingerprint-sentinel-views-20261110-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"b80266549c5ec2e2083f5dddc29abc4dd61f987af16e7b3d3bde1798a9c993bb\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "SENTINEL-VIEWS-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SENTINEL-VIEWS-SEAL-PLAN.json",
+        "sha256": "b80266549c5ec2e2083f5dddc29abc4dd61f987af16e7b3d3bde1798a9c993bb"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-fingerprint-sentinel-views-20261110-v1",
+        "members": [
+          {
+            "source": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/libc-c95189006321647c/build-script-build-script-build",
+            "name": "sentinel-0",
+            "sha256": "eccbc73b7de12a25f0f69e54ad6e7566cd73d1c6ce016368390caa4c91796ab9",
+            "mode": 292
+          },
+          {
+            "source": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/libc-c95189006321647c/dep-build-script-build-script-build",
+            "name": "sentinel-1",
+            "sha256": "93a4afc37518a1bf7830744017176e1d1946e5df993e47159069839f61fe49ab",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "SOURCE-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SOURCE-SEAL-EXECUTION.json",
+        "sha256": "f53595694dc76d77dd698437d71066bda9ae4472a2959ba052dc353619a24f8c"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"b949791e4f5ab6166f5d707ffe84d0ed631a7a14c0e815c41345c091f1a7d9f5\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "SOURCE-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/SOURCE-SEAL-PLAN.json",
+        "sha256": "b949791e4f5ab6166f5d707ffe84d0ed631a7a14c0e815c41345c091f1a7d9f5"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1",
+        "members": [
+          {
+            "source": "/tmp/uploader-cargo-seed-chain-main-20261110-v1.rs",
+            "name": "main.rs",
+            "sha256": "a7a40b62016b1686f0cc8d02dce0f1f4eb0d571b84209b2cab64ba89fec5b968",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "build-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/build-tests-ORIGINAL-ARGV.json",
+        "sha256": "49c4c2247948842c570b1d5d420cc7eb7f13e70a307506fe62516027fe67e219"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-seed-chain-build-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_uploader_cargo_seed_chain",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/build-tests"
+      ]
+    },
+    "build-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "5a880f7d4f56bd9d2e85a4e1f7adc98145defab7d12eb332f316007e657d840f"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-seed-chain-build-tests-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 460ms\nCPU time consumed: 844ms\nMemory peak: 2.9M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "eb71b5b9b15678dc35d3ad303e8d08cb31926a7cd026053a58d98286f0c73cce"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-seed-chain-clippy-production-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_uploader_cargo_seed_chain",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/clippy-production"
+      ]
+    },
+    "clippy-production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "d9a025b879795f8140576c83f6abf140816cb65082f1fac27ecd0fd89b288556"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-seed-chain-clippy-production-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 629ms\nCPU time consumed: 1.105s\nMemory peak: 2.5M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-tests-ORIGINAL-ARGV.json",
+        "sha256": "956ca3d6b1dc0b6c7e47df712906d8df45f744364c172cc5e7cb4496cac13ea2"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-seed-chain-clippy-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_uploader_cargo_seed_chain",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/clippy-tests"
+      ]
+    },
+    "clippy-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "31e1f2717b4dccea4b9ca163a51c5d0a927b0a632f8e1adf7af527d277248789"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-seed-chain-clippy-tests-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 508ms\nCPU time consumed: 858ms\nMemory peak: 4.2M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ordinary-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ordinary-tests-ORIGINAL-ARGV.json",
+        "sha256": "fc64d3d53c8c0e55162f9ac5547ead0d61615039b7d6b05134dd37d304d9303d"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-seed-chain-ordinary-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/build-tests",
+        "--test-threads=1"
+      ]
+    },
+    "ordinary-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/ordinary-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "3bdf6f2b9782dc745e6fed4a8629f2e90d74e14d27067629b19d617c71b8dbde"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "\nrunning 8 tests\ntest tests::compiler_or_shell_cannot_replace_cargo ... ok\ntest tests::enlarged_or_zero_caps_are_rejected ... ok\ntest tests::inherited_compiler_overrides_are_rejected ... ok\ntest tests::only_exact_capture_purpose_is_allowed ... ok\ntest tests::sentinels_cannot_escape_or_duplicate ... ok\ntest tests::source_and_destination_cannot_escape ... ok\ntest tests::target_must_be_actual_writable_tmpfs ... ok\ntest tests::wrapper_and_cargo_home_cannot_be_replaced ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "Running as unit: horizon-uploader-cargo-seed-chain-ordinary-tests-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 19ms\nCPU time consumed: 18ms\nMemory peak: 1.8M\nMemory swap peak: 0B\n"
+      }
+    },
+    "production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/production-ORIGINAL-ARGV.json",
+        "sha256": "5d32fbda03daee3ac1fcc622dbbc05f3422392e72603d8914379c47ae2f3e521"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-seed-chain-production-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_uploader_cargo_seed_chain",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-seed-chain-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/work/production"
+      ]
+    },
+    "production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-seed-chain-qa-v1/production-ORIGINAL-EXECUTION.json",
+        "sha256": "f574817f5c8db77db170ceeae338f21eb72dc04775e269121c813fe485119725"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-seed-chain-production-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 634ms\nCPU time consumed: 1.082s\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+      }
+    }
+  },
+  "actual_main_capture": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779237.json",
+      "sha256": "b5cc1c9c1aa454d7a844caa2ffdfdc20d66322953292762d917d1bbb61c90e56"
+    },
+    "document": {
+      "argv": [
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "jetstreamer_r2",
+        "--edition=2024",
+        "jetstreamer-r2/src/main.rs",
+        "--error-format=json",
+        "--json=diagnostic-rendered-ansi,artifacts,future-incompat",
+        "--crate-type",
+        "bin",
+        "--emit=dep-info,link",
+        "-C",
+        "opt-level=3",
+        "-C",
+        "lto",
+        "-C",
+        "codegen-units=1",
+        "--check-cfg",
+        "cfg(docsrs,test)",
+        "--check-cfg",
+        "cfg(feature, values())",
+        "-C",
+        "metadata=17fc98a0f5c90fa0",
+        "-C",
+        "extra-filename=-e0b97ea02470d442",
+        "--out-dir",
+        "/home/sol/workspace/jetstreamer/target/release/deps",
+        "-C",
+        "strip=debuginfo",
+        "-L",
+        "dependency=/home/sol/workspace/jetstreamer/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "aws_credential_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+        "--extern",
+        "aws_sdk_s3=/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+        "--extern",
+        "aws_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib",
+        "--extern",
+        "base64=/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+        "--extern",
+        "futures_util=/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+        "--extern",
+        "libc=/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+        "--extern",
+        "md5=/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+        "--extern",
+        "reqwest=/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib",
+        "--extern",
+        "serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib",
+        "--extern",
+        "serde_json=/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+        "--extern",
+        "sha2=/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib",
+        "--extern",
+        "tempfile=/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib",
+        "--extern",
+        "tokio=/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib",
+        "--extern",
+        "url=/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib",
+        "-L",
+        "native=/home/sol/workspace/jetstreamer/target/release/build/ring-f1ef47f68a3a2332/out",
+        "-L",
+        "native=/home/sol/workspace/jetstreamer/target/release/build/aws-lc-sys-c0f468b561a15d48/out"
+      ],
+      "artifact_provenance_qualified": false,
+      "build_script_invoked": false,
+      "cargo": {
+        "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+      },
+      "compile_denied_before_execution": true,
+      "compiler_invoked": false,
+      "exit_code": 86,
+      "invocation_id": "f1228aac84a447ae8228c1533cbef602",
+      "linker_invoked": false,
+      "new_memory_promise_bytes": 0,
+      "owner": "/root",
+      "pid": 779237,
+      "plan": {
+        "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+      },
+      "pre_recorded_probe_response": false,
+      "replay_admission_authorized": false,
+      "rustc": {
+        "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+      },
+      "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+      "selected_environment": {
+        "CARGO": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "CARGO_CRATE_NAME": "jetstreamer_r2",
+        "CARGO_HOME": "/home/sol/.cargo",
+        "CARGO_MANIFEST_DIR": "/home/sol/workspace/jetstreamer/jetstreamer-r2",
+        "CARGO_MANIFEST_PATH": "/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+        "CARGO_PKG_NAME": "jetstreamer-r2",
+        "CARGO_PKG_VERSION": "0.9.0",
+        "CARGO_PRIMARY_PACKAGE": "1",
+        "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+        "LANG": "C.UTF-8",
+        "LD_LIBRARY_PATH": "/home/sol/workspace/jetstreamer/target/release/deps",
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+        "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "RUST_MIN_STACK": "67108864"
+      },
+      "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+      "source": {
+        "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+      },
+      "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "working_directory": "/home/sol/workspace/jetstreamer"
+    }
+  },
+  "prior_gate_diagnostics": {
+    "ROOT_V3_ALTERNATE_CORPUS_SOURCE_BINDINGS.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_V3_ALTERNATE_CORPUS_SOURCE_BINDINGS.json",
+        "sha256": "70f883fbbaaa8627854222357ed4ea2d8063825d0a3c9ab574f0272e797424e6"
+      },
+      "document": {
+        "source_comparison": {
+          "path": "/tmp/root-uploader-libc-gate-source-20261110-v1/ALTERNATE_ORIGINAL_HOME_CORPUS_COMPARISON.json",
+          "sha256": "07e137abdc06dd2e83e80e6a55a1661738c9378d9dbb8240256f924b206a851c"
+        },
+        "dependencies": [
+          {
+            "crate": "aws_sdk_s3",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+              "sha256": "6adf31847384e3166fa0b475071dca6a5205e0976b95ae08353e9e7b730738ce"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/aws-sdk-s3-93f3d02a9b33ba1f/lib-aws_sdk_s3",
+              "sha256": "9cc1068a171e6f7590af3aefaefa8f8c3658124b1bd3e12a229dc32e8782f40f"
+            },
+            "same_as_original_fingerprint": false
+          },
+          {
+            "crate": "url",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liburl-aab30bab24c3367b.rlib",
+              "sha256": "f3c406a20a0bfb1033e54ef8c5e5e7324616a607d30bf4b3017419330569a67e"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/url-aab30bab24c3367b/lib-url",
+              "sha256": "0183ab961ce1f15d9fa32bd0f10b26cb6dc65568a8fc7268650b8123aef160b2"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "futures_util",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+              "sha256": "6c0dcb71b821aaa9f255e20570777388b0b65351011e05e9c3b8436e97c924fe"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/futures-util-4ce61cb3cde45817/lib-futures_util",
+              "sha256": "1c2ad1b63f65e2712275064ff6e3f37bfe09c87424f31e157722f1839f317b90"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "serde",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde-c096c92dd15927d9.rlib",
+              "sha256": "38fd5d451dd24168f563c68083ce6a914c90cb4ac1e36b1c9556618885aa9070"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/serde-c096c92dd15927d9/lib-serde",
+              "sha256": "cf9486c86d3e280a15e7042a79f790212bf7452632e4abf2aae6aa2bc92dbfdc"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "md5",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+              "sha256": "c9d0e2fdc4b8e8f6fb7af19ecdaa6c2f64b994deeed0aada9081c71bb6f86d63"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/md-5-7ed6f069a8ec7c45/lib-md5",
+              "sha256": "e402818c771dfa065fd07e418633f0d13a52d44f4e8840a7c207688b0413c2d2"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "serde_json",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+              "sha256": "9690b39d361de1e77877a58c56864588d581201767008d64846ce524f873dc65"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/serde_json-4701be7eb60bc14f/lib-serde_json",
+              "sha256": "500da269cd2b097d38ea907cf1ad21c4e54fc222c056799d952f3647bfd866d1"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "tokio",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libtokio-309aad71f7138ec5.rlib",
+              "sha256": "4f27a6e14fa27801b20d618f9ccb454e89d296d9cb89e0c7f8a27f2c501ca3f3"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/tokio-309aad71f7138ec5/lib-tokio",
+              "sha256": "131b664a5cbee0f16274252f0bd00b180c9801456b8c9cb6cadac4dba20f8114"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "tempfile",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libtempfile-47898064045d0aed.rlib",
+              "sha256": "89733c592505515bd90820c90fac3789a541a544cbbac2c36b5e4afe224ac2ed"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/tempfile-47898064045d0aed/lib-tempfile",
+              "sha256": "e4619f4f95eb1bd5d5dbfb60964391a4d733ff145894bf83f5cc67849aeb32ec"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "sha2",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libsha2-104d7c128ea151cf.rlib",
+              "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/sha2-104d7c128ea151cf/lib-sha2",
+              "sha256": "b2cb2082b66ebe468738dd97d44eae5a18498b7aceebe7b661cbe0467a3cc099"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "aws_types",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_types-917590190742fc65.rlib",
+              "sha256": "1df886a92d0c084416637272e63cab41b67704eb25a2a945381bc2734c69b5d4"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/aws-types-917590190742fc65/lib-aws_types",
+              "sha256": "26defb4e0d6ed156ff2f641261e23a904173d0d8bde06dc85945c6bf601868f9"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "libc",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liblibc-1353d01eceea9c4e.rlib",
+              "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/libc-1353d01eceea9c4e/lib-libc",
+              "sha256": "ecd7799561182e76e29abd2991e3b15c6ef709605bafac32d176ec6f28f29a3c"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "base64",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+              "sha256": "790bca532a9b906da8bbe5b4a27997ceb033d25ace5311eeab1fae16e1ed0c93"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/base64-c8c2297b8bb1658f/lib-base64",
+              "sha256": "7c60752ad6ea4a057d933626c041870da132d0b62e8a7da3945a28e7fae1c65d"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "anyhow",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libanyhow-7d758cdd889142f0.rlib",
+              "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/anyhow-7d758cdd889142f0/lib-anyhow",
+              "sha256": "eabbc35f8624fec0f376d34199ec8fb33c073c985e5727a36c8de16dba0d271c"
+            },
+            "same_as_original_fingerprint": true
+          },
+          {
+            "crate": "reqwest",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libreqwest-7041eaa0a4658599.rlib",
+              "sha256": "dfc6a8d5475627d56a15ec59ad8d43d09183f7347c7b9dd3d0baaf65f79d26a8"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/reqwest-7041eaa0a4658599/lib-reqwest",
+              "sha256": "8f75d9771b182aad4abb5c0d570e977200770bd7119b609a76cd9243a589a02d"
+            },
+            "same_as_original_fingerprint": false
+          },
+          {
+            "crate": "aws_credential_types",
+            "library": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+              "sha256": "8f5e7ea55d3f9ca3e7dba4d972ee34d9f25318c3cdd04ad2bf45490706331038"
+            },
+            "fingerprint": {
+              "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/.fingerprint/aws-credential-types-c80851adf6905535/lib-aws_credential_types",
+              "sha256": "90b01c245c125fb00549a32f303e491bfb964ab15a8617a31a12096c89d9706d"
+            },
+            "same_as_original_fingerprint": true
+          }
+        ],
+        "whole_image_provenance_claimed": false,
+        "new_memory_or_DATA_promise_bytes": 0
+      }
+    },
+    "ROOT_V3_CHANGED_METADATA_INPUTS_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_V3_CHANGED_METADATA_INPUTS_BOOKING.json",
+        "sha256": "4d89277bcc865d2cedfab30bd3b453d7595c851dd3308670d9e887fc89648025"
+      },
+      "document": {
+        "previous_sandbox": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/CARGO_METADATA_CAPTURE_SANDBOX_V2.json",
+          "sha256": "d751dbcc24a281d6ea0d83dc96c08586a5e83520e7a1ecdf6bd600e58726979d"
+        },
+        "new_corpus": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_V3_ALTERNATE_CORPUS_SOURCE_BINDINGS.json",
+          "sha256": "70f883fbbaaa8627854222357ed4ea2d8063825d0a3c9ab574f0272e797424e6"
+        },
+        "existing_kernel_denial": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CACHED_BUILDSCRIPT_KERNEL_DENIAL_V2.json",
+          "sha256": "b99938ab690fe7a78653b891f8f56460f698a522e0b79606e41d21d1277a1bc3"
+        },
+        "same_allowed_execution_paths": true,
+        "same_native_callback_bytes": 536870912,
+        "same_memory_tmpfs_target_bytes": 100663296,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "scope": "One changed-corpus compiler-free Cargo capture. Source-root cache repair only; no compiler/buildscript/linker/replay or memory release authority."
+      }
+    },
+    "Cargo-main-capture-V3-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V3-ORIGINAL-EXECUTION.json",
+        "sha256": "3968cceaa5b47ac45c5719a5df6f64112ad88af51922f5ed0d33b0c93b75943d"
+      },
+      "document": {
+        "code": 101,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-main-capture-20261110-v3.service\nwarning: failed to save last-use data\nThis may prevent cargo from accurately tracking what is being used in its global cache. This information is used for automatically removing unused data in the cache.\n\nunable to open database file\n\nCaused by:\n  Error code 14: unable to open database file\n   Compiling libc v0.2.189\n     Running `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name build_script_build --edition=2021 /home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no -C codegen-units=1 --allow=unused_qualifications '--warn=clippy::unnecessary_semicolon' '--allow=clippy::unnecessary_cast' '--warn=clippy::ptr_as_ptr' '--allow=clippy::non_minimal_cfg' '--allow=clippy::missing_safety_doc' '--warn=clippy::map_unwrap_or' '--warn=clippy::manual_assert' '--allow=clippy::identity_op' '--warn=clippy::explicit_iter_loop' --cfg 'feature=\"default\"' --cfg 'feature=\"std\"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values(\"align\", \"const-extern-fn\", \"default\", \"extra_traits\", \"rustc-dep-of-std\", \"rustc-std-workspace-core\", \"std\", \"use_std\"))' -C metadata=8a963305cba00d38 -C extra-filename=-c95189006321647c --out-dir /home/sol/workspace/jetstreamer/target/release/build/libc-c95189006321647c -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --cap-lints allow`\nintercept rejected: original absolute working directory required\nerror: could not compile `libc` (build script)\n\nCaused by:\n  process didn't exit successfully: `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name build_script_build --edition=2021 /home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no -C codegen-units=1 --allow=unused_qualifications '--warn=clippy::unnecessary_semicolon' '--allow=clippy::unnecessary_cast' '--warn=clippy::ptr_as_ptr' '--allow=clippy::non_minimal_cfg' '--allow=clippy::missing_safety_doc' '--warn=clippy::map_unwrap_or' '--warn=clippy::manual_assert' '--allow=clippy::identity_op' '--warn=clippy::explicit_iter_loop' --cfg 'feature=\"default\"' --cfg 'feature=\"std\"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values(\"align\", \"const-extern-fn\", \"default\", \"extra_traits\", \"rustc-dep-of-std\", \"rustc-std-workspace-core\", \"std\", \"use_std\"))' -C metadata=8a963305cba00d38 -C extra-filename=-c95189006321647c --out-dir /home/sol/workspace/jetstreamer/target/release/build/libc-c95189006321647c -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --cap-lints allow` (exit status: 87)\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=101\nService runtime: 2.680s\nCPU time consumed: 1.677s\nMemory peak: 132.6M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ROOT_GENUINE_CARGO_INVOCATION_OUTCOME_V3.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_GENUINE_CARGO_INVOCATION_OUTCOME_V3.json",
+        "sha256": "4a755cb76937ee16efb2a59243810c01b9da4a3249095a4aff18164e8c0ced71"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V3-ORIGINAL-EXECUTION.json",
+          "sha256": "3968cceaa5b47ac45c5719a5df6f64112ad88af51922f5ed0d33b0c93b75943d"
+        },
+        "actual_native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "101",
+          "Id": "horizon-uploader-cargo-main-capture-20261110-v3.service",
+          "InvocationID": "06c796ba442e46b295986cce454a07bc"
+        },
+        "actual_wrapper_receipts": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-774501.json",
+            "sha256": "12af32873b5908b2276fdc8b283423a008effeeef1f07fdf1dbd2cc3edba6a45"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-774503.json",
+            "sha256": "082dcdbb4bc61c3eab5a554d8e5989bf043e5da0d9f817fbe28281e47e2a1504"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-774502.json",
+            "sha256": "c15e16bec3407ee1f4cfaf064086ab96a92f79c597bd5dd70fb19605b6c7740c"
+          }
+        ],
+        "actual_wrapper_count": 3,
+        "uploader_main_compilation_requests": 0,
+        "compiler_or_buildscript_or_linker_executed": false,
+        "artifact_provenance_qualified": false,
+        "new_memory_or_DATA_promise_bytes": 0
+      }
+    },
+    "ROOT_V4_BOUND_DIAGNOSTIC_PURPOSE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_V4_BOUND_DIAGNOSTIC_PURPOSE.json",
+        "sha256": "8fcd02f2e4a01e732a789f6a8fa183677b7c8ff901f79505825e4f68039a495c"
+      },
+      "document": {
+        "prior_negative_gate": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_GENUINE_CARGO_INVOCATION_OUTCOME_V3.json",
+          "sha256": "4a755cb76937ee16efb2a59243810c01b9da4a3249095a4aff18164e8c0ced71"
+        },
+        "reason": "Changed original-home corpus still requested libc buildscript; capture Cargo own precise dirty-fingerprint explanation before selecting another source change. Diagnostic logging only, no success retry claim.",
+        "same512_callback_and96_tmpfs_bytes": true,
+        "compiler_and_buildscript_execution_denied": true,
+        "new_memory_or_DATA_promise_bytes": 0
+      }
+    },
+    "ROOT_CLOSED_OBSOLETE_ANON_V9_V10_WORK_RETIREMENT_COMPLETE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CLOSED_OBSOLETE_ANON_V9_V10_WORK_RETIREMENT_COMPLETE.json",
+        "sha256": "92647797b1aa8200c2df4182d70cecfca76638bf041a477b00a2bc06370220ec"
+      },
+      "document": {
+        "intent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CLOSED_OBSOLETE_ANON_V9_V10_WORK_RETIREMENT_INTENT.json",
+          "sha256": "af491f5df45de374477d23735ab3199fbcbf4dc3a020d40b772b91f13fd41635"
+        },
+        "physical_bytes_reclaimed": 29167616,
+        "filesystem_available_before_bytes": 6338525966336,
+        "filesystem_available_after_bytes": 6339549888512,
+        "new_DATA_promise_credit_bytes": 0,
+        "all_source_sealed_runtimes_and_receipts_retained": true
+      }
+    },
+    "Cargo-fingerprint-diagnostic-V4-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-fingerprint-diagnostic-V4-ORIGINAL-EXECUTION.json",
+        "sha256": "18f6100fad295e4974d327c316ffa16a89ca31a4862df020294146a18513abbc"
+      },
+      "actual_code": 101,
+      "selected_missing_fingerprint_diagnostics": [
+        "   0.488331496s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/anyhow-120964684968d045/dep-build-script-build-script-build\"",
+        "   0.488373607s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/futures-core-be18f29694c02bb2/dep-lib-futures_core\"",
+        "   0.488392847s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/futures-task-c2a6f4cff1b19f9c/dep-lib-futures_task\"",
+        "   0.488412567s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/pin-project-lite-ca0f4ec4ac664224/dep-lib-pin_project_lite\"",
+        "   0.488430507s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/slab-c96b5482beaacbdf/dep-lib-slab\"",
+        "   0.488465267s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/bytes-835b93f587ba4915/dep-lib-bytes\"",
+        "   0.488486767s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/libc-c95189006321647c/dep-build-script-build-script-build\"",
+        "   0.488549888s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/proc-macro2-caec9c846a221303/dep-build-script-build-script-build\"",
+        "   0.488576818s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/unicode-ident-1beb76f57e0be32f/dep-lib-unicode_ident\"",
+        "   0.488607548s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/quote-b67244c859aae9a8/dep-build-script-build-script-build\"",
+        "   0.488704918s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/outref-96f35bb7c73e2c5d/dep-lib-outref\"",
+        "   0.488724419s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/vsimd-c84bf80d18f2dab4/dep-lib-vsimd\"",
+        "   0.488756909s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/either-fe715b9d6de4223d/dep-lib-either\"",
+        "   0.488787319s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/fnv-a5b8d610e839c913/dep-lib-fnv\"",
+        "   0.488809399s  INFO prepare_target{force=false package_id=jetstreamer-r2 v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-r2) target=\"jetstreamer-r2\"}: cargo::core::compiler::fingerprint: stale: missing \"/home/sol/workspace/jetstreamer/target/release/.fingerprint/itoa-c720d5b338cdaa08/dep-lib-itoa\""
+      ]
+    }
+  }
+}
