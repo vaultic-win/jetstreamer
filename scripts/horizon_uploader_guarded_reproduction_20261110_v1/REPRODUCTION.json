@@ -1,0 +1,315 @@
+{
+  "schema": "horizon-uploader-exact-guarded-reproduction-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "source_image_provenance_proven": true,
+  "live_image_sha256": "7b21414c1c105cefb18f5bf3ca8bb96759c14c529ea42232a70835bdc864b990",
+  "normal_package": "/usr/local/lib/jetstreamer/horizon-uploader-exact-source-image-proof-20261110-v1",
+  "normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-exact-source-image-proof-20261110-v1/deployment-seal-receipt.json",
+    "sha256": "682c66d8f7c48087eb269c947901c4ee513a746a14d89a7ff456e42e84f7f3de"
+  },
+  "immutable_proof": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-exact-source-image-proof-20261110-v1/source-artifact-proof.json",
+    "sha256": "80ece7d136609ed54f259896365ea3f12ddf34fae85cd07dd928f18b9aecf70a"
+  },
+  "candidate": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-exact-source-image-proof-20261110-v1/candidate-do-not-execute",
+    "sha256": "7b21414c1c105cefb18f5bf3ca8bb96759c14c529ea42232a70835bdc864b990",
+    "length_bytes": 12635528,
+    "mode": "0444",
+    "executed": false
+  },
+  "source": {
+    "actual_captured_binding": {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+      "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+    },
+    "actual_captured_recipe": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-779237.json",
+      "sha256": "b5cc1c9c1aa454d7a844caa2ffdfdc20d66322953292762d917d1bbb61c90e56"
+    },
+    "working_directory": "/home/sol/workspace/jetstreamer",
+    "historical_candidate_git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+    "retained_immutable_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs",
+      "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+    },
+    "retained_source_normal_seal": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/deployment-seal-receipt.json",
+      "sha256": "89bddc11f6a880ed9e18c4a199befe0b9035bc4ead3cf497d35e38ce83a17b3d"
+    },
+    "binding_limit": "The captured working-tree path is a historical namespace projection, not a promise about the current mutable host worktree; the retained immutable source and original actor bindings supply the actual bytes."
+  },
+  "actual_compiler_graph": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/CAPTURED_ACTUAL_MAIN_AND_COMPILER_GRAPH.json",
+      "sha256": "a575d9b2730b12c81e13198c0601bc1deba6fc609b122d2211e951a578c62119"
+    },
+    "rustc": {
+      "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+    },
+    "argv": [
+      "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+      "--crate-name",
+      "jetstreamer_r2",
+      "--edition=2024",
+      "jetstreamer-r2/src/main.rs",
+      "--error-format=json",
+      "--json=diagnostic-rendered-ansi,artifacts,future-incompat",
+      "--crate-type",
+      "bin",
+      "--emit=dep-info,link",
+      "-C",
+      "opt-level=3",
+      "-C",
+      "lto",
+      "-C",
+      "codegen-units=1",
+      "--check-cfg",
+      "cfg(docsrs,test)",
+      "--check-cfg",
+      "cfg(feature, values())",
+      "-C",
+      "metadata=17fc98a0f5c90fa0",
+      "-C",
+      "extra-filename=-e0b97ea02470d442",
+      "--out-dir",
+      "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/compiler-out",
+      "-C",
+      "strip=debuginfo",
+      "-L",
+      "dependency=/home/sol/workspace/jetstreamer/target/release/deps",
+      "--extern",
+      "anyhow=/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "--extern",
+      "aws_credential_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+      "--extern",
+      "aws_sdk_s3=/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+      "--extern",
+      "aws_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib",
+      "--extern",
+      "base64=/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+      "--extern",
+      "futures_util=/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+      "--extern",
+      "libc=/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "--extern",
+      "md5=/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+      "--extern",
+      "reqwest=/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib",
+      "--extern",
+      "serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib",
+      "--extern",
+      "serde_json=/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "--extern",
+      "sha2=/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "--extern",
+      "tempfile=/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib",
+      "--extern",
+      "tokio=/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib",
+      "--extern",
+      "url=/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib",
+      "-L",
+      "native=/home/sol/workspace/jetstreamer/target/release/build/ring-f1ef47f68a3a2332/out",
+      "-L",
+      "native=/home/sol/workspace/jetstreamer/target/release/build/aws-lc-sys-c0f468b561a15d48/out"
+    ],
+    "fifteen_externs": [
+      {
+        "extern": "anyhow=/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libanyhow-7d758cdd889142f0.rlib",
+          "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
+        }
+      },
+      {
+        "extern": "aws_credential_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+          "sha256": "8f5e7ea55d3f9ca3e7dba4d972ee34d9f25318c3cdd04ad2bf45490706331038"
+        }
+      },
+      {
+        "extern": "aws_sdk_s3=/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+          "sha256": "6adf31847384e3166fa0b475071dca6a5205e0976b95ae08353e9e7b730738ce"
+        }
+      },
+      {
+        "extern": "aws_types=/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libaws_types-917590190742fc65.rlib",
+          "sha256": "1df886a92d0c084416637272e63cab41b67704eb25a2a945381bc2734c69b5d4"
+        }
+      },
+      {
+        "extern": "base64=/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+          "sha256": "790bca532a9b906da8bbe5b4a27997ceb033d25ace5311eeab1fae16e1ed0c93"
+        }
+      },
+      {
+        "extern": "futures_util=/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+          "sha256": "6c0dcb71b821aaa9f255e20570777388b0b65351011e05e9c3b8436e97c924fe"
+        }
+      },
+      {
+        "extern": "libc=/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liblibc-1353d01eceea9c4e.rlib",
+          "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
+        }
+      },
+      {
+        "extern": "md5=/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+          "sha256": "c9d0e2fdc4b8e8f6fb7af19ecdaa6c2f64b994deeed0aada9081c71bb6f86d63"
+        }
+      },
+      {
+        "extern": "reqwest=/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libreqwest-7041eaa0a4658599.rlib",
+          "sha256": "dfc6a8d5475627d56a15ec59ad8d43d09183f7347c7b9dd3d0baaf65f79d26a8"
+        }
+      },
+      {
+        "extern": "serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde-1dae98566e82c864.rlib",
+          "sha256": "39eed391362f983e0383fcd8b43f0fa9368cc251155f42724ff1e2e512efa897"
+        }
+      },
+      {
+        "extern": "serde_json=/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+          "sha256": "9690b39d361de1e77877a58c56864588d581201767008d64846ce524f873dc65"
+        }
+      },
+      {
+        "extern": "sha2=/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libsha2-104d7c128ea151cf.rlib",
+          "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
+        }
+      },
+      {
+        "extern": "tempfile=/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libtempfile-47898064045d0aed.rlib",
+          "sha256": "89733c592505515bd90820c90fac3789a541a544cbbac2c36b5e4afe224ac2ed"
+        }
+      },
+      {
+        "extern": "tokio=/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libtokio-309aad71f7138ec5.rlib",
+          "sha256": "4f27a6e14fa27801b20d618f9ccb454e89d296d9cb89e0c7f8a27f2c501ca3f3"
+        }
+      },
+      {
+        "extern": "url=/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib",
+        "actual": {
+          "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liburl-aab30bab24c3367b.rlib",
+          "sha256": "f3c406a20a0bfb1033e54ef8c5e5e7324616a607d30bf4b3017419330569a67e"
+        }
+      }
+    ],
+    "only_change_from_actual_Cargo_capture": "out-dir moved inside already charged DATA12 compiler envelope; whole-image equality remains mandatory",
+    "actual_serde_binding": "serde=/home/sol/workspace/jetstreamer/target/release/deps/libserde-1dae98566e82c864.rlib",
+    "earlier_serde_c096_draft_not_used": true,
+    "namespace_bindings_required": true,
+    "binding_limit": "Actual argv contains original namespace paths. The fifteen actual artifacts and original actor mount properties are required; this is historical execution evidence, not a currently admitted launch command."
+  },
+  "guarded_start": {
+    "guard": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-guard-tools-20261110-v3/guard",
+      "sha256": "c5854ffc6ea91e89d0790543d6ee899e51e50bb85864ebf15dab322db02ea8e4"
+    },
+    "gate": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-build-prestart-tools-20261110-v2/gate",
+      "sha256": "8c40227a6ba277905d694b8f1ad4897dffb70f3f4f5d5404da062d19868c156c"
+    },
+    "static_preparation": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/PREPARED_STATIC_PHASE.json",
+      "sha256": "1da1f2c7149264bcbe18c1aaf683acd09c287dc654311a07188bbb98b4e8e722"
+    },
+    "actual_complete_actor_argv": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/FULL-COMPILER-ACTOR-LAUNCH-ORIGINAL-ARGV.json",
+      "sha256": "4e34a74622e6ce3692eaa857d7fcad970f5e674038d69e58916b7076197df0af"
+    },
+    "original_start_pre": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ORIGINAL_ACTOR_START_PRE.json",
+      "sha256": "9ca7602042fe47870bf24c88da764a406a7d612b7df4b82e3e2fca7fa7ba2e58"
+    },
+    "first_genuine_guard": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/FIRST_GENUINE_GUARD_SUCCESS.json",
+      "sha256": "1498cfd9bc97112028323c8657a9ed14f601a2465af5f36e1d44e7f68842ad84"
+    },
+    "token_before_original_deadline": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ACTUAL_TOKEN_RELEASE_BEFORE_ORIGINAL_DEADLINE.json",
+      "sha256": "1744f6052b5d98222aebf2214b86118b8c5ac626967a37b739a2d05c7faf7ffd"
+    },
+    "original_deadline_reset": false
+  },
+  "original_terminal": {
+    "unit": "horizon-qualify-uploader-image-build-20261110-v1.service",
+    "invocation_id": "39f2f543ad09451cb6f1f15999921542",
+    "actual_execution_millis": 49982,
+    "recovered_from_original_PID1": true,
+    "unit_recreated": false,
+    "original_collected_native": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ACTUAL_FULL_COMPILER_TERMINAL_NATIVE.json",
+      "sha256": "6d0a0fd7a863e13c36d6b15c1c764fbb6bd26a7f6a257e4c98069050d858e5f3"
+    },
+    "recovery": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ROOT_ORIGINAL_COMPILER_PID1_TERMINAL_RECOVERY.json",
+      "sha256": "dddd6ffae59e806d0b05a42aa5bd0b97830c8d2feedc851b5f68f08929136d73"
+    },
+    "original_PID1_journal": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ORIGINAL_COMPILER_PID1_JOURNAL_CAPTURE.json",
+      "sha256": "f0f81f6dd50767fbe8e3187a999768d083655933ab23c27d9e72b7b5b5af7931"
+    },
+    "limitation": "Collected/default not-found properties alone cannot establish original success. Original PID1 start/deactivation events and compiler outputs supply the original invocation proof."
+  },
+  "whole_image_comparison": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ACTUAL_WHOLE_IMAGE_COMPARISON.json",
+    "sha256": "9eca603fc0b022fd6ed26b9c542acea6d46d7cf20c92b084a5f1b3f1f47838fb"
+  },
+  "Root_acceptance": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ROOT_EXACT_ORIGINAL_UPLOADER_IMAGE_REPRODUCTION_ACCEPTED.json",
+    "sha256": "cded8b7e4f6ca603065f4776d5c0d3e37de2e43689f1fbeecac98ac6dfbf7f45"
+  },
+  "lease_state": {
+    "lease": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ROOT_TEMPORARY_EXCLUSIVE_COMPILER8_AND_RETAINED_DATA12_LEASE.json",
+      "sha256": "f7a945f3a9a5b0107eb37d8a2c151aa427e7126211874631c65fe6036abd4084"
+    },
+    "drained": {
+      "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/ROOT_TEMPORARY_COMPILER_LEASE_DRAINED_ALL_RESERVATIONS_RETAINED.json",
+      "sha256": "d60b21ed3b58caadb0bf12939cb43c538eb9ef60fefcc703a2bcb1ca0130ea7f"
+    },
+    "active_temporary_compiler_bytes": 0,
+    "all_retained_promises_preserved": true,
+    "ending_or_credit_bytes": 0
+  },
+  "binding_limits": {
+    "source_and_exact_selected_graph_only": true,
+    "earlier_0252_9eda_or_43849_hypotheses_are_not_the_actual_proof": true,
+    "qualified_future_uploader_or_host_memory_bound": false,
+    "memory_ending_authorized": false,
+    "replay_admission_authorized": false,
+    "candidate_deployment_or_execution_authorized": false,
+    "archive_or_sidecar_mutations": false,
+    "new_ordinary_or_R2_publication_authority": false,
+    "new_build_or_operation_authorized": false
+  }
+}
