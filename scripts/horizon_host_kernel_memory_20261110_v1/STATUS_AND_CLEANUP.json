@@ -1,0 +1,64 @@
+{
+  "fleet": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_143022_RUST_V8.json",
+    "sha256": "85361b974291721339feff3ed2095283515074a952a6b4495fbfb7763fea9568"
+  },
+  "sampled_at_utc": "2026-11-10T14:30:22Z",
+  "ready_pairs": 70,
+  "remaining_epochs": 30,
+  "active_useful_replay_count": 7,
+  "proven_replay_count": 7,
+  "desired_lanes": 13,
+  "status_audit": {
+    "path": "/home/sol/.jetstreamer-private/r2-status-receipts/range-101-200-status-audit-20261110143257.json",
+    "sha256": "4dbd63a2c54a06404a2ff11342f430def6da7aa9660b3159829c26fadf50495a"
+  },
+  "latest_173_and_185_authenticated_statuses": [
+    {
+      "epoch": 173,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-173.status-correction-20261110143257.json",
+        "sha256": "a81edc49ca0ce1dae245ec95a9d41d910ce3969bc4e3fdc56e4055a2d3fb3d4d"
+      }
+    },
+    {
+      "epoch": 185,
+      "outcome": "refreshed-authenticated-readback",
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261110143257.json",
+        "sha256": "05285a27a7aa5f99731c77edfae0baaefd24a258f43129f178e8b1a372666403"
+      }
+    }
+  ],
+  "next_observer_receipt": {
+    "path": "/home/sol/.jetstreamer-private/visible-primary-next-observer-150022-with166167168169170171172-20261110-v1/SOLE_NEXT_TIMER_ACCEPTED.json",
+    "sha256": "f225c14769b01489bc7c325510b2f7af35607a99731f97a31ea700a3612371ac"
+  },
+  "next_observer_utc": "2026-11-10T15:00:22Z",
+  "epoch185_review27_model": {
+    "path": "/var/lib/jetstreamer/epoch185-explicit-control-review27-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW27.json",
+    "sha256": "65f672aed2e369cdfdc78b2aec2604d052f08bce14026f726c9101c0bf7181aa"
+  },
+  "epoch185_control_planning_utc": "2026-11-10T19:55:00Z",
+  "epoch185_qualification_planning_utc": "2026-11-10T20:19:18Z",
+  "epoch173_preparation_planning_utc": "2026-11-10T19:52:50Z",
+  "all_original_anchors_native_clocks_and_full_replay_delivery_allowances_retained": true,
+  "cleanup_receipt": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ROOT_CLOSED_HASH_AND_HOST_KERNEL_COMPILER_WORK_RETIREMENT_COMPLETE.json",
+    "sha256": "91cdf3765bf90db40ebbf92593887972e2d35e774c7f45c754c1ae03f49167be"
+  },
+  "cleanup": {
+    "intent": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ROOT_CLOSED_HASH_AND_HOST_KERNEL_COMPILER_WORK_RETIREMENT_INTENT.json",
+      "sha256": "b33274a14c27301ac6ef5042e8fa5b78fba929bf5fedb0ff6d60745629cc55b1"
+    },
+    "physical_bytes_reclaimed": 45207552,
+    "filesystem_available_before_bytes": 6302764191744,
+    "filesystem_available_after_bytes": 6304923045888,
+    "new_DATA_promise_credit_bytes": 0,
+    "all_source_sealed_runtimes_and_receipts_retained": true
+  },
+  "new_resource_credit_bytes": 0,
+  "no_new_replay_admission": true
+}
