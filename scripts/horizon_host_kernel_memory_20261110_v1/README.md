@@ -1,0 +1,9 @@
+# Disjoint host-kernel consumption
+
+V14 extends the qualified anonymous remaining-growth check with one global kernel component: SUnreclaim, page-backed x86_64 KernelStack and PageTables. It uses each field's smaller native endpoint, subtracts a separate1GiB margin, and caps fulfillment at the source-proven43,603,734,528-byte historical host component. It excludes the separate2.5GiB input promises, wholeSlab, reclaimable memory, Percpu, file cache, RSS and child-kernel counters. Every hard promise and future pool remains unchanged.
+
+The source passed four strict Rustc/Clippy configurations and26 tests. Linux6.8 counter semantics, same-local slab arithmetic, the running6.8.0-146-generic/x86_64 ABI and installed VMAP-stack configuration were reviewed independently. The13-member semantics package, source and runtime were normally sealed. The failed V13 test-name lint and original V14 plan-schema rejection remain preserved; the distinct corrected plan changes no native clock or reservation.
+
+The genuine14:18 native invocation confirms7,209,922,560 bytes of already-consumed kernel memory after margin. Required remaining growth was784,179,191,808 bytes against709,834,432,512 available: the candidate still **does not fit**, with a74,344,759,296-byte gap. Original PID1 start/deactivation records authenticate terminal success; collected-unit defaults do not prove it.
+
+This is a finite report with a300-second expiry, capped by the unchanged observer clock. It grants no reserve ending, future host/uploader bound, effective-consumer or guard authority, native Frame/Reader acceptance, or replay admission. Shared64/native16/verifier96/normal10 and the seven68GiB actors remain retained. The next capacity dependency is a qualified uploader whole-service cap and complete shared-role accounting, followed by effective consumers and fresh admission. Do not repeat this unchanged fit as a recovery action.

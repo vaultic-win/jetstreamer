@@ -1,0 +1,143 @@
+{
+  "qualified_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-fulfilled-anon-host-kernel-memory-source-20261110-v14/main.rs",
+    "sha256": "d647329fb0d328387984091e558e956b9761dfc1442eb551ab3961473c6d60d4"
+  },
+  "runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-fulfilled-anon-host-kernel-memory-tools-20261110-v14/check",
+    "sha256": "6dec42c787bf88f487ed197514836ba4fc0ebe87ff0f721d756b777f30cdb606"
+  },
+  "artifact_proof": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ARTIFACT.json",
+    "sha256": "db9c61269dd9e9e58bfef16f2211a68f6670a6c9bd12957c35198d29c8140333"
+  },
+  "semantics_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-host-kernel-counter-semantics-20261110-v1/deployment-seal-receipt.json",
+    "sha256": "9c023b62e1531913b29e4c3dd82212995a3f3330e4b9b3503dcbd4815a3bea63"
+  },
+  "kernel_ABI_source_review": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ROOT_KERNEL_ABI_SOURCE_REVIEW.json",
+    "sha256": "c8dd8d7fa39972a8ddea653534bf35d0ece89749dbdaf9914a2307d9fb775357"
+  },
+  "four_strict_compilers_passed": true,
+  "ordinary_tests_passed": 26,
+  "checks": {
+    "production": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/production-ORIGINAL-ARGV.json",
+        "sha256": "591e40e76b6da2f455319eca25f94e696b67a450e05fcdc5dc8e3e47201b9ac0"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/production-ORIGINAL-EXECUTION.json",
+        "sha256": "04893a6c9863c4ef3154205dea71dce2fbcd4037657d55a7264703187056ab71"
+      }
+    },
+    "build-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/build-tests-ORIGINAL-ARGV.json",
+        "sha256": "3368a037694abe256abf0aa9f2b83bb0a8a7ef1bcd0d5af55106f424e0214744"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/build-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "85ce31e2282d447c39775c7a2d92a1a89c434cfa2790f6245f71ce84e57e1664"
+      }
+    },
+    "clippy-production": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "b89c307e42e99efa318d4df3a27986a1686e851315d22792a14d0e1c508fb50b"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "f1c25f879054dd9df97c9eec2a8a275c0cf353f127efab19a1ca35233da6ec22"
+      }
+    },
+    "clippy-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/clippy-tests-ORIGINAL-ARGV.json",
+        "sha256": "7a340a9dc95301fd5389f546bd1881335caad53dbb9fa111f4091aaa339a71fd"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "566c16d34f9262d8b45b3488e8cbaa2d2c7ca869c0f3fc94534364feafa9ef2e"
+      }
+    },
+    "ordinary-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ordinary-tests-ORIGINAL-ARGV.json",
+        "sha256": "56e7a898f73dd6938c4d8e78b02361bea697370af8467dc63a3aee1441a2fd0e"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ordinary-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "cde3042395682bd88565e5ad31a348b61ca2f4331eab25a069a2133a68b59285"
+      }
+    }
+  },
+  "original_V13_lint_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v13/build-tests-ORIGINAL-EXECUTION.json",
+    "sha256": "14549cd6ee00f530ebe67a6299f4c83df9dbe5b9fc4f2bd01fbd1a4ae1cfe933"
+  },
+  "V14_source_correction": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ROOT_V13_STRICT_TEST_NAME_FAILURE_CORRECTION.json",
+    "sha256": "6bf5ca0fd2a2354167fa8331d05c327f335035647743bc7ac57a983b7ee034fb"
+  },
+  "original_V14_plan_schema_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/NATIVE-ORIGINAL-EXECUTION.json",
+    "sha256": "c394bf886cc490f9fdc1d4c9528b91d46058fe6cdcee67cfa20c9ce4fca086ec"
+  },
+  "corrected_plan": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/native-r2/ACTUAL_PLAN.json",
+    "sha256": "e6601ac8b2a6cc9598b8bd51d669c4d962ced0f16858540316854fe8fb2b31cc"
+  },
+  "plan_correction": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/native-r2/ROOT_PLAN_SCHEMA_R2_CORRECTION_AND_ORIGINAL_DRAIN.json",
+    "sha256": "7430c5b5d5cdff2c8117d9657620d3422acedd406fd30f3915cc6ac2f32630f1"
+  },
+  "original_native_execution": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/native-r2/NATIVE-ORIGINAL-EXECUTION.json",
+    "sha256": "8adf6ff05e5bce9fab5f0453281bc8580f54743b2de95a328abd7df8b8e35a93"
+  },
+  "original_terminal_recovery": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/native-r2/ROOT_NATIVE_KERNEL_MEMORY_DRAINED_ORIGINAL_PID1_TERMINAL_RECOVERY.json",
+    "sha256": "f44e0dd719d3787e42b69d91b6dd8f4715fecaa82c9899f5625efcd13511874b"
+  },
+  "actual_native_report": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/native-r2/ACTUAL_FULFILLED_ANON_HOST_KERNEL_MEMORY_QUALIFICATION.json",
+    "sha256": "f7d633adda3a1ccbca5cd4855ed47c3ff080c246f7ce8a8238a56b6d1ea978bf"
+  },
+  "recorded_unix_seconds": 1794320305,
+  "planning_sample_expires_unix_seconds": 1794320605,
+  "per_host_kernel_fulfilled": {
+    "additional_global_margin_bytes": 1073741824,
+    "already_consumed_kernel_bytes": 7209922560,
+    "charged_once_to_true_historical_host_component_bytes": 43603734528,
+    "global_component_minima_bytes": {
+      "KernelStack": 42369024,
+      "PageTables": 1205719040,
+      "SUnreclaim": 7035576320
+    },
+    "hard_promises_released_bytes": 0,
+    "outside_input_component_counted_bytes": 0,
+    "pre_margin_unique_kernel_bytes": 8283664384,
+    "resource_credit_bytes": 0,
+    "shared_native_verifier_or_actor_kernel_credit_bytes": 0,
+    "unfulfilled_host_component_bytes": 36393811968
+  },
+  "required_remaining_growth_bytes": 784179191808,
+  "conservative_available_memory_bytes": 709834432512,
+  "memory_gap_bytes": 74344759296,
+  "candidate_fits": false,
+  "all_hard_promises_and_pools_retained": true,
+  "new_memory_or_DATA_promise_bytes": 0,
+  "resource_credit_bytes": 0,
+  "physical_credit_bytes": 0,
+  "replay_admission_authorized": false,
+  "separate_OS32_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v14/ROOT_SEPARATE_OS32_KERNEL_AND_HASH_SOURCE_PROOF_BOOKING.json",
+    "sha256": "9dbbc8116c2a0d7b2ec431f31687839ceb561ac8c88e98c4ef522a1d365d2406"
+  },
+  "previous_separate_OS32_booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-host-kernel-qa-v13/ROOT_SEPARATE_OS32_KERNEL_AND_HASH_SOURCE_PROOF_BOOKING.json",
+    "sha256": "539b86e4a6a042a6340de11d3592684f71c076895833d26e540a94c4d4d7e151"
+  }
+}

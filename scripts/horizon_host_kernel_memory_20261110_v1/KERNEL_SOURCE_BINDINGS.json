@@ -1,0 +1,78 @@
+{
+  "source_only": true,
+  "source_scope": "UpstreamLinuxv6.8 ABI semantics; exact distro/runtime release match remains a native qualification gate",
+  "sources": [
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/fs/proc/meminfo.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/fs__proc__meminfo.c",
+      "sha256": "2c6f41b68527711de9d417d62dd5a7c9b22ff4fb04c7e649a28ee51f0be8fcae",
+      "bytes": 5890
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/page_alloc.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/mm__page_alloc.c",
+      "sha256": "5ec6e187b4b7134cf7e4d4eafb6525b29d88d3c2e9b0c9e79436103a077afcd0",
+      "bytes": 195553
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/memcontrol.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/mm__memcontrol.c",
+      "sha256": "950762d45b6c8742b874f6870ed56575e7781db2e09679245baa0ca98d568b3b",
+      "bytes": 220359
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/Documentation/filesystems/proc.rst",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/Documentation__filesystems__proc.rst",
+      "sha256": "20b52d9035007c160791f1d79cade05382479822b9b03507ec3fc50dee78f843",
+      "bytes": 98473
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/Documentation/admin-guide/cgroup-v2.rst",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/Documentation__admin-guide__cgroup-v2.rst",
+      "sha256": "717277564e1c365c38c080339efbbac1efa82585907c4d4e10fb940dc9c856d3",
+      "bytes": 118283
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/percpu.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/mm__percpu.c",
+      "sha256": "ab581db727de4afe4c5b9c3813311936f58ec166021bfaba8ac7e9ee566790a2",
+      "bytes": 105049
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/show_mem.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/mm__show_mem.c",
+      "sha256": "29c0c6f784bf30c666e0f8416e0e4c36ca65bdcbbd4ecccc0218b40bf24aee18",
+      "bytes": 12086
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/kernel/fork.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/kernel__fork.c",
+      "sha256": "82e2af227e6f67d64f9c4c20a5c121c59aac575c6cb59da54a9bd16c5eb159e8",
+      "bytes": 89451
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/include/asm-generic/pgalloc.h",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/include__asm-generic__pgalloc.h",
+      "sha256": "ce9e2cef493815bd2e0c65a0bd67916720f0fcc37fbc134b5aeac1c8872cbad1",
+      "bytes": 5504
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/mm/memory.c",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/mm__memory.c",
+      "sha256": "85a7bf0d9d61bf21e764a4ea4e458ed72863f1bf2acee9fdcbc2038524ba8266",
+      "bytes": 175291
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/arch/x86/include/asm/page_64_types.h",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/arch__x86__include__asm__page_64_types.h",
+      "sha256": "0fabfb5b6c79bbd8909e2f69192b56889265438a80b2f2b79768a860ef8ad7d0",
+      "bytes": 3144
+    },
+    {
+      "source_url": "https://raw.githubusercontent.com/torvalds/linux/v6.8/arch/x86/include/asm/page_types.h",
+      "path": "/tmp/root-host-kernel-memory-source-20261110-v1/linux-v6.8-sources/arch__x86__include__asm__page_types.h",
+      "sha256": "aeb01992dcba1bcad2900366e1d14a33087164607b1842d265c27038b8f36e23",
+      "bytes": 2062
+    }
+  ]
+}
