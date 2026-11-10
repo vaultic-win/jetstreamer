@@ -1,0 +1,750 @@
+{
+  "schema": "horizon-corrected-head-anonymous-memory-v12-qualification-report-v1",
+  "four_strict_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 16,
+  "native_qualification_completed": true,
+  "candidate_fits": false,
+  "shortfall_bytes": 91548504064,
+  "new_memory_or_DATA_credit_bytes": 0,
+  "guard_or_producer_mutations": false,
+  "replay_admission_authorized": false,
+  "source_review": {
+    "path": "/tmp/root-anon-v11-source-20261110-v1/INDEPENDENT_REVIEW.md",
+    "sha256": "dbe007bfe434fe8cc9b39239164922cb4841c4309299694dda2447b1b08a3aba"
+  },
+  "source_v11_macro_recursion_failure": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v11/production-ORIGINAL-EXECUTION.json",
+      "sha256": "a2781fe1e7d33ec43a77f1a4ab982989859d48a97a3e050c193ec29966d54dad"
+    },
+    "document": {
+      "code": 1,
+      "stdout": "",
+      "stderr": "Running as unit: horizon-fulfilled-anon-memory-production-20261110-v11.service\nerror: recursion limit reached while expanding `$crate::json_internal!`\n   --> /usr/local/lib/jetstreamer/horizon-fulfilled-anon-memory-source-20261110-v11/main.rs:745:9\n    |\n745 | ...   json!({\"schema\":\"horizon-fulfilled-anon-memo...,\"routine_observation_cadence_reset\":false}),\n    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: consider increasing the recursion limit by adding a `#![recursion_limit = \"256\"]` attribute to your crate (`horizon_fulfilled_anon_memory`)\n    = note: this error originates in the macro `$crate::json_internal` which comes from the expansion of the macro `json` (in Nightly builds, run with -Z macro-backtrace for more info)\n\nerror: aborting due to 1 previous error\n\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 90ms\nCPU time consumed: 89ms\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+    }
+  },
+  "evidence": {
+    "ARTIFACT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ARTIFACT.json",
+        "sha256": "8e18a3dc22ac0e9737d5b43ed64a1f6f6232205fa76191c7aff4e1b6e71e6a45"
+      },
+      "document": {
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/horizon-fulfilled-anon-memory-source-20261110-v12/main.rs",
+          "sha256": "8ca264b2225f2af55a0d17c41efceb86f92b404718157b29125b46a642efab77"
+        },
+        "predecessor_graph": {
+          "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+          "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+        },
+        "actual_direct_externs": {
+          "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+          },
+          "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+            "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+          },
+          "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+            "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+          }
+        },
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 16,
+        "authority_selection_authorized": false,
+        "native_memory_qualification_pending": true
+      }
+    },
+    "ROOT_QUALIFIED_NATIVE_PENDING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ROOT_QUALIFIED_NATIVE_PENDING.json",
+        "sha256": "c0b323871f52b17107d3cb318f5f1c92af31e7abd220d982357aa1338afe6e2e"
+      },
+      "document": {
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 16,
+        "all_compiler_slots_drained": true,
+        "runtime": {
+          "path": "/usr/local/lib/jetstreamer/horizon-fulfilled-anon-memory-tools-20261110-v12/check",
+          "sha256": "71627047d98ca81269b0559adfa238f72d33a8b2bc3f43af1a72787a9b3e0bf0"
+        },
+        "active_extra_native_callback_bytes": 0,
+        "all_original_native_pool_allocations_retained": true,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "native_ending_or_replay_admission_authorized": false
+      }
+    },
+    "ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json",
+        "sha256": "72b81e12cd03c47e9fb2d0b1cbc357b6f49531bc4afda809333917fa6d926cd2"
+      },
+      "document": {
+        "RSS_file_cache_shared_pages_and_other_cgroups_credited_bytes": 0,
+        "additional_host_headroom_bytes": 17179869184,
+        "already_resident_nonreclaimable_anonymous_bytes_counted_in_those_caps": 57568215040,
+        "candidate_additive_hard_memory_bytes": 74088185856,
+        "candidate_fits_this_native_sample": false,
+        "complete_DATA_promises_preserved_bytes": 6582025928498,
+        "complete_hard_memory_promises_preserved_bytes": 759789531136,
+        "conservative_DATA_add_back_already_selected_bytes": 480969228288,
+        "conservative_available_memory_bytes": 701940867072,
+        "conservative_memory_add_back_already_selected_bytes": 51539607552,
+        "corrected_conservative_authority": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_CONSERVATIVE_DUPLICATE722_ADD_BACK_CURRENT_AUTHORITY.json",
+          "sha256": "ee31a884f0cbbb0f58f045eaaf9d9dd823fe8ec8852f560d0f5c21f79aa004d8"
+        },
+        "current_observer_sample_unix_seconds": 1794303022,
+        "effective_consumer_and_guard_accounting_authority_granted": false,
+        "full_caps_plus_candidate_and_headroom_bytes": 851057586176,
+        "hard_promises_released_bytes": 0,
+        "host_after": {
+          "available_bytes": 702054866944,
+          "raw_meminfo_sha256": "d8d33de3479f74e7e5c7ad8799296fd0cb5b6b309042e53feb057fb778e3d8a0",
+          "total_bytes": 810902843392
+        },
+        "host_before": {
+          "available_bytes": 701940867072,
+          "raw_meminfo_sha256": "77cdfbe835d056916d487dfcc8245d35d23074bcc9d02730288a4a13f01dab47",
+          "total_bytes": 810902843392
+        },
+        "kernel_zero_swap_anon_semantics_only": true,
+        "native_Frame_or_full_Reader_authority": false,
+        "native_self": {
+          "ActiveState": "active",
+          "ControlGroup": "/system.slice/horizon-fulfilled-anon-memory-qualification-20261110-v12.service",
+          "ControlPID": "0",
+          "Delegate": "no",
+          "Id": "horizon-fulfilled-anon-memory-qualification-20261110-v12.service",
+          "InvocationID": "85f01fd3f97c4483880ddacebac4bb08",
+          "Job": "",
+          "LoadState": "loaded",
+          "MainPID": "662445",
+          "MemoryAccounting": "yes",
+          "MemoryMax": "536870912",
+          "MemorySwapMax": "0",
+          "NRestarts": "0",
+          "Restart": "no",
+          "SubState": "running"
+        },
+        "new_memory_or_DATA_promise_bytes": 0,
+        "new_resource_observations": true,
+        "normal_pool_bytes": 10737418240,
+        "observation_reason": "admission-qualification",
+        "owner": "/root",
+        "per_producer_fulfilled": [
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 8681238528,
+            "invocation_id": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-166-standard-20261109-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 7994470400,
+            "invocation_id": "efd81d59a4584013a93d0d020e49852e",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-167-standard-20261109-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 7596261376,
+            "invocation_id": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-168-standard-20261109-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 8969736192,
+            "invocation_id": "ca4d6b8da24c4e92a4c75419edae6f1d",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-169-standard-20261109-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 7722946560,
+            "invocation_id": "1950530fc73b4a519f5327749f0036b7",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-170-standard-20261109-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 8224808960,
+            "invocation_id": "3b0694043e374b0488ee9a81762e210d",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-171-standard-20261110-v1.service"
+          },
+          {
+            "conservative_nonreclaimable_fulfilled_bytes": 8378753024,
+            "invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+            "per_lane_additional_margin_bytes": 1073741824,
+            "unit": "horizon-qualify-172-standard-20261110-v1.service"
+          }
+        ],
+        "persistent_background_after": {
+          "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "ControlPID": "0",
+            "Delegate": "no",
+            "Id": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "InvocationID": "7ac4617f73ab4f979a8527cce461c6a4",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "3204661",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "infinity",
+            "MemorySwapMax": "infinity",
+            "NRestarts": "0",
+            "Restart": "on-failure",
+            "SubState": "running"
+          },
+          "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "ControlPID": "0",
+            "Delegate": "no",
+            "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "2467123",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "SubState": "running"
+          }
+        },
+        "persistent_background_before": {
+          "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "ControlPID": "0",
+            "Delegate": "no",
+            "Id": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "InvocationID": "7ac4617f73ab4f979a8527cce461c6a4",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "3204661",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "infinity",
+            "MemorySwapMax": "infinity",
+            "NRestarts": "0",
+            "Restart": "on-failure",
+            "SubState": "running"
+          },
+          "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "ControlPID": "0",
+            "Delegate": "no",
+            "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "2467123",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "SubState": "running"
+          }
+        },
+        "physical_credit_bytes": 0,
+        "plan": {
+          "additional_host_headroom_bytes": 17179869184,
+          "candidate_actor_memory_bytes": 73014444032,
+          "candidate_epoch": 173,
+          "candidate_guard_memory_bytes": 1073741824,
+          "current_complete_authority": {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_CONSERVATIVE_DUPLICATE722_ADD_BACK_CURRENT_AUTHORITY.json",
+            "sha256": "ee31a884f0cbbb0f58f045eaaf9d9dd823fe8ec8852f560d0f5c21f79aa004d8"
+          },
+          "current_fleet": {
+            "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_093022_RUST_V8.json",
+            "sha256": "dbd514939f2122e66a5582b8d3ae22b5051facf345de029be46fa1debcb1923d"
+          },
+          "output": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json",
+          "owner": "/root",
+          "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+          "purpose": "qualification",
+          "schema": "horizon-fulfilled-anon-memory-check-plan-v1"
+        },
+        "planning_sample_expires_unix_seconds": 1794304381,
+        "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+        "producer_after": [
+          {
+            "anonymous_bytes": 9754980352,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63511535616,
+            "memory_events_sha256": "da88e6db6e0670a1eba4f513b50b823099d997e011294f2b46ac1f0d17a0ad00",
+            "memory_stat_sha256": "21cc6012163615d17eeec95b22daeccfae26236f3d2b173fdde03502993b7892",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-166-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-166-standard-20261109-v1.service",
+              "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "4188448",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9069727744,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 61154234368,
+            "memory_events_sha256": "8f06086e3c73f545d7ceca77de364521a27c230e21f022444cc6ad6a6d4e4c2d",
+            "memory_stat_sha256": "23a212926b3b197b9594f3103be3abc1936251ec1f46377c21a43a2fdd1a1afd",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-167-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-167-standard-20261109-v1.service",
+              "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "713",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 8670162944,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 66725842944,
+            "memory_events_sha256": "722116639877200968d87e109774140dce8a59fa38a10611df5506cfed2a3617",
+            "memory_stat_sha256": "6b772373ebd0a9d8331c8995ae2686b47abeaaff8528902736f0098528b1ed0d",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-168-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-168-standard-20261109-v1.service",
+              "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "14201",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 10043478016,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63742668800,
+            "memory_events_sha256": "ba6577ae15c228c067999e272b7345c13b9a8d890838264115868a46f419d2ff",
+            "memory_stat_sha256": "46bcf24c92b9b8f5a3dd34eadf0da957ce9a4e55b82e82ffce73d7e415216304",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-169-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-169-standard-20261109-v1.service",
+              "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "50818",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 8802390016,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 65438892032,
+            "memory_events_sha256": "5e4d2d4a9580ee3ccf883f2803b46d7abce7ec07fe335e6274116d5211e4f8bc",
+            "memory_stat_sha256": "7d5d7bee50be4bc031989e31fa31da072ff186605f506500ed3bf775ccb68f32",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-170-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-170-standard-20261109-v1.service",
+              "InvocationID": "1950530fc73b4a519f5327749f0036b7",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "86457",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9298550784,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 64434712576,
+            "memory_events_sha256": "b05098dcc14b80e067c0e89a994ca07eaca16b37f5175e4232d2e4a3f9057ce0",
+            "memory_stat_sha256": "5e04e521b2f9f65f7d529d6f060ac38e5020c58e7731208acff8cd0338bce861",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-171-standard-20261110-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-171-standard-20261110-v1.service",
+              "InvocationID": "3b0694043e374b0488ee9a81762e210d",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "243865",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9452494848,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63990288384,
+            "memory_events_sha256": "852cb04b54574112b82ab723da60413a8d957eaba2b268aab3a6fbf207c768a4",
+            "memory_stat_sha256": "bacebc7395e706c87b864d1236088cc7d9bdb9927728e84958bc5ef58125de2f",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-172-standard-20261110-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-172-standard-20261110-v1.service",
+              "InvocationID": "6aa8bc6036b34c57ababa2d5855b2098",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "431228",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          }
+        ],
+        "producer_before": [
+          {
+            "anonymous_bytes": 9755897856,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63511515136,
+            "memory_events_sha256": "da88e6db6e0670a1eba4f513b50b823099d997e011294f2b46ac1f0d17a0ad00",
+            "memory_stat_sha256": "60637b6d8c0dbdc233715052fb4a3dfdab932115c6e18477055234532d947889",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-166-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-166-standard-20261109-v1.service",
+              "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "4188448",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9068212224,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 61153296384,
+            "memory_events_sha256": "8f06086e3c73f545d7ceca77de364521a27c230e21f022444cc6ad6a6d4e4c2d",
+            "memory_stat_sha256": "fe51bf0c19a5ec4d10bcfd5721835b96f429159006debfb0d5a83eae71d569d4",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-167-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-167-standard-20261109-v1.service",
+              "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "713",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 8670003200,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 66714705920,
+            "memory_events_sha256": "722116639877200968d87e109774140dce8a59fa38a10611df5506cfed2a3617",
+            "memory_stat_sha256": "89897a377a59bee9712b26eecbbd0f96443d007bd3ea5181d146111e3d1682f9",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-168-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-168-standard-20261109-v1.service",
+              "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "14201",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 10043478016,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63739621376,
+            "memory_events_sha256": "ba6577ae15c228c067999e272b7345c13b9a8d890838264115868a46f419d2ff",
+            "memory_stat_sha256": "044c934220759bc039a95744aac4708d946a5fd636ef218882e795edd8e79734",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-169-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-169-standard-20261109-v1.service",
+              "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "50818",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 8796688384,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 65432387584,
+            "memory_events_sha256": "5e4d2d4a9580ee3ccf883f2803b46d7abce7ec07fe335e6274116d5211e4f8bc",
+            "memory_stat_sha256": "bdc225a62df901d2c1182f3ce1635829659141cc577e5fa444b940041e31aa27",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-170-standard-20261109-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-170-standard-20261109-v1.service",
+              "InvocationID": "1950530fc73b4a519f5327749f0036b7",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "86457",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9298862080,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 64435916800,
+            "memory_events_sha256": "b05098dcc14b80e067c0e89a994ca07eaca16b37f5175e4232d2e4a3f9057ce0",
+            "memory_stat_sha256": "c84e4deef382853f02773e4948dc4de0650975cf5180b64b6d45b20956b3e67b",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-171-standard-20261110-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-171-standard-20261110-v1.service",
+              "InvocationID": "3b0694043e374b0488ee9a81762e210d",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "243865",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          },
+          {
+            "anonymous_bytes": 9452597248,
+            "anonymous_is_a_component_of_the_existing_hard_cap": true,
+            "file_cache_RSS_and_other_cgroups_counted_bytes": 0,
+            "memory_current_bytes": 63989862400,
+            "memory_events_sha256": "852cb04b54574112b82ab723da60413a8d957eaba2b268aab3a6fbf207c768a4",
+            "memory_stat_sha256": "9c17a198b87f5ade53c1fc26553c0d478777c2444b224870ab1862bee1d3af3e",
+            "memory_swap_current_bytes": 0,
+            "unit": {
+              "ActiveState": "active",
+              "ControlGroup": "/system.slice/horizon-qualify-172-standard-20261110-v1.service",
+              "ControlPID": "0",
+              "Delegate": "no",
+              "Id": "horizon-qualify-172-standard-20261110-v1.service",
+              "InvocationID": "6aa8bc6036b34c57ababa2d5855b2098",
+              "Job": "",
+              "LoadState": "loaded",
+              "MainPID": "431228",
+              "MemoryAccounting": "yes",
+              "MemoryMax": "73014444032",
+              "MemorySwapMax": "0",
+              "NRestarts": "0",
+              "Restart": "no",
+              "SubState": "running"
+            }
+          }
+        ],
+        "producer_mutations": false,
+        "recorded_unix_seconds": 1794304081,
+        "remote_mutations": false,
+        "replay_launch_authorized": false,
+        "required_available_memory_for_remaining_growth_bytes": 793489371136,
+        "resource_credit_bytes": 0,
+        "retained_native_pool_bytes": 17179869184,
+        "retained_shared_pool_bytes": 68719476736,
+        "retained_verifier_pool_bytes": 103079215104,
+        "routine_observation_cadence_reset": false,
+        "schema": "horizon-fulfilled-anon-memory-native-check-v1"
+      }
+    },
+    "NATIVE-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/NATIVE-ORIGINAL-EXECUTION.json",
+        "sha256": "c61cb7b1a537c3f597ee82cd2e3bbd5cbcd371441938dd2c04a6ca8b1fd69937"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"candidate_fits_this_native_sample\":false,\"output\":\"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json\",\"replay_launch_authorized\":false,\"resource_credit_bytes\":0}\n",
+        "stderr": "Running as unit: horizon-fulfilled-anon-memory-qualification-20261110-v12.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 318ms\nCPU time consumed: 283ms\nMemory peak: 98.8M\nMemory swap peak: 0B\n",
+        "stdout_log": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/native.stdout",
+          "sha256": "b5a5a05e0cbd403a47663fc82051326ebb661fa47f27c63734ba686245ee0d12"
+        },
+        "stderr_log": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/native.stderr",
+          "sha256": "0ebf5ce5cc4c1b82311e99c96222ddcf38225d1965fda7aff415b8f763562be2"
+        }
+      }
+    },
+    "ROOT_NATIVE_ANON_MEMORY_DRAINED_NO_FLOOR_OR_ADMISSION_AUTHORITY.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ROOT_NATIVE_ANON_MEMORY_DRAINED_NO_FLOOR_OR_ADMISSION_AUTHORITY.json",
+        "sha256": "3a04c00b13c035fb938526ee7f197a1320eb079dc2c9a61e04d95343d9ee5901"
+      },
+      "document": {
+        "native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "success",
+          "NRestarts": "0",
+          "ExecMainStatus": "0",
+          "ActiveState": "inactive",
+          "SubState": "dead"
+        },
+        "actual_check": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json",
+          "sha256": "72b81e12cd03c47e9fb2d0b1cbc357b6f49531bc4afda809333917fa6d926cd2"
+        },
+        "native_pool_bytes": 17179869184,
+        "new_credit_bytes": 0,
+        "guard_floor_changed": false,
+        "DATA_fit_not_checked": true,
+        "replay_admission_authorized": false
+      }
+    },
+    "ROOT_CLOSED_ANON_MEMORY_V12_WORK_RETIREMENT_COMPLETE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ROOT_CLOSED_ANON_MEMORY_V12_WORK_RETIREMENT_COMPLETE.json",
+        "sha256": "3cae0de8720135071484afd83d8c54409bad8f21446856cd6660907c76526fdb"
+      },
+      "document": {
+        "intent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ROOT_CLOSED_ANON_MEMORY_V12_WORK_RETIREMENT_INTENT.json",
+          "sha256": "d98aff5064f99e69612883b3ec49948a5b5693385a7f752026b8106b007ad4ce"
+        },
+        "physical_bytes_reclaimed": 24547328,
+        "filesystem_available_before_bytes": 6386279956480,
+        "filesystem_available_after_bytes": 6385807273984,
+        "DATA_promise_credit_bytes": 0,
+        "sources_receipts_all_sealed_runtimes_and_external_libraries_retained": true,
+        "completed_unix_seconds": 1794304207,
+        "no_remote_mutation": true
+      }
+    }
+  },
+  "authenticated_status": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_ACTUAL173_CORRECTED_MEMORY_V12_AND_CURRENT_STATUS.json",
+      "sha256": "d658ca7efbef3759ed078bc9e7c6d85d6c2dc6b83d7af8947d66ab87d75cad44"
+    },
+    "document": {
+      "actual_memory_check": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json",
+        "sha256": "72b81e12cd03c47e9fb2d0b1cbc357b6f49531bc4afda809333917fa6d926cd2"
+      },
+      "status_receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-173.status-correction-20261110095052.json",
+        "sha256": "02b81cce43139d6fe9233e52b18172f08e4a459d7f5b349751e3e3d4f97dac33"
+      },
+      "after_status": {
+        "elapsed_execution_millis": 14288000,
+        "epoch": 173,
+        "estimated_remaining_millis": 460322206,
+        "jet_size_bytes": 0,
+        "phase": "verification",
+        "sampled_at_utc": "2026-11-10T09:50:52Z"
+      },
+      "shortfall_bytes": 91548504064,
+      "next_capacity_gate": "Qualify original154 unused future-DATA through actual independent ancestry/scope/no-writer check and no-clobber ending; then effective consumer and continuous guard handoff. In parallel resolve memory deficit through source-bound future host/shared/uploader obligations. Preserve seven replays, corrected pools and all guards; no repeated unchanged fit attempt.",
+      "no173_producer_or_admission": true,
+      "new_ending_credit_bytes": 0
+    }
+  }
+}
