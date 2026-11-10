@@ -1,0 +1,111 @@
+{
+  "schema": "horizon-epoch173-static-preparation-and-memory-qualification-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "fulfilled-anon-v9.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch173_memory_20261110_v1/source/fulfilled-anon-v9.rs",
+      "sha256": "2f2e0792662af956c91170b598c844459c250f25e191aa335056d7bdfcbfab6e"
+    },
+    "fulfilled-anon-v10.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch173_memory_20261110_v1/source/fulfilled-anon-v10.rs",
+      "sha256": "dc3ae8299ed77e843a35f19529ba57162d6de24b933469cc3a294e12b9e59786"
+    }
+  },
+  "full_canonical_start": 74736000,
+  "full_canonical_terminal": 75167999,
+  "manifest_fingerprint": "sha256:41325d910ad0326283caadd340aef7a69a9f2ed7445c15fc13335675699f74f1",
+  "static_package_and_two_exact_negative_capabilities_passed": true,
+  "coherent_idle_gcloud_copy_and_both_generation_metadata_passed": true,
+  "snapshot_body_bytes_downloaded": 0,
+  "v9_production_compiled_test_build_failed_safely_on_non_snake_case_test_name": true,
+  "v10_all_four_strict_compiler_configurations_and10tests_passed": true,
+  "actual_memory_checker": {
+    "path": "/usr/local/lib/jetstreamer/horizon-fulfilled-anon-memory-tools-20261110-v10/check",
+    "sha256": "b6af7e08f2823ddd2e473b1290ff5dfb518697a56db3b5b2028082b415fe0490"
+  },
+  "legacy_V8_names_in_two_local_receipts_are_labels_only_actual_source_and_runtime_are_V10": true,
+  "native_qualification_executed_successfully_candidate_fits": false,
+  "required_available_memory_bytes": 743897636864,
+  "actual_conservative_available_memory_bytes": 707950809088,
+  "shortfall_bytes": 35946827776,
+  "candidate_actor68_guard1_and_host16GiB_retained": true,
+  "all_prior_endings_checked_once_without_reapplication": true,
+  "failed1530_actor_guard_and_future_DATA_ending_already_consumed_cannot_reapply": true,
+  "complete_DATA_bytes": 6101056700210,
+  "complete_projected_memory_bytes": 708249923584,
+  "normal_pool_bytes": 10737418240,
+  "no173_producer_or_admission": true,
+  "existing_seven_replays_preserved": true,
+  "next_action": "Reconcile historical shared64GiB actual/future consumers and qualify only unused future capacity, preserving all verifier96/native16/producer caps. A changed qualified authority and fresh memory/full admission are required.",
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_METADATA_PREPARATION_BOOKING.json",
+      "sha256": "2e0529700b9e4818fe75f5339fc3b34c4507701313cd0cf8a7a2e1fa400dcb8b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_OFFLINE_MANIFEST_ACCEPTANCE_NOT_ADMISSION.json",
+      "sha256": "8b6535733ad404ca2067621a9d3dbf692179d50ebea978cc423e5bf44bb0b857"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/PACKAGE_SEAL_ORIGINAL_EXECUTION.json",
+      "sha256": "284f3da16cca5d63d94908fed787032f6d801f8d0406272c0f53cd226265a58d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/crossed-fingerprint-ORIGINAL-EXECUTION.json",
+      "sha256": "2dd1c3412a36ecf3d1aaffad6dbbd5efc494a847aa08f298148f7360c61a554f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/matching-schema-invalid-snapshot-ORIGINAL-EXECUTION.json",
+      "sha256": "a82482245632c6846d9fb75943f49fd75f223d0bad469b1b9d7139984781fcf4"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/INITIAL_173_STATUS_AUTHENTICATED_READBACK.json",
+      "sha256": "3ee8ef5a6125de64626488159ffa86166b315c055366cb3017e13234b4d84e73"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_STATIC173_PREPARATION_AND_STATUS_ACCEPTED_INPUT_GATES_PENDING.json",
+      "sha256": "692d91578fca0cf3c0c32568f5dada797f8c8080ba2cb2a1660f4bf041fab253"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_FRESH_IDLE_LANE_CONFIG_AND_BOTH_GENERATIONS_ACCEPTANCE.json",
+      "sha256": "48874c6f52da3ea6e6a10f048182d67b6b69de21ea3164aa823601178a241958"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_ACTUAL173_MEMORY_SHORTFALL_AND_NEXT_GATE.json",
+      "sha256": "30103aa969820ba0d8f2283d47e53bb024e33e4da1b344fc94e0f03880de4c74"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_ACTUAL173_MEMORY_SHORTFALL_AND_NEXT_GATE_V2.json",
+      "sha256": "7d9a08aa878f9bcc2d8d43b71e1de456de5b37eec15fc6ecbc51219685d832df"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/FULFILLED-ANON-V10-ARTIFACT.json",
+      "sha256": "d41bf836efa793257b1af59968208d1ed9321cc7eed9a76feb94b5a261852105"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/ROOT_FULFILLED_ANON_V8_FOUR_COMPILERS_AND_TEN_TESTS_PASSED_NATIVE_PENDING.json",
+      "sha256": "cb38c794e57c3a69a844524d348a3c933fd38b3823bd50d9ecb7b3061fac16cf"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/FULFILLED-ANON-V10-QUALIFICATION-PLAN-SEAL-EXECUTION.json",
+      "sha256": "4792e727e2d08464711b59b7ccb5fe1161729e6c2f55d3579d8fdf56954356cd"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/FULFILLED-ANON-V10-QUALIFICATION-R2-PLAN-SEAL-EXECUTION.json",
+      "sha256": "78cb3bb8b75521c25f7fdd17c593cb9bea8219cac758754c1f6c248e1420d07c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/FULFILLED-ANON-V10-QUALIFICATION-R2-ORIGINAL-EXECUTION.json",
+      "sha256": "0e1ed6d38831e03016f0ce83a2b74802bab3e40317bfa406e13dbb3426a248dc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v10/ROOT_ACTUAL_FULFILLED_ANON_V8_EPOCH173_QUALIFICATION-R2.json",
+      "sha256": "880c73ac649fbd8b09c6d451bd892a3c21dc59ba164341420ec42743a81ac15d"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-ended-setup-reservations-20261109-v1/5f4b7cb4621a4a2080fd9b083c14f5a0/ended.json",
+      "sha256": "1347ef9cc7bdd9f684e3cf28da69ebdd14a3844f14b17d643d6b2239dbb3eb10"
+    }
+  ]
+}
