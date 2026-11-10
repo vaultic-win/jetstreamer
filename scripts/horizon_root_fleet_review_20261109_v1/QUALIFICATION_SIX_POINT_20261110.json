@@ -6,8 +6,7 @@
   },
   "four_compiler_configurations_passed": true,
   "ordinary_tests_passed": 28,
-  "native_explicit_six_point_review_pending": true,
-  "proven_operating_point_remains": 5,
+  "native_explicit_six_point_review_pending": false,
   "earliest_matching_six_window": [
     "2026-11-10T01:30:22Z",
     "2026-11-10T02:00:22Z"
@@ -43,6 +42,33 @@
     {
       "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SANDBOXED-TESTS-V7-ORIGINAL-EXECUTION.json",
       "sha256": "2feb2ca4d7ff9fbfcd3517f825b0ba5720e56f07326dd8e35e6b979caa9b9482"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXPLICIT_STANDARD_SIX_LANE_OPERATING_REVIEW_020022.json",
+      "sha256": "9ace389b66c52ecd93201d0981930529952208f3a6cba8a1feff037439d7a782"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_020022_RUST_V5.json",
+      "sha256": "8449cc838294f130b8b6de4e8d4725adc2a1ea41738ab6e10b9c8f582ac0f7ce"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-020022-V5-ORIGINAL-EXECUTION.json",
+      "sha256": "e0247fcd8fee171a354a8ee1a7d925a2541c73387e9916878cd87e8e04d69293"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_020022_NATIVE_V5_DRAINED_EXISTING_NORMAL9_RESTORED.json",
+      "sha256": "f727dcad1adb449cf0cda671c3b8cd1f666efe3e8003e83b8c6e37952cdde8b1"
     }
-  ]
+  ],
+  "genuine_native_0200_complete_fleet_passed": true,
+  "proven_operating_point_selected": 6,
+  "current_memory_selected_target_at_0200": 15,
+  "native_review_observer": {
+    "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261110T020022Z-postcompletion154-v1.json",
+    "sha256": "e0c384c2b24fd09e393abd7cd1e963edff39c8d4e685d74e604365f2fe212f2b"
+  },
+  "native_verified_operating_point": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_EXPLICIT_STANDARD_SIX_LANE_OPERATING_REVIEW_020022.json",
+    "sha256": "9ace389b66c52ecd93201d0981930529952208f3a6cba8a1feff037439d7a782"
+  }
 }
