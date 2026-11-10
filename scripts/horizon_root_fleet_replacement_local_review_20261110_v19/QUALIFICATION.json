@@ -1,0 +1,22 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v19/replacement-fleet-v19/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "eab18148d41cc1f7f63d67b1f47e77de9828698c829c068a0c1b3c9bf571de31"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/replacement-local-fleet-qualification-20261110-v19/replacement-fleet-v19/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "9ecc4383dd9ad9f2498e7a4886fd161122ba440be75e4774e6d561cde3300403"
+  },
+  "actual_ordinary_test_count": 72,
+  "published_source_sha256": {
+    "main.rs": "774c410a6fdd57249d7b5682b7504c3f6339070a5fcffd7b2ff911d6637ada60",
+    "terminal.rs": "58327a9524975ebcd811a66d4929abdd998358b99d7cbc1d8f7ac5d2f618dc2d",
+    "bootstrap.rs": "239800d59817eb40a4484e6d092fc5a604bacde3393ea5d8131977bdca7b804a",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda",
+    "replacement.rs": "c92438fd732b6a08cf1380bdea944a4faca4b75f4fa9deb3d1b94d636d097ece",
+    "replacement_validation.rs": "37d8153a8e28d0ce381bff9703d33956b957aee965b68aa5bd1baf297d064b20",
+    "replacement_tests.rs": "37dbd70803588983d82a803ce5ef2a86f589c189e0e31e68c9ab321a2070d0e5"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false
+}
