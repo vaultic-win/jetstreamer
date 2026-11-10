@@ -1,0 +1,24 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/next171172-local-recipes-qualification-20261110-v14/local-recipes-v14/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "972080ff3c30b8a95dc3bd2b68e548ecc1c9da92a9885da504a0b2316cae472f"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/next171172-local-recipes-qualification-20261110-v14/local-recipes-v14/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "671d7bf7d6baa36174259a8ea2b43ca83cc50f3985e919bcd633da140a1b17fe"
+  },
+  "actual_ordinary_test_count": 89,
+  "published_source_sha256": {
+    "main.rs": "bd38c73ca3d517d57e69dd6550811daf9417e8aaf08c11cfe518b32b3f71efab",
+    "profile.rs": "ad904595bb77ccfddefc1c8f7cbcfc6cbae8b08c2fb43fa76a36e790b4b8a04b",
+    "tests.rs": "835f3151c73e6ec3d35a1e32d32dc12b0e8b267d308b660747031677376fadfb",
+    "local.rs": "8319089e637ceb79bd1b3d7100633b75feeab066fee4f81d0d2abdfdadbd49e2",
+    "resident_capture.rs": "64bfeee3982f366d5241cfe48dd984e7f4add7fc85576585d1df7387475adaab",
+    "resident_memory.rs": "e80c0ef0212532238f0e0eb6aa4b264f5a3bfc379a0e8b2c7bbd796f30024ec0",
+    "resident_memory_tests.rs": "28e0867de3684db68f237c14331a702c614242716e876adb1a0adcfdd8059839",
+    "host_fulfillment.rs": "27eebadac3853db91d3a5b166b4fcc479827433130a06f97527ac40593a8ad70"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0
+}

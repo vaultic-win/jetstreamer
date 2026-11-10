@@ -1,0 +1,22 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v9/local2-native-bridge-v9/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "1ed9ab4b8cbd49ff1ffc9b66eaae59632ee347ccbbd8619d4f39db58bf028137"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v9/local2-native-bridge-v9/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "4c202af5da92a9977de9e187ff725cf80eb2a877e23e52d3dc87935a61ff2612"
+  },
+  "actual_ordinary_test_count": 29,
+  "published_source_sha256": {
+    "main.rs": "3ebb0420097c996de1e8ccf08b47fe162780ef9768e6c73c9307f62ff4134c8b",
+    "supplement.rs": "b933126fac5e5cce6f60342230d390b80eb67e28e34cee68b52ee54a8134935e"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "actual170_native_capture": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v9/local2-native-bridge-v9/ROOT_ACTUAL170_NATIVE_CAPTURE_ACCEPTED.json",
+    "sha256": "5d04ac355c55472bfa1c474438afe416c1a17986cea6d5e6a41d1b09c7a47fd5"
+  }
+}
