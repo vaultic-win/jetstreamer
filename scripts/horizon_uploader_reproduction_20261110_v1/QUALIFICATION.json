@@ -1,0 +1,2850 @@
+{
+  "scope": "No compiler/build-script/linker executed by capture. No main compiler command captured; no provenance or memory/replay authority. Actual whole-image match remains gate.",
+  "source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+    "sha256": "d070c5c5ddabb8d72295c9c7791847eb21481833ce0f5e33df443c9da876a723"
+  },
+  "qualification": {
+    "ARTIFACT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ARTIFACT.json",
+        "sha256": "f0016f42df5280b5e591e1c313099ebdd7ad493f84e3ba39b3faa14792ded2a5"
+      },
+      "document": {
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+          "sha256": "d070c5c5ddabb8d72295c9c7791847eb21481833ce0f5e33df443c9da876a723"
+        },
+        "predecessor_graph": {
+          "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+          "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+        },
+        "actual_direct_externs": {
+          "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+          },
+          "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+            "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+          },
+          "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+            "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+          }
+        },
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 12,
+        "shared_budget_ending_authorized": false,
+        "native_census_pending": true
+      }
+    },
+    "CARGO_METADATA_CAPTURE_SANDBOX.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/CARGO_METADATA_CAPTURE_SANDBOX.json",
+        "sha256": "8a53d1c7ecf6ec489de664659f935141fc44060af72795cf82810a88f810bdce"
+      },
+      "document": {
+        "properties": [
+          "User=root",
+          "Group=root",
+          "UMask=0077",
+          "Restart=no",
+          "MemoryMax=512M",
+          "MemorySwapMax=0",
+          "CPUQuota=100%",
+          "TasksMax=128",
+          "RuntimeMaxSec=90",
+          "LimitFSIZE=1048576",
+          "LimitCORE=0",
+          "ProtectSystem=strict",
+          "ProtectHome=read-only",
+          "PrivateNetwork=yes",
+          "PrivateTmp=yes",
+          "NoNewPrivileges=yes",
+          "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+          "AmbientCapabilities=CAP_DAC_OVERRIDE",
+          "WorkingDirectory=/home/sol/workspace/jetstreamer",
+          "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "NoExecPaths=/",
+          "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp",
+          "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "Environment=CARGO_HOME=/home/sol/.cargo",
+          "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+          "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+          "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+          "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+          "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+          "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+          "ExecStartPre=/usr/bin/cp -a --no-preserve=ownership /home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint /home/sol/workspace/jetstreamer/target/release/.fingerprint",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate"
+        ],
+        "source_inputs": {
+          "path": "/tmp/root-uploader-reproduction-source-20261110-v1/SOURCE_INPUTS.json",
+          "sha256": "0535771b81dc4799a175939e45bf046e92a2eac875c7f3a53b2b3ed11498b7d7"
+        },
+        "wrapper_controls": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_NATIVE_INTERCEPT_AND_KERNEL_DENIAL_CONTROLS_PASSED.json",
+          "sha256": "569625f6eb0a0a170b5d35e1153e60d746f055e2d1a19ad5fb81760588e7f830"
+        }
+      }
+    },
+    "CARGO_METADATA_CAPTURE_SANDBOX_V2.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/CARGO_METADATA_CAPTURE_SANDBOX_V2.json",
+        "sha256": "d751dbcc24a281d6ea0d83dc96c08586a5e83520e7a1ecdf6bd600e58726979d"
+      },
+      "document": {
+        "properties": [
+          "User=root",
+          "Group=root",
+          "UMask=0077",
+          "Restart=no",
+          "MemoryMax=512M",
+          "MemorySwapMax=0",
+          "CPUQuota=100%",
+          "TasksMax=128",
+          "RuntimeMaxSec=90",
+          "LimitFSIZE=1048576",
+          "LimitCORE=0",
+          "ProtectSystem=strict",
+          "ProtectHome=read-only",
+          "PrivateNetwork=yes",
+          "PrivateTmp=yes",
+          "NoNewPrivileges=yes",
+          "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+          "AmbientCapabilities=CAP_DAC_OVERRIDE",
+          "WorkingDirectory=/home/sol/workspace/jetstreamer",
+          "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "NoExecPaths=/",
+          "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp /usr/lib/x86_64-linux-gnu/libselinux.so.1 /usr/lib/x86_64-linux-gnu/libacl.so.1.1.2302 /usr/lib/x86_64-linux-gnu/libattr.so.1.1.2502 /usr/lib/x86_64-linux-gnu/libpcre2-8.so.0.11.2",
+          "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "Environment=CARGO_HOME=/home/sol/.cargo",
+          "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+          "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+          "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+          "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+          "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+          "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+          "ExecStartPre=/usr/bin/cp -a --no-preserve=ownership /home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint /home/sol/workspace/jetstreamer/target/release/.fingerprint",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+          "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate"
+        ],
+        "predecessor": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/CARGO_METADATA_CAPTURE_SANDBOX.json",
+          "sha256": "8a53d1c7ecf6ec489de664659f935141fc44060af72795cf82810a88f810bdce"
+        },
+        "original_prestart_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-ORIGINAL-EXECUTION.json",
+          "sha256": "025de72a23d2423f41fda4d47bbfc2fabd4d2c535086cf64480ea29b408d4014"
+        },
+        "correction": "Only four indispensable cp shared-library paths added; compiler and every target/buildscript body still NoExec. Original failed before cached script or Cargo main."
+      }
+    },
+    "Cargo-main-capture-V2-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V2-ORIGINAL-ARGV.json",
+        "sha256": "e11f598df4b6828b5c27b6f311ac793299bb38525d5cfda24b5a0d7d97bc590d"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-main-capture-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=90",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp /usr/lib/x86_64-linux-gnu/libselinux.so.1 /usr/lib/x86_64-linux-gnu/libacl.so.1.1.2302 /usr/lib/x86_64-linux-gnu/libattr.so.1.1.2502 /usr/lib/x86_64-linux-gnu/libpcre2-8.so.0.11.2",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "-p",
+        "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+        "-p",
+        "ExecStartPre=/usr/bin/cp -a --no-preserve=ownership /home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint /home/sol/workspace/jetstreamer/target/release/.fingerprint",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+        "build",
+        "--release",
+        "-p",
+        "jetstreamer-r2",
+        "--bin",
+        "jetstreamer-r2",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "--verbose"
+      ]
+    },
+    "Cargo-main-capture-V2-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V2-ORIGINAL-EXECUTION.json",
+        "sha256": "91056ec3c8681f2b04fea251be6715e6fa1240b94231a6cad23b290d32d2f856"
+      },
+      "document": {
+        "code": 101,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-main-capture-20261110-v2.service\nwarning: failed to save last-use data\nThis may prevent cargo from accurately tracking what is being used in its global cache. This information is used for automatically removing unused data in the cache.\n\nunable to open database file\n\nCaused by:\n  Error code 14: unable to open database file\n   Compiling libc v0.2.189\n     Running `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name build_script_build --edition=2021 /home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no -C codegen-units=1 --allow=unused_qualifications '--warn=clippy::unnecessary_semicolon' '--allow=clippy::unnecessary_cast' '--warn=clippy::ptr_as_ptr' '--allow=clippy::non_minimal_cfg' '--allow=clippy::missing_safety_doc' '--warn=clippy::map_unwrap_or' '--warn=clippy::manual_assert' '--allow=clippy::identity_op' '--warn=clippy::explicit_iter_loop' --cfg 'feature=\"default\"' --cfg 'feature=\"std\"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values(\"align\", \"const-extern-fn\", \"default\", \"extra_traits\", \"rustc-dep-of-std\", \"rustc-std-workspace-core\", \"std\", \"use_std\"))' -C metadata=8a963305cba00d38 -C extra-filename=-c95189006321647c --out-dir /home/sol/workspace/jetstreamer/target/release/build/libc-c95189006321647c -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --cap-lints allow`\nintercept rejected: original absolute working directory required\nerror: could not compile `libc` (build script)\n\nCaused by:\n  process didn't exit successfully: `/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name build_script_build --edition=2021 /home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libc-0.2.189/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no -C codegen-units=1 --allow=unused_qualifications '--warn=clippy::unnecessary_semicolon' '--allow=clippy::unnecessary_cast' '--warn=clippy::ptr_as_ptr' '--allow=clippy::non_minimal_cfg' '--allow=clippy::missing_safety_doc' '--warn=clippy::map_unwrap_or' '--warn=clippy::manual_assert' '--allow=clippy::identity_op' '--warn=clippy::explicit_iter_loop' --cfg 'feature=\"default\"' --cfg 'feature=\"std\"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values(\"align\", \"const-extern-fn\", \"default\", \"extra_traits\", \"rustc-dep-of-std\", \"rustc-std-workspace-core\", \"std\", \"use_std\"))' -C metadata=8a963305cba00d38 -C extra-filename=-c95189006321647c --out-dir /home/sol/workspace/jetstreamer/target/release/build/libc-c95189006321647c -C strip=debuginfo -L dependency=/home/sol/workspace/jetstreamer/target/release/deps --cap-lints allow` (exit status: 87)\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=101\nService runtime: 1.648s\nCPU time consumed: 1.532s\nMemory peak: 83.9M\nMemory swap peak: 0B\n"
+      }
+    },
+    "NATIVE-INTERCEPT-PLAN-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-INTERCEPT-PLAN-SEAL-EXECUTION.json",
+        "sha256": "4e6a092e4eb1e5fc10caf040e2c4b2193ab93bbe8caf06924a71dc957b52e7fe"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"7cc38a0423dba91eb1b88740854dc941de4d756aeed0111d6c3310e687eba927\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "NATIVE-INTERCEPT-PLAN-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-INTERCEPT-PLAN-SEAL-PLAN.json",
+        "sha256": "7cc38a0423dba91eb1b88740854dc941de4d756aeed0111d6c3310e687eba927"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1",
+        "members": [
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-INTERCEPT-PLAN.json",
+            "name": "plan.json",
+            "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "NATIVE-INTERCEPT-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-INTERCEPT-PLAN.json",
+        "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+      },
+      "document": {
+        "schema": "horizon-uploader-cargo-intercept-plan-v1",
+        "owner": "/root",
+        "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+        "compiler_execution_authorized": false,
+        "build_script_execution_authorized": false,
+        "replay_admission_authorized": false,
+        "working_directory": "/home/sol/workspace/jetstreamer",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "probe_responses": [
+          {
+            "name": "version-verbose",
+            "argv": [
+              "-vV"
+            ],
+            "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+            "stdout_sha256": "3975d062e234a9f3921955bf6ae5b90f5819df94fa825d057f76b34a35ed0f4d"
+          },
+          {
+            "name": "cargo-native-target-metadata",
+            "argv": [
+              "-",
+              "--crate-name",
+              "___",
+              "--print=file-names",
+              "--crate-type",
+              "bin",
+              "--crate-type",
+              "rlib",
+              "--crate-type",
+              "dylib",
+              "--crate-type",
+              "cdylib",
+              "--crate-type",
+              "staticlib",
+              "--crate-type",
+              "proc-macro",
+              "--print=sysroot",
+              "--print=split-debuginfo",
+              "--print=crate-name",
+              "--print=cfg",
+              "-Wwarnings"
+            ],
+            "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout": "___\nlib___.rlib\nlib___.so\nlib___.so\nlib___.a\nlib___.so\n/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu\noff\npacked\nunpacked\n___\ndebug_assertions\npanic=\"unwind\"\nproc_macro\ntarget_abi=\"\"\ntarget_arch=\"x86_64\"\ntarget_endian=\"little\"\ntarget_env=\"gnu\"\ntarget_family=\"unix\"\ntarget_feature=\"fxsr\"\ntarget_feature=\"sse\"\ntarget_feature=\"sse2\"\ntarget_has_atomic=\"16\"\ntarget_has_atomic=\"32\"\ntarget_has_atomic=\"64\"\ntarget_has_atomic=\"8\"\ntarget_has_atomic=\"ptr\"\ntarget_has_atomic_primitive_alignment=\"16\"\ntarget_has_atomic_primitive_alignment=\"32\"\ntarget_has_atomic_primitive_alignment=\"64\"\ntarget_has_atomic_primitive_alignment=\"8\"\ntarget_has_atomic_primitive_alignment=\"ptr\"\ntarget_os=\"linux\"\ntarget_pointer_width=\"64\"\ntarget_vendor=\"unknown\"\nunix\n",
+            "stdout_sha256": "05f7bc8fff5f7e110fb1e261b8b0d823e08650d1c7815793c79d2ab10c2e4988"
+          }
+        ],
+        "receipt_directory": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts"
+      }
+    },
+    "NATIVE-deny-compile-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-deny-compile-ORIGINAL-ARGV.json",
+        "sha256": "1f86d6fa7e1de9960ad63232739c4a9010d564f00d189dccdd631b92fda5b598"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-intercept-native-deny-compile-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=45",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "jetstreamer_r2",
+        "jetstreamer-r2/src/main.rs",
+        "--crate-type",
+        "bin",
+        "--emit=link"
+      ]
+    },
+    "NATIVE-deny-compile-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-deny-compile-ORIGINAL-EXECUTION.json",
+        "sha256": "dcfef68c3f814dcc3514b09b7e0a1f85ad38c8911071f1d23df5a6cf700eb0fc"
+      },
+      "document": {
+        "code": 86,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-intercept-native-deny-compile-20261110-v1.service\nHORIZON_COMPILER_INTERCEPTED: argv captured; no compiler, build script or linker was executed\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=86\nService runtime: 87ms\nCPU time consumed: 86ms\nMemory peak: 5.3M\nMemory swap peak: 0B\n"
+      }
+    },
+    "NATIVE-kernel-deny-rustc-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-kernel-deny-rustc-ORIGINAL-ARGV.json",
+        "sha256": "72dc724c308fffe04ccc79c1f4776677638318f6dd115bf1f30636c9889a90b7"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-intercept-native-kernel-deny-rustc-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=45",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-vV"
+      ]
+    },
+    "NATIVE-kernel-deny-rustc-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-kernel-deny-rustc-ORIGINAL-EXECUTION.json",
+        "sha256": "150209d48dd1a1612f42a928ce407b5680274d740272feb9b8039972743935a0"
+      },
+      "document": {
+        "code": 203,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-intercept-native-kernel-deny-rustc-20261110-v1.service\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=203\nService runtime: 22ms\nCPU time consumed: 21ms\nMemory peak: 372.0K\nMemory swap peak: 0B\n"
+      }
+    },
+    "NATIVE-target-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-target-ORIGINAL-ARGV.json",
+        "sha256": "970097c69216b317d24285e2ec1ec1af00485c7c358f479b05b09d653efc60f1"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-intercept-native-target-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=45",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-",
+        "--crate-name",
+        "___",
+        "--print=file-names",
+        "--crate-type",
+        "bin",
+        "--crate-type",
+        "rlib",
+        "--crate-type",
+        "dylib",
+        "--crate-type",
+        "cdylib",
+        "--crate-type",
+        "staticlib",
+        "--crate-type",
+        "proc-macro",
+        "--print=sysroot",
+        "--print=split-debuginfo",
+        "--print=crate-name",
+        "--print=cfg",
+        "-Wwarnings"
+      ]
+    },
+    "NATIVE-target-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-target-ORIGINAL-EXECUTION.json",
+        "sha256": "8cd05a5f8f1447948cfc8e0cd753bd60af911f5920861cd399945ad94c32c8ca"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "___\nlib___.rlib\nlib___.so\nlib___.so\nlib___.a\nlib___.so\n/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu\noff\npacked\nunpacked\n___\ndebug_assertions\npanic=\"unwind\"\nproc_macro\ntarget_abi=\"\"\ntarget_arch=\"x86_64\"\ntarget_endian=\"little\"\ntarget_env=\"gnu\"\ntarget_family=\"unix\"\ntarget_feature=\"fxsr\"\ntarget_feature=\"sse\"\ntarget_feature=\"sse2\"\ntarget_has_atomic=\"16\"\ntarget_has_atomic=\"32\"\ntarget_has_atomic=\"64\"\ntarget_has_atomic=\"8\"\ntarget_has_atomic=\"ptr\"\ntarget_has_atomic_primitive_alignment=\"16\"\ntarget_has_atomic_primitive_alignment=\"32\"\ntarget_has_atomic_primitive_alignment=\"64\"\ntarget_has_atomic_primitive_alignment=\"8\"\ntarget_has_atomic_primitive_alignment=\"ptr\"\ntarget_os=\"linux\"\ntarget_pointer_width=\"64\"\ntarget_vendor=\"unknown\"\nunix\n",
+        "stderr": "Running as unit: horizon-uploader-intercept-native-target-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 96ms\nCPU time consumed: 79ms\nMemory peak: 4.8M\nMemory swap peak: 0B\n"
+      }
+    },
+    "NATIVE-version-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-version-ORIGINAL-ARGV.json",
+        "sha256": "db8f8080bbecea9081210af769afc677b2a72a4c4ca950b442e7e315ee296cbf"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-intercept-native-version-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=45",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-vV"
+      ]
+    },
+    "NATIVE-version-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-version-ORIGINAL-EXECUTION.json",
+        "sha256": "d67d6db9aa843b93fa543dbb7000407c9c528bb6811f18efd7de7af88400c2c1"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+        "stderr": "Running as unit: horizon-uploader-intercept-native-version-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 80ms\nCPU time consumed: 78ms\nMemory peak: 5.4M\nMemory swap peak: 0B\n"
+      }
+    },
+    "NATIVE_CONTROL_SANDBOX.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE_CONTROL_SANDBOX.json",
+        "sha256": "9ca80414bff54ec7b30068bb5c8aae0b4ec1b6ff7e0ade94a668e74459afd4da"
+      },
+      "document": {
+        "properties": [
+          "User=root",
+          "Group=root",
+          "UMask=0077",
+          "Restart=no",
+          "MemoryMax=512M",
+          "MemorySwapMax=0",
+          "CPUQuota=100%",
+          "TasksMax=128",
+          "RuntimeMaxSec=45",
+          "LimitFSIZE=1048576",
+          "LimitCORE=0",
+          "ProtectSystem=strict",
+          "ProtectHome=read-only",
+          "PrivateNetwork=yes",
+          "PrivateTmp=yes",
+          "NoNewPrivileges=yes",
+          "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+          "AmbientCapabilities=CAP_DAC_OVERRIDE",
+          "WorkingDirectory=/home/sol/workspace/jetstreamer",
+          "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts",
+          "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "NoExecPaths=/",
+          "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1",
+          "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "Environment=CARGO_HOME=/home/sol/.cargo",
+          "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+          "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+          "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        ],
+        "allowed_execution_paths": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+          "/usr/lib/x86_64-linux-gnu/libc.so.6",
+          "/usr/lib/x86_64-linux-gnu/libdl.so.2",
+          "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+          "/usr/lib/x86_64-linux-gnu/libm.so.6",
+          "/usr/lib/x86_64-linux-gnu/libpthread.so.0",
+          "/usr/lib/x86_64-linux-gnu/librt.so.1"
+        ],
+        "source_binding": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        }
+      }
+    },
+    "ORIGINAL-SOURCE-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ORIGINAL-SOURCE-SEAL-EXECUTION.json",
+        "sha256": "cbe4afc52f73104db8546a2a72ee8639dc7982e51a9e7853adb41a69f8226248"
+      },
+      "document": {
+        "code": 1,
+        "stdout": "",
+        "stderr": "error: invalid deployment member name \".cargo__config.toml\"\n"
+      }
+    },
+    "ORIGINAL-SOURCE-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ORIGINAL-SOURCE-SEAL-PLAN.json",
+        "sha256": "644a513fb38a275c68a79944244f6634a81e70a93fabaaa0c5777a840b4ac9b3"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v1",
+        "members": [
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.toml",
+            "name": "Cargo.toml",
+            "sha256": "b7dfcfbdc32102e2550049dd2cb3d992fb6f2b234e50c3c0164c8d1f7dccba78",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.lock",
+            "name": "Cargo.lock",
+            "sha256": "6b4bc2c0924e112806f1fdc6d73c0e3fa84c4655a72a42c479e4f20fcfefcc7d",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/.cargo/config.toml",
+            "name": ".cargo__config.toml",
+            "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/rust-toolchain.toml",
+            "name": "rust-toolchain.toml",
+            "sha256": "11c321f58f12a33cd9ac00964725f27c61722ed11933f5cca733c911a16d19c4",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/src/main.rs",
+            "name": "jetstreamer-r2__src__main.rs",
+            "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/Cargo.toml",
+            "name": "jetstreamer-r2__Cargo.toml",
+            "sha256": "28ffa3895e385d674b9e21598bab3c7c0ccda309f6b3f14e4d0a1f5417046ad9",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2-progressive/Cargo.toml",
+            "name": "jetstreamer-r2-progressive__Cargo.toml",
+            "sha256": "aca91e54e479f37500031b27b7229fb2b01e2867a78ff0862d0e0a6f173546c5",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-firehose/Cargo.toml",
+            "name": "jetstreamer-firehose__Cargo.toml",
+            "sha256": "e8c6ffa070dd46f7829812dd8ce1243ec330415c66585d64d7fd295279103c67",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon/Cargo.toml",
+            "name": "jetstreamer-horizon__Cargo.toml",
+            "sha256": "d4c9622701bcc7610ac13c6de690090b93ff73af1b2a455b0219147e2498153b",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon-observe/Cargo.toml",
+            "name": "jetstreamer-horizon-observe__Cargo.toml",
+            "sha256": "fa9fe0433ca9c710517a824013e09c008dcee1c0373ca32ce0b2ade394eb5673",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-node/Cargo.toml",
+            "name": "jetstreamer-node__Cargo.toml",
+            "sha256": "46cf6c7712844c7948192d151aac59827e91832e81187d479bca0de9c1f7df21",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-plugin/Cargo.toml",
+            "name": "jetstreamer-plugin__Cargo.toml",
+            "sha256": "8ef01e0ddcf3c978e57b5400bb91ff079168766f38957231377992f85f5e7580",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-utils/Cargo.toml",
+            "name": "jetstreamer-utils__Cargo.toml",
+            "sha256": "cb1b1cc834fb74f8c3f5e2a492d4d226e0ddcf52e27cd7d0b0c381c37e46ae5d",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "ORIGINAL-SOURCE-V2-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ORIGINAL-SOURCE-V2-SEAL-EXECUTION.json",
+        "sha256": "87b41e9a9a87c28b9a03f60904ce9c98431cfffe16c3e7bf8152e096b6611276"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2\",\"member_count\":13,\"outcome\":\"created\",\"plan_sha256\":\"183eb11b44041d36cd9658f42c246133c36e3a40191f07ef6aa1a378a4451f83\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "ORIGINAL-SOURCE-V2-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ORIGINAL-SOURCE-V2-SEAL-PLAN.json",
+        "sha256": "183eb11b44041d36cd9658f42c246133c36e3a40191f07ef6aa1a378a4451f83"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2",
+        "members": [
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.toml",
+            "name": "Cargo.toml",
+            "sha256": "b7dfcfbdc32102e2550049dd2cb3d992fb6f2b234e50c3c0164c8d1f7dccba78",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.lock",
+            "name": "Cargo.lock",
+            "sha256": "6b4bc2c0924e112806f1fdc6d73c0e3fa84c4655a72a42c479e4f20fcfefcc7d",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/.cargo/config.toml",
+            "name": "cargo-config.toml",
+            "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/rust-toolchain.toml",
+            "name": "rust-toolchain.toml",
+            "sha256": "11c321f58f12a33cd9ac00964725f27c61722ed11933f5cca733c911a16d19c4",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/src/main.rs",
+            "name": "jetstreamer-r2__src__main.rs",
+            "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/Cargo.toml",
+            "name": "jetstreamer-r2__Cargo.toml",
+            "sha256": "28ffa3895e385d674b9e21598bab3c7c0ccda309f6b3f14e4d0a1f5417046ad9",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2-progressive/Cargo.toml",
+            "name": "jetstreamer-r2-progressive__Cargo.toml",
+            "sha256": "aca91e54e479f37500031b27b7229fb2b01e2867a78ff0862d0e0a6f173546c5",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-firehose/Cargo.toml",
+            "name": "jetstreamer-firehose__Cargo.toml",
+            "sha256": "e8c6ffa070dd46f7829812dd8ce1243ec330415c66585d64d7fd295279103c67",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon/Cargo.toml",
+            "name": "jetstreamer-horizon__Cargo.toml",
+            "sha256": "d4c9622701bcc7610ac13c6de690090b93ff73af1b2a455b0219147e2498153b",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon-observe/Cargo.toml",
+            "name": "jetstreamer-horizon-observe__Cargo.toml",
+            "sha256": "fa9fe0433ca9c710517a824013e09c008dcee1c0373ca32ce0b2ade394eb5673",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-node/Cargo.toml",
+            "name": "jetstreamer-node__Cargo.toml",
+            "sha256": "46cf6c7712844c7948192d151aac59827e91832e81187d479bca0de9c1f7df21",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-plugin/Cargo.toml",
+            "name": "jetstreamer-plugin__Cargo.toml",
+            "sha256": "8ef01e0ddcf3c978e57b5400bb91ff079168766f38957231377992f85f5e7580",
+            "mode": 292
+          },
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-utils/Cargo.toml",
+            "name": "jetstreamer-utils__Cargo.toml",
+            "sha256": "cb1b1cc834fb74f8c3f5e2a492d4d226e0ddcf52e27cd7d0b0c381c37e46ae5d",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "ROOT_CACHED_BUILDSCRIPT_KERNEL_DENIAL.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CACHED_BUILDSCRIPT_KERNEL_DENIAL.json",
+        "sha256": "e6a72bcb6b3b2c56ad4a44ffd9a5a239b6840eeb3ae5a69dd9642d2fb3ced0ee"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-ORIGINAL-EXECUTION.json",
+          "sha256": "025de72a23d2423f41fda4d47bbfc2fabd4d2c535086cf64480ea29b408d4014"
+        },
+        "native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "0"
+        },
+        "exact_blocked_file": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build/serde-08d4201abb9a9f4a/build-script-build",
+          "sha256": "b0bef68755ed16bfb600d0939d14990442204246099ee1941f5ac4b6e1107013"
+        }
+      }
+    },
+    "ROOT_CACHED_BUILDSCRIPT_KERNEL_DENIAL_V2.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CACHED_BUILDSCRIPT_KERNEL_DENIAL_V2.json",
+        "sha256": "b99938ab690fe7a78653b891f8f56460f698a522e0b79606e41d21d1277a1bc3"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-V2-ORIGINAL-EXECUTION.json",
+          "sha256": "74da3925dab77d8980cf54c381be868a74bcd192d847fc788db938971cab7f60"
+        },
+        "native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "203"
+        },
+        "exact_blocked_file": {
+          "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build/serde-08d4201abb9a9f4a/build-script-build",
+          "sha256": "b0bef68755ed16bfb600d0939d14990442204246099ee1941f5ac4b6e1107013"
+        }
+      }
+    },
+    "ROOT_CARGO_CAPTURE_ACTUAL_OUTCOME_V2.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CARGO_CAPTURE_ACTUAL_OUTCOME_V2.json",
+        "sha256": "c2a29031cd9e28be8c11f513df4ccee940342b906107cd4de7c9dbad9cf6d4f5"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V2-ORIGINAL-EXECUTION.json",
+          "sha256": "91056ec3c8681f2b04fea251be6715e6fa1240b94231a6cad23b290d32d2f856"
+        },
+        "actual_returncode": 101,
+        "actual_wrapper_capture_count": 6,
+        "candidate_main_compilation_captures": 1,
+        "compiler_execution_authorized": false,
+        "artifact_provenance_qualified": false
+      }
+    },
+    "ROOT_CLOSED_UPLOADER_CARGO_INTERCEPT_V1_WORK_RETIREMENT_COMPLETE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_INTERCEPT_V1_WORK_RETIREMENT_COMPLETE.json",
+        "sha256": "03d7de0adcd7824ea8174cdd33a6c7bfeadbb4afbabb71f538756dbc1c673f7b"
+      },
+      "document": {
+        "intent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_INTERCEPT_V1_WORK_RETIREMENT_INTENT.json",
+          "sha256": "a3da762ee26943e972120f3a7dd2d5c7c8f29d1a70484923774060d04a68d822"
+        },
+        "physical_bytes_reclaimed": 24158208,
+        "filesystem_available_before_bytes": 6356746113024,
+        "filesystem_available_after_bytes": 6351131897856,
+        "DATA_promise_credit_bytes": 0,
+        "sources_receipts_all_sealed_runtimes_and_external_libraries_retained": true,
+        "completed_unix_seconds": 1794311508,
+        "no_remote_mutation": true
+      }
+    },
+    "ROOT_CLOSED_UPLOADER_CARGO_INTERCEPT_V1_WORK_RETIREMENT_INTENT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CLOSED_UPLOADER_CARGO_INTERCEPT_V1_WORK_RETIREMENT_INTENT.json",
+        "sha256": "a3da762ee26943e972120f3a7dd2d5c7c8f29d1a70484923774060d04a68d822"
+      },
+      "document": {
+        "schema": "horizon-closed-duplicate-metadata-compiler-output-retirement-v1",
+        "recorded_unix_seconds": 1794311496,
+        "files": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/build-tests",
+            "identity": [
+              64512,
+              110562958,
+              7319728,
+              1794311290451411660,
+              1794311290451411660
+            ],
+            "sha256": "9e74f26426b73f4fc587cf28cbb0af1549f579d3b90438b85aea0da9e8e73582",
+            "bytes": 7319728,
+            "physical_bytes": 7323648
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/clippy-production",
+            "identity": [
+              64512,
+              110563472,
+              4752024,
+              1794311291588418317,
+              1794311291589418323
+            ],
+            "sha256": "95c95c5f38f105718a08d47b0e465747ffb6e2a0bc0896dea55849a916d7f55d",
+            "bytes": 4752024,
+            "physical_bytes": 4755456
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/clippy-tests",
+            "identity": [
+              64512,
+              110563875,
+              7319784,
+              1794311292497423638,
+              1794311292498423644
+            ],
+            "sha256": "1937b5bf8f17c80fb2135897b7e95b95e88278a5d65e0ca0ef1737bfd176efac",
+            "bytes": 7319784,
+            "physical_bytes": 7323648
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/production",
+            "identity": [
+              64512,
+              110562836,
+              4752104,
+              1794311289601406682,
+              1794311289602406688
+            ],
+            "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+            "bytes": 4752104,
+            "physical_bytes": 4755456
+          }
+        ],
+        "units": {
+          "horizon-uploader-cargo-intercept-production-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-intercept-production-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-intercept-build-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-intercept-build-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-intercept-clippy-production-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-intercept-clippy-production-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-intercept-clippy-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-intercept-clippy-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          },
+          "horizon-uploader-cargo-intercept-ordinary-tests-20261110-v1.service": {
+            "Restart": "no",
+            "MainPID": "0",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-uploader-cargo-intercept-ordinary-tests-20261110-v1.service",
+            "OnSuccess": "",
+            "OnFailure": "",
+            "Triggers": "",
+            "TriggeredBy": "",
+            "LoadState": "not-found",
+            "ActiveState": "inactive",
+            "SubState": "dead",
+            "Job": ""
+          }
+        },
+        "retained_evidence": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ARTIFACT.json",
+            "sha256": "f0016f42df5280b5e591e1c313099ebdd7ad493f84e3ba39b3faa14792ded2a5"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_QUALIFIED_NATIVE_PENDING.json",
+            "sha256": "f699b2bcc61fe81e7d6dfb3e71bd7e0e036d101dee7f105645566214a5dfb9bc"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/SOURCE-SEAL-EXECUTION.json",
+            "sha256": "3b4fb9f85a85f59bbddf52d1f541c433daac4cd8ed305889df408684370252b8"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/RUNTIME-SEAL-EXECUTION.json",
+            "sha256": "6e08e981c44c9bb5346e7f9ae5727c0ce6860421c21117cae9d6352de13629c9"
+          },
+          {
+            "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+            "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/production-ORIGINAL-EXECUTION.json",
+            "sha256": "97d12ba836286ff8edd1511485ee351fe85507eacc2338b31d89ee000ac9627c"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "fe0f0b24be6948e66f00a7e173b9332ffba579da3faf53741ef0f21ca6fc604e"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+            "sha256": "6672b18ea61874f40eb758a2c7e4265dddfd4c333b5e8967996c7164bb09306e"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "b1561fe066d7c20430169bf6dd69dcdba02167ae4391036e43cbd537608c7f2b"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ordinary-tests-ORIGINAL-EXECUTION.json",
+            "sha256": "8cdcbbb1026a7619925e8de7615ca18d6e640e333e00c577e0987fdd1e79cab9"
+          }
+        ],
+        "existing_reference_scanner": {
+          "path": "/home/sol/workspace/jetstreamer/scripts/retire_historical_replay_scratch.py",
+          "sha256": "84e5c1b3e97c692f4771da2d369fd13f5d0bd7f7572ac2bb2234eb0799643ca5"
+        },
+        "all_required_sources_receipts_runtimes_and_external_library_graphs_retained": true,
+        "no_current_or_staged_consumer": true,
+        "complete_DATA_promise_credit_bytes": 0,
+        "archive_or_snapshot_files_selected": false,
+        "remote_mutations": false
+      }
+    },
+    "ROOT_GENUINE_CARGO_INVOCATION_OUTCOME_CORRECTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_GENUINE_CARGO_INVOCATION_OUTCOME_CORRECTION.json",
+        "sha256": "7e012e0a27f580dac70c34e1143f35befdf6d150d036bdd51338514ce1bf5c9d"
+      },
+      "document": {
+        "schema": "horizon-uploader-Cargo-capture-original-outcome-correction-v1",
+        "original_report": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_CARGO_CAPTURE_ACTUAL_OUTCOME_V2.json",
+          "sha256": "c2a29031cd9e28be8c11f513df4ccee940342b906107cd4de7c9dbad9cf6d4f5"
+        },
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/Cargo-main-capture-V2-ORIGINAL-EXECUTION.json",
+          "sha256": "91056ec3c8681f2b04fea251be6715e6fa1240b94231a6cad23b290d32d2f856"
+        },
+        "actual_native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "101",
+          "Id": "horizon-uploader-cargo-main-capture-20261110-v2.service",
+          "InvocationID": "8f92dbf500f54186b2dcddca6bbee3dd"
+        },
+        "actual_invocation_matched_wrapper_receipts": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761519.json",
+            "sha256": "d57418fc59cd78839b4060701e2ac11a255b419caa1ee40f2052042164c08a33"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761518.json",
+            "sha256": "86cc5a1ea158995d08bb3cacade9988ff0a7e5c1421d14f7484d6ce001707bd6"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761520.json",
+            "sha256": "32fd1d4a6fbc62a8ba25d67347b1547a415dea11cd8be75ebbb1dd06e073fc09"
+          }
+        ],
+        "actual_invocation_wrapper_capture_count": 3,
+        "actual_Cargo_main_compile_captures": 0,
+        "earlier_direct_compile_denial_control_is_not_Cargo_main_capture": true,
+        "actual_failure": "Cargo requested libc0.2.189 build_script_build; source-bound wrapper rejected its foreign cwd before executing a compiler. No uploader-main compiler recipe captured. Read-only private cache tracking warning was nonfatal.",
+        "compiler_or_buildscript_or_linker_executed": false,
+        "artifact_provenance_qualified": false,
+        "serial8_lease_booked": false,
+        "new_resource_credit_bytes": 0,
+        "next_action": "Diagnose frozen libc build-script fingerprint/profile mismatch using retained source; changed-source metadata qualification or separately admitted exact candidate reproduction, never compile missing dependencies as part of the capture."
+      }
+    },
+    "ROOT_METADATA_CARGO_TMPFS512_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_METADATA_CARGO_TMPFS512_BOOKING.json",
+        "sha256": "5d57142c1aebb3b387337c52b1b859de674ae7522617da4db7eef0a606439556"
+      },
+      "document": {
+        "parent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_NATIVE512_INTERCEPT_CONTROL_BOOKING.json",
+          "sha256": "d601cc4e322f9825313e03db129a43d8aee23f97480f43b5ceee54436796d946"
+        },
+        "same_serial_native_cap_bytes": 536870912,
+        "tmpfs_target_maximum_bytes": 100663296,
+        "private_cache_bytes": 684032,
+        "maximum_wrapper_receipts_bytes": 4194304,
+        "retained173_metadata_bytes": 67108864,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "all_frozen_sources_and_shared_target_untouched": true,
+        "compiler_buildscript_and_linker_execution_forbidden": true
+      }
+    },
+    "ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json",
+        "sha256": "cd749654e00a01b53089ae03c5da63456ef88b07e7cbbbb427e507b32f91c9f0"
+      },
+      "document": {
+        "parent_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "native_pool_bytes": 17179869184,
+        "all_committed_existing_native_bytes": 13757317120,
+        "one_serial_compiler_or_native_bytes": 536870912,
+        "total_native_with_callback_bytes": 14294188032,
+        "remaining_native_bytes": 2885681152,
+        "retained173_metadata_DATA_bytes": 67108864,
+        "actual_metadata_bytes_before": 38880247,
+        "new_maximum_artifact_bytes": 27262976,
+        "new_hard_memory_or_DATA_promise_bytes": 0,
+        "scope": "Four strict compilers/twelve tests and finite compiler-free Cargo interception wrapper qualification inside separate512MiB native16 callback. The wrapper never starts any process; Cargo target build scripts need separate kernel execution prohibition before any native capture. All historical native4.5,8control,guard256,OS64 and full16 retained; no extra8/ending/replay authority. Original cancelled profile48 and selected154 DATA ending remain consumed once. Future compiler source/sandbox/guard/booked lease still required."
+      }
+    },
+    "ROOT_NATIVE512_INTERCEPT_CONTROL_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_NATIVE512_INTERCEPT_CONTROL_BOOKING.json",
+        "sha256": "d601cc4e322f9825313e03db129a43d8aee23f97480f43b5ceee54436796d946"
+      },
+      "document": {
+        "parent_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "qualified_wrapper": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0"
+        },
+        "existing_native16_bytes": 17179869184,
+        "already_committed_native_bytes": 13757317120,
+        "separate_serial_callback_bytes": 536870912,
+        "total_native_during_control_bytes": 14294188032,
+        "retained173_metadata_DATA_bytes": 67108864,
+        "new_memory_promise_bytes": 0,
+        "new_DATA_promise_bytes": 0,
+        "serial8_reproduction_lease_booked": false,
+        "scope": "Finite metadata-only wrapper and kernel execution-denial controls. No actual compiler/build script/linker/Cargo execution authorized. All existing commitments retained."
+      }
+    },
+    "ROOT_NATIVE_INTERCEPT_AND_KERNEL_DENIAL_CONTROLS_PASSED.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_NATIVE_INTERCEPT_AND_KERNEL_DENIAL_CONTROLS_PASSED.json",
+        "sha256": "569625f6eb0a0a170b5d35e1153e60d746f055e2d1a19ad5fb81760588e7f830"
+      },
+      "document": {
+        "compiler_invoked": false,
+        "Cargo_invoked": false,
+        "build_script_invoked": false,
+        "version_and_target_probes_passed": true,
+        "kernel_denied_real_rustc_exec": true,
+        "actual_compile_denied_with86": true,
+        "normal512_callback_drained": true,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "serial8_lease_booked": false,
+        "artifact_provenance_qualified": false
+      }
+    },
+    "ROOT_ORIGINAL_KERNEL_DENIAL_DIAGNOSTIC_ASSERTION_CORRECTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_ORIGINAL_KERNEL_DENIAL_DIAGNOSTIC_ASSERTION_CORRECTION.json",
+        "sha256": "daa7a5e1d83afb858986c466f9634997971c78b02f012517086f4b73fea3ef0b"
+      },
+      "document": {
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/NATIVE-kernel-deny-rustc-ORIGINAL-EXECUTION.json",
+          "sha256": "150209d48dd1a1612f42a928ce407b5680274d740272feb9b8039972743935a0"
+        },
+        "actual_native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "NRestarts": "0",
+          "ExecMainStatus": "203",
+          "Id": "horizon-uploader-intercept-native-kernel-deny-rustc-20261110-v1.service",
+          "InvocationID": "0f5c0b4645d744cdb8f236ab1834495e"
+        },
+        "reason": "systemd-run reported status=203 without /EXEC suffix; original compiled process never ran. Correct assertion against exact original native203, no rerun or source/binary change.",
+        "actual_compiler_executed": false
+      }
+    },
+    "ROOT_QUALIFIED_NATIVE_PENDING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ROOT_QUALIFIED_NATIVE_PENDING.json",
+        "sha256": "f699b2bcc61fe81e7d6dfb3e71bd7e0e036d101dee7f105645566214a5dfb9bc"
+      },
+      "document": {
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 12,
+        "all_compiler_slots_drained": true,
+        "runtime": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0"
+        },
+        "active_extra_native_callback_bytes": 0,
+        "all_original_native_pool_allocations_retained": true,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "shared_future_ending_or_replay_admission_authorized": false
+      }
+    },
+    "RUNTIME-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/RUNTIME-SEAL-EXECUTION.json",
+        "sha256": "6e08e981c44c9bb5346e7f9ae5727c0ce6860421c21117cae9d6352de13629c9"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1\",\"member_count\":2,\"outcome\":\"created\",\"plan_sha256\":\"3af791eb02feeb1f7348673e091a68525de3a035d11f7227cd6711c70d9c6c9b\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "RUNTIME-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/RUNTIME-SEAL-PLAN.json",
+        "sha256": "3af791eb02feeb1f7348673e091a68525de3a035d11f7227cd6711c70d9c6c9b"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1",
+        "members": [
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/production",
+            "name": "wrapper",
+            "sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+            "mode": 365
+          },
+          {
+            "source": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ARTIFACT.json",
+            "name": "artifact-proof.json",
+            "sha256": "f0016f42df5280b5e591e1c313099ebdd7ad493f84e3ba39b3faa14792ded2a5",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "SOURCE-SEAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/SOURCE-SEAL-EXECUTION.json",
+        "sha256": "3b4fb9f85a85f59bbddf52d1f541c433daac4cd8ed305889df408684370252b8"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"destination\":\"/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1\",\"member_count\":1,\"outcome\":\"created\",\"plan_sha256\":\"d3285e022cd6b47a9be986d354e6558a9d9ba9dd5111bdb83dac1b3a2a20ac10\",\"publication_authorized\":false,\"r2_mutations\":false,\"remote_mutations\":false,\"replay_launch_authorized\":false,\"sealer_sha256\":\"e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3\"}\n",
+        "stderr": ""
+      }
+    },
+    "SOURCE-SEAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/SOURCE-SEAL-PLAN.json",
+        "sha256": "d3285e022cd6b47a9be986d354e6558a9d9ba9dd5111bdb83dac1b3a2a20ac10"
+      },
+      "document": {
+        "schema": "jetstreamer-sealed-deployment-plan-v1",
+        "destination": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1",
+        "members": [
+          {
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/cargo-intercept.rs",
+            "name": "main.rs",
+            "sha256": "d070c5c5ddabb8d72295c9c7791847eb21481833ce0f5e33df443c9da876a723",
+            "mode": 292
+          }
+        ]
+      }
+    },
+    "build-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/build-tests-ORIGINAL-ARGV.json",
+        "sha256": "2eff435314f6e4d7fe2f0bfb278ed878b978d75c510d431ec37fc90c1eae0c34"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-intercept-build-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_uploader_cargo_intercept",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/build-tests"
+      ]
+    },
+    "build-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "fe0f0b24be6948e66f00a7e173b9332ffba579da3faf53741ef0f21ca6fc604e"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-intercept-build-tests-20261110-v1.service; invocation ID: e38b0fae86cf469cba8c9ff50af1fbeb\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 789ms\nCPU time consumed: 1.411s\nMemory peak: 3.7M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "9cccdd4cef17aa4cf7a418c919b2c678593f8cf63aca0774678d44acb0dff766"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-intercept-clippy-production-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_uploader_cargo_intercept",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/clippy-production"
+      ]
+    },
+    "clippy-production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "6672b18ea61874f40eb758a2c7e4265dddfd4c333b5e8967996c7164bb09306e"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-intercept-clippy-production-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 948ms\nCPU time consumed: 1.659s\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-tests-ORIGINAL-ARGV.json",
+        "sha256": "6feb8da891cc0451c3a9dc6069841b2a3e3b78ddc1a0d21012bb70e6ba942ecb"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-intercept-clippy-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_uploader_cargo_intercept",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/clippy-tests"
+      ]
+    },
+    "clippy-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "b1561fe066d7c20430169bf6dd69dcdba02167ae4391036e43cbd537608c7f2b"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-intercept-clippy-tests-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 836ms\nCPU time consumed: 1.461s\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+      }
+    },
+    "kernel-deny-cached-buildscript-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-ORIGINAL-ARGV.json",
+        "sha256": "cb8dc11b946d5943ac173789241becb751697dfbb30575c55d1c985979afb4ae"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-kernel-deny-cached-buildscript-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=90",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "-p",
+        "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+        "-p",
+        "ExecStartPre=/usr/bin/cp -a --no-preserve=ownership /home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint /home/sol/workspace/jetstreamer/target/release/.fingerprint",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate",
+        "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build/serde-08d4201abb9a9f4a/build-script-build"
+      ]
+    },
+    "kernel-deny-cached-buildscript-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-ORIGINAL-EXECUTION.json",
+        "sha256": "025de72a23d2423f41fda4d47bbfc2fabd4d2c535086cf64480ea29b408d4014"
+      },
+      "document": {
+        "code": 1,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-kernel-deny-cached-buildscript-20261110-v1.service\n/usr/bin/cp: error while loading shared libraries: libselinux.so.1: failed to map segment from shared object\nFinished with result: exit-code\nService runtime: 45ms\nCPU time consumed: 43ms\nMemory peak: 1.6M\nMemory swap peak: 0B\n"
+      }
+    },
+    "kernel-deny-cached-buildscript-V2-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-V2-ORIGINAL-ARGV.json",
+        "sha256": "68b6b0f5121825621eb1fa5df7710b6f21dca57ab5068e7c0b37aadef4322a3c"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-kernel-deny-cached-buildscript-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=90",
+        "-p",
+        "LimitFSIZE=1048576",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "WorkingDirectory=/home/sol/workspace/jetstreamer",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__src__main.rs:/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+        "-p",
+        "NoExecPaths=/",
+        "-p",
+        "ExecPaths=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo /usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 /usr/lib/x86_64-linux-gnu/libc.so.6 /usr/lib/x86_64-linux-gnu/libdl.so.2 /usr/lib/x86_64-linux-gnu/libgcc_s.so.1 /usr/lib/x86_64-linux-gnu/libm.so.6 /usr/lib/x86_64-linux-gnu/libpthread.so.0 /usr/lib/x86_64-linux-gnu/librt.so.1 /usr/bin/cp /usr/lib/x86_64-linux-gnu/libselinux.so.1 /usr/lib/x86_64-linux-gnu/libacl.so.1.1.2302 /usr/lib/x86_64-linux-gnu/libattr.so.1.1.2502 /usr/lib/x86_64-linux-gnu/libpcre2-8.so.0.11.2",
+        "-p",
+        "Environment=RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "-p",
+        "Environment=RUSTC_WRAPPER=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+        "-p",
+        "Environment=CARGO_HOME=/home/sol/.cargo",
+        "-p",
+        "Environment=CARGO_TARGET_DIR=/home/sol/workspace/jetstreamer/target",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_SELF_SHA256=a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN=/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+        "-p",
+        "Environment=HORIZON_INTERCEPT_PLAN_SHA256=b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1",
+        "-p",
+        "TemporaryFileSystem=/home/sol/workspace/jetstreamer/target:rw,size=96M,mode=0700",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps:/home/sol/workspace/jetstreamer/target/release/deps",
+        "-p",
+        "BindReadOnlyPaths=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build:/home/sol/workspace/jetstreamer/target/release/build",
+        "-p",
+        "ExecStartPre=/usr/bin/cp -a --no-preserve=ownership /home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint /home/sol/workspace/jetstreamer/target/release/.fingerprint",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.toml:/home/sol/workspace/jetstreamer/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/Cargo.lock:/home/sol/workspace/jetstreamer/Cargo.lock",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/cargo-config.toml:/home/sol/workspace/jetstreamer/.cargo/config.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/rust-toolchain.toml:/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-r2-progressive__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-firehose__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-horizon-observe__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-node__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-plugin__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+        "-p",
+        "BindReadOnlyPaths=/usr/local/lib/jetstreamer/horizon-uploader-original-source-projection-20261110-v2/jetstreamer-utils__Cargo.toml:/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.global-cache:/home/sol/.cargo/.global-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache:/home/sol/.cargo/.package-cache",
+        "-p",
+        "BindPaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/cargo-private-cache/.package-cache-mutate:/home/sol/.cargo/.package-cache-mutate",
+        "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/build/serde-08d4201abb9a9f4a/build-script-build"
+      ]
+    },
+    "kernel-deny-cached-buildscript-V2-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/kernel-deny-cached-buildscript-V2-ORIGINAL-EXECUTION.json",
+        "sha256": "74da3925dab77d8980cf54c381be868a74bcd192d847fc788db938971cab7f60"
+      },
+      "document": {
+        "code": 203,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-kernel-deny-cached-buildscript-20261110-v2.service\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=203\nService runtime: 2.250s\nCPU time consumed: 1.104s\nMemory peak: 130.5M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ordinary-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ordinary-tests-ORIGINAL-ARGV.json",
+        "sha256": "c4bd9ef89260ee7d4f4e163e0e3aa8ec0538ad416f9ffc576ba209f98628412b"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-intercept-ordinary-tests-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/build-tests",
+        "--test-threads=1"
+      ]
+    },
+    "ordinary-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/ordinary-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "8cdcbbb1026a7619925e8de7615ca18d6e640e333e00c577e0987fdd1e79cab9"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "\nrunning 12 tests\ntest tests::arbitrary_credentials_are_never_recorded ... ok\ntest tests::changed_print_order_or_target_is_not_accepted ... ok\ntest tests::compiler_authority_cannot_be_added_by_plan ... ok\ntest tests::dependency_build_script_and_metadata_compiles_are_denied ... ok\ntest tests::duplicate_probe_cannot_hide_compile_permissions ... ok\ntest tests::forged_metadata_response_digest_is_rejected ... ok\ntest tests::inherited_workspace_wrapper_and_encoded_flags_are_rejected ... ok\ntest tests::injected_codegen_or_response_file_cannot_extend_a_probe ... ok\ntest tests::normal_uploader_compile_is_denied ... ok\ntest tests::only_two_exact_metadata_queries_can_succeed ... ok\ntest tests::stdin_is_bound_even_for_print_only_queries ... ok\ntest tests::wrong_rustc_or_package_cannot_be_captured_as_uploader ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "Running as unit: horizon-uploader-cargo-intercept-ordinary-tests-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 22ms\nCPU time consumed: 19ms\nMemory peak: 2.1M\nMemory swap peak: 0B\n"
+      }
+    },
+    "production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/production-ORIGINAL-ARGV.json",
+        "sha256": "8964de215a6ee06bee4af254763c3e3cfb4c1e00efa88be0df1ae4091bd016cf"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-uploader-cargo-intercept-production-20261110-v1",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_uploader_cargo_intercept",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-source-20261110-v1/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/work/production"
+      ]
+    },
+    "production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/production-ORIGINAL-EXECUTION.json",
+        "sha256": "97d12ba836286ff8edd1511485ee351fe85507eacc2338b31d89ee000ac9627c"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-uploader-cargo-intercept-production-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 954ms\nCPU time consumed: 1.668s\nMemory peak: 3.3M\nMemory swap peak: 0B\n"
+      }
+    }
+  },
+  "native_wrapper_receipts": {
+    "rustc-wrapper-760378.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-760378.json",
+        "sha256": "baa0c49f3cc041074133c736da3a4ad4d6bf04aaac2264e14bce9a0962068c74"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "-vV"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": false,
+        "compiler_invoked": false,
+        "exit_code": 0,
+        "invocation_id": "9480c9bce8ef4bccae2649c10097d4b4",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 760378,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": true,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    },
+    "rustc-wrapper-760390.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-760390.json",
+        "sha256": "ff6c4b0b4f3a14758ebd971212494138a28af616aa459d2e031970e3708041bb"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "-",
+          "--crate-name",
+          "___",
+          "--print=file-names",
+          "--crate-type",
+          "bin",
+          "--crate-type",
+          "rlib",
+          "--crate-type",
+          "dylib",
+          "--crate-type",
+          "cdylib",
+          "--crate-type",
+          "staticlib",
+          "--crate-type",
+          "proc-macro",
+          "--print=sysroot",
+          "--print=split-debuginfo",
+          "--print=crate-name",
+          "--print=cfg",
+          "-Wwarnings"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": false,
+        "compiler_invoked": false,
+        "exit_code": 0,
+        "invocation_id": "7edfbc14c8eb44e0b5ad60d0646dc1ab",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 760390,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": true,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    },
+    "rustc-wrapper-760399.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-760399.json",
+        "sha256": "8b429c3d951c8f4d9e72c848b7a55f072e2092476bb60df0abb003574a540029"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "--crate-name",
+          "jetstreamer_r2",
+          "jetstreamer-r2/src/main.rs",
+          "--crate-type",
+          "bin",
+          "--emit=link"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": true,
+        "compiler_invoked": false,
+        "exit_code": 86,
+        "invocation_id": "a423af883b71481a8c5db739920eef62",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 760399,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": false,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    },
+    "rustc-wrapper-761518.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761518.json",
+        "sha256": "86cc5a1ea158995d08bb3cacade9988ff0a7e5c1421d14f7484d6ce001707bd6"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "-vV"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": false,
+        "compiler_invoked": false,
+        "exit_code": 0,
+        "invocation_id": "8f92dbf500f54186b2dcddca6bbee3dd",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 761518,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": true,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "RUST_MIN_STACK": "67108864"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    },
+    "rustc-wrapper-761519.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761519.json",
+        "sha256": "d57418fc59cd78839b4060701e2ac11a255b419caa1ee40f2052042164c08a33"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "-",
+          "--crate-name",
+          "___",
+          "--print=file-names",
+          "--crate-type",
+          "bin",
+          "--crate-type",
+          "rlib",
+          "--crate-type",
+          "dylib",
+          "--crate-type",
+          "cdylib",
+          "--crate-type",
+          "staticlib",
+          "--crate-type",
+          "proc-macro",
+          "--print=sysroot",
+          "--print=split-debuginfo",
+          "--print=crate-name",
+          "--print=cfg",
+          "-Wwarnings"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": false,
+        "compiler_invoked": false,
+        "exit_code": 0,
+        "invocation_id": "8f92dbf500f54186b2dcddca6bbee3dd",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 761519,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": true,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "RUST_MIN_STACK": "67108864"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    },
+    "rustc-wrapper-761520.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-cargo-intercept-qa-v1/native-capture-receipts/rustc-wrapper-761520.json",
+        "sha256": "32fd1d4a6fbc62a8ba25d67347b1547a415dea11cd8be75ebbb1dd06e073fc09"
+      },
+      "document": {
+        "argv": [
+          "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "-vV"
+        ],
+        "artifact_provenance_qualified": false,
+        "build_script_invoked": false,
+        "cargo": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "sha256": "ff3022fcbd13b08434ea7afde9a0ef9d5b3f5c17b5fc7a40031be3ee000a6a24"
+        },
+        "compile_denied_before_execution": false,
+        "compiler_invoked": false,
+        "exit_code": 0,
+        "invocation_id": "8f92dbf500f54186b2dcddca6bbee3dd",
+        "linker_invoked": false,
+        "new_memory_promise_bytes": 0,
+        "owner": "/root",
+        "pid": 761520,
+        "plan": {
+          "path": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-plan-20261110-v1/plan.json",
+          "sha256": "b770c3e9617664463920d5cc6b989576a2b37465ccfca905457e288551cf51e1"
+        },
+        "pre_recorded_probe_response": true,
+        "replay_admission_authorized": false,
+        "rustc": {
+          "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+        },
+        "schema": "horizon-uploader-cargo-intercept-invocation-v1",
+        "selected_environment": {
+          "CARGO": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+          "CARGO_HOME": "/home/sol/.cargo",
+          "CARGO_TARGET_DIR": "/home/sol/workspace/jetstreamer/target",
+          "LANG": "C.UTF-8",
+          "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin",
+          "RUSTC": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTC_WRAPPER": "/usr/local/lib/jetstreamer/horizon-uploader-cargo-intercept-tools-20261110-v1/wrapper",
+          "RUST_MIN_STACK": "67108864"
+        },
+        "self_sha256": "a75c7d755b94b02d612a07112475030e934e45c080852b41d1cc324ebef899e0",
+        "source": {
+          "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+          "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d"
+        },
+        "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "working_directory": "/home/sol/workspace/jetstreamer"
+      }
+    }
+  },
+  "source_references": {
+    "SOURCE_INPUTS.json": {
+      "binding": {
+        "path": "/tmp/root-uploader-reproduction-source-20261110-v1/SOURCE_INPUTS.json",
+        "sha256": "0535771b81dc4799a175939e45bf046e92a2eac875c7f3a53b2b3ed11498b7d7"
+      },
+      "document": {
+        "source_only": true,
+        "artifact_provenance_claimed": false,
+        "rows": [
+          {
+            "repository_path": "Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "b7dfcfbdc32102e2550049dd2cb3d992fb6f2b234e50c3c0164c8d1f7dccba78",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/Cargo.toml",
+            "proposed_sealed_member": "Cargo.toml"
+          },
+          {
+            "repository_path": "Cargo.lock",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "6b4bc2c0924e112806f1fdc6d73c0e3fa84c4655a72a42c479e4f20fcfefcc7d",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/Cargo.lock",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/Cargo.lock",
+            "proposed_sealed_member": "Cargo.lock"
+          },
+          {
+            "repository_path": ".cargo/config.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/.cargo/config.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/.cargo/config.toml",
+            "proposed_sealed_member": ".cargo__config.toml"
+          },
+          {
+            "repository_path": "rust-toolchain.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "11c321f58f12a33cd9ac00964725f27c61722ed11933f5cca733c911a16d19c4",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/rust-toolchain.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+            "proposed_sealed_member": "rust-toolchain.toml"
+          },
+          {
+            "repository_path": "jetstreamer-r2/src/main.rs",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "4f008782bb85eaebbf93f1a66f5ccf7eb207918065e388642c39ad51fa9d275d",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/src/main.rs",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+            "proposed_sealed_member": "jetstreamer-r2__src__main.rs"
+          },
+          {
+            "repository_path": "jetstreamer-r2/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "28ffa3895e385d674b9e21598bab3c7c0ccda309f6b3f14e4d0a1f5417046ad9",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-r2__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-r2-progressive/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "aca91e54e479f37500031b27b7229fb2b01e2867a78ff0862d0e0a6f173546c5",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-r2-progressive/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-r2-progressive/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-r2-progressive__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-firehose/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "e8c6ffa070dd46f7829812dd8ce1243ec330415c66585d64d7fd295279103c67",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-firehose/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-firehose__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-horizon/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "d4c9622701bcc7610ac13c6de690090b93ff73af1b2a455b0219147e2498153b",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-horizon__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-horizon-observe/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "fa9fe0433ca9c710517a824013e09c008dcee1c0373ca32ce0b2ade394eb5673",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-horizon-observe/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-horizon-observe/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-horizon-observe__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-node/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "46cf6c7712844c7948192d151aac59827e91832e81187d479bca0de9c1f7df21",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-node/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-node/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-node__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-plugin/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "8ef01e0ddcf3c978e57b5400bb91ff079168766f38957231377992f85f5e7580",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-plugin/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-plugin/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-plugin__Cargo.toml"
+          },
+          {
+            "repository_path": "jetstreamer-utils/Cargo.toml",
+            "git_commit": "2c54449e42016750a1b37de74d668c2e96a1867e",
+            "sha256": "cb1b1cc834fb74f8c3f5e2a492d4d226e0ddcf52e27cd7d0b0c381c37e46ae5d",
+            "source": "/tmp/root-uploader-reproduction-source-20261110-v1/original-source/jetstreamer-utils/Cargo.toml",
+            "original_absolute_path": "/home/sol/workspace/jetstreamer/jetstreamer-utils/Cargo.toml",
+            "proposed_sealed_member": "jetstreamer-utils__Cargo.toml"
+          }
+        ]
+      }
+    },
+    "EXACT_PRERECORDED_PROBE_RESPONSES.json": {
+      "binding": {
+        "path": "/tmp/root-uploader-reproduction-source-20261110-v1/EXACT_PRERECORDED_PROBE_RESPONSES.json",
+        "sha256": "f2f7cb3ece9438a9cd6a569d272240562bd134f31d644af54ee6bbaf2d2ab65a"
+      },
+      "document": [
+        {
+          "name": "version-verbose",
+          "argv": [
+            "-vV"
+          ],
+          "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.0\nLLVM version: 22.1.8\n",
+          "stdout_sha256": "3975d062e234a9f3921955bf6ae5b90f5819df94fa825d057f76b34a35ed0f4d"
+        },
+        {
+          "name": "cargo-native-target-metadata",
+          "argv": [
+            "-",
+            "--crate-name",
+            "___",
+            "--print=file-names",
+            "--crate-type",
+            "bin",
+            "--crate-type",
+            "rlib",
+            "--crate-type",
+            "dylib",
+            "--crate-type",
+            "cdylib",
+            "--crate-type",
+            "staticlib",
+            "--crate-type",
+            "proc-macro",
+            "--print=sysroot",
+            "--print=split-debuginfo",
+            "--print=crate-name",
+            "--print=cfg",
+            "-Wwarnings"
+          ],
+          "stdin_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout": "___\nlib___.rlib\nlib___.so\nlib___.so\nlib___.a\nlib___.so\n/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu\noff\npacked\nunpacked\n___\ndebug_assertions\npanic=\"unwind\"\nproc_macro\ntarget_abi=\"\"\ntarget_arch=\"x86_64\"\ntarget_endian=\"little\"\ntarget_env=\"gnu\"\ntarget_family=\"unix\"\ntarget_feature=\"fxsr\"\ntarget_feature=\"sse\"\ntarget_feature=\"sse2\"\ntarget_has_atomic=\"16\"\ntarget_has_atomic=\"32\"\ntarget_has_atomic=\"64\"\ntarget_has_atomic=\"8\"\ntarget_has_atomic=\"ptr\"\ntarget_has_atomic_primitive_alignment=\"16\"\ntarget_has_atomic_primitive_alignment=\"32\"\ntarget_has_atomic_primitive_alignment=\"64\"\ntarget_has_atomic_primitive_alignment=\"8\"\ntarget_has_atomic_primitive_alignment=\"ptr\"\ntarget_os=\"linux\"\ntarget_pointer_width=\"64\"\ntarget_vendor=\"unknown\"\nunix\n",
+          "stdout_sha256": "05f7bc8fff5f7e110fb1e261b8b0d823e08650d1c7815793c79d2ab10c2e4988"
+        }
+      ]
+    },
+    "ORIGINAL_EXTERNS.json": {
+      "binding": {
+        "path": "/tmp/root-uploader-reproduction-source-20261110-v1/ORIGINAL_EXTERNS.json",
+        "sha256": "3f8504ef879f45b2fa100a198606e9833d09a731b49ea2c5804216dbc23b5714"
+      },
+      "document": {
+        "source_only": true,
+        "byte_hashes_inherited_from_parent_packet_not_requalified_here": true,
+        "dependencies": [
+          {
+            "crate": "aws_sdk_s3",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+            "expected_rlib_sha256": "8e6a6b8521eb6dba2cf25a89395f041a7aaa3eee6f489a1377cf3a2f7d698706",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libaws_sdk_s3-93f3d02a9b33ba1f.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/aws-sdk-s3-93f3d02a9b33ba1f",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "url",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/liburl-aab30bab24c3367b.rlib",
+            "expected_rlib_sha256": "10b2d034c839631c0f0b92cc26c9fac6832571123d67824312474a9479949c17",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/liburl-aab30bab24c3367b.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/url-aab30bab24c3367b",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "futures_util",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+            "expected_rlib_sha256": "cdf5788684ba5df71719fe761d3a2e9ff3be28953e4c09b21969ce0597bb3798",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libfutures_util-4ce61cb3cde45817.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/futures-util-4ce61cb3cde45817",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "serde",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde-c096c92dd15927d9.rlib",
+            "expected_rlib_sha256": "6f4d4eeef580cd9e681005701843117902cae2298b42e7358e3c7201d4c96cd3",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libserde-c096c92dd15927d9.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/serde-c096c92dd15927d9",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "md5",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+            "expected_rlib_sha256": "5cf4f62ffbbf4baa60bd760326bc38505a283438be4545f145310873006cd5fd",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/md-5-7ed6f069a8ec7c45",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "serde_json",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+            "expected_rlib_sha256": "e108e8541002aaabd1ec3e8e45fd57578f65cb24a9d47b1a88e004135e66de43",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/serde_json-4701be7eb60bc14f",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "tokio",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtokio-309aad71f7138ec5.rlib",
+            "expected_rlib_sha256": "cf96d2483a403c4f11ed5f277e9224cd03a472f853d20636c5c2517344c298b3",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libtokio-309aad71f7138ec5.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/tokio-309aad71f7138ec5",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "tempfile",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libtempfile-47898064045d0aed.rlib",
+            "expected_rlib_sha256": "58608490ce9dbf4cd455c8c528b5a916ef21d600274f00e99879f0c75d47811d",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libtempfile-47898064045d0aed.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/tempfile-47898064045d0aed",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "sha2",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-104d7c128ea151cf.rlib",
+            "expected_rlib_sha256": "f65fb521186d22bdb996286b2e7c306c5b6c2f0fe80652823e5f701c5549a864",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libsha2-104d7c128ea151cf.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/sha2-104d7c128ea151cf",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "aws_types",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libaws_types-917590190742fc65.rlib",
+            "expected_rlib_sha256": "da4308b1e33d0774a6496ecc088fcbf65eee461dec32a3e6303ec726caef23da",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libaws_types-917590190742fc65.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/aws-types-917590190742fc65",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "libc",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+            "expected_rlib_sha256": "ecc7a534b3a813e2cb51daed0355df7d79c1ae086c89a3640b74d71cd45e7744",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/liblibc-1353d01eceea9c4e.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/libc-1353d01eceea9c4e",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "base64",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+            "expected_rlib_sha256": "e5b685c1a1b11ab4d3ba0494d659fe2f1e181a1925a9850ed445c37ecb3845f9",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/base64-c8c2297b8bb1658f",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "anyhow",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "expected_rlib_sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/anyhow-7d758cdd889142f0",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "reqwest",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libreqwest-7041eaa0a4658599.rlib",
+            "expected_rlib_sha256": "cc060169e016f63724577093753a9e70fc53c70a484fad4fa3c016481628bfa8",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libreqwest-7041eaa0a4658599.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/reqwest-7041eaa0a4658599",
+            "frozen_fingerprint_directory_present": true
+          },
+          {
+            "crate": "aws_credential_types",
+            "frozen_rlib": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+            "expected_rlib_sha256": "cfca0355969a2eb5d70c984ad1e231098f53c582949f25f017bf4dc93c864171",
+            "original_extern": "/home/sol/workspace/jetstreamer/target/release/deps/libaws_credential_types-c80851adf6905535.rlib",
+            "frozen_fingerprint_directory": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/.fingerprint/aws-credential-types-c80851adf6905535",
+            "frozen_fingerprint_directory_present": true
+          }
+        ]
+      }
+    }
+  }
+}
