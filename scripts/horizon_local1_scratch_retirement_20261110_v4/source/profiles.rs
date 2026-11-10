@@ -1,0 +1,111 @@
+//! Immutable failed-local1 launch profiles. No discovery or wildcard retirement.
+use anyhow::{Context, Result};
+use std::path::PathBuf;
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct Profile {
+    pub epoch: u64,
+    pub local1_root: &'static str,
+    pub run: &'static str,
+    pub unit: &'static str,
+    pub iid: &'static str,
+    pub guard: &'static str,
+    pub pid: u64,
+    pub start_unix: u64,
+    pub start_monotonic_usecs: u64,
+    pub run_inode: u64,
+    pub scratch_inode: u64,
+    pub manifest_sha: &'static str,
+    pub fingerprint: &'static str,
+    pub native_sha: &'static str,
+    pub argv_sha: &'static str,
+    pub start_sha: &'static str,
+    pub failure_sha: &'static str,
+    pub terminal_sha: &'static str,
+}
+impl Profile {
+    pub fn package(&self) -> PathBuf {
+        format!(
+            "/usr/local/lib/jetstreamer/horizon-independent{}-singleton-package-20261109-v1",
+            self.epoch
+        )
+        .into()
+    }
+    pub fn out(&self) -> PathBuf {
+        format!(
+            "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch{}",
+            self.epoch
+        )
+        .into()
+    }
+    pub fn evidence(&self) -> PathBuf {
+        format!("/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local-launch-v1/epoch{}", self.epoch).into()
+    }
+}
+pub(crate) fn profile(epoch: u64) -> Result<&'static Profile> {
+    PROFILES
+        .iter()
+        .find(|p| p.epoch == epoch)
+        .context("only failed local1 epochs166–168 are authorized")
+}
+pub(crate) static PROFILES: [Profile; 3] = [
+    Profile {
+        epoch: 166,
+        local1_root: "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local1-20261110-v1",
+        run: "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local1-20261110-v1/private/destination-0c1400ee42ebf5db0c618183fe5be11d23cd899570a7e9f54a744bb820347e8b/work/root-cohort-166-166/run-1041050-1794337084697216744",
+        unit: "horizon-replacement-166-local1-20261110-v1.service",
+        iid: "4d29fdef77ef4760a4c8155e17874515",
+        guard: "horizon-guard-replacement-166-local1-20261110-v1",
+        pid: 1041050,
+        start_unix: 1794337081,
+        start_monotonic_usecs: 2683742435076,
+        run_inode: 103161241,
+        scratch_inode: 103161244,
+        manifest_sha: "c632ae8d95748f563d8c47db587afa9139b165298004c3fa6820332c4d89b6b4",
+        fingerprint: "sha256:08b441e89d7c9456aba5026ce206db8e08a14f96cb31cbad94a4a5c5e6e5622b",
+        native_sha: "3f3a65d917d793416116631e16d7eb035fa2c8b154c5ab60e00a8c15fff13211",
+        argv_sha: "94b7c531b1d01cd75f33d8671ed7b28ffeac74cd172268a54f9b9ef6e5ce28ab",
+        start_sha: "2dfb9687df34b7aea4efadc77fccf6e046ce6005a822b3e7c5dd38eeb1f660cb",
+        failure_sha: "2f631f24d725aaabf1417011ff49f4a661e53d3ca4769a7ea2edc19e21055df4",
+        terminal_sha: "6118e69e130cff8bb33d7cabc8df5b0b4a5dc0510dab2a02c1ee6734f2ec33b5",
+    },
+    Profile {
+        epoch: 167,
+        local1_root: "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local1-20261110-v1",
+        run: "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local1-20261110-v1/private/destination-ea40940e16dbea34f7bd3b7b056c9dc6e18dce195f8e0b74ee09f5032ba456f9/work/root-cohort-167-167/run-1041176-1794337109866939127",
+        unit: "horizon-replacement-167-local1-20261110-v1.service",
+        iid: "904a854037fa407d9342fed29fdc82e5",
+        guard: "horizon-guard-replacement-167-local1-20261110-v1",
+        pid: 1041176,
+        start_unix: 1794337106,
+        start_monotonic_usecs: 2683767636064,
+        run_inode: 103874618,
+        scratch_inode: 103874622,
+        manifest_sha: "125424a7fe2a84119a690e9e14a9ff1b0a7b32a5e32b3f3d896f95c0816940d5",
+        fingerprint: "sha256:3f28743306031e8a407f6f9302224101f05c70ac6db496e194c9dbc6b71c249b",
+        native_sha: "996379107ae761f066d52781e99a87002298f2741bb84b55f9e2c6b9393072f0",
+        argv_sha: "3b51ea266b54bc2acdf3141a5cc6e15d113fbeb4d45ed1b5a9043d012a1980ad",
+        start_sha: "a05cb76ae50696c0dc53ceb254e45ba079efe9d3a6b02467c9bbdba4c3e5ec35",
+        failure_sha: "6b4209307450ccd09f2d8f8b5ae3748dabe0769f3589e2bd5026117287b1aac8",
+        terminal_sha: "8baad5898d47ff98ef934bcab8e29a0fc2f315ac47ec6fdab167070e56b08965",
+    },
+    Profile {
+        epoch: 168,
+        local1_root: "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1",
+        run: "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/private/destination-9483912a9d981a5fe09c46a7f94b1df9d7b38b370f74af429a627a2dd540d348/work/root-cohort-168-168/run-1041273-1794337135449340557",
+        unit: "horizon-replacement-168-local1-20261110-v1.service",
+        iid: "fc9ba2f8227c4621bec7395a6356f9ab",
+        guard: "horizon-guard-replacement-168-local1-20261110-v1",
+        pid: 1041273,
+        start_unix: 1794337131,
+        start_monotonic_usecs: 2683793068101,
+        run_inode: 104005649,
+        scratch_inode: 104005652,
+        manifest_sha: "27b7a803c39d7cf42407e46bc9fe5033761f471f668545460a1bcbde007ee196",
+        fingerprint: "sha256:f5824f170325f9def8fe257fd542c9093f298419b1f558d4c35ddd1a6ae98011",
+        native_sha: "388c1cdc184267ec54a50f13bee59099e00918c16fea6c8e22a69e3ee0eaf55d",
+        argv_sha: "49a7b0cf647ddebe94895c62e07bdc833ba6ab07b19a0598eebeea172d09adc5",
+        start_sha: "f080072d89f290704fd91692add81edf11ab2ee0f330eabd6ec8a106675cc542",
+        failure_sha: "20a36d1b8460e7aeece4a32beabb1850e31dfe879692896f87e7c374b1a6c255",
+        terminal_sha: "105e2003809534dee0218541ea76ac981130f96f8b9bde543ea308bc0696cae4",
+    },
+];

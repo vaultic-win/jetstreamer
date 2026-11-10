@@ -1,0 +1,19 @@
+{
+  "schema": "horizon-local2-exact172-native-registration-v1",
+  "genuine_native_birth_registered": true,
+  "epoch": 172,
+  "unit": "horizon-qualify-172-replacement-local2-20261110-v1.service",
+  "invocation_id": "5359f45fc6df479ca62b17912f08e43d",
+  "main_pid": 1213582,
+  "original_start_unix_seconds": 1794350283,
+  "original_start_native": "Tue 2026-11-10 22:38:03 UTC",
+  "run_directory": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/replacement-local2-20261110-v1/private/destination-40aac42d26e05aa1c88eaf8c96d15b3d2d46fca14750b212dfea5976a0809c22/work/root-cohort-172-172/run-1213582-1794350286596650289",
+  "worker_executable": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/replacement-local2-20261110-v1/private/destination-40aac42d26e05aa1c88eaf8c96d15b3d2d46fca14750b212dfea5976a0809c22/work/root-cohort-172-172/run-1213582-1794350286596650289/scratch/.historical-runtime/jetstreamer-historical-parent-aluIrm/bound-worker/historical-worker",
+  "birth": {"path":"/home/sol/.jetstreamer-private/visible-primary-next-observer-230022-seven-local2-20261110-v1/NEW172_BIRTH_BINDING.json","sha256":"3a8bcfa2890c788124a24aac9b5d8c9403e8bbd67061892d2ceb54c93b81682e"},
+  "original_native": {"path":"/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/ACTUAL_PRODUCER_NATIVE.json","sha256":"d29ae0d1463af8d25f62412c07e89548fd5b4f644294ea44d3010ad0ad0b9f1f"},
+  "launch": {"path":"/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/ROOT_THREE_GUARDED_LOCAL_PRODUCER_LAUNCH_RESULT.json","sha256":"5c3e260f263a873b1d791283a1b46bc9dcc043b45f60321dcedf4e86e8ac1e09"},
+  "first_guard": {"path":"/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/GENUINE_FIRST_GUARD_PID1_TIMER_PROOF.json","sha256":"cb3d645c08dd539e652279a6506d5fe95480fa4e5ce7a7df871d9d26fb50720e"},
+  "admission": {"path":"/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/ACTUAL_REPLACEMENT_ADMISSION.json","sha256":"3d9e44f87cd56d65004f33356200f208f67c9f6a975e6eb0c6b558e0575ba906"},
+  "protection": {"path":"/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/ACTUAL_GUARD_PROTECTION.json","sha256":"34d5013b0c762039e2f43d86e4f2ffce7b9e5c1480508bc326c0326f225bdea5"},
+  "package_deployment_seal": {"path":"/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/deployment-seal-receipt.json","sha256":"c5bc4129c10f988b2b0b23379ada0be71c83aeb53cef5693014350916a7e4f59"}
+}

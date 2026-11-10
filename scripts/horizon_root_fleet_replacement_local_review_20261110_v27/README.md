@@ -1,0 +1,3 @@
+Supports all seven DATA guard handoffs and exact166 recovered original terminal state. Version26 refused native execution because its self-image path still named25; version27 corrects the pin. Four strict checks and96 tests passed; Native complete acceptance passed: all100 epoch rows,19 authenticated statuses, seven useful replays and seven original terminal histories. The first wrapper attempt omitted the handoff bindings by reading a reference rather than its authenticated proof; a separately retained corrected retry passed.
+
+The source package preserves all existing resource and integrity gates. It grants no new replay admission, archive publication, resource ending or remote mutation authority.

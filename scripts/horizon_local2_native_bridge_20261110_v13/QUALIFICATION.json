@@ -1,0 +1,44 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v13/local2-native-bridge-v13/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "4cc11be86fa2a937781813935e2f1ffaca4cfe9fbf1c069c4548eb66add0118e"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v13/local2-native-bridge-v13/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "8c81c6c3b2a14d72ce4c05850bcde8b09fb1741dd2be07bf16b09d8b64844411"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-native-bridge-source-20261110-v13/deployment-seal-receipt.json",
+    "sha256": "0fa6a86a4cd658272a45ec6b0f809ec49e5ab79110a736267a0e580d8e48aaf5"
+  },
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-native-bridge-20261110-v13/deployment-seal-receipt.json",
+    "sha256": "881124bc515acbf1dabc8abea102e6fb3ef4670fada6aaae36a5d46241c5ccc2"
+  },
+  "runtime_members": {
+    "capture": {
+      "path": "/usr/local/lib/jetstreamer/horizon-local2-native-bridge-20261110-v13/capture",
+      "sha256": "01c14691a7d42d27562b414e8959be80f442c5d408865d846c6106ec9ca5faa2"
+    }
+  },
+  "actual_ordinary_test_count": 61,
+  "published_source_sha256": {
+    "main.rs": "6ef4015aaec95d0f57364e01045d39597a90a46d4119501de0df2de5a6651fd1",
+    "supplement.rs": "b933126fac5e5cce6f60342230d390b80eb67e28e34cee68b52ee54a8134935e",
+    "sixth.rs": "b8f1675400ba7bdb1a754e249734a3e7e08084084c2d4a6886832b3a40dac63f",
+    "seventh.rs": "0a12bc1be15272972201c9491bd33ef1625f1d581a9186ccd49a5063a20f031f",
+    "guard_handoff.rs": "f291d3aac0289d8ad885e69a60c2b7ecda167cd85d4acdef1463a5e4903299f1",
+    "data_guard_reader.rs": "33726508799f263fd786b9c0cd983a6ab0bb12090b4f18a0ae12bd395fbc8776",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "epoch172-pins.json": "c68b771840da61fe0888ad9d63934d165bad77b5254e5f361dd672ae91f3ef08",
+    "guard-handoffs.json": "0a663a8f74e4ca14905a39d171ed1cae96871e79ad646faadd685c2e41474fe5"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "remote_mutations": false,
+  "actual_native172_acceptance": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v13/local2-native-bridge-v13/ROOT_ACTUAL172_NATIVE_CAPTURE_ACCEPTED.json",
+    "sha256": "28959760e6b666c9f94b97149bdc7ab9f28b02fb287d7547a0bd0842fc645546"
+  }
+}

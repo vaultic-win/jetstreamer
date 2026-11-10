@@ -1,0 +1,37 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/data-guard-handoff-operator-qualification-20261110-v3/data-guard-handoff-operator-v3/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "53397f1d3d7ee54465820cd4db05f63b319e6eec5d157c39874a5131b3880ad7"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/data-guard-handoff-operator-qualification-20261110-v3/data-guard-handoff-operator-v3/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "e46666f8725bd852fb27b1e2a3ea5491e2e1eba3c1301a42ba30177c2f0aa264"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-handoff-operator-source-20261110-v3/deployment-seal-receipt.json",
+    "sha256": "6a99fd447ea4ba33f5e898c83d2ac015ac4203442e1d015e2a22c9435738746c"
+  },
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-handoff-operator-20261110-v3/deployment-seal-receipt.json",
+    "sha256": "e47005df65cdf6974ed32d8c9ff4720a359c47f2b4572f3519b7142403705548"
+  },
+  "runtime_members": {
+    "handoff": {
+      "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-handoff-operator-20261110-v3/handoff",
+      "sha256": "a31fd31b6cf776128235c6a8e998380aeb0fa37a4079b7c2caaee3515d39d020"
+    }
+  },
+  "actual_ordinary_test_count": 14,
+  "published_source_sha256": {
+    "main.rs": "5f7fda24cdbc20bb8af35fd8892872e89be475d03e08b2841e7db628e7d4f2a5",
+    "data_guard_reader.rs": "33726508799f263fd786b9c0cd983a6ab0bb12090b4f18a0ae12bd395fbc8776",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "registration-binding.json": "2e9dc2ed3b6e3e99c2317342922ff4abbf00dcbe6f0b6261b056843cd8bf32d8",
+    "targets.json": "1423fe84c7f3e2900dbe300daa76a8d4123cc212f6553901ffe249bdb693d85e"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "remote_mutations": false,
+  "actual_handoff_results_recorded_by_source_publication": false
+}

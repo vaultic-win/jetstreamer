@@ -1,0 +1,8 @@
+{
+  "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-registration-20261110-v5/registration.json",
+  "sha256": "a4f462ac890f310a8b70c13051756ae9f7580a12fc9fdcb15185a1b1c412b62b",
+  "deployment_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-data-guard-registration-20261110-v5/deployment-seal-receipt.json",
+    "sha256": "099471d5b1939b5e0dd0cc069441af2229c1750d6b44dc1dcf08a0dc1a8f487c"
+  }
+}

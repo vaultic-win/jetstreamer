@@ -1,0 +1,38 @@
+{
+  "four_strict_and_fixture_result": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v14/local2-native-bridge-v14/ROOT_FOUR_STRICT_CONFIGURATIONS_AND_FIXTURES_PASSED.json",
+    "sha256": "9facbb6c206529494691ce04bf809ebc46c5ad9928a5501012ef0538f7578748"
+  },
+  "source_graph_freeze": {
+    "path": "/var/lib/jetstreamer/local2-native-bridge-qualification-20261110-v14/local2-native-bridge-v14/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "4f03731ff028496cd01313c3a82fba24f83f513d06fe8b8bf4b3664c45342c0b"
+  },
+  "source_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-native-bridge-source-20261110-v14/deployment-seal-receipt.json",
+    "sha256": "8e7a59b68a52fa468fab7d423b01db48861896cfa557d1d03106ec5721e9f05a"
+  },
+  "actual_ordinary_test_count": 65,
+  "published_source_sha256": {
+    "main.rs": "f9a8946ec3e7fda792376ad76c7d279b2247e69245981686c48b679272c8ce64",
+    "supplement.rs": "b933126fac5e5cce6f60342230d390b80eb67e28e34cee68b52ee54a8134935e",
+    "sixth.rs": "b8f1675400ba7bdb1a754e249734a3e7e08084084c2d4a6886832b3a40dac63f",
+    "seventh.rs": "0a12bc1be15272972201c9491bd33ef1625f1d581a9186ccd49a5063a20f031f",
+    "guard_handoff.rs": "a5c77821c72fdddfe29de3dcd4af195ce7bed06ddec844af34e99ebd2dbcde36",
+    "data_guard_reader.rs": "9462ae6dba8588a8424e0f74f0f0c70e45d5e7ef12fc81e2ed2c4090171c4886",
+    "interrupted_recovery.rs": "537f3d120a76373d1eeec3e4f36984c6131b4ace02058c82ae28d8c96206b3c7",
+    "data-guard-registrations.json": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99",
+    "epoch172-pins.json": "c68b771840da61fe0888ad9d63934d165bad77b5254e5f361dd672ae91f3ef08",
+    "guard-handoffs.json": "0a663a8f74e4ca14905a39d171ed1cae96871e79ad646faadd685c2e41474fe5"
+  },
+  "replay_launch_authorized": false,
+  "archive_publication_authorized": false,
+  "resource_credit_bytes": 0,
+  "runtime_normal_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local2-native-bridge-20261110-v14/deployment-seal-receipt.json",
+    "sha256": "da90ad20adcb8d0fd4f56e4f272e2ff18b8b4a18e454590b9546c3351d9c11f4"
+  },
+  "actual_native_guards7_acceptance": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-2330-seven-DATA-retry1-20261110-v27/CURRENT-GUARD-ORIGINAL-EXECUTION.json",
+    "sha256": "62dcfa50882ad7896ce2d05d22bf8ff824e0c060c84a03dbbe9aba46063dfa98"
+  }
+}
