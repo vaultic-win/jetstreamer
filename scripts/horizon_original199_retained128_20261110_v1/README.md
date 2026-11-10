@@ -1,0 +1,11 @@
+# Original199 retained DATA reduced to 128 GiB
+
+This distinct ending reduces the terminal original199 run's remaining future DATA commitment from 448 GiB to 128 GiB. It binds the already selected first 320 GiB ending, retains the raw 768 GiB history, and ends an additional 320 GiB exactly once. The genuine closed-tree census remains 17 entries, 101,011,119,148 apparent bytes and 101,011,263,488 allocated bytes. The new allowance retains 120 GiB for that payload and 8 GiB for external metadata and guards.
+
+Every file, the original controller and directory FD9, quarantine, guard limits and producer identities remain intact. Physical retirement is zero. The original producer must never restart; replacement replay needs a fresh admission. Root's complete DATA authority becomes 6,263,929,913,138 bytes; hard memory promises stay at 720,061,083,648 bytes. Existing guard floors require a separate qualified handoff before relying on the new accounting for admission.
+
+The Rust tool reuses the qualified parent library's scoped source, state, native, queue, process-reference and directory-anchor checks. It authenticates the complete six-owner fleet, both background owners and the selected first ending's real ancestry. It performs two no-follow closed-tree scans between independent scoped censuses, rejects changing or unsafe files, and preserves every original source gate.
+
+V1 passed four compiler configurations, eight tests and its genuine native check. The manual wrapper then rejected systemd's removal of that completed check's empty cgroup, before any ending was attempted. V2 retains the exact successful, installed invocation and its original 900-second check clock, accepting an absent cgroup only with that native proof; a present cgroup must be empty. Four compiler configurations, nine tests and the genuine V2 native ending passed. It fsyncs a separate once-only intent before the ending receipt. Root selected that ending only after both auxiliary scopes drained.
+
+`source/check-v1.rs` preserves the actual first check image. `source/check-end-v2.rs` contains the qualified ending and cgroup correction. `QUALIFICATION.json` binds their compiler, native, incident, drain and separate Root selection evidence. This grants no Frame, full Reader, archive, remote mutation or replay authority.

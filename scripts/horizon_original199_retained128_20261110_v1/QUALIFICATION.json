@@ -1,0 +1,85 @@
+{
+  "schema": "horizon-original199-retained128-qualified-source-v1",
+  "source": {
+    "check-v1.rs": "29ffc18c2a2acc072cb653e4e3a49da59605fb377c9b79fb02aad30cab81d531",
+    "check-end-v2.rs": "4ceb36c123f0c80f1a99b07405dc1b99a04fcf76e5200325d9daa03e78c461d9"
+  },
+  "v1_four_compilers_passed": true,
+  "v1_ordinary_tests_passed": 8,
+  "v1_genuine_native_check_passed": true,
+  "v2_four_compilers_passed": true,
+  "v2_ordinary_tests_passed": 9,
+  "v2_genuine_native_ending_passed_and_drained": true,
+  "raw_original_DATA_bytes": 824633720832,
+  "previous_effective_retained_DATA_bytes": 481036337152,
+  "effective_retained_DATA_bytes": 137438953472,
+  "additional_ended_unused_future_DATA_bytes": 343597383680,
+  "first_ending_reapplied_bytes": 0,
+  "cumulative_ended_unused_future_DATA_bytes": 687194767360,
+  "physical_retirement_bytes": 0,
+  "complete_DATA_bytes": 6263929913138,
+  "complete_projected_memory_bytes": 720061083648,
+  "new_replay_admission_authorized": false,
+  "receipts": [
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V1-clippy-prod-ORIGINAL-EXECUTION.json",
+      "sha256": "408e1b09ea30de1cb27e54be7dabe0f279c508e363245fade8b3c26a448cdf7d"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V1-clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "4d528c919648378ca494a93bc814a78dc8143fa69d3bf6fd5fb525c9cae4de29"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V1-test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "2b1c706109ba29e2404f9031432a2a9c0cb22bbc3d635088c3624af33dbf0851"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V1-release-ORIGINAL-EXECUTION.json",
+      "sha256": "df76d93d6d8a2f7d747c9a50883bfc5fc3aafbae501bf98f8940155680bff4e6"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V1-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "15bbd0373bc39b50b192af6d06a9d3011eb217b4bbdfd746769a251f731c0e64"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V2-clippy-prod-ORIGINAL-EXECUTION.json",
+      "sha256": "915e94e8dc8b4aba372edb7ff197202402d282cd4ab299cd3fbc5df979463e52"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V2-clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "20ca703640c3ea97fb1d3cb6168049fd29f476462bafacfa117cb5a257711348"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V2-test-build-ORIGINAL-EXECUTION.json",
+      "sha256": "26ded0d0e7dc476955de8bdccff11b5078bdf90e5d05569fa4aae772363c9156"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V2-release-ORIGINAL-EXECUTION.json",
+      "sha256": "085d9856545ff1d5cb27f9e95f692da3d5224ab2dcb04e6c103e3fa838e29e67"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ORIGINAL199-RETAINED128-V2-ORDINARY-ORIGINAL-EXECUTION.json",
+      "sha256": "05f5c12aa813e966aa2241a261b7028cdc93b5fb446db5e144739694c2b4b97e"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ACTUAL_ORIGINAL199_RETAINED128_NATIVE_CHECK.json",
+      "sha256": "8d0bcba35f8199bff40805c3ca1dda35fdeb2b37c55ccd7e325930de9914b80a"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_RETAINED128_WRAPPER_CGROUP_ABSENCE_INCIDENT.json",
+      "sha256": "16400583b1f67206e6e289e2da103eb48d253951d57ba2b0f582fafa574320d7"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_SECOND320_FUTURE_DATA_ENDED_ONCE.json",
+      "sha256": "ec5cbfad84e88cff699da3b83d55059f2496965a1f87f560a908f202c77f73cf"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ORIGINAL199_RETAINED128_CHECK_END_PASSED_AND_DRAINED.json",
+      "sha256": "4d8bac9cc912665d05346da8d60884db3f9280ddfd2fccd80ee9b5b3c08908a1"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_ORIGINAL199_SECOND320_RETAINED128_SELECTED_CURRENT_AUTHORITY.json",
+      "sha256": "6322984b5ca4602241849ab3e469d84a7a048c7720704d8c6d3687137d44880e"
+    }
+  ]
+}
