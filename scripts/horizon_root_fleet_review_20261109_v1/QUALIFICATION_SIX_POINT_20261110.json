@@ -1,0 +1,48 @@
+{
+  "schema": "horizon-Root-six-point-review-compiler-qualified-source-v1",
+  "source": {
+    "main.rs": "11882b3bffbf82cbbd632e9b60072de856e776ed3d4d23a9ac002cf09263c0f2",
+    "memory_target.rs": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
+  },
+  "four_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 28,
+  "native_explicit_six_point_review_pending": true,
+  "proven_operating_point_remains": 5,
+  "earliest_matching_six_window": [
+    "2026-11-10T01:30:22Z",
+    "2026-11-10T02:00:22Z"
+  ],
+  "new_resource_observations": false,
+  "additional_memory_or_DATA_promises_bytes": 0,
+  "replay_admission_authorized": false,
+  "receipts": [
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V7_CONTROL_CALLBACK_QA_DRAINED.json",
+      "sha256": "6693c8ffd1b38fa181a935959ea9d9b053fdac60551aa359063673e0a2f3d79a"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V7_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json",
+      "sha256": "33d10f3b4505871743c17d6a7b9f7c6952d9b06291f07f6ffec1b4014f46673c"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/production-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "abf9d0ed749230497e6ba391e7d8f2c16704f3237365ad643448e1c4876061c6"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/build-tests-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "cd542335bfcc1d4e0231641791dd3e11735ec1aebf789deecf15c02f9ac26145"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-production-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "418bd272bff1a2555f7a30dddc61c880843825ce791051e156d1079c2e1c06e9"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/clippy-tests-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "3805b361af39bfab045e8f590bfa1d5f41c5d6f1b6c8d539121796d6c984d2dd"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/SANDBOXED-TESTS-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "2feb2ca4d7ff9fbfcd3517f825b0ba5720e56f07326dd8e35e6b979caa9b9482"
+    }
+  ]
+}

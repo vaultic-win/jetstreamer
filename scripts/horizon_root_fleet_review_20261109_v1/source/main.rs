@@ -11,7 +11,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 mod memory_target;
 type R<T> = Result<T, Box<dyn std::error::Error>>;
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261109-v4/review";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-root-fleet-operational-review-tools-20261110-v5/review";
 const NOFOLLOW: i32 = 0x20000;
 const CLOEXEC: i32 = 0x80000;
 const FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainStatus,ControlGroup,Type,Job";
@@ -127,7 +127,8 @@ fn selected_operating_count(previous: u64, point: &Value) -> R<u64> {
     let count=n(point,"proven_replay_count")?;
     let four=point["schema"]=="horizon-Root-expanded-standard-four-lane-operating-review-v1" && count==4 && point["whole_four_owner_window_seconds"]==1800;
     let five=point["schema"]=="horizon-Root-expanded-standard-five-lane-operating-review-v1" && count==5 && point["whole_five_owner_window_seconds"]==1800 && point["new_resource_observations"]==false;
-    need((four||five) && point["owner"]=="/root" && point["primary_thread"]=="01a1af2a-9ce8-76a2-8939-b2112bd38f53" && point["explicit_Root_operating_point_review"]==true && point["replay_admission_authorized"]==false && count>=previous && count<=previous.checked_add(1).ok_or("count overflow")? && point["full_original_owner_and_worker_sets_unchanged"]==true && point["hard_memory_limit_and_OOM_delta_zero"]==true,"qualified explicit four/five-lane operating review required")?;
+    let six=point["schema"]=="horizon-Root-expanded-standard-six-lane-operating-review-v1" && count==6 && point["whole_six_owner_window_seconds"]==1800 && point["new_resource_observations"]==false;
+    need((four||five||six) && point["owner"]=="/root" && point["primary_thread"]=="01a1af2a-9ce8-76a2-8939-b2112bd38f53" && point["explicit_Root_operating_point_review"]==true && point["replay_admission_authorized"]==false && count>=previous && count<=previous.checked_add(1).ok_or("count overflow")? && point["full_original_owner_and_worker_sets_unchanged"]==true && point["hard_memory_limit_and_OOM_delta_zero"]==true,"qualified explicit four/five/six-lane operating review required")?;
     Ok(count)
 }
 fn clean_five_window(current:&Value, previous:&Value, complete_data:u64) -> R<()> {
@@ -143,6 +144,22 @@ fn clean_five_window(current:&Value, previous:&Value, complete_data:u64) -> R<()
         let delta=&row["cross_sample"]["producer_cgroup_counter_delta"];
         for key in ["memory_events.max","memory_events.oom","memory_events.oom_kill","memory_events.oom_group_kill"] {need(delta[key]==0,"whole-five hard memory/OOM event")?;}
         need(row["worker_after"]["matching_workers"]==1 && row["worker_after"]["executable_beneath_bound_scratch"]==true && n(&row["worker_after"],"vmas")?<3_500_000,"whole-five worker/VMA stop mismatch")?;
+    }
+    Ok(())
+}
+fn clean_six_window(current:&Value, previous:&Value, complete_data:u64) -> R<()> {
+    let rows=current["replays"].as_array().ok_or("six current rows")?;
+    need(rows.len()==6 && previous["replays"].as_array().is_some_and(|r|r.len()==6) && observer_owner_signatures(current)?==observer_owner_signatures(previous)?,"exact matching whole-six owner window required")?;
+    need(current["cadence"]["routine_minimum_interval_enforced"]==true && current["cadence"]["observed_interval_seconds"]==1800 && n(&current["filesystem"],"conservative_available_bytes")?>=complete_data,"whole-six routine cadence or complete DATA floor failed")?;
+    let pressure=&current["host_global_pressure"]["cross_sample"];
+    need(pressure["status"]=="observed","whole-six host pressure missing")?;
+    let elapsed=n(pressure,"elapsed_millis")?.checked_mul(1000).ok_or("pressure elapsed overflow")?;
+    need(elapsed>0 && n(&pressure["counter_delta_usec"],"memory.full_total_usec")?<=elapsed/200,"host full memory pressure exceeds conservative0.5percent operating review bound")?;
+    for row in rows {
+        let work=&row["useful_work"];need(row["invocation_binding_stable"]==true && work["counter_resets"]==0 && work["sufficient_for_rates"]==true && work["transaction_delta"].as_u64().is_some_and(|v|v>0),"whole-six useful transaction window missing/reset")?;
+        let delta=&row["cross_sample"]["producer_cgroup_counter_delta"];
+        for key in ["memory_events.max","memory_events.oom","memory_events.oom_kill","memory_events.oom_group_kill"] {need(delta[key]==0,"whole-six hard memory/OOM event")?;}
+        need(row["worker_after"]["matching_workers"]==1 && row["worker_after"]["executable_beneath_bound_scratch"]==true && n(&row["worker_after"],"vmas")?<3_500_000,"whole-six worker/VMA stop mismatch")?;
     }
     Ok(())
 }
@@ -278,11 +295,11 @@ fn run() -> R<()> {
     let point_owners=point["current_native_producers"].as_object().ok_or("operating owner census")?;need(point_owners.len() as u64==selected_count,"operating owner census count")?;
     for(epoch,unit)in point_owners {let e=epoch.parse::<u64>()?;let expected=json!({"epoch":e,"unit":unit["Id"],"invocation_id":unit["InvocationID"],"main_pid":unit["MainPID"]});for sample in [&point_before,&point_now] {let r=sample["replays"].as_array().ok_or("operating rows")?.iter().find(|x|x["range"]==epoch.as_str()).ok_or("operating row absent")?;owner_observation(r,&expected)?;}}
     for g in point["fresh_genuine_guards"].as_array().ok_or("operating guard census")? {let sample=bound(&g["receipt"])?;need(sample["trip_reason"].is_null() && sample["producer_stop_enabled"]==true && sample["guard_sha256"]=="35dbd4826c8947f38d50dff049345e1c3d62450eb85e41e94e326880e1898fbc","operating guard proof changed")?;}
-    if selected_count==5 {
+    if selected_count==5 || selected_count==6 {
         let authority=bound(&point["complete_resource_authority"])?;
-        clean_five_window(&point_now,&point_before,n(&authority,"complete_DATA_bytes")?)?;
+        if selected_count==5 {clean_five_window(&point_now,&point_before,n(&authority,"complete_DATA_bytes")?)?;} else {clean_six_window(&point_now,&point_before,n(&authority,"complete_DATA_bytes")?)?;}
         let guards=point["fresh_genuine_guards"].as_array().ok_or("five genuine guards")?;
-        need(guards.len()==5,"whole-five genuine guard census")?;
+        need(guards.len() as u64==selected_count,"complete expanded genuine guard census")?;
         let mut epochs=BTreeSet::new();
         for guard in guards {let epoch=n(guard,"epoch")?;need(epochs.insert(epoch),"duplicate guard epoch")?;let owner=point_owners.get(&epoch.to_string()).ok_or("guard owner absent")?;let receipt=bound(&guard["receipt"])?;need(receipt["producer_invocation_id"]==owner["InvocationID"] && receipt["root_physical_observation_error"].is_null() && receipt["worker_observation_error"].is_null() && guard["timer"]["ActiveState"]=="active" && guard["timer"]["SubState"]=="waiting" && guard["native"]["Result"]=="success" && guard["native"]["ExecMainStatus"]=="0" && guard["native"]["MainPID"]=="0" && guard["native"]["ControlPID"]=="0","whole-five genuine guard/timer proof")?;}
     }
@@ -361,5 +378,12 @@ mod tests {
         let o=clean_fixture();assert!(clean_five_window(&o,&o,100).is_ok());assert!(clean_five_window(&o,&o,101).is_err());let mut b=o.clone();b["replays"][0]["cross_sample"]["producer_cgroup_counter_delta"]["memory_events.oom"]=json!(1);assert!(clean_five_window(&b,&o,100).is_err());let mut b=o.clone();b["replays"][4]["useful_work"]["counter_resets"]=json!(1);assert!(clean_five_window(&b,&o,100).is_err());let mut b=o.clone();b["host_global_pressure"]["cross_sample"]["counter_delta_usec"]["memory.full_total_usec"]=json!(10_000_000);assert!(clean_five_window(&b,&o,100).is_err());
     }
     #[test] fn clean_five_window_rejects_replacement_and_vma_stop() {let o=clean_fixture();let mut b=o.clone();b["replays"][4]["worker_after"]["pid"]=json!(99);assert!(clean_five_window(&b,&o,100).is_err());let mut b=o.clone();b["replays"][0]["worker_after"]["vmas"]=json!(3_500_000);assert!(clean_five_window(&b,&o,100).is_err());}
+
+    fn six_point()->Value {json!({"schema":"horizon-Root-expanded-standard-six-lane-operating-review-v1","owner":"/root","primary_thread":"01a1af2a-9ce8-76a2-8939-b2112bd38f53","explicit_Root_operating_point_review":true,"replay_admission_authorized":false,"proven_replay_count":6,"whole_six_owner_window_seconds":1800,"new_resource_observations":false,"full_original_owner_and_worker_sets_unchanged":true,"hard_memory_limit_and_OOM_delta_zero":true})}
+    fn clean_six_fixture()->Value {let mut o=clean_fixture();let mut sixth=o["replays"][0].clone();sixth["range"]=json!("171");sixth["worker_after"]["pid"]=json!(7);o["replays"].as_array_mut().unwrap().push(sixth);o}
+    #[test]fn six_point_requires_one_step_and_explicit_six_schema(){let p=six_point();assert_eq!(selected_operating_count(5,&p).unwrap(),6);assert!(selected_operating_count(4,&p).is_err());let mut b=p;b["schema"]=json!("horizon-Root-expanded-standard-five-lane-operating-review-v1");assert!(selected_operating_count(5,&b).is_err());}
+    #[test]fn six_point_rejects_missing_window_or_automatic_promotion(){for(k,v)in[("whole_six_owner_window_seconds",json!(1799)),("explicit_Root_operating_point_review",json!(false)),("new_resource_observations",json!(true)),("replay_admission_authorized",json!(true))]{let mut p=six_point();p[k]=v;assert!(selected_operating_count(5,&p).is_err());}}
+    #[test]fn six_window_requires_both_complete_matching_owner_sets(){let o=clean_six_fixture();assert!(clean_six_window(&o,&o,100).is_ok());assert!(clean_six_window(&o,&clean_fixture(),100).is_err());let mut b=o.clone();b["replays"][5]["worker_after"]["pid"]=json!(99);assert!(clean_six_window(&b,&o,100).is_err());assert!(clean_five_window(&o,&o,100).is_err());}
+    #[test]fn sixth_owner_preserves_pressure_oom_vma_useful_work_and_floor_gates(){let o=clean_six_fixture();assert!(clean_six_window(&o,&o,101).is_err());for(k,v)in[("memory_events.max",1),("memory_events.oom",1),("memory_events.oom_kill",1),("memory_events.oom_group_kill",1)]{let mut b=o.clone();b["replays"][5]["cross_sample"]["producer_cgroup_counter_delta"][k]=json!(v);assert!(clean_six_window(&b,&o,100).is_err());}let mut b=o.clone();b["replays"][5]["worker_after"]["vmas"]=json!(3_500_000);assert!(clean_six_window(&b,&o,100).is_err());let mut b=o.clone();b["replays"][5]["useful_work"]["counter_resets"]=json!(1);assert!(clean_six_window(&b,&o,100).is_err());let mut b=o.clone();b["host_global_pressure"]["cross_sample"]["counter_delta_usec"]["memory.full_total_usec"]=json!(10_000_000);assert!(clean_six_window(&b,&o,100).is_err());}
 
 }
