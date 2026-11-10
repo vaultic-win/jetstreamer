@@ -93,10 +93,15 @@ The fixed sandbox additionally requires `PrivateDevices=yes`, `PrivateTmp=no`,
 `ProtectControlGroups=yes`. RootDirectory/RootImage, MountImages, extension
 images/directories, BindPaths/BindReadOnlyPaths, TemporaryFileSystem, managed
 Runtime/State/Cache/Logs/Configuration directories and InaccessiblePaths must be
-empty. `ReadOnlyPaths` must be exactly `/run`: `ProtectSystem=strict` alone can
-leave that runtime filesystem writable. Empty, alternative or additional paths
-are rejected. Actual mountinfo must still show `/run` and its ordinary child
-mounts read-only; the projection grants no new writable API exception.
+empty. `ReadOnlyPaths` must contain exactly the two disjoint paths `/run` and
+`/dev/hugepages`; duplicates, missing paths, aliases and extra paths are rejected,
+and ordering is immaterial. `MemoryPressureWatch=no` disables the automatic
+writable cgroup pressure-file projection. `ProcSubset=pid` selects a fresh proc
+view without inherited non-process mounts such as writable `binfmt_misc`.
+Actual complete mountinfo still must pass the unchanged writable API/result
+policy; hidden writable entries are never skipped. These settings restrict this
+fixed diagnostic profile and grant no new writable exception. The original
+before/after properties, mount view, owner and bounded native checks remain.
 `ReadWritePaths` contains only the result parent.
 The root mount must be read-only; exactly one writable result-parent mount must
 refer to the same underlying host directory. Actual mountinfo and its SHA plus

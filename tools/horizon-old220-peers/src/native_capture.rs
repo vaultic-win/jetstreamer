@@ -24,7 +24,7 @@ use std::{
 };
 const SCHEMA: &str = "horizon-old220-peers1061-native-capture-admission-v1";
 const CAPS: u64 = (1 << 1) | (1 << 19); // DAC_OVERRIDE and SYS_PTRACE only.
-const OWN_PROPERTIES: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,NRestarts,Type,User,Group,Restart,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateNetwork,KillMode,ExecStart,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,PrivateDevices,PrivateTmp,PrivateMounts,ProtectKernelTunables,ProtectKernelModules,ProtectControlGroups,RootDirectory,RootImage,MountImages,ExtensionImages,ExtensionDirectories,BindPaths,BindReadOnlyPaths,TemporaryFileSystem,RuntimeDirectory,StateDirectory,CacheDirectory,LogsDirectory,ConfigurationDirectory,ReadOnlyPaths,InaccessiblePaths";
+const OWN_PROPERTIES: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ControlGroup,NRestarts,Type,User,Group,Restart,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,ProtectSystem,ProtectHome,PrivateNetwork,KillMode,ExecStart,ReadWritePaths,CapabilityBoundingSet,AmbientCapabilities,PrivateDevices,PrivateTmp,PrivateMounts,ProtectKernelTunables,ProtectKernelModules,ProtectControlGroups,RootDirectory,RootImage,MountImages,ExtensionImages,ExtensionDirectories,BindPaths,BindReadOnlyPaths,TemporaryFileSystem,RuntimeDirectory,StateDirectory,CacheDirectory,LogsDirectory,ConfigurationDirectory,ReadOnlyPaths,InaccessiblePaths,MemoryPressureWatch,ProcSubset";
 const STREAM_LIMIT: u64 = 2 << 20;
 const TOTAL_STREAM_LIMIT: usize = 32 << 20;
 const RESULT_LIMIT: usize = 48 << 20;
@@ -414,15 +414,25 @@ fn validate_write_properties(p: &BTreeMap<String, String>, output: &Path) -> Res
         ("ProtectKernelTunables", "yes"),
         ("ProtectKernelModules", "yes"),
         ("ProtectControlGroups", "yes"),
-        // ProtectSystem=strict alone can leave /run writable. Require this
-        // exact projection; actual mount_view must still prove it read-only.
-        ("ReadOnlyPaths", "/run"),
+        // Disable automatic writable pressure binding and use a fresh PID-only
+        // proc view. Actual raw mount policy remains independently enforced.
+        ("MemoryPressureWatch", "no"),
+        ("ProcSubset", "pid"),
     ] {
         ensure!(
             p.get(key).map(String::as_str) == Some(expected),
             "unexpected sandbox field {key}"
         );
     }
+    let readonly = p
+        .get("ReadOnlyPaths")
+        .context("missing read-only projections")?;
+    let mut readonly: Vec<_> = readonly.split(' ').collect();
+    readonly.sort_unstable();
+    ensure!(
+        readonly == vec!["/dev/hugepages", "/run"],
+        "unexpected read-only projection set"
+    );
     for key in [
         "RootDirectory",
         "RootImage",
@@ -934,7 +944,9 @@ mod tests {
             p.insert(key.into(), "yes".into());
         }
         p.insert("PrivateTmp".into(), "no".into());
-        p.insert("ReadOnlyPaths".into(), "/run".into());
+        p.insert("ReadOnlyPaths".into(), "/run /dev/hugepages".into());
+        p.insert("MemoryPressureWatch".into(), "no".into());
+        p.insert("ProcSubset".into(), "pid".into());
         p.insert("ReadWritePaths".into(), output.display().to_string());
         validate_write_properties(&p, &output).unwrap();
         for key in [
@@ -947,7 +959,7 @@ mod tests {
             bad.insert(key.into(), "extra".into());
             assert!(validate_write_properties(&bad, &output).is_err());
         }
-        // Only the exact property string /run is admitted. Empty, alternative,
+        // Only the exact disjoint /run and /dev/hugepages path set is admitted. Empty,
         // extra/duplicate paths, optional prefixes and alternate spellings fail.
         for value in [
             "",
@@ -965,6 +977,34 @@ mod tests {
                 "ReadOnlyPaths={value:?}"
             );
         }
+        for value in [
+            "/run",
+            "/run /dev/hugepages /dev/hugepages",
+            "/run /dev/hugepages /proc/sys/fs/binfmt_misc /tmp",
+        ] {
+            let mut bad = p.clone();
+            bad.insert("ReadOnlyPaths".into(), value.into());
+            assert!(validate_write_properties(&bad, &output).is_err());
+        }
+        let mut reordered = p.clone();
+        reordered.insert("ReadOnlyPaths".into(), "/dev/hugepages /run".into());
+        validate_write_properties(&reordered, &output).unwrap();
+        for value in ["", "auto", "yes", "skip"] {
+            let mut bad = p.clone();
+            bad.insert("MemoryPressureWatch".into(), value.into());
+            assert!(validate_write_properties(&bad, &output).is_err());
+        }
+        for value in ["", "all", "default", "pid all"] {
+            let mut bad = p.clone();
+            bad.insert("ProcSubset".into(), value.into());
+            assert!(validate_write_properties(&bad, &output).is_err());
+        }
+        let mut missing_subset = p.clone();
+        missing_subset.remove("ProcSubset");
+        assert!(validate_write_properties(&missing_subset, &output).is_err());
+        let mut missing_pressure = p.clone();
+        missing_pressure.remove("MemoryPressureWatch");
+        assert!(validate_write_properties(&missing_pressure, &output).is_err());
         let mut missing = p.clone();
         missing.remove("ReadOnlyPaths");
         assert!(validate_write_properties(&missing, &output).is_err());
