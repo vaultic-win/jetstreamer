@@ -1,0 +1,137 @@
+{
+  "current_main": {
+    "path": "/home/sol/workspace/jetstreamer/jetstreamer-r2/src/main.rs",
+    "sha256": "17b43a0b0df0cb67166b3b236175db8b16ab416fc53d77d9cfa678b97c8966c9"
+  },
+  "source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-hash-streaming-source-20261110-v1/main.rs",
+    "sha256": "323481037b2f6bbab2475ed31158ef02bb169002b1fdd61b8cfb976a550aaa73"
+  },
+  "function_bindings": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-hash-streaming-source-20261110-v1/SOURCE_BINDINGS.json",
+    "sha256": "ca61e6f66c2b96f422367e256bb1a033be2fd3201b3a3f500f4c7e6bc6d29f70"
+  },
+  "proven_original_graph": {
+    "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/work/uploader-image-reproduction-20261110-v1/CAPTURED_ACTUAL_MAIN_AND_COMPILER_GRAPH.json",
+    "sha256": "a575d9b2730b12c81e13198c0601bc1deba6fc609b122d2211e951a578c62119"
+  },
+  "actual_seven_direct_externs": {
+    "anyhow": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
+    },
+    "base64": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libbase64-c8c2297b8bb1658f.rlib",
+      "sha256": "790bca532a9b906da8bbe5b4a27997ceb033d25ace5311eeab1fae16e1ed0c93"
+    },
+    "libc": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
+    },
+    "md5": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libmd5-7ed6f069a8ec7c45.rlib",
+      "sha256": "c9d0e2fdc4b8e8f6fb7af19ecdaa6c2f64b994deeed0aada9081c71bb6f86d63"
+    },
+    "serde": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde-1dae98566e82c864.rlib",
+      "sha256": "39eed391362f983e0383fcd8b43f0fa9368cc251155f42724ff1e2e512efa897"
+    },
+    "sha2": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
+    },
+    "tempfile": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libtempfile-47898064045d0aed.rlib",
+      "sha256": "89733c592505515bd90820c90fac3789a541a544cbbac2c36b5e4afe224ac2ed"
+    }
+  },
+  "four_compilers_passed": true,
+  "ordinary_tests_passed": 3,
+  "all_actors_drained": true,
+  "scope": "Actual changed hash function bodies and three regression bodies, isolated library extraction. Full current uploader application compilation/deployment remains separate.",
+  "new_resource_credit_bytes": 0,
+  "live_uploader_changed": false,
+  "shared64_bytes_retained": 68719476736,
+  "accepted_receipt": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ROOT_FOUR_STRICT_COMPILERS_THREE_EXTRACTED_REGRESSIONS_PASSED.json",
+    "sha256": "3dca8915e3b4213013e2dcab75156412b288a1f139d39766ceca0e50244141cf"
+  },
+  "checks": {
+    "production": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/production-R2-ORIGINAL-ARGV.json",
+        "sha256": "d71141d8b10322099829312f13726d5f1a0d6bd3500315f436438abdc32a20f6"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/production-R2-ORIGINAL-EXECUTION.json",
+        "sha256": "ebb1ff55ea1413848bf48d59b9fee758bc3f754761ae9d8152b8ee9108629eb4"
+      },
+      "exit_code": 0
+    },
+    "build-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/build-tests-R2-ORIGINAL-ARGV.json",
+        "sha256": "68d5ad1864702a2802035307d6ebddd62cdb517aedfdd6cc721baf436144f407"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/build-tests-R2-ORIGINAL-EXECUTION.json",
+        "sha256": "7071a2cc199ad729a8d7b4505ff8627c42ba88df2e50dfd72053b0bbd06bd5ca"
+      },
+      "exit_code": 0
+    },
+    "clippy-production": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/clippy-production-R2-ORIGINAL-ARGV.json",
+        "sha256": "5910cdb8a02d12d21635c73857ae42ff5b031d7efe76c2bf81f8ba151dc3ab90"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/clippy-production-R2-ORIGINAL-EXECUTION.json",
+        "sha256": "c8687ea015845a6a3d0dd98417c4df32094f7593eeaf5ce0621915ca101f876f"
+      },
+      "exit_code": 0
+    },
+    "clippy-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/clippy-tests-R2-ORIGINAL-ARGV.json",
+        "sha256": "53bd360c7a589d6e3dd1510786c864525d19613eebf7d3ce534db016adef292c"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/clippy-tests-R2-ORIGINAL-EXECUTION.json",
+        "sha256": "5247db834c29548d8e84b36a0768bc63583939331f5a435c548191c959a30dd4"
+      },
+      "exit_code": 0
+    },
+    "ordinary-tests": {
+      "argv": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ordinary-tests-R2-ORIGINAL-ARGV.json",
+        "sha256": "00b7af450554fce985c4ad9837875ab847398a742ed293d9535a3fc86821b293"
+      },
+      "execution": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ordinary-tests-R2-ORIGINAL-EXECUTION.json",
+        "sha256": "955ad018064e4258d10c1880820fdbae4a7f9d3d0b93913075b5cd952610fcf5"
+      },
+      "exit_code": 0
+    }
+  },
+  "ordinary_test_count": 3,
+  "source_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-uploader-hash-streaming-source-20261110-v1/deployment-seal-receipt.json",
+    "sha256": "df8e663fa3039f1f235c948f1ccbfaffa6deb2fc55a4aeb89f27287dcbc8422b"
+  },
+  "original_namespace_failure": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/production-ORIGINAL-EXECUTION.json",
+    "sha256": "4d02be598622beb97dbb5df098a1f3bd406b9b74ce5ecc871cf3b3d5accadd49"
+  },
+  "first_setup_path_correction": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ROOT_SETUP_PATH_SUBSTITUTION_FAILURE_CORRECTION.json",
+    "sha256": "7713f776bc60d87f16e49bb6447c1d3d54360f4446b3ff8c83176640f30a4c94"
+  },
+  "native_namespace_correction": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ROOT_NAMESPACE_PATH_SUBSTITUTION_R2_CORRECTION.json",
+    "sha256": "9a61efb0d9485931681d69a42c453a0f1f1ca5a7c892ba395801cfd3db3be6f0"
+  },
+  "booking": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/uploader-hash-streaming-qa-v1/ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json",
+    "sha256": "3c81ef62ec9429c9d02aa4b9cbc06737e23cf7befa583ae9247591c7f137fc16"
+  }
+}
