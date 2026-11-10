@@ -1,0 +1,1921 @@
+{
+  "scope": "Qualified metadata-only temporary exclusive reuse of already charged serial8; no compiler lease, new memory, ending, Frame, Reader or replay authority",
+  "sources": [
+    {
+      "path": "/tmp/native16-serial8-reuse-main-20261110-v1.rs",
+      "sha256": "5c96ce56f595f821bb0a088cea4dd2c63233ed851cee33d82ac42674e63e35a2"
+    },
+    {
+      "path": "/tmp/native16-serial8-reuse-main-20261110-v2.rs",
+      "sha256": "02973ff88601de37d92884df32875f32d8c8826e2ef4e64584742c410583c00b"
+    }
+  ],
+  "qualification": {
+    "ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_NATIVE16_CALLBACK512_WITHIN173_METADATA64_BOOKING.json",
+        "sha256": "2b69f118e3118a85bb282c014817fbf7dc5e6a67131a309fcf8d99918d821a24"
+      },
+      "document": {
+        "parent_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "native_pool_bytes": 17179869184,
+        "all_committed_existing_native_bytes": 13757317120,
+        "one_serial_compiler_or_native_bytes": 536870912,
+        "total_native_with_callback_bytes": 14294188032,
+        "remaining_native_bytes": 2885681152,
+        "retained173_metadata_DATA_bytes": 67108864,
+        "actual_metadata_bytes_before": 38806186,
+        "new_maximum_artifact_bytes": 27262976,
+        "new_hard_memory_or_DATA_promise_bytes": 0,
+        "scope": "Four strict compilers/fourteen tests and finite metadata-only already charged serial8 reuse qualification. All historical native4.5,8control,guard256,OS64 and full16 retained; no extra8/ending/replay authority. Original cancelled profile48 and selected154 DATA ending remain consumed once. Future compiler source/sandbox/guard/booked lease still required."
+      }
+    },
+    "ARTIFACT.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ARTIFACT.json",
+        "sha256": "b107b27f8a4259aacc96daeb993c22fdb0bac75d0482bf0a95095e70e7433a09"
+      },
+      "document": {
+        "source": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v2/main.rs",
+          "sha256": "02973ff88601de37d92884df32875f32d8c8826e2ef4e64584742c410583c00b"
+        },
+        "predecessor_graph": {
+          "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+          "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+        },
+        "actual_direct_externs": {
+          "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+            "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+          },
+          "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+            "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+          },
+          "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+            "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+            "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+          }
+        },
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 14,
+        "shared_budget_ending_authorized": false,
+        "native_census_pending": true
+      }
+    },
+    "ROOT_QUALIFIED_NATIVE_PENDING.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_QUALIFIED_NATIVE_PENDING.json",
+        "sha256": "4cf4f6c3c313da9fb85d1cb8d300da993f04110a6d0beabb4bbd3f471c88bf9c"
+      },
+      "document": {
+        "four_compilers_passed": true,
+        "ordinary_tests_passed": 14,
+        "all_compiler_slots_drained": true,
+        "runtime": {
+          "path": "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-tools-20261110-v2/check",
+          "sha256": "cd80e0600eb80ed14dbd49bf5303bf43ef8bec2f45cdaeef2637885261677c3d"
+        },
+        "active_extra_native_callback_bytes": 0,
+        "all_original_native_pool_allocations_retained": true,
+        "new_memory_or_DATA_promise_bytes": 0,
+        "shared_future_ending_or_replay_admission_authorized": false
+      }
+    },
+    "ACTUAL-PLAN.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ACTUAL-PLAN.json",
+        "sha256": "dce715159dfd79e32f41902811c4c26de7c63a423faa79d0b14eb1d0aac958d3"
+      },
+      "document": {
+        "schema": "horizon-native16-existing-pool-compiler-check-plan-v1",
+        "owner": "/root",
+        "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+        "historical_raw_accounting": {
+          "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json",
+          "sha256": "d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274"
+        },
+        "original_memory_pool_facts": {
+          "path": "/usr/local/lib/jetstreamer/horizon-epoch136-suffix-accounting-projections-20261027-v1/prior-memory.json",
+          "sha256": "7b6e9a72fe89964d94ba22afe2a5320ed9ae401d2a624eaa01be9a57c772568a"
+        },
+        "selected_parent_memory": {
+          "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334/select-1/selection.json",
+          "sha256": "04a6c68f71a4a3a763a2a529b72b3eaa14b82728bfa46919073eb12098074b92"
+        },
+        "selected_parent_memory_total_bytes": 482764140544,
+        "current_complete_resource_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "complete_DATA_bytes": 6229838610226,
+        "complete_projected_memory_bytes": 759789531136,
+        "current_fleet": {
+          "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_113022_RUST_V8.json",
+          "sha256": "597f416cff7d6a90ac706a2a69467ebf12acbccdb1ccfdb50982083049aa4c8e"
+        },
+        "current_Root_callback_drain": {
+          "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_113022_NATIVE_V8_DRAINED_EXISTING_NORMAL10_RESTORED.json",
+          "sha256": "e9639962ae763d92b59f0160a91b63d2c122993207f88d59405c5c6c045e9f83"
+        },
+        "freshness": {
+          "sample_unix_seconds": 1794310222,
+          "sampled_at_utc": "2026-11-10T11:30:22Z"
+        },
+        "live_replays": [
+          {
+            "epoch": 166,
+            "unit": "horizon-qualify-166-standard-20261109-v1.service",
+            "invocation_id": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "main_pid": "4188448"
+          },
+          {
+            "epoch": 167,
+            "unit": "horizon-qualify-167-standard-20261109-v1.service",
+            "invocation_id": "efd81d59a4584013a93d0d020e49852e",
+            "main_pid": "713"
+          },
+          {
+            "epoch": 168,
+            "unit": "horizon-qualify-168-standard-20261109-v1.service",
+            "invocation_id": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "main_pid": "14201"
+          },
+          {
+            "epoch": 169,
+            "unit": "horizon-qualify-169-standard-20261109-v1.service",
+            "invocation_id": "ca4d6b8da24c4e92a4c75419edae6f1d",
+            "main_pid": "50818"
+          },
+          {
+            "epoch": 170,
+            "unit": "horizon-qualify-170-standard-20261109-v1.service",
+            "invocation_id": "1950530fc73b4a519f5327749f0036b7",
+            "main_pid": "86457"
+          },
+          {
+            "epoch": 171,
+            "unit": "horizon-qualify-171-standard-20261110-v1.service",
+            "invocation_id": "3b0694043e374b0488ee9a81762e210d",
+            "main_pid": "243865"
+          },
+          {
+            "epoch": 172,
+            "unit": "horizon-qualify-172-standard-20261110-v1.service",
+            "invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+            "main_pid": "431228"
+          }
+        ],
+        "separately_protected_background_owners": [
+          {
+            "unit": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "invocation_id": "7ac4617f73ab4f979a8527cce461c6a4",
+            "main_pid": "3204661"
+          },
+          {
+            "unit": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "invocation_id": "dbf49bb1b72c42c584f2d3ac94259cb8",
+            "main_pid": "2467123"
+          },
+          {
+            "unit": "jetstreamer-horizon-audit-epochs101-181-v4.service",
+            "invocation_id": "2612e3bb8fe4415b804532ee87d46ea3",
+            "main_pid": "199885"
+          },
+          {
+            "unit": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+            "invocation_id": "699d09b3e4254b7cab02a7b26456428b",
+            "main_pid": "200082"
+          },
+          {
+            "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+            "invocation_id": "671943ead310459fbd812c8874c3d1b9",
+            "main_pid": "200234"
+          },
+          {
+            "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+            "invocation_id": "89b072dea9cd4167881d060c571be6cf",
+            "main_pid": "200268"
+          },
+          {
+            "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+            "invocation_id": "99c1aded731d4de8aa6bff571134aac6",
+            "main_pid": "200281"
+          }
+        ],
+        "normal10_guard_roles": [
+          {
+            "unit": "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          },
+          {
+            "unit": "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service",
+            "MemoryMax": "1073741824"
+          }
+        ],
+        "normal_pool_bytes": 10737418240,
+        "one_serial_compiler_cap_bytes": 8589934592,
+        "native_check_unit": "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+        "output": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json",
+        "serial8_existing_backing": {
+          "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_VERIFICATION144_NATIVE16_PROFILE48_CURRENT_AUTHORITY.json",
+          "sha256": "9def5e3b680a13f9a414bf100c0ef70f2f2abcecc10937eb7599d188d04ec060"
+        },
+        "profile48_already_cancelled": {
+          "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION32_FUTURE_ENDED_CURRENT_AUTHORITY.json",
+          "sha256": "d4f1b74c3fd21e67df1839e12270aca4e53ee8756877b69b64af14662e25ff08"
+        },
+        "reuse_purpose": "immutable-original-uploader-image-reproduction",
+        "temporary_exclusive_reuse_only": true
+      }
+    },
+    "NATIVE-CHECK-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/NATIVE-CHECK-ORIGINAL-ARGV.json",
+        "sha256": "008c339ac742563c898c8cc1d90dc42cc2c1f9531d40da1219c736f21237c359"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-current-check1130-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryHigh=384M",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=100%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=600",
+        "-p",
+        "TimeoutStopSec=15",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-tools-20261110-v2/check",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-current-plan1130-20261110-v2/plan.json",
+        "--plan-sha256",
+        "dce715159dfd79e32f41902811c4c26de7c63a423faa79d0b14eb1d0aac958d3",
+        "--self-sha256",
+        "cd80e0600eb80ed14dbd49bf5303bf43ef8bec2f45cdaeef2637885261677c3d",
+        "--check-existing-pool"
+      ]
+    },
+    "NATIVE-CHECK-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/NATIVE-CHECK-ORIGINAL-EXECUTION.json",
+        "sha256": "254daa2bc1b498a7a1fadc4164bb53809f17ed1d71701e29cf5ea80c1aec3301"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "{\"allocation_booked\":false,\"existing_pool_check_passed\":true,\"new_memory_promise_bytes\":0,\"output\":\"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json\"}\n",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-current-check1130-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1min 12.873s\nCPU time consumed: 49.303s\nMemory peak: 95.6M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json",
+        "sha256": "4b065970bbcbe4eb379c0411420def207d82568fb18df613eb865f6e964b739c"
+      },
+      "document": {
+        "all_helper_guard_OS_old_rows_retained": true,
+        "all_original_raw_suballocations_retained": true,
+        "allocation_booked": false,
+        "complete_projected_memory_bytes_unchanged": 759789531136,
+        "current_fleet": {
+          "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_113022_RUST_V8.json",
+          "sha256": "597f416cff7d6a90ac706a2a69467ebf12acbccdb1ccfdb50982083049aa4c8e"
+        },
+        "historical_committed_bytes_retained": 4831838208,
+        "native_after_count": 6898,
+        "native_after_sha256": "95927cfc8089d77a6a4e5bd60e6767761084f3df078f9cb49ce079ce5f47bd1a",
+        "native_before_count": 6898,
+        "native_before_sha256": "06c9a657ae5d0613e716bbcc8cdbfd7841c26824ce930011bea6c04f5e2ac77a",
+        "new_memory_promise_bytes": 0,
+        "new_resource_observations": false,
+        "next_action": "Root may lease exactly the already charged serial8 role exclusively while holding the same native16 pool lock; old full-helper8 may not overlap. The256MiB guard,64MiB metadata and original4.5 stay retained. Exact immutable source/output/sandbox and genuine prestart guard remain required before compiler launch; this checker grants no new8, ending, release, Frame or replay authority.",
+        "no_unclassified_live_or_queued_Horizon_unit": true,
+        "normal_pool_bytes": 10737418240,
+        "one_serial_compiler_cap_bytes": 8589934592,
+        "owner": "/root",
+        "physical_retirement_bytes": 0,
+        "plan": {
+          "complete_DATA_bytes": 6229838610226,
+          "complete_projected_memory_bytes": 759789531136,
+          "current_Root_callback_drain": {
+            "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_113022_NATIVE_V8_DRAINED_EXISTING_NORMAL10_RESTORED.json",
+            "sha256": "e9639962ae763d92b59f0160a91b63d2c122993207f88d59405c5c6c045e9f83"
+          },
+          "current_complete_resource_authority": {
+            "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+            "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+          },
+          "current_fleet": {
+            "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_113022_RUST_V8.json",
+            "sha256": "597f416cff7d6a90ac706a2a69467ebf12acbccdb1ccfdb50982083049aa4c8e"
+          },
+          "freshness": {
+            "sample_unix_seconds": 1794310222,
+            "sampled_at_utc": "2026-11-10T11:30:22Z"
+          },
+          "historical_raw_accounting": {
+            "path": "/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json",
+            "sha256": "d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274"
+          },
+          "live_replays": [
+            {
+              "epoch": 166,
+              "invocation_id": "06c7b420f92d42a6b0743ba578bcd8b6",
+              "main_pid": "4188448",
+              "unit": "horizon-qualify-166-standard-20261109-v1.service"
+            },
+            {
+              "epoch": 167,
+              "invocation_id": "efd81d59a4584013a93d0d020e49852e",
+              "main_pid": "713",
+              "unit": "horizon-qualify-167-standard-20261109-v1.service"
+            },
+            {
+              "epoch": 168,
+              "invocation_id": "e1050eb5e99a4a159630c881e0dd5eb3",
+              "main_pid": "14201",
+              "unit": "horizon-qualify-168-standard-20261109-v1.service"
+            },
+            {
+              "epoch": 169,
+              "invocation_id": "ca4d6b8da24c4e92a4c75419edae6f1d",
+              "main_pid": "50818",
+              "unit": "horizon-qualify-169-standard-20261109-v1.service"
+            },
+            {
+              "epoch": 170,
+              "invocation_id": "1950530fc73b4a519f5327749f0036b7",
+              "main_pid": "86457",
+              "unit": "horizon-qualify-170-standard-20261109-v1.service"
+            },
+            {
+              "epoch": 171,
+              "invocation_id": "3b0694043e374b0488ee9a81762e210d",
+              "main_pid": "243865",
+              "unit": "horizon-qualify-171-standard-20261110-v1.service"
+            },
+            {
+              "epoch": 172,
+              "invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+              "main_pid": "431228",
+              "unit": "horizon-qualify-172-standard-20261110-v1.service"
+            }
+          ],
+          "native_check_unit": "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+          "normal10_guard_roles": [
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service"
+            },
+            {
+              "MemoryMax": "1073741824",
+              "unit": "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service"
+            }
+          ],
+          "normal_pool_bytes": 10737418240,
+          "one_serial_compiler_cap_bytes": 8589934592,
+          "original_memory_pool_facts": {
+            "path": "/usr/local/lib/jetstreamer/horizon-epoch136-suffix-accounting-projections-20261027-v1/prior-memory.json",
+            "sha256": "7b6e9a72fe89964d94ba22afe2a5320ed9ae401d2a624eaa01be9a57c772568a"
+          },
+          "output": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json",
+          "owner": "/root",
+          "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+          "profile48_already_cancelled": {
+            "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION32_FUTURE_ENDED_CURRENT_AUTHORITY.json",
+            "sha256": "d4f1b74c3fd21e67df1839e12270aca4e53ee8756877b69b64af14662e25ff08"
+          },
+          "reuse_purpose": "immutable-original-uploader-image-reproduction",
+          "schema": "horizon-native16-existing-pool-compiler-check-plan-v1",
+          "selected_parent_memory": {
+            "path": "/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334/select-1/selection.json",
+            "sha256": "04a6c68f71a4a3a763a2a529b72b3eaa14b82728bfa46919073eb12098074b92"
+          },
+          "selected_parent_memory_total_bytes": 482764140544,
+          "separately_protected_background_owners": [
+            {
+              "invocation_id": "7ac4617f73ab4f979a8527cce461c6a4",
+              "main_pid": "3204661",
+              "unit": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service"
+            },
+            {
+              "invocation_id": "dbf49bb1b72c42c584f2d3ac94259cb8",
+              "main_pid": "2467123",
+              "unit": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service"
+            },
+            {
+              "invocation_id": "2612e3bb8fe4415b804532ee87d46ea3",
+              "main_pid": "199885",
+              "unit": "jetstreamer-horizon-audit-epochs101-181-v4.service"
+            },
+            {
+              "invocation_id": "699d09b3e4254b7cab02a7b26456428b",
+              "main_pid": "200082",
+              "unit": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service"
+            },
+            {
+              "invocation_id": "671943ead310459fbd812c8874c3d1b9",
+              "main_pid": "200234",
+              "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service"
+            },
+            {
+              "invocation_id": "89b072dea9cd4167881d060c571be6cf",
+              "main_pid": "200268",
+              "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service"
+            },
+            {
+              "invocation_id": "99c1aded731d4de8aa6bff571134aac6",
+              "main_pid": "200281",
+              "unit": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service"
+            }
+          ],
+          "serial8_existing_backing": {
+            "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_VERIFICATION144_NATIVE16_PROFILE48_CURRENT_AUTHORITY.json",
+            "sha256": "9def5e3b680a13f9a414bf100c0ef70f2f2abcecc10937eb7599d188d04ec060"
+          },
+          "temporary_exclusive_reuse_only": true
+        },
+        "planning_sample_expires_unix_seconds": 1794311067,
+        "plugin128GiB_and_shared64GiB_untouched": true,
+        "producer_mutations": false,
+        "profile48_already_cancelled": {
+          "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION32_FUTURE_ENDED_CURRENT_AUTHORITY.json",
+          "sha256": "d4f1b74c3fd21e67df1839e12270aca4e53ee8756877b69b64af14662e25ff08"
+        },
+        "protected_native_after": {
+          "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "activating",
+            "ControlGroup": "/system.slice/horizon-guard-166-standard-duplicate722-correction-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "b0427e9310c249d8af6b1222cc56a041",
+            "Job": "47187831",
+            "LoadState": "loaded",
+            "MainPID": "747088",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "start",
+            "Type": "oneshot"
+          },
+          "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "activating",
+            "ControlGroup": "/system.slice/horizon-guard-167-standard-duplicate722-correction-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "451be13a6fb5494f8e5401cf7e57bc4c",
+            "Job": "47188061",
+            "LoadState": "loaded",
+            "MainPID": "747884",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "start",
+            "Type": "oneshot"
+          },
+          "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "4ec9916a38084c9bbd616977ffa1d96d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "activating",
+            "ControlGroup": "/system.slice/horizon-guard-169-standard-duplicate722-correction-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "38e6d627eef74b63a982f2f1e10d24c6",
+            "Job": "47187601",
+            "LoadState": "loaded",
+            "MainPID": "746987",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "start",
+            "Type": "oneshot"
+          },
+          "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "activating",
+            "ControlGroup": "/system.slice/horizon-guard-170-standard-duplicate722-correction-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "cffc117d37c64d40a6be1001fed1aa4b",
+            "Job": "47187716",
+            "LoadState": "loaded",
+            "MainPID": "746989",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "start",
+            "Type": "oneshot"
+          },
+          "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "a8ae4861afb6441487c412fe6d64d0d9",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "a5e02e2bb9a247f1a2a5d00b9ecf94cf",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+            "InvocationID": "1241aa3366a8491ca2eaeb3411b60986",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "738615",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-166-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-166-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-166-standard-20261109-v1.service",
+            "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "4188448",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-167-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-167-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-167-standard-20261109-v1.service",
+            "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "713",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-168-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-168-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-168-standard-20261109-v1.service",
+            "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "14201",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-169-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-169-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-169-standard-20261109-v1.service",
+            "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "50818",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-170-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-170-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-170-standard-20261109-v1.service",
+            "InvocationID": "1950530fc73b4a519f5327749f0036b7",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "86457",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-171-standard-20261110-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-171-standard-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-171-standard-20261110-v1.service",
+            "InvocationID": "3b0694043e374b0488ee9a81762e210d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "243865",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-172-standard-20261110-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-172-standard-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-172-standard-20261110-v1.service",
+            "InvocationID": "6aa8bc6036b34c57ababa2d5855b2098",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "431228",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "InvocationID": "7ac4617f73ab4f979a8527cce461c6a4",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "3204661",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "infinity",
+            "MemorySwapMax": "infinity",
+            "NRestarts": "0",
+            "Restart": "on-failure",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "2467123",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-audit-epochs101-181-v4.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-audit-epochs101-181-v4.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-audit-epochs101-181-v4.service",
+            "InvocationID": "2612e3bb8fe4415b804532ee87d46ea3",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "199885",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "34359738368",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+            "InvocationID": "699d09b3e4254b7cab02a7b26456428b",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200082",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+            "InvocationID": "671943ead310459fbd812c8874c3d1b9",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200234",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+            "InvocationID": "89b072dea9cd4167881d060c571be6cf",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200268",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "34359738368",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+            "InvocationID": "99c1aded731d4de8aa6bff571134aac6",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200281",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          }
+        },
+        "protected_native_before": {
+          "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-166-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "5a2391ab32ca46f890558d325f15815d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "activating",
+            "ControlGroup": "/system.slice/horizon-guard-167-standard-duplicate722-correction-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-167-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "8fe4ce47ac5a446b9024cd3dc249a0b8",
+            "Job": "47183921",
+            "LoadState": "loaded",
+            "MainPID": "739892",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "start",
+            "Type": "oneshot"
+          },
+          "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-168-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "290b15ab1d8b4d3da3e24d585010fae3",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-169-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "3403d222f49b43bab7a36cd63e53a219",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-170-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "ba49dd6d83a741c9ac84809b8cab86c6",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-171-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "879b1ae9658e48399eddff406b1e1e97",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service": {
+            "ActiveState": "inactive",
+            "ControlGroup": "",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-guard-172-standard-duplicate722-correction-20261110-v1.service",
+            "InvocationID": "c1c4ba2385be493da015f7f30ad03193",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "1073741824",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "dead",
+            "Type": "oneshot"
+          },
+          "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-native16-serial8-reuse-current-check1130-20261110-v2.service",
+            "InvocationID": "1241aa3366a8491ca2eaeb3411b60986",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "738615",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-166-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-166-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-166-standard-20261109-v1.service",
+            "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "4188448",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-167-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-167-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-167-standard-20261109-v1.service",
+            "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "713",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-168-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-168-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-168-standard-20261109-v1.service",
+            "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "14201",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-169-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-169-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-169-standard-20261109-v1.service",
+            "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "50818",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-170-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-170-standard-20261109-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-170-standard-20261109-v1.service",
+            "InvocationID": "1950530fc73b4a519f5327749f0036b7",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "86457",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-171-standard-20261110-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-171-standard-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-171-standard-20261110-v1.service",
+            "InvocationID": "3b0694043e374b0488ee9a81762e210d",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "243865",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-qualify-172-standard-20261110-v1.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-qualify-172-standard-20261110-v1.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-qualify-172-standard-20261110-v1.service",
+            "InvocationID": "6aa8bc6036b34c57ababa2d5855b2098",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "431228",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "73014444032",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+            "InvocationID": "7ac4617f73ab4f979a8527cce461c6a4",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "3204661",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "infinity",
+            "MemorySwapMax": "infinity",
+            "NRestarts": "0",
+            "Restart": "on-failure",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+            "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "2467123",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "536870912",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-audit-epochs101-181-v4.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-audit-epochs101-181-v4.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-audit-epochs101-181-v4.service",
+            "InvocationID": "2612e3bb8fe4415b804532ee87d46ea3",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "199885",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "34359738368",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-boundary-audit-101-181-v6-fsync.service",
+            "InvocationID": "699d09b3e4254b7cab02a7b26456428b",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200082",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-b-v4-fsync.service",
+            "InvocationID": "671943ead310459fbd812c8874c3d1b9",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200234",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-c-v4-fsync.service",
+            "InvocationID": "89b072dea9cd4167881d060c571be6cf",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200268",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "34359738368",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          },
+          "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service": {
+            "ActiveState": "active",
+            "ControlGroup": "/system.slice/jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+            "ControlPID": "0",
+            "ExecMainStatus": "0",
+            "Id": "jetstreamer-horizon-plugin-receipt-watcher-shard-d-v4-fsync.service",
+            "InvocationID": "99c1aded731d4de8aa6bff571134aac6",
+            "Job": "",
+            "LoadState": "loaded",
+            "MainPID": "200281",
+            "MemoryAccounting": "yes",
+            "MemoryMax": "8589934592",
+            "MemorySwapMax": "0",
+            "NRestarts": "0",
+            "Restart": "no",
+            "Result": "success",
+            "SubState": "running",
+            "Type": "exec"
+          }
+        },
+        "recorded_unix_seconds": 1794310767,
+        "remaining_uncommitted_native_pool_bytes": 3422552064,
+        "remote_mutations": false,
+        "replay_admission_authorized": false,
+        "resource_credit_bytes": 0,
+        "retained_native_pool_bytes": 17179869184,
+        "schema": "horizon-native16-existing-serial8-reuse-check-v1",
+        "serial8_existing_backing": {
+          "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_VERIFICATION144_NATIVE16_PROFILE48_CURRENT_AUTHORITY.json",
+          "sha256": "9def5e3b680a13f9a414bf100c0ef70f2f2abcecc10937eb7599d188d04ec060"
+        },
+        "temporary_native512_including_check_bytes": 14294188032,
+        "this_is_existing_charged8_reuse_not_new8_promise": true,
+        "total_committed_if_Root_books_compiler_bytes": 13757317120
+      }
+    },
+    "ROOT_NATIVE_CURRENT_CHECK_DRAINED.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_NATIVE_CURRENT_CHECK_DRAINED.json",
+        "sha256": "907474f7e6851ba4bf552444f3ac79ad97b4caebed0bf1c582d5a660c7b979c5"
+      },
+      "document": {
+        "original_native": {
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "success",
+          "NRestarts": "0",
+          "ExecMainStatus": "0",
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "InvocationID": ""
+        },
+        "original_execution": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/NATIVE-CHECK-ORIGINAL-EXECUTION.json",
+          "sha256": "254daa2bc1b498a7a1fadc4164bb53809f17ed1d71701e29cf5ea80c1aec3301"
+        },
+        "current_pool_check": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_ACTUAL_EXISTING_NATIVE16_SERIAL8_REUSE_CURRENT_CHECK_1130.json",
+          "sha256": "4b065970bbcbe4eb379c0411420def207d82568fb18df613eb865f6e964b739c"
+        },
+        "normal_pool_bytes": 10737418240,
+        "active_extra_QA_bytes": 0,
+        "allocation_booked": false,
+        "new_memory_promise_bytes": 0
+      }
+    },
+    "ROOT_CLOSED_NATIVE16_SERIAL8_V2_WORK_RETIREMENT_COMPLETE.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_CLOSED_NATIVE16_SERIAL8_V2_WORK_RETIREMENT_COMPLETE.json",
+        "sha256": "9f6ee6c6644b7b4fbd72a7ed01437e9988209ad5b48de18109fe21f539200757"
+      },
+      "document": {
+        "intent": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ROOT_CLOSED_NATIVE16_SERIAL8_V2_WORK_RETIREMENT_INTENT.json",
+          "sha256": "22b404a2b0c918df28a2af97f0f8e1a0af3b22745ccb4717a16406a45c0bb01e"
+        },
+        "physical_bytes_reclaimed": 24276992,
+        "filesystem_available_before_bytes": 6367047458816,
+        "filesystem_available_after_bytes": 6367464648704,
+        "DATA_promise_credit_bytes": 0,
+        "sources_receipts_all_sealed_runtimes_and_external_libraries_retained": true,
+        "completed_unix_seconds": 1794310235,
+        "no_remote_mutation": true
+      }
+    },
+    "production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/production-ORIGINAL-ARGV.json",
+        "sha256": "af501f7141ddbe33634961b48fcf824aa8c14a2994250ff28f7b59483799b170"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-production-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_native16_serial8_reuse",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v2/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work/production"
+      ]
+    },
+    "production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/production-ORIGINAL-EXECUTION.json",
+        "sha256": "1a253c6398b326f82764146d56ad8698cbdc7077a5fe1e27bfd6b5527e148591"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-production-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.429s\nCPU time consumed: 2.328s\nMemory peak: 12.1M\nMemory swap peak: 0B\n"
+      }
+    },
+    "build-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/build-tests-ORIGINAL-ARGV.json",
+        "sha256": "a123f5fdcac2d81db99dad7334d954adf24986130afed0a61b30b1fe245f6523"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-build-tests-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+        "--crate-name",
+        "horizon_native16_serial8_reuse",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v2/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work/build-tests"
+      ]
+    },
+    "build-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/build-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "994a27fee5fae32e4838dc12440a60dd2113edd6a57e1e5343c062a18ab01152"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-build-tests-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 504ms\nCPU time consumed: 759ms\nMemory peak: 3.2M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-production-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/clippy-production-ORIGINAL-ARGV.json",
+        "sha256": "2a6e769848acf3717a89628232d0fe2ce195bec63637686b2b908460883ae261"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-clippy-production-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_native16_serial8_reuse",
+        "--edition=2024",
+        "-Dwarnings",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v2/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work/clippy-production"
+      ]
+    },
+    "clippy-production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/clippy-production-ORIGINAL-EXECUTION.json",
+        "sha256": "00b35da2c9dc875b08946066a9581b42ff2215f5381c64059ec2528009886a32"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-clippy-production-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.604s\nCPU time consumed: 2.509s\nMemory peak: 4.7M\nMemory swap peak: 0B\n"
+      }
+    },
+    "clippy-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/clippy-tests-ORIGINAL-ARGV.json",
+        "sha256": "306a4a1f0b7ff2db7557777b44ca80f684defb1a3b278f54df1e91a98836722e"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-clippy-tests-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "LimitFSIZE=16777216",
+        "-p",
+        "LimitCORE=0",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "-p",
+        "ReadWritePaths=/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work",
+        "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-name",
+        "horizon_native16_serial8_reuse",
+        "--edition=2024",
+        "-Dwarnings",
+        "--test",
+        "--check-cfg=cfg(test)",
+        "-C",
+        "debuginfo=0",
+        "-Copt-level=2",
+        "-L",
+        "dependency=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps",
+        "--extern",
+        "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+        "--extern",
+        "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+        "--extern",
+        "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+        "/usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v2/main.rs",
+        "-o",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work/clippy-tests"
+      ]
+    },
+    "clippy-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/clippy-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "4887daf53e0cd0fafc07ab2bde521353dc66b35c9b0255598bc4cae885e1c5b3"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-clippy-tests-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 530ms\nCPU time consumed: 856ms\nMemory peak: 3.5M\nMemory swap peak: 0B\n"
+      }
+    },
+    "ordinary-tests-ORIGINAL-ARGV.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ordinary-tests-ORIGINAL-ARGV.json",
+        "sha256": "abb8894fabaedd9ead214d50dafd3bfdc1630a6bdc9c4af46b9b722bbaa3c051"
+      },
+      "document": [
+        "/usr/bin/systemd-run",
+        "--wait",
+        "--pipe",
+        "--unit=horizon-native16-serial8-reuse-ordinary-tests-20261110-v2",
+        "--service-type=exec",
+        "-p",
+        "User=root",
+        "-p",
+        "Group=root",
+        "-p",
+        "UMask=0077",
+        "-p",
+        "Restart=no",
+        "-p",
+        "MemoryMax=512M",
+        "-p",
+        "MemorySwapMax=0",
+        "-p",
+        "CPUQuota=200%",
+        "-p",
+        "TasksMax=128",
+        "-p",
+        "RuntimeMaxSec=120",
+        "-p",
+        "ProtectSystem=strict",
+        "-p",
+        "ProtectHome=read-only",
+        "-p",
+        "PrivateNetwork=yes",
+        "-p",
+        "PrivateTmp=yes",
+        "-p",
+        "NoNewPrivileges=yes",
+        "-p",
+        "CapabilityBoundingSet=CAP_DAC_OVERRIDE",
+        "-p",
+        "AmbientCapabilities=CAP_DAC_OVERRIDE",
+        "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/work/build-tests",
+        "--test-threads=1"
+      ]
+    },
+    "ordinary-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v2/ordinary-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "3ce0274c587af792d20b7680e3a9ee1ea9b149bc36f02996322388dad3be1226"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "\nrunning 14 tests\ntest tests::changed_reproduction_slot_is_rejected ... ok\ntest tests::conservative_fit_keeps_every_old_byte ... ok\ntest tests::drained_unknown_unit_does_not_gain_credit ... ok\ntest tests::exact8_reuse_keeps_guard_os_and_all_history ... ok\ntest tests::extra8_cannot_be_added_on_top_of_charged8 ... ok\ntest tests::fit_denies_overcommit_and_zero ... ok\ntest tests::lower_original_history_cannot_create_new_room ... ok\ntest tests::missing_pool_and_replay_alias_fail ... ok\ntest tests::separate_guard_cannot_borrow_more_memory ... ok\ntest tests::strict_clock_keeps_real_leap_dates ... ok\ntest tests::strict_clock_matches_real_observer_and_rejects_units_or_calendar_errors ... ok\ntest tests::unclassified_queued_unit_denies_reuse ... ok\ntest tests::unclassified_running_unit_denies_reuse ... ok\ntest tests::unsafe_unit_names_fail ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-ordinary-tests-20261110-v2.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 19ms\nCPU time consumed: 19ms\nMemory peak: 1.5M\nMemory swap peak: 0B\n"
+      }
+    }
+  },
+  "preserved_v1_results": {
+    "production-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v1/production-ORIGINAL-EXECUTION.json",
+        "sha256": "1144e883faf41bcac857938b000a318e6eef069e14cec0e2cf3fdd56941ec4eb"
+      },
+      "document": {
+        "code": 0,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-production-20261110-v1.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 1.484s\nCPU time consumed: 2.354s\nMemory peak: 5.9M\nMemory swap peak: 0B\n"
+      }
+    },
+    "build-tests-ORIGINAL-EXECUTION.json": {
+      "binding": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/native16-serial8-reuse-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+        "sha256": "2eb45f257f7bb99fc8d57c88f3ebb904d2f8e92febf47a6558d0f55fc2b00ba8"
+      },
+      "document": {
+        "code": 1,
+        "stdout": "",
+        "stderr": "Running as unit: horizon-native16-serial8-reuse-build-tests-20261110-v1.service\nerror: function `exact8_reuse_keeps_guard_OS_and_all_history` should have a snake case name\n   --> /usr/local/lib/jetstreamer/horizon-native16-serial8-reuse-source-20261110-v1/main.rs:652:8\n    |\n652 |     fn exact8_reuse_keeps_guard_OS_and_all_history() {\n    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: convert the identifier to snake case (notice the capitalization): `exact8_reuse_keeps_guard_os_and_all_history`\n    |\n    = note: `-D non-snake-case` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(non_snake_case)]`\n\nerror: aborting due to 1 previous error\n\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 161ms\nCPU time consumed: 160ms\nMemory peak: 4.5M\nMemory swap peak: 0B\n"
+      }
+    }
+  },
+  "current_fleet": {
+    "binding": {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_113022_RUST_V8.json",
+      "sha256": "597f416cff7d6a90ac706a2a69467ebf12acbccdb1ccfdb50982083049aa4c8e"
+    },
+    "compact_summary": {
+      "sampled_at_utc": "2026-11-10T11:30:22Z",
+      "ready_pairs": 70,
+      "remaining_epochs": 30,
+      "live_replay_count": 7,
+      "useful_replay_count": 7,
+      "proven_replay_count": 7,
+      "authenticated_status_count": 19,
+      "current_memory_selected_target": {
+        "admission_authorized": false,
+        "aggregate_lane_rss_bytes": 380425207808,
+        "aggregate_private_lane_rss_bytes": 0,
+        "aggregate_production_lane_rss_bytes": 380425207808,
+        "all_live_production_replays_in_current_observer": true,
+        "century": 100,
+        "century_maximum_observed_lane_rss_bytes": 130056269824,
+        "desired_lanes": 13,
+        "desired_production_lanes": 13,
+        "disk_or_cpu_used_to_lower_desired_count": false,
+        "executing_lanes": 7,
+        "executing_private_lanes": 0,
+        "executing_production_lanes": 7,
+        "host_resident_planning_bytes": 433223688192,
+        "host_total_bytes": 810902843392,
+        "host_usage_basis": "entire host process RSS plus kernel components; unmapped file cache excluded; shared pages may count per process",
+        "kernel_resident_bytes": 48475525120,
+        "lane_gap": 6,
+        "marginal_basis": "mean current production lane RSS, rounded up; private RSS accounted separately",
+        "marginal_lane_rss_bytes": 54346458259,
+        "native_Frame_or_full_Reader_acceptance_claimed": false,
+        "next_action": "Use fresh admission and qualified pressure relief for execution; beyond proven count add one experimental lane, then require a clean expanded sample.",
+        "non_lane_resident_planning_bytes": 52798480384,
+        "observed_private_replays": 0,
+        "observed_production_replays": 7,
+        "observer": {
+          "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261110T113022Z-postcompletion154-v1.json",
+          "sha256": "8cb2dd1838cce01e5aec4d2bbcb6d971d723ac777e91b6b44c24ff547b00135d"
+        },
+        "policy": {
+          "century": 100,
+          "expected_observed_bootstrap_owners": 0,
+          "expected_observed_private_replays": 0,
+          "expected_observed_production_replays": 7,
+          "expected_supplemental_production_replays": 0,
+          "schema": "horizon-Root-coordinated-memory-target-policy-v1",
+          "unobserved_active_resource_owners": []
+        },
+        "reservation_ceiling_bytes": 195084404736,
+        "rounding": "ceil desired lane count toward target",
+        "sampled_at_utc": "2026-11-10T11:30:22Z",
+        "supplemental_production_replays": 0,
+        "target_percent": 90,
+        "target_used_bytes": 729812559052,
+        "valid": true
+      },
+      "observer": {
+        "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261110T113022Z-postcompletion154-v1.json",
+        "sha256": "8cb2dd1838cce01e5aec4d2bbcb6d971d723ac777e91b6b44c24ff547b00135d"
+      },
+      "authenticated_status_audit": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/range-101-200-status-audit-20261110113539.json",
+        "sha256": "6eb41ffd494eb237dbd508841dabb5411994143b9f6f0a964ae2b474752d2556"
+      },
+      "complete_DATA_authority": {
+        "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+        "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+      },
+      "complete_DATA_bytes": 6229838610226,
+      "complete_projected_memory_bytes": 759789531136,
+      "next_observer_receipt": {
+        "path": "/home/sol/.jetstreamer-private/visible-primary-next-observer-120022-with166167168169170171172-20261110-v1/SOLE_NEXT_TIMER_ACCEPTED.json",
+        "sha256": "13118e413c12f0dfce18a776b28e3f71dd3a428ce4c5701e0fb3e9b07e58d1e8"
+      },
+      "next_observer_utc": "2026-11-10T12:00:22Z"
+    }
+  }
+}
