@@ -1,0 +1,1136 @@
+{
+  "schema": "horizon-resource-repair-forecast-review26-v1",
+  "explicit_added_forecast_millis": 14400000,
+  "original_clocks_and_full_unexecuted_replay_preserved": true,
+  "model": {
+    "binding": {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review26-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW26.json",
+      "sha256": "29070c966551406d09436a70cc5ca3a8617be9b10762b6c8c0fc5151d00d8040"
+    },
+    "document": {
+      "schema": "horizon-epoch185-fixed-unexecuted-replay-planning-model-v1",
+      "epoch": 185,
+      "owner": "/root",
+      "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+      "authenticated_full_work_basis": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261105194538.json",
+        "sha256": "6dae466b92485611a652acb8f527b352191c0b64755468cdae06cce046fea3eb"
+      },
+      "full_replay_fixed_millis": 413404206,
+      "qualification_original_review": {
+        "path": "/home/sol/.jetstreamer-private/actual173022-visible-root-acceptance-20261108-v1/status-estimate-review173022.json",
+        "sha256": "22b318775efec63ec9b542d852ffbfe327cdaa3c299da8b280846ca5c635e146"
+      },
+      "qualification_anchor_utc": "2026-11-08T17:30:22Z",
+      "qualification_original_total_millis": 86400000,
+      "control_model_issued_at_utc": "2026-11-08T19:25:15Z",
+      "control_integration_allocation_millis": 160185000,
+      "control_allocation_is_inside_original24h_budget": false,
+      "bootstrap_millis": 3600000,
+      "verification_millis": 21600000,
+      "delivery_millis": 14400000,
+      "no_full_epoch_replay_has_started": true,
+      "qualification_or_control_clock_is_not_a_replay_lease": true,
+      "assumption": "Seven original166-172 replays remain executing/proven7 with stable identities and zero restarts in actual1100complete fleet and19 authenticated reports; memory-selected target14. Original154 unused future328GiB DATA was genuinely checked/ended/selected once with70-node69-equation ancestry,270 entries8102522880 retained bytes,32GiB retained and every original raw row/file preserved; no memory or physical credit. Current DATA6229838610226/memory759789531136, normal10/verifier96/native16/shared64/seven68GiB caps unchanged. New owned-diskV5 four strict compilers18tests and native actual fit passed:6131298258738 required vs6382790459392 available, margin251492200654. Seven stronger floors6264131239730 remain until separate effective-consumer and continuous handoff qualification. V12 actual corrected-head anonymous memory check passed but fitfalse gap91548504064; no unchanged retry. Exact uploader source candidate2c54449e/blob3885c346 and all15 original fingerprint-matched frozen libraries now located; actual artifact uses rustc1.98.0. Whole-image reproduction/future buffer-runtime-host envelope and a genuinely funded exclusive serial8control/compile reuse proof remain before any memory reduction. Timestamp/dependency matches are not source-artifact proof. Full185 separately scoped actual-successor wholeouter harness, Helper40pin, effective consumers, distinctFrame and normalReader remain unqualified; held source regression is not the full native proof, historical harmless48GiB profile is not repeated. Previous11:55control/12:19qualification forecast no longer covers source/capacity and native-harness dependencies. Add exactly4h uncertain engineering allowance outside original24h: about1h source reproduction and complete future-memory component proof,2h complete outer/helper/Frame/Reader qualification,1h fresh funding/admission/first-guard and contingency. Control15:55 and qualification16:19:18 remain planning forecasts, not native leases. Preserve originalNov8anchors, original600s120sreader clocks, every failed original, full unexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h, all producers/uploader/original199FD9quarantine/145timer/otherhost. No new replay, resource ending, old start, lease or archive authority is reset.",
+      "control_review_history": [
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/actual1925-fixed-work-eta-event185-20261108-v1/FIXED185_ETA_MODEL.json",
+            "sha256": "c0fd7a8ac593998c635731e64e94ad0b32c95ce1d3e74316bb75e0ab34b3ec52"
+          },
+          "previous_total_control_allocation_millis": 7200000,
+          "reviewed_at_utc": "2026-11-08T21:19:32Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "reason": "Original twohour control integration estimate insufficient: actual enrollment helper mismatch fixed, parent periodicguard race fixed andgenuinelypassed, actual21fleet suffix ordering failure now repaired against exactHelper32consumer; qualify remaining controls and freshadmission. No full-route progress or replay credit.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/actual2100-fleet-order-and-explicit-control-review-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW2.json",
+            "sha256": "8563275737b1a5f06120144987d1b48c3dd991ed13884b912194e1ea3af1a080"
+          },
+          "previous_total_control_allocation_millis": 12257000,
+          "reviewed_at_utc": "2026-11-08T22:45:03Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "reason": "Actual22:30 Frame/fullreader/parent/cached145/memory/DATA allpassed, but Planner3 rejected Helper33 because its native-capture pin still namedHelper32. No185actor was started. Planner4now qualified4compiler/24ordinary andactualbyteidenticalfailed2230requestaccepted in metadata-only control; normal-sealedR2 onlycorrects inherited Helper32metadata label. Operation35pinningPlanner4underqualification. OriginalfullReader300s eligibility expired; nextfresh23:00sample is after current22:49:32control deadline. Explicit review now allocates90minutesremaining from SAME19:25:15anchor INSIDE unchangedoriginal17:30:22+24h total. No native lease/clock or full unexecuted413404206ms replay cost reset. No replay/publication/resource credit.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/actual2230-planner4-explicit-control-review3-event185-20261108-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW3.json",
+            "sha256": "7277c044bde1cd513ba1c03e2ffc807ebdc1a3ef633511e0634497683ce66edc"
+          },
+          "previous_total_control_allocation_millis": 17388000,
+          "reviewed_at_utc": "2026-11-08T23:58:36Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "reason": "Helper34 now genuinely qualified four compiler stages,2937ordinary,three historical23:00 composition controls and retained full outer; Planner5 qualified27ordinary/six real saved2300 request controls; Operation36 qualified63ordinary/ten genuine native/lifecycle/profile/eight-file controls and normally sealed. Original23:00 actor expired without Main. These repairs consumed23:30 startup window; next sole00:00 sample needed. Midnight guard current code compiled but one test retained23:00 expected timestamp; distinctR2 test-source correction and genuine requalification required. Actual successor-authority integration, original2300 terminal preservation, fresh reader/admission/first native guard/Main still outstanding. Explicit90minute control allowance from SAME19:25:15 anchor within unchanged original17:30:22+24h qualification budget; no nativelease/clock or fullreplay reset.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review4-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW4.json",
+            "sha256": "4fe10f74670a446803e9dd151678f070dfe6137164301be555934d01d660cd45"
+          },
+          "previous_total_control_allocation_millis": 21801000,
+          "reviewed_at_utc": "2026-11-09T01:25:00Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Actual0100 reached genuine current Frame, fullReader13, parent/memory/DATA, original guarded actor, enrolledHelper34 persistent fullreader, allfour readableviews and actualeightfileSolread. First realDriver11guard thenfailed because activation omitted scratch/ledger/output/receipts; bothguard andworker requirepreexisting empty0700dirs. Final3also exposed IN_MODIFY receipt readbeforeclose race. Actor was positively guardstopped beforeMain; no fullreplay. Remaining estimates: Final4closed-write fix/nativepublicationcontrols10min; Operation37dirsetup/actualunprivilegedscan and exact0100successfulreaderretirement10min; strict successor/profile/nativeintegration10min; fresh scheduledtuple and originalguardedreader/admission/Main20min plus10mincontingency. These are uncertain planning allocations, not nativeleaseextensions. Existing Reader13/H34/P5/D11retained; fullboundary/publicationstillunqualified.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review5-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW5.json",
+            "sha256": "08720c9def3712b29d4b3e8022e7e74134df4dc42655fa7eb5431d5555321b30"
+          },
+          "previous_total_control_allocation_millis": 25185000,
+          "reviewed_at_utc": "2026-11-09T02:17:25Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Actual02 finitechain passed strict qualified37/Final4 metadata authority and realfleet; realFrame capability passed. O26 capture-phase failed while the unchanged145 periodicguard was activating with pendingJob41040174. Its query rejects Job before its intended active-guard wait branch. No02Frame/reader/actor/Main ran; no retry after original02:15:22 cutoff. Root will repair this finite readonly phase wait to classify exact busy guard states as waiting, retain strict settled guard/timer identity and all2-4s/25s gates, qualify native negatives, and integrate phase successor. Remaining planning allocation: timing source and ordinary/native qualification15min, next02:30 guard/current metadata preparation10min, fresh finite Frame/reader/admission/originalMain25min, contingency10min. Final4/Operation37/guard0200 actual qualification and exact0100retirement remain completed and not repeated. Fullboundary/publicationstillunqualified. Original24h qualification and full unexecuted replay costs unchanged; no native lease change.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review6-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW6.json",
+            "sha256": "12f903138485d1bd73326bec9792a2c228fa5d0dddeb072c2f4abc1a55e26c35"
+          },
+          "previous_total_control_allocation_millis": 28330000,
+          "reviewed_at_utc": "2026-11-09T03:13:21Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "reason": "Actual0230 got through genuineFrame/fullreader/resources/planner/actualSolrunlayout/enrolledH34/firstguard/token/Main. Main coldinitialized8min thenOWN5sresourceguardreportedENOENT, no canonicalprogress; zeroOOMcounters. ActualFinal4postMaincapture exposed prestartguard race andwrongoutputnamespace, qualifiedH34R2 captured lifecycle without restart, qualified terminalcapture succeeded after exactfailedtimerstop. Remaining allocation: Driver12 complete-census transient-file/PID repair plus ordinary/native tests15min; exactnewconsumerregistration/helper-Frame-CLI completeouter25min; Final5/O38/postMainreaderretirement qualification15min; freshscheduledtuple/fullreader/admission/nativeMain/earlybootstrap25min; contingency10min. Existingconsumerpins andnativeclocks remain until actuallyqualified replacements. Fullparentroute stillseparate. Explicit90minremaining is uncertainplanning from SAME19:25:15controlanchor INSIDE original17:30:22+24hqualification, notnativeleaseextension orfailedworkerrestart. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged, noresourceorfullreplaycredit.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review7-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW7.json",
+            "sha256": "6fa0bc5c379a47d66e72add1ee72a994c76389f8bce73f945f493f0eab1d358c"
+          },
+          "previous_total_control_allocation_millis": 33486000,
+          "reviewed_at_utc": "2026-11-09T04:42:33Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "D12/H35/Final6/P6/O38 now actually qualified and normally sealed, actual0230 successfulreader aliases retired after genuine postMain terminal closure without payload/credit changes. Genuine0430 Frame captured55fda127 and completeHelper27 outer passed after exact0300/0330/0400 bridge finalization; native43resource/admission/worker not started. Fleet8 rejected newpolicy rows and gateevidence, so accepted0430rawfleet retains exactoldpolicy while newterminal/q context is preserved separately; no policygate bypass. Remaining estimated control allocation60min: complete current authority binding and full prior-plus-new qualification/poolclosure20min; next fresh scheduled tuple/Frame/resource/prereader/admission integration20min; native setup/firstguard/token/Main/earlybootstrap10min; contingency10min. This is uncertain planning, not a lease or clockreset. Same19:25:15controlanchor inside original17:30:22+24hqualification, same fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h. Bounded80351283/48GiB/14400s is not full185; fullparentroute still separately unqualified. CurrentDATA5176926614164normal6GiBextraQA0, replay0target5, otherhost200-300/protected199 untouched.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review8-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW8.json",
+            "sha256": "92bfb17fca2510e66301a649fb4f997281b197ad765b32f850fdd78268935c31"
+          },
+          "previous_total_control_allocation_millis": 37038000,
+          "reviewed_at_utc": "2026-11-09T05:42:19Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 7200000,
+          "reason": "Actual0500 current Frame/fullreader/memory/DATA/Planner6/O38/H35/Driver12firstguard/token/Main succeeded; Main05:15:23..05:23:23 then failed its own allocation census during account-file churn, no transactionprogress and cgroupOOM0. Root captured qualifiedHelper35lifecycle without restart before terminal. Exact failure/ownedstop/PID1/openrepair retained. Driver13pinned-inode census now ACTUALLYqualified strictfourcompilers,43ordinary,fiveRootnative,14Solcensus plusoldSolnative, all8originalsPID1success/drained, normallysealed7de0d10f. Original30s/8retries/4M/depth64 preserved; missingbeforepin stillfailsclosed. Helper36/Planner7/Final7/Operation39 actualpair integration stillneeded, no newadmission. Remaining uncertaincontrol estimate120min: minimalHelper36 actualD13registration compilation/qualification25min; Planner7/Final7/Operation39 exactrole/static/nativecontrols35min; nextgenuine scheduledcurrentFrame/resource/admission/Main20min; coldinitialization validation20min; contingency20min. Same19:25:15controlanchor inside unchanged17:30:22+24hqualification; no nativelease/deadline/reset/retry and no replaycost credit. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h remain. Bounded80351283/48GiB/14400s isnotcomplete185 route; fullparentqualification and independent163nineconsumer/native48path remainopen. DATA5181758452372normal6extraQA0; useful0target5. Otherhost200-300 and original199FDs protected.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review9-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW9.json",
+            "sha256": "a98e755b7f7acc2a113a704c2633147fd4b1edc28e60d7de28fcd5b665bc40eb"
+          },
+          "previous_total_control_allocation_millis": 44224000,
+          "reviewed_at_utc": "2026-11-09T07:44:15Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Actual0730observer/fleet/Frame and both H36/H27completeouter passed, actual authority/root QAclosure1739 passed withDATA5190885257876. Actual full Reader13 started under original phase at07:39 and exited1: unavailable diagnostic still owns resources. Captured0730observer includes terminal failed0500epoch185 but immutable fleet unit_census has no row for that new unit; H13 generic unavailable check sees null, rejects correctly. No replay/Main or memory/DATA selection ran. Root must qualify terminal185 observer/fleet handoff preserving every old memory/DATA promise and failure/backlog, or exact supported typed reader route; no dropping debt, relabeling full resources, blind retry or rebuildingalreadyqualifiedD13/H36. Original0730readerfailedIIDa04328f69a1244fa92e98ac419c49d5d and originalphaseb19c0dd6458c42ae9c67eb75e3586e1a preserved. Nextsole0800observerarmed, cannot rerun0730reader. Explicit remaining control planning60min: terminal-row/typeddebt diagnosis+qualification20min, nextsample/freshreader-memory-DATA/admission20min, guardedMain/bootstrap10min, contingency10min. This allocation stays inside same original17:30:22+24h qualification and uses same19:25:15 controlanchor; no native clocks/deadlines reset and full413404206ms replay/bootstrap1h/verification6h/delivery4h unchanged. Replay0minimum3target5, alloldpromisesretained, Rootrepairactive, independent163bootstrap/native48 and full185boundaryroute unqualified.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review10-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW10.json",
+            "sha256": "ff4407e483a6ead86b2391f64cd9ee06b342d3790d8eedb9332de6bcf7e0559a"
+          },
+          "previous_total_control_allocation_millis": 47940000,
+          "reviewed_at_utc": "2026-11-09T08:41:22Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 7200000,
+          "reason": "H37 exactclosed-source policy passed bounded512MiB Clippy/testbuild/four semantic tests incl real0500life/terminal parent, no fullhelper/nativefleet/Frame/reader/admission claim. Actual0730fullReader13failed unavailable diagnostic still ownsresources; terminal0500owner must be accounted with48GiB+guard256MiB+549890031616DATA, not omitted. ActualH35life andterminal alreadyexist, but sourcefrontier needs sameoriginalparent composition plus genuine archivedobserver bridge and selected typedreader/Frame/memory/DATAconsumers. Root now preparing fullH37compiler using existing qualified0500selectedmemory projection430083301376 plus explicitretainedold185/external/kernel budgets and currentnativeconditions, without claiming a fresh replay tuple or credit. Fullrawreader estimate800GB is a different projection. Remaining uncertaincontrol120min: completeH37build/fulltests/nativecontrols25min; retainedfrontier/observerbridge20min; downstreamFrame/memory/DATAconsumerqualification25min; freshscheduledtuple/admission/guardedMain20min; independentbackfill15min; contingency15min. Same19:25:15controlanchor INSIDE unchanged17:30:22+24hqualification, no nativeclock reset. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h unchanged. Replay0minimum3target5; allfailedhistory/debtretained, Rootrepairactive. Latest0830all11statusreadback08:38:04 andinventory70/30/0. Nextsole09:00observerarmed. Sourcecode/tests/controllers not replaylanes.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review11-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW11.json",
+            "sha256": "53eeada9acfda2802539d33d457587c691486fc758bb70e6069eed00676bfe38"
+          },
+          "previous_total_control_allocation_millis": 54967000,
+          "reviewed_at_utc": "2026-11-09T10:20:56Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "reason": "H39 now actually qualified/sealed: four strict compilers2951ordinary20retainednative plus real full current_allocation/tokenview load, real0500metadata and0930ancestry controls; all28originalsPID1/drained, freshQA5closed. Actual1000retained185 fullfleet accepted nativeIIDb1313f3973d444219ac4e4f2c1388bc9, includes original185actor48GiB+guard256MiB+DATA549890031616 and complete native roles; no resource credits/currentfullreader/admission. Future1030guardfourstrictcompilers65testsnormallysealed, actualwindowstillrequired. Mainnextgate is Frame producer: exact genuinepreviousFrame0730fleet580285f2 differs currentH39previousoriginal0500enrolledfleet7ee68645; existingCLI5preparer/staticroute requires equality and has no cold185projection. Rootpreserves that gate and qualifies an exact genuine-chain typed adapter/CLI successor, then every actual selected consumer and newFrameimage outer validation. Five currentreader/phase/parent-memory/DATA source changes and20compilerrecipes staged, actualpins/nativeacceptance pending; O39also needs exactnewreader/postreader role integration. No straightReader13swap or oldFramepassingclaim. Lastcomplete resources0500,genuineFrame0730; currentnativefleet1000 is newdistinctprogress, not fullresourceadmission. Rootexplicitlyreviews90min uncertain remainingcontrol: exactFrameadapter/CLI+predecessor/nativeouter25min, reader/phase/memory/DATA/operationconsumerqualification30min, freshreader/selection/admission15min, independentbackfill10min, contingency10min. Same19:25:15controlanchor and unchanged17:30:22+24hqualification/fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h preserved; no nativeclocks reset. Replay0minimum3target5shortfall remains open; independent163realprotectedbootstrapprivateview/source-scopecontrol stillpending. DATA5205380772500normal6extraQA0 includes1030guardDATA512once. Latest1000inventory70/30/0 andall11statusauthenticated10:00:53; nextsole1030observerarmed. Otherhost/protected199unchanged.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review12-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW12.json",
+            "sha256": "4cfc3e5d3ec325d112ac75d2ac92cbd637beb4d489c02d35f4d3d6364bb550fb"
+          },
+          "previous_total_control_allocation_millis": 59141000,
+          "reviewed_at_utc": "2026-11-09T11:39:39Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Frame7 exactnested CLI5 repair actually passed8strict compilers476typed52CLIordinary3native controls, all13originals terminal/PID1/drained; normallysealed candidate5bf59210. Genuine1130 H39fleet IID53831fb198364f848f3e92e922b7bdd9 accepted. Real currentplan complete validate_evidence positive/unknownimage/native/missingterminal rejections passed before probe. Actualnewdifferentimagecapability03f027a6 andgenuinecapturee065511f passed originalnative/PID1/drained; realpostcapture fullvalidate_evidence+validate_frame andtamperingpassed IID01c4fc54. Frame7nowfullyqualified/finalnormallysealed withactualgenuine1130Frame, notfullresourceadmission. Currentnextreader source1504 plus82consumers staged andrefrozen fromactualH39; onlyactualFrame7imagepinset, all3futurereaderpinsremainNone. All29oldexternsandbothfeaturespreserved; newuniqueFramecrate/metadata30thexternavoidsStableCrateIdcollision. UniqueFramefourstrictcompilepathactivelyrunning fromactualacceptedFrame7source, firsttwoClippypassed. Nextfullreader+completeadapterouter, parentmemory/DATA/phaseclients, genuinefreshreader/selections/operationadmissionstillrequired. Rootexplicitlyreviews60minuncertaincontrol: uniqueFramequalification5min; fullreader4stages/inherited/native/completeouter15min; parent/phase20recipes/tests15min; freshscheduledtuple/selector/guardedadmission15min; independent1635min; contingency5min. SAMEoriginal19:25:15controlanchor and17:30:22+24hqualificationbudget preserved; no nativeclocksrenewed. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4hunchanged. DATA5231150576276 includesnewnextreader/consumerDATA16afterFrame2DATA4; normal6+existingQA5=11GiBserialcompiler8observer2Root1, noextramemoryreleasedorcountedtwice. Old185actor48GiB+guard256MiB+549890031616DATAretainedzero credits. Lastcomplete resourcetuple0500 but genuineFrame1130 nowactual. Replay0minimum3target5stillincident. All11statusauthenticated11:31:14; nextsole1200observerarmed. Rootactivebuild/qualification; otherhostandoriginal199/FD9unchanged.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review13-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW13.json",
+            "sha256": "2359e1b08abd30c455cb0ef6f33bf6c16627878f27e2b8bbaeceadbfdbf5babc"
+          },
+          "previous_total_control_allocation_millis": 62064000,
+          "reviewed_at_utc": "2026-11-09T12:30:31Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "ActualFrame7 fullyqualifiedgenuine1130capability/capture/differentimageouter; current3and7bridgeoriginalJSONmetadatafinalizedreadonlyexactinodebytesmtime/clocks. NewcompleteReader2fullyqualified4strict2957ordinary20nativeplusgenuine1130adapterall29originalsPID1successdrained,original29externs+unique30th/bothfeaturespreserved. All20consumeractualstrictcompilerexecspassedafterexactlog/qaDIRsetuprepairs. Originalfalseall20summaryhash-boundcorrectionpreserved; corrected20graphindependentlyrechecksall20code0. Definedordinarycountsparentmemory60,parentDATA69,memoryselector0,DATAselector6,phase71=206;3actualwitness/discoverynativecontrolspassed;miswordedbothselectorszeroexpectationcorrectedbyactualcountreceipt. Selectoractualnativecurrentresourcecapabilitiesstillrequired. Phasecandidatev4normallysealedONLYoperation; actualfirstnativequalfailedENOENTatrole()beforeusefulguardworkbecausemandatoryartifact-proof.jsonabsent. Rootpreservesincompletepackage/originalexit1andpreparesdistinctv5candidatewithactual4strict/71ordinarysource-boundstaticproof(all_required_tests_passedfalse/nativepending)underoriginalqualifiedrole+sealerpolicy,then2actualnativemetadata controls. No role()bypass/packageoverwrite/sourcechange. Rootexplicitlyreviews60minuncertainremainingcontrol: phasepackaging/native10min; freshscheduledFrame/fullreader/parentselections15min; exactO39successorrolesand4compiler/nativeguardedMain20min; independent163bootstrap10min; contingency5min. SAMEcontrolanchor19:25:15andqualification17:30:22+24h/fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4hpreserved; no nativeclockrenewal. CurrentDATA5231150576276normal6+existingQA5pool11retainedallold18548GiB+guard256MiB+549890031616DATAzero credits. Latest1200inventory70/30/0/all11reportsauthenticated12:01:07,nextsole1230observerarmed. No1200Frame/readerattemptaftersamplefreshmarginconsumed; nextgenuinescheduled1230tupleusedwithoutclocksreuse. Rootactivequalification; usefulreplay0minimum3target5incidentopen; otherhost/original199FD9unchanged.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review14-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW14.json",
+            "sha256": "913834c3e89b9d55107a8cbb0ec621e6ee3262bb06273556694ca8c844f8b0a1"
+          },
+          "previous_total_control_allocation_millis": 65116000,
+          "reviewed_at_utc": "2026-11-09T13:25:33Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Actual1300observer/fleet/Frame7capability/capture/fullouteracceptedand3originalmetadatareadonlyfinalized; all11statusauthenticated13:02:02. QualifiedReader2andall20consumercompilers206definedordinary3witnessand2phaseactualnativecontrolssealed. Rootsource-boundreadonly2GiBadmissionnowexplicitlyqualifiedfromactualexisting0500raw1049632333824 lessalreadyqualified141207232172032/original199206158430208/cached145206158430208=430083301376unchangedbaseline, fresh1300originalnativeconditions+old18548GiBguard256MiB+entirepool11+sameenddelta,headroom311465701376, no newrelease/freshreplaycredit. Actualphase-gatedReader2ranunderexact2GiBnativeprofileandfailedexit1: cold185 observer declaration crosses original range, actor or scratch custody. Exactoriginalchild102outcome retained; readerIID5517d8aeb2cf4849948261a562afd521Main0Control0cgroupempty, no acceptedrawreport/selection/admission. Actualobserverdeclaresold185run_root/scratch; signedregistrationandexistingqualifiedobserver_ownedcontractrequirewholeevent.run_root. Range185/IIDmatch. Rootreviews prospective1330observerliteralcorrectiontoWHOLEregisteredallocationrootcoveringscratchandmetadata, preservesoriginalfailed1300sample; no codegateweakening/oldsampleedit/positiveobservationfabrication. Typedpeer48GiBguard256MiBDATA549890031616alreadychargedandretained. Qualifyfutureconfigthroughnormal-sealedrecipe; qualifiedretirefailedreadernativerolewithoutresets, thennewgenuine1330Frame/fullreader/selectors. Agentfinal2source-onlyOperation40additiverolesinprogresspreservingReader13/H36; notyetqualified. Explicit60minuncertainremainingcontrol: corrected1330tuple/fullreader15min;freshselectors10min;O40source4compiler/native20min;independent16310min;contingency5min. Original19:25:15controlanchorand17:30:22+24hqualification/fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4hunchanged,no nativeclockrenewal. DATA5231150576276normal6+QA5pool11zero creditsretained. Replay0minimum3target5stillincident; otherhost/original199FD9unchanged. Nextsole1330cadencepreserved.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review15-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW15.json",
+            "sha256": "2fbdc203a74e84258e0df4aaa1e5e250705bc0944d89482a9925cbaa2c3c2225"
+          },
+          "previous_total_control_allocation_millis": 68418000,
+          "reviewed_at_utc": "2026-11-09T13:44:15Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 7200000,
+          "reason": "Nov9 actual1330 corrected observer/retainedH39fleet/Frame7capability/capture/completeouter and exact3readonly originalmetadata accepted. Actualphase-gatedReader2 IID348b447a0bc9475ab97f90fc2c450794 completed successfully under2GiB; raw reports preserved, actual original native completion/fourhistoricalfamilycontract/fullrawreadonly and terminal199-parent-memory-current-reader artifact normal-sealed. This resolves1300rootmismatch without weakening gates; original1300failure retained and exactfailedrolemanagercollectedzerocredit. Freshresource selectors remain unexecuted. Source inspection now identifies additional necessary client dependency: original199-census4 links oldparentmemory library and its OriginalDiscovery recognizes Reader13 only; Reader2 registration is in newparentmemory5 but census was not relinked among five consumers. Need additive qualified census successor and bootstrap policy preserving oldroles; do not execute unsupported oldcensus or let current1330reader freshness expire silently. Source-only O40 packet also found Planner7 independentReader13gate; Planner8 required then finalO40pins/compilers/native. Rootqualifies needed clients and prepare parentchain before nextgenuine1400or latercurrenttuple. New120min uncertain remainingcontrol: census/parentnativeclient20min;Planner8/O40 strictordinary/native55min;freshcurrentreader/selectors20min; guarded185launch15min;independent1635min;contingency5min. Full413404206ms replay/bootstrap1h/verification6h/delivery4h and originalqualification/controlanchors unchanged; no nativeclockrenewal or replayauthority. DATA5231150576276normal6plusreservedQA5old185actor48GiBguard256MiBDATA549890031616retainedzero credits. Replay0minimum3target5shortfall remains; all11statusreadbacks13:33:58 inventory70ready30missing0anomalies;solecorrected1400cadencearmed. Otherhost200-300/original199FD9protected.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review16-model-20261109-next-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW16.json",
+            "sha256": "d187477756d4429a26b8c8d8ad0dd01e453dfdbb245939fbf8e9b4a5e9e797d3"
+          },
+          "previous_total_control_allocation_millis": 73140000,
+          "reviewed_at_utc": "2026-11-09T15:40:07Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 3600000,
+          "reason": "Actual1530 completeFrame7/Reader2/census5/cached145/memory5/DATA5/O40assembly passed. First genuine O40 original185 attempt reached native gated ready/task capture then actual enrollment rejected old retained185 registration: oldplan epoch185_cold_startpre_registration is nonnull while observer and both fleet observer bindings match. No transaction replay or guard release. Old terminal185 history must remain; qualify additive successor enrollment/fleet/reader transition and original finite continuation or preserve expiredattempt, not eraseoldregistration or resetsetup600. Rootrepairactive. New uncertain60min control planning: exact retained-registration repair/nativecontrols25min, integration qualification15min, nextfreshsample/guardedadmission15min, contingency5min; within unchanged original24hqualification budget. Fullreplay413404206/bootstrap1h/verification6h/delivery4h unchanged. Replay0minimum3target5. GCloudvalidated. Independent163Rustcollector source implemented and awaitingactualcompiler/nativequalification; cleanup30GBnineeligiblecaches preparedqualification. Sole1600cadencearmed; protected199/otherhost200-300 preserved.",
+          "inside_original24h_qualification_budget": true,
+          "no_original_native_clock_reset": true,
+          "actual_failed_enrollment": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-o40-original1530-20261109-v1/619-enroll-original-task-original-outcome.json",
+            "sha256": "920a229045dc5433ea8e7cb3109d070d5505dd67e0425ec85fccb975bd8483e9"
+          }
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review17-enrollment-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW17.json",
+            "sha256": "613d6a9dfcf1aea326c2dbee9e72ea007f32c147bb4fe05acd356e29609f9b5c"
+          },
+          "previous_total_control_allocation_millis": 76492000,
+          "reviewed_at_utc": "2026-11-09T16:42:55Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 5400000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 5400000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "reason": "Actual1530start uncovered true single-original retained185 enrollment incompatibility. Sharedadditivepolicy3 nowactuallypassed4strict6ordinaryandRootgenuinehistoricalfailedsetupinspection, preservingold722andnew1530debt. Fullproductionhelper/fleet/reader/O40adapter integration andcompleteouter/nativecontrolsremain, so earliercontrolthrough16:40:07is missed. Explicit90min uncertainremainingintegrationallowance: fullhelper/reader/fleettypedpeers45min, consumer/Operationintegration20min, actualnative/negativecompleteouter15min, contingency10min. Adds90min reviewedqualificationplanningoutsideoriginal24h budget; originalqualificationanchor,total24hbaseline,controlanchor andfullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h preserved. This changesonlydeliveryforecast, never native600s clocks or failedactor restart. Rootalsoexecutedindependent166standardmanifest/package/twoactualnegativecapabilities andrealSolGCSgeneration/CRC/MD5probe; freshresourceadmission and actualworker next, no runtimecompilerneeded. Legacy163OS227GBversus96GBfreegateblockedunchangedcontrol; RootreviewingcurrentOSclaims/cleanupwhileindependent166proceeds. Replay0minimum3target5remains. Latest1630all12authenticated16:32:51, sourcecompleteDATA6163132399410 retained, no resourcecredits; sole1700observerarmed; uploader/protected199/otherhostpreserved."
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review18-integration-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW18.json",
+            "sha256": "3e2b2c0f2f2679371e39541378d487842d6f84d13836c905571a1bbeac984e44"
+          },
+          "previous_total_control_allocation_millis": 82060000,
+          "reviewed_at_utc": "2026-11-09T18:12:22Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 10800000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 13320000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "reason": "Epoch185 full retained-successor helper/reader/Frame/O40 integration remains source-only; required post-release Frame contract and exact once-only failed1530 ended-obligation consumption add concrete qualification work. Root prioritized real independent replay throughput:166/167advance with zero restarts;168original17:59:09producer started and genuinefirstguardpassed. Specificfailed1530tool passedfourstrict13ordinary plus realreadonlynativecheck andonce-onlyclosure;512GiBfuturepayloadand51808043008memoryended,128MiBmetadataandallactualfiles/old722/rawclaimsretained. Both healthy166/167guards handed off continuously with actualsame-IID sustainednewfires beforeoldtimersstopped. New168freshadmissioncompleteDATA6567664631602/memory708249923584. New uncertain180min remaining185engineering forecast:typedended-obligation successor accounting and Frame/reader contracts60min, actualfullhelper/consumer builds and completeouter/nativecontrols70min, freshguardedadmission20min, contingency30min. Original24hqualificationbaseline andoriginalcontrolanchor stay recorded; extend only the deliveryforecast outside that baseline. No failedactor restart, token, native600s extension, replay credit, archive or sidecar authority. Fullunexecuted413404206ms/bootstrap1h/verification6h/delivery4h retained. Ninecache15tests/fourcompiler/nativecheckpassed but execution needs optimizedwhole-operationqualification; no deletion orphysicalcredit yet. Nextnormal18:00observeraccepted166/167;168freshlaunchsupplementretainsitsfullclaim, next18:30willcoverallthree. Additionalcapacityandrepairscontinue alongside realreplay."
+        },
+        {
+          "previous_model": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+            "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+          },
+          "previous_total_control_allocation_millis": 92827000,
+          "reviewed_at_utc": "2026-11-09T21:05:08Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 10800000,
+          "explicit_remaining_total_qualification_millis": 14400000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 27286000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "reason": "Original185 engineering deadline21:12 cannot cover remaining full-route work. Four real166-169 lanes now advance with zero restarts. Exact old722 genuine started-terminal closed-tree check and once-only future ending passed; its48GiB actor memory and480969228288 futureDATA ended while every physical file and guard/history promise remained. Failed74 ending remains already consumed, never applied twice. Full185 retained-successor helper/fleet/Reader/Frame/O40 source still needs30-extern graph builds, complete native outer contracts and explicit integration of these effective endings without changing raw history. Root is also preparing actual170 to maximize useful throughput. Explicit uncertain4hour remaining qualification forecast: typed ending/consumer integration90min, actual helper/consumer QA60min, full native Frame/Reader/outer45min, fresh admission/first guard15min, contingency30min. First3hours are the remaining control integration forecast; finalhour is current full native/admission work. Preserve original qualification17:30:22 anchor, original24h baseline, control19:25:15 anchor and full unexecuted413404206ms replay/bootstrap/verification/delivery costs. This revises delivery planning only; it resets no native clock, failed actor or resource authority.",
+          "actual_old722_ending": {
+            "path": "/var/lib/jetstreamer/horizon-old722-actor-future-20261109-v1/722adc397ae24bb4b96d452783599f57/ended.json",
+            "sha256": "eec2a374a3bd7a52f49ceaeaa2de16fd17ef52d740a310a0d6a6c8469cf2fee9"
+          }
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review20-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW20.json",
+            "sha256": "a39af0796fea9f68f5d9b3026e068e824bc0f373c99d61479f2a7d4c3c1964c0"
+          },
+          "previous_total_control_allocation_millis": 103193000,
+          "reviewed_at_utc": "2026-11-09T23:28:51Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 18000000,
+          "explicit_remaining_total_qualification_millis": 21600000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 43109000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "reason": "Full185 Helper40 now passed exact30-extern/both-feature four compiler configurations and2967ordinary tests. Five original166-170 replays are advancing, proven5 after genuine matching window/guards, memory-selected target16. Full successor native/outer, effective-ending consumers, distinct-image Frame and normal Reader/client registrations plus fresh resource admission remain. New attempt to fund a48GiB native profile inside the verification pool failed safely because actual shardC hard cap is32GiB, not the8GiB source assumption; no pool allocation or limit change occurred. Correct the typed pool scope/census or qualify a separately funded bounded route before actual profile controls. The earlier00:05control/01:05qualification forecast is no longer credible for this concrete remaining scope. Explicit uncertain6hour remaining qualification forecast from this review: resource and full successor native control integration2h, helper/Frame/normal-reader consumer qualification2h, fresh complete accounting/admission/first guard1h, contingency1h; first5hours control, finalhour full qualification/admission. Preserve originalNov8 17:30:22 qualification anchor, original24h baseline, Nov8 19:25:15 control anchor, full unexecuted413404206ms replay and future bootstrap1h/verification6h/delivery4h. This changes delivery planning only; no native clock, failed actor, original state or resource promise is reset.",
+          "actual_four_compilers_and_ordinary_tests": {
+            "path": "/home/sol/.jetstreamer-private/epoch185-retained-successor-helper40-qa-20261109-v1/ROOT_FOUR_COMPILERS_AND_ORDINARY_TESTS_PASSED_NATIVE_PENDING.json",
+            "sha256": "bb4d35ba75fd6dda5c968a7bb49fb6e62c7e2b792f466eba81a162525b80288c"
+          },
+          "actual_verification_pool_failed_gate": {
+            "path": "/var/lib/jetstreamer/verification128-suballocation-qualification-20261109-v2/NATIVE-CHECK-ORIGINAL-EXECUTION.json",
+            "sha256": "2aa43a2ff749dc50b562031a1bc4a165d2a8ece6a092d7b35a06e21a85c43575"
+          }
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review21-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW21.json",
+            "sha256": "c636b65323ad5d29b242478264bdb2c364ff9a46fd1b21ea821ed01e68076995"
+          },
+          "previous_total_control_allocation_millis": 119016000,
+          "reviewed_at_utc": "2026-11-10T02:19:18Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 18000000,
+          "explicit_remaining_total_qualification_millis": 21600000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 53336000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "reason": "185 full Helper40 four strict compiler configurations,2967 ordinary tests and four genuine retained read-only controls remain accepted. Full successor native/outer, effective-ending consumers, distinct-image Frame and normal Reader, actual48GiB profile and fresh admission remain unfinished. The initial resource/native integration allowance has slipped while Root established six actual independent replays and recovered obsolete commitments; six now passed a genuine full matching window with zero hard memory/OOM deltas.172 static package and both GCloud generation metadata checks passed, with no172 replay. Actual verifier caps total96GiB including futureA8;96+48 exceeds the original128 pool. Next qualified funding proposal is an additive16GiB extension to144GiB, preserving the raw128 and every actual verifier cap, plus a fresh six-owner anonymous remaining-growth proof; this has not been admitted or credited. A seventh standard68GiB actor plus1GiB guard and extra16GiB headroom would exceed host total by426295296B even before other unfulfilled growth, so it cannot reuse the old171 check. New explicit uncertain remaining185 qualification forecast6h: resource/full native controls90min, helper/Frame/normal-reader/effective-ending consumer qualification150min, fresh full accounting/admission/first guard60min, contingency60min. First5h control and finalhour full qualification/admission. Preserve originalNov8 17:30:22 qualification anchor/original24h baseline,19:25:15 control anchor, full unexecuted413404206ms replay, bootstrap1h, verification6h, delivery4h. No failed native actor, original600s clock, token or resource promise is reset."
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review22-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW22.json",
+            "sha256": "94b2b88a0bad20bbd8b6d1ff011ebbc518a5d9ebce3200a9f700d14f4749ac56"
+          },
+          "previous_total_control_allocation_millis": 129243000,
+          "reviewed_at_utc": "2026-11-10T04:27:19Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 12461000,
+          "explicit_remaining_total_qualification_millis": 13919000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 53336000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "no_additional_qualification_forecast_added": true,
+          "control_forecast_utc": "2026-11-10T07:55:00Z",
+          "qualification_forecast_utc": "2026-11-10T08:19:18Z",
+          "reason": "Actual old72248GiB memory and480969228288B futureDATA endings and all six continuous guard handoffs passed. Unused additive verifier16GiB extension return passed full6851-unit before/after census and drained; original128/all96 verifier caps retained. Current memory668521476096/DATA5783162011442/normal9.172 exact effective bootstrap/terminal generation rechecks passed04:19, but genuineV7 memory point failed safely by150507520B:712802779136 required vs712652271616 available. No172 producer exists and no rejected point reused. Next qualify distinct unused32GiB original verifier-pool future budget ending, retaining raw128 history/all96 actual or future role caps/shared64/native16; not credited. Then fresh4:30 memory/full admission/first guard. Full185 new-successor whole-outer harness/actual Helper40 pin, Frame/Reader/effective consumers remain; old Operation40 harmless48 profile already passed and is not repeated. Resource/native work has consumed about35min beyond its initial90min step. Rebalance35m42 from the existing60min contingency into controls: control forecast07:55:00 instead of07:19:18, qualification forecast still08:19:18. No additional qualification milliseconds or arrival extension: unchanged53336000 outside original24h and original2:19+6h total forecast. Preserve Nov8 anchors/full unexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h, original native clocks, every failed attempt, six166-171 producers/uploader/original199FD9/quarantine/original145timer/otherhost."
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review23-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW23.json",
+            "sha256": "5db3808166d61258e7e4eedf16e999e5054bf5c68ad7da408daf4e515d6f33b1"
+          },
+          "previous_total_control_allocation_millis": 131385000,
+          "previous_additional_qualification_forecast_millis": 53336000,
+          "explicitly_added_this_review_millis": 7200000,
+          "reviewed_at_utc": "2026-11-10T07:00:58Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 10442000,
+          "explicit_remaining_total_qualification_millis": 11900000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 60536000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "control_forecast_utc": "2026-11-10T09:55:00Z",
+          "qualification_forecast_utc": "2026-11-10T10:19:18Z",
+          "reason": "Seven original166-172 replays now genuinely execute and point7 passed full0600window/native100row19status qualification;630refresh retained all identities and zero restarts.173 package/negative capabilities/idleGCloudgenerations passed, but actualV10 memory qualification failed by35946827776B. All96 actual/future verifier caps and native16/shared64 remain retained; no unallocated verifier budget. Expired1530 actor/guard/futureDATA ending already consumed and cannot supply new capacity. Root is tracing actual/future shared64 obligations with an independently qualified report-only fullnativecensus; no shared ending or eighth admission is selected. Sharedcensus first lint then incompleteguard-testfixture were rejected safely before runtime use; their sources/evidence are preserved. Full185 Helper40 fourcompilers2967tests/fourretainedreadonlycontrols remain accepted, but genuine new-successor wholeouter/actualhelperpin/effectiveendingconsumers/distinctFrame/normalReader and freshfunding/admission still require work. Historical Operation40 harmless48GiB profile already passed and is not repeated as that proof. The prior07:55control/08:19qualification forecast no longer covers this scope and resourcefunding dependency. Add exactly2h uncertain engineering forecast outside original24h: control09:55, qualification10:19:18. OriginalNov8qualification17:30:22/original86400000ms/control19:25:15 anchors, originalnative600s/120s/reader deadlines, allfailedoriginals and fullunexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h remain unchanged. This is delivery planning only; no lease, start, failedactor, resource or archive authority is reset."
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review24-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW24.json",
+            "sha256": "cb430c5a672a9b7ebdd73d22d345693f1eb81089e41432617e8b7913dfc46430"
+          },
+          "previous_total_control_allocation_millis": 138585000,
+          "previous_additional_qualification_forecast_millis": 60536000,
+          "explicitly_added_this_review_millis": 7200000,
+          "reviewed_at_utc": "2026-11-10T09:03:00Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 10320000,
+          "explicit_remaining_total_qualification_millis": 11778000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 67736000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "control_forecast_utc": "2026-11-10T11:55:00Z",
+          "qualification_forecast_utc": "2026-11-10T12:19:18Z",
+          "reason": "Seven original166-172 transaction replays remain active/proven7 with original identities and zero restarts in0830complete fleet/19 authenticated reports; desired13. Root found duplicated original722 actor48/futureDATA deductions, qualified four-compilers/10-test/genuine45-node audit, and conservatively restored them. Current memory759789531136/DATA6582025928498/normal10 and all verifier96/native16/shared64 caps are retained. All seven continuous stronger guards passed with no gap or producer restart and floor6264131239730. New owned-root fulfillment V4 passed four strict compilers/16 tests and genuine native stable two-pass/midpoint filesystem check:411083153408 already allocated inside unchanged caps, required6488770354994 versus available6404456910848, deficit84313444146; no floor or promise changed. Earlier inode-churn native failure and V3 test lint are preserved. Old155/156 holding candidates are already retired and supply zero new bytes. Actual remaining disk/holding and memory/effective consumer qualification therefore precede any new funded185 control or173 replay. Helper40 existing fourcompilers2967tests/four historical read-only controls remain; the new held native-corpus source regression is uncompiled and grants no whole-outer/lifecycle/terminal/Frame/Reader flags. The separately scoped candidate-native wholeouter harness/actual helper pin/effective consumers/distinctFrame/normalReader still need work. Prior09:55control/10:19qualification forecast no longer covers the established scope. Add exactly2h uncertain engineering forecast outside original24h: control11:55, qualification12:19:18. Preserve all Nov8 anchors, original native600s/120s/reader clocks, every failed original, full413404206ms unexecuted replay/bootstrap1h/verification6h/delivery4h. No lease, old start, release or archive authority is reset."
+        },
+        {
+          "previous_model": {
+            "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW25.json",
+            "sha256": "034b01fd4a6a3d854c432c4719f83ee468d5bf29db87b705dd15f2db345a1c98"
+          },
+          "previous_total_control_allocation_millis": 145785000,
+          "previous_additional_qualification_forecast_millis": 67736000,
+          "explicitly_added_this_review_millis": 14400000,
+          "reviewed_at_utc": "2026-11-10T11:08:31Z",
+          "original_control_anchor_preserved": "2026-11-08T19:25:15Z",
+          "explicit_new_remaining_control_allowance_millis": 17189000,
+          "explicit_remaining_total_qualification_millis": 18647000,
+          "explicit_additional_qualification_forecast_outside_original24h_millis": 82136000,
+          "inside_original24h_qualification_budget": false,
+          "no_original_native_clock_reset": true,
+          "control_forecast_utc": "2026-11-10T15:55:00Z",
+          "qualification_forecast_utc": "2026-11-10T16:19:18Z",
+          "reason": "Seven original166-172 replays remain executing/proven7 with stable identities and zero restarts in actual1100complete fleet and19 authenticated reports; memory-selected target14. Original154 unused future328GiB DATA was genuinely checked/ended/selected once with70-node69-equation ancestry,270 entries8102522880 retained bytes,32GiB retained and every original raw row/file preserved; no memory or physical credit. Current DATA6229838610226/memory759789531136, normal10/verifier96/native16/shared64/seven68GiB caps unchanged. New owned-diskV5 four strict compilers18tests and native actual fit passed:6131298258738 required vs6382790459392 available, margin251492200654. Seven stronger floors6264131239730 remain until separate effective-consumer and continuous handoff qualification. V12 actual corrected-head anonymous memory check passed but fitfalse gap91548504064; no unchanged retry. Exact uploader source candidate2c54449e/blob3885c346 and all15 original fingerprint-matched frozen libraries now located; actual artifact uses rustc1.98.0. Whole-image reproduction/future buffer-runtime-host envelope and a genuinely funded exclusive serial8control/compile reuse proof remain before any memory reduction. Timestamp/dependency matches are not source-artifact proof. Full185 separately scoped actual-successor wholeouter harness, Helper40pin, effective consumers, distinctFrame and normalReader remain unqualified; held source regression is not the full native proof, historical harmless48GiB profile is not repeated. Previous11:55control/12:19qualification forecast no longer covers source/capacity and native-harness dependencies. Add exactly4h uncertain engineering allowance outside original24h: about1h source reproduction and complete future-memory component proof,2h complete outer/helper/Frame/Reader qualification,1h fresh funding/admission/first-guard and contingency. Control15:55 and qualification16:19:18 remain planning forecasts, not native leases. Preserve originalNov8anchors, original600s120sreader clocks, every failed original, full unexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h, all producers/uploader/original199FD9quarantine/145timer/otherhost. No new replay, resource ending, old start, lease or archive authority is reset."
+        }
+      ],
+      "explicitly_reviewed_additional_qualification_millis": 82136000
+    }
+  },
+  "authenticated185_event": {
+    "binding": {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review26-model-20261110-v1/AUTHENTICATED185_EVENT_READBACK.json",
+      "sha256": "0e0f2e5f9b861178535dbeaad5fe056110aeb132424d5b18f89514ffc0a9f489"
+    },
+    "document": {
+      "after_status": {
+        "elapsed_execution_millis": 107588000,
+        "epoch": 185,
+        "estimated_remaining_millis": 471651206,
+        "jet_size_bytes": 0,
+        "phase": "verification",
+        "sampled_at_utc": "2026-11-10T11:08:31Z"
+      },
+      "receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261110110831.json",
+        "sha256": "5702aeb3782af24d7a0dbf5c6fb2516d40f020a0fb2c9a627d49398180f29bbe"
+      }
+    }
+  },
+  "authenticated185_receipt": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261110110831.json",
+      "sha256": "5702aeb3782af24d7a0dbf5c6fb2516d40f020a0fb2c9a627d49398180f29bbe"
+    },
+    "document": {
+      "schema": "horizon-status-only-correction-v1",
+      "epoch": 185,
+      "key": "epoch-185.epoch-status.json",
+      "sampled_at_utc": "2026-11-10T11:08:31Z",
+      "before_body": "{\"elapsed_execution_millis\":107252000,\"epoch\":185,\"estimated_remaining_millis\":457587206,\"jet_size_bytes\":0,\"phase\":\"verification\",\"sampled_at_utc\":\"2026-11-10T11:02:55Z\"}\n",
+      "before_status": {
+        "elapsed_execution_millis": 107252000,
+        "epoch": 185,
+        "estimated_remaining_millis": 457587206,
+        "jet_size_bytes": 0,
+        "phase": "verification",
+        "sampled_at_utc": "2026-11-10T11:02:55Z"
+      },
+      "before_etag": "\"e7924ac86f27f8fdb8ab7d62cf2b7d95\"",
+      "before_sha256": "e63def1c9a340eebacde097bdd173c659659de66b42bab093d8f126ab29b9610",
+      "after_status": {
+        "elapsed_execution_millis": 107588000,
+        "epoch": 185,
+        "estimated_remaining_millis": 471651206,
+        "jet_size_bytes": 0,
+        "phase": "verification",
+        "sampled_at_utc": "2026-11-10T11:08:31Z"
+      },
+      "after_sha256": "2024df2452004aa1286e4868d0cb18f4b3689ef725e43e30cf3b0878f9df9d99",
+      "previous_receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261110110255.json",
+        "sha256": "2cfc104d0e637285984b66987388ac0656649639a370e610857285a75137474e"
+      },
+      "owner_evidence": {
+        "accepted_fleet": {
+          "path": "/var/lib/jetstreamer-horizon-fleet-101-200-20261019-v1/fleet-20261109T140022Z-retained185-h39-refresh-v1.json",
+          "sha256": "a4d71b13e0a2a21292adaa5205733ec2930a2f4b8aaec3dda7773ac48340c27f"
+        },
+        "active_fresh_extra_QA5_bytes": 0,
+        "actual0030_reader_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0030-reader-phase-20261109-v15/94-actual-phase-gated-original-reader-original-outcome.json",
+          "sha256": "84d880ee10cf1b8a3258cf5e5fdd7526f3bd58b9b30e40d29b2466c74233a13d"
+        },
+        "actual0100_final3_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual0100-original-r3-20261109-next/3688-actual-c71-one-original-final-original-outcome.json",
+          "sha256": "3d26a8bfa7abcd2d398acc6f78489689d83f633424aa563b6f1bd6f66fd57933"
+        },
+        "actual0100_first_guard_failure": {
+          "path": "/var/lib/jetstreamer/epoch185-cold-guard-v4/guard-50a0f038091f4c578791c3720a85a72e.json",
+          "sha256": "430cddfe3fc6968557eba5d9469448e860d25027d9b15dc3e2d87ba5558f37ac"
+        },
+        "actual0200_capture_phase_failure": {
+          "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0200-20261109-v1/FRAME5-R4-capture-PHASE-EXECUTION.json",
+          "sha256": "c781a3cd80b3799d1f47ae38b6821138bb0d5a7bbdb0c600cd7d7b893039ef47"
+        },
+        "actual0200_original_pending_guard_sample": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0200-frame-capture-r4-20261109-v24/19-reader-start-phase-native-original-outcome.json",
+          "sha256": "4358d7e430728f52efc28901c63e59ab055a3e2855997f2a1b7a9afaceda7827"
+        },
+        "actual0230_closed_cold_initialization_failure_log": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0230-20261109-next/private-stdout-stderr.log",
+          "sha256": "1f8907233e6c3446619868554dea75399d14b0c1e7bfd1893fa565cbf5820928"
+        },
+        "actual0230_failed_after_Main_native": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainExitTimestamp": "Mon 2026-11-09 02:47:53 UTC",
+          "ExecMainPID": "3889589",
+          "ExecMainStartTimestamp": "Mon 2026-11-09 02:39:53 UTC",
+          "ExecMainStatus": "1",
+          "Id": "horizon-qualify-185-capped-cold-positive-positive-0230-20261109-next.service",
+          "InvocationID": "da9b57fed9f04c9fa1b0c5dba1932488",
+          "MainPID": "0",
+          "MemoryPeak": "51539607552",
+          "NRestarts": "0",
+          "Result": "exit-code",
+          "SubState": "failed"
+        },
+        "actual0500_failure_log": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-cold-control-positive-positive-0500-20261109-next/private-stdout-stderr.log",
+          "sha256": "3a19ff12c0c083d156cd326a1d97ef788ae938f6d5841e4a5b9f66cb5c47b875"
+        },
+        "actual0500_terminal_native": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainPID": "3961564",
+          "ExecMainStartTimestamp": "Mon 2026-11-09 05:15:23 UTC",
+          "Id": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+          "InvocationID": "722adc397ae24bb4b96d452783599f57",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "SubState": "failed"
+        },
+        "actual0730_reader_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-current0730-reader-phase-20261109-v15/88-actual-phase-gated-original-reader-original-outcome.json",
+          "sha256": "6ff61d0153bd778d7cdd07fe97adf66e7e6b04fab3e54a91f60903fecb67ac37"
+        },
+        "actual1530_actor_terminal": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-o40-original1530-20261109-v1/ROOT_ORIGINAL1530_FINITE_SETUP_EXPIRY_NATIVE_EVENT.json",
+          "sha256": "635aba7305044ffb05cc5852bb8d7778dcf63a6ec4d0ff7cd9802aa204626d37"
+        },
+        "actual1530_complete_resource_components": {
+          "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current1530-20261109-v1/parent/ROOT_ACTUAL1530_MEMORY_AND_DATA_COMPONENTS_ACCEPTED_NOT_FULL163_ADMISSION.json",
+          "sha256": "a1d9badccdd9a58d7a6e8004a997dce7c0731bf108eb2ed2ece79916051c2f03"
+        },
+        "actual1530_enrollment_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-o40-original1530-20261109-v1/619-enroll-original-task-original-outcome.json",
+          "sha256": "920a229045dc5433ea8e7cb3109d070d5505dd67e0425ec85fccb975bd8483e9"
+        },
+        "actual_1530_actor_gated_no_replay_claim": false,
+        "actual_Frame6_candidate": {
+          "path": "/home/sol/.jetstreamer-private/retained185-frame-producer-qa-20261109-v1/ACTUAL_CANDIDATE_PRODUCER_BINDINGS.json",
+          "sha256": "a19d480db1e8e9ae0dc92ae5bdf8e35813f057c2fca327ea04bc0e083f5b045c"
+        },
+        "actual_Frame6_capability_failure": {
+          "path": "/home/sol/.jetstreamer-private/retained185-frame-producer-qa-20261109-v1/FRAME6-R2-capability-ORIGINAL-EXECUTION.json",
+          "sha256": "012c83e3eb2127c536a63ee9930145a2a6c06a1ebdd9ebdded3dabab750b2104"
+        },
+        "actual_Frame6_capability_native": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainStatus": "1",
+          "Id": "horizon-first-lane-current1100-retained185-frame-r2-capability-20261109-v6.service",
+          "InvocationID": "a0aaedd3187342a3b1a0216627c1aa65",
+          "Job": "",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "exit-code",
+          "SubState": "failed"
+        },
+        "actual_Frame_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/retained185-reader2-parent1400-normal6-closure-20261109-v1/ROOT_FRESH_FRAME_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "b704422005376f0a0b470f250588b4fdc1b6155ed66a9ec090ad3e3ebe22c1ee"
+        },
+        "actual_H37_2G_Clippy_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper37-closed-terminal-composition-qa-20261109-v1/clippy-prod-ORIGINAL-EXECUTION.json",
+          "sha256": "6b2e5ab48bdf28d46417d41fd4589d21c24466ec180d42de1a157040333b7ee6"
+        },
+        "actual_H37_QA_native_selected_conditions": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper37-closed-terminal-composition-qa-20261109-v1/ROOT_CURRENT_NATIVE_CONDITIONS_FOR_EXISTING_SELECTED_MEMORY_QA_ONLY.json",
+          "sha256": "f12b37de18bb002211fbe2a04799453f5cb61d7177dda5a8585c7d4f45afd99b"
+        },
+        "actual_H37_exact_policy_leaf_proof": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-h37-composition-leaf-qa-20261109-v1/ROOT_EXACT_POLICY_LEAF_PASSED_NOT_HELPER_QUALIFICATION.json",
+          "sha256": "ca91c33f43ed00eff5c7005dc14ecdfeed3771e0b234f257ab74e17d2ac18ba3"
+        },
+        "actual_H37_fresh_QA5_memory_phase": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper37-closed-terminal-composition-qa-20261109-v1/ROOT_FRESH_H37_QA5_COMPILER8_MEMORY_PHASE_R2.json",
+          "sha256": "7025dd96a19fa14ea39e2f84eb138e879c82426e1573399c5275765e0a6bfe88"
+        },
+        "actual_H38_failed_retained_fleet_original": {
+          "path": "/home/sol/.jetstreamer-private/retained185-current0930-h38-actual-fleet-20261109-v1/FLEET-ORIGINAL-EXECUTION.json",
+          "sha256": "9a078e27b7db276e0dfdf3af685cd2067523c653ba48f182557ea81d80197c79"
+        },
+        "actual_H38_source_and_recipes": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper38-current-observer-composition-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+          "sha256": "ace28ee67a795c5b41094c8e6646be450fdbdc6ade6347b3e1d677fbea641cd9"
+        },
+        "actual_H39_source_and_recipes": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper39-retained-readable-acceptance-qa-20261109-v1/SOURCE_AND_EXACT4_FROZEN_RECIPES.json",
+          "sha256": "52bd8287fc24741a3af17cb4c33cc68bf79f5870cd4baddeabc229094bc11726"
+        },
+        "actual_Helper34_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "1cbf8c099c1f3fe5e5e4f53534194fe883435509be25966908fa529c748b9acf"
+        },
+        "actual_Helper34_fresh_extraQA5_booking": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-inherited-census-helper-qa-20261108-v34/ROOT_FRESH_EXTRA_QA5_COMPILER8_DATA4_BOOKING.json",
+          "sha256": "052f84c82284923737988144fefd243bd2820bec7dba9aa3aaa0d1fc3801d06d"
+        },
+        "actual_Helper36_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-driver13-consumer-helper-qa-20261109-v36/ROOT_FRESH_EXTRA_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "0e49c528b271a93fdff4bfd7a59fb8bbc6f5d2d7eb383a87c41b25c0aaeba966"
+        },
+        "actual_Helper37_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper37-closed-terminal-composition-qa-20261109-v1/ROOT_FRESH_H37_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "ef077de390a451125d5223e75558edda977e035e30e0882d1ef5ecfc68245736"
+        },
+        "actual_Helper38_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper38-current-observer-composition-qa-20261109-v1/ROOT_FRESH_H38_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "527354b694b6875cd65387c2ff20213d1d9e4269054a1116d804bd3472062f16"
+        },
+        "actual_Helper39_QA5_closure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper39-retained-readable-acceptance-qa-20261109-v1/ROOT_FRESH_H39_QA5_CLOSED_NORMAL6_DATA_RETAINED.json",
+          "sha256": "fa185c0a3098127aec4ba0bf4ed86f23769e666b3d920c780d06f3abe8ef9a0d"
+        },
+        "actual_Planner8_qualified": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-reader2-current-witness-planner-qa-20261109-v8/ROOT_ACTUAL_QUALIFIED_PLANNER8_BINDINGS.json",
+          "sha256": "6cb0a3f435104b0ff3a851ca99d79f45ed6b702000a33c8ca4f2bf17bd8fc81d"
+        },
+        "actual_active_repair_owner": "/root",
+        "actual_additive_policy3": {
+          "path": "/home/sol/.jetstreamer-private/retained185-additive-policy-qa-20261109-v3/ROOT_ACTUAL_POLICY3_4STRICT_6ORDINARY_HISTORICAL_INSPECTION_ACCEPTED_NOT_FULL_FLEET.json",
+          "sha256": "d477febcc63d6755386d53a83bf8f6348a7e03cc8c132eae0c56dca9bedc6451"
+        },
+        "actual_census5_static_bindings": {
+          "path": "/home/sol/.jetstreamer-private/retained185-reader2-original199-census-qa-20261109-v1/ROOT_CENSUS5_STATIC_QUALIFIED_NORMAL_BINDINGS_NATIVE_PENDING.json",
+          "sha256": "42e9043f36c3f11dd64e9b01d332d3a16a54ff92e6210e2d62f80eac7d519dba"
+        },
+        "actual_collector4_qualified": {
+          "path": "/home/sol/.jetstreamer-private/epoch163-rust-compiler-collector-qa-20261109-v4/ROOT_ACTUAL_QUALIFIED_COLLECTOR4_BINDINGS.json",
+          "sha256": "ac2141b6c41c297edad49f806b1bdb2500f52622b95e34788217039eb2c5c43b"
+        },
+        "actual_controller": null,
+        "actual_current_Frame": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T133022-retained185-cli7-v1.json",
+          "sha256": "bda046911d25faa4e8fdac1833ec48a6f452a11a200666d77b29c6480dda1ea9"
+        },
+        "actual_current_Frame_acceptance": {
+          "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current0730-20261109-v1/ROOT_GENUINE_CURRENT_CLI_V5_CAPTURE_ACCEPTED.json",
+          "sha256": "8757c96461334e736ff980dd936dad2272291b6a6f8a5d07e1a8003f7f3ade49"
+        },
+        "actual_current_guarded_actor_terminal": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainPID": "0",
+          "Id": "horizon-qualify-185-capped-cold-positive-positive-0100-20261109-next.service",
+          "InvocationID": "9568cb52af154f7d8fbd48e7571770fa",
+          "Job": "",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "signal",
+          "SubState": "failed"
+        },
+        "actual_current_producer_invocation_id": "722adc397ae24bb4b96d452783599f57",
+        "actual_current_producer_native": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainPID": "3961564",
+          "ExecMainStartTimestamp": "Mon 2026-11-09 05:15:23 UTC",
+          "Id": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+          "InvocationID": "722adc397ae24bb4b96d452783599f57",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "SubState": "failed"
+        },
+        "actual_current_producer_unit": "horizon-qualify-185-capped-cold-positive-positive-0500-20261109-next.service",
+        "actual_current_retained185_fleet_acceptance": {
+          "path": "/home/sol/.jetstreamer-private/retained185-current1000-h39-actual-fleet-20261109-v1/ROOT_ACTUAL_CURRENT_RETAINED185_FLEET_ACCEPTED.json",
+          "sha256": "da8f2e9e598a09adb5b145e3612d8913f6103a3c96a346d1f4b67e0464c12446"
+        },
+        "actual_exact_once_only_failed1530_obligation": {
+          "path": "/var/lib/jetstreamer/horizon-ended-setup-reservations-20261109-v1/5f4b7cb4621a4a2080fd9b083c14f5a0/ended.json",
+          "sha256": "1347ef9cc7bdd9f684e3cf28da69ebdd14a3844f14b17d643d6b2239dbb3eb10"
+        },
+        "actual_fleet_failure": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-upstream-actual2300-original-r3-20261108-next/1867-actual-enrolled-fleet-original-outcome.json",
+          "sha256": "b07b76afe6c58aeaaf6cdc72322d9e2b153182e1f63b6d0c3f2bd189e08692d2"
+        },
+        "actual_genuine0700_Helper36_complete_outer": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper36-genuine0700-outer-qa-20261109-v1/ACTUAL0700-COMPLETE-OUTER-ORIGINAL-EXECUTION.json",
+          "sha256": "d00256782718cb29a41d1ed83d1a9fa4ea21a95094372c9939b2c7da40e30e5c"
+        },
+        "actual_lifecycle": {
+          "path": "/var/lib/jetstreamer/horizon-epoch185-native-retained-20261105-v2/722adc397ae24bb4b96d452783599f57/lifecycle.json",
+          "sha256": "4858cea6ef8d48c05181c50b55365beba7278985d261df85be830fc988829b9a"
+        },
+        "actual_next_reader_first_compiler_failure": {
+          "path": "/home/sol/.jetstreamer-private/retained185-next-complete-reader-qa-20261109-v1/reader-clippy-prod-ORIGINAL-EXECUTION.json",
+          "sha256": "d1006a0d05a891dabedb4675eed09a3e4c97dee134bc5c5e8501d5213405bf27"
+        },
+        "actual_next_reader_first_compiler_terminal": {
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "ExecMainStatus": "1",
+          "Id": "horizon-retained185-next-reader-clippy-prod-20261109-v1-r2.service",
+          "InvocationID": "b2936e6d017e43c9af451482cb025bf7",
+          "Job": "",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "exit-code"
+        },
+        "actual_next_reader_source_and_recipes": {
+          "path": "/home/sol/.jetstreamer-private/retained185-next-complete-reader-qa-20261109-v1/ROOT_NEXT_READER_AND_UNIQUE_FRAME_SOURCE_AND_EXACT28.json",
+          "sha256": "0fb03658611dea125950028d2aa9ec36f629ae09b1412bcb5c42fddcd8649798"
+        },
+        "actual_original_actor_terminal": {
+          "ActiveState": "failed",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "Id": "horizon-qualify-185-capped-cold-positive-positive-2300-20261108-next.service",
+          "InvocationID": "dff3a3ef94d943b0bae94634fa9dfc50",
+          "Job": "",
+          "MainPID": "0",
+          "NRestarts": "0",
+          "Result": "exit-code",
+          "SubState": "failed"
+        },
+        "actual_parent1400_components": {
+          "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current1400-20261109-v1/parent/ROOT_ACTUAL1400_MEMORY_AND_DATA_COMPONENTS_ACCEPTED_NOT_FULL163_ADMISSION.json",
+          "sha256": "fccd31d0a162d56b86aa7a617d98b0f3b8a4974433b9dcbc224a30bf3f9f1bcc"
+        },
+        "actual_planner8_static_bindings": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-reader2-current-witness-planner-qa-20261109-v8/ROOT_PLANNER8_STATIC_CANDIDATE_BINDINGS_NATIVE_PENDING.json",
+          "sha256": "b1f0036a878d6d73665eeddca64e25f35bf0479ab21ec0f9749968f5c1e165ad"
+        },
+        "actual_producer": null,
+        "actual_qualified_Frame7": {
+          "path": "/home/sol/.jetstreamer-private/retained185-frame-producer-qa-20261109-v2/ROOT_ACTUAL_QUALIFIED_FRAME7_BINDINGS.json",
+          "sha256": "261c97f4845bf02cd65f72acebee2729beaae30d20894aadf76f14db3af2df26"
+        },
+        "actual_qualified_Helper37": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper37-closed-terminal-composition-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_HELPER37_BINDINGS.json",
+          "sha256": "fb0e811be9c47b1f38e7c32994140bfa65a4c4788785e4c52a394daf6f1adaa5"
+        },
+        "actual_qualified_Helper38": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper38-current-observer-composition-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_HELPER38_BINDINGS.json",
+          "sha256": "cabeac229158f031f7971c5d2ab4639c528ee75827a01a69c5921dc370c5a8f2"
+        },
+        "actual_qualified_Helper39": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-helper39-retained-readable-acceptance-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_HELPER39_BINDINGS.json",
+          "sha256": "5ecc605dc396913403bf01d60bbbc45c82ac220ffe288f3a47af65feb975f219"
+        },
+        "actual_qualified_Operation39": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-operation39-driver13-helper36-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_OPERATION39_BINDINGS.json",
+          "sha256": "34cdd253d3951f048707ceba791b72202f87f991e1e98391839e1e1699468934"
+        },
+        "actual_qualified_components": [
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER13_BINDINGS.json",
+            "sha256": "0dfc3dfc08766d37a69ba47eb064b1424b008025fe87d61b8b3ce0e4090f865f"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch185-driver13-consumer-helper-qa-20261109-v36/ROOT_ACTUAL_QUALIFIED_HELPER36_BINDINGS.json",
+            "sha256": "6083e7abc7554c689a3dfa159b890e1821ace7dc93c5e02ada9ea2cb20e509f7"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch185-final7-driver13-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_FINAL7_BINDINGS.json",
+            "sha256": "0d52b4b236d785294d3bf2f5a192ebbfaea685476720be4962506426ba500d19"
+          },
+          {
+            "path": "/home/sol/.jetstreamer-private/epoch185-helper36-current-witness-planner-qa-20261109-v7/ROOT_ACTUAL_QUALIFIED_PLANNER7_BINDINGS.json",
+            "sha256": "0000ded40bbbb10e291bbae4ee91a280653f77ae4ce1c3d542c047f87c6c23a9"
+          }
+        ],
+        "actual_qualified_driver13": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-pinned-allocation-census-qa-20261109-v1/ROOT_ACTUAL_NORMALLY_SEALED_DRIVER13_BINDINGS.json",
+          "sha256": "0dfc3dfc08766d37a69ba47eb064b1424b008025fe87d61b8b3ce0e4090f865f"
+        },
+        "actual_qualified_unique_Frame_library": {
+          "path": "/home/sol/.jetstreamer-private/retained185-next-complete-reader-qa-20261109-v1/ROOT_ACTUAL_QUALIFIED_UNIQUE_FRAME_LIBRARY_BINDINGS.json",
+          "sha256": "bf27980d73b199a1a8070c9b3cb25515e532de7613790f0ef4c0ee5c61c12d83"
+        },
+        "actual_reader2_all_four_compilers": {
+          "path": "/home/sol/.jetstreamer-private/retained185-next-complete-reader-qa-20261109-v2/ROOT_NEXT_READER_ALL_FOUR_STRICT_COMPILERS_PASSED.json",
+          "sha256": "17aa7a85a0c82022f6a45b98d62fc5001b9337b436746e4fe1b19af96208fbbb"
+        },
+        "actual_reader2_complete_adapter_failure": {
+          "path": "/home/sol/.jetstreamer-private/retained185-next-complete-reader-qa-20261109-v2/ACTUAL1130-COMPLETE-ADAPTER-ORIGINAL-EXECUTION.json",
+          "sha256": "e18bfe830f07c772d1e8520f8e15a62612f6c94c812092b5954443aaece1ce56"
+        },
+        "actual_review10_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review11_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review12_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review13_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review14_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review15_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review19_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review6_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_review9_model": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-explicit-control-review19-typed-obligation-model-20261109-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW19.json",
+          "sha256": "d79645f4ebf1459d83c328fca58ffbc45a9b17b23823046e8508e4cf3c4b3041"
+        },
+        "actual_same_original_main_recovery": {
+          "path": "/home/sol/.jetstreamer-private/epoch185-positive-final-control-722adc397ae24bb4b96d452783599f57/ROOT_MAIN_LIFECYCLE_CAPTURED_WITHOUT_ACTOR_RESTART.json",
+          "sha256": "12af3df2bb38cd3cf0e146e97366404b5401baf8d7dd5c14f8734482940536d7"
+        },
+        "actual_seven_original_producers": {
+          "horizon-qualify-166-standard-20261109-v1.service": {
+            "MainPID": "4188448",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-166-standard-20261109-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6"
+          },
+          "horizon-qualify-167-standard-20261109-v1.service": {
+            "MainPID": "713",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-167-standard-20261109-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "efd81d59a4584013a93d0d020e49852e"
+          },
+          "horizon-qualify-168-standard-20261109-v1.service": {
+            "MainPID": "14201",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-168-standard-20261109-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3"
+          },
+          "horizon-qualify-169-standard-20261109-v1.service": {
+            "MainPID": "50818",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-169-standard-20261109-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d"
+          },
+          "horizon-qualify-170-standard-20261109-v1.service": {
+            "MainPID": "86457",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-170-standard-20261109-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "1950530fc73b4a519f5327749f0036b7"
+          },
+          "horizon-qualify-171-standard-20261110-v1.service": {
+            "MainPID": "243865",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-171-standard-20261110-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "3b0694043e374b0488ee9a81762e210d"
+          },
+          "horizon-qualify-172-standard-20261110-v1.service": {
+            "MainPID": "431228",
+            "ControlPID": "0",
+            "NRestarts": "0",
+            "Id": "horizon-qualify-172-standard-20261110-v1.service",
+            "ActiveState": "active",
+            "SubState": "running",
+            "InvocationID": "6aa8bc6036b34c57ababa2d5855b2098"
+          }
+        },
+        "actual_six_original_producers": {
+          "horizon-qualify-166-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-166-standard-20261109-v1.service",
+            "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "MainPID": "4188448",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          "horizon-qualify-167-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-167-standard-20261109-v1.service",
+            "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+            "MainPID": "713",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          "horizon-qualify-168-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-168-standard-20261109-v1.service",
+            "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "MainPID": "14201",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          "horizon-qualify-169-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-169-standard-20261109-v1.service",
+            "InvocationID": "ca4d6b8da24c4e92a4c75419edae6f1d",
+            "MainPID": "50818",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          "horizon-qualify-170-standard-20261109-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-170-standard-20261109-v1.service",
+            "InvocationID": "1950530fc73b4a519f5327749f0036b7",
+            "MainPID": "86457",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          "horizon-qualify-171-standard-20261110-v1.service": {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-171-standard-20261110-v1.service",
+            "InvocationID": "3b0694043e374b0488ee9a81762e210d",
+            "MainPID": "243865",
+            "NRestarts": "0",
+            "SubState": "running"
+          }
+        },
+        "actual_source_work_active": true,
+        "actual_three_guarded_standard_producers": [
+          {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-166-standard-20261109-v1.service",
+            "InvocationID": "06c7b420f92d42a6b0743ba578bcd8b6",
+            "MainPID": "4188448",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-167-standard-20261109-v1.service",
+            "InvocationID": "efd81d59a4584013a93d0d020e49852e",
+            "MainPID": "713",
+            "NRestarts": "0",
+            "SubState": "running"
+          },
+          {
+            "ActiveState": "active",
+            "ControlPID": "0",
+            "Id": "horizon-qualify-168-standard-20261109-v1.service",
+            "InvocationID": "e1050eb5e99a4a159630c881e0dd5eb3",
+            "MainPID": "14201",
+            "NRestarts": "0",
+            "SubState": "running"
+          }
+        ],
+        "actual_two_continuous_live_guard_handoffs": {
+          "path": "/home/sol/.jetstreamer-private/failed1530-ended-obligation-qa-20261109-v1/ROOT_BOTH_CONTINUOUS_GUARD_HANDOFFS_COMPLETE.json",
+          "sha256": "62169b57a7c36ab9dc83745de4918a4eacde9e84ebef11692d9248d2ffa40245"
+        },
+        "authenticated_event_correction_preserved_after_review": true,
+        "bounded_native_initialization_active": false,
+        "complete_current_DATA_bytes": 6229838610226,
+        "coordinated_observer": {
+          "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261110T110022Z-postcompletion154-v1.json",
+          "sha256": "7919f405fcde9709009710a2ff39e1559dad83583465065e367492f5773ebe7f"
+        },
+        "current_172_preparation": {
+          "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION16_RETURNED_CURRENT_AUTHORITY.json",
+          "sha256": "b5e80efbb2d626388090703ae033eb7923149407252398f0fe21f4e6599e008a"
+        },
+        "current_173_preparation": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "current_accepted_resource_frame": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T140022-retained185-cli7-v1.json",
+          "sha256": "5d000ecdc5bfad5e7cbc012af3a28659dfa3dd88f475575adb97d88c44176f1a"
+        },
+        "current_complete_DATA_authority": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "current_complete_resources_pending": true,
+        "current_existing_native16_compiler_booking": {
+          "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+          "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+        },
+        "current_existing_native16_compiler_bytes": 0,
+        "current_extra_QA_bytes": 0,
+        "current_fresh_observer": {
+          "path": "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-20261110T110022Z-postcompletion154-v1.json",
+          "sha256": "7919f405fcde9709009710a2ff39e1559dad83583465065e367492f5773ebe7f"
+        },
+        "current_operator": "/root",
+        "current_phase": "verification",
+        "current_primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+        "current_resource_authority_under_component_reconciliation": true,
+        "current_shared_dependency": "Nov9 05:00 planned continuation. Replay0target5. ActualD12/H35/Final6/P6/O38 qualifiedsealed; exact0230successfulreader aliases retired04:25aftergenuinepostMainterminalclosure withzeroRAM/DATAcredit. Genuine0430Frame55fda127 captured/finalized and completeHelper27outer passed; exact0300/0330/0400observerbridges finalized preservinginode/bytes/mtime. Actual0430metadata authority and normal6closure revalidated1539historical+87additionalterminalunits; originalhistoricalextraQA6release notcreditedagain. Lastcompleteoperationalresource tuple remains0230; no0430reader/parentmemory/DATA/admission/worker was started beforeoriginal04:45:22cutoff. Next05sourcechainmustpreserveFrame0430/resources0230split. Guard0500ACTUALLYqualified65tests/fourcompilerssealed, but actual05sample/Frame/reader/admissionpendingatpreparation. NewcanonicalDATA5177463485076 includesguard0500DATA512once over5176926614164; normal6extraQA0. Review8actuallypublished04:42:55 afterexplicit04:42:33review; planningcontrol deadline05:42:33, same19:25:15control/original17:30:22+24hqualification/full413404206/bootstrap1h/verification6h/delivery4h. 60minuncertainplanningallocation forcurrentauthority/closure/staticchain20min, freshscheduledtuple/resource/admission20min, nativeMain10min, contingency10min; noexistingnativeclockreset. Fleet8 exactinheritedpolicy retained after rejectingadditions; actualnewterminal/qmetadata retainedseparately, no gateweakened. Currentfull185route unqualified; bounded80351283/48GiB/14400s isnotfull185. Otherhost200-300/protected199FDs untouched.",
+        "current_task": "Seven original166-172 replays remain executing/proven7 with stable identities and zero restarts in actual1100complete fleet and19 authenticated reports; memory-selected target14. Original154 unused future328GiB DATA was genuinely checked/ended/selected once with70-node69-equation ancestry,270 entries8102522880 retained bytes,32GiB retained and every original raw row/file preserved; no memory or physical credit. Current DATA6229838610226/memory759789531136, normal10/verifier96/native16/shared64/seven68GiB caps unchanged. New owned-diskV5 four strict compilers18tests and native actual fit passed:6131298258738 required vs6382790459392 available, margin251492200654. Seven stronger floors6264131239730 remain until separate effective-consumer and continuous handoff qualification. V12 actual corrected-head anonymous memory check passed but fitfalse gap91548504064; no unchanged retry. Exact uploader source candidate2c54449e/blob3885c346 and all15 original fingerprint-matched frozen libraries now located; actual artifact uses rustc1.98.0. Whole-image reproduction/future buffer-runtime-host envelope and a genuinely funded exclusive serial8control/compile reuse proof remain before any memory reduction. Timestamp/dependency matches are not source-artifact proof. Full185 separately scoped actual-successor wholeouter harness, Helper40pin, effective consumers, distinctFrame and normalReader remain unqualified; held source regression is not the full native proof, historical harmless48GiB profile is not repeated. Previous11:55control/12:19qualification forecast no longer covers source/capacity and native-harness dependencies. Add exactly4h uncertain engineering allowance outside original24h: about1h source reproduction and complete future-memory component proof,2h complete outer/helper/Frame/Reader qualification,1h fresh funding/admission/first-guard and contingency. Control15:55 and qualification16:19:18 remain planning forecasts, not native leases. Preserve originalNov8anchors, original600s120sreader clocks, every failed original, full unexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h, all producers/uploader/original199FD9quarantine/145timer/otherhost. No new replay, resource ending, old start, lease or archive authority is reset.",
+        "desired_replay_lanes": 14,
+        "duplicate_old722_ending_incident": {
+          "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_DUPLICATE_OLD722_ENDING_INCIDENT.json",
+          "sha256": "6f8eb6047469cf883f30b9ea8c420866f46ff2a0b78832a7ee11029ccdbaa652"
+        },
+        "elapsed_time_basis": "Original current producer Main ExecMainStartTimestamp05:15:23, replacing prior Root-repair elapsed basis through authenticated handoff",
+        "estimate_review": {
+          "path": "/home/sol/.jetstreamer-private/actual110022-visible-root-acceptance-20261110-v1/status-estimate-review110022.json",
+          "sha256": "5aa0dc4f5748241a06b5c9e9b568ba105f2fbaa1358099c4ef90e8bd138aade6"
+        },
+        "existing_native16_compiler_reservation_bytes": 0,
+        "explicit_forecast_extension_outside_original24h_millis": 13320000,
+        "fixed_work_eta_model": {
+          "path": "/var/lib/jetstreamer/epoch185-explicit-control-review26-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW26.json",
+          "sha256": "29070c966551406d09436a70cc5ca3a8617be9b10762b6c8c0fc5151d00d8040"
+        },
+        "guarded_standard_producer_count": 7,
+        "immediate_Frame_predecessor": {
+          "path": "/var/lib/jetstreamer/horizon-recovered-resource-frames-20261029-v1/frame20261109T140022-retained185-cli7-v1.json",
+          "sha256": "5d000ecdc5bfad5e7cbc012af3a28659dfa3dd88f475575adb97d88c44176f1a"
+        },
+        "last_complete_resource_selector": {
+          "path": "/home/sol/.jetstreamer-private/first-lane-full-reader-witness-qualification-20261107-v1/current1400-20261109-v1/accepted-frame-selector.json",
+          "sha256": "160eb1caa0d4f5c90c2b5f5d2e53e364637afd1b5d5c29caf86d3a213bb6d647"
+        },
+        "new_extra_memory_promise_bytes": 0,
+        "new_release_or_admission_authorized": false,
+        "next_distinct_sample_utc": "2026-11-09T07:30:22Z",
+        "no_full_epoch_replay_started": true,
+        "no_live_producer_claimed": true,
+        "normal_pool_bytes": 10737418240,
+        "original0700_startup_cutoff_utc": "2026-11-09T07:15:22Z",
+        "phase": "verification",
+        "previous_authenticated_owner_evidence": {
+          "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261107155014.json",
+          "sha256": "676075762409b0e7705c250c0c90f11c562e5012c13221f8e0a7b2ffbfe3555a"
+        },
+        "previous_owner_evidence": {
+          "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-185.status-correction-20261110103219.json",
+          "sha256": "64734d3104fd0bbdaa810ec132dd96b90a0f5cff3ddba5a154f2049279a405f7"
+        },
+        "qualified_state_copy": {
+          "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_STATE_CAPTURE_EXACT_BYTES_AND_UNCHANGED_GUARD_ACCEPTED.json",
+          "sha256": "68e08cced670a337cd5173e03605f465d73c8095fa7fa183244b20ab91c5b950"
+        },
+        "qualified_witness": {
+          "path": "/home/sol/.jetstreamer-private/original199-input-witness-qualification-20261107-v1/ROOT_ACTUAL_FULL_INPUT_WITNESS_ACCEPTED_CONSUMER_INTEGRATION_PENDING.json",
+          "sha256": "c728698afbbb6dac654b3e3c14428622e51c1e58a53392a4f241e2a451312eb2"
+        },
+        "resource_credit_bytes": 0,
+        "review22_request": {
+          "path": "/var/lib/jetstreamer/epoch185-old722-data-and-172-fit-status-20261110-v1/ROOT_EXPLICIT_REVIEW22_CURRENT_AUTHORITY.json",
+          "sha256": "e8b654500eb5dbca8c09992877fb9c10988afda1fce62c9d86022b43de46588e"
+        },
+        "review23_request": {
+          "path": "/var/lib/jetstreamer/epoch185-explicit-control-review23-model-20261110-v1/ROOT_EXPLICIT_REVIEW23_CURRENT_AUTHORITY.json",
+          "sha256": "0490ac3a52b962a8734683fc98855494f5028ad36e61c1b0e12fbad82ec048fa"
+        },
+        "review24_request": {
+          "path": "/var/lib/jetstreamer/epoch185-explicit-control-review26-model-20261110-v1/ROOT_EXPLICIT_REVIEW26_CURRENT_AUTHORITY.json",
+          "sha256": "6db363ba7745d80c09aab001b697db41ac76dad269f2af9ce66e30be85683b0a"
+        },
+        "useful_replay_lanes": 7
+      },
+      "estimate_parts_millis": {
+        "current_fleet_order_repair_and_launch_controls_millis": 13589000,
+        "fresh_full_reader_memory_DATA_and_replay_admission_millis": 3600000,
+        "full_boundary_runtime_native_Frame_successor_qualification_millis": 1458000,
+        "bootstrap_load_and_warmup_millis": 3600000,
+        "full_epoch_replay_using_same_century_peer_rate_with25percent_contingency_millis": 413404206,
+        "archive_close_full_plugin_boundary_verification_millis": 21600000,
+        "upload_whole_object_readback_and_sidecar_commit_millis": 14400000
+      },
+      "estimated_remaining_millis": 471651206,
+      "assumption": "Seven original166-172 replays remain executing/proven7 with stable identities and zero restarts in actual1100complete fleet and19 authenticated reports; memory-selected target14. Original154 unused future328GiB DATA was genuinely checked/ended/selected once with70-node69-equation ancestry,270 entries8102522880 retained bytes,32GiB retained and every original raw row/file preserved; no memory or physical credit. Current DATA6229838610226/memory759789531136, normal10/verifier96/native16/shared64/seven68GiB caps unchanged. New owned-diskV5 four strict compilers18tests and native actual fit passed:6131298258738 required vs6382790459392 available, margin251492200654. Seven stronger floors6264131239730 remain until separate effective-consumer and continuous handoff qualification. V12 actual corrected-head anonymous memory check passed but fitfalse gap91548504064; no unchanged retry. Exact uploader source candidate2c54449e/blob3885c346 and all15 original fingerprint-matched frozen libraries now located; actual artifact uses rustc1.98.0. Whole-image reproduction/future buffer-runtime-host envelope and a genuinely funded exclusive serial8control/compile reuse proof remain before any memory reduction. Timestamp/dependency matches are not source-artifact proof. Full185 separately scoped actual-successor wholeouter harness, Helper40pin, effective consumers, distinctFrame and normalReader remain unqualified; held source regression is not the full native proof, historical harmless48GiB profile is not repeated. Previous11:55control/12:19qualification forecast no longer covers source/capacity and native-harness dependencies. Add exactly4h uncertain engineering allowance outside original24h: about1h source reproduction and complete future-memory component proof,2h complete outer/helper/Frame/Reader qualification,1h fresh funding/admission/first-guard and contingency. Control15:55 and qualification16:19:18 remain planning forecasts, not native leases. Preserve originalNov8anchors, original600s120sreader clocks, every failed original, full unexecuted413404206ms replay/bootstrap1h/verification6h/delivery4h, all producers/uploader/original199FD9quarantine/145timer/otherhost. No new replay, resource ending, old start, lease or archive authority is reset.",
+      "conditional_header": "If-Match",
+      "resource_sample_claimed": false,
+      "archive_publication_authorized": false,
+      "replay_launch_authorized": false,
+      "authenticated_readback": true,
+      "after_etag": "\"1b645b9adbed3055e3dffb0bae334611\""
+    }
+  },
+  "current173_preparation_review": {
+    "binding": {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/ROOT_ACTUAL173_PREPARATION_REVIEW2_AND_CURRENT_STATUS.json",
+      "sha256": "39b567fc33c3d312ca0e8587c92ae9d0c9f71a52d473100ab917b5824759a963"
+    },
+    "document": {
+      "actual_memory_check": {
+        "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/anon173-qa-v12/ACTUAL_FULFILLED_ANON_MEMORY_QUALIFICATION.json",
+        "sha256": "72b81e12cd03c47e9fb2d0b1cbc357b6f49531bc4afda809333917fa6d926cd2"
+      },
+      "status_receipt": {
+        "path": "/home/sol/.jetstreamer-private/r2-status-receipts/epoch-173.status-correction-20261110111145.json",
+        "sha256": "b498015f7dc48f11433df5e6014abe6b79cdc5a5e9a4a553d4815ddcd9ef587b"
+      },
+      "after_status": {
+        "elapsed_execution_millis": 19141000,
+        "epoch": 173,
+        "estimated_remaining_millis": 469869206,
+        "jet_size_bytes": 0,
+        "phase": "verification",
+        "sampled_at_utc": "2026-11-10T11:11:45Z"
+      },
+      "shortfall_bytes": 91548504064,
+      "next_capacity_gate": "Advance complete source-bound future host/shared/uploader/verifier memory obligations and actual new-head effective consumers. Native V5 DATA fits after selected154 ending; keep current stronger guards until qualified continuous handoff. No173 replay or fresh memory fit claimed.",
+      "no173_producer_or_admission": true,
+      "new_ending_credit_bytes": 0
+    }
+  },
+  "no_new_replay_or_resource_ending_claimed": true
+}
