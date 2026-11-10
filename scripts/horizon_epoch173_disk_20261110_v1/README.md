@@ -1,0 +1,11 @@
+# Epoch173 owned-root DATA qualification
+
+The checker preserves the corrected6,582,025,928,498-byte DATA authority and all seven309,237,645,312-byte root caps. It measures bytes already allocated inside those caps, so free space does not have to fund them a second time. It grants no ending, reclamation, floor change, memory fit or replay admission.
+
+V1 passed four strict compiler configurations and12 tests, then genuinely failed closed when a live scan encountered a repeated physical inode. V2 excludes ambiguous inodes and requires identical file identity, allocated blocks, size, birthtime, ctime and mtime across two descriptor-anchored scans, with filesystem free space captured at their common midpoint. It also rejects symlinks and foreign filesystems, excludes multiply linked files and applies a1GiB margin per actor. Its15 tests and genuine native qualification passed, but the candidate did not fit.
+
+V3 extended the stable set to small allocated files; strict test Clippy rejected one assertion before any native actor started. V4 corrected that lint and passed all four strict compilers and16 tests. Its finite native run used a separately booked1GiB slice inside the retained native16 pool and found411,083,153,408 bytes already allocated within unchanged caps. Required free space was6,488,770,354,994 versus6,404,456,910,848 available: an84,313,444,146-byte shortfall. Both completed checks returned disk_fits=false; no producer, guard, remote object or resource promise changed.
+
+The inode/size/timestamp intersection establishes a common between-pass point without keeping volatile files open or relying on append-only behavior. Sparse apparent lengths supply no allocation credit. Qualified sources, actual argv, original failures and normally sealed runtimes remain bound in QUALIFICATION.json; superseded compiler copies were retired with zero DATA-promise credit.
+
+Further admission requires changed, qualified capacity, fresh memory/DATA/input/guard gates and the exact current authority. Old155/156 holding artifacts examined during this cycle were already retired and supply no new bytes. The original held136 memory release is already consumed; only demonstrably unconsumed old-attempt future DATA may be considered next.

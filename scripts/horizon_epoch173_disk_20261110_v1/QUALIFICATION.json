@@ -1,0 +1,244 @@
+{
+  "schema": "horizon-owned-root-DATA-fulfillment-qualification-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "fulfilled-owned-disk-v1.rs": {
+      "path": "scripts/horizon_epoch173_disk_20261110_v1/source/fulfilled-owned-disk-v1.rs",
+      "sha256": "ef39f666236026c9bcfc02d9ac2f96e78bababd37b7fef179ca1a50f9e059a40"
+    },
+    "fulfilled-owned-disk-v2.rs": {
+      "path": "scripts/horizon_epoch173_disk_20261110_v1/source/fulfilled-owned-disk-v2.rs",
+      "sha256": "7888e19d6ddcccac0e7a07a2a61dae76ceaad6cd893814a8f6b64b663f0e9893"
+    },
+    "fulfilled-owned-disk-v3.rs": {
+      "path": "scripts/horizon_epoch173_disk_20261110_v1/source/fulfilled-owned-disk-v3.rs",
+      "sha256": "6ab35b16c8963b824bc784bd5dbeae306868300c34378d8d7b1cfc11c15ef8a6"
+    },
+    "fulfilled-owned-disk-v4.rs": {
+      "path": "scripts/horizon_epoch173_disk_20261110_v1/source/fulfilled-owned-disk-v4.rs",
+      "sha256": "e4eb5fba6da84e5bab29cfb5a062e10bed72190f64072b4faaac8f766f14e0fc"
+    }
+  },
+  "qualified_versions": {
+    "v1": {
+      "four_strict_compilers": true,
+      "ordinary_tests": 12,
+      "native_failed_safely": "Repeated physical inode during live churn; no result or credit"
+    },
+    "v2": {
+      "four_strict_compilers": true,
+      "ordinary_tests": 15,
+      "native_completed": true,
+      "already_allocated_inside_unchanged_caps_bytes": 361532518400,
+      "required_free_bytes": 6538320990002,
+      "available_bytes": 6423414587392,
+      "disk_fits": false
+    },
+    "v3": {
+      "strict_test_clippy_failed": true,
+      "native_never_started": true,
+      "failed_native_operator_rejected_missing_qualified_descriptor": true
+    },
+    "v4": {
+      "four_strict_compilers": true,
+      "ordinary_tests": 16,
+      "native_completed": true,
+      "native_memory_cap_bytes": 1073741824,
+      "already_allocated_inside_unchanged_caps_bytes": 411083153408,
+      "required_free_bytes": 6488770354994,
+      "available_bytes": 6404456910848,
+      "remaining_shortfall_bytes": 84313444146,
+      "disk_fits": false
+    }
+  },
+  "complete_unchanged_DATA_promises_bytes": 6582025928498,
+  "complete_unchanged_memory_promises_bytes": 759789531136,
+  "physical_bytes_retired_or_offloaded_by_checker": 0,
+  "DATA_promises_ended_bytes": 0,
+  "new_resource_credit_bytes": 0,
+  "guard_floors_changed": false,
+  "replay_admission_authorized": false,
+  "stat_reader": {
+    "path": "/usr/bin/stat",
+    "sha256": "166809d4415b69e598e9ad20539e85223394cb7db38903b0b0a9104a13434739"
+  },
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/SOURCE-SEAL-PLAN.json",
+      "sha256": "76a57c4dfa9a53e87f77c58f4b837e23ea9edcd401404974bb83b3afccb79d8c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/production-ORIGINAL-EXECUTION.json",
+      "sha256": "a3a05d9d79f09462f644052e363e215eaa561b44cebf5bd0fe7eef1f01ba1f28"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "e1deebb409305b19cc9f025874773d251a984bad61bebaaee789b9e672349507"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "d49d24f284826323fa0c78d6ec7d08eaed23776b7fe1185a3b102f4c508101a4"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "43465140526a4de1205af52928308469dd2a6c38978d16ed22a6e847c17f162f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/ordinary-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "0e45609dd993aed0cc2f31e6ddefebbd4a7a1ba00d7aa2920aee5907df9e0d69"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/ARTIFACT.json",
+      "sha256": "ae07d6d522ea2ebc126ccf5b8028d95c3cb6364efee178fd5ec06f0702c2104b"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/ROOT_QUALIFIED_NATIVE_PENDING.json",
+      "sha256": "d5c61cc0019fcc978ce1a6f2eef9cfb52926ece7e47e1f90838165e55914b976"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/NATIVE-ORIGINAL-ARGV.json",
+      "sha256": "3ced8e0b629c95c2dd70c17579bde984ed4fbc314fd07272ec392599e5f1eeab"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v1/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "8e491eac2c7643b165813c8063dd994b0d6abb3a815a2aaa181f6abfcf9014f0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/SOURCE-SEAL-PLAN.json",
+      "sha256": "8b5eb1bafaab3c39ce095a118be520e2cf3243905281323125b231761ccd600c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/production-ORIGINAL-EXECUTION.json",
+      "sha256": "5d0057223d0a7ba4c8bd3c0c0a889ca62411f8162bc5f1b47db1297773a7dc82"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "d0f3f8a313b991cf39b100b01a64e3238dbc70d2c2ea58b4b35f6087380b472a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "4e84cd4e0bdb96bc18508bcc68e3de89ec9ebfa3670baca247be32b7533bb64f"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "f426cbed0b04ab15c296645700d271d02d30c7f0aa7162ca27e69342e9669298"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ordinary-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "63f1fd123ffcc554a7fd960b80e368f83787aaa991d8b66af75dc2d9b8d46956"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ARTIFACT.json",
+      "sha256": "491899178a8b3484f193c7d4d47a2b3848289ed53b77f1a4fcf746fe92f81236"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ROOT_QUALIFIED_NATIVE_PENDING.json",
+      "sha256": "487578727d35b7a5218367958e6bba5f0836a3146e7f554a84ece5062096b9fd"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/NATIVE-ORIGINAL-ARGV.json",
+      "sha256": "19ad53663b71f4ae1ba7dca76705c61d6b9091e9aa8960206443eaaf70cd08d3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "ccc281ec00ad91928cdf467991b33a603cb9961fc127a31416d69c2774051fb6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ACTUAL_PLAN.json",
+      "sha256": "45a6146772ab11b3bcdadb44b267633641f7d517b480f92df8e1bee04f442d39"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ACTUAL_FULFILLED_OWNED_DISK_QUALIFICATION.json",
+      "sha256": "22a2ce6afe0dd80b669f66fa821f5bda930365d26bba08c54c63f4376e7b7d95"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v2/ROOT_NATIVE_OWNED_DISK_DRAINED_NO_FLOOR_OR_ADMISSION_AUTHORITY.json",
+      "sha256": "1f62212498b30c900b297c78a288aecd9ce61b4eb3c1257b96032a305de6ceee"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/SOURCE-SEAL-PLAN.json",
+      "sha256": "5a0a8e5a7346e323bfee3fb6d6fdebdb8f300ff7328ff54219c46dd6465f4d0e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/production-ORIGINAL-EXECUTION.json",
+      "sha256": "f3f8d417fe0f8aff3d957610ef28f1301f2ee205ee99b72d19ef19647a2b2126"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "5e6b4ddd9bbe57ce3986786e4c57925d9b7ba50c8db0e40218edc346e922f265"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "e0f38c969dd13abd10b17758bf84686f40317fa7f21d174cc9059a78d45a161d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "5c58fcc4a17f82143f817cac30cf6d457e2b56723cf23f1c016746499773d5bb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/ROOT_V3_FAILED_STRICT_TEST_LINT_NO_NATIVE_ACTOR_STARTED.json",
+      "sha256": "1eee2553168deaec4e89bc4b3992a8c164939e0ae9260474d4afce39810f2f95"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v3/CLOSED_SUPERSEDED_WORK_RETIREMENT_COMPLETE.json",
+      "sha256": "580727e4b52f396f9bea849e3acdca8cb928b38209853ce060f332177d6981ad"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/SOURCE-SEAL-PLAN.json",
+      "sha256": "205f36bb1b59e8743da3996878b96d089f09beaab26bd0ebf67644fc9d7cf80d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/production-ORIGINAL-EXECUTION.json",
+      "sha256": "75758efc5a9294a6dbf8ce48baa9604dbdcb437682a094873e4b780318b6ff6c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "f0d18f875671bcfb45d9b25211fe6625ec6c0570fa0587fbce86bdf3efee8e78"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "2ffdacb995ef59d7b7a7d960fff39edcf0df9c8ea8d3ea09f238f1f85f1ce240"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "18c7fa3c63cb960aaae3b2ecd6732f9c0ea18c2e64c680c594415044de5fcc71"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ordinary-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "139e53ada0a82e635defacc719cddd94879acde53ec42359d7b79d316225e829"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ARTIFACT.json",
+      "sha256": "e7cb84b967e51adecb20a0bbc61dd051429256b4b59686d95b5a56d3bac6b88c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ROOT_QUALIFIED_NATIVE_PENDING.json",
+      "sha256": "7065f4f5d1dd31b073ebf272f70be3e509715170ee2153b538947598097e19e0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/NATIVE-ORIGINAL-ARGV.json",
+      "sha256": "14355358136555f0a6f13290edf7be5e284abceaf7a3998ef115276a982a22bc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "3409b5b67051221d230d1e345f1e1ec8dfa3844ca6c938809623d43d522955fc"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ACTUAL_PLAN.json",
+      "sha256": "2f298635f7895fe438e2b4853a6e62308bda5a67e649c7def132fb8b28a34253"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ACTUAL_FULFILLED_OWNED_DISK_QUALIFICATION.json",
+      "sha256": "b849176dae637d8ac331852e7276eacaf6be74b08803d9ed2ea16cf235b60954"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ROOT_NATIVE_OWNED_DISK_DRAINED_NO_FLOOR_OR_ADMISSION_AUTHORITY.json",
+      "sha256": "dfc90a401c747cb85b92e51b5e77af59ac56336a5480bbf12168ba7c04379c58"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/fulfilled-owned-disk-qa-v4/ROOT_NATIVE16_SERIAL1GiB_OWNED_DISK_SUBALLOCATION.json",
+      "sha256": "af34a9177e053e8c65853e2d03f436e71d1dd1a4dadba34f060ded37071efb7e"
+    }
+  ]
+}

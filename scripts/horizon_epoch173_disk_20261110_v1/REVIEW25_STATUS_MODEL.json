@@ -1,0 +1,36 @@
+{
+  "schema": "horizon-epoch185-review25-current-model-evidence-v1",
+  "explicit_additional_qualification_millis": 67736000,
+  "exact_forecast_increment_this_review_millis": 7200000,
+  "control_forecast_utc": "2026-11-10T11:55:00Z",
+  "qualification_forecast_utc": "2026-11-10T12:19:18Z",
+  "all_original_anchors_native_clocks_and_full_replay_preserved": true,
+  "first_attempt_failed_before_python_on_duplicate_parent_child_lock": true,
+  "distinct_R2_attempt_authenticated_readback": true,
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/MODEL_BINDING.json",
+      "sha256": "d1a747d1d91ff171ee706449156a1a4a34897a78b77305a71044b2dbf1ebb33c"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/FIXED185_ETA_MODEL_EXPLICIT_CONTROL_REVIEW25.json",
+      "sha256": "034b01fd4a6a3d854c432c4719f83ee468d5bf29db87b705dd15f2db345a1c98"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/AUTHENTICATED185_EVENT_READBACK.json",
+      "sha256": "d1219c48383a8574380e2fa3e8aa2bebca8edd87d1d4657b963e47753fa18888"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/ORIGINAL-EXECUTION.json",
+      "sha256": "1cf3f4966fa22fec3e9701c35e3cdbc54f4a15714b92fa977a74f3105a29492b"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/R2-ORIGINAL-EXECUTION.json",
+      "sha256": "ed019bb416e1f19038c8323731870ff8650cdb646bbf33f36e0362b763751659"
+    },
+    {
+      "path": "/var/lib/jetstreamer/epoch185-explicit-control-review25-model-20261110-v1/ROOT_PARENT_CHILD_LOCK_FAILURE_CORRECTION.json",
+      "sha256": "5f14cca8ce3662dd874924cc422c7bdbce78a79605d1029cfd442c32c59a63c1"
+    }
+  ]
+}
