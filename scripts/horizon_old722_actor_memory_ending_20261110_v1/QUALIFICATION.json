@@ -1,0 +1,131 @@
+{
+  "schema": "horizon-old722-actor-memory-only-qualified-source-v1",
+  "source_members": {
+    "main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_old722_actor_memory_ending_20261110_v1/source/main.rs",
+      "sha256": "74f4f2c886b8c2620ef2d7d10e2554c1966847b14c32ff41ba657c1275cf8d3a"
+    },
+    "common.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_old722_actor_memory_ending_20261110_v1/source/common.rs",
+      "sha256": "4c4f0dc85361b87be4206c99d7fe43b741c4c64196bb2faffc2e946c4e40199e"
+    },
+    "bindings.json": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_old722_actor_memory_ending_20261110_v1/source/bindings.json",
+      "sha256": "008aa680e99bcb4807abe00efacededa05935fcfbba678264069689f87d984c2"
+    }
+  },
+  "four_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 13,
+  "genuine_native_scanner_controls_passed": 2,
+  "genuine_actual_check_and_ending_passed_and_drained": true,
+  "actual_original_invocation_id": "722adc397ae24bb4b96d452783599f57",
+  "once_only_memory_ending_selected_bytes": 51539607552,
+  "all_original_DATA_reservation_bytes_retained": 549890031616,
+  "guard_memory_retained_bytes": 268435456,
+  "DATA_credit_bytes": 0,
+  "physical_retirement_bytes": 0,
+  "complete_DATA_bytes": 6264131239730,
+  "complete_projected_memory_bytes": 685701345280,
+  "effective_consumer_and_guard_handoffs_pending": true,
+  "replay_admission_authorized": false,
+  "evidence": [
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/ROOT_QA_BOOKING.json",
+      "sha256": "09cff7aa50834a6b5de45a69e7fd73b37a0309414a4e6230281a2be2f3e65a6c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/ROOT_QA_CLOSED.json",
+      "sha256": "57a1bbc053f8c44c2478bd3e3cddcaf5dc1436db7dc9a5973b073a615545f0fa"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/ARTIFACT.json",
+      "sha256": "9e2bf4868ed38f764f3cb19db67f25df9b81e45c99f502fbca6c40695c76ec83"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/SOURCE-SEAL-EXECUTION.json",
+      "sha256": "3cb8b546dc9576fb22bc1c248d81c5217518e5053c96456511f37bd14a66eae3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/RUNTIME-SEAL-EXECUTION.json",
+      "sha256": "566016c0bdaad0262b7d6a0713ea77309bb1c8ebe0fc5e185090e03f2104caf2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/production-ORIGINAL-EXECUTION.json",
+      "sha256": "5e38afa56c1524e30f074af80bb7b570afe36b94b102e81555443758841632c1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "4d098f09cb1d4964b7d67aaeab030b5a5a1ed595cb5ccbb6ad3bf9f040f634a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/clippy-production-ORIGINAL-EXECUTION.json",
+      "sha256": "f551f53202516e6c09b3b970ac25d4a04a25b4f5ee11bd41d05c4d07aa085de6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/clippy-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "56e17b44cd5b8d1efc73bba92a10ab5a88404b8a2b1d52d5423b0e14b079726d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "494beee13390a4ec33bdd99dc84e14ffad1742aca2171159b3cfc08fb8018d2c"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/native-links-ORIGINAL-EXECUTION.json",
+      "sha256": "2d0a5a0a3ad2b822dfa483e4933899a1de2e1b66a71e722e68da86355507a746"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/native-growth-ORIGINAL-EXECUTION.json",
+      "sha256": "8b7ee6cea3c1170626ed2055b65be1f6bf12be28d1f8de131787f3c092db4ee7"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/ROOT_NATIVE512_BOOKING.json",
+      "sha256": "e6aaf1b68675c130a0c25907df84325977865f46698055383a3f7b30b95aea31"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/check-ORIGINAL-EXECUTION.json",
+      "sha256": "45c1988101301254caa62443fa8b87745f96047cef12ebaefcbb5c387a4822b6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/check-ORIGINAL-DRAIN.json",
+      "sha256": "6ddaf600c69328ce35ac1ceaaaf2f0b4a9dc7501530a2c42ad137279533f69a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/end-ORIGINAL-EXECUTION.json",
+      "sha256": "e1d6d3b5d485c51af4aa60d95134648f595f9ed6c016d9befe0cda86b14c39b6"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/end-ORIGINAL-DRAIN.json",
+      "sha256": "6ddaf600c69328ce35ac1ceaaaf2f0b4a9dc7501530a2c42ad137279533f69a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v5/ROOT_OLD722_ENDING_NATIVE_DRAINED_CONSUMER_PENDING.json",
+      "sha256": "62d7a890a720ac92f5ac4c30d0e0cb9f6ab641c9fab1b6f4ef927ceaaba9b904"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_OLD722_ACTOR48_MEMORY_ENDING_SELECTED.json",
+      "sha256": "4945a4a8e1753632a1f04067ba8b873c74c7e2bd57bf5fab63a532893dc1bbde"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-old722-actor-future-20261110-v5/722adc397ae24bb4b96d452783599f57/ended.json",
+      "sha256": "fdee9f4a66f72cf2df40ed12321b0377f1f362b77c66c90837a80e2ba85c8106"
+    }
+  ],
+  "preserved_failed_attempts": [
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v1/check-ORIGINAL-EXECUTION.json",
+      "sha256": "be91de6244680988fbf46a71bf60f2a162635d61c7e9c25f583e55dac96d9be3"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v2/check-ORIGINAL-EXECUTION.json",
+      "sha256": "e30f42af90aa9c1909ec69148f1762db063f095999e8c039e4e283903f0bfeb1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v3/build-tests-ORIGINAL-EXECUTION.json",
+      "sha256": "9fb10bd0bce5db31d6451508a2980c7ce294686c72fbc7ea2e965de53dbede37"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v4/TESTS-ORIGINAL-EXECUTION.json",
+      "sha256": "b7ab247d9b9e25ecd2ea526761d2923c5c81e90c31df9c5d1f99b97de9ce3c7e"
+    }
+  ]
+}
