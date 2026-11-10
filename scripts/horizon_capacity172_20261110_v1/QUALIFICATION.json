@@ -1,0 +1,220 @@
+{
+  "schema": "horizon-capacity172-qualified-source-history-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "sources": {
+    "verification144-v5.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/verification144-v5.rs",
+      "sha256": "04dbb84a738b30d478a6505777f95eb1719b6817a6ed42ed5cd0f5861fffa5b2"
+    },
+    "verification144-v6.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/verification144-v6.rs",
+      "sha256": "9c79d97674ee0298cb15ee690ab7677d70436c4263a4a11439e7e83bdf628352"
+    },
+    "verification144-v7.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/verification144-v7.rs",
+      "sha256": "7629d8d373a331289f2a392a8f1b9f34c58824f46724061ea21739626f70c944"
+    },
+    "fulfilled-anon-v6.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/fulfilled-anon-v6.rs",
+      "sha256": "21bc0eb81c07a98d8d4893a0a40bdc72f088f31093c6c47a200138404c2ecc55"
+    },
+    "fulfilled-anon-v7.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/fulfilled-anon-v7.rs",
+      "sha256": "7726412e3bfc8d173cdd3434b9c28ac5a6d544428b74e3eea0eecc5b0b8ae3da"
+    },
+    "fulfilled-anon-v8.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/fulfilled-anon-v8.rs",
+      "sha256": "769271da79f3fa84d533f471b7278c0eef59a8cfa5d604818d89965b96071be6"
+    },
+    "old722/main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/old722/main.rs",
+      "sha256": "09b032237f8d89af0e9690b819c776f3d787b4e2a8455b3e89b3e6fdbeee2be0"
+    },
+    "old722/common.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/old722/common.rs",
+      "sha256": "4c4f0dc85361b87be4206c99d7fe43b741c4c64196bb2faffc2e946c4e40199e"
+    },
+    "old722/bindings.json": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_capacity172_20261110_v1/source/old722/bindings.json",
+      "sha256": "ea7d0fd5917e05e043e92eb1c1b8d474d10cc352c5fa0d5b8a92c35afb644665"
+    }
+  },
+  "qualified_artifacts": {
+    "old722-v6": {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/ARTIFACT.json",
+      "sha256": "e112175571f93c75fc7ee29171ede59fa4f91fb14b04ef9886dd57b2b9397b81"
+    },
+    "verification144-v5": {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/VERIFICATION144-V5-ARTIFACT.json",
+      "sha256": "4cf9ce63d0fcd57821b43dae349e94c90272c022ccf9b3308498de37f26778ea"
+    },
+    "verification144-v6": {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v6/VERIFICATION144-V6-ARTIFACT.json",
+      "sha256": "a53409c13b3136d08e9931ca21ab6634f02133433b2e22693319b692fd5611c7"
+    },
+    "verification144-v7": {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/VERIFICATION144-V7-ARTIFACT.json",
+      "sha256": "4b8addc1847e4de5e6b3431eb9bf131d640d5f7f2f2ef47c84f2a845d734fda0"
+    },
+    "fulfilled-anon-v6": {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V6-ARTIFACT.json",
+      "sha256": "b46debd0d0a52821ff6d8f9c0fe31c2dbec8dedfd1afc63068b956fb98e169a0"
+    },
+    "fulfilled-anon-v7": {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/anon172-four-context-qa-v7/FULFILLED-ANON-V7-ARTIFACT.json",
+      "sha256": "47fd459e7658120d0e1ce320a25a047463f6b8232a6ab4f0e5bb76225762d455"
+    },
+    "fulfilled-anon-v8": {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/FULFILLED-ANON-V8-ARTIFACT.json",
+      "sha256": "2b08333b7614a22e38b36063b0aa41194670bc00851a81873e50b60047b9d44d"
+    }
+  },
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_OLD722_FUTURE_DATA_ENDING_SELECTED.json",
+      "sha256": "88b628d8b355f571ef26fde5446a81658e40e58d26672e9c11a7af1fb6eea155"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION16_RETURNED_CURRENT_AUTHORITY.json",
+      "sha256": "b5e80efbb2d626388090703ae033eb7923149407252398f0fe21f4e6599e008a"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ONCE_ONLY_UNUSED_VERIFICATION32_FUTURE_ENDED_CURRENT_AUTHORITY.json",
+      "sha256": "d4f1b74c3fd21e67df1839e12270aca4e53ee8756877b69b64af14662e25ff08"
+    },
+    {
+      "path": "/var/lib/jetstreamer/held136-baseline-view-qualification-20261109-v1/ROOT_ACTUAL_FULFILLED_ANON_V8_EPOCH172_QUALIFICATION.json",
+      "sha256": "ce58fcfc4b24b11fde8679cf82bf8b856311d9c6b97c3ac9fb8f70a9663ece9e"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/check-ORIGINAL-EXECUTION.json",
+      "sha256": "32af8bf6c0b51e700a054d181759d1c69fe348300985a65004879867a573a9ae"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/end-ORIGINAL-EXECUTION.json",
+      "sha256": "3a4800bc8dc25f41ed0888e11fb16c945f0a93a839198e789fc7ed205ab69af2"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/ROOT_OLD722_ENDING_NATIVE_DRAINED_CONSUMER_PENDING.json",
+      "sha256": "99ede5b8ae13fe168e3e65d7fe480e026d6832b1a37689f6a3e6116888181d57"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/ROOT_DUPLICATE_CLOSED_QA_WORK_OUTPUTS_RETIRED.json",
+      "sha256": "1de2d4b20db5ddbc4a4aee87249fd46882f3d11847fe6b36e63590634baee5ee"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ROOT_FRESH_STANDARD172_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+      "sha256": "d0fa07c259fdb5dadc4ce564d3afc562b32180354db16788ba083fb670e96027"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ACTUAL172_FULFILLED_ANON_ADMISSION_POINT.json",
+      "sha256": "957e07f688bb95af3ecfec4e7d6117dd9183523f46f5250efa5a58d527f7df56"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ACTUAL172_FIRST_GUARD_RECEIPT_CAPTURE.json",
+      "sha256": "2468361e32bc48b2243dd77f82baa09ad3aa5bf15cfeca4d35804fa864160d0d"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ACTUAL172_GENUINE_FIRST_GUARD_PID1_AND_TIMER.json",
+      "sha256": "539688b164d89151920621f40075941832cdccdeff935d7db558eaa79d264583"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ROOT_ACTUAL_FIRST_TRANSACTION_REPLAY_PHASE_EVENT.json",
+      "sha256": "24397d2fbb5bc49e0308d2313e31a67d4653ab0be1da82913d0c4200f35b35d1"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ACTUAL172_REPLAY_STATUS_AUTHENTICATED_READBACK.json",
+      "sha256": "e4dd63a55a928b09fce5a509d58cd46b1e99f41c128dbd0fe13e1805259eaa89"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/ROOT_NATIVE512_EXISTING16_SUBALLOCATION.json",
+      "sha256": "c5e4e9374bd24410151537606478d6a08cdc1357d4090b2bcd3bcaebc1b815eb"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/ROOT_VERIFICATION144_V5_FOUR_COMPILERS_AND_NINETEEN_TESTS_PASSED_NATIVE_PENDING.json",
+      "sha256": "ff53e943ed7d40022ebf1dfc9014b76dbf5599dfd095568c817e042cc442135a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/NATIVE-ORIGINAL-DRAIN.json",
+      "sha256": "6ddaf600c69328ce35ac1ceaaaf2f0b4a9dc7501530a2c42ad137279533f69a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/ACTUAL_UNUSED16_RETURN_NATIVE_CHECK.json",
+      "sha256": "923f6e7960912de8db1d3e511bff651936dc1dc0ecb5bbe84084b4dd42e4d736"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused16-return-qa-v5/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "c07b4787c8915fa677c59d7b5f984d5e36bdd5b2b5e24a75927da172a6d106d0"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/ACTUAL_UNUSED32_RETURN_NATIVE_CHECK.json",
+      "sha256": "a1821226b5cfbd0e1f3d9fd2654b4651228a1a3c7207b41960af57eaf28ef5d8"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/ROOT_NATIVE512_EXISTING16_SUBALLOCATION.json",
+      "sha256": "244b13918736e31924e9132ede0e04ead1081f5cf887524c66653c3d50ec17fa"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/ROOT_VERIFICATION144_V7_FOUR_COMPILERS_AND_NINETEEN_TESTS_PASSED_NATIVE_PENDING.json",
+      "sha256": "ff53e943ed7d40022ebf1dfc9014b76dbf5599dfd095568c817e042cc442135a"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/NATIVE-ORIGINAL-DRAIN.json",
+      "sha256": "6ddaf600c69328ce35ac1ceaaaf2f0b4a9dc7501530a2c42ad137279533f69a9"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/ROOT_PRE_NATIVE_BACKGROUND_FILTER_LITERAL_CORRECTION.json",
+      "sha256": "a7cd256bca67bf2fe41eae5358c8d79cc5373f6213fedbc28c06e9ea537acc43"
+    },
+    {
+      "path": "/home/sol/.jetstreamer-private/old722-actor-future-qualification-20261110-v6/verification-unused32-return-qa-v7/NATIVE-ORIGINAL-EXECUTION.json",
+      "sha256": "461b4cdbd27902032914fe42774a4cf6a90adb924efb692300dd01ef71ac5587"
+    }
+  ],
+  "source_copy_only_no_new_compilation": true,
+  "old722": {
+    "four_compiler_configurations_passed": true,
+    "ordinary_tests_passed": 14,
+    "genuine_native_scanner_controls_passed": 2,
+    "actual_check_and_end_passed": true,
+    "unused_future_DATA_ending_bytes": 480969228288,
+    "all_physical_files_retained": true
+  },
+  "verification144": {
+    "four_compiler_configurations_per_version": 4,
+    "ordinary_tests_per_version": 19,
+    "v5_actual_unused16GiB_return_passed": true,
+    "v6_qualified_but_not_natively_executed": true,
+    "v7_actual_unused32GiB_original_pool_future_ending_passed": true,
+    "all_actual_and_future_verifier_role_caps_preserved": true,
+    "effective_verifier_pool_bytes": 103079215104,
+    "unallocated_verifier_pool_bytes": 0,
+    "raw128GiB_history_retained": true
+  },
+  "fulfilled_anon": {
+    "four_compiler_configurations_per_version": 4,
+    "ordinary_tests_per_version": 8,
+    "v6_fit_failed_safely": true,
+    "v7_fit_failed_by_bytes": 150507520,
+    "v8_genuine_qualification_passed": true,
+    "v8_context_expires_utc": "2026-11-10T05:00:00Z",
+    "actual172_admission_consumed_before_expiry": true,
+    "expired_context_not_reusable_for_new_admission": true
+  },
+  "actual172": {
+    "started_at_utc": "2026-11-10T04:58:28Z",
+    "invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+    "pid": 431228,
+    "full_canonical_start_slot": 74304000,
+    "full_canonical_terminal_slot": 74735999,
+    "runtime": "v1.5.6",
+    "complete_DATA_bytes": 6100989591346,
+    "complete_projected_memory_bytes": 708249923584,
+    "normal_pool_bytes": 10737418240,
+    "proven_operating_point_remains": 6,
+    "seventh_is_one_guarded_experiment": true
+  },
+  "no_new_replay_admission_or_Frame_Reader_authority": true,
+  "no_reapplied_ending_or_physical_cleanup_credit": true
+}
