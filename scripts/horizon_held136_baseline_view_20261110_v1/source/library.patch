@@ -1,0 +1,54 @@
+--- a/failed4/selector.rs
++++ b/failed4/selector.rs
+@@ -231,3 +231,43 @@
+             .context("effective peers absent")?,
+     })
+ }
++
++/// Auxiliary held-baseline view. This does not open a current Frame/reader clock,
++/// reissue a retirement, alter raw peers, or grant global admission authority.
++pub fn held_baseline_view(held_source:&Bound, accounting_source:&Bound, request:&Request)->Result<Value> {
++    ensure!(held_source.path==Path::new("/var/lib/jetstreamer/horizon-original199-parent-memory-selection-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334/select-1/selection.json") && held_source.sha256=="04a6c68f71a4a3a763a2a529b72b3eaa14b82728bfa46919073eb12098074b92","exact previously qualified held baseline required");
++    ensure!(accounting_source.path==Path::new("/var/lib/jetstreamer/horizon-failed4-current-accounting-reader-20261104-v1/e6a0713f158869752e84560f11f52d52a7f9dfb405038e5ee2d4af031e6b2334-cold185-722adc397ae24bb4b96d452783599f57/raw-accounting.json") && accounting_source.sha256=="d783309cf31a26a572b0ad9113c154e4c86604fe1c8a8f882b17f3a6285f7274","exact unchanged held raw accounting required");
++    let held=f::json(held_source)?;let accounting:Value=serde_json::from_slice(&f::bytes(accounting_source,16<<20)?)?;
++    ensure!(held["schema"]=="terminal199-parent-memory-selector-original-execution-v1" && held["actual_native_capability_passed"]==true && held["memory_credit_bytes"]==0 && held["DATA_credit_bytes"]==0,"genuine held parent selection required");
++    let selected=&held["selection"];
++    ensure!(selected["raw_accounting_serde_json_sha256"]==f::sha(&serde_json::to_vec(&accounting)?) && selected["request"]["current"]==json!(request.current),"held original tuple/raw accounting crossed");
++    let (total,peers)=held_totals(selected)?;
++    let (reg,receipt)=registration(request)?;
++    validate_peer(accounting["active_peer_allocations"].as_array().context("held complete peer census")?,&receipt.original_peer)?;
++    let clock=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs();
++    ensure!(custody::verify(&accounting,clock)?==receipt.original_peer,"held failed136 custody changed");
++    eprintln!("{clock} held136 fresh terminal/reference census-before start");
++    let before=native::capture()?;
++    eprintln!("{} held136 census-before complete; census-after start",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs());
++    let after=native::capture()?;
++    ensure!(before["units"]==after["units"] && before["absent_cgroups"]==after["absent_cgroups"],"held family revived during view selection");
++    Ok(json!({"schema":"failed136-original-held-baseline-effective-memory-view-v1","held_parent_selection":held_source,"held_raw_accounting":accounting_source,"original_held_tuple":request.current,"original_retirement_receipt":reg.receipt,"original_writer_completion":reg.writer_completion,"claim_key":CLAIM,"retired_family_invocation_id":scope::FAILED_RETRY0004_IID,"held_total_before_bytes":total,"held_total_after_bytes":total.checked_sub(scope::MEMORY).context("held total subtraction")?,"held_peer_before_bytes":peers,"held_peer_after_bytes":peers.checked_sub(scope::MEMORY).context("held peer subtraction")?,"effective_retired_family_memory_bytes":scope::MEMORY,"native_before":before,"native_after":after,"recorded_unix_seconds":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),"all_original_raw_rows_and_DATA_retained":true,"new_retirement_recorded":false,"historical_held_tuple_is_not_fresh_resource_evidence":true,"native_Frame_or_full_Reader_acceptance_claimed":false,"DATA_credit_bytes":0,"physical_credit_bytes":0,"guard_changes":false,"replay_launch_authorized":false,"remote_mutations":false}))
++}
++fn held_totals(selected:&Value)->Result<(u64,u64)> {
++    let n=|key:&str|selected[key].as_u64().with_context(||format!("held {key}"));
++    ensure!(selected["schema"]=="terminal199-parent-only-effective-memory-selection-v1" && selected["raw_history_preserved"]==true && selected["all_DATA_promises_preserved"]==true && selected["DATA_credit_bytes"]==0 && selected["physical_credit_bytes"]==0 && selected["guards_changed"]==false,"held selection scope differs");
++    let raw=n("raw_total_memory_promises_bytes")?;let raw_peers=n("raw_peer_memory_bytes")?;
++    let captured=193u64<<30;let original=192u64<<30;let cached=192u64<<30;
++    ensure!(n("original199_parent_retirement_bytes")?==original && n("completed_cached145_parent_retirement_bytes")?==cached && n("baseline_effective_total_bytes")?==raw.checked_sub(captured).context("captured baseline total")? && n("baseline_effective_peer_bytes")?==raw_peers.checked_sub(captured).context("captured baseline peers")?,"held previously applied distinct parent/captured reductions differ");
++    let total=n("effective_total_memory_promises_bytes")?;let peers=n("effective_peer_memory_bytes")?;
++    ensure!(total==482_764_140_544 && peers==212_600_881_152 && raw.checked_sub(captured).and_then(|v|v.checked_sub(original)).and_then(|v|v.checked_sub(cached))==Some(total) && raw_peers.checked_sub(captured).and_then(|v|v.checked_sub(original)).and_then(|v|v.checked_sub(cached))==Some(peers),"held family was already reduced or baseline changed");
++    Ok((total,peers))
++}
++#[cfg(test)]
++mod held_baseline_tests {
++ use super::*;
++ fn baseline()->Value {json!({"schema":"terminal199-parent-only-effective-memory-selection-v1","raw_history_preserved":true,"all_DATA_promises_preserved":true,"DATA_credit_bytes":0,"physical_credit_bytes":0,"guards_changed":false,"raw_total_memory_promises_bytes":1102313172992u64,"raw_peer_memory_bytes":832149913600u64,"baseline_effective_total_bytes":895081000960u64,"baseline_effective_peer_bytes":624917741568u64,"original199_parent_retirement_bytes":192u64<<30,"completed_cached145_parent_retirement_bytes":192u64<<30,"effective_total_memory_promises_bytes":482764140544u64,"effective_peer_memory_bytes":212600881152u64})}
++ #[test]fn held_view_preserves_distinct_previous_reductions(){let v=baseline();assert_eq!(held_totals(&v).unwrap(),(482764140544,212600881152));}
++ #[test]fn already_reduced_or_changed_data_cannot_subtract_again(){let mut v=baseline();v["effective_total_memory_promises_bytes"]=json!(409749696512u64);assert!(held_totals(&v).is_err());let mut v=baseline();v["DATA_credit_bytes"]=json!(1);assert!(held_totals(&v).is_err());}
++ #[test]fn crossing_old_parent_reduction_or_omitting_raw_peers_rejects(){let mut v=baseline();v["original199_parent_retirement_bytes"]=json!(0);assert!(held_totals(&v).is_err());let mut v=baseline();v["raw_peer_memory_bytes"]=json!(212600881152u64);assert!(held_totals(&v).is_err());}
++}
+--- a/failed4/mod.rs
++++ b/failed4/mod.rs
+@@ -15,4 +15,4 @@
+ #[cfg(test)]
+ mod tests;
+ pub use recorder::{finalize, record};
+-pub use selector::{Selection, revalidate, select};
++pub use selector::{Selection, held_baseline_view, revalidate, select};
