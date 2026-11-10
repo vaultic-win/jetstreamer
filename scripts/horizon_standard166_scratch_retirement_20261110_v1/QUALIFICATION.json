@@ -1,0 +1,56 @@
+{
+  "schema": "horizon-exact-standard166-contents-retirement-qualification-v1",
+  "source": {
+    "stopped_tree.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_standard166_scratch_retirement_20261110_v1/source/stopped_tree.rs",
+      "sha256": "543e3a9a0dd216b564de569001fb7fbc318bdd65f2d04f247094984cb4dc3096"
+    },
+    "tests.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_standard166_scratch_retirement_20261110_v1/source/tests.rs",
+      "sha256": "e5c218f2393315cdba761e6ffcebfd0605d18cb5bf2eaa0a973d14f3c75ce1c8"
+    },
+    "source-review.md": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_standard166_scratch_retirement_20261110_v1/source/source-review.md",
+      "sha256": "342a7673ccefc6a89413b2122a17b4542ce4a7aae9f1a55240999b395ddf256b"
+    },
+    "main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_standard166_scratch_retirement_20261110_v1/source/main.rs",
+      "sha256": "0db687ae1b3910c5dd538a3566605b6d1dcb07cd959d412f9f638793fce1ba0a"
+    },
+    "process_references.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_standard166_scratch_retirement_20261110_v1/source/process_references.rs",
+      "sha256": "f60ffd9fd04a1604226567b9af0ea0652d0b622dc95ee8608b045b4e48391756"
+    }
+  },
+  "four_strict_compiler_configurations_passed": true,
+  "ordinary_tests_passed": 26,
+  "qualification": {
+    "path": "/var/lib/jetstreamer/standard166-scratch-retirement-qualification-20261110-v1/qa-v5/ROOT_FOUR_STRICT_COMPILERS_TWENTYSIX_TESTS_PASSED.json",
+    "sha256": "39543f034873e468725e53acbba4ad7f2b8465c107f6edf64997fb11cf7f7527"
+  },
+  "running_image": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standard166-scratch-retire-tools-20261110-v3/retire",
+    "sha256": "bc7f3880426bc90653d8edb0e6e72b782aa151f6acd4a472c7ca23be8f8fe4c2"
+  },
+  "native_check": {
+    "path": "/var/lib/jetstreamer/standard166-scratch-retirement-qualification-20261110-v1/ROOT_NATIVE_CHECK_PASSED_NO_REMOVAL.json",
+    "sha256": "881bdd68ef5010f13ed1cf8919653b6de58958dd0cb5e34a531244eb4766b7e4"
+  },
+  "native_execution": {
+    "path": "/var/lib/jetstreamer/standard166-scratch-retirement-qualification-20261110-v1/ROOT_ACTUAL166_SCRATCH_CONTENTS_RETIREMENT_COMPLETE.json",
+    "sha256": "fbe2cac3158bc9a00a578357523c61a267c22f971d3f4da09dac5614415d94d6"
+  },
+  "native_drain_and_normal_slot_return": {
+    "path": "/var/lib/jetstreamer/standard166-scratch-retirement-qualification-20261110-v1/ROOT_EXECUTION_DRAINED_NORMAL166_SLOT_RETURNED.json",
+    "sha256": "9aaa56afb1df02fc3c58e41c6a12d7efbe0658f76ea577e78644183db84af2e2"
+  },
+  "retired_regular_physical_file_bytes": 57260408832,
+  "actual_available_DATA_delta_bytes": 57293955072,
+  "preserved_partial_archive_bytes": 51630524269,
+  "scratch_root_inode_preserved": true,
+  "all_inputs_state_and_partial_preserved": true,
+  "reservation_ending_bytes": 0,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "full_plugin_and_canonical_retirement_authority": false
+}

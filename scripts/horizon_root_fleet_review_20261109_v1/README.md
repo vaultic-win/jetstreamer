@@ -21,3 +21,14 @@ The seventh runtime generation separates an exact admitted original172 bootstrap
 Source generation8/runtimeV6 passed four compiler configurations and38 tests, then rejected the genuine timer while it was running its bound guard. Source generation9/runtimeV7 accepts that valid armed substate with the same exact timer/trigger identity;39 tests, all four compilers and both native fleet reconciliations passed. The05:00 ledger retains six useful replays plus one bootstrap; a separate05:22 transaction event preceded the05:30 ledger’s seven useful replays. All100 rows,18 authenticated reports,70ready/30missing and seven-owner RSS accounting are retained. Proven point6 and current memory target14 do not admit an eighth producer. `QUALIFICATION_BOOTSTRAP_20261110.json` binds the successes and failed predecessor without rewriting either observation.
 
 The eighth runtime generation adds the explicit seven-owner operating route. It preserves point4/5/6 and bootstrap handling and requires a single-step6→7 selection, matching complete owner/worker sets, a fresh1800second useful window with no counter resets, all seven zero hard-limit/OOM deltas, VMA bounds, current complete DATA floor, host pressure and all genuine guards. All four strict compilers and43 tests passed. The genuine06:00 native100-row/19-status review selected point7: all seven original166–172 workers advanced, host full memory pressure was0.01255%, and aggregate transaction throughput was6645.56/s. Current memory target14 remains distinct from admission. Epoch173 has not been admitted. `QUALIFICATION_SEVEN_POINT_20261110.json` binds native acceptance and the50,417,664-byte closed duplicate compiler-output retirement; no DATA promise was released by that cleanup.
+
+The ninth runtime generation reconciles the seven original producers after their
+15:40 filesystem-guard stops. It requires each exact stop chain and original
+PID1 terminal event, preserves all100 rows and19 authenticated repair reports,
+and checks current terminal identities before and after the complete census.
+It supports both the pre-stop observation and a later observation with zero
+ordinary replays and seven retained terminal diagnostics. Historical point7 and
+target13 remain explicit; zero active producers yields no new memory target,
+resource release or replay admission. Four strict compiler configurations,
+50 tests and genuine16:00/16:30 native reconciliations passed.
+`QUALIFICATION_TERMINAL_20261110.json` binds those exact source and runtime bytes.
