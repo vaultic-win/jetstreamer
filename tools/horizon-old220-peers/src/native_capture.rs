@@ -414,6 +414,9 @@ fn validate_write_properties(p: &BTreeMap<String, String>, output: &Path) -> Res
         ("ProtectKernelTunables", "yes"),
         ("ProtectKernelModules", "yes"),
         ("ProtectControlGroups", "yes"),
+        // ProtectSystem=strict alone can leave /run writable. Require this
+        // exact projection; actual mount_view must still prove it read-only.
+        ("ReadOnlyPaths", "/run"),
     ] {
         ensure!(
             p.get(key).map(String::as_str) == Some(expected),
@@ -434,7 +437,6 @@ fn validate_write_properties(p: &BTreeMap<String, String>, output: &Path) -> Res
         "CacheDirectory",
         "LogsDirectory",
         "ConfigurationDirectory",
-        "ReadOnlyPaths",
         "InaccessiblePaths",
     ] {
         ensure!(
@@ -891,6 +893,8 @@ mod tests {
         assert_eq!(valid.writable.len(), 3);
         for bad in [
             format!("{good}6 1 8:1 /var/lib/extra /var/lib/extra rw - ext4 /dev/root rw\n"),
+            format!("{good}6 1 0:4 / /run rw - tmpfs tmpfs rw\n"),
+            format!("{good}6 1 0:4 / /run/child rw - tmpfs tmpfs rw\n"),
             good.replace("/ / ro -", "/ / rw -"),
             good.replace(
                 &format!("{} {} rw", output.display(), output.display()),
@@ -905,6 +909,11 @@ mod tests {
         ] {
             assert!(mount_view(bad, &output).is_err());
         }
+        assert!(mount_view(
+            format!("{good}6 1 0:4 / /run ro - tmpfs tmpfs rw\n"),
+            &output,
+        )
+        .is_ok());
         assert!(mount_path("/bad\\777escape").is_err());
         assert_eq!(mount_path("/a\\040b").unwrap(), "/a b");
     }
@@ -925,6 +934,7 @@ mod tests {
             p.insert(key.into(), "yes".into());
         }
         p.insert("PrivateTmp".into(), "no".into());
+        p.insert("ReadOnlyPaths".into(), "/run".into());
         p.insert("ReadWritePaths".into(), output.display().to_string());
         validate_write_properties(&p, &output).unwrap();
         for key in [
@@ -937,6 +947,27 @@ mod tests {
             bad.insert(key.into(), "extra".into());
             assert!(validate_write_properties(&bad, &output).is_err());
         }
+        // Only the exact property string /run is admitted. Empty, alternative,
+        // extra/duplicate paths, optional prefixes and alternate spellings fail.
+        for value in [
+            "",
+            "/tmp",
+            "/run /tmp",
+            "/run /run",
+            "-/run",
+            "/run/",
+            "/run\t/tmp",
+        ] {
+            let mut bad = p.clone();
+            bad.insert("ReadOnlyPaths".into(), value.into());
+            assert!(
+                validate_write_properties(&bad, &output).is_err(),
+                "ReadOnlyPaths={value:?}"
+            );
+        }
+        let mut missing = p.clone();
+        missing.remove("ReadOnlyPaths");
+        assert!(validate_write_properties(&missing, &output).is_err());
     }
     #[test]
     fn atomic_result_publication_never_overwrites_an_existing_result() {

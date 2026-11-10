@@ -92,8 +92,12 @@ The fixed sandbox additionally requires `PrivateDevices=yes`, `PrivateTmp=no`,
 `PrivateMounts=yes`, `ProtectKernelTunables=yes`, `ProtectKernelModules=yes` and
 `ProtectControlGroups=yes`. RootDirectory/RootImage, MountImages, extension
 images/directories, BindPaths/BindReadOnlyPaths, TemporaryFileSystem, managed
-Runtime/State/Cache/Logs/Configuration directories, ReadOnlyPaths and
-InaccessiblePaths must be empty. `ReadWritePaths` contains only the result parent.
+Runtime/State/Cache/Logs/Configuration directories and InaccessiblePaths must be
+empty. `ReadOnlyPaths` must be exactly `/run`: `ProtectSystem=strict` alone can
+leave that runtime filesystem writable. Empty, alternative or additional paths
+are rejected. Actual mountinfo must still show `/run` and its ordinary child
+mounts read-only; the projection grants no new writable API exception.
+`ReadWritePaths` contains only the result parent.
 The root mount must be read-only; exactly one writable result-parent mount must
 refer to the same underlying host directory. Actual mountinfo and its SHA plus
 the explicit writable API/result mount list are included beside the peer summary.
