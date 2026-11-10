@@ -1,0 +1,87 @@
+{
+  "schema": "horizon-Root-original172-bootstrap-reviewer-qualification-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "source_members": {
+    "main.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/main.rs",
+      "sha256": "277406d7ee8b202921e8b49b6336cd2736a5864d62a886fcc56fa0a5395de202"
+    },
+    "memory_target.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/memory_target.rs",
+      "sha256": "ae6ba062ddea8082ef9c6e090cdc58ff250deda853d3675d5e683804cb3f2fda"
+    },
+    "bootstrap.rs": {
+      "path": "/home/sol/workspace/jetstreamer/scripts/horizon_root_fleet_review_20261109_v1/source/bootstrap.rs",
+      "sha256": "e1947abf37376265415f155452b5be745ed563bde89734a3711b0b8ddfe4f031"
+    }
+  },
+  "v6_source_generation8": {
+    "four_strict_compiler_configurations_passed": true,
+    "ordinary_tests_passed": 38,
+    "native0500_failed_closed": true,
+    "failure": "The original armed guard timer was running its bound guard; its valid running substate was rejected at the end of the metadata census."
+  },
+  "v7_source_generation9": {
+    "four_strict_compiler_configurations_passed": true,
+    "ordinary_tests_passed": 39,
+    "native0500_passed": true,
+    "native0530_passed": true,
+    "all100_epoch_rows_preserved": true,
+    "authenticated_status_count": 18,
+    "earlier0500_useful_transaction_replays": 6,
+    "earlier0500_guarded_bootstrap_owners": 1,
+    "current0530_transaction_replays": 7,
+    "current0530_guarded_bootstrap_owners": 0,
+    "proven_operating_point": 6,
+    "current_memory_selected_target": 14
+  },
+  "evidence": [
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V8_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json",
+      "sha256": "8e65039895a720e62b31d68c28c10f0f763f5ff5c29af2292a96a86b27fabfbb"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V8_CONTROL_CALLBACK_QA_DRAINED.json",
+      "sha256": "33a3119bc1bcd5c590d7c34b70e081c80d8a2588f340fddf0a89ec911a2b3e7d"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V9_SOURCE_AND_EXACT_REUSED_LIBRARY_FREEZE.json",
+      "sha256": "b168a95db69d9172072751e06e6e984c2b65bc603e188027607052068e5e290a"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V9_CONTROL_CALLBACK_QA_DRAINED.json",
+      "sha256": "ef209534df29ce01a8ad997cda53de930152903d87d6a31412e2669755ee9bbc"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-050022-V6-ORIGINAL-EXECUTION.json",
+      "sha256": "c9231963cadec506efd2f57efb3a855bf88d9b31bbea3f95da5189bbfe788d1c"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-050022-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "05cc70d8d40afd9f7530767f59dd6aa73b936d19000735210499e7af93ba775f"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/NATIVE-REVIEW-053022-V7-ORIGINAL-EXECUTION.json",
+      "sha256": "a8e6433248245192038f3f7e7687c47e3a28895bb9f05b68f603ed4c119535d5"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_050022_RUST_V7.json",
+      "sha256": "93ea7e02b8b61e89a1e3f09a5ec879f02616d5b0b6756273ba8b1602118f1426"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_053022_RUST_V7.json",
+      "sha256": "5bb6e60c78417b1b24207953b97e433a0528dca7f7fb86b74b6d1892566c89ef"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_050022_NATIVE_V7_DRAINED_EXISTING_NORMAL10_RESTORED.json",
+      "sha256": "9331b71bb2c5f9b1ec0927a59129f230691f713eff0711d0f5fa5dd1ea8b9158"
+    },
+    {
+      "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_053022_NATIVE_V7_DRAINED_EXISTING_NORMAL10_RESTORED.json",
+      "sha256": "f28b3690b0d14d44627df1465c0f39c2ace95f396f87144ce5e3d516eaf7cdd0"
+    }
+  ],
+  "no_new_operating_point_or_replay_admission": true,
+  "no_R2_archive_sidecar_or_producer_mutation": true
+}
