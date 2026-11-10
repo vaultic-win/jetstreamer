@@ -1,0 +1,84 @@
+{
+  "schema": "horizon-Root-failed-local1-three-scratch-retirement-accounting-v1",
+  "owner": "/root",
+  "recorded_at_utc": "2026-11-10T23:53:53.021467+00:00",
+  "runtime": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local1-scratch-retire-tools-20261110-v1/retire",
+    "sha256": "0b6bab665e0746b7337dbf254604820d5c9492de7143d5628ebd85ddaa336580"
+  },
+  "normal_runtime_seal": {
+    "path": "/usr/local/lib/jetstreamer/horizon-local1-scratch-retire-tools-20261110-v1/deployment-seal-receipt.json",
+    "sha256": "5c7d517ca203bb2e5bcac887923d8cce9f386c5293a130761b155408fa3c1fbb"
+  },
+  "rows": [
+    {
+      "epoch": 166,
+      "completion": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch166/completion.json",
+        "sha256": "6372b2612d07200d9387554936909d5b41615a1ded4f6b01ea86a9efe5387f44"
+      },
+      "retirement_accounting": {
+        "path": "/var/lib/jetstreamer/local1-scratch-native-retirement-retry1-20261110-v1/epoch166/ROOT_ACTUAL_CONTENTS_RETIREMENT_COMPLETE.json",
+        "sha256": "292d9604242e727a238da5f05653874bebece20a63239316df9ef1328c5a22d8"
+      },
+      "native_ledger": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch166/ledger.json",
+        "sha256": "de758b7455b21d150ba9274a06bc8a7c3f7060e7e974ecf695e88aaaabba06ce"
+      },
+      "retired_regular_physical_file_bytes": 3938705408,
+      "ledger_entry_count": 91089,
+      "preserved_empty_root_inode": 103161244
+    },
+    {
+      "epoch": 167,
+      "completion": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch167/completion.json",
+        "sha256": "7cbc93245128d668a0073359e0d904b40acd21d2a80fd2569eee2896cf714424"
+      },
+      "retirement_accounting": {
+        "path": "/var/lib/jetstreamer/local1-scratch-native-retirement-retry1-20261110-v1/epoch167/ROOT_ACTUAL_CONTENTS_RETIREMENT_COMPLETE.json",
+        "sha256": "60008ca184fbd880ab59501bcbba4dcd717482dc8db5fa63fb250b9660fa77d6"
+      },
+      "native_ledger": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch167/ledger.json",
+        "sha256": "620a88475d8fd4da8ba1376375ddc0bfd4d2738a8004492c4c15179f394b777a"
+      },
+      "retired_regular_physical_file_bytes": 3989684224,
+      "ledger_entry_count": 86593,
+      "preserved_empty_root_inode": 103874622
+    },
+    {
+      "epoch": 168,
+      "completion": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch168/completion.json",
+        "sha256": "1e81a3d003770e42d312e8d88b926e0d05e59e7b2b3fcfa6a568fd0602a8a966"
+      },
+      "retirement_accounting": {
+        "path": "/var/lib/jetstreamer/local1-scratch-native-retirement-retry1-20261110-v1/epoch168/ROOT_ACTUAL_CONTENTS_RETIREMENT_COMPLETE.json",
+        "sha256": "9b2d870d996670314499d98ca5f072dc5257abf8660eec54e13a93fefa33fb21"
+      },
+      "native_ledger": {
+        "path": "/var/lib/jetstreamer/local1-scratch-retirement-20261110-v1/epoch168/ledger.json",
+        "sha256": "20a3f5418b772d3d22564b565bc8a48c889786e384d8a66536478b03b87147b0"
+      },
+      "retired_regular_physical_file_bytes": 4029100032,
+      "ledger_entry_count": 86025,
+      "preserved_empty_root_inode": 104005652
+    }
+  ],
+  "total_retired_regular_physical_file_bytes": 11957489664,
+  "all_completions": {
+    "path": "/var/lib/jetstreamer/local1-scratch-native-retirement-retry1-20261110-v1/ROOT_THREE_FAILED_LOCAL1_SCRATCH_RETIREMENTS_COMPLETE.json",
+    "sha256": "0b06dd3c6d012b6c50300596bea5e09895e8a18dcfe0e755a626bd802ad3eb70"
+  },
+  "failed_original_check": {
+    "path": "/var/lib/jetstreamer/local1-scratch-native-retirement-20261110-v1/epoch166/check-ORIGINAL-EXECUTION.json",
+    "sha256": "f0f3431b408f7b431e1b4169d3e6800f5b5e7ebb239d03af7a987a789444389d"
+  },
+  "correction": "Exact shared mutation lock writable binding; retained native terminal bytes changed only to readonly0400; dependency evidence uses normal sealed copies. All gates and source retained.",
+  "all_memory_DATA_and_floor_promises_retained": true,
+  "reservation_ending_bytes": 0,
+  "replay_admission_authorized": false,
+  "archive_or_sidecar_mutations": false,
+  "remote_mutations": false
+}
