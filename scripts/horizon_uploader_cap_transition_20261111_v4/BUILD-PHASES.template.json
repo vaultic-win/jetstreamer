@@ -1,0 +1,110 @@
+{
+  "schema": "horizon-isolated-transition-source-build-template-v1",
+  "actual_predecessor_qa": {
+    "path": "/var/lib/jetstreamer/uploader-capped-census-qualification-20261111-v5/capped-census-v5/ROOT_EXACT_SOURCE_AND_ACTUAL_LIBRARY_GRAPH_FREEZE.json",
+    "sha256": "b54270b54e1f0dd1a4e67f35a6b1ddee430087972eed138b4dc0669a31c4de24"
+  },
+  "root_only": true,
+  "unexecuted": true,
+  "actual_graph": {
+    "anyhow": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "sha256": "69d8dea7b0eb33c8977833b75a41a0ee8521773be7b51da31a1366c45cc73dda"
+    },
+    "libc": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liblibc-1353d01eceea9c4e.rlib",
+      "sha256": "1ad98e33569cd95079056b4f21b70832b3d209a3ab6cb9b3cf86e5c26c5c141e"
+    },
+    "serde": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde-c096c92dd15927d9.rlib",
+      "sha256": "38fd5d451dd24168f563c68083ce6a914c90cb4ac1e36b1c9556618885aa9070"
+    },
+    "serde_json": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+      "sha256": "9690b39d361de1e77877a58c56864588d581201767008d64846ce524f873dc65"
+    },
+    "sha2": {
+      "path": "/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libsha2-104d7c128ea151cf.rlib",
+      "sha256": "4ee42ce093bbcf289d29b68351f6751f68426938f471fd233aeb7b216d1e1521"
+    }
+  },
+  "compiler": {
+    "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc",
+    "sha256": "3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2"
+  },
+  "clippy": {
+    "path": "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/clippy-driver",
+    "sha256": "f3d6f504333820cb4dbaccb5e4742d98c826f6a199c81964affe53639d19e734"
+  },
+  "common_flags": [
+    "--edition=2024",
+    "-Dwarnings",
+    "--check-cfg=cfg(test)",
+    "--check-cfg=cfg(horizon_uploader_freeze_fixture)",
+    "--check-cfg=cfg(horizon_uploader_freeze_case,values(\"work-fd\",\"live-child\",\"extra-thread\",\"caught-term\",\"ignored-term\",\"late-work\",\"late-term\"))",
+    "-Ccodegen-units=2",
+    "-Cdebuginfo=0",
+    "-Copt-level=2",
+    "-L",
+    "dependency=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps",
+    "--extern",
+    "anyhow=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libanyhow-7d758cdd889142f0.rlib",
+    "--extern",
+    "libc=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/liblibc-1353d01eceea9c4e.rlib",
+    "--extern",
+    "serde=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde-c096c92dd15927d9.rlib",
+    "--extern",
+    "serde_json=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libserde_json-4701be7eb60bc14f.rlib",
+    "--extern",
+    "sha2=/var/lib/jetstreamer-builds/readback-progress-20261022-v1/release/deps/libsha2-104d7c128ea151cf.rlib"
+  ],
+  "strict_configurations": [
+    "rustc application",
+    "rustc --test",
+    "clippy-driver application -Dwarnings",
+    "clippy-driver --test -Dwarnings"
+  ],
+  "stages": [
+    {
+      "stage": "uncapped_fixture",
+      "source": "readers/uncapped/main.rs",
+      "extra_flags": [
+        "--cfg=horizon_uploader_freeze_fixture"
+      ],
+      "ordinary_tests_expected": 4,
+      "then": "Root actual acceptance and normal seal; record actual SHA before next stage"
+    },
+    {
+      "stage": "capped_fixture",
+      "source": "readers/capped/main.rs",
+      "extra_flags": [
+        "--cfg=horizon_uploader_freeze_fixture"
+      ],
+      "ordinary_tests_expected": 20,
+      "requires": "replace only fixture_predecessor.rs with actual accepted uncapped fixture SHA; production8e7a constant unchanged"
+    },
+    {
+      "stage": "production_cfg_regression",
+      "source": "readers/capped/main.rs",
+      "extra_flags": [],
+      "ordinary_tests_expected": 20,
+      "requires": "retain fixed production predecessor and all original gates; never execute native production reader"
+    },
+    {
+      "stage": "controller",
+      "source": "controller/main.rs",
+      "extra_flags": [],
+      "requires": "fill compiled-bindings only after both actual reader acceptances and retained booking; source freeze external to compiled bindings; postbuild controller acceptance external in run plan",
+      "ordinary_tests_expected": 9,
+      "controller_source_members": [
+        "main.rs",
+        "evidence.rs",
+        "compiled-bindings.json",
+        "controller.service.template",
+        "reader_guards.rs",
+        "root_outer.rs"
+      ]
+    }
+  ],
+  "execution": "Root only. Preserve V1 source and all actual reader source/build bindings. Controller V2 requires independent strict qualification, normal source/runtime seals, immutable final plan metadata, distinct disjoint1GiB Root outer plus1GiB fixture aggregate booked within retainednative16, and all original native gates. No compiler during captures."
+}

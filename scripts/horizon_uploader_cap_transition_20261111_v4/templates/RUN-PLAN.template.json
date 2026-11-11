@@ -1,0 +1,66 @@
+{
+  "schema": "horizon-isolated-cap-transition-plan-v2",
+  "bindings": {
+    "schema": "horizon-isolated-cap-transition-bindings-v1",
+    "booking": {
+      "path": "ROOT_MUST_BIND_ACTUAL_RETAINED_NATIVE16_OS512_BOOKING",
+      "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+    },
+    "old_reader": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-uncapped-20261111-v2/census",
+      "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+    },
+    "capped_reader": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-capped-20261111-v2/census",
+      "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+    },
+    "service_template": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-profile-20261111-v2/horizon-uploader-cap-transition-fixture-20261111-v2.service",
+      "sha256": "5fc5f2c97dca3d893a52132343516a973a32c64c2bc80a0b893e33c526a79b40"
+    },
+    "slice_template": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-profile-20261111-v2/horizon_uploader_cap_transition_20261111_v2.slice",
+      "sha256": "09138959f26a630adfaa98236ea35f745e6c44f1d82ff06b222d4116d48e6ad0"
+    },
+    "fixture_slice_template": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-profile-20261111-v2/horizon_uploader_cap_transition_20261111_v2-fixture.slice",
+      "sha256": "2e0754345395b86855030aa3f5376aa27981da835e5bfc6063e0d14b973593f0"
+    },
+    "sealer": {
+      "path": "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment",
+      "sha256": "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+    },
+    "native16_exclusive_lock": "ROOT_MUST_BIND_ACTUAL_EXISTING_NATIVE16_EXCLUSIVE_LOCK",
+    "compiler_cgroups": [
+      "ROOT_MUST_LIST_ALL_COMPILER_EXCLUSION_CGROUPS"
+    ],
+    "old_reader_acceptance": {
+      "path": "ROOT_MUST_BIND_ACTUAL_OLD_FIXTURE_ACCEPTANCE",
+      "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+    },
+    "capped_reader_acceptance": {
+      "path": "ROOT_MUST_BIND_ACTUAL_CAPPED_FIXTURE_ACCEPTANCE",
+      "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+    },
+    "waiter_source": {
+      "path": "/usr/local/lib/jetstreamer/horizon-uploader-cap-transition-profile-20261111-v2/waiter-source.rs",
+      "sha256": "4e021521dceea4c3ab535509cc7781cb00d8a1e3a465814f50d0d7ad03e30815"
+    }
+  },
+  "source_freeze": {
+    "path": "ROOT_MUST_BIND_POSTBINDINGS_NORMAL_SEALED_SOURCE_FREEZE",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "controller_acceptance": {
+    "path": "ROOT_MUST_BIND_POSTBUILD_NORMAL_SEALED_CONTROLLER_ACCEPTANCE",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "output": "/var/lib/jetstreamer/horizon-uploader-cap-transition-20261111-v2/RESULT.json",
+  "root_outer": {
+    "unit": "ROOT_MUST_BIND_ACTUAL_SEPARATE_ROOT_OUTER_SERVICE",
+    "invocation_id": "ROOT_MUST_BIND_ACTUAL_IID",
+    "main_pid": 0,
+    "start_ticks": 0,
+    "control_group": "ROOT_MUST_BIND_ACTUAL_DISJOINT_ROOT_OUTER_CGROUP"
+  }
+}

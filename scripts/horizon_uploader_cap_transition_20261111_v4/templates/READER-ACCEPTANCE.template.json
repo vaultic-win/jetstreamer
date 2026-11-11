@@ -1,0 +1,27 @@
+{
+  "schema": "horizon-isolated-fixture-reader-actual-acceptance-v1",
+  "four_strict_configurations_passed": false,
+  "normal_seal_verified": false,
+  "accepted_image": {
+    "path": "ROOT_MUST_BIND_ACTUAL_NORMALLY_SEALED_FIXTURE_READER",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_four_strict_configurations": {
+    "path": "ROOT_MUST_BIND_ACTUAL_QUALIFICATION",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_normal_deployment_seal": {
+    "path": "ROOT_MUST_BIND_ACTUAL_NORMAL_SEAL",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "actual_fixture_predecessor": {
+    "path": "ROOT_MUST_BIND_ACTUAL_ACCEPTED_UNCAPPED_FIXTURE_FOR_CAPPED_ONLY",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "source_freeze": {
+    "path": "ROOT_MUST_BIND_ACTUAL_SOURCE_FREEZE",
+    "sha256": "ROOT_MUST_BIND_ACTUAL_SHA256"
+  },
+  "ordinary_tests_passed": "ROOT_MUST_RECORD_ACTUAL_TEST_COUNT",
+  "no_production_liveness_or_resource_credit": true
+}
