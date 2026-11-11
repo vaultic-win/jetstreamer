@@ -1,0 +1,29 @@
+{
+  "accepted_artifact": {
+    "path": "/usr/local/lib/jetstreamer/horizon-shared64-owner-census-tools-20261110-v3/artifact-proof.json",
+    "sha256": "f87f84ea399e9bbab79441658ed6cebe132e0cca272b750c897acf921b158d3f"
+  },
+  "selected_direct_externs": {
+    "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+    },
+    "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+      "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+    },
+    "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+      "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+    }
+  },
+  "compiler_freeze": {
+    "path": "/var/lib/jetstreamer/native16-compiler-suballocation-qualification-20261109-v1/SOURCE-COMPILER-LIBRARY-FREEZE.json",
+    "sha256": "fc8f8efd00ac275ffa198c89b73d3d02a9adc7d8c63a3464a761dd0f5ccbe625"
+  },
+  "retained_complete_graph": {
+    "path": "/var/lib/jetstreamer/root-fleet-operational-review-qualification-20261109-v1/ROOT_V5_EXACT_SOURCE_AND_REUSED_LIBRARY_FREEZE.json",
+    "sha256": "9c470619d39590fb20c7903f6dbd7d1490e0467ab94646dd27e8c7aeb7c37423"
+  },
+  "all_original_graph_inputs_preserved": true
+}

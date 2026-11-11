@@ -1,0 +1,103 @@
+{
+  "schema": "horizon-whole-role-published-source-QA-v1",
+  "source_QA_acceptance": {
+    "path": "/var/lib/jetstreamer/whole-shared-role-source-qa-20261111-v5/ROOT_FOUR_STRICT_AND_RETAINED_NEW_TESTS_PASSED_NO_NATIVE_AUTHORITY.json",
+    "sha256": "a5c0b2f95ed62ad7d256565d02fe87a9c9a58ad5034d608454c540078112625b"
+  },
+  "normally_sealed_source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-whole-role-source-qa-source-20261111-v5/deployment-seal-receipt.json",
+    "sha256": "64a28a78a5074ef7a9cd1b53b6a93934663a814620e363937148bcc81a484190"
+  },
+  "normally_sealed_source_QA_candidate": {
+    "path": "/usr/local/lib/jetstreamer/horizon-whole-role-source-qa-tools-20261111-v5/source-qa-candidate",
+    "sha256": "fbac59c656f82dce082ef51ef303453f5a2dd3b3ef764bc43372e5a255203376"
+  },
+  "source_members": [
+    {
+      "name": "BUILD_GRAPH_AND_RECIPE.json",
+      "bytes": 23245,
+      "sha256": "f6a915814ba9f1d26b31f50f6b8010adcbec623d9033093498e33370e4a604b0"
+    },
+    {
+      "name": "SEALED_PLAN.json",
+      "bytes": 32286,
+      "sha256": "41707bd1a5ba9ad8536e7151396cf4a712ea5eb3e119bebf22806a3e08e98f52"
+    },
+    {
+      "name": "budget.rs",
+      "bytes": 18840,
+      "sha256": "ddfeeaf9ed3c74f55508788bf31bd1a15ccecf87a8cd4487fd758f31f44af5b9"
+    },
+    {
+      "name": "budget_tests.rs",
+      "bytes": 9680,
+      "sha256": "a3a890f2d20755ac8708db0e8355c85b784c47ca96522401dc630a592d20ebe4"
+    },
+    {
+      "name": "capture.rs",
+      "bytes": 18691,
+      "sha256": "fbb6234372b452b2350a62aa1b2b6372032c2b5d2ef3d44aa67f14fde83ad1d8"
+    },
+    {
+      "name": "data-guard-registrations.json",
+      "bytes": 443,
+      "sha256": "c48928594cfa2526403fc616fac6112b42b35e6511bd686fa4a4b5ae95fc3f99"
+    },
+    {
+      "name": "data_guard_reader.rs",
+      "bytes": 38046,
+      "sha256": "9462ae6dba8588a8424e0f74f0f0c70e45d5e7ef12fc81e2ed2c4090171c4886"
+    },
+    {
+      "name": "interrupted_recovery.rs",
+      "bytes": 15278,
+      "sha256": "537f3d120a76373d1eeec3e4f36984c6131b4ace02058c82ae28d8c96206b3c7"
+    },
+    {
+      "name": "legacy.rs",
+      "bytes": 21380,
+      "sha256": "d809c3564d3076e7d1aeba5b4470d8f49f979f9780bcde875c9a48f63330fc76"
+    },
+    {
+      "name": "local2-owners.json",
+      "bytes": 37630,
+      "sha256": "7de1cff572c4f5ed4a09550c852e4b00bdc8fbb65f825a2e60703106f91d395b"
+    },
+    {
+      "name": "local2_owners.rs",
+      "bytes": 16923,
+      "sha256": "60d4627db837ed1aa8ac235fd4060b995f839e0e92d2069651bcd60ecff891a9"
+    },
+    {
+      "name": "local2_owners_tests.rs",
+      "bytes": 11307,
+      "sha256": "1b9e7161926f6576b352507e27ee342a4ff3b29e86cf0f221cf5d29275fd1176"
+    },
+    {
+      "name": "main.rs",
+      "bytes": 21322,
+      "sha256": "66605840178034463f6d73a19d689699b7a810f9699e8a6e5ad7d419d759b37f"
+    },
+    {
+      "name": "main_tests.rs",
+      "bytes": 3755,
+      "sha256": "fce14a10bd210e273abc79df818d71077446d068abe1788772102916b755d4fc"
+    },
+    {
+      "name": "memory_main.rs",
+      "bytes": 77901,
+      "sha256": "6b74e9c5a16876f2a16bb5094eb3005620e4dff15ba2cd963e078d0f842173ff"
+    }
+  ],
+  "four_strict_configurations_passed": true,
+  "unfiltered_ordinary_tests_passed": 100,
+  "retained_tests": 60,
+  "new_tests": 40,
+  "exact_direct_externs": 3,
+  "retained_search_members_reauthenticated": 5183,
+  "source_QA_only": true,
+  "genuine_native_report_qualified": false,
+  "production_cap_or_service_changed": false,
+  "memory_or_DATA_credit_bytes": 0,
+  "replay_admission_authorized": false
+}

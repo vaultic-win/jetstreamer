@@ -1,0 +1,17 @@
+{
+  "artifact": {
+    "path": "/var/lib/jetstreamer/whole-shared-role-source-qa-20261111-v5/ARTIFACT.json",
+    "sha256": "ad73261b8d01ab91582492a6f4121bee7a1360be5fcb1ca6bcc23ddf9f4041ae"
+  },
+  "normally_sealed_candidate": {
+    "path": "/usr/local/lib/jetstreamer/horizon-whole-role-source-qa-tools-20261111-v5/source-qa-candidate",
+    "sha256": "fbac59c656f82dce082ef51ef303453f5a2dd3b3ef764bc43372e5a255203376"
+  },
+  "four_strict_configurations_passed": true,
+  "ordinary_tests_passed": 100,
+  "all_compiler_slots_terminal": true,
+  "no_native_execution": true,
+  "new_memory_or_DATA_credit_bytes": 0,
+  "replay_admission_authorized": false,
+  "next_gate": "Bind genuine current plan, qualify lock-FD transport and full role/native proof under a distinct actual runtime generation. Unbound source-QA template grants no native acceptance."
+}

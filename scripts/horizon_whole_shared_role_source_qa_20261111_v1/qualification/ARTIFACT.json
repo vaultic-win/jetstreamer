@@ -1,0 +1,36 @@
+{
+  "schema": "horizon-whole-role-template-source-QA-artifact-v1",
+  "source": {
+    "path": "/usr/local/lib/jetstreamer/horizon-whole-role-source-qa-source-20261111-v5/main.rs",
+    "sha256": "66605840178034463f6d73a19d689699b7a810f9699e8a6e5ad7d419d759b37f"
+  },
+  "author_manifest": {
+    "path": "/tmp/root-whole-shared-role-rust-source-20261111-v4/SOURCE_PACKET_MANIFEST.json",
+    "sha256": "7237a88d21b0896577632bc0cd9d4776962435c43fed3b303b11be689c59f71e"
+  },
+  "flat_source_index": {
+    "path": "/tmp/root-whole-role-reviewed-flat-source-index-20261111-v4.json",
+    "sha256": "1c5471cc3bd1f3c0dace9dfb8daff760d6cdfd6835cf8a35567cd58c16ba4717"
+  },
+  "actual_direct_externs": {
+    "anyhow=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libanyhow-7d758cdd889142f0.rlib",
+      "sha256": "c91eaa346c1b75db0e0fcd74193c3640244898a5fa014123362b4f1196716c07"
+    },
+    "serde_json=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libserde_json-cebf2d29a5a77525.rlib",
+      "sha256": "c3bb7a303d8af544b65907d3b4a50891e079633d1f90b35f95fc7f2ce9d6abe4"
+    },
+    "sha2=/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib": {
+      "path": "/home/sol/.jetstreamer-private/cold-retirement-dev-20261026-v1/target/release/deps/libsha2-753ac001a1cbaa99.rlib",
+      "sha256": "d9f94400c4d56df175e28bdcec983b13944489d5b1e7e83580e62810a2296e14"
+    }
+  },
+  "four_strict_configurations_passed": true,
+  "ordinary_tests_passed": 100,
+  "unbound_template_source_QA_only": true,
+  "genuine_native_report_qualified": false,
+  "production_changed": false,
+  "shared_budget_ending_authorized": false,
+  "replay_admission_authorized": false
+}

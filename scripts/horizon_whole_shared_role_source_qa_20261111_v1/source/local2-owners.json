@@ -1,0 +1,614 @@
+{
+  "schema": "horizon-seven-current-local2-owner-pins-v1",
+  "source_fleet": {
+    "path": "/var/lib/jetstreamer/root-fleet-replacement-native-qualification-2330-seven-DATA-retry1-20261110-v27/ROOT_COMPLETE_FLEET_OPERATIONAL_REVIEW_233022_SEVEN_LOCAL2_DATA_RUST_V27.json",
+    "sha256": "61299153cddd634b57479504c7f1b2e05a43a2f225dd61d582596726571a4b4b"
+  },
+  "owners": [
+    {
+      "epoch": 166,
+      "unit": "horizon-qualify-166-replacement-local2-20261110-v1.service",
+      "iid": "3d0d0bb640684627ab370e314e6c116a",
+      "pid": 1056542,
+      "start": 1794339094,
+      "start_native": "Tue 2026-11-10 19:31:34 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "0fd399ed2b1fed6571f3140d60b626a943246c3d3f7cbcdce7922b092c2e76b2"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch166/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "e9d12b10adfb747c4233d4eaa42077b4646127f9c28c20bb69ad8da4aed02f5d"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch166/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "1657f26e74c65e67b5c97427c23de8a8b55a044c8e2d898cc0632b00ad8189f4"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-166-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "3d0d0bb640684627ab370e314e6c116a",
+        "MainPID": "1056542",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-166-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-node 166 /home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/preflight-166-v4.json --cohort-manifest-fingerprint=sha256:08b441e89d7c9456aba5026ce206db8e08a14f96cb31cbad94a4a5c5e6e5622b --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input166-20261110-v1/snapshot-71711708-73JLv83cyRgHUNxtajhwXimfDSH4GUmu6R8LHKPbxu76.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 19:31:34 UTC] ; stop_time=[n/a] ; pid=1056542 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 19:31:34 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local2-20261110-v1/private/destination-4340e82dc7f9078183bdcaf72e22fdc929afedcc759feb0211eb22c5aa34d794/work/root-cohort-166-166/run-1056542-1794339097602952768"
+    },
+    {
+      "epoch": 167,
+      "unit": "horizon-qualify-167-replacement-local2-20261110-v1.service",
+      "iid": "5a5ea1ae3f9e41bab0a2231e38e59028",
+      "pid": 1056574,
+      "start": 1794339096,
+      "start_native": "Tue 2026-11-10 19:31:36 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "fc745554f3cb75e98cc713491e916bd9a3d9b13ebcd48a240777f8ab13b17f2f"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch167/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "3a98876c6fd1ba1c16cd90e9b86d65ca739bcd66d4b055fe4dc8b03d7e90b0c6"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch167/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "30758097987a213cdb85e57e39f5386dc18031d1b5570decf3754f4ad0559cb4"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-167-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "5a5ea1ae3f9e41bab0a2231e38e59028",
+        "MainPID": "1056574",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-167-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/jetstreamer-node 167 /home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/preflight-167-v4.json --cohort-manifest-fingerprint=sha256:3f28743306031e8a407f6f9302224101f05c70ac6db496e194c9dbc6b71c249b --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input167-20261110-v1/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 19:31:36 UTC] ; stop_time=[n/a] ; pid=1056574 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 19:31:36 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local2-20261110-v1/private/destination-6b055e049ddb1f377815e547482a3ef25a9366994ee9904e8cd4e41481f09ee2/work/root-cohort-167-167/run-1056574-1794339099726847720"
+    },
+    {
+      "epoch": 168,
+      "unit": "horizon-qualify-168-replacement-local2-20261110-v1.service",
+      "iid": "28c71c8287714cd2bec606a0ee463c9d",
+      "pid": 1056602,
+      "start": 1794339099,
+      "start_native": "Tue 2026-11-10 19:31:39 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch168/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "d8e313271d3e76ec599011471ecdd09c93669bd6951dbe69a012b40974385a56"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-three-local2-launch-v1/epoch168/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "e2091c2db5caf6fceacaecbc3fdc6bdfa54da0a700698a3de33fe0cf9f24754d"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch168/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "6fa4eb29df8f1a67d3bdda8454475f859af29432005a0d5cc678101e6e1beaac"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-168-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "28c71c8287714cd2bec606a0ee463c9d",
+        "MainPID": "1056602",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-168-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/jetstreamer-node 168 /home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1/preflight-168-v4.json --cohort-manifest-fingerprint=sha256:f5824f170325f9def8fe257fd542c9093f298419b1f558d4c35ddd1a6ae98011 --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input168-20261110-v1/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 19:31:39 UTC] ; stop_time=[n/a] ; pid=1056602 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 19:31:39 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local2-20261110-v1/private/destination-e715c3e12412871a2a1be75a5224e3429a8e0d1fe120e2e289654f79a3273c7d/work/root-cohort-168-168/run-1056602-1794339102622433887"
+    },
+    {
+      "epoch": 169,
+      "unit": "horizon-qualify-169-replacement-local2-20261110-v1.service",
+      "iid": "81a6eee953d249a0a11ab123c81d63cc",
+      "pid": 1123930,
+      "start": 1794344383,
+      "start_native": "Tue 2026-11-10 20:59:43 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next169-local2-launch-v1/epoch169/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "4850f6b3eb6478176defcb0f7497463691d8e1a8f0bb84c36684dc1bf4fad078"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next169-local2-launch-v1/epoch169/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "a6b414118a21ef48df84f1133c2d633fd8544490e6363c08fd4f69b158afe08b"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch169/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "0074ff13640814ea42e5d0d874019b67ab5142c8c0e269e5129e9486f664224d"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-169-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "81a6eee953d249a0a11ab123c81d63cc",
+        "MainPID": "1123930",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-169-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent169-singleton-package-20261109-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent169-singleton-package-20261109-v1/jetstreamer-node 169 /home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent169-singleton-package-20261109-v1/preflight-169-v4.json --cohort-manifest-fingerprint=sha256:be8b431d6c09cf44e304e7c4317474d3b327d67eb78ebbb73398e3e0b4b802c6 --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input169-20261110-v1/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 20:59:43 UTC] ; stop_time=[n/a] ; pid=1123930 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 20:59:43 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent169-singleton-package-20261109-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/replacement-local2-20261110-v1/private/destination-99fd88ae3977469031317185e462e9adc14336d9b131d4b9afdcf5f5d91203fa/work/root-cohort-169-169/run-1123930-1794344387009889404"
+    },
+    {
+      "epoch": 170,
+      "unit": "horizon-qualify-170-replacement-local2-20261110-v1.service",
+      "iid": "350248d54a4f437bbb04b65319e6275f",
+      "pid": 1145812,
+      "start": 1794346477,
+      "start_native": "Tue 2026-11-10 21:34:37 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next170-local2-launch-v1/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "f2167ef26d4666a36e97e0e413a529c90653b8501feec50e90714389627526dd"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next170-local2-launch-v1/epoch170/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "7e76e6a699b18ea33f900823ba8f17fe7280decc807fec6ffa55d17e434f8483"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch170/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "521ee0d2d25d269261685c430cc7c15d4ae185af8db7cb105afc370d83e01583"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-170-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "350248d54a4f437bbb04b65319e6275f",
+        "MainPID": "1145812",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-170-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent170-singleton-package-20261109-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent170-singleton-package-20261109-v1/jetstreamer-node 170 /home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent170-singleton-package-20261109-v1/preflight-170-v4.json --cohort-manifest-fingerprint=sha256:a18e763167b4cd47833f89627209ea7b5e08e55de16152df612e2c0d9be05890 --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input170-20261110-v1/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 21:34:37 UTC] ; stop_time=[n/a] ; pid=1145812 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 21:34:37 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent170-singleton-package-20261109-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local2-20261110-v1/private/destination-e9558877ed68ab39b5376e467d72f084b65f96d8e14f5fa29b667589f272fc79/work/root-cohort-170-170/run-1145812-1794346481082557740"
+    },
+    {
+      "epoch": 171,
+      "unit": "horizon-qualify-171-replacement-local2-20261110-v1.service",
+      "iid": "9b33770ea58a4622b55a5e6e5165eaa5",
+      "pid": 1177103,
+      "start": 1794348592,
+      "start_native": "Tue 2026-11-10 22:09:52 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next171-local2-launch-v1/epoch171/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "5df2e07c93cb2df7c05b473dcf20d5c80280f6dd324176fc991d97528460a8d1"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next171-local2-launch-v1/epoch171/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "79689f69bd789c1addc8fecc6202b61daf56de4a06f21d95f95b1b7ba881f167"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch171/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "88e619c07dd65607676e243445dfd739543e4ec00bb85d4cb5be02e9d9c7ee86"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-171-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "9b33770ea58a4622b55a5e6e5165eaa5",
+        "MainPID": "1177103",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-171-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1/jetstreamer-node 171 /home/sol/.jetstreamer-private/epoch171-standard-lane-20261110-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1/preflight-171-v4.json --cohort-manifest-fingerprint=sha256:8ccccab0bd59ec36a4eda3c57e8ae721feb83197f5a0f3d6c85ca756903e838a --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input171-20261110-v1/snapshot-73871796-29vpNnumVyQE5dpygpinJJWj7UHXe8zU2H3Z71ojXhke.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 22:09:52 UTC] ; stop_time=[n/a] ; pid=1177103 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 22:09:52 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch171-standard-lane-20261110-v1/replacement-local2-20261110-v1/private/destination-821b340b1d732f265a638485ca2929d52a5db49f9619afa26f52525047dc2ccf/work/root-cohort-171-171/run-1177103-1794348596212437206"
+    },
+    {
+      "epoch": 172,
+      "unit": "horizon-qualify-172-replacement-local2-20261110-v1.service",
+      "iid": "5359f45fc6df479ca62b17912f08e43d",
+      "pid": 1213582,
+      "start": 1794350283,
+      "start_native": "Tue 2026-11-10 22:38:03 UTC",
+      "admission": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "3d9e44f87cd56d65004f33356200f208f67c9f6a975e6eb0c6b558e0575ba906"
+      },
+      "guard_protection": {
+        "path": "/var/lib/jetstreamer/cached-standard-input-qualification-20261110-v1/actual-next172-local2-launch-v1/epoch172/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "34d5013b0c762039e2f43d86e4f2ffce7b9e5c1480508bc326c0326f225bdea5"
+      },
+      "handoff": {
+        "path": "/var/lib/jetstreamer/local2-data-guard-handoffs-20261110-v1/epoch172/ROOT_ACTUAL_CONTINUOUS_GUARD_HANDOFF_COMPLETE.json",
+        "sha256": "0b5bbdda4a487ad93abf38f2b8440e12c728f5b7573e02d39ec908df877544e0"
+      },
+      "whole_service_profile": {
+        "Id": "horizon-qualify-172-replacement-local2-20261110-v1.service",
+        "LoadState": "loaded",
+        "ActiveState": "active",
+        "SubState": "running",
+        "InvocationID": "5359f45fc6df479ca62b17912f08e43d",
+        "MainPID": "1213582",
+        "ControlPID": "0",
+        "ControlGroup": "/system.slice/horizon-qualify-172-replacement-local2-20261110-v1.service",
+        "NRestarts": "0",
+        "Restart": "no",
+        "Job": "",
+        "MemoryHigh": "68719476736",
+        "MemoryMax": "73014444032",
+        "MemorySwapMax": "0",
+        "CPUQuotaPerSecUSec": "9s",
+        "TasksMax": "1024",
+        "ExecStart": "{ path=/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/jetstreamer-node ; argv[]=/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/jetstreamer-node 172 /home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/replacement-local2-20261110-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/preflight-172-v4.json --cohort-manifest-fingerprint=sha256:b0009b16376d984d14df0d8fce66b696912710f8e4087dc4250231b9dce8c4db --snapshot-archive=/usr/local/lib/jetstreamer/horizon-standard-local-input172-20261110-v1/snapshot-74303701-A4a2VMV6mmHxSGDDwizEB8AzfKymoy9QeFC8nXQeZ3BR.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-10 22:38:03 UTC] ; stop_time=[n/a] ; pid=1213582 ; code=(null) ; status=0/0 }",
+        "ExecMainStartTimestamp": "Tue 2026-11-10 22:38:03 UTC",
+        "User": "sol",
+        "Group": "horizon",
+        "WorkingDirectory": "/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1",
+        "UMask": "0077",
+        "LimitNOFILE": "1048576"
+      },
+      "run_directory": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/replacement-local2-20261110-v1/private/destination-40aac42d26e05aa1c88eaf8c96d15b3d2d46fca14750b212dfea5976a0809c22/work/root-cohort-172-172/run-1213582-1794350286596650289"
+    }
+  ],
+  "stable_non_replay_owners": {
+    "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service": {
+      "ActiveState": "active",
+      "ControlGroup": "/system.slice/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+      "ControlPID": "0",
+      "ExecMainStatus": "0",
+      "Id": "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service",
+      "InvocationID": "7ac4617f73ab4f979a8527cce461c6a4",
+      "Job": "",
+      "LoadState": "loaded",
+      "MainPID": "3204661",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running",
+      "Type": "exec"
+    },
+    "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service": {
+      "ActiveState": "active",
+      "ControlGroup": "/system.slice/jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "ControlPID": "0",
+      "ExecMainStatus": "0",
+      "Id": "jetstreamer-epoch199-backfill-20261102-controller-v1-r2.service",
+      "InvocationID": "dbf49bb1b72c42c584f2d3ac94259cb8",
+      "Job": "",
+      "LoadState": "loaded",
+      "MainPID": "2467123",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "running",
+      "Type": "exec"
+    }
+  },
+  "terminal_producer_event": {
+    "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/ORIGINAL_SEVEN_RESERVE_STOPS_AND_REPAIR_MODEL.json",
+    "sha256": "b3bff5d44d24dc507313d8dfdb8e5cd5bec50a7732b288327106ee20b7a7b0eb"
+  },
+  "terminal_producers": [
+    {
+      "epoch": 166,
+      "original_invocation_id": "06c7b420f92d42a6b0743ba578bcd8b6",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-166-standard-20261109-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch166-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "a5a8a7491f185d6c77531ab970c0c76aec54de0c96f1b4a1c0a80905125dd147"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch166-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "feb72802f57e992c398c2ad500db8ee6f5489ce46e9b58165da9d08967924b24"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-166-original-stop-journal.json",
+        "sha256": "11047a44b63a207f9b91aafbbdfd0e804f500c664a17a80251674f51468cb5c1"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/archives/epoch-166.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 167,
+      "original_invocation_id": "efd81d59a4584013a93d0d020e49852e",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-167-standard-20261109-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch167-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "20a2444725113fb9ad410b01c2d9c9fa6a18e57ecb9baf70675f834e70488f56"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch167-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "469c6196fbb4a5b38f8330ee23d3aa98d30484f0b86c335b1c7ef2b640857e26"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-167-original-stop-journal.json",
+        "sha256": "21ffdefced11b9f1447d016c7a530354bae055084ac92197289bd951b32f306a"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/archives/epoch-167.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 168,
+      "original_invocation_id": "e1050eb5e99a4a159630c881e0dd5eb3",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-168-standard-20261109-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch168-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "8a08f509d7bbf872a3d5ebb36c5cb329f56222dfb1252ef04f3f682bd433622a"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch168-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "c3bbd81a255dfea670f88c422400a76872506342be8b325f308d9b5577a433bb"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-168-original-stop-journal.json",
+        "sha256": "9ed3098e982658241b16e61d90ccf630449a11cee2eab1130a03acdf6fd3daeb"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/archives/epoch-168.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 169,
+      "original_invocation_id": "ca4d6b8da24c4e92a4c75419edae6f1d",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-169-standard-20261109-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "7ccc6c70d1335b18708e99cbb2238ee0d3cb71f9a533f293454a750ee500b6ec"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "3cfe9e97d0cfae83935dded6f7979f65f370d355abb3ea2bcb00a354409c2dc9"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-169-original-stop-journal.json",
+        "sha256": "8924f588dd85953f3216955e8ed0e8f35a43d8dd7f3f1e2f42a43d3944994183"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/archives/epoch-169.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 170,
+      "original_invocation_id": "1950530fc73b4a519f5327749f0036b7",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-170-standard-20261109-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch170-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "36f60e9771a398f716085f9ffbc9ee8765bc2bcfbf24486518249df0713650b4"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch170-independent-singleton-20261109-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "6d49e604a4c2af67afca3b08c5717baccb647565a79cd69e5530a041d79cb606"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-170-original-stop-journal.json",
+        "sha256": "3813fe2f2e49d392ad5bb5e819c013cb8869960bfefb1472ac4eeaa748e2e7f0"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/archives/epoch-170.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 171,
+      "original_invocation_id": "3b0694043e374b0488ee9a81762e210d",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-171-standard-20261110-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "7264faf6f39c58d04ee950f237989a8d933c1beb65fcc6fe1b9a3ab6f39c63e3"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "b3dc135b1d67fecd0d97e749c3d356e1f60457aaa91a9168ecfffa248656c877"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-171-original-stop-journal.json",
+        "sha256": "adf0467cc734c14cce1b0ffb0f6d2d034f87f3c16e5a2e42aa8eefdb7fc052cd"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch171-standard-lane-20261110-v1/private/destination-ceecad45f99bbfd9764a635b7c33373502da7f4b9582afebf6462a5174cf1a70/work/root-cohort-171-171/run-243865-1794273077951567734/archives/epoch-171.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch171-standard-lane-20261110-v1/private/destination-ceecad45f99bbfd9764a635b7c33373502da7f4b9582afebf6462a5174cf1a70/work/root-cohort-171-171/run-243865-1794273077951567734/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    },
+    {
+      "epoch": 172,
+      "original_invocation_id": "6aa8bc6036b34c57ababa2d5855b2098",
+      "terminal_native": {
+        "ActiveState": "inactive",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "ExecMainStatus": "0",
+        "Id": "horizon-qualify-172-standard-20261110-v1.service",
+        "InvocationID": "",
+        "Job": "",
+        "LoadState": "not-found",
+        "MainPID": "0",
+        "NRestarts": "0",
+        "Result": "success",
+        "SubState": "dead",
+        "Type": ""
+      },
+      "stop_intent": {
+        "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-intent.json",
+        "sha256": "d7b9cc236fb359c6d9637238daffcf6a1b31bf9b3ec5a3f4e0f584133c2040fc"
+      },
+      "stop_completion": {
+        "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/duplicate722-correction-current-guard-handoff-20261110-v1/receipts/stop-completion.json",
+        "sha256": "8b86da161b80082c0ddb9ca9cce337539158b0851c178a15da3053012a5b60c2"
+      },
+      "original_PID1_journal": {
+        "path": "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/epoch-172-original-stop-journal.json",
+        "sha256": "3d4884fc6807b9cf8b7a9f6979a8aee5daf5dd3b614f7a549aaae74ec960dd2d"
+      },
+      "partial_archive_preserved": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/private/destination-312c1fcbc12c0fcd3361b5a8fdeb5c442cc76496e8e3a8e9b59aa167bee142c9/work/root-cohort-172-172/run-431228-1794286711430587255/archives/epoch-172.jet",
+      "scratch_preserved": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/private/destination-312c1fcbc12c0fcd3361b5a8fdeb5c442cc76496e8e3a8e9b59aa167bee142c9/work/root-cohort-172-172/run-431228-1794286711430587255/scratch",
+      "repair_open": true,
+      "resource_release_bytes": 0
+    }
+  ]
+}

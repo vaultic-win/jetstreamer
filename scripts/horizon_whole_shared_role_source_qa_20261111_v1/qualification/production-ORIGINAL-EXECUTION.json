@@ -1,0 +1,5 @@
+{
+  "code": 0,
+  "stdout": "",
+  "stderr": "Running as unit: horizon-whole-role-source-qa-production-20261111-v5.service\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 5.901s\nCPU time consumed: 10.343s\nMemory peak: 4.5M\nMemory swap peak: 0B\n"
+}
