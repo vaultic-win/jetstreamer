@@ -27,7 +27,7 @@ project, add the feature and both patches to that project's workspace root:
 
 ```toml
 [dependencies]
-jetstreamer-firehose = { version = "0.9.0", features = ["geyser"] }
+jetstreamer-firehose = { git = "https://github.com/vaultic-win/jetstreamer", tag = "v0.10.0", features = ["geyser"] }
 
 [patch.crates-io]
 librocksdb-sys = { git = "https://github.com/anza-xyz/rust-rocksdb", rev = "4dba80dfe9434e595a971f5b2985ff9ba4fb31e7" }

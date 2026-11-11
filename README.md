@@ -1,7 +1,6 @@
 # Jetstreamer
 
-[![Crates.io](https://img.shields.io/crates/v/jetstreamer.svg)](https://crates.io/crates/jetstreamer)
-[![Docs.rs](https://docs.rs/jetstreamer/badge.svg)](https://docs.rs/jetstreamer)
+[![GitHub release](https://img.shields.io/github/v/release/vaultic-win/jetstreamer)](https://github.com/vaultic-win/jetstreamer/releases/latest)
 [![CI](https://github.com/vaultic-win/jetstreamer/actions/workflows/rust.yaml/badge.svg)](https://github.com/vaultic-win/jetstreamer/actions/workflows/rust.yaml)
 
 ## 🐻‍❄️ Jetstreamer has a new home
@@ -30,8 +29,8 @@ Jetstreamer is split across four crates:
   ClickHouse-friendly batching and runtime metrics.
 - `jetstreamer-utils` - utils used by the Jetstreamer ecosystem.
 
-Every crate ships with rich module-level documentation and runnable examples. Visit
-[docs.rs/jetstreamer](https://docs.rs/jetstreamer) to explore the API surface in detail.
+Every crate includes module-level documentation and examples. Generate the current
+API documentation from a release checkout as described under [Documentation](#documentation).
 
 All 3 sub-crates are provided as re-exports within the main `jetstreamer` crate via the
 following re-exports:
@@ -132,7 +131,7 @@ table (with a companion `pubkeys` lookup table populated via materialised view).
 
 The CLI accepts a single epoch (`950`), an inclusive `<start>-<end>` epoch range (`900-950`),
 or an inclusive `<start>:<end>` slot range on the command line. See
-[`JetstreamerRunner::parse_cli_args`](https://docs.rs/jetstreamer/latest/jetstreamer/fn.parse_cli_args.html)
+[`JetstreamerRunner::parse_cli_args`](src/lib.rs)
 for the precise rules.
 
 ### TUI dashboard
@@ -363,6 +362,32 @@ unit accounting first appears at epoch 450. Plan replay windows accordingly.
 
 ## Installation and Setup
 
+### GitHub releases
+
+Vaultic distributes Jetstreamer through [GitHub Releases](https://github.com/vaultic-win/jetstreamer/releases).
+The existing crates.io packages and docs.rs pages describe older Anza releases.
+Current releases provide source archives; install the CLI from a pinned tag:
+
+```sh
+cargo install --git https://github.com/vaultic-win/jetstreamer --tag v0.10.0 --locked jetstreamer
+```
+
+Install the native prerequisites below first. Rust library consumers should pin
+the same tag (or commit) for every Jetstreamer crate they use:
+
+```toml
+[dependencies]
+jetstreamer = { git = "https://github.com/vaultic-win/jetstreamer", tag = "v0.10.0" }
+```
+
+For a source checkout with the examples, Cargo aliases, and Nix shell:
+
+```sh
+git clone --branch v0.10.0 --depth 1 https://github.com/vaultic-win/jetstreamer.git
+cd jetstreamer
+cargo build --locked --release
+```
+
 ### Nix
 
 The development shell pins Nixpkgs and the Rust overlay by revision and hash in
@@ -427,11 +452,24 @@ cargo build --locked --release
 If bindgen cannot find libclang, set `LIBCLANG_PATH` to the directory containing
 its shared library. Clang 16 is not a fixed requirement.
 
+## Documentation
+
+Generate API documentation from the same release checkout you build:
+
+```sh
+DOCS_RS=1 cargo doc --locked --workspace --no-deps --open
+```
+
+`DOCS_RS=1` skips the bundled ClickHouse download for documentation only. Leave it
+unset when building binaries. The [firehose guide](jetstreamer-firehose/README.md)
+covers archive backends and external Geyser plugins.
+
 ## Developing Locally
 
 - Format and lint: `cargo fmt --all` and `cargo clippy --workspace`.
 - Run tests: `cargo test --workspace`.
-- Regenerate docs: `cargo doc --workspace --open`.
+- Regenerate docs: see [Documentation](#documentation).
+- Maintainer release instructions: [RELEASING.md](RELEASING.md).
 
 ## Community
 
