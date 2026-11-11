@@ -1,0 +1,32 @@
+name: Nix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-nix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Nix workspace check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Nix
+        uses: cachix/install-nix-action@d698718aa798980d17dd749f03beae0b51183399 # v31
+      - name: Check the pinned development shell
+        run: |
+          nix-shell --pure --run '
+            rustc --version
+            clang --version
+            export CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0
+            cargo check --locked --workspace --all-features
+          '

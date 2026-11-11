@@ -28,3 +28,14 @@ tempfile.workspace = true
 libc.workspace = true
 solana-logger.workspace = true
 ctrlc.workspace = true
+
+[build-dependencies]
+sha2.workspace = true
+flate2 = "1"
+tar = "0.4"
+tempfile.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true
+flate2 = "1"
+tar = "0.4"

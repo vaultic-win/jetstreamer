@@ -363,63 +363,69 @@ unit accounting first appears at epoch 450. Plan replay windows accordingly.
 
 ## Installation and Setup
 
-### Nix (Recommended)
+### Nix
 
-For the most reliable setup, use Nix:
+The development shell pins Nixpkgs and the Rust overlay by revision and hash in
+`nix/sources.nix`. It supplies Clang, libclang, OpenSSL, and the Rust version from
+`rust-toolchain.toml`; no channel configuration or separate Rust installation is
+needed. From the repository root:
 
 ```bash
-nix-shell
-cargo build --release
+nix-shell --pure
+cargo build --locked --release
 ```
+
+The first shell entry downloads the pinned tools. Cargo also needs network access
+for crates and the checksum-verified ClickHouse artifact. For an offline build,
+prefetch these dependencies and supply the pinned ClickHouse artifact through
+`JETSTREAMER_CLICKHOUSE_ARTIFACT`; retain it when entering the pure shell with
+`nix-shell --pure --keep JETSTREAMER_CLICKHOUSE_ARTIFACT`.
+
+On NixOS, running the bundled ClickHouse also requires the standard Linux dynamic
+loader. Enable `programs.nix-ld.enable = true;` in your NixOS configuration or run
+Jetstreamer inside an FHS environment. The development shell supplies build tools;
+it does not change the host's dynamic loader configuration. The Nix CI job uses
+Ubuntu and does not validate NixOS runtime setup.
+
+Nix CI checks the workspace with all features, including the optional Geyser
+loader. Update the pins in `nix/sources.nix` when changing native dependencies;
+update the Rust overlay pin if it does not contain a newly selected Rust version.
 
 ### Non-Nix Setup
 
-Jetstreamer requires **Clang 16** (not 17) due to RocksDB dependencies. Install dependencies and set environment variables:
+Install the Rust toolchain specified in `rust-toolchain.toml`. Native builds need
+Clang/libclang, a C/C++ toolchain, pkg-config, and OpenSSL headers. The optional
+`geyser` feature also compiles RocksDB; see the firehose README for its required
+Cargo patches when using Jetstreamer outside this workspace.
 
 #### Linux (Ubuntu/Debian)
 
 ```bash
-# Install Clang 16
-wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 16
-sudo apt update && sudo apt install -y gcc-13 g++-13 zlib1g-dev libssl-dev libtool
-
-# Set as default
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
-sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
-
-# Environment variables (add to ~/.bashrc)
-export CC=clang
-export CXX=clang++
-export LIBCLANG_PATH=/usr/lib/llvm16/lib/libclang.so
+sudo apt update
+sudo apt install -y build-essential clang llvm-dev libclang-dev pkg-config libssl-dev libudev-dev curl ca-certificates
+cargo build --locked --release
 ```
 
 #### Linux (Arch)
 
 ```bash
-sudo pacman -S clang16 llvm16 zlib openssl libtool
-yay -S gcc13  # or use system gcc
-
-# Environment variables (add to ~/.bashrc)
-export CC=clang-16
-export CXX=clang++-16
-export LIBCLANG_PATH=/usr/lib/llvm16/lib/libclang.so
-export LD_LIBRARY_PATH=/usr/lib/llvm16/lib:$LD_LIBRARY_PATH
+sudo pacman -S --needed base-devel clang llvm openssl systemd curl ca-certificates
+cargo build --locked --release
 ```
 
 #### macOS
 
-```bash
-brew install llvm@16 zlib openssl libtool
+Install the Xcode command-line tools and Homebrew dependencies:
 
-# Environment variables (add to ~/.zshrc)
-export CC=/opt/homebrew/opt/llvm@16/bin/clang
-export CXX=/opt/homebrew/opt/llvm@16/bin/clang++
-export LIBCLANG_PATH=/opt/homebrew/opt/llvm@16/lib/libclang.dylib
-export LDFLAGS="-L/opt/homebrew/opt/llvm@16/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/llvm@16/include"
+```bash
+xcode-select --install
+brew install llvm openssl pkgconf
+export LIBCLANG_PATH="$(brew --prefix llvm)/lib"
+cargo build --locked --release
 ```
 
-**Troubleshooting**: If you get RocksDB compilation errors, ensure you're using Clang 16 (not 17) and `LIBCLANG_PATH` is correctly set.
+If bindgen cannot find libclang, set `LIBCLANG_PATH` to the directory containing
+its shared library. Clang 16 is not a fixed requirement.
 
 ## Developing Locally
 
@@ -429,8 +435,8 @@ export CPPFLAGS="-I/opt/homebrew/opt/llvm@16/include"
 
 ## Community
 
-Questions, issues, and contributions are welcome! Open a discussion or pull request on
-[GitHub](https://github.com/anza-xyz/jetstreamer) and join the effort to build faster Solana
+Questions, issues, and contributions are welcome! Open an issue or pull request on
+[GitHub](https://github.com/vaultic-win/jetstreamer) and join the effort to build faster Solana
 analytics pipelines.
 
 ## License

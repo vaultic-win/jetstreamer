@@ -17,6 +17,13 @@ on:
         default: "main"
         type: string
 
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -51,7 +58,7 @@ jobs:
             fi
             tag="${crate}@v${version}"
             todo=""
-            if ! curl -fsSL --retry 3 -H "User-Agent: jetstreamer-release-workflow (github.com/anza-xyz/jetstreamer)" \
+            if ! curl -fsSL --retry 3 -H "User-Agent: jetstreamer-release-workflow (github.com/vaultic-win/jetstreamer)" \
               "https://crates.io/api/v1/crates/${crate}/${version}" 2>/dev/null | jq -e '.version.num == "'"${version}"'"' >/dev/null 2>&1; then
               todo="publish"
               if [ -z "${first}" ]; then
@@ -85,7 +92,7 @@ jobs:
       # Skipped entirely when only tags/releases are missing (nothing to publish).
       - name: Cargo publish dry run (first unpublished crate)
         if: steps.plan.outputs.first != ''
-        run: cargo publish -p "${FIRST}" --dry-run
+        run: cargo publish --locked -p "${FIRST}" --dry-run
         env:
           FIRST: ${{ steps.plan.outputs.first }}
 
@@ -99,28 +106,10 @@ jobs:
       attestations: write
       artifact-metadata: write
     steps:
-      - name: Create github app token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        id: app-token
-        with:
-          client-id: ${{ vars.CLIENT_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-
-      - name: Set git config
-        run: |
-          git config --global user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
-          git config --global user.name "${APP_SLUG}[bot]"
-          git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf https://github.com/
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          APP_ID: ${{ vars.APP_ID }}
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          persist-credentials: false
+          persist-credentials: true
           ref: ${{ needs.check.outputs.ref }}
 
       - name: Dependencies
@@ -143,7 +132,7 @@ jobs:
         run: .github/scripts/release-crate.sh jetstreamer-utils
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth-utils.outputs.token }}
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Generate SLSA provenance (jetstreamer-utils)
         if: steps.release-utils.outputs.published == 'true'
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -158,7 +147,7 @@ jobs:
         run: .github/scripts/release-crate.sh jetstreamer-firehose
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth-firehose.outputs.token }}
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Generate SLSA provenance (jetstreamer-firehose)
         if: steps.release-firehose.outputs.published == 'true'
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -173,7 +162,7 @@ jobs:
         run: .github/scripts/release-crate.sh jetstreamer-plugin
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth-plugin.outputs.token }}
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Generate SLSA provenance (jetstreamer-plugin)
         if: steps.release-plugin.outputs.published == 'true'
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
@@ -188,7 +177,7 @@ jobs:
         run: .github/scripts/release-crate.sh jetstreamer
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth-jetstreamer.outputs.token }}
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Generate SLSA provenance (jetstreamer)
         if: steps.release-jetstreamer.outputs.published == 'true'
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
