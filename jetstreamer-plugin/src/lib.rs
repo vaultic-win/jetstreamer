@@ -3,9 +3,9 @@
 //!
 //! # Overview
 //! Plugins let you react to every block, transaction, reward, entry, and stats update emitted
-//! by [`jetstreamer_firehose`](https://crates.io/crates/jetstreamer-firehose). Combined with
+//! by [`jetstreamer_firehose`](https://github.com/vaultic-win/jetstreamer/tree/main/jetstreamer-firehose). Combined with
 //! the
-//! [`JetstreamerRunner`](https://docs.rs/jetstreamer/latest/jetstreamer/struct.JetstreamerRunner.html),
+//! [`JetstreamerRunner`](https://github.com/vaultic-win/jetstreamer/blob/main/src/lib.rs),
 //! they provide a high-throughput analytics pipeline capable of exceeding 2.7 million
 //! transactions per second on the right hardware. All events originate from Old Faithful's CAR
 //! archive and are streamed over the network into your local runner.

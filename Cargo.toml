@@ -8,7 +8,7 @@ version = "0.10.0"
 authors = ["sam0x17", "anza-team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/vaultic-win/jetstreamer"
-documentation = "https://docs.rs/jetstreamer/latest"
+documentation = "https://github.com/vaultic-win/jetstreamer#documentation"
 keywords = ["solana", "geyser", "jetstreamer", "firehose", "transaction"]
 
 [package]

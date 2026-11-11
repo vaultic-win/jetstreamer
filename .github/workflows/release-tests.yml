@@ -1,0 +1,28 @@
+name: Release tooling
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/scripts/release-github.py
+      - .github/scripts/test_release_github.py
+      - .github/workflows/release.yml
+      - .github/workflows/release-tests.yml
+  pull_request:
+    paths:
+      - .github/scripts/release-github.py
+      - .github/scripts/test_release_github.py
+      - .github/workflows/release.yml
+      - .github/workflows/release-tests.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test release tooling
+        run: python3 -m unittest discover -s .github/scripts -p 'test_release_github.py'

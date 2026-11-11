@@ -11,8 +11,8 @@
 //! the stream for analysis and backfilling workloads.
 //!
 //! Firehose is the foundation that powers
-//! [`jetstreamer`](https://crates.io/crates/jetstreamer) and
-//! [`jetstreamer-plugin`](https://crates.io/crates/jetstreamer-plugin), but it can also be
+//! [`jetstreamer`](https://github.com/vaultic-win/jetstreamer) and
+//! [`jetstreamer-plugin`](https://github.com/vaultic-win/jetstreamer/tree/main/jetstreamer-plugin), but it can also be
 //! consumed directly to build bespoke replay pipelines. The crate exposes:
 //! - Async readers for Old Faithful CAR archives via [`firehose`].
 //! - Rich data models for blocks, entries, rewards, and transactions.
@@ -62,7 +62,7 @@
 //!
 //! Sequential-mode ripget buffering is configured on the [`firehose::firehose`] call via
 //! `buffer_window_bytes`. Pass `None` to use the built-in default (`min(4 GiB, 15% of available
-//! RAM)`). If you're using [`jetstreamer`](https://crates.io/crates/jetstreamer)'s binary runner,
+//! RAM)`). If you're using [`jetstreamer`](https://github.com/vaultic-win/jetstreamer)'s binary runner,
 //! that layer exposes `JETSTREAMER_BUFFER_WINDOW` and forwards the parsed value here.
 //!
 //! # Limitations
