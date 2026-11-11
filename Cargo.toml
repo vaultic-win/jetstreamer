@@ -4,10 +4,10 @@ members = ["jetstreamer-firehose", "jetstreamer-plugin", "jetstreamer-utils"]
 [workspace.package]
 edition = "2024"
 rust-version = "1.98.1"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["sam0x17", "anza-team"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/anza-xyz/jetstreamer"
+repository = "https://github.com/vaultic-win/jetstreamer"
 documentation = "https://docs.rs/jetstreamer/latest"
 keywords = ["solana", "geyser", "jetstreamer", "firehose", "transaction"]
 
@@ -30,9 +30,9 @@ s3-backend = ["jetstreamer-firehose/s3-backend"]
 verify-transaction-signatures = ["jetstreamer-firehose/verify-transaction-signatures"]
 
 [workspace.dependencies]
-jetstreamer-firehose = { path = "jetstreamer-firehose", version = "0.9.0" }
-jetstreamer-plugin = { path = "jetstreamer-plugin", version = "0.9.0" }
-jetstreamer-utils = { path = "jetstreamer-utils", version = "0.9.0" }
+jetstreamer-firehose = { path = "jetstreamer-firehose", version = "0.10.0" }
+jetstreamer-plugin = { path = "jetstreamer-plugin", version = "0.10.0" }
+jetstreamer-utils = { path = "jetstreamer-utils", version = "0.10.0" }
 tokio = "1"
 futures-util = { version = "0", default-features = false }
 log = "0"

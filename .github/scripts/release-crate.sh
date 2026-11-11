@@ -27,7 +27,7 @@ summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 published_on_registry() {
   curl -fsSL --retry 3 \
-    -H "User-Agent: jetstreamer-release-workflow (github.com/anza-xyz/jetstreamer)" \
+    -H "User-Agent: jetstreamer-release-workflow (github.com/vaultic-win/jetstreamer)" \
     "https://crates.io/api/v1/crates/${crate}/${version}" 2>/dev/null |
     jq -e ".version.num == \"${version}\"" >/dev/null 2>&1
 }
@@ -40,7 +40,7 @@ else
   echo "==> ${tag}: publishing to crates.io"
   # cargo blocks until the published crate is available in the registry index,
   # so the next crate in dependency order can resolve it immediately.
-  cargo publish -p "${crate}"
+  cargo publish --locked -p "${crate}"
   published_this_run=true
   echo "- \`${tag}\`: published to crates.io" >> "${summary}"
 fi
@@ -50,7 +50,7 @@ if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; t
   echo "- \`${tag}\`: tag skipped (already exists)" >> "${summary}"
 else
   echo "==> ${tag}: pushing tag"
-  git tag -a "${tag}" -m "Release ${tag}"
+  git tag "${tag}"
   git push origin "${tag}"
   echo "- \`${tag}\`: tag pushed" >> "${summary}"
 fi
