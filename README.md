@@ -381,6 +381,12 @@ prefetch these dependencies and supply the pinned ClickHouse artifact through
 `JETSTREAMER_CLICKHOUSE_ARTIFACT`; retain it when entering the pure shell with
 `nix-shell --pure --keep JETSTREAMER_CLICKHOUSE_ARTIFACT`.
 
+On NixOS, running the bundled ClickHouse also requires the standard Linux dynamic
+loader. Enable `programs.nix-ld.enable = true;` in your NixOS configuration or run
+Jetstreamer inside an FHS environment. The development shell supplies build tools;
+it does not change the host's dynamic loader configuration. The Nix CI job uses
+Ubuntu and does not validate NixOS runtime setup.
+
 Nix CI checks the workspace with all features, including the optional Geyser
 loader. Update the pins in `nix/sources.nix` when changing native dependencies;
 update the Rust overlay pin if it does not contain a newly selected Rust version.

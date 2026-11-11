@@ -50,4 +50,5 @@ replacement checksum files. A changed or replaced upstream asset fails closed.
 
 The `clickhouse_artifact` integration tests use local fixtures to exercise target
 selection, corrupted downloads and caches, interrupted download recovery,
-verified local input, and archive member rejection. They require no network.
+verified local input, and archive member rejection. The test cases use no network;
+the initial crate build still needs a cached, local, or downloadable artifact.
