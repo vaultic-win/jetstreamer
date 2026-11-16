@@ -1267,15 +1267,24 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 
 ## Mandatory local cleanup after completion
 
-An epoch is not operationally finished until its unnecessary local files have been deleted.
-After full/current-plugin verification, authenticated upload and whole-object readback, and the
-matching canonical R2 sidecar commit, retire local files as soon as their last local dependency
-ends. Apply the existing boundary, receipt, shared mutation-lock and no-consumer gates to archive
-retirement; remote pair presence alone is insufficient. Use the qualified Rust retirement tools.
+Make local cleanup the immediate post-verification step of every epoch's completion workflow.
+The trigger is full/current-plugin verification, authenticated R2 upload and whole-object readback,
+and the matching canonical R2 sidecar commit; local verification alone does not authorize deletion.
+At that event, delete all local data associated with the completed epoch, subject only to the
+concrete dependencies and compact evidence exceptions below. Do not wait for disk pressure, a
+user reminder, the next epoch, or the next 30-minute observation. An epoch is not operationally
+finished until cleanup succeeds or each retained path has a documented dependency.
+Apply the existing boundary, receipt, shared mutation-lock and no-consumer gates, honoring any
+explicit user-approved narrower retirement policy as described under `retire-local`. Remote pair
+presence alone is insufficient. Use the qualified Rust retirement tools and continue already
+authorized cleanup without asking for renewed permission.
 
 Cleanup covers `HORIZON_DIR` (normally `~/horizon`), private epoch output and replay scratch,
-restored snapshots and caches, diagnostic copies, superseded build trees, temporary deployments,
-and Horizon-only worktrees/directories under `~/workspace`. Do not retain obsolete trees merely
+restored snapshots and caches, duplicate archives, superseded partial outputs and failed attempts,
+diagnostic copies, superseded build trees, temporary deployments, and Horizon-only
+worktrees/directories under `~/workspace`. Inventory epoch-associated files across the host,
+including `~/.jetstreamer-private` and `/var/lib/jetstreamer`; the public archive directory and
+workspace alone are not the cleanup scope. Do not retain obsolete trees merely
 because disk space is plentiful or because they document historical work. Keep compact completion,
 verification and provenance receipts outside deletion trees while they remain necessary; delete
 those too when no recovery, audit, lineage or active workflow still needs them. Preserve shared
@@ -1292,14 +1301,20 @@ removing it, then promptly delete the obsolete copies.
 
 At completion, enumerate exact cleanup targets, verify no live process, open descriptor, map,
 controller, timer, staged launch, neighboring boundary check or recovery plan still needs them,
-and remove qualified targets in the same work cycle. Record any retained target's concrete
-dependency and clean it promptly when that dependency ends. Preserve unuploaded, unverified and
-resumable work. Remove a disposable Git worktree through Git after preserving any needed source
+and remove qualified targets in the same work cycle. Record each retained path, its bytes, the
+specific unfinished epoch or active/staged consumer that needs it, and the event that releases it.
+A historical mention, completed consumer, or speculative future use is not a retention dependency.
+Remove released data immediately; reconcile outstanding cleanup at the existing 30-minute cadence
+and after controller restart so failed or interrupted cleanup cannot silently accumulate.
+Preserve unuploaded, unverified and resumable work for unfinished epochs. Once the complete epoch
+is verified in R2, its obsolete local attempts are cleanup targets too. Remove a disposable Git
+worktree through Git after preserving any needed source
 changes/commits; do not delete unrelated projects or infer ownership from an epoch-like name alone.
 For a user-requested host-wide Horizon cleanup, inventory Horizon-owned paths across prior ranges
 as well as the current campaign; that request does not authorize cleanup of other projects or R2.
-Record removed paths and actual reclaimed space in one compact cleanup receipt, rather than
-creating a new per-target directory hierarchy.
+Record removed paths, authenticated R2 proof, actual reclaimed space, and retained dependencies in
+one compact cleanup receipt, rather than creating a new per-target directory hierarchy. Confirm
+deletion and measure available disk space before counting reclaimed bytes toward another lane.
 
 ## Deliver
 
