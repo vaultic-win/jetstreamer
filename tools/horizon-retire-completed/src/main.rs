@@ -1,0 +1,567 @@
+//! Retire explicitly selected obsolete local files after complete R2 delivery.
+//! This is not a canonical-archive verifier: obsolete partial bodies need not
+//! equal the complete archive. The operator must establish epoch association and
+//! absence of staged dependencies before authorizing the exact immutable plan.
+use anyhow::{Context, Result, ensure};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::BTreeSet,
+    fs::{self, File, OpenOptions},
+    io::{Read, Write},
+    os::fd::AsRawFd,
+    os::unix::{
+        ffi::OsStrExt,
+        fs::{MetadataExt, OpenOptionsExt},
+    },
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+const PRIVATE: &str = "/home/ubuntu/.jetstreamer-private";
+const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
+const LIMIT: u64 = 16 << 20;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Bound {
+    path: PathBuf,
+    sha256: String,
+}
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
+#[serde(deny_unknown_fields)]
+struct Stamp {
+    dev: u64,
+    ino: u64,
+    len: u64,
+    blocks: u64,
+    uid: u32,
+    gid: u32,
+    mode: u32,
+    nlink: u64,
+    mtime: i64,
+    mtime_ns: i64,
+    ctime: i64,
+    ctime_ns: i64,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Target {
+    epoch: u64,
+    path: PathBuf,
+    identity: Stamp,
+    reason: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Proof {
+    epoch: u64,
+    receipt: Bound,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Plan {
+    schema: String,
+    obsolete_local_files_authorized: bool,
+    no_staged_consumers_confirmed: bool,
+    remote_mutations: bool,
+    inventory_binary: Bound,
+    proofs: Vec<Proof>,
+    targets: Vec<Target>,
+    inactive_units: Vec<String>,
+    audit: PathBuf,
+}
+fn stamp(m: &fs::Metadata) -> Stamp {
+    Stamp {
+        dev: m.dev(),
+        ino: m.ino(),
+        len: m.len(),
+        blocks: m.blocks(),
+        uid: m.uid(),
+        gid: m.gid(),
+        mode: m.mode(),
+        nlink: m.nlink(),
+        mtime: m.mtime(),
+        mtime_ns: m.mtime_nsec(),
+        ctime: m.ctime(),
+        ctime_ns: m.ctime_nsec(),
+    }
+}
+fn exact(path: &Path) -> Result<fs::Metadata> {
+    ensure!(
+        path.is_absolute() && path.canonicalize()? == path,
+        "aliased/relative path: {}",
+        path.display()
+    );
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        m.is_file() && m.nlink() == 1,
+        "not a singly linked regular file: {}",
+        path.display()
+    );
+    Ok(m)
+}
+fn digest(path: &Path) -> Result<String> {
+    // The kernel's own executable handle is deliberately a procfs magic link.
+    // All ordinary evidence paths still refuse symlinks.
+    let mut f = if path == Path::new("/proc/self/exe") {
+        File::open(path)?
+    } else {
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(path)?
+    };
+    let mut h = Sha256::new();
+    let mut buf = [0u8; 65536];
+    loop {
+        let n = f.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        h.update(&buf[..n]);
+    }
+    Ok(format!("{:x}", h.finalize()))
+}
+fn bound(b: &Bound, limit: u64) -> Result<Vec<u8>> {
+    let before = stamp(&exact(&b.path)?);
+    ensure!(before.len <= limit, "oversized evidence");
+    let bytes = fs::read(&b.path)?;
+    ensure!(
+        format!("{:x}", Sha256::digest(&bytes)) == b.sha256 && stamp(&exact(&b.path)?) == before,
+        "changed evidence: {}",
+        b.path.display()
+    );
+    Ok(bytes)
+}
+fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
+    let entries = inventory["entries"]
+        .as_array()
+        .context("missing inventory entries")?;
+    let matching: Vec<_> = entries.iter().filter(|e| e["epoch"] == epoch).collect();
+    ensure!(matching.len() == 1, "ambiguous/missing remote epoch");
+    let e = matching[0];
+    ensure!(
+        inventory["schema"] == "jetstreamer-horizon-r2-inventory-v1" && e["state"] == "ready-pair",
+        "remote pair not ready"
+    );
+    let sha = receipt["archive_sha256"]
+        .as_str()
+        .context("receipt SHA missing")?;
+    ensure!(
+        sha.len() == 64
+            && sha
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "bad SHA"
+    );
+    ensure!(
+        receipt["schema"] == "jetstreamer-horizon-r2-receipt-v1"
+            && receipt["bucket"] == "solana-archive-with-accounts-data"
+            && receipt["epoch"] == epoch
+            && receipt["remote_sha256_readback"] == true
+            && receipt["archive_key"] == format!("epoch-{epoch}.jet")
+            && receipt["checksum_key"] == format!("epoch-{epoch}.jet.sha256"),
+        "receipt lacks whole-object delivery proof"
+    );
+    ensure!(
+        receipt["archive_length"].as_u64().is_some_and(|n| n > 0)
+            && receipt["archive_etag"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty()),
+        "incomplete receipt"
+    );
+    ensure!(
+        receipt["archive_length"] == e["archive_length"]
+            && receipt["archive_etag"] == e["archive_etag"]
+            && e["sidecar_sha256"] == sha
+            && e["archive_metadata_sha256"] == sha,
+        "remote pair differs from durable receipt"
+    );
+    Ok(())
+}
+fn check_target(t: &Target) -> Result<()> {
+    ensure!(
+        t.epoch >= 201 && t.epoch <= 300 && !t.reason.trim().is_empty(),
+        "invalid target authorization"
+    );
+    ensure!(
+        t.path.starts_with(PRIVATE) && !t.path.starts_with(Path::new(PRIVATE).join("r2-receipts")),
+        "target outside private data"
+    );
+    ensure!(
+        stamp(&exact(&t.path)?) == t.identity,
+        "target changed: {}",
+        t.path.display()
+    );
+    ensure!(t.identity.len > 1 << 20, "retain compact metadata");
+    Ok(())
+}
+fn inactive(units: &[String]) -> Result<()> {
+    for unit in units {
+        ensure!(
+            unit.ends_with(".service") || unit.ends_with(".timer"),
+            "invalid unit"
+        );
+        ensure!(
+            unit.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_.@-".contains(&b)),
+            "unsafe unit name"
+        );
+        let o = Command::new("/usr/bin/systemctl")
+            .args(["show", unit, "-p", "ActiveState", "-p", "MainPID"])
+            .output()?;
+        ensure!(o.status.success(), "cannot inspect unit {unit}");
+        let s = String::from_utf8(o.stdout)?;
+        ensure!(
+            s.lines()
+                .any(|s| s == "ActiveState=inactive" || s == "ActiveState=failed")
+                && !s
+                    .lines()
+                    .any(|s| s.starts_with("MainPID=") && s != "MainPID=0"),
+            "unit is live: {unit}"
+        );
+    }
+    Ok(())
+}
+fn contains(hay: &[u8], needle: &[u8]) -> bool {
+    hay.windows(needle.len()).any(|w| w == needle)
+}
+fn scan_consumers(targets: &[Target]) -> Result<()> {
+    let me = std::process::id().to_string();
+    for entry in fs::read_dir("/proc")? {
+        let entry = entry?;
+        let pid = entry.file_name();
+        let pid = pid.to_string_lossy();
+        if pid == me || !pid.bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let root = entry.path();
+        let check = || -> Result<()> {
+            for name in ["cmdline", "maps"] {
+                let data = fs::read(root.join(name))?;
+                for t in targets {
+                    ensure!(
+                        !contains(&data, t.path.as_os_str().as_bytes()),
+                        "PID {pid} references {} in {name}",
+                        t.path.display()
+                    );
+                }
+            }
+            for name in ["cwd", "root", "exe"] {
+                match fs::read_link(root.join(name)) {
+                    Ok(p) => {
+                        for t in targets {
+                            ensure!(p != t.path, "PID {pid} uses {}", t.path.display());
+                        }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            for fd in fs::read_dir(root.join("fd"))? {
+                let fd = fd?;
+                match fs::metadata(fd.path()) {
+                    Ok(m) => {
+                        for t in targets {
+                            ensure!(
+                                (m.dev(), m.ino()) != (t.identity.dev, t.identity.ino),
+                                "PID {pid} has {} open",
+                                t.path.display()
+                            );
+                        }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.into()),
+                }
+            }
+            Ok(())
+        };
+        if let Err(e) = check()
+            && root.exists()
+        {
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+fn event(log: &mut File, v: Value) -> Result<()> {
+    serde_json::to_writer(&mut *log, &v)?;
+    log.write_all(b"\n")?;
+    log.sync_all()?;
+    Ok(())
+}
+fn remove_exact(t: &Target) -> Result<()> {
+    check_target(t)?;
+    unlink_identity(&t.path, &t.identity)
+}
+fn unlink_identity(path: &Path, expected: &Stamp) -> Result<()> {
+    let parent = path.parent().context("no parent")?;
+    let dir = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(parent)?;
+    let projected = PathBuf::from(format!(
+        "/proc/self/fd/{}/{}",
+        dir.as_raw_fd(),
+        path.file_name().unwrap().to_string_lossy()
+    ));
+    ensure!(
+        stamp(&fs::symlink_metadata(&projected)?) == *expected,
+        "changed directory entry"
+    );
+    let name = std::ffi::CString::new(path.file_name().unwrap().as_bytes())?;
+    ensure!(
+        unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), 0) } == 0,
+        "unlink failed: {}",
+        std::io::Error::last_os_error()
+    );
+    dir.sync_all()?;
+    Ok(())
+}
+fn run() -> Result<()> {
+    let args: Vec<_> = std::env::args().collect();
+    ensure!(
+        args.len() == 4 || args.len() == 5,
+        "usage: horizon-retire-completed PLAN PLAN_SHA256 SELF_SHA256 [--check-only]"
+    );
+    let check_only = args.len() == 5;
+    ensure!(!check_only || args[4] == "--check-only", "unknown argument");
+    ensure!(
+        unsafe { libc::geteuid() } == 0,
+        "requires root for complete consumer inspection"
+    );
+    ensure!(
+        digest(Path::new("/proc/self/exe"))? == args[3],
+        "self digest mismatch"
+    );
+    let plan_path = PathBuf::from(&args[1]);
+    let pm = exact(&plan_path)?;
+    ensure!(
+        pm.uid() == 0 && pm.mode() & 0o022 == 0,
+        "plan not immutable root-owned evidence"
+    );
+    let bytes = bound(
+        &Bound {
+            path: plan_path,
+            sha256: args[2].clone(),
+        },
+        LIMIT,
+    )?;
+    let p: Plan = serde_json::from_slice(&bytes)?;
+    ensure!(
+        p.schema == "horizon-retire-completed-v1"
+            && p.obsolete_local_files_authorized
+            && p.no_staged_consumers_confirmed
+            && !p.remote_mutations,
+        "unauthorized plan"
+    );
+    ensure!(
+        !p.targets.is_empty() && !p.proofs.is_empty(),
+        "empty selection"
+    );
+    let mut paths = BTreeSet::new();
+    let mut epochs = BTreeSet::new();
+    for t in &p.targets {
+        ensure!(paths.insert(&t.path), "duplicate target");
+        epochs.insert(t.epoch);
+        check_target(t)?;
+    }
+    let proof_epochs: BTreeSet<_> = p.proofs.iter().map(|x| x.epoch).collect();
+    ensure!(
+        proof_epochs == epochs && p.proofs.len() == epochs.len(),
+        "proof/target epoch mismatch"
+    );
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(LOCK)?;
+    ensure!(
+        lock.metadata()?.is_file() && lock.metadata()?.nlink() == 1,
+        "unsafe lock"
+    );
+    ensure!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "mutation lock busy"
+    );
+    let bm = exact(&p.inventory_binary.path)?;
+    ensure!(
+        bm.uid() == 0
+            && bm.mode() & 0o022 == 0
+            && digest(&p.inventory_binary.path)? == p.inventory_binary.sha256,
+        "unqualified inventory binary"
+    );
+    inactive(&p.inactive_units)?;
+    scan_consumers(&p.targets)?;
+    let output = Command::new(&p.inventory_binary.path)
+        .env("TOKIO_WORKER_THREADS", "2")
+        .args([
+            "inventory",
+            "/home/ubuntu/horizon",
+            "--epochs",
+            &format!("{}-{}", epochs.first().unwrap(), epochs.last().unwrap()),
+            "--receipt-directory",
+            "/home/ubuntu/.jetstreamer-private/r2-receipts",
+        ])
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "authenticated inventory failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    ensure!(output.stdout.len() <= LIMIT as usize, "oversized inventory");
+    let inventory: Value = serde_json::from_slice(&output.stdout)?;
+    for proof in &p.proofs {
+        let r: Value = serde_json::from_slice(&bound(&proof.receipt, LIMIT)?)?;
+        ready(proof.epoch, &r, &inventory)?;
+    }
+    inactive(&p.inactive_units)?;
+    scan_consumers(&p.targets)?;
+    for t in &p.targets {
+        check_target(t)?;
+    }
+    if check_only {
+        println!(
+            "checked {} exact files, {} verified R2 epochs; no deletion",
+            p.targets.len(),
+            epochs.len()
+        );
+        return Ok(());
+    }
+    ensure!(
+        p.audit.is_absolute()
+            && p.audit.parent().context("audit parent")?.canonicalize()?
+                == p.audit.parent().unwrap(),
+        "aliased audit path"
+    );
+    let mut log = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&p.audit)?;
+    event(
+        &mut log,
+        json!({"event":"authorized","plan_sha256":args[2],"self_sha256":args[3],"unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"inventory":inventory}),
+    )?;
+    File::open(p.audit.parent().unwrap())?.sync_all()?;
+    let mut bytes = 0;
+    for t in &p.targets {
+        inactive(&p.inactive_units)?;
+        scan_consumers(std::slice::from_ref(t))?;
+        event(
+            &mut log,
+            json!({"event":"intent","epoch":t.epoch,"path":t.path,"identity":t.identity,"reason":t.reason}),
+        )?;
+        remove_exact(t)?;
+        bytes += t.identity.blocks * 512;
+        event(
+            &mut log,
+            json!({"event":"removed","epoch":t.epoch,"path":t.path,"allocated_bytes":t.identity.blocks*512}),
+        )?;
+    }
+    event(
+        &mut log,
+        json!({"event":"complete","allocated_bytes_removed":bytes,"remote_mutations":false}),
+    )?;
+    println!(
+        "removed {} files, {} allocated bytes; receipt {}",
+        p.targets.len(),
+        bytes,
+        p.audit.display()
+    );
+    Ok(())
+}
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{e:#}");
+        std::process::exit(1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn running_executable_can_be_hashed() {
+        assert_eq!(
+            digest(Path::new("/proc/self/exe")).unwrap(),
+            digest(&std::env::current_exe().unwrap()).unwrap()
+        );
+    }
+    fn pair() -> (Value, Value) {
+        let sha = "a".repeat(64);
+        (
+            json!({"schema":"jetstreamer-horizon-r2-receipt-v1","bucket":"solana-archive-with-accounts-data","epoch":202,"remote_sha256_readback":true,"archive_key":"epoch-202.jet","checksum_key":"epoch-202.jet.sha256","archive_length":100,"archive_etag":"etag","archive_sha256":sha}),
+            json!({"schema":"jetstreamer-horizon-r2-inventory-v1","entries":[{"epoch":202,"state":"ready-pair","archive_length":100,"archive_etag":"etag","sidecar_sha256":sha,"archive_metadata_sha256":sha}]}),
+        )
+    }
+    #[test]
+    fn authentic_complete_pair() {
+        let (r, i) = pair();
+        ready(202, &r, &i).unwrap();
+    }
+    #[test]
+    fn no_readback_rejected() {
+        let (mut r, i) = pair();
+        r["remote_sha256_readback"] = json!(false);
+        assert!(ready(202, &r, &i).is_err());
+    }
+    #[test]
+    fn remote_changes_rejected() {
+        for field in [
+            "archive_length",
+            "archive_etag",
+            "sidecar_sha256",
+            "archive_metadata_sha256",
+            "state",
+        ] {
+            let (r, mut i) = pair();
+            i["entries"][0][field] = json!("changed");
+            assert!(ready(202, &r, &i).is_err(), "{field}");
+        }
+    }
+    #[test]
+    fn wrong_epoch_and_duplicate_rejected() {
+        let (r, mut i) = pair();
+        assert!(ready(203, &r, &i).is_err());
+        let e = i["entries"][0].clone();
+        i["entries"].as_array_mut().unwrap().push(e);
+        assert!(ready(202, &r, &i).is_err());
+    }
+    #[test]
+    fn aliases_and_hardlinks_rejected() {
+        let p = std::env::temp_dir().join(format!("retire-test-{}", std::process::id()));
+        fs::create_dir(&p).unwrap();
+        let f = p.join("data");
+        fs::write(&f, b"test").unwrap();
+        exact(&f).unwrap();
+        let link = p.join("link");
+        std::os::unix::fs::symlink(&f, &link).unwrap();
+        assert!(exact(&link).is_err());
+        fs::remove_file(&link).unwrap();
+        fs::hard_link(&f, &link).unwrap();
+        assert!(exact(&f).is_err());
+        fs::remove_dir_all(p).unwrap();
+    }
+    #[test]
+    fn deletion_rejects_changed_file_and_preserves_neighbor() {
+        let p = std::env::temp_dir().join(format!("retire-unlink-test-{}", std::process::id()));
+        fs::create_dir(&p).unwrap();
+        let f = p.join("selected");
+        let other = p.join("preserved");
+        fs::write(&f, b"old").unwrap();
+        fs::write(&other, b"evidence").unwrap();
+        let before = stamp(&exact(&f).unwrap());
+        fs::write(&f, b"changed content").unwrap();
+        assert!(unlink_identity(&f, &before).is_err());
+        assert_eq!(fs::read(&f).unwrap(), b"changed content");
+        unlink_identity(&f, &stamp(&exact(&f).unwrap())).unwrap();
+        assert!(!f.exists());
+        assert_eq!(fs::read(&other).unwrap(), b"evidence");
+        fs::remove_dir_all(p).unwrap();
+    }
+}

@@ -1279,6 +1279,14 @@ explicit user-approved narrower retirement policy as described under `retire-loc
 presence alone is insufficient. Use the qualified Rust retirement tools and continue already
 authorized cleanup without asking for renewed permission.
 
+For superseded partial archives and other obsolete private files that intentionally differ from
+the complete R2 archive, use the repository's
+[completed-file retirement tool](../../../tools/horizon-retire-completed/README.md). Its exact
+plan binds file identities, qualified authenticated inventory and durable whole-readback receipts;
+it does not substitute a partial file's digest for the canonical archive digest. Establish epoch
+association and absence of staged dependencies, seal the tool and plan, run its check-only path,
+then execute cleanup and verify its durable removal audit.
+
 Cleanup covers `HORIZON_DIR` (normally `~/horizon`), private epoch output and replay scratch,
 restored snapshots and caches, duplicate archives, superseded partial outputs and failed attempts,
 diagnostic copies, superseded build trees, temporary deployments, and Horizon-only
