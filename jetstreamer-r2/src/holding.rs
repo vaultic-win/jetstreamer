@@ -5,6 +5,8 @@ use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 #[path = "holding_epoch136.rs"]
 mod epoch136;
+#[path = "holding_epoch166_retire.rs"]
+mod epoch166_retire;
 #[path = "holding_epoch185.rs"]
 mod epoch185;
 
@@ -1271,6 +1273,8 @@ pub(super) async fn run() -> Result<()> {
         "holding-retire185" => epoch185::retire_local(&client, &m, v, &spec, false).await,
         "holding-check-retire136" => epoch136::retire_local(&client, &m, v, &spec, true).await,
         "holding-retire136" => epoch136::retire_local(&client, &m, v, &spec, false).await,
+        "holding-check-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         _ => bail!("unsupported holding action"),
     }
 }
