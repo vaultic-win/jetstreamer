@@ -5,7 +5,7 @@
 //! copying either archive or weakening the normal full-verification evidence.
 
 use {
-    anyhow::{Context, Result, anyhow, ensure},
+    anyhow::{anyhow, ensure, Context, Result},
     serde::{Deserialize, Serialize},
     sha2::{Digest, Sha256},
     std::{
@@ -22,6 +22,7 @@ use {
 };
 
 const PLAN_SCHEMA: &str = "jetstreamer-horizon-boundary-bridge-plan-v1";
+const PLAN_SCHEMA_MIXED_UID: &str = "jetstreamer-horizon-boundary-bridge-plan-v2";
 const RECEIPT_SCHEMA: &str = "jetstreamer-horizon-boundary-bridge-receipt-v1";
 const MAX_PLAN_BYTES: u64 = 1024 * 1024;
 const MAX_EVIDENCE_BYTES: u64 = 1024 * 1024;
@@ -36,6 +37,10 @@ struct Plan {
     verifier: BoundExecutable,
     full_receipt_allowlist: FullReceiptAllowlist,
     expected_artifact_uid: u32,
+    #[serde(default)]
+    left_expected_artifact_uid: Option<u32>,
+    #[serde(default)]
+    right_expected_artifact_uid: Option<u32>,
     left: ArchiveEvidence,
     right: ArchiveEvidence,
     receipt_directories: Vec<ReceiptDirectory>,
@@ -360,6 +365,37 @@ fn full_receipt_owner_matches(receipt_uid: u32, artifact_uid: u32) -> bool {
     receipt_uid == artifact_uid || receipt_uid == 0
 }
 
+fn artifact_uids(plan: &Plan) -> Result<(u32, u32)> {
+    match plan.schema.as_str() {
+        PLAN_SCHEMA => {
+            ensure!(
+                plan.left_expected_artifact_uid.is_none()
+                    && plan.right_expected_artifact_uid.is_none(),
+                "v1 plan cannot override artifact owners"
+            );
+            Ok((plan.expected_artifact_uid, plan.expected_artifact_uid))
+        }
+        PLAN_SCHEMA_MIXED_UID => {
+            let left = plan
+                .left_expected_artifact_uid
+                .context("missing left owner")?;
+            let right = plan
+                .right_expected_artifact_uid
+                .context("missing right owner")?;
+            ensure!(
+                matches!(left, 0 | 1000) && matches!(right, 0 | 1000),
+                "unsupported artifact owner"
+            );
+            ensure!(
+                right == plan.expected_artifact_uid,
+                "right owner differs from legacy owner binding"
+            );
+            Ok((left, right))
+        }
+        _ => anyhow::bail!("plan schema mismatch"),
+    }
+}
+
 fn validate_archive(
     evidence: &ArchiveEvidence,
     epoch: u64,
@@ -662,7 +698,7 @@ fn main() -> Result<()> {
         "plan digest mismatch"
     );
     let plan: Plan = serde_json::from_slice(&plan_bytes).context("invalid plan JSON")?;
-    ensure!(plan.schema == PLAN_SCHEMA, "plan schema mismatch");
+    let (left_uid, right_uid) = artifact_uids(&plan)?;
     ensure!(
         plan.right_epoch
             == plan
@@ -734,13 +770,13 @@ fn main() -> Result<()> {
     let left = validate_archive(
         &plan.left,
         plan.left_epoch,
-        plan.expected_artifact_uid,
+        left_uid,
         &plan.full_receipt_allowlist,
     )?;
     let right = validate_archive(
         &plan.right,
         plan.right_epoch,
-        plan.expected_artifact_uid,
+        right_uid,
         &plan.full_receipt_allowlist,
     )?;
     let before_left = left.clone();
@@ -763,13 +799,13 @@ fn main() -> Result<()> {
     let left = validate_archive(
         &plan.left,
         plan.left_epoch,
-        plan.expected_artifact_uid,
+        left_uid,
         &plan.full_receipt_allowlist,
     )?;
     let right = validate_archive(
         &plan.right,
         plan.right_epoch,
-        plan.expected_artifact_uid,
+        right_uid,
         &plan.full_receipt_allowlist,
     )?;
     ensure!(
@@ -912,6 +948,60 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
 
+    fn test_plan(schema: &str, left_uid: Option<u32>, right_uid: Option<u32>) -> Plan {
+        serde_json::from_value(serde_json::json!({
+            "schema": schema,
+            "left_epoch": 204,
+            "right_epoch": 205,
+            "verifier": {"path": "/bin/true", "sha256": "a".repeat(64)},
+            "full_receipt_allowlist": {
+                "verifier_sha256": ["b".repeat(64)],
+                "script_sha256": ["c".repeat(64)]
+            },
+            "expected_artifact_uid": 1000,
+            "left_expected_artifact_uid": left_uid,
+            "right_expected_artifact_uid": right_uid,
+            "left": {
+                "archive": "/left/epoch-204.jet",
+                "sidecar": "/left/epoch-204.jet.sha256",
+                "full_receipt": "/left/epoch-204.full.ok"
+            },
+            "right": {
+                "archive": "/right/epoch-205.jet",
+                "sidecar": "/right/epoch-205.jet.sha256",
+                "full_receipt": "/right/epoch-205.full.ok"
+            },
+            "receipt_directories": [],
+            "private_receipt": {"path": "/receipt", "expected_parent_uid": 0},
+            "authority": {
+                "archive_publication_authorized": false,
+                "local_archive_retirement_authorized": false,
+                "remote_mutations": false,
+                "r2_mutations": false
+            }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn v1_plan_preserves_single_owner_binding() {
+        let plan = test_plan(PLAN_SCHEMA, None, None);
+        assert_eq!(artifact_uids(&plan).unwrap(), (1000, 1000));
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA, Some(0), None)).is_err());
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA, None, Some(1000))).is_err());
+    }
+
+    #[test]
+    fn v2_plan_requires_both_explicit_owners_and_legacy_right_binding() {
+        let plan = test_plan(PLAN_SCHEMA_MIXED_UID, Some(0), Some(1000));
+        assert_eq!(artifact_uids(&plan).unwrap(), (0, 1000));
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA_MIXED_UID, None, Some(1000))).is_err());
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA_MIXED_UID, Some(0), None)).is_err());
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA_MIXED_UID, Some(0), Some(0))).is_err());
+        assert!(artifact_uids(&test_plan(PLAN_SCHEMA_MIXED_UID, Some(2000), Some(1000))).is_err());
+        assert!(artifact_uids(&test_plan("unknown", Some(0), Some(1000))).is_err());
+    }
+
     fn test_identity() -> FileIdentity {
         FileIdentity {
             device: 1,
@@ -979,14 +1069,12 @@ mod tests {
             .unwrap(),
             (verifier, script)
         );
-        assert!(
-            parse_full_receipt(
-                format!("{} {} {}\n", "d".repeat(64), "b".repeat(64), "c".repeat(64)).as_bytes(),
-                &digest,
-                &allowlist
-            )
-            .is_err()
-        );
+        assert!(parse_full_receipt(
+            format!("{} {} {}\n", "d".repeat(64), "b".repeat(64), "c".repeat(64)).as_bytes(),
+            &digest,
+            &allowlist
+        )
+        .is_err());
     }
 
     #[test]
@@ -1019,12 +1107,10 @@ mod tests {
         let uid = unsafe { libc::geteuid() };
 
         assert!(publish_noclobber(&output, b"receipt\n", uid).is_err());
-        assert!(
-            fs::symlink_metadata(&output)
-                .unwrap()
-                .file_type()
-                .is_symlink()
-        );
+        assert!(fs::symlink_metadata(&output)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(fs::read(&target).unwrap(), b"receipt\n");
     }
 
@@ -1083,22 +1169,18 @@ mod tests {
 
         let mut wrong_path = serde_json::to_value(&receipt).unwrap();
         wrong_path["bridge"]["verifier_path"] = serde_json::json!("/bin/wrong");
-        assert!(
-            validate_existing_private_receipt(
-                &serde_json::to_vec(&wrong_path).unwrap(),
-                &expectation
-            )
-            .is_err()
-        );
+        assert!(validate_existing_private_receipt(
+            &serde_json::to_vec(&wrong_path).unwrap(),
+            &expectation
+        )
+        .is_err());
 
         let mut extra_field = serde_json::to_value(&receipt).unwrap();
         extra_field["unexpected"] = serde_json::json!(true);
-        assert!(
-            validate_existing_private_receipt(
-                &serde_json::to_vec(&extra_field).unwrap(),
-                &expectation
-            )
-            .is_err()
-        );
+        assert!(validate_existing_private_receipt(
+            &serde_json::to_vec(&extra_field).unwrap(),
+            &expectation
+        )
+        .is_err());
     }
 }
