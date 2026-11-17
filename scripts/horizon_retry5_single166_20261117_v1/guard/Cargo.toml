@@ -1,0 +1,30 @@
+[package]
+name = "horizon-retry5-data-guard"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "horizon-retry5-data-guard"
+path = "horizon_standalone_guard_bin.rs"
+
+[features]
+preparation = []
+epoch207-native-main-guard = []
+epoch209-native-main-guard = []
+epoch209-singleton-guard = []
+epoch210-native-main-guard = []
+epoch223-native20-prefix-guard = []
+epoch227-native-main-guard = []
+epoch227-singleton-guard = []
+epoch227-v1625-native-main-guard = []
+epoch228-native-main-guard = []
+
+[dependencies]
+anyhow = "1"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
