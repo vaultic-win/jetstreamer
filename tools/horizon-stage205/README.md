@@ -1,8 +1,10 @@
 # Epoch 205 canonical stage
 
-This one use Rust tool stages the validated epoch 205 archive as a canonical
-archive and sidecar. It holds the shared local mutation lock, checks the exact
-successful diagnostic invocations, verifies both the source and copied bytes,
+The first sealed generation copied the archive but stopped before publication
+because its expected SHA-256 literal had one extra character. The second
+generation reuses only that exact complete temporary file after checking the
+failed unit, intent, inode, source digest, and temporary copy digest. It holds
+the shared local mutation lock, checks the successful diagnostic invocations,
 publishes with no clobber renames, and fsyncs a private receipt. The private
 source remains intact. The receipt does not authorize verification, R2 upload,
 or local retirement.
