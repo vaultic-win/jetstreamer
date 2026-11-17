@@ -2,6 +2,7 @@
 
 The first sealed generation copied the archive but stopped before publication
 because its expected SHA-256 literal had one extra character. The second
+generation reached the permission step after rechecking both digests. The third
 generation reuses only that exact complete temporary file after checking the
 failed unit, intent, inode, source digest, and temporary copy digest. It holds
 the shared local mutation lock, checks the successful diagnostic invocations,

@@ -11,16 +11,16 @@ use std::process::Command;
 
 const SOURCE: &str = "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-205-bounded8-refresh421-v1/output/epoch-205-checkpoint-restart-v4.jet";
 const DEST: &str = "/home/ubuntu/horizon";
-const RECEIPTS: &str = "/home/ubuntu/.jetstreamer-private/epoch205-canonical-stage-20261117-v2";
+const RECEIPTS: &str = "/home/ubuntu/.jetstreamer-private/epoch205-canonical-stage-20261117-v3";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const SIZE: u64 = 104_772_252_720;
 const SHA: &str = "8a8205ade01bc4a39b5c59b5597841869bf7bd2bbda9f982744e14ac1dd250d7";
 const RECOVERY_TEMP: &str = "/home/ubuntu/horizon/.epoch-205.jet.stage-501033";
-const FAILED_UNIT: &str = "horizon205-canonical-stage-20261117-v1.service";
-const FAILED_ID: &str = "c84065c9c32d4ae8a1ee98b23071d0b6";
+const FAILED_UNIT: &str = "horizon205-canonical-stage-20261117-v2.service";
+const FAILED_ID: &str = "deb76c2b517842ee9b5dc571a9012bd9";
 const FAILED_INTENT: &str =
-    "/home/ubuntu/.jetstreamer-private/epoch205-canonical-stage-20261117-v1/intent.json";
-const FAILED_INTENT_SHA: &str = "241405395fe1d22ec74ddeaae0e7801659c2747c5473566c89c07b3950c22cc9";
+    "/home/ubuntu/.jetstreamer-private/epoch205-canonical-stage-20261117-v2/intent.json";
+const FAILED_INTENT_SHA: &str = "f49617dd93d2af39a3983f53a8d1d2645bffdac049620e2017e0522ab9849423";
 const FULL: (&str, &str, &str) = (
     "horizon205-internal-full-20261117-v1.service",
     "de93145c5ad74b85bef571859db6216f",
@@ -145,7 +145,7 @@ fn recovery(source_device: u64) -> Result<()> {
         "ActiveState=failed",
         "Result=exit-code",
         "ExecMainStatus=1",
-        "InvocationID=c84065c9c32d4ae8a1ee98b23071d0b6",
+        "InvocationID=deb76c2b517842ee9b5dc571a9012bd9",
     ] {
         ensure!(
             text.lines().any(|s| s == expected),
@@ -156,7 +156,7 @@ fn recovery(source_device: u64) -> Result<()> {
         hash(Path::new(FAILED_INTENT))? == FAILED_INTENT_SHA,
         "failed intent changed"
     );
-    let temp = file(Path::new(RECOVERY_TEMP), SIZE, 0, 0o600)?;
+    let temp = file(Path::new(RECOVERY_TEMP), SIZE, 1000, 0o600)?;
     ensure!(
         temp.dev() == source_device && temp.ino() == 518346,
         "failed stage inode changed"
@@ -211,7 +211,7 @@ fn run() -> Result<()> {
         "unexpected plan fields"
     );
     ensure!(
-        p["schema"] == "horizon-stage205-plan-v2"
+        p["schema"] == "horizon-stage205-plan-v3"
             && p["source"] == SOURCE
             && p["destination_directory"] == DEST
             && p["receipt_directory"] == RECEIPTS
@@ -266,7 +266,7 @@ fn run() -> Result<()> {
     );
     durable(
         &intent,
-        &json!({"schema":"horizon-stage205-intent-v2","source":SOURCE,"source_device":src.dev(),"source_inode":src.ino(),"size":SIZE,"sha256":SHA,"destination":archive,"recovery_temp":RECOVERY_TEMP,"recovery_inode":518346,"failed_unit":FAILED_UNIT,"failed_invocation":FAILED_ID,"failed_intent_sha256":FAILED_INTENT_SHA,"full_unit":FULL.0,"full_invocation":FULL.1,"plugin_unit":PLUGIN.0,"plugin_invocation":PLUGIN.1,"r2_mutations":false}),
+        &json!({"schema":"horizon-stage205-intent-v3","source":SOURCE,"source_device":src.dev(),"source_inode":src.ino(),"size":SIZE,"sha256":SHA,"destination":archive,"recovery_temp":RECOVERY_TEMP,"recovery_inode":518346,"failed_unit":FAILED_UNIT,"failed_invocation":FAILED_ID,"failed_intent_sha256":FAILED_INTENT_SHA,"full_unit":FULL.0,"full_invocation":FULL.1,"plugin_unit":PLUGIN.0,"plugin_invocation":PLUGIN.1,"r2_mutations":false}),
     )?;
     let tmp = Path::new(RECOVERY_TEMP).to_path_buf();
     let tmp_sidecar = Path::new(DEST).join(format!(
@@ -293,10 +293,14 @@ fn run() -> Result<()> {
         .custom_flags(libc::O_NOFOLLOW)
         .open(&tmp)?;
     ensure!(
-        unsafe { libc::fchown(output.as_raw_fd(), 1000, 1000) } == 0,
-        "archive chown failed"
+        unsafe { libc::fchown(output.as_raw_fd(), 0, 0) } == 0,
+        "archive root custody failed"
     );
     output.set_permissions(fs::Permissions::from_mode(0o440))?;
+    ensure!(
+        unsafe { libc::fchown(output.as_raw_fd(), 1000, 1000) } == 0,
+        "archive final custody failed"
+    );
     output.sync_all()?;
     ensure!(
         file(&tmp, SIZE, 1000, 0o440)?.ino() == 518346,
@@ -309,11 +313,11 @@ fn run() -> Result<()> {
         .mode(0o600)
         .open(&tmp_sidecar)?;
     sf.write_all(sidecar_bytes.as_bytes())?;
+    sf.set_permissions(fs::Permissions::from_mode(0o440))?;
     ensure!(
         unsafe { libc::fchown(sf.as_raw_fd(), 1000, 1000) } == 0,
         "sidecar chown failed"
     );
-    sf.set_permissions(fs::Permissions::from_mode(0o440))?;
     sf.sync_all()?;
     absent(&archive)?;
     absent(&sidecar)?;
@@ -330,7 +334,7 @@ fn run() -> Result<()> {
     );
     durable(
         &done,
-        &json!({"schema":"horizon-stage205-completion-v2","epoch":205,"source":SOURCE,"destination":archive,"source_inode":src.ino(),"destination_inode":staged.ino(),"bytes":SIZE,"sha256":SHA,"sidecar_sha256":sha(sidecar_bytes.as_bytes()),"intent_sha256":hash(&intent)?,"failed_intent_sha256":FAILED_INTENT_SHA,"reused_recovery_temp":true,"source_preserved":true,"canonical_pair_present":true,"full_unit":FULL.0,"full_invocation":FULL.1,"plugin_unit":PLUGIN.0,"plugin_invocation":PLUGIN.1,"r2_mutations":false,"verification_authorized":false,"upload_authorized":false,"retirement_authorized":false}),
+        &json!({"schema":"horizon-stage205-completion-v3","epoch":205,"source":SOURCE,"destination":archive,"source_inode":src.ino(),"destination_inode":staged.ino(),"bytes":SIZE,"sha256":SHA,"sidecar_sha256":sha(sidecar_bytes.as_bytes()),"intent_sha256":hash(&intent)?,"failed_intent_sha256":FAILED_INTENT_SHA,"reused_recovery_temp":true,"source_preserved":true,"canonical_pair_present":true,"full_unit":FULL.0,"full_invocation":FULL.1,"plugin_unit":PLUGIN.0,"plugin_invocation":PLUGIN.1,"r2_mutations":false,"verification_authorized":false,"upload_authorized":false,"retirement_authorized":false}),
     )?;
     println!("epoch 205 canonical pair staged");
     Ok(())
