@@ -26,3 +26,10 @@ Verification: `cargo test --offline --locked`, strict Clippy, and release build
 passed. `systemd-analyze verify` accepted all three generated units; its two
 messages concern unrelated installed XFS units. The generated packet hashes are
 recorded in `source-plan.json`.
+
+The first sealed static package left the accepted bootstrap inside a writable
+worker root. The corrected immutable `packet-v2/` adds the entire accepted
+`input/` directory to `ReadOnlyPaths`. It was separately sealed as
+`/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2`; receipt SHA-256
+`9bbc1af99e689c1ddf614a8a79c91d561e18a66716782658f6b2c8688de6be1f`.
+The v1 package remains historical evidence and is not a launch source.

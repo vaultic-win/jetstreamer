@@ -1,0 +1,18 @@
+{
+  "destination": "/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-v5",
+  "members": [
+    {
+      "mode": 365,
+      "name": "horizon-reboot250-launch",
+      "sha256": "92d209fdbb593ada4b74afa01f92b55d183219e9c0fff1b2b4e15e3274213713",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon-reboot250-launch/target/release/horizon-reboot250-launch"
+    },
+    {
+      "mode": 292,
+      "name": "launch-plan.json",
+      "sha256": "3bdf39ee87c2f6901e92fcaee2e39c49cc7e05cfa89b624afc1cee8e8460573f",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon-reboot250-launch/packet-v5/launch-plan.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

@@ -1,0 +1,36 @@
+{
+  "destination": "/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2",
+  "members": [
+    {
+      "mode": 292,
+      "name": "horizon-qualify-250-reboot-20261117-v1.service",
+      "sha256": "9ef783df5862a605cbdea70e8297b90189d2861c35e51bb9715f3c09a9ad2462",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon250-replacement-source/packet-v2/horizon-qualify-250-reboot-20261117-v1.service"
+    },
+    {
+      "mode": 292,
+      "name": "horizon-250-reboot-20261117-protective-v1.service",
+      "sha256": "fee203fbdc165f3e95e4618cc586589caa4f2aef452e0b9e43535d4191e54e83",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon250-replacement-source/packet-v2/horizon-250-reboot-20261117-protective-v1.service"
+    },
+    {
+      "mode": 292,
+      "name": "horizon-250-reboot-20261117-protective-v1.timer",
+      "sha256": "8fd1463f68f37b1ca4f8e671bb526c8fcd73495c96df543eb29b6edcf41c54a6",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon250-replacement-source/packet-v2/horizon-250-reboot-20261117-protective-v1.timer"
+    },
+    {
+      "mode": 292,
+      "name": "source-plan.json",
+      "sha256": "a7f042b71df4252978cad026287b0b0b8c1654bf815f0c46a8ff3c47d27d0fb1",
+      "source": "/home/ubuntu/workspace/jetstreamer/tools/horizon250-replacement-source/packet-v2/source-plan.json"
+    },
+    {
+      "mode": 292,
+      "name": "service-effective-car-header-proof.json",
+      "sha256": "b0f4e19f2b2755559138dda7c5823ac9723249e1052928fb9512fffdbb80e9b7",
+      "source": "/var/lib/jetstreamer/horizon250-reboot-20261117-static-v1/service-effective-car-header-proof.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}

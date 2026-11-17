@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{fs::{self, File, OpenOptions}, io::Write, os::unix::fs::{MetadataExt, OpenOptionsExt}, path::{Path, PathBuf}};
 
 const BASE: &str = "/var/lib/jetstreamer/horizon249-replay2445-static-v1";
-const OUT: &str = "/home/ubuntu/workspace/horizon250-replacement-source-20261117-v1/packet";
+const OUT: &str = "/home/ubuntu/workspace/jetstreamer/tools/horizon250-replacement-source/packet-v2";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-250-reboot-20261117-v1";
 const CACHE: &str = "/var/lib/jetstreamer/horizon250-index-reboot-20261117-cache-v1";
 const AUTH: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-input-auth-v1/acceptance.json";
@@ -57,9 +57,13 @@ fn producer() -> Result<String> {
     replace_one(&mut s, "/var/lib/jetstreamer/horizon249-controls2418-v1/preflight-249-target1.json", MANIFEST)?;
     replace_one(&mut s, "sha256:1eba23638b04526c0ee06e2ddda702eb21c3e9bedb7010729d430b1443d080bc", FINGERPRINT)?;
     replace_one(&mut s, "/var/lib/jetstreamer/horizon-contiguous-249-251-current-46b4b4a-v1/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst", BOOTSTRAP)?;
+    let old_read_only = format!("ReadOnlyPaths={TOKENS} {ROOT}/output/compact-indexes");
+    let new_read_only = format!("{old_read_only} {ROOT}/input");
+    replace_one(&mut s, &old_read_only, &new_read_only)?;
     ensure!(s.contains("ExecStartPre=/usr/bin/sleep 60") && s.contains("ExecStartPre=/usr/bin/test -f") && s.contains("ExecStartPre=/usr/bin/test ! -L"), "prestart gate lost");
     ensure!(s.contains("MemoryMax=251041591296") && s.contains("MemoryHigh=167361060864") && s.contains("CPUQuota=800%") && s.contains("RuntimeMaxSec=259200") && s.contains("Restart=no"), "resource envelope changed");
-    ensure!(s.contains("--verify --root-checkpoint-cohort") && s.contains(&format!("--snapshot-archive={BOOTSTRAP}")), "replay route changed");
+    ensure!(s.contains("--verify --root-checkpoint-cohort") && s.contains(&format!("--snapshot-archive={BOOTSTRAP}"))
+        && s.contains(&format!("ReadOnlyPaths={TOKENS} {ROOT}/output/compact-indexes {ROOT}/input")), "replay route changed");
     ensure!(!s.contains("qualification-249") && !s.contains("horizon249-") && !s.contains(" 249 "), "stale 249 producer source");
     Ok(s)
 }
@@ -103,8 +107,13 @@ fn run() -> Result<()> {
     let producer = producer()?; let guard = guard()?; let timer = timer()?;
     fs::create_dir(OUT)?;
     let files = vec![save(UNIT, producer.as_bytes())?, save(GUARD, guard.as_bytes())?, save(TIMER, timer.as_bytes())?];
-    let plan = json!({"schema":"horizon250-replacement-source-plan-v1","candidate_epoch":250,"producer_unit":UNIT,"guard_unit":GUARD,"timer_unit":TIMER,"worker_root":ROOT,"index_cache":CACHE,"input_acceptance":{"path":AUTH,"sha256":"8c7bcf8828827081f6005e0be006aa8bb3b25fb64a03b55dc5ebf1919943bf04"},"index_capability":{"path":CAP,"sha256":"d158bc2593702a552b9db6edf16b98481cfc169ee949f352ec935a0edeabef73"},"successor_probe":{"path":PROBE,"sha256":"2f185dc9bd453c389e8e588b33efa99770e39c1dc05776aaa2fecb2e6ae8338a"},"files":files,"candidate_memory_max_bytes":251041591296u64,"candidate_memory_high_bytes":167361060864u64,"candidate_root_cap_bytes":506191984640u64,"fourth_lane_memory_fit_proven":false,"replacement_requires_terminal_lane_event":true,"service_effective_car_header_route_qualified":false,"fresh_main_admission_accepted":false,"native_replay_qualified":false,"first_guard_fired":false,"replay_launch_authorized":false,"r2_mutations":false,"remote_mutations":false});
-    save("source-plan.json", format!("{}\n", serde_json::to_string_pretty(&plan)?).as_bytes())?;
+    let plan = json!({"schema":"horizon250-replacement-source-plan-v2","candidate_epoch":250,"producer_unit":UNIT,"guard_unit":GUARD,"timer_unit":TIMER,"worker_root":ROOT,"index_cache":CACHE,"input_acceptance":{"path":AUTH,"sha256":"8c7bcf8828827081f6005e0be006aa8bb3b25fb64a03b55dc5ebf1919943bf04"},"index_capability":{"path":CAP,"sha256":"d158bc2593702a552b9db6edf16b98481cfc169ee949f352ec935a0edeabef73"},"successor_probe":{"path":PROBE,"sha256":"2f185dc9bd453c389e8e588b33efa99770e39c1dc05776aaa2fecb2e6ae8338a"},"files":files,"candidate_memory_max_bytes":251041591296u64,"candidate_memory_high_bytes":167361060864u64,"candidate_root_cap_bytes":506191984640u64,"bootstrap_input_read_only":true,"fourth_lane_memory_fit_proven":false,"replacement_requires_terminal_lane_event":true,"service_effective_car_header_route_qualified":true,"fresh_main_admission_accepted":false,"native_replay_qualified":false,"first_guard_fired":false,"replay_launch_authorized":false,"r2_mutations":false,"remote_mutations":false});
+    let source_plan = save("source-plan.json", format!("{}\n", serde_json::to_string_pretty(&plan)?).as_bytes())?;
+    let mut members: Vec<Value> = files.iter().map(|f| json!({"source":f["path"],"name":Path::new(f["path"].as_str().unwrap()).file_name().unwrap().to_string_lossy(),"sha256":f["sha256"],"mode":292})).collect();
+    members.push(json!({"source":source_plan["path"],"name":"source-plan.json","sha256":source_plan["sha256"],"mode":292}));
+    members.push(json!({"source":"/var/lib/jetstreamer/horizon250-reboot-20261117-static-v1/service-effective-car-header-proof.json","name":"service-effective-car-header-proof.json","sha256":"b0f4e19f2b2755559138dda7c5823ac9723249e1052928fb9512fffdbb80e9b7","mode":292}));
+    let deployment = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2","members":members});
+    save("deployment-plan.json", format!("{}\n", serde_json::to_string_pretty(&deployment)?).as_bytes())?;
     File::open(OUT)?.sync_all()?; File::open(Path::new(OUT).parent().context("packet parent")?)?.sync_all()?;
     println!("{OUT}"); Ok(())
 }
