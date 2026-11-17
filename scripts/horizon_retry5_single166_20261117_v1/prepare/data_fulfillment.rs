@@ -925,6 +925,7 @@ fn scope(s: &Scope<'_>) -> Result<()> {
         "local3retry3",
         "local3retry4",
         "local3retry5",
+        "local3retry6",
     ]
     .into_iter()
     .find_map(|namespace| {
@@ -938,7 +939,8 @@ fn scope(s: &Scope<'_>) -> Result<()> {
     let date = if e < 171 { "20261109" } else { "20261110" };
     ensure!(
         (166..=172).contains(&e)
-            && (!["local3retry4", "local3retry5"].contains(&namespace) || e == 166)
+            && (!["local3retry4", "local3retry5", "local3retry6"].contains(&namespace)
+                || e == 166)
             && (namespace == "local2" || [166, 167, 169, 170].contains(&e))
             && s.unit == format!("horizon-qualify-{e}-replacement-{namespace}-20261110-v1.service")
             && s.worker_root
@@ -955,7 +957,8 @@ fn scope(s: &Scope<'_>) -> Result<()> {
                     "local3retry2",
                     "local3retry3",
                     "local3retry4",
-                    "local3retry5"
+                    "local3retry5",
+                    "local3retry6"
                 ]
                 .contains(&namespace)
                 {
@@ -1293,6 +1296,21 @@ mod tests {
             assert!(scope(&s).is_err());
             s.raw_floor = CURRENT_FLOOR;
             s.worker_root = Path::new("/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1");
+            assert!(scope(&s).is_err());
+        }
+    }
+    #[test]
+    fn retry6_only166_preserves_current_floor_and_exact_root() {
+        for e in 165..=173 {
+            let date = if e < 171 { "20261109" } else { "20261110" };
+            let root = PathBuf::from(format!(
+                "/home/sol/.jetstreamer-private/epoch{e}-standard-lane-{date}-v1"
+            ));
+            let unit = format!("horizon-qualify-{e}-replacement-local3retry6-20261110-v1.service");
+            let mut s = namespace_scope(&unit, &root);
+            s.raw_floor = CURRENT_FLOOR;
+            assert_eq!(scope(&s).is_ok(), e == 166);
+            s.raw_floor = FLOOR;
             assert!(scope(&s).is_err());
         }
     }
