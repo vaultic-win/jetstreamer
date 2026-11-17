@@ -43,7 +43,7 @@ const R2_SHA: &str = "2e718f08c3cd072c40f79dbb85f35fd59864aedc26782fcfd89a031a7f
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24";
-const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v3/horizon-epoch244-import-operator";
+const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v4/horizon-epoch244-import-operator";
 const STATE: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-state-20261117-v1";
 const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon244-current-import-protective-20261117-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon244-current-import-tokens-20261117-v1";
@@ -54,6 +54,11 @@ const FLOOR: u64 = 2_000_000_000_000;
 const THREE_REPLAY_OBLIGATION: u64 = 980_221_169_664;
 const IMPORT_MEMORY_MAX: u64 = 68_719_476_736;
 const GUARD_MEMORY_MAX: u64 = 1_073_741_824;
+const MINIMUM_HOST_MEMORY_RESERVE: u64 = 64 * 1024 * 1024 * 1024;
+const VERIFIER_UNITS: [&str; 2] = [
+    "horizon-full-verify-239-current-20261117-v1.service",
+    "horizon-plugin-verify-239-current-20261117-v1.service",
+];
 const LIVE: [(&str, &str); 3] = [
     ("247-247", "horizon-qualify-247-reboot-20261117-v2.service"),
     ("248-248", "horizon-qualify-248-reboot-20261117-v1.service"),
@@ -110,7 +115,7 @@ fn fields(unit: &str) -> Result<BTreeMap<String, String>> {
         &[
             "show",
             unit,
-            "--property=Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,MainPID,Restart,KillMode,Delegate,ControlGroup,ExecMainStartTimestamp",
+            "--property=Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,MainPID,Restart,KillMode,Delegate,ControlGroup,ExecMainStartTimestamp,MemoryMax",
         ],
     )?;
     raw.lines()
@@ -159,6 +164,41 @@ fn total_memory_bytes() -> Result<u64> {
         .context("bad MemTotal")?
         .parse()?;
     kib.checked_mul(1024).context("memory overflow")
+}
+
+fn concurrent_verifier_memory_max_bytes() -> Result<u64> {
+    let mut total = 0_u64;
+    for unit in VERIFIER_UNITS {
+        let row = fields(unit)?;
+        match field(&row, "ActiveState")? {
+            "inactive" => {}
+            "active" | "activating" => {
+                let cap: u64 = field(&row, "MemoryMax")?.parse()?;
+                ensure!(
+                    cap > 0 && cap < u64::MAX,
+                    "unbounded verifier memory: {unit}"
+                );
+                total = total.checked_add(cap).context("verifier memory overflow")?;
+            }
+            state => anyhow::bail!("unresolved verifier state {unit}: {state}"),
+        }
+    }
+    Ok(total)
+}
+
+fn admitted_memory_obligation(total: u64, verifier_max: u64) -> Result<u64> {
+    let obligation = THREE_REPLAY_OBLIGATION
+        .checked_add(IMPORT_MEMORY_MAX)
+        .and_then(|value| value.checked_add(GUARD_MEMORY_MAX))
+        .and_then(|value| value.checked_add(verifier_max))
+        .context("memory obligation overflow")?;
+    ensure!(
+        obligation
+            .checked_add(MINIMUM_HOST_MEMORY_RESERVE)
+            .is_some_and(|reserved| reserved <= total),
+        "import memory admission lacks host reserve"
+    );
+    Ok(obligation)
 }
 
 fn private_json(path: &Path, maximum: u64) -> Result<Value> {
@@ -368,8 +408,8 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
         );
     }
     let total = total_memory_bytes()?;
-    let obligation = THREE_REPLAY_OBLIGATION + IMPORT_MEMORY_MAX + GUARD_MEMORY_MAX;
-    ensure!(obligation < total, "import memory admission exceeds host");
+    let verifier_max = concurrent_verifier_memory_max_bytes()?;
+    let obligation = admitted_memory_obligation(total, verifier_max)?;
     let free = available_bytes()?;
     ensure!(
         free >= FLOOR + ARCHIVE_BYTES + 16_000_000_000,
@@ -398,6 +438,8 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
         "native_proof":{"path":NATIVE_PROOF,"sha256":NATIVE_PROOF_SHA},"r2_inventory":remote,
         "live_replay_count":3,"retained_replay_memory_obligation_bytes":THREE_REPLAY_OBLIGATION,
         "candidate_import_memory_max_bytes":IMPORT_MEMORY_MAX,"guard_memory_max_bytes":GUARD_MEMORY_MAX,
+        "concurrent_verifier_memory_max_bytes":verifier_max,
+        "minimum_host_memory_reserve_bytes":MINIMUM_HOST_MEMORY_RESERVE,
         "memory_obligation_after_bytes":obligation,"host_memory_total_bytes":total,
         "available_disk_bytes":free,"minimum_free_bytes":FLOOR,
         "import_unit":IMPORT_UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER_UNIT,
@@ -721,6 +763,14 @@ mod tests {
         assert!(ROOT_CAP > ARCHIVE_BYTES);
         assert_eq!(FLOOR, 2_000_000_000_000);
         assert_eq!(LIVE.len(), 3);
+    }
+
+    #[test]
+    fn concurrent_239_verifiers_block_import_until_capacity_is_released() {
+        let host_total = 1_212_136_964_096;
+        let two_verifiers = 2 * 68_719_476_736;
+        assert!(admitted_memory_obligation(host_total, two_verifiers).is_err());
+        assert!(admitted_memory_obligation(host_total, 0).is_ok());
     }
 
     #[test]
