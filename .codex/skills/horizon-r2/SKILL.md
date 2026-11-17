@@ -338,6 +338,16 @@ For a long-running range, use the repository's `jetstreamer-r2-progressive` Rust
   verify authenticated absence, and fsync a private no-clobber deletion receipt. Its idempotent
   recovery path may accept an already-absent status only when the exact authenticated publication
   receipt proves that object previously existed and the ready pair still passes every gate.
+  When the latest status was published through the authenticated status-only fallback and has no
+  native status-publication receipt, use the reviewed Rust `status-delete-fallback-ready` command.
+  Seal its binary and a root-owned plan with schema
+  `jetstreamer-r2-fallback-ready-status-plan-v1`; bind the exact fallback completion receipt,
+  authenticated raw status bytes, and whole-readback archive receipt by path and SHA-256. Put the
+  no-clobber intent and deletion receipt in one canonical root-private state directory. Run the
+  sealed command with `PLAN --plan-sha256 HEX --self-sha256 HEX --check-only`, then repeat without
+  `--check-only` only after it confirms the ready pair and exact status publication. It conditionally
+  deletes only that epoch's status key, verifies authenticated absence and the ready pair, and fsyncs
+  the deletion receipt. Never fabricate a native publication receipt for a fallback status.
 - For confirmed inactive/orphaned work, remove the status promptly even when no ready archive exists.
   Require durable terminal/ownership evidence, no replacement replay or active downstream/handoff,
   an authenticated match to the exact owner's latest status-publication receipt, a fresh race check,
