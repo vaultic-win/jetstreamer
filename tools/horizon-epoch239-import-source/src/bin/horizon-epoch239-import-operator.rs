@@ -15,15 +15,18 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const IMPORT_UNIT: &str = "horizon-import-239-current-20261117-v2.service";
-const GUARD_UNIT: &str = "horizon-import-239-protective-20261117-v2.service";
-const TIMER_UNIT: &str = "horizon-import-239-protective-20261117-v2.timer";
-const IMPORT_PACKAGE: &str = "/var/lib/jetstreamer/horizon239-current-import-runtime-20261117-v2";
-const IMPORT_SERVICE_SHA: &str = "1a1aaa25b8ab2ff39a1241e391cd4cf0ebb12169d3dceb1e95c589980a75d7b1";
-const PREPARATION_SHA: &str = "a7d46e9b5737599fa563b660d01dc9ee27c9b81bd015b83f7db44caa738b4061";
+const IMPORT_UNIT: &str = "horizon-import-239-current-20261117-v3.service";
+const GUARD_UNIT: &str = "horizon-import-239-protective-20261117-v3.service";
+const TIMER_UNIT: &str = "horizon-import-239-protective-20261117-v3.timer";
+const IMPORT_PACKAGE: &str = "/var/lib/jetstreamer/horizon239-current-import-runtime-20261117-v3";
+const IMPORT_SERVICE_SHA: &str = "eb95b43a389fc94ca6b8ed10761b7672cb963aadb9957d7dc16b56b899d63a64";
+const PREPARATION_SHA: &str = "fe72b2037e408618af9d3b75cb5dce0e339fe7f5ac65f9bf991f14b0c5dc3983";
 const NATIVE_PROOF: &str =
-    "/var/lib/jetstreamer/horizon239-native-probe-proof-20261117-v1/accepted-result.json";
-const NATIVE_PROOF_SHA: &str = "c28264ea0afdf9cf430a948c5993885debc8efe52e1d7dc9559da9cf2d30086d";
+    "/var/lib/jetstreamer/horizon239-native-probe-proof-20261117-v2/accepted-result.json";
+const NATIVE_PROOF_SHA: &str = "f7bd838986cc0f2e125ca6db7a66d4a9a597be823e57bc1f1112aa895dc18d40";
+const NATIVE_PROBE_BINARY_SHA: &str =
+    "a4b0283540f269b0b37365ae3d10d7d62cb8fd6687c1e305fd6422c5473b1ed5";
+const LEASE_SCOPE: &str = "/home/ubuntu/.jetstreamer-private/destination-cc16e4ac982549c49990203164025f5c92247f275e6530e0654ed82c45a07519";
 const PRIVATE: &str =
     "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1";
 const ARCHIVE: &str = "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1/output/epoch-239.jet";
@@ -32,24 +35,20 @@ const ARCHIVE_SHA: &str = "d530332035fa1765f4f222c3df6ff9aa5825817c2be5ff0dc27f7
 const ARCHIVE_BYTES: u64 = 161_186_911_272;
 const HASH_REPORT: &str =
     "/home/ubuntu/.codex/diagnostics/horizon-239-private-archive-hash-20261117.txt";
-const GUARD_BINARY: &str = "/var/lib/jetstreamer/horizon239-current-import-guard-20261117-v3/jetstreamer-horizon-standalone-guard";
-const GUARD_SHA: &str = "0fa0ec800d581c2583299e8c791566114169e889e16f76f461a83d3b921c0b0f";
+const GUARD_BINARY: &str = "/var/lib/jetstreamer/horizon239-current-import-guard-20261117-v4/jetstreamer-horizon-standalone-guard";
+const GUARD_SHA: &str = "f2ac0a5ba99438238425a5b44105f48bcef4961b6b5b4987a0fb8819c7f455b3";
 const R2_BINARY: &str =
     "/var/lib/jetstreamer/horizon-status240243-cleanup-production-SDK2451-v1/jetstreamer-r2";
 const R2_SHA: &str = "2e718f08c3cd072c40f79dbb85f35fd59864aedc26782fcfd89a031a7ff67c07";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24";
-const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon239-current-import-operator-20261117-v2/horizon-epoch239-import-operator";
-const STATE: &str = "/var/lib/jetstreamer/horizon239-current-import-operator-state-20261117-v2";
-const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon239-current-import-protective-20261117-v2";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon239-current-import-tokens-20261117-v2";
+const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon239-current-import-operator-20261117-v3/horizon-epoch239-import-operator";
+const STATE: &str = "/var/lib/jetstreamer/horizon239-current-import-operator-state-20261117-v3";
+const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon239-current-import-protective-20261117-v3";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon239-current-import-tokens-20261117-v3";
 const RECEIPTS: &str =
-    "/var/lib/jetstreamer/horizon239-current-import-protective-receipts-20261117-v2";
-const PRIOR_IMPORT_INVOCATION: &str = "9a96e4be2f904029b4da7478b420c71b";
-const PRIOR_GUARD_SAMPLE: &str = "/var/lib/jetstreamer/horizon239-current-import-protective-receipts-20261117-v1/sample-02e002b8b32a41e3a52c0e298a6729cc.json";
-const PRIOR_GUARD_SAMPLE_SHA: &str =
-    "2bc2b9712188ee4b8cbb7bf1982937db0992451c7cd0a7145fc2e454445c0e1b";
+    "/var/lib/jetstreamer/horizon239-current-import-protective-receipts-20261117-v3";
 const ROOT_CAP: u64 = 206_158_430_208;
 const FLOOR: u64 = 2_000_000_000_000;
 const THREE_REPLAY_OBLIGATION: u64 = 980_221_169_664;
@@ -189,6 +188,11 @@ fn check_static() -> Result<()> {
             1 << 20,
         ),
         (NATIVE_PROOF.to_owned(), NATIVE_PROOF_SHA, 1 << 20),
+        (
+            format!("{IMPORT_PACKAGE}/horizon-epoch239-import-source"),
+            NATIVE_PROBE_BINARY_SHA,
+            4 << 20,
+        ),
         (GUARD_BINARY.to_owned(), GUARD_SHA, 4 << 20),
         (R2_BINARY.to_owned(), R2_SHA, 64 << 20),
         (SEALER.to_owned(), SEALER_SHA, 4 << 20),
@@ -200,10 +204,17 @@ fn check_static() -> Result<()> {
     }
     let proof = private_json(Path::new(NATIVE_PROOF), 1 << 20)?;
     ensure!(
-        proof["schema"] == "horizon-epoch239-native-namespace-proof-v1"
+        proof["schema"] == "horizon-epoch239-native-namespace-proof-v2"
             && proof["all_masks_read_only"] == true
             && proof["source_and_destination_same_device"] == true
             && proof["source_and_destination_mounts_writable"] == true
+            && proof["lease_mount_writable"] == true
+            && proof["lease_scope"] == LEASE_SCOPE
+            && proof["import_unit_sha256"] == IMPORT_SERVICE_SHA
+            && proof["probe_binary_sha256"] == NATIVE_PROBE_BINARY_SHA
+            && proof["preparation_sha256"] == PREPARATION_SHA
+            && proof["probe_result"] == "success"
+            && proof["probe_exit_status"] == 0
             && proof["mask_count"] == 1572
             && proof["archive_mutations"] == false
             && proof["remote_mutations"] == false,
@@ -217,6 +228,10 @@ fn check_static() -> Result<()> {
         source["source"]["archive"]["sha256"] == ARCHIVE_SHA
             && source["source"]["archive"]["bytes"] == ARCHIVE_BYTES
             && source["unit_sha256"] == IMPORT_SERVICE_SHA
+            && source["unit"] == IMPORT_UNIT
+            && source["read_only_masks"]
+                .as_array()
+                .is_some_and(|masks| masks.len() == 1572 && !masks.iter().any(|p| p == LEASE_SCOPE))
             && source["first_guard_token_directory"] == TOKENS,
         "import preparation changed"
     );
@@ -272,51 +287,6 @@ fn no_other_public_importer() -> Result<()> {
         );
     }
     Ok(())
-}
-
-fn exact_failed_prestart_retry(importer: &BTreeMap<String, String>) -> Result<bool> {
-    if field(importer, "LoadState")? == "not-found" {
-        ensure!(
-            field(importer, "ActiveState")? == "inactive",
-            "unknown importer state"
-        );
-        return Ok(false);
-    }
-    ensure!(
-        field(importer, "LoadState")? == "loaded"
-            && field(importer, "ActiveState")? == "failed"
-            && field(importer, "SubState")? == "failed"
-            && field(importer, "InvocationID")? == PRIOR_IMPORT_INVOCATION
-            && field(importer, "Result")? == "signal"
-            && field(importer, "NRestarts")? == "0"
-            && field(importer, "MainPID")? == "0"
-            && field(importer, "ExecMainStartTimestamp")?.is_empty(),
-        "prior importer is not the exact stopped prestart attempt"
-    );
-    ensure!(
-        digest(Path::new(PRIOR_GUARD_SAMPLE), 1 << 20)? == PRIOR_GUARD_SAMPLE_SHA,
-        "prior first guard sample changed"
-    );
-    let prior: Value = private_json(Path::new(PRIOR_GUARD_SAMPLE), 1 << 20)?;
-    ensure!(
-        prior["producer_invocation_id"] == PRIOR_IMPORT_INVOCATION
-            && prior["producer"]["sub"] == "start-pre"
-            && prior["root_physical_observation"].is_null()
-            && prior["root_physical_observation_error"].is_null()
-            && prior["trip_reason"].is_null(),
-        "prior guard failure does not match the repaired condition"
-    );
-    ensure!(
-        !Path::new(&format!("{TOKENS}/{PRIOR_IMPORT_INVOCATION}/guard-admission.json")).exists()
-            && !Path::new("/var/lib/jetstreamer/horizon239-current-import-operator-state-20261117-v1/guarded-startup-handoff.json").exists(),
-        "prior importer received a token or handoff"
-    );
-    let timer = fields("horizon-import-239-protective-20261117-v1.timer")?;
-    ensure!(
-        field(&timer, "ActiveState")? == "inactive",
-        "prior timer still active"
-    );
-    Ok(true)
 }
 
 fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
@@ -392,8 +362,21 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
             && remote["entries"][0]["state"] == "missing",
         "R2 epoch 239 is no longer missing"
     );
+    let prior = fields("horizon-import-239-current-20261117-v2.service")?;
+    let prior_timer = fields("horizon-import-239-protective-20261117-v2.timer")?;
+    ensure!(
+        field(&prior, "ActiveState")? == "failed"
+            && field(&prior, "Result")? == "exit-code"
+            && field(&prior, "NRestarts")? == "0"
+            && field(&prior_timer, "ActiveState")? == "inactive",
+        "prior lease-failed importer or timer is not safely stopped"
+    );
     let importer = fields(IMPORT_UNIT)?;
-    let failed_prestart_retry = exact_failed_prestart_retry(&importer)?;
+    ensure!(
+        field(&importer, "LoadState")? == "not-found"
+            && field(&importer, "ActiveState")? == "inactive",
+        "new importer is already installed or active"
+    );
     Ok(
         json!({"schema":"horizon239-native-import-main-admission-v1", "issued_unix_seconds":current,
         "expires_unix_seconds":current+120,"epoch":239,"Main_accepted":true,"observer":{"path":observer_path,"sha256":observer_sha},
@@ -403,7 +386,7 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
         "memory_obligation_after_bytes":obligation,"host_memory_total_bytes":total,
         "available_disk_bytes":free,"minimum_free_bytes":FLOOR,
         "import_unit":IMPORT_UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER_UNIT,
-        "exact_failed_prestart_retry":failed_prestart_retry,
+        "prior_lease_failed_attempt_stopped":true,
         "source_archive":{"path":ARCHIVE,"sha256":ARCHIVE_SHA,"bytes":ARCHIVE_BYTES,"device":fs::metadata(ARCHIVE)?.dev(),"inode":fs::metadata(ARCHIVE)?.ino()},
         "archive_mutations":false,"remote_mutations":false,"r2_mutations":false}),
     )
@@ -628,14 +611,10 @@ fn launch(observer: &Path, observer_sha: &str) -> Result<()> {
     let state = Path::new(STATE);
     directory(state, 0o700)?;
     let admission_sha = write_new(&state.join("admission.json"), &admission, 0o600)?;
-    if admission["exact_failed_prestart_retry"] == true {
-        command("/usr/bin/systemctl", &["reset-failed", IMPORT_UNIT])?;
-    } else {
-        command(
-            "/usr/bin/systemctl",
-            &["link", &format!("{IMPORT_PACKAGE}/{IMPORT_UNIT}")],
-        )?;
-    }
+    command(
+        "/usr/bin/systemctl",
+        &["link", &format!("{IMPORT_PACKAGE}/{IMPORT_UNIT}")],
+    )?;
     command("/usr/bin/systemctl", &["daemon-reload"])?;
     command("/usr/bin/systemctl", &["start", "--no-block", IMPORT_UNIT])?;
     let started = Instant::now();
@@ -720,7 +699,7 @@ mod tests {
     fn guard_profile_preserves_import_scope_and_budget() {
         assert_eq!(
             IMPORT_UNIT,
-            "horizon-import-239-current-20261117-v2.service"
+            "horizon-import-239-current-20261117-v3.service"
         );
         assert_eq!(GUARD_SHA.len(), 64);
         assert!(THREE_REPLAY_OBLIGATION + IMPORT_MEMORY_MAX + GUARD_MEMORY_MAX < 1_212_136_964_096);

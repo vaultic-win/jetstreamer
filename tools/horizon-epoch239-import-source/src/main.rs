@@ -13,11 +13,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const ROOT: &str = "/var/lib/jetstreamer/horizon239-current-import-source-20261117-v2";
-const RUNTIME: &str = "/var/lib/jetstreamer/horizon239-current-import-runtime-20261117-v2";
-const UNIT: &str = "horizon-import-239-current-20261117-v2.service";
-const PROBE_UNIT: &str = "horizon-import-239-namespace-probe-20261117-v2.service";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon239-current-import-tokens-20261117-v2";
+const ROOT: &str = "/var/lib/jetstreamer/horizon239-current-import-source-20261117-v3";
+const RUNTIME: &str = "/var/lib/jetstreamer/horizon239-current-import-runtime-20261117-v3";
+const UNIT: &str = "horizon-import-239-current-20261117-v3.service";
+const PROBE_UNIT: &str = "horizon-import-239-namespace-probe-20261117-v3.service";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon239-current-import-tokens-20261117-v3";
+const LEASE_SCOPE: &str = "/home/ubuntu/.jetstreamer-private/destination-cc16e4ac982549c49990203164025f5c92247f275e6530e0654ed82c45a07519";
 const PRIVATE: &str = "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1";
 const ARCHIVE: &str = "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1/output/epoch-239.jet";
 const SIDECAR: &str = "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1/output/epoch-239.jet.sha256";
@@ -125,7 +126,7 @@ fn masks() -> Result<Vec<PathBuf>> {
     let output = source.join("output");
     let mut masks = Vec::new();
     masks.extend(children(home)?.into_iter().filter(|p| p != &private && p != &public));
-    masks.extend(children(&private)?.into_iter().filter(|p| p != source));
+    masks.extend(children(&private)?.into_iter().filter(|p| p != source && p != Path::new(LEASE_SCOPE)));
     masks.extend(children(&public)?.into_iter().filter(|p| p.file_name().is_none_or(|n| n != "epoch-239.jet" && n != "epoch-239.jet.sha256")));
     masks.extend(children(source)?.into_iter().filter(|p| p != &output));
     masks.extend(children(&output)?.into_iter().filter(|p| p != Path::new(ARCHIVE) && p != Path::new(SIDECAR)));
@@ -133,7 +134,7 @@ fn masks() -> Result<Vec<PathBuf>> {
         ensure!(masks.iter().any(|p| p == &private.join(live)), "live replay root unmasked: {live}");
     }
     ensure!(masks.iter().all(|p| p != Path::new(ARCHIVE) && p != Path::new(SIDECAR)
-        && p != &public && p != &private && p != source && p != &output), "writable namespace accidentally masked");
+        && p != &public && p != &private && p != source && p != &output && p != Path::new(LEASE_SCOPE)), "writable namespace accidentally masked");
     Ok(masks)
 }
 
@@ -240,8 +241,12 @@ fn probe() -> Result<()> {
         ensure!(row.as_str() == path.to_str() && readonly(path)?, "unprotected mask: {}", path.display());
     }
     ensure!(!readonly(Path::new(PRIVATE))? && !readonly(Path::new(ARCHIVE))?
-        && !readonly(Path::new(SIDECAR))? && !readonly(Path::new("/home/ubuntu/horizon"))?,
-        "source or destination mount is read-only");
+        && !readonly(Path::new(SIDECAR))? && !readonly(Path::new("/home/ubuntu/horizon"))?
+        && !readonly(Path::new(LEASE_SCOPE))? && !readonly(&Path::new(LEASE_SCOPE).join("locks"))?,
+        "source, destination, or lease mount is read-only");
+    let lease = fs::symlink_metadata(Path::new(LEASE_SCOPE).join("locks"))?;
+    ensure!(lease.is_dir() && lease.uid() == 1000 && lease.mode() & 0o077 == 0,
+        "lease directory is not owner-only");
     let archive = File::open(ARCHIVE)?;
     let sidecar = File::open(SIDECAR)?;
     let destination = File::open("/home/ubuntu/horizon")?;

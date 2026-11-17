@@ -39,3 +39,9 @@ The second sealed guard measures the private root in this exact prestart state.
 The second operator accepts only the pinned failed invocation and guard sample,
 requires the old timer to be inactive and the old token absent, resets that
 unit's failed state, and uses a new guard, receipt, and admission generation.
+
+The second invocation passed that guard but the native node exited while opening
+the canonical epoch lease: its default private scope had been masked read-only.
+The third sealed unit leaves that exact lease scope writable, and its sandbox
+probe checks the lease mount alongside the source and destination mounts. Its
+new proof, guard, operator, and token generation are independently pinned.

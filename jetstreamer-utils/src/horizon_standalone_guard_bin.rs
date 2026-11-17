@@ -425,7 +425,11 @@ fn active(unit: &Unit) -> bool {
 }
 
 fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
-    plan.unit == "horizon-import-239-current-20261117-v2.service"
+    matches!(
+        plan.unit.as_str(),
+        "horizon-import-239-current-20261117-v2.service"
+            | "horizon-import-239-current-20261117-v3.service"
+    )
         && unit.active == "activating"
         && unit.sub == "start-pre"
         && unit.pid == 0
@@ -635,7 +639,11 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
-    if plan.unit == "horizon-import-239-current-20261117-v2.service" {
+    if matches!(
+        plan.unit.as_str(),
+        "horizon-import-239-current-20261117-v2.service"
+            | "horizon-import-239-current-20261117-v3.service"
+    ) {
         return cfg!(feature = "epoch239-native-import-guard")
             && plan.filesystem == Path::new("/")
             && plan.worker_root
@@ -1227,10 +1235,16 @@ mod tests {
             validate_plan(&serde_json::from_value(value.clone()).unwrap()).is_ok(),
             cfg!(feature = "epoch239-native-import-guard")
         );
+        let mut retry = value.clone();
+        retry["unit"] = json!("horizon-import-239-current-20261117-v3.service");
+        assert_eq!(
+            validate_plan(&serde_json::from_value(retry).unwrap()).is_ok(),
+            cfg!(feature = "epoch239-native-import-guard")
+        );
         for (pointer, replacement) in [
             (
                 "/unit",
-                json!("horizon-import-239-current-20261117-v3.service"),
+                json!("horizon-import-239-current-20261117-v4.service"),
             ),
             ("/filesystem", json!("/other")),
             ("/worker_root", json!("/other")),
