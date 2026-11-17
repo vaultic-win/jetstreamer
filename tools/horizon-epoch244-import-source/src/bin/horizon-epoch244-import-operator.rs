@@ -43,7 +43,7 @@ const R2_SHA: &str = "2e718f08c3cd072c40f79dbb85f35fd59864aedc26782fcfd89a031a7f
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24";
-const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v4/horizon-epoch244-import-operator";
+const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v5/horizon-epoch244-import-operator";
 const STATE: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-state-20261117-v1";
 const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon244-current-import-protective-20261117-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon244-current-import-tokens-20261117-v1";
@@ -55,10 +55,21 @@ const THREE_REPLAY_OBLIGATION: u64 = 980_221_169_664;
 const IMPORT_MEMORY_MAX: u64 = 68_719_476_736;
 const GUARD_MEMORY_MAX: u64 = 1_073_741_824;
 const MINIMUM_HOST_MEMORY_RESERVE: u64 = 64 * 1024 * 1024 * 1024;
-const VERIFIER_UNITS: [&str; 2] = [
-    "horizon-full-verify-239-current-20261117-v1.service",
-    "horizon-plugin-verify-239-current-20261117-v1.service",
+const VERIFIER_TRANSITIONS: [(&str, &str, &str, &str); 2] = [
+    (
+        "horizon-full-verify-239-current-20261117-v1.service",
+        "208d2a07f4d34cdc9a125aaae3487ec3",
+        "horizon-full-verify-239-current-20261117-v2.service",
+        "7c0afd0381fe4a5b80e699c0d5fec88b",
+    ),
+    (
+        "horizon-plugin-verify-239-current-20261117-v1.service",
+        "21d503ce8c38402a922b6235f778537d",
+        "horizon-plugin-verify-239-current-20261117-v2.service",
+        "3398bff4b3154fb8935358d3b8a48375",
+    ),
 ];
+const VERIFIER_MEMORY_MAX: u64 = 68_719_476_736;
 const LIVE: [(&str, &str); 3] = [
     ("247-247", "horizon-qualify-247-reboot-20261117-v2.service"),
     ("248-248", "horizon-qualify-248-reboot-20261117-v1.service"),
@@ -168,19 +179,38 @@ fn total_memory_bytes() -> Result<u64> {
 
 fn concurrent_verifier_memory_max_bytes() -> Result<u64> {
     let mut total = 0_u64;
-    for unit in VERIFIER_UNITS {
-        let row = fields(unit)?;
-        match field(&row, "ActiveState")? {
-            "inactive" => {}
+    for (old_unit, old_id, current_unit, current_id) in VERIFIER_TRANSITIONS {
+        let old = fields(old_unit)?;
+        ensure!(
+            field(&old, "InvocationID")? == old_id
+                && field(&old, "ActiveState")? == "failed"
+                && field(&old, "Result")? == "exit-code"
+                && field(&old, "MainPID")? == "0"
+                && field(&old, "NRestarts")? == "0",
+            "superseded verifier changed: {old_unit}"
+        );
+        let current = fields(current_unit)?;
+        ensure!(
+            field(&current, "InvocationID")? == current_id
+                && field(&current, "NRestarts")? == "0"
+                && field(&current, "MemoryMax")? == VERIFIER_MEMORY_MAX.to_string(),
+            "current verifier identity or cap changed: {current_unit}"
+        );
+        match field(&current, "ActiveState")? {
             "active" | "activating" => {
-                let cap: u64 = field(&row, "MemoryMax")?.parse()?;
                 ensure!(
-                    cap > 0 && cap < u64::MAX,
-                    "unbounded verifier memory: {unit}"
+                    field(&current, "Result")? == "success",
+                    "current verifier failed: {current_unit}"
                 );
-                total = total.checked_add(cap).context("verifier memory overflow")?;
+                total = total
+                    .checked_add(VERIFIER_MEMORY_MAX)
+                    .context("verifier memory overflow")?;
             }
-            state => anyhow::bail!("unresolved verifier state {unit}: {state}"),
+            "inactive" => ensure!(
+                field(&current, "Result")? == "success",
+                "current verifier ended unsuccessfully: {current_unit}"
+            ),
+            state => anyhow::bail!("unresolved verifier state {current_unit}: {state}"),
         }
     }
     Ok(total)
