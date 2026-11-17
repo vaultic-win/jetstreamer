@@ -424,6 +424,13 @@ fn active(unit: &Unit) -> bool {
     ) && unit.pid != 0
 }
 
+fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
+    plan.unit == "horizon-import-239-current-20261117-v2.service"
+        && unit.active == "activating"
+        && unit.sub == "start-pre"
+        && unit.pid == 0
+}
+
 fn stop_if_bound<F>(unit: &Unit, expected_invocation: &str, stop: F) -> Result<()>
 where
     F: FnOnce() -> Result<()>,
@@ -888,7 +895,7 @@ fn run() -> Result<()> {
     // never evidence that the unit has no worker.
     let error = observed_workers.as_ref().err().map(ToString::to_string);
     let worker_list = observed_workers.unwrap_or_default();
-    let root_observation = if active(&before) {
+    let root_observation = if active(&before) || observe_root_for_import_prestart(&plan, &before) {
         plan.maximum_root_physical_bytes
             .map(|limit| root_budget::observe(&plan.worker_root, limit))
     } else {
@@ -1284,6 +1291,41 @@ mod tests {
         fs::remove_file(proc.join("exe")).unwrap();
         symlink("/other/jetstreamer-node", proc.join("exe")).unwrap();
         assert!(import239_workers_from_roots(&unit, &roots.0, &roots.1, node).is_err());
+    }
+
+    #[test]
+    fn epoch239_import_prestart_still_measures_its_physical_root() {
+        let plan: Plan = serde_json::from_value(json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-import-239-current-20261117-v2.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/",
+            "minimum_free_bytes": 2_000_000_000_000u64,
+            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1",
+            "maximum_worker_vmas": 3_500_000,
+            "maximum_root_physical_bytes": 206_158_430_208u64,
+            "receipt_directory": "/sealed/receipts"
+        }))
+        .unwrap();
+        let mut unit = Unit {
+            load_state: "loaded".into(),
+            invocation_id: "a".repeat(32),
+            active: "activating".into(),
+            sub: "start-pre".into(),
+            result: "success".into(),
+            restarts: 0,
+            restart_policy: "no".into(),
+            kill_mode: "control-group".into(),
+            delegated: false,
+            cgroup: "/system.slice/import.service".into(),
+            pid: 0,
+        };
+        assert!(observe_root_for_import_prestart(&plan, &unit));
+        unit.sub = "running".into();
+        assert!(!observe_root_for_import_prestart(&plan, &unit));
+        unit.sub = "start-pre".into();
+        unit.active = "failed".into();
+        assert!(!observe_root_for_import_prestart(&plan, &unit));
     }
 
     #[test]

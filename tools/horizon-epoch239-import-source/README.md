@@ -31,3 +31,11 @@ the token leaves the importer unable to pass its prestart gate.
 The operator does not upload, delete, or mutate R2. The running importer and
 its protective timer still need operational observation, native import
 completion checks, full/plugin/boundary verification, and R2 delivery.
+
+The first launch's guard sampled the importer during systemd `start-pre`, when
+`MainPID` is zero. That sample had no physical-root measurement, so the operator
+withheld its token and the invocation was stopped before the native command.
+The second sealed guard measures the private root in this exact prestart state.
+The second operator accepts only the pinned failed invocation and guard sample,
+requires the old timer to be inactive and the old token absent, resets that
+unit's failed state, and uses a new guard, receipt, and admission generation.
