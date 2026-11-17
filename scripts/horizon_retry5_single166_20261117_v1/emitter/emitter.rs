@@ -12,7 +12,7 @@ use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
-const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-retry5-166-emitter-20261117-v1/emitter";
+const IMAGE: &str = "/usr/local/lib/jetstreamer/horizon-retry6-166-emitter-20261117-v1/emitter";
 const THREAD: &str = "01a1af2a-9ce8-76a2-8939-b2112bd38f53";
 const DATA: u64 = 6_229_838_610_226;
 const MEMORY: u64 = 759_789_531_136;
@@ -218,6 +218,12 @@ fn candidate_template(c: &Value, epoch: u64) -> Result<Value> {
             ensure!(epoch == 166, "retry5 is exact166 only");
             Ok(serde_json::from_str(include_str!(
                 "epoch166.RETRY5_PLAN.SOURCE_TEMPLATE.json"
+            ))?)
+        }
+        Some("local3retry6") => {
+            ensure!(epoch == 166, "retry6 is exact166 only");
+            Ok(serde_json::from_str(include_str!(
+                "epoch166.RETRY6_PLAN.SOURCE_TEMPLATE.json"
             ))?)
         }
         _ => anyhow::bail!("unqualified attempt"),
@@ -615,6 +621,17 @@ fn live_peers(event: &Value, current: &Value, candidate: u64) -> Result<(Vec<Val
         );
         if !seen.contains(&e) {
             closed(native)?;
+        }
+    }
+    if current["complete_metadata_unit_census"].is_object() {
+        for unit in [
+            "horizon-qualify-166-replacement-local3retry5-20261110-v1.service",
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.service",
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.timer",
+        ] {
+            if let Some(native) = current["complete_metadata_unit_census"].get(unit) {
+                closed(native)?;
+            }
         }
     }
     let [replays, bootstraps] = result;
@@ -1020,5 +1037,26 @@ mod retry4_tests {
             peer_unit(169),
             "horizon-qualify-169-replacement-local3retry3-20261110-v1.service"
         );
+    }
+
+    #[test]
+    fn retry6_template_is_disjoint_and_binds_failed_retry5() {
+        let t = candidate_template(&json!({"attempt":"local3retry6"}), 166).unwrap();
+        assert_eq!(t["attempt"], "local3retry6");
+        assert_eq!(
+            t["retry5"]["failed_retry5"]["sha256"],
+            "04b669f00269fa7995e8fb8175fd4a8a226279f224a06bae16600ae8d6927b9e"
+        );
+        assert_eq!(
+            t["data_fulfillment"]["runtime"]["sha256"],
+            "f38032a7655503fe39d62a17507d0e8dd30e286491612ea69f32ffbb97943258"
+        );
+        assert!(
+            t["fresh_subtree"]
+                .as_str()
+                .unwrap()
+                .contains("local3retry6")
+        );
+        assert!(candidate_template(&json!({"attempt":"local3retry6"}), 167).is_err());
     }
 }
