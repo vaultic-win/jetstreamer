@@ -467,12 +467,72 @@ fn cgroup_pids(root: &Path) -> Result<Vec<u32>> {
 }
 
 fn workers(unit: &Unit, worker_root: &Path) -> Result<Vec<(u32, u64)>> {
+    if worker_root
+        == Path::new(
+            "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1",
+        )
+    {
+        return import239_workers(unit);
+    }
     workers_from_roots(
         unit,
         worker_root,
         Path::new("/sys/fs/cgroup"),
         Path::new("/proc"),
     )
+}
+
+fn import239_workers(unit: &Unit) -> Result<Vec<(u32, u64)>> {
+    const NODE: &str =
+        "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-node";
+    import239_workers_from_roots(
+        unit,
+        Path::new("/sys/fs/cgroup"),
+        Path::new("/proc"),
+        Path::new(NODE),
+    )
+}
+
+fn import239_workers_from_roots(
+    unit: &Unit,
+    cgroup_root: &Path,
+    proc_root: &Path,
+    node: &Path,
+) -> Result<Vec<(u32, u64)>> {
+    ensure!(
+        unit.cgroup.starts_with('/')
+            && !unit.cgroup.starts_with("//")
+            && unit.cgroup != "/"
+            && !unit
+                .cgroup
+                .split('/')
+                .any(|part| part == "." || part == ".."),
+        "unsafe importer cgroup path"
+    );
+    let mut workers = Vec::new();
+    for pid in cgroup_pids(&cgroup_root.join(&unit.cgroup[1..]))? {
+        let process = proc_root.join(pid.to_string());
+        let executable = match fs::read_link(process.join("exe")) {
+            Ok(path) => path,
+            Err(error) if matches!(error.raw_os_error(), Some(libc::ENOENT | libc::ESRCH)) => {
+                continue;
+            }
+            Err(error) => return Err(error.into()),
+        };
+        if executable
+            .file_name()
+            .is_some_and(|name| name == "jetstreamer-node")
+        {
+            ensure!(executable == node, "importer node executable changed");
+            let maps = fs::read_to_string(process.join("maps"))?;
+            workers.push((pid, maps.lines().count() as u64));
+        }
+    }
+    ensure!(
+        unit.sub != "running" || (workers.len() == 1 && workers[0].0 as u64 == unit.pid),
+        "running importer node is missing or ambiguous"
+    );
+    Ok(workers)
 }
 
 fn workers_from_roots(
@@ -1178,6 +1238,52 @@ mod tests {
                 "{pointer}"
             );
         }
+    }
+
+    #[test]
+    fn epoch239_import_guard_tracks_the_real_node_after_start_pre() {
+        use std::os::unix::fs::symlink;
+        let temp = tempfile::tempdir().unwrap();
+        let cg = temp.path().join("cg/system.slice/import.service");
+        let proc = temp.path().join("proc/42");
+        fs::create_dir_all(&cg).unwrap();
+        fs::create_dir_all(&proc).unwrap();
+        fs::write(cg.join("cgroup.procs"), "42\n").unwrap();
+        fs::write(proc.join("maps"), "first\nsecond\n").unwrap();
+        let node = Path::new(
+            "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-node",
+        );
+        symlink(node, proc.join("exe")).unwrap();
+        let mut unit = Unit {
+            load_state: "loaded".into(),
+            invocation_id: "a".repeat(32),
+            active: "active".into(),
+            sub: "running".into(),
+            result: "success".into(),
+            restarts: 0,
+            restart_policy: "no".into(),
+            kill_mode: "control-group".into(),
+            delegated: false,
+            cgroup: "/system.slice/import.service".into(),
+            pid: 42,
+        };
+        let roots = (temp.path().join("cg"), temp.path().join("proc"));
+        assert_eq!(
+            import239_workers_from_roots(&unit, &roots.0, &roots.1, node).unwrap(),
+            vec![(42, 2)]
+        );
+        fs::remove_file(proc.join("exe")).unwrap();
+        symlink("/usr/bin/sleep", proc.join("exe")).unwrap();
+        assert!(import239_workers_from_roots(&unit, &roots.0, &roots.1, node).is_err());
+        unit.sub = "start-pre".into();
+        assert!(
+            import239_workers_from_roots(&unit, &roots.0, &roots.1, node)
+                .unwrap()
+                .is_empty()
+        );
+        fs::remove_file(proc.join("exe")).unwrap();
+        symlink("/other/jetstreamer-node", proc.join("exe")).unwrap();
+        assert!(import239_workers_from_roots(&unit, &roots.0, &roots.1, node).is_err());
     }
 
     #[test]
