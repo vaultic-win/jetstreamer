@@ -37,7 +37,7 @@ mod retry_path;
 use local::LocalInputs;
 use profile::{Profile, profile};
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-retry5-zeroowner-prepare-20261117-v2/prepare";
+    "/usr/local/lib/jetstreamer/horizon-retry6-zeroowner-prepare-20261117-v1/prepare";
 const EVENT: &str = "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/ORIGINAL_SEVEN_RESERVE_STOPS_AND_REPAIR_MODEL.json";
 const EVENT_SHA: &str = "b3bff5d44d24dc507313d8dfdb8e5cd5bec50a7732b288327106ee20b7a7b0eb";
 const AUTHORITY: &str = "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json";
@@ -52,7 +52,7 @@ const MEMORY: u64 = 759_789_531_136;
 const RESERVE: u64 = 17_179_869_184;
 const ROOT_CAP: u64 = 309_237_645_312;
 const THREAD: &str = "01a1af2a-9ce8-76a2-8939-b2112bd38f53";
-const OUT: &str = "/var/lib/jetstreamer/retry3-preparation-20261113-v1";
+const OUT: &str = "/var/lib/jetstreamer/retry6-preparation-20261117-v1";
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
