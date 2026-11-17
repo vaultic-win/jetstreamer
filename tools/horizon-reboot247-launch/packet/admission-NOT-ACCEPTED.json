@@ -1,0 +1,96 @@
+{
+  "Main_accepted": false,
+  "actual_executing_before": 0,
+  "all_other_obligations_preserved": false,
+  "boot_id": "REPLACE",
+  "candidate_control_memory_bytes": 1610612736,
+  "candidate_epoch": 247,
+  "candidate_memory_high_bytes": 167361060864,
+  "candidate_memory_max_bytes": 251041591296,
+  "candidate_root_cap_bytes": 506191984640,
+  "capacity": {
+    "path": "REPLACE_WITH_ROOT_OWNED_EVIDENCE_PATH",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "census": {
+    "path": "REPLACE_WITH_ROOT_OWNED_EVIDENCE_PATH",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "century_floor_bytes": null,
+  "complete_native_census_reviewed": false,
+  "evidence_claims": {
+    "capacity": {
+      "candidate_control_memory_bytes": "/candidate_control_memory_bytes",
+      "candidate_memory_high_bytes": "/candidate_memory_high_bytes",
+      "candidate_memory_max_bytes": "/candidate_memory_max_bytes",
+      "candidate_root_cap_bytes": "/candidate_root_cap_bytes",
+      "century_floor_bytes": "/century_floor_bytes",
+      "guard_minimum_free_bytes": "/guard_minimum_free_bytes",
+      "memory_obligation_after_bytes": "/memory_obligation_after_bytes",
+      "proposed_replay_lanes": "/proposed_replay_lanes",
+      "required_initial_free_bytes": "/required_initial_free_bytes"
+    },
+    "census": {
+      "actual_executing_before": "/actual_executing_before",
+      "boot_id": "/boot_id",
+      "initializing_before": "/initializing_before"
+    },
+    "fleet": {
+      "actual_executing_before": "/actual_executing_before",
+      "initializing_before": "/initializing_before",
+      "proven_operating_count": "/proven_operating_count"
+    },
+    "observer": {
+      "host_memory_total_bytes": "/host_memory_total_bytes",
+      "observed_available_bytes": "/observed_available_bytes",
+      "observer_unix_seconds": "/observer_unix_seconds"
+    },
+    "owner": {
+      "boot_id": "/boot_id",
+      "main_controller_pid": "/main_controller_pid",
+      "main_controller_start_ticks": "/main_controller_start_ticks"
+    }
+  },
+  "expires_unix_seconds": 0,
+  "first_guard_before_useful_work_required": true,
+  "fleet": {
+    "path": "REPLACE_WITH_ROOT_OWNED_EVIDENCE_PATH",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "guard_minimum_free_bytes": null,
+  "guard_unit": "horizon-247-reboot-20261117-protective-v2.service",
+  "host_memory_total_bytes": null,
+  "initializing_before": 0,
+  "interrupted247_preserved": false,
+  "interruption": {
+    "path": "REPLACE_WITH_ROOT_OWNED_INTERRUPTION_PROOF",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "issued_unix_seconds": 0,
+  "launch_plan": {
+    "path": "/home/ubuntu/workspace/horizon-reboot247-launch-source-20261117-v1/packet/launch-plan.json",
+    "sha256": "8bdaa764f4cfbe6caad1d391676a8e725684d2b77de763e0814c6b1a5dfac7f6"
+  },
+  "launcher_unit": "REPLACE_WITH_EXACT_LAUNCHER_UNIT.service",
+  "main_controller_pid": 0,
+  "main_controller_start_ticks": 0,
+  "memory_obligation_after_bytes": null,
+  "no_overlapping_campaign_controller": false,
+  "observed_available_bytes": null,
+  "observer": {
+    "path": "REPLACE_WITH_ROOT_OWNED_EVIDENCE_PATH",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "observer_unix_seconds": 0,
+  "owner": {
+    "path": "REPLACE_WITH_ROOT_OWNED_EVIDENCE_PATH",
+    "sha256": "REPLACE_WITH_SHA256"
+  },
+  "producer_unit": "horizon-qualify-247-reboot-20261117-v2.service",
+  "proposed_replay_lanes": 1,
+  "proven_operating_count": 3,
+  "required_initial_free_bytes": null,
+  "schema": "horizon247-reboot-main-admission-v1",
+  "timer_unit": "horizon-247-reboot-20261117-protective-v2.timer",
+  "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2"
+}
