@@ -10,3 +10,19 @@ native namespace probe, fresh fleet admission, and invocation-bound first guard
 sample are required before native import. Completion still requires independent
 full, plugin, and boundary verification, authenticated R2 delivery, and local
 cleanup.
+
+## Guarded import operator
+
+`horizon-epoch244-import-operator` is the invocation-bound launch route for the
+sealed source unit. Its `inspect` command checks the native namespace proof,
+archive identity, live three-lane observer, memory and disk admission, and R2
+absence without starting the importer. Its `launch` command uses the same checks,
+starts the source unit, seals a guard plan bound to the actual systemd invocation,
+arms the protective timer, validates the first genuine guard result during the
+60-second pre-start window, and seals a readable token under that invocation ID.
+The unit's remaining pre-start checks require that exact token before native work.
+
+Run `inspect` again with the latest coordinated observer receipt and its SHA-256
+immediately before launch. The operator rejects a sample more than 30 minutes old.
+The sealed operator and guard binary are separate from the source-only renderer;
+their exact deployment paths and hashes are recorded in their seal receipts.
