@@ -22,7 +22,7 @@ pub(super) fn require_fresh_start(epoch: u64, attempt: &str, existing: bool) -> 
         !(selected(epoch, attempt)
             || ([166, 167, 169, 170].contains(&epoch)
                 && ["local3retry3", "local3retry4"].contains(&attempt))
-            || (epoch == 166 && attempt == "local3retry5"))
+            || (epoch == 166 && ["local3retry5", "local3retry6"].contains(&attempt)))
             || !existing,
         "selected local3 retry requires a new empty subtree, not staged/in-place reuse"
     );

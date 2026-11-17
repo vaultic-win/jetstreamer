@@ -4,6 +4,8 @@ pub(super) const RUNTIME: &str =
     "/usr/local/lib/jetstreamer/horizon-retry4-166-data-guard-20261114-v1/guard";
 pub(super) const RETRY5_RUNTIME: &str =
     "/usr/local/lib/jetstreamer/horizon-retry5-166-data-guard-20261117-v1/guard";
+pub(super) const RETRY6_RUNTIME: &str =
+    "/usr/local/lib/jetstreamer/horizon-retry6-166-data-guard-20261117-v1/guard";
 const LEGACY_RUNTIME: &str =
     "/usr/local/lib/jetstreamer/horizon-retry3-data-guard-20261113-v1/guard";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
@@ -20,7 +22,8 @@ pub(super) fn shape(r: &Request) -> Result<()> {
         [
             Path::new(RUNTIME),
             Path::new(LEGACY_RUNTIME),
-            Path::new(RETRY5_RUNTIME)
+            Path::new(RETRY5_RUNTIME),
+            Path::new(RETRY6_RUNTIME)
         ]
         .contains(&r.runtime.path.as_path())
             && lower_hex(&r.runtime.sha256, 64),

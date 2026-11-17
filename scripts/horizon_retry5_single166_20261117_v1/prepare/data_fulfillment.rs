@@ -939,8 +939,7 @@ fn scope(s: &Scope<'_>) -> Result<()> {
     let date = if e < 171 { "20261109" } else { "20261110" };
     ensure!(
         (166..=172).contains(&e)
-            && (!["local3retry4", "local3retry5", "local3retry6"].contains(&namespace)
-                || e == 166)
+            && (!["local3retry4", "local3retry5", "local3retry6"].contains(&namespace) || e == 166)
             && (namespace == "local2" || [166, 167, 169, 170].contains(&e))
             && s.unit == format!("horizon-qualify-{e}-replacement-{namespace}-20261110-v1.service")
             && s.worker_root
@@ -1033,7 +1032,8 @@ pub(super) fn observe_preparation(
                 Path::new(
                     "/usr/local/lib/jetstreamer/horizon-retry4-166-data-guard-20261114-v1/guard"
                 ),
-                Path::new(crate::prelaunch_data::RETRY5_RUNTIME)
+                Path::new(crate::prelaunch_data::RETRY5_RUNTIME),
+                Path::new(crate::prelaunch_data::RETRY6_RUNTIME)
             ]
             .contains(&qualified_guard.path.as_path()),
         "exact prelaunch filesystem and qualified successor guard required"
@@ -1295,7 +1295,8 @@ mod tests {
             s.raw_floor = FLOOR;
             assert!(scope(&s).is_err());
             s.raw_floor = CURRENT_FLOOR;
-            s.worker_root = Path::new("/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1");
+            s.worker_root =
+                Path::new("/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1");
             assert!(scope(&s).is_err());
         }
     }

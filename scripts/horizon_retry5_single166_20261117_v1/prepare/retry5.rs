@@ -17,6 +17,16 @@ const LOCAL2: &str =
 const LOCAL2_SHA: &str = "08d07989b1121674e63c79a330a27586431dd89ada83e93b6893bd9428f86514";
 const OLD_UNIT: &str = "horizon-qualify-166-replacement-local3retry4-20261110-v1.service";
 const OLD_IID: &str = "58778e77980e4a15828c3be837e447aa";
+const FAILED_RETRY5: &str = "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch166/local3retry5/guard-state/receipts/sample-5b03cac176234482a2afd31bcbf3cdec.json";
+const FAILED_RETRY5_SHA: &str = "04b669f00269fa7995e8fb8175fd4a8a226279f224a06bae16600ae8d6927b9e";
+const FAILED_RETRY5_IID: &str = "4e97705db1b04ab3846a2857e0db158b";
+const FAILED_RETRY5_STOP: &str = "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch166/local3retry5/guard-state/receipts/stop-completion.json";
+const FAILED_RETRY5_STOP_SHA: &str =
+    "7b08bb184942fd5f43274dbe25a0eb29e9514ff87e40456480013df4535f1bef";
+const FAILED_RETRY5_SETUP: &str =
+    "/var/lib/jetstreamer/retry5-single166-guarded-launch-20261117-v1/epoch166/FAILED_SETUP.json";
+const FAILED_RETRY5_SETUP_SHA: &str =
+    "246b64c2451b6e568b2d03cfadb1a5fe48a8e1f13699c80b6904f3ef75b3fccd";
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -26,6 +36,8 @@ pub(super) struct Request {
     pub prior_admission: Bound,
     pub retired_retry4: Bound,
     pub retired_local2_partial: Bound,
+    #[serde(default)]
+    pub failed_retry5: Option<Bound>,
 }
 
 fn exact(path: &str, sha256: &str) -> Bound {
@@ -36,14 +48,14 @@ fn exact(path: &str, sha256: &str) -> Bound {
 }
 
 pub(super) fn selected(p: &Plan) -> bool {
-    p.epoch == 166 && p.attempt == "local3retry5"
+    p.epoch == 166 && ["local3retry5", "local3retry6"].contains(&p.attempt.as_str())
 }
 
 pub(super) fn shape(p: &Plan) -> Result<()> {
     if !selected(p) {
         ensure!(
-            p.attempt != "local3retry5" && p.retry5.is_none(),
-            "retry5 is exact166 only"
+            !["local3retry5", "local3retry6"].contains(&p.attempt.as_str()) && p.retry5.is_none(),
+            "retry5 lineage is exact166 only"
         );
         return Ok(());
     }
@@ -60,13 +72,22 @@ pub(super) fn shape(p: &Plan) -> Result<()> {
         "retry5 exact predecessor or retirement binding differs"
     );
     ensure!(
+        if p.attempt == "local3retry6" {
+            r.failed_retry5 == Some(exact(FAILED_RETRY5, FAILED_RETRY5_SHA))
+        } else {
+            r.failed_retry5.is_none()
+        },
+        "retry6 requires exact failed retry5 guard sample"
+    );
+    ensure!(
         p.existing_preparation.is_none()
             && p.retry4.is_none()
             && p.fresh_subtree
-                == Path::new(
-                    "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1"
-                ),
-        "retry5 requires a fresh disjoint root"
+                == Path::new(&format!(
+                    "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-{}-20261110-v1",
+                    p.attempt
+                )),
+        "retry5/retry6 requires a fresh disjoint root"
     );
     for unit in [
         OLD_UNIT,
@@ -79,11 +100,28 @@ pub(super) fn shape(p: &Plan) -> Result<()> {
             "retired producer or guard omitted"
         );
     }
+    if p.attempt == "local3retry6" {
+        for unit in [
+            "horizon-qualify-166-replacement-local3retry5-20261110-v1.service",
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.service",
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.timer",
+        ] {
+            ensure!(
+                p.closed_units.iter().any(|candidate| candidate == unit),
+                "failed retry5 owner omitted"
+            );
+        }
+    }
+    let required_guard = if p.attempt == "local3retry6" {
+        prelaunch_data::RETRY6_RUNTIME
+    } else {
+        prelaunch_data::RETRY5_RUNTIME
+    };
     ensure!(
         p.data_fulfillment
             .as_ref()
-            .is_some_and(|r| r.runtime.path == Path::new(prelaunch_data::RETRY5_RUNTIME)),
-        "retry5 requires its own qualified successor DATA guard"
+            .is_some_and(|r| r.runtime.path == Path::new(required_guard)),
+        "retry5/retry6 requires its exact qualified successor DATA guard"
     );
     Ok(())
 }
@@ -158,8 +196,37 @@ pub(super) fn authenticate(p: &Plan) -> Result<Value> {
         digest(&raw(&receipt.path, 1 << 20, false)?) == receipt.sha256,
         "local2 cleanup receipt differs"
     );
+    let failed_retry5 = if p.attempt == "local3retry6" {
+        let sample_binding = r.failed_retry5.as_ref().context("failed retry5 binding")?;
+        let sample = bound(sample_binding)?;
+        let stop_binding = exact(FAILED_RETRY5_STOP, FAILED_RETRY5_STOP_SHA);
+        let stop = bound(&stop_binding)?;
+        let setup_binding = exact(FAILED_RETRY5_SETUP, FAILED_RETRY5_SETUP_SHA);
+        let setup = bound(&setup_binding)?;
+        ensure!(
+            sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+                && sample["producer_invocation_id"] == FAILED_RETRY5_IID
+                && sample["trip_reason"] == "DATA-fulfillment-observation-failed"
+                && sample["DATA_fulfillment_observation_error"]
+                    == "exact admitted local2 or selected local3 unit required"
+                && stop["schema"] == "jetstreamer-horizon-standalone-stop-completion-v1"
+                && stop["producer_invocation_id"] == FAILED_RETRY5_IID
+                && stop["plan_sha256"] == sample["plan_sha256"]
+                && stop["scratch_deleted"] == false
+                && setup["error"] == "guard sample DATA or identity proof invalid"
+                && setup["guard_timer_start_confirmed"] == true
+                && setup["originals_preserved"] == true,
+            "retry5 failed guard and stop evidence differs"
+        );
+        Some(
+            json!({"sample":sample_binding,"stop":stop_binding,"setup":setup_binding,
+            "producer_invocation_id":FAILED_RETRY5_IID,"partial_reuse":false}),
+        )
+    } else {
+        None
+    };
     Ok(
-        json!({"terminal_event":r.terminal_event,"prior_preparation":r.prior_preparation,"prior_admission":r.prior_admission,"retired_retry4":r.retired_retry4,"retired_local2_partial":r.retired_local2_partial,"old_retry4_invocation_id":OLD_IID,"old_partial_reuse":false,"resource_credit_bytes":0}),
+        json!({"terminal_event":r.terminal_event,"prior_preparation":r.prior_preparation,"prior_admission":r.prior_admission,"retired_retry4":r.retired_retry4,"retired_local2_partial":r.retired_local2_partial,"old_retry4_invocation_id":OLD_IID,"failed_retry5":failed_retry5,"old_partial_reuse":false,"resource_credit_bytes":0}),
     )
 }
 
@@ -180,6 +247,7 @@ mod tests {
             prior_admission: exact(ADMISSION, ADMISSION_SHA),
             retired_retry4: exact(RETIREMENT, RETIREMENT_SHA),
             retired_local2_partial: exact(LOCAL2, LOCAL2_SHA),
+            failed_retry5: None,
         });
         p.fresh_subtree = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1".into();
         p.closed_units.extend([
@@ -195,6 +263,25 @@ mod tests {
                 .parent()
                 .unwrap()
                 .join("deployment-seal-receipt.json");
+        p
+    }
+
+    fn retry6_plan() -> Plan {
+        let mut p = plan();
+        p.attempt = "local3retry6".into();
+        p.retry5.as_mut().unwrap().failed_retry5 = Some(exact(FAILED_RETRY5, FAILED_RETRY5_SHA));
+        p.fresh_subtree = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1".into();
+        p.closed_units.extend([
+            "horizon-qualify-166-replacement-local3retry5-20261110-v1.service".into(),
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.service".into(),
+            "horizon-guard-replacement-166-local3retry5-20261110-v1.timer".into(),
+        ]);
+        let data = p.data_fulfillment.as_mut().unwrap();
+        data.runtime.path = prelaunch_data::RETRY6_RUNTIME.into();
+        data.runtime_seal.path = Path::new(prelaunch_data::RETRY6_RUNTIME)
+            .parent()
+            .unwrap()
+            .join("deployment-seal-receipt.json");
         p
     }
 
@@ -221,5 +308,29 @@ mod tests {
         let result = authenticate(&plan()).unwrap();
         assert_eq!(result["old_retry4_invocation_id"], OLD_IID);
         assert_eq!(result["old_partial_reuse"], false);
+    }
+
+    #[test]
+    fn retry6_requires_failed_retry5_lineage_and_closed_units() {
+        let mut p = retry6_plan();
+        shape(&p).unwrap();
+        p.retry5.as_mut().unwrap().failed_retry5 = None;
+        assert!(shape(&p).is_err());
+        let mut p = retry6_plan();
+        p.closed_units.pop();
+        assert!(shape(&p).is_err());
+        let mut p = retry6_plan();
+        p.data_fulfillment.as_mut().unwrap().runtime.path = prelaunch_data::RETRY5_RUNTIME.into();
+        assert!(shape(&p).is_err());
+    }
+
+    #[test]
+    fn retry6_authenticates_actual_failed_guard_and_stop() {
+        let result = authenticate(&retry6_plan()).unwrap();
+        assert_eq!(
+            result["failed_retry5"]["producer_invocation_id"],
+            FAILED_RETRY5_IID
+        );
+        assert_eq!(result["failed_retry5"]["partial_reuse"], false);
     }
 }
