@@ -1,0 +1,12 @@
+Retain these exact inputs until the fresh 248 launch is disposed:
+/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1
+/var/lib/jetstreamer/horizon248-input-auth2454-accepted-v1
+/var/lib/jetstreamer/horizon248-bootstrap-copy2454-work-v1
+/var/lib/jetstreamer/horizon248-controls2402-v1
+/var/lib/jetstreamer/horizon248-replay2457-static-v1
+/var/lib/jetstreamer/horizon237-v4-genesis-input-v1
+/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1
+/var/lib/jetstreamer/horizon-live-observe-ca2e38b-v8
+/var/lib/jetstreamer/horizon247-reboot-20261117-state-v2/launch-v2/guarded-startup-handoff.json
+/home/ubuntu/.jetstreamer-private/qualification-248-general-shrink-debt-budget506-e3f15eb2-v1
+/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2

@@ -1,0 +1,18 @@
+{
+  "destination": "/var/lib/jetstreamer/horizon248-reboot-20261117-launcher-v3",
+  "members": [
+    {
+      "mode": 365,
+      "name": "horizon-reboot248-launch",
+      "sha256": "bd5b8e64adecc3161f329abee97d8f804a266a65d39041fe7a6d896b023704b5",
+      "source": "/tmp/horizon-reboot248-cargo-20261117/release/horizon-reboot248-launch"
+    },
+    {
+      "mode": 292,
+      "name": "launch-plan.json",
+      "sha256": "bba926d99d1be3650131942bfa6f43a1d643faa0618bb2073ee4b2fd3f07d839",
+      "source": "/tmp/horizon248-reboot-source-packet-20261117-v3/launch-plan.json"
+    }
+  ],
+  "schema": "jetstreamer-sealed-deployment-plan-v1"
+}
