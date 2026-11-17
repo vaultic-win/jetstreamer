@@ -64,12 +64,17 @@ launch plan using the Rust deployment sealer, and supply a Root-owned hash-bound
 ```
 horizon-reboot247-launch inspect PLAN PLAN_SHA256 SELF_SHA256
 horizon-reboot247-launch prepare PLAN PLAN_SHA256 SELF_SHA256 ADMISSION ADMISSION_SHA256
+horizon-reboot247-launch preflight-launch PLAN PLAN_SHA256 SELF_SHA256 ADMISSION ADMISSION_SHA256
 horizon-reboot247-launch launch PLAN PLAN_SHA256 SELF_SHA256 ADMISSION ADMISSION_SHA256
 ```
 
 `inspect` is read-only. `prepare` creates fresh root state and seals/loads an inactive producer.
 `launch` is the only command that starts it. A fresh admission may be used between preparation
 and launch; each admission lasts at most 300 seconds and binds an observer under 1800 seconds old.
+`preflight-launch` checks the prepared state and loaded unit without starting the producer. It
+is available only for the exact first launch failure recorded under `state-v2/launch/failure.json`;
+that failure occurred before a producer invocation or guard state existed. The follow-up launch
+uses a distinct `launch-v2` evidence directory and preserves the first failure record.
 
 Admission binds immutable owner, observer, fleet, capacity, complete census and interruption
 evidence. `evidence_claims` names JSON pointers in those real evidence schemas. Each required

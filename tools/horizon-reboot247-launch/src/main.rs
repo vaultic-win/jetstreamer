@@ -453,7 +453,10 @@ fn validate_admission(a: &Value, plan: &Value) -> Result<()> {
             == number(a, "main_controller_start_ticks")?,
         "main controller changed"
     );
-    let cpus = fs::read_to_string("/sys/fs/cgroup/system.slice/cpuset.cpus.effective")?;
+    // system.slice has no cpuset controller on this host; its effective set is
+    // inherited from the cgroup root. The producer's narrower CPU binding is
+    // checked independently against its loaded unit before launch.
+    let cpus = fs::read_to_string("/sys/fs/cgroup/cpuset.cpus.effective")?;
     let online = fs::read_to_string("/sys/devices/system/cpu/online")?;
     ensure!(
         cpus.trim() == "0-127" && online.trim() == "0-127",
@@ -812,6 +815,19 @@ fn validate_loaded(v: &BTreeMap<String, String>, raw: &[u8]) -> Result<()> {
         ("Slice", "system.slice"),
         ("BindReadOnlyPaths", ""),
     ] {
+        // This systemd build omits EnvironmentFiles entirely when the unit
+        // has none. A configured file is emitted (as for ssh.service here).
+        // The unchanged sealed source template must also omit the directive.
+        if k == "EnvironmentFiles" && !v.contains_key(k) {
+            ensure!(
+                !templates()?
+                    .0
+                    .lines()
+                    .any(|line| line.starts_with("EnvironmentFile=")),
+                "missing native property {k}"
+            );
+            continue;
+        }
         ensure!(row(v, k)? == want, "loaded {k} differs");
     }
     ensure!(
@@ -1061,7 +1077,7 @@ fn timer_deadline(bytes: &[u8], clock: u64) -> Result<u64> {
     );
     Ok(next)
 }
-fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<()> {
+fn preflight_launch(n: &mut Native, a: &Value, plan: &Value) -> Result<Vec<u8>> {
     validate_admission(a, plan)?;
     check_inputs()?;
     root_pristine()?;
@@ -1093,13 +1109,50 @@ fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<
     let extra = "ExecStart,ExecStartPre,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,ReadOnlyPaths,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,AllowedCPUs,CPUAffinity,TasksMax,PrivateNetwork,ProtectHome,ProtectSystem,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,Slice,BindReadOnlyPaths";
     let (v, raw) = n.show(UNIT, extra)?;
     validate_loaded(&v, &raw)?;
-    save_at(&n.root, "producer-loaded.txt", &raw)?;
     for u in [GUARD_UNIT, TIMER] {
         absent(&Path::new("/run/systemd/system").join(u))?;
         let (v, _) = n.show(u, "")?;
         closed(&v)?;
         ensure!(row(&v, "LoadState")? == "not-found", "guard name consumed");
     }
+    Ok(raw)
+}
+fn review_failed_first_launch(n: &mut Native) -> Result<()> {
+    let failure = Path::new(STATE).join("launch/failure.json");
+    let bytes = small(&failure)?;
+    ensure!(
+        hash_bytes(&bytes) == "789826d54d9a3ffb28e3cb853c723bc65821ae6baf3764718cd7c7eea719d7e0",
+        "first launch failure evidence changed"
+    );
+    let f: Value = serde_json::from_slice(&bytes)?;
+    ensure!(
+        f["error"] == "missing native property EnvironmentFiles"
+            && f["original_attempt_not_retried"] == true
+            && f["automatic_retry_authorized"] == false,
+        "first launch failed after a different gate"
+    );
+    let (v, _) = n.show(UNIT, "")?;
+    ensure!(
+        row(&v, "LoadState")? == "loaded"
+            && row(&v, "ActiveState")? == "inactive"
+            && row(&v, "MainPID")? == "0"
+            && row(&v, "ControlPID")? == "0"
+            && row(&v, "NRestarts")? == "0"
+            && row(&v, "InvocationID")?.is_empty(),
+        "first launch may have started producer"
+    );
+    absent(Path::new(BOUND))?;
+    for p in [TOKENS, RECEIPTS] {
+        ensure!(
+            fs::read_dir(p)?.next().is_none(),
+            "first launch left guard state"
+        );
+    }
+    Ok(())
+}
+fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<()> {
+    let raw = preflight_launch(n, a, plan)?;
+    save_at(&n.root, "producer-loaded.txt", &raw)?;
     // All setup and prerequisite checks finish before this single original clock.
     let started = now()?;
     n.deadline = Some(Instant::now() + Duration::from_secs(50));
@@ -1359,7 +1412,7 @@ fn run() -> Result<()> {
         return Ok(());
     }
     ensure!(
-        args.len() == 7 && ["prepare", "launch"].contains(&args[1].as_str()),
+        args.len() == 7 && ["prepare", "preflight-launch", "launch"].contains(&args[1].as_str()),
         "unsupported command"
     );
     let admission_ref = json!({"path":args[5],"sha256":args[6]});
@@ -1393,9 +1446,16 @@ fn run() -> Result<()> {
         let b = small(&n.root.join("prepared.json"))?;
         save_at(Path::new(STATE), "prepared.json", &b)?;
         println!("prepared fresh root and inactive producer; no replay launched");
+    } else if args[1] == "preflight-launch" {
+        directory(&Path::new(STATE).join("preflight-v1"), 0, 0o700)?;
+        let mut n = Native::new(Path::new(STATE).join("preflight-v1"));
+        review_failed_first_launch(&mut n)?;
+        preflight_launch(&mut n, &a, &plan_ref)?;
+        println!("prepared state and loaded producer passed read-only preflight");
     } else {
-        directory(&Path::new(STATE).join("launch"), 0, 0o700)?;
-        let mut n = Native::new(Path::new(STATE).join("launch"));
+        directory(&Path::new(STATE).join("launch-v2"), 0, 0o700)?;
+        let mut n = Native::new(Path::new(STATE).join("launch-v2"));
+        review_failed_first_launch(&mut n)?;
         if let Err(error) = launch(&mut n, &a, &plan_ref, &admission_ref) {
             let _ = save_at(
                 &n.root,
