@@ -31,7 +31,7 @@ const UNIT: &str = "horizon-qualify-250-reboot-20261117-v1.service";
 const GUARD_UNIT: &str = "horizon-250-reboot-20261117-protective-v1.service";
 const TIMER: &str = "horizon-250-reboot-20261117-protective-v1.timer";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-250-reboot-20261117-v1";
-const STATE: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-state-v1";
+const STATE: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-state-v2";
 const STATIC: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2";
 const BOUND: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-guard-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-tokens-v1";
@@ -1746,7 +1746,7 @@ fn run() -> Result<()> {
         let p = json!({"schema":"horizon250-reboot-launch-plan-four-v1","candidate_epoch":250,"worker_root":ROOT,"state_directory":STATE,"producer_unit":UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER,"setup_seconds":60,"operator_deadline_seconds":50,"maximum_root_physical_bytes":CAP,"memory_high_bytes":HIGH,"memory_max_bytes":MAX,"maximum_worker_vmas":3500000,"input_auth":{"path":AUTH,"sha256":AUTH_SHA},"static_seal":{"path":format!("{STATIC}/deployment-seal-receipt.json"),"sha256":STATIC_RECEIPT_SHA},"fourth_lane_experiment_required":true,"fourth_lane_fit_proven":false,"remote_mutations":false,"archive_retirement_authorized":false,"reuse_original_invocation_authorized":false});
         let pref = save_at(root, "launch-plan.json", &serde_json::to_vec_pretty(&p)?)?;
         let executable = fs::canonicalize("/proc/self/exe")?;
-        let deployment = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v1","members":[{"source":executable,"name":"horizon-reboot250-launch4","sha256":hash(&executable)?,"mode":365},{"source":pref["path"],"name":"launch-plan.json","sha256":pref["sha256"],"mode":292}]});
+        let deployment = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v2","members":[{"source":executable,"name":"horizon-reboot250-launch4","sha256":hash(&executable)?,"mode":365},{"source":pref["path"],"name":"launch-plan.json","sha256":pref["sha256"],"mode":292}]});
         save_at(
             root,
             "deployment-plan.json",

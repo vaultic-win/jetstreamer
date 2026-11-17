@@ -26,11 +26,16 @@ replacement launchers for a terminal epoch 247, 248, or 249.
 
 The 2026-11-17 source qualification passed 16 tests, strict Clippy, and a
 release build. The release executable SHA-256 is
-`a8b5f68931870ed47494ab6613dbdd0f30894d198cca858b9d6dd74ca00ba631`.
-The immutable launcher is sealed at
-`/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v1`;
+`4bb320d5e79d324d084be28dc5f63b38dba5525f30a28e378c47654c36be7813`.
+The first preparation attempt preserved its failed state after finding a
+preexisting temporary CAR header proof directory. Those six proof files were
+preserved outside the accepted input root. The next attempt uses a distinct
+state and deployment namespace; it still requires fresh Main admission.
+
+The revised launcher is sealed at
+`/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v2`;
 its plan SHA-256 is
-`4442974022bb1894394e81a0a137926ef7dc770b03a459a2365c68b01e0b23a2`.
+`242457c1b535daadd3cc2618b3fb915ff44b039e7457a620ba67d192726526f3`.
 The deployed binary's read-only `inspect` completed with `inputs_unchanged`,
-`source_templates_unchanged`, and `no_units_changed` true. No admission or
-replay launch was performed.
+`source_templates_unchanged`, and `no_units_changed` true. The first attempt's
+admission and failed preparation are preserved; no replay launch occurred.

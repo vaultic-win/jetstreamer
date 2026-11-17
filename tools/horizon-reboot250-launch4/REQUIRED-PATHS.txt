@@ -3,7 +3,7 @@ Retain these exact paths until the epoch 250 fourth-lane attempt is disposed:
 /var/lib/jetstreamer/horizon250-reboot-20261117-input-auth-v1
 /var/lib/jetstreamer/horizon250-index-reboot-20261117-cache-v1
 /var/lib/jetstreamer/horizon250-reboot-20261117-static-v2
-/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v1
+/var/lib/jetstreamer/horizon250-reboot-20261117-launcher-4live-v2
 /var/lib/jetstreamer/horizon250-controls2402-v1
 /var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1
 /var/lib/jetstreamer/horizon247-reboot-20261117-state-v2/launch-v2/guarded-startup-handoff.json
