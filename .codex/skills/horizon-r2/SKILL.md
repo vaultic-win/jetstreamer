@@ -1312,6 +1312,11 @@ controller, timer, staged launch, neighboring boundary check or recovery plan st
 and remove qualified targets in the same work cycle. Record each retained path, its bytes, the
 specific unfinished epoch or active/staged consumer that needs it, and the event that releases it.
 A historical mention, completed consumer, or speculative future use is not a retention dependency.
+For privileged consumer searches, resolve the search tool's absolute path under the effective
+identity before using it. Treat a no-match exit code separately from a tool, permission or search
+failure; do not hide the latter with a pipeline or redirected stderr. Repeat the exact no-consumer
+check under the shared mutation lock immediately before deletion. If a check was skipped or failed,
+correct the cleanup record and inspect current consumers before counting the path as retired.
 Remove released data immediately; reconcile outstanding cleanup at the existing 30-minute cadence
 and after controller restart so failed or interrupted cleanup cannot silently accumulate.
 Preserve unuploaded, unverified and resumable work for unfinished epochs. Once the complete epoch
