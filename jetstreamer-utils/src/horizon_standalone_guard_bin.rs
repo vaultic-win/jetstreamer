@@ -568,6 +568,20 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if plan.unit == "horizon-import-239-current-20261117-v2.service" {
+        return cfg!(feature = "epoch239-native-import-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1",
+                )
+            && plan.minimum_free_bytes >= 2_000_000_000_000
+            && plan.maximum_root_physical_bytes == Some(206_158_430_208)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan
         .unit
         .starts_with("horizon-qualify-223-v1620-root-prefix-resource-")
@@ -1129,6 +1143,43 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn epoch239_import_guard_requires_exact_unit_root_and_budget() {
+        let value = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-import-239-current-20261117-v2.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/",
+            "minimum_free_bytes": 2_000_000_000_000u64,
+            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1",
+            "maximum_worker_vmas": 3_500_000,
+            "maximum_root_physical_bytes": 206_158_430_208u64,
+            "receipt_directory": "/sealed/receipts"
+        });
+        assert_eq!(
+            validate_plan(&serde_json::from_value(value.clone()).unwrap()).is_ok(),
+            cfg!(feature = "epoch239-native-import-guard")
+        );
+        for (pointer, replacement) in [
+            (
+                "/unit",
+                json!("horizon-import-239-current-20261117-v3.service"),
+            ),
+            ("/filesystem", json!("/other")),
+            ("/worker_root", json!("/other")),
+            ("/minimum_free_bytes", json!(1_999_999_999_999u64)),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/maximum_root_physical_bytes", json!(206_158_430_207u64)),
+        ] {
+            let mut changed = value.clone();
+            *changed.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(changed).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+    }
+
     #[test]
     fn native20_full223_prefix_guard_requires_its_own_feature_and_exact_whole_root() {
         let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":"horizon-qualify-223-v1620-root-prefix-resource-full-v1.service","invocation_id":"a".repeat(32),"filesystem":"/","minimum_free_bytes":2_000_000_000_000u64,"worker_root":"/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1","maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471_798_691_840u64,"receipt_directory":"/sealed/receipts"});
