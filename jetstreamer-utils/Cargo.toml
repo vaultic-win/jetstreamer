@@ -22,6 +22,7 @@ epoch227-singleton-guard = []
 epoch209-singleton-guard = []
 epoch223-native20-prefix-guard = []
 epoch239-native-import-guard = []
+epoch244-native-import-guard = []
 epoch223-v1620-prefix-capability = []
 sst-capability-tests = ["dep:rocksdb"]
 # Pins the separate bounded epoch 225 upstream-comparison worker, not an era.

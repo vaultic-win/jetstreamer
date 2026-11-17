@@ -22,11 +22,18 @@ arms the protective timer, validates the first genuine guard result during the
 60-second pre-start window, and seals a readable token under that invocation ID.
 The unit's remaining pre-start checks require that exact token before native work.
 
+The retry operator accepts only the known first attempt that failed in pre-start
+before native execution. It verifies the failed import and guard invocation IDs,
+the inactive old timer, the installed source unit, the empty import log, and the
+absence of an old token. It resets that unit's start limit, starts the same sealed
+import service with a new invocation ID, and seals a replacement guard and timer.
+
 The operator binds the failed epoch 239 v1 verifier invocation IDs and the
 replacement v2 invocation IDs. It charges each active v2 verifier at its sealed
 memory cap, rejects an unknown verifier transition, and waits for enough host
 memory reserve before admitting the import. A successful, inactive v2 verifier
-releases its memory charge.
+releases its memory charge only when its root-owned completion receipt binds the
+exact epoch 239 archive, verifier, and script hashes.
 
 Run `inspect` again with the latest coordinated observer receipt and its SHA-256
 immediately before launch. The operator rejects a sample more than 30 minutes old.

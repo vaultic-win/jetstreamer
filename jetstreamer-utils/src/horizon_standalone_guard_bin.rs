@@ -429,6 +429,7 @@ fn observe_root_for_import_prestart(plan: &Plan, unit: &Unit) -> bool {
         plan.unit.as_str(),
         "horizon-import-239-current-20261117-v2.service"
             | "horizon-import-239-current-20261117-v3.service"
+            | "horizon-import-244-current-20261117-v1.service"
     )
         && unit.active == "activating"
         && unit.sub == "start-pre"
@@ -482,6 +483,10 @@ fn workers(unit: &Unit, worker_root: &Path) -> Result<Vec<(u32, u64)>> {
         == Path::new(
             "/home/ubuntu/.jetstreamer-private/qualification-239-general-shrink-debt-budget506-e3f15eb2-v1",
         )
+        || worker_root
+            == Path::new(
+                "/home/ubuntu/.jetstreamer-private/qualification-244-general-shrink-debt-budget506-e3f15eb2-v2",
+            )
     {
         return import239_workers(unit);
     }
@@ -639,6 +644,20 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if plan.unit == "horizon-import-244-current-20261117-v1.service" {
+        return cfg!(feature = "epoch244-native-import-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-244-general-shrink-debt-budget506-e3f15eb2-v2",
+                )
+            && plan.minimum_free_bytes >= 2_000_000_000_000
+            && plan.maximum_root_physical_bytes == Some(240_000_000_000)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if matches!(
         plan.unit.as_str(),
         "horizon-import-239-current-20261117-v2.service"
@@ -1218,6 +1237,57 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn epoch244_import_guard_requires_exact_unit_root_and_budget() {
+        let value = json!({
+            "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit": "horizon-import-244-current-20261117-v1.service",
+            "invocation_id": "a".repeat(32),
+            "filesystem": "/",
+            "minimum_free_bytes": 2_000_000_000_000u64,
+            "worker_root": "/home/ubuntu/.jetstreamer-private/qualification-244-general-shrink-debt-budget506-e3f15eb2-v2",
+            "maximum_worker_vmas": 3_500_000,
+            "maximum_root_physical_bytes": 240_000_000_000u64,
+            "receipt_directory": "/sealed/receipts"
+        });
+        assert_eq!(
+            validate_plan(&serde_json::from_value(value.clone()).unwrap()).is_ok(),
+            cfg!(feature = "epoch244-native-import-guard")
+        );
+        let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+        let mut prestart = Unit {
+            load_state: "loaded".into(),
+            invocation_id: "a".repeat(32),
+            active: "activating".into(),
+            sub: "start-pre".into(),
+            result: "success".into(),
+            restarts: 0,
+            restart_policy: "no".into(),
+            kill_mode: "control-group".into(),
+            delegated: false,
+            cgroup: "/system.slice/import.service".into(),
+            pid: 0,
+        };
+        assert!(observe_root_for_import_prestart(&plan, &prestart));
+        prestart.active = "failed".into();
+        assert!(!observe_root_for_import_prestart(&plan, &prestart));
+        for (pointer, replacement) in [
+            ("/unit", json!("horizon-import-244-current-20261117-v2.service")),
+            ("/filesystem", json!("/other")),
+            ("/worker_root", json!("/other")),
+            ("/minimum_free_bytes", json!(1_999_999_999_999u64)),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+            ("/maximum_root_physical_bytes", json!(239_999_999_999u64)),
+        ] {
+            let mut changed = value.clone();
+            *changed.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(changed).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+    }
+
     #[test]
     fn epoch239_import_guard_requires_exact_unit_root_and_budget() {
         let value = json!({

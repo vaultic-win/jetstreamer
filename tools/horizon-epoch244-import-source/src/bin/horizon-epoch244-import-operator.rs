@@ -16,8 +16,12 @@ use std::{
 };
 
 const IMPORT_UNIT: &str = "horizon-import-244-current-20261117-v1.service";
-const GUARD_UNIT: &str = "horizon-import-244-protective-20261117-v1.service";
-const TIMER_UNIT: &str = "horizon-import-244-protective-20261117-v1.timer";
+const FAILED_IMPORT_ID: &str = "f9298e2a08564da69e0dfbec86149438";
+const FAILED_GUARD_ID: &str = "6a714c5e14d44367b7a1bfd675b9776e";
+const OLD_GUARD_UNIT: &str = "horizon-import-244-protective-20261117-v1.service";
+const OLD_TIMER_UNIT: &str = "horizon-import-244-protective-20261117-v1.timer";
+const GUARD_UNIT: &str = "horizon-import-244-protective-20261117-v2.service";
+const TIMER_UNIT: &str = "horizon-import-244-protective-20261117-v2.timer";
 const IMPORT_PACKAGE: &str = "/var/lib/jetstreamer/horizon244-current-import-runtime-20261117-v1";
 const IMPORT_SERVICE_SHA: &str = "4cb7866d90e6cccd209364de9efba47a95fcf57431058e56a4d0f5291bb8a76a";
 const PREPARATION_SHA: &str = "0a0002e099629b3905d5ba192c1caeaf0bf27e50e00be482a00452943bc692bd";
@@ -35,41 +39,49 @@ const ARCHIVE_SHA: &str = "4b50748ef0e458cf71da050acb3b7e3751e5d1918db8cd0bd40f8
 const ARCHIVE_BYTES: u64 = 175_862_403_401;
 const HASH_REPORT: &str =
     "/home/ubuntu/.codex/diagnostics/horizon-244-private-archive-hash-20261117.txt";
-const GUARD_BINARY: &str = "/var/lib/jetstreamer/horizon244-current-import-guard-20261117-v1/jetstreamer-horizon-standalone-guard";
-const GUARD_SHA: &str = "f2ac0a5ba99438238425a5b44105f48bcef4961b6b5b4987a0fb8819c7f455b3";
+const GUARD_BINARY: &str = "/var/lib/jetstreamer/horizon244-current-import-guard-20261117-v2/jetstreamer-horizon-standalone-guard";
+const GUARD_SHA: &str = "f8c9e2ae06833eefb053ef59698716fdd67afae2decb85237c7fd969233a19fb";
 const R2_BINARY: &str =
     "/var/lib/jetstreamer/horizon-status240243-cleanup-production-SDK2451-v1/jetstreamer-r2";
 const R2_SHA: &str = "2e718f08c3cd072c40f79dbb85f35fd59864aedc26782fcfd89a031a7ff67c07";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24";
-const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v5/horizon-epoch244-import-operator";
-const STATE: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-state-20261117-v1";
-const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon244-current-import-protective-20261117-v1";
+const OPERATOR_RUNTIME: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-20261117-v7/horizon-epoch244-import-operator";
+const STATE: &str = "/var/lib/jetstreamer/horizon244-current-import-operator-state-20261117-v2";
+const GUARD_PACKAGE: &str = "/var/lib/jetstreamer/horizon244-current-import-protective-20261117-v2";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon244-current-import-tokens-20261117-v1";
 const RECEIPTS: &str =
-    "/var/lib/jetstreamer/horizon244-current-import-protective-receipts-20261117-v1";
+    "/var/lib/jetstreamer/horizon244-current-import-protective-receipts-20261117-v2";
 const ROOT_CAP: u64 = 240_000_000_000;
 const FLOOR: u64 = 2_000_000_000_000;
 const THREE_REPLAY_OBLIGATION: u64 = 980_221_169_664;
 const IMPORT_MEMORY_MAX: u64 = 68_719_476_736;
 const GUARD_MEMORY_MAX: u64 = 1_073_741_824;
 const MINIMUM_HOST_MEMORY_RESERVE: u64 = 64 * 1024 * 1024 * 1024;
-const VERIFIER_TRANSITIONS: [(&str, &str, &str, &str); 2] = [
+const VERIFIER_TRANSITIONS: [(&str, &str, &str, &str, &str, &str); 2] = [
     (
         "horizon-full-verify-239-current-20261117-v1.service",
         "208d2a07f4d34cdc9a125aaae3487ec3",
         "horizon-full-verify-239-current-20261117-v2.service",
         "7c0afd0381fe4a5b80e699c0d5fec88b",
+        "/home/ubuntu/.jetstreamer-private/verification-239-current-20261117-v2/full/receipts/epoch-239.full.ok",
+        "6ff8a6be80712b258577c027bf3512274a9c7d9f326b77a5cb07906205125302",
     ),
     (
         "horizon-plugin-verify-239-current-20261117-v1.service",
         "21d503ce8c38402a922b6235f778537d",
         "horizon-plugin-verify-239-current-20261117-v2.service",
         "3398bff4b3154fb8935358d3b8a48375",
+        "/home/ubuntu/.jetstreamer-private/verification-239-current-20261117-v2/plugin/receipts/epoch-239.plugin.ok",
+        "853c8a3f7448a75afbeea1fdf6b6e6e4f0001e970162bc2ad3b05e01d29f3c5b",
     ),
 ];
 const VERIFIER_MEMORY_MAX: u64 = 68_719_476_736;
+const EPOCH239_ARCHIVE_SHA: &str =
+    "d530332035fa1765f4f222c3df6ff9aa5825817c2be5ff0dc27f7f1d37c88189";
+const VERIFIER_SCRIPT_SHA: &str =
+    "ad8ab9a04394797ae4ee4ff7b65297bd3c75e4997d32be0948757f43ddbc8dfe";
 const LIVE: [(&str, &str); 3] = [
     ("247-247", "horizon-qualify-247-reboot-20261117-v2.service"),
     ("248-248", "horizon-qualify-248-reboot-20261117-v1.service"),
@@ -126,7 +138,7 @@ fn fields(unit: &str) -> Result<BTreeMap<String, String>> {
         &[
             "show",
             unit,
-            "--property=Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,MainPID,Restart,KillMode,Delegate,ControlGroup,ExecMainStartTimestamp,MemoryMax",
+            "--property=Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,MainPID,Restart,KillMode,Delegate,ControlGroup,ExecMainStartTimestamp,MemoryMax,FragmentPath,UnitFileState",
         ],
     )?;
     raw.lines()
@@ -179,7 +191,8 @@ fn total_memory_bytes() -> Result<u64> {
 
 fn concurrent_verifier_memory_max_bytes() -> Result<u64> {
     let mut total = 0_u64;
-    for (old_unit, old_id, current_unit, current_id) in VERIFIER_TRANSITIONS {
+    for (old_unit, old_id, current_unit, current_id, receipt, verifier_sha) in VERIFIER_TRANSITIONS
+    {
         let old = fields(old_unit)?;
         ensure!(
             field(&old, "InvocationID")? == old_id
@@ -191,25 +204,44 @@ fn concurrent_verifier_memory_max_bytes() -> Result<u64> {
         );
         let current = fields(current_unit)?;
         ensure!(
-            field(&current, "InvocationID")? == current_id
-                && field(&current, "NRestarts")? == "0"
+            field(&current, "NRestarts")? == "0"
                 && field(&current, "MemoryMax")? == VERIFIER_MEMORY_MAX.to_string(),
             "current verifier identity or cap changed: {current_unit}"
         );
         match field(&current, "ActiveState")? {
             "active" | "activating" => {
                 ensure!(
-                    field(&current, "Result")? == "success",
+                    field(&current, "InvocationID")? == current_id
+                        && field(&current, "Result")? == "success",
                     "current verifier failed: {current_unit}"
                 );
                 total = total
                     .checked_add(VERIFIER_MEMORY_MAX)
                     .context("verifier memory overflow")?;
             }
-            "inactive" => ensure!(
-                field(&current, "Result")? == "success",
-                "current verifier ended unsuccessfully: {current_unit}"
-            ),
+            "inactive" => {
+                let id = field(&current, "InvocationID")?;
+                ensure!(
+                    (id.is_empty() || id == current_id)
+                        && field(&current, "SubState")? == "dead"
+                        && field(&current, "Result")? == "success",
+                    "current verifier ended unsuccessfully: {current_unit}"
+                );
+                let path = Path::new(receipt);
+                let meta = fs::symlink_metadata(path)?;
+                ensure!(
+                    meta.is_file()
+                        && meta.uid() == 0
+                        && meta.nlink() == 1
+                        && meta.mode() & 0o077 == 0
+                        && meta.len() <= 256
+                        && fs::read_to_string(path)?
+                            == format!(
+                                "{EPOCH239_ARCHIVE_SHA} {verifier_sha} {VERIFIER_SCRIPT_SHA}\n"
+                            ),
+                    "current verifier completion receipt changed: {current_unit}"
+                );
+            }
             state => anyhow::bail!("unresolved verifier state {current_unit}: {state}"),
         }
     }
@@ -387,6 +419,57 @@ fn no_other_public_importer() -> Result<()> {
     Ok(())
 }
 
+fn failed_import_state(
+    importer: &BTreeMap<String, String>,
+    guard: &BTreeMap<String, String>,
+    timer: &BTreeMap<String, String>,
+) -> Result<()> {
+    ensure!(
+        field(importer, "LoadState")? == "loaded"
+            && field(importer, "ActiveState")? == "failed"
+            && field(importer, "SubState")? == "failed"
+            && field(importer, "InvocationID")? == FAILED_IMPORT_ID
+            && field(importer, "Result")? == "signal"
+            && field(importer, "MainPID")? == "0"
+            && field(importer, "NRestarts")? == "0"
+            && field(importer, "ExecMainStartTimestamp")?.is_empty()
+            && field(importer, "FragmentPath")? == format!("/etc/systemd/system/{IMPORT_UNIT}")
+            && field(importer, "UnitFileState")? == "linked",
+        "failed import identity or pre-native boundary changed"
+    );
+    ensure!(
+        field(guard, "InvocationID")? == FAILED_GUARD_ID
+            && field(guard, "ActiveState")? == "failed"
+            && field(guard, "Result")? == "exit-code",
+        "failed first guard changed"
+    );
+    ensure!(
+        field(timer, "ActiveState")? == "inactive" && field(timer, "SubState")? == "dead",
+        "old protective timer remains active"
+    );
+    Ok(())
+}
+
+fn failed_import_retry_gate(
+    importer: &BTreeMap<String, String>,
+    guard: &BTreeMap<String, String>,
+    timer: &BTreeMap<String, String>,
+) -> Result<()> {
+    failed_import_state(importer, guard, timer)?;
+    ensure!(
+        fs::read_link(format!("/etc/systemd/system/{IMPORT_UNIT}"))?
+            == Path::new(&format!("{IMPORT_PACKAGE}/{IMPORT_UNIT}")),
+        "installed import unit link changed"
+    );
+    ensure!(!Path::new(TOKENS).exists(), "old import token exists");
+    let log = fs::symlink_metadata(format!("{PRIVATE}/output/import-244.log"))?;
+    ensure!(
+        log.is_file() && log.len() == 0,
+        "native import output exists"
+    );
+    Ok(())
+}
+
 fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
     check_static()?;
     no_other_public_importer()?;
@@ -456,12 +539,11 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
             && remote["entries"][0]["state"] == "missing",
         "R2 epoch 244 is no longer missing"
     );
-    let importer = fields(IMPORT_UNIT)?;
-    ensure!(
-        field(&importer, "LoadState")? == "not-found"
-            && field(&importer, "ActiveState")? == "inactive",
-        "new importer is already installed or active"
-    );
+    failed_import_retry_gate(
+        &fields(IMPORT_UNIT)?,
+        &fields(OLD_GUARD_UNIT)?,
+        &fields(OLD_TIMER_UNIT)?,
+    )?;
     Ok(
         json!({"schema":"horizon244-native-import-main-admission-v1", "issued_unix_seconds":current,
         "expires_unix_seconds":current+120,"epoch":244,"Main_accepted":true,"observer":{"path":observer_path,"sha256":observer_sha},
@@ -472,7 +554,8 @@ fn inspect(observer_path: &Path, observer_sha: &str) -> Result<Value> {
         "minimum_host_memory_reserve_bytes":MINIMUM_HOST_MEMORY_RESERVE,
         "memory_obligation_after_bytes":obligation,"host_memory_total_bytes":total,
         "available_disk_bytes":free,"minimum_free_bytes":FLOOR,
-        "import_unit":IMPORT_UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER_UNIT,
+        "import_unit":IMPORT_UNIT,"failed_import_invocation_id":FAILED_IMPORT_ID,
+        "guard_unit":GUARD_UNIT,"timer_unit":TIMER_UNIT,
         "namespace_probe_completed":true,
         "source_archive":{"path":ARCHIVE,"sha256":ARCHIVE_SHA,"bytes":ARCHIVE_BYTES,"device":fs::metadata(ARCHIVE)?.dev(),"inode":fs::metadata(ARCHIVE)?.ino()},
         "archive_mutations":false,"remote_mutations":false,"r2_mutations":false}),
@@ -698,11 +781,7 @@ fn launch(observer: &Path, observer_sha: &str) -> Result<()> {
     let state = Path::new(STATE);
     directory(state, 0o700)?;
     let admission_sha = write_new(&state.join("admission.json"), &admission, 0o600)?;
-    command(
-        "/usr/bin/systemctl",
-        &["link", &format!("{IMPORT_PACKAGE}/{IMPORT_UNIT}")],
-    )?;
-    command("/usr/bin/systemctl", &["daemon-reload"])?;
+    command("/usr/bin/systemctl", &["reset-failed", IMPORT_UNIT])?;
     command("/usr/bin/systemctl", &["start", "--no-block", IMPORT_UNIT])?;
     let started = Instant::now();
     let actual_id = loop {
@@ -713,7 +792,7 @@ fn launch(observer: &Path, observer_sha: &str) -> Result<()> {
         let row = fields(IMPORT_UNIT)?;
         if field(&row, "ActiveState")? == "activating" && field(&row, "SubState")? == "start-pre" {
             let id = field(&row, "InvocationID")?;
-            if id.len() == 32 && field(&row, "NRestarts")? == "0" {
+            if id.len() == 32 && id != FAILED_IMPORT_ID && field(&row, "NRestarts")? == "0" {
                 break id.to_owned();
             }
         }
@@ -801,6 +880,61 @@ mod tests {
         let two_verifiers = 2 * 68_719_476_736;
         assert!(admitted_memory_obligation(host_total, two_verifiers).is_err());
         assert!(admitted_memory_obligation(host_total, 0).is_ok());
+    }
+
+    #[test]
+    fn retry_requires_exact_failed_pre_native_invocation() {
+        let importer: BTreeMap<String, String> = [
+            ("LoadState", "loaded"),
+            ("ActiveState", "failed"),
+            ("SubState", "failed"),
+            ("InvocationID", FAILED_IMPORT_ID),
+            ("Result", "signal"),
+            ("MainPID", "0"),
+            ("NRestarts", "0"),
+            ("ExecMainStartTimestamp", ""),
+            (
+                "FragmentPath",
+                "/etc/systemd/system/horizon-import-244-current-20261117-v1.service",
+            ),
+            ("UnitFileState", "linked"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+        let guard: BTreeMap<String, String> = [
+            ("InvocationID", FAILED_GUARD_ID),
+            ("ActiveState", "failed"),
+            ("Result", "exit-code"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+        let timer: BTreeMap<String, String> = [("ActiveState", "inactive"), ("SubState", "dead")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        assert!(failed_import_state(&importer, &guard, &timer).is_ok());
+        for (key, bad) in [
+            ("InvocationID", "different"),
+            ("Result", "exit-code"),
+            ("MainPID", "42"),
+            ("ExecMainStartTimestamp", "Tue 2026-11-17 11:47:33 UTC"),
+            ("UnitFileState", "enabled"),
+        ] {
+            let mut changed = importer.clone();
+            changed.insert(key.to_owned(), bad.to_owned());
+            assert!(
+                failed_import_state(&changed, &guard, &timer).is_err(),
+                "{key}"
+            );
+        }
+        let mut changed_guard = guard.clone();
+        changed_guard.insert("InvocationID".into(), "different".into());
+        assert!(failed_import_state(&importer, &changed_guard, &timer).is_err());
+        let mut changed_timer = timer.clone();
+        changed_timer.insert("ActiveState".into(), "active".into());
+        assert!(failed_import_state(&importer, &guard, &changed_timer).is_err());
     }
 
     #[test]
