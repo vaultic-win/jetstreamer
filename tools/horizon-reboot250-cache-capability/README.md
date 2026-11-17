@@ -7,6 +7,15 @@ the exact epoch, kind, and root CID in the epoch 250 indexes. The deployed node
 does not expose a read-only `--probe-successor-boundary` route, so this check
 does not claim native replay capability or launch authority.
 
+A separate sealed source node at
+`/var/lib/jetstreamer/horizon250-successor-boundary-probe-20261117-v1/jetstreamer-node`
+subsequently ran its read-only `--probe-successor-boundary=108432000` route.
+The exact result was parent slot `108431999` and first successor block slot
+`108432004`, recorded in
+`/home/ubuntu/.codex/diagnostics/horizon250-sealed-boundary-probe-20261117-v1.json`.
+That diagnostic does not qualify the deployed replay node, a producer unit, or
+fresh admission for epoch 250.
+
 The accepted sealed diagnostic output is
 `/home/ubuntu/workspace/horizon250-readiness-20261117-v1/index-capability/capability-v4.json`.
 The output is created once with no clobber and fsynced. Its SHA-256 is
