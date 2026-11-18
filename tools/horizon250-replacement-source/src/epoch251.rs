@@ -21,7 +21,7 @@ const UNIT251: &str = "horizon-qualify-251-replacement-20261118-v1.service";
 const GUARD251: &str = "horizon-251-replacement-20261118-protective-v1.service";
 const TIMER251: &str = "horizon-251-replacement-20261118-protective-v1.timer";
 
-fn read_bound(path: &str, sha: &str) -> Result<Vec<u8>> {
+pub(super) fn read_bound(path: &str, sha: &str) -> Result<Vec<u8>> {
     let p = Path::new(path);
     let before = fs::symlink_metadata(p)?;
     ensure!(
@@ -60,7 +60,7 @@ fn read_bound(path: &str, sha: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn bound_value(path: &str, sha: &str) -> Result<Value> {
+pub(super) fn bound_value(path: &str, sha: &str) -> Result<Value> {
     Ok(serde_json::from_slice(&read_bound(path, sha)?)?)
 }
 
@@ -192,7 +192,7 @@ fn validate_journal(rows: &[Value]) -> Result<()> {
     Ok(())
 }
 
-fn save251(out: &Path, name: &str, bytes: &[u8]) -> Result<Value> {
+pub(super) fn save251(out: &Path, name: &str, bytes: &[u8]) -> Result<Value> {
     ensure!(!name.contains('/'), "unsafe member");
     let path = out.join(name);
     let mut file = OpenOptions::new()

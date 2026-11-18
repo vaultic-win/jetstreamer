@@ -1,4 +1,5 @@
 //! Exact epoch 250 input custody. No replay or remote mutations.
+mod epoch251;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -46,6 +47,7 @@ fn restore(receipt:&Value, source:&Value, path:&str, digest:&str) -> Result<()> 
 }
 
 fn run() -> Result<()> {
+    if std::env::args().nth(1).as_deref()==Some("check-251") { return epoch251::run(); }
     ensure!(std::env::args().len()==1,"no arguments accepted");
     ensure!(unsafe {libc::geteuid()}==0,"root required");
     ensure!(!Path::new(OUT).exists(),"acceptance generation exists");

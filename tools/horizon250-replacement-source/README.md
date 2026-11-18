@@ -56,3 +56,18 @@ header probe. It checks the exact invocation, command, sandbox properties, cache
 and genesis mounts, HTTP 206 range, canonical CAR header and expected root CID.
 Manager and file identities must remain stable during capture. This establishes
 the tested network route, not deployed-node cache-reader or replay qualification.
+
+`prepare-251-fifth OUTPUT_DIRECTORY` stages a separately qualified fifth-lane
+candidate with a 128 GB hard cap and 100 GB soft limit. It binds the accepted
+19:20 observation and fleet, checks all four live invocations and their unchanged
+hard limits before and after preparation, and budgets their full hard growth.
+The 64 GiB host reserve covers measured non-lane resident usage and five guard
+maxima; the candidate controller allowance is separate. The smaller candidate
+fits the host arithmetic without checkpoint relief or releasing a live claim.
+Its replay throughput and smaller full-replay profile remain unproven.
+
+The source retains the original root cap, VMA guard, first-fire token gate and
+dormant root. Its CPU set is disjoint from all four retained live sets. The disk
+calculation takes no occupied-allocation credit, preserves the inherited guard
+floor and requires a fresh century census at admission. The assessment and source
+packet do not install units, admit work or authorize a replay launch.
