@@ -16,7 +16,7 @@ observations, matching structured report/log counters and a clean exit.
 Inspect it without a model or agent:
 
 ```sh
-sudo /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v1/audit status /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v1/config.json
+sudo /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v2/audit status /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v2/config.json
 sudo journalctl -u horizon-r2-chronological-plugin-audit-20261118-v1.service -n 30 --no-pager
 ```
 
@@ -43,3 +43,39 @@ restarts. All 19 active status JSONs were refreshed with authenticated readback.
 The sole next replay observer is armed for 21:49:25 UTC. Epoch 141 holding is
 still running; no newly parked bytes have been credited or locally retired.
 The next epoch 167 admission remains dependent on actual reclaimed space.
+
+## Allocation-scan repair and v2 resumption
+
+The first build was stopped by the allocation guard at 21:51:10 UTC when a
+temporary Cargo file disappeared between enumeration and metadata inspection.
+The controller preserved that failed attempt and waited for reader recovery.
+The repair treats only disappeared entries as zero retained allocation; other
+inspection failures still stop the subprocess. Four deterministic regression
+tests cover both removal windows, other errors, and symlink non-traversal.
+All 19 runner tests and strict Clippy passed; the v2 deployment helper passed
+three tests and strict Clippy.
+
+The fix is published as `bf365e75d2a424efe08c5757e17de63aac836943` on
+`account-updates`. The v2 runtime is sealed at
+`/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v2`.
+Runner SHA-256:
+`7472ca22405ea0a08e58987fd13e90970e02cbcc4bb13eb83cb553fbdd910b5d`.
+The same persistent service restarted at **22:10:35 UTC**, invocation
+`6de50b080c4e48f79dc095d03255d493`, controller PID 1568376. It entered
+`qualifying_reader`, and authenticated branch fetch plus bounded Cargo metadata
+completed successfully. No archive pass is claimed by this resumption record.
+
+The v1 config is preserved byte-for-byte. State, credentials, resources, reader
+generations, and historical attempts remain at their existing paths. Frozen
+inventory SHA-256 remains
+`d38d5146d50b7788cf5866fa0f7f5aeefade92fbf0496398fee334b480b7084e`.
+Only the waiting audit controller was replaced; campaign replay was not restarted.
+
+Epoch 141 recovery also advanced: the exact completed hash control's fragment,
+native terminal state and journal were preserved before closing it. A fresh
+staged-reference scan returned no references. The exact retirement executable
+passed its durable-transition test and is sealed at
+`/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v1`.
+The holding transfer still must finish authenticated readback and custody before
+the compressed local input can pass its check and retirement commands. No space
+from that transfer has been credited yet.
