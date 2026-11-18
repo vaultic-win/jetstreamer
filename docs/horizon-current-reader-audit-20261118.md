@@ -169,3 +169,24 @@ qualification of those reader artifacts; it does not qualify the older uploader
 or replace executable/readback acceptance. Historical archives still require
 their actual latest-reader audit. Future changes to the relevant reader sources
 or dependencies invalidate equivalence and require renewed qualification.
+
+`reader_playback_qualification` is a native qualification example for the next
+artifact build. It generates private synthetic epoch-251 fixtures with the full
+432,000-slot range, two PoH-linked transaction blocks, legitimate intervening
+skips, epoch updates and both orphan-update phases. It invokes the real pipeline
+and strict full verifier, checks the report's exact invocation, boundaries and
+all record/byte totals, and requires exit code 1 with no success report for
+partial coverage and a missing epoch notification. A wrong-PoH fixture must fail
+the strict full verifier. Expectations come from fixed inputs and canonical PoH
+construction before archive serialization. Files are created without clobbering
+an earlier attempt, and executable hashes are checked around each invocation.
+
+The example passed metadata compilation and strict Clippy against the retained
+full-pipeline dependency metadata. This is not yet native execution. Build it
+with `cargo build --release --locked -p jetstreamer-horizon --example
+reader_playback_qualification`, then run it with an absent absolute private root,
+the qualified pipeline path and the qualified full-verifier path. Synthetic
+acceptance never proves a canonical epoch or authenticated R2 readback. Adding
+this example changes the conservative reader path set, so the subsequent build
+and qualification must bind the new published revision; preserve the already
+running build and reuse its dependency work after normal closure.
