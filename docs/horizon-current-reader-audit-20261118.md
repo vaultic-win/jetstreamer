@@ -434,3 +434,33 @@ bypass the strict-tail check, derive trusted boundaries from the archive under
 test, or alter the running epoch-205 artifacts. Any reader change requires
 fresh reader qualification and affects the running audit's final branch
 equivalence gate. No repair for this finding has yet been deployed.
+
+The actual epoch-205 audit passed its initial archive hash and reached full
+PoH verification with two threads. Its startup rate is about 65 slots/second,
+with roughly two hours estimated for that stage alone. Full verification,
+local plugin playback, a separate authenticated readback and remote plugin
+playback must all finish before this becomes a compatibility pass.
+
+The independent boundary responses for all five live epochs are now sealed at
+`/var/lib/jetstreamer/horizon-active-reader-boundaries-20261118-v1`.
+Root-owned expectations for 247–250 are separately sealed at
+`/var/lib/jetstreamer/horizon-active-reader-expectations-20261118-v1`, binding
+each first real block's independently confirmed parent and the real block at
+the nominal final slot. Leading skipped slots are covered by separate range
+responses. No archive under test supplied any trusted hash. Epoch 251's raw
+successor evidence is preserved, but no incompatible terminal expectation or
+relaxed verification plan was issued for it.
+
+The 23:53:26 UTC coordinated observation again proved five unchanged advancing
+owners and both host RSS censuses. All five R2 statuses were conditionally
+refreshed and authenticated-readback verified from that one sample. Fleet
+reconciliation reports 34 ready pairs, 66 missing, zero anomalies and no
+diagnostics. Its memory target remains nine against five executing lanes;
+conservative free disk is 4,279,625,019,392 bytes. The next ordinary observation
+is not before 2026-11-19 00:23:26 UTC; its sealed v69 configuration passed
+static checks without taking an additional resource observation.
+
+The 252–256 replacement cohort's fresh production-node input probes and
+retained-bootstrap rehash are recorded in
+`docs/horizon-252-cohort-readiness-20261118.md`. These advance candidate
+qualification without changing any healthy replay or claiming a sixth lane.
