@@ -146,3 +146,15 @@ hashes, compiler version and the resource budget are under
 The candidate build remains unqualified until normal completion, captured
 source/artifact review, immutable sealing and genuine native capability and
 end-to-end playback checks. It does not replace any live worker or guard.
+
+Subsequent verifier-call review found that strict `--full` verification requires
+an incoming anchor for non-genesis epochs. The initial gate invocation omitted
+that anchor and would fail closed. Reader plans now require a sealed per-epoch
+expectation containing the parent slot/hash, exact terminal slot/hash, optional
+expected provenance digest and independent evidence. The gate passes those
+values explicitly through `--anchor`, `--expected-terminal` and, when present,
+`--expected-provenance-sha256`; it never derives the trusted expectation from
+the archive being checked. Missing evidence or an incomplete epoch range fails
+before upload. The currently running `72751e30` build predates this correction:
+its reader artifacts can still be qualified, but its uploader must be rebuilt
+from the corrected published source before deployment.

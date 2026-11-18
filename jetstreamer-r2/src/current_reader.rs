@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
@@ -51,6 +52,61 @@ struct Plan {
     threads: usize,
     maximum_archive_bytes: u64,
     minimum_free_bytes: u64,
+    epoch_expectations: BTreeMap<u64, Bound>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EpochExpectation {
+    schema: String,
+    epoch: u64,
+    parent_slot: u64,
+    parent_blockhash: String,
+    terminal_slot: u64,
+    terminal_blockhash: String,
+    provenance_sha256: Option<String>,
+    independent_evidence: Vec<Bound>,
+}
+
+fn full_arguments(
+    archive: &Path,
+    epoch: u64,
+    threads: usize,
+    e: &EpochExpectation,
+) -> Result<Vec<String>> {
+    let first = epoch.checked_mul(432000).context("epoch overflow")?;
+    let last = first.checked_add(431999).context("epoch overflow")?;
+    ensure!(
+        e.schema == "horizon-current-reader-epoch-expectation-v1"
+            && e.epoch == epoch
+            && e.parent_slot < first
+            && e.terminal_slot == last
+            && !e.independent_evidence.is_empty(),
+        "missing independent full-epoch parent/terminal expectations"
+    );
+    for hash in [&e.parent_blockhash, &e.terminal_blockhash] {
+        ensure!(
+            bs58::decode(hash).into_vec()?.len() == 32,
+            "invalid boundary blockhash"
+        );
+    }
+    let mut args = vec![
+        archive.to_str().context("non-UTF8 archive")?.into(),
+        "--full".into(),
+        "--threads".into(),
+        threads.to_string(),
+        "--anchor".into(),
+        e.parent_slot.to_string(),
+        e.parent_blockhash.clone(),
+        "--expected-terminal".into(),
+        e.terminal_slot.to_string(),
+        e.terminal_blockhash.clone(),
+    ];
+    if let Some(digest) = &e.provenance_sha256 {
+        ensure!(hex(digest, 64), "invalid expected provenance digest");
+        args.extend(["--expected-provenance-sha256".into(), digest.clone()]);
+    }
+    Ok(args)
 }
 
 #[derive(Debug, Deserialize)]
@@ -364,6 +420,16 @@ impl Gate {
         }
         bound_file(&plan.pipeline)?;
         bound_file(&plan.full_verifier)?;
+        let expectation_binding = plan
+            .epoch_expectations
+            .get(&epoch)
+            .context("missing epoch boundary evidence")?;
+        let expectation: EpochExpectation =
+            serde_json::from_value(bound_json(expectation_binding)?)?;
+        let full_args = full_arguments(archive, epoch, plan.threads, &expectation)?;
+        for evidence in &expectation.independent_evidence {
+            bound_file(evidence)?;
+        }
         private_directory(&plan.scratch_directory)?;
         let current = current_branch(&plan)?;
         check_readback_capacity(&plan, length)?;
@@ -393,12 +459,7 @@ impl Gate {
             archive.file_name() == gate.readback.file_name(),
             "noncanonical local archive name"
         );
-        let args = vec![
-            archive.to_string_lossy().into_owned(),
-            "--full".into(),
-            "--threads".into(),
-            gate.plan.threads.to_string(),
-        ];
+        let args = full_args;
         gate.command(&gate.plan.full_verifier, &args)?;
         gate.local_playback =
             gate.playback(archive.parent().context("archive parent")?, "local")?;
@@ -557,6 +618,43 @@ mod tests {
     }
 
     #[test]
+    fn full_verifier_gets_independent_parent_terminal_and_provenance() {
+        let mut e = EpochExpectation {
+            schema: "horizon-current-reader-epoch-expectation-v1".into(),
+            epoch: 251,
+            parent_slot: 108431999,
+            parent_blockhash: bs58::encode([1; 32]).into_string(),
+            terminal_slot: 108863999,
+            terminal_blockhash: bs58::encode([2; 32]).into_string(),
+            provenance_sha256: Some("a".repeat(64)),
+            independent_evidence: vec![Bound {
+                path: "/expectation".into(),
+                sha256: "b".repeat(64),
+            }],
+        };
+        let args = full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).unwrap();
+        assert!(
+            args.windows(3)
+                .any(|v| v[0] == "--anchor" && v[1] == "108431999" && v[2] == e.parent_blockhash)
+        );
+        assert!(args.windows(3).any(|v| v[0] == "--expected-terminal"
+            && v[1] == "108863999"
+            && v[2] == e.terminal_blockhash));
+        assert!(
+            args.windows(2)
+                .any(|v| v[0] == "--expected-provenance-sha256" && v[1] == "a".repeat(64))
+        );
+        e.terminal_slot -= 1;
+        assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+        e.terminal_slot += 1;
+        e.parent_slot += 1;
+        assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+        e.parent_slot -= 1;
+        e.independent_evidence.clear();
+        assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+    }
+
+    #[test]
     fn incomplete_wrong_epoch_or_wrong_source_playback_is_rejected() {
         for (pointer, replacement) in [
             ("/report/epoch", json!(250)),
@@ -594,6 +692,7 @@ mod tests {
             threads: 2,
             maximum_archive_bytes: 1024,
             minimum_free_bytes: 1024,
+            epoch_expectations: BTreeMap::new(),
         }
     }
 

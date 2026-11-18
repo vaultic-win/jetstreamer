@@ -37,3 +37,21 @@ The audit is created without overwriting any existing evidence. If a run
 is interrupted, retain its audit and prepare a new exact plan and audit filename
 for only the remaining files; never reuse an old identity or claim a planned
 deletion succeeded without checking its outcome.
+
+On 2026-11-18 the exact external epoch 246 bootstrap route passed nine tests,
+strict Clippy, a clean captured release build from published `8decfe9b`, and
+native check-only validation. The sealed executable is
+`/var/lib/jetstreamer/horizon246-retirement-20261118-v1/horizon-retire-completed`,
+SHA-256 `89aa3a83100904c7ae0f46e9334ff5554df4fdb86fc5161a117492dc1df1d37e`.
+Its original invocation `99de86d86b1843a38a1f78e7ac50fdc9` completed normally.
+The exact retirement plan and Main review are sealed in
+`/var/lib/jetstreamer/horizon246-bootstrap-retirement-plan-20261118-v1` and
+`/var/lib/jetstreamer/horizon246-bootstrap-retirement-review-20261118-v1`.
+
+Execution revalidated the target, matched fresh authenticated R2 inventory to
+the original whole-object receipt, repeated the consumer checks under the shared
+mutation lock, and removed **13,110,140,928 allocated bytes**. The audit is
+`/home/ubuntu/.codex/diagnostics/horizon246-bootstrap-retirement-review-20261118-v1/retirement-audit.jsonl`.
+The selected snapshot is absent; all four sibling metadata files remain.
+No R2 object was modified. The completed plan cannot be reused as another file's
+authority, and the remaining immutable metadata is retained as audit evidence.
