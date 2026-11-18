@@ -19,21 +19,23 @@ group before the controller enters its retry wait.
 
 ## Current source status and inventory
 
-This is a source candidate for parent review and publication, not an admitted
-deployment. The parent must publish it to `origin/account-updates`, bind its exact
-build/source identity, seal the controller/config, approve resource accounting,
-and install the unit before production work. No downloads were launched during
-source preparation. The test/debug image was used only for an authenticated
-`ListObjectsV2` inventory at 2026-11-18 21:25:14 UTC:
+The persistent service is deployed on this host. See
+[`docs/horizon-r2-chronological-audit-deployment-20261118.md`](../../docs/horizon-r2-chronological-audit-deployment-20261118.md)
+for its exact runtime, resource bounds and progress paths. Its v2 controller
+started at 2026-11-18 22:10:35 UTC after repairing a Cargo temporary-file race
+in the allocation guard. Reader qualification precedes the first download;
+startup alone is not evidence that any archive passed. The initial authenticated
+`ListObjectsV2` inventory at 2026-11-18 21:25:14 UTC contained:
 
 - 225 canonical archives, epochs 0 through 960, with gaps.
 - Total: 16,504,898,595,724 bytes.
 - Smallest: epoch 0, 398,594,860 bytes.
 - Largest: epoch 941, 385,290,386,716 bytes.
 
-The inventory evidence is currently in the root-private directory
+The initial inventory evidence is in the root-private directory
 `/tmp/horizon-r2-chronological-audit-inventory-20261118-v1/inventory.json`.
-The production run should capture a fresh inventory when its new state is created.
+Production captured its own inventory when its state was created, under
+`/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1/inventory.json`.
 Once captured, inventory membership/ETags are frozen; restart does not silently
 add epochs or accept replaced remote objects. A later sweep uses another state
 directory. Existing success and failure receipts both mean "attempted"; a later
@@ -107,8 +109,9 @@ Every newly built reader is installed by the existing root Rust sealer, with its
 independently supplied self hash and hash-bound plan. Each generation gets a new
 immutable directory containing the executable and full source/build proof. The
 controller verifies the root-owned sealed image and deployment receipt before
-reuse. It does not overwrite a reader deployment. The unprivileged service needs
-its existing noninteractive sudo route to the exact sealer; do not set
+reuse. It does not overwrite a reader deployment. The service runs as root so its
+guard can account for the sealer's private temporary directories and terminate
+privileged child groups. It invokes the exact sealer through noninteractive sudo; do not set
 `NoNewPrivileges=yes` on this service. The parent provisions the root-owned 0755
 reader root and exposes only that exact root in `ReadWritePaths`.
 
