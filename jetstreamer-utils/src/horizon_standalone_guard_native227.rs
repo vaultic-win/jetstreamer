@@ -63,8 +63,25 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
                 "/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",
             )
         && n.sha256 == "d3fe9c72d542237c97504e0b680fe51e2eb4365b8a9343a631f9bc7512529827";
+    let profile251 = cfg!(feature = "epoch251-native-main-guard")
+        && p.unit == "horizon251-native-input-small-20261118-v1.service"
+        && p.worker_root
+            == Path::new(
+                "/home/ubuntu/.jetstreamer-private/qualification-251-native-input-20261118-v2/run",
+            )
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon251-native-test-artifact-20261118-v1/jetstreamer-v1715-epoch251-native-test",
+            )
+        && n.sha256 == "fc0589c05f47eea76cbab2b2c10477e818c3a2484d35204ab0fcb695f487551b";
     ensure!(
-        (profile227_v1625 || profile227 || profile207 || profile209 || profile210 || profile228)
+        (profile227_v1625
+            || profile227
+            || profile207
+            || profile209
+            || profile210
+            || profile228
+            || profile251)
             && n.main_pid > 1
             && p.maximum_root_physical_bytes == Some(300_000_000_000)
             && p.maximum_worker_vmas == 3500000
@@ -168,6 +185,39 @@ fn observe_at(
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    #[test]
+    fn epoch251_exact_native_profile_requires_its_full_tuple() {
+        let mut p: Plan = serde_json::from_value(json!({
+            "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon251-native-input-small-20261118-v1.service",
+            "invocation_id":"a".repeat(32),"filesystem":"/","minimum_free_bytes":2_000_000_000_000u64,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/qualification-251-native-input-20261118-v2/run",
+            "maximum_worker_vmas":3_500_000,"maximum_root_physical_bytes":300_000_000_000u64,
+            "receipt_directory":"/var/lib/jetstreamer/horizon251-native-small-guard-receipts-v1"
+        })).unwrap();
+        let mut n = Binding {
+            executable: "/var/lib/jetstreamer/horizon251-native-test-artifact-20261118-v1/jetstreamer-v1715-epoch251-native-test".into(),
+            sha256: "fc0589c05f47eea76cbab2b2c10477e818c3a2484d35204ab0fcb695f487551b".into(),
+            main_pid: 123,
+        };
+        assert_eq!(
+            validate(&p, &n).is_ok(),
+            cfg!(feature = "epoch251-native-main-guard")
+        );
+        p.unit = "horizon251-native-input-test-20261118-v1.service".into();
+        assert!(validate(&p, &n).is_err());
+        p.unit = "horizon251-native-input-small-20261118-v1.service".into();
+        n.sha256 = "0".repeat(64);
+        assert!(validate(&p, &n).is_err());
+        n.sha256 = "fc0589c05f47eea76cbab2b2c10477e818c3a2484d35204ab0fcb695f487551b".into();
+        p.worker_root = "/tmp/other".into();
+        assert!(validate(&p, &n).is_err());
+        p.worker_root =
+            "/home/ubuntu/.jetstreamer-private/qualification-251-native-input-20261118-v2/run"
+                .into();
+        p.maximum_root_physical_bytes = Some(299_999_999_999);
+        assert!(validate(&p, &n).is_err());
+    }
     #[test]
     fn epoch207_requires_its_complete_registered_tuple_and_preserves227() {
         let mut p: Plan = serde_json::from_value(json!({
