@@ -301,3 +301,14 @@ The 7 GB/one-job build reuses the closed release cache and preserves every live
 worker. Its initial filter is `current_reader::`; genuine transport and restore
 tests remain to be run from that resulting harness before selecting the new
 uploader for the historical restore/readback operation.
+
+That standalone uploader-target build subsequently failed before tests ran:
+`bs58::decode::Error` lacks `StdError` when its `std` feature is absent. The
+combined reader build had enabled that feature through dependency unification,
+masking the uploader's implicit reliance on it. The boundary decoder now maps
+the displayable decoding error explicitly, without requiring `bs58/std`.
+The bounded production-module test package now selects only `bs58/alloc`,
+matching this constraint, and tests malformed and wrong-length parent and
+terminal hashes. All seven tests pass. The failed native build and journal
+remain preserved; actual uploader-target compilation/tests must be repeated
+from the published correction before operational use.

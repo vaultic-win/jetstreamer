@@ -85,10 +85,12 @@ fn full_arguments(
         "missing independent full-epoch parent/terminal expectations"
     );
     for hash in [&e.parent_blockhash, &e.terminal_blockhash] {
-        ensure!(
-            bs58::decode(hash).into_vec()?.len() == 32,
-            "invalid boundary blockhash"
-        );
+        // bs58's std feature is not required by the standalone uploader.
+        // Do not rely on another workspace target enabling its StdError impl.
+        let decoded = bs58::decode(hash)
+            .into_vec()
+            .map_err(|error| anyhow::anyhow!("invalid boundary blockhash: {error}"))?;
+        ensure!(decoded.len() == 32, "invalid boundary blockhash");
     }
     let mut args = vec![
         archive.to_str().context("non-UTF8 archive")?.into(),
@@ -644,6 +646,14 @@ mod tests {
             args.windows(2)
                 .any(|v| v[0] == "--expected-provenance-sha256" && v[1] == "a".repeat(64))
         );
+        for invalid in ["0".to_string(), bs58::encode([1; 31]).into_string()] {
+            let parent = std::mem::replace(&mut e.parent_blockhash, invalid.clone());
+            assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+            e.parent_blockhash = parent;
+            let terminal = std::mem::replace(&mut e.terminal_blockhash, invalid);
+            assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+            e.terminal_blockhash = terminal;
+        }
         e.terminal_slot -= 1;
         assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
         e.terminal_slot += 1;
