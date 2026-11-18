@@ -81,6 +81,21 @@ bucket. The bucket-level setting covers both existing and future objects. If the
 control-plane credential cannot inspect or enable that origin, preserve all objects and report the
 permission blocker without holding up the authenticated archive campaign.
 
+Before publishing a `.jet` archive to R2, establish that it is readable by the archive consumer
+from the current `origin/account-updates` branch. This compatibility gate applies to archives only;
+status JSONs, sidecars and other operational objects retain their existing validation requirements.
+Source publication alone is not compatibility evidence. Fetch the branch and bind the reader commit,
+exact reader artifact/features and archive format to the publication evidence. Fully decode and
+verify the exact staged archive through that current reader before upload. A checksum match or
+successful upload alone does not prove readability. Retain authenticated remote readback and the
+existing full/plugin/boundary gates; use the current reader on the readback or prove it is
+byte-identical to the archive that passed the current reader. An already-qualified reader may be
+reused only when its relevant source, dependencies, features and format support are demonstrably
+unchanged on the fetched branch. If compatibility requires a fix, merge it into `account-updates`
+and qualify the resulting reader before publishing the archive. Never publish an archive that only
+an unmerged fork, local patch or private reader understands. This rule does not authorize
+overwriting or deleting an existing archive or sidecar.
+
 Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
 ## Rust-first implementation policy
