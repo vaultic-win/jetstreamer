@@ -18,12 +18,12 @@ fn main()->Result<()> {
  let git=|a:&[&str]|run(Command::new("git").arg("-C").arg(REPO).args(a));
  let commit=git(&["rev-parse","HEAD"])?;git(&["merge-base","--is-ancestor",commit.trim(),"origin/account-updates"])?;
  ensure!(git(&["status","--porcelain","--untracked-files=no","--","scripts/horizon_snapshot183_cleanup_20261118_v1","jetstreamer-horizon-observe","scripts/horizon_retry6_167_live166_stage_20261118_v1"])?.is_empty(),"relevant source changed");
- git(&["diff","--exit-code","a3a8913c","HEAD","--","scripts/horizon_snapshot183_cleanup_20261118_v1","jetstreamer-horizon-observe"])?;
+ git(&["diff","--exit-code","663c476d","HEAD","--","scripts/horizon_snapshot183_cleanup_20261118_v1","jetstreamer-horizon-observe"])?;
  ensure!(sha(&fs::read(IMAGE)?)==IMAGE_SHA && sha(&fs::read(SEALER)?)==SEALER_SHA,"qualified image or sealer changed");
  fs::create_dir(ROOT)?;fs::set_permissions(ROOT,fs::Permissions::from_mode(0o700))?;
  let mut sources=serde_json::Map::new();
  for p in git(&["ls-files","--","scripts/horizon_snapshot183_cleanup_20261118_v1"])?.lines(){sources.insert(p.into(),json!(sha(&fs::read(format!("{REPO}/{p}"))?)));}
- let proof=json!({"schema":"horizon-snapshot183-private-retire-build-proof-v1","source_commit":commit.trim(),"equivalent_reviewed_source_commit":"a3a8913c","source_verified_on_fetched_origin":true,"source_paths":sources,"production_sha256":IMAGE_SHA,"retirement_scope":[0],"retained_sealed_source_preserved":true,"tests_and_clippy_passed_in_source_qualification":true,"remote_mutations":false,"r2_mutations":false});
+ let proof=json!({"schema":"horizon-snapshot183-private-retire-build-proof-v1","source_commit":commit.trim(),"equivalent_reviewed_source_commit":"663c476d","source_verified_on_fetched_origin":true,"source_paths":sources,"production_sha256":IMAGE_SHA,"retirement_scope":[0],"retained_sealed_source_preserved":true,"tests_and_clippy_passed_in_source_qualification":true,"rebuild_after_observe_rss_change_preserved_exact_image":true,"remote_mutations":false,"r2_mutations":false});
  let proof_bytes=serde_json::to_vec_pretty(&proof)?;let pp=save("artifact-proof.json",&proof_bytes)?;
  let plan=json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":DEST,"members":[{"source":IMAGE,"name":"retire","sha256":IMAGE_SHA,"mode":365},{"source":pp,"name":"artifact-proof.json","sha256":sha(&proof_bytes),"mode":292}]});
  let bytes=serde_json::to_vec_pretty(&plan)?;let path=save("seal-plan.json",&bytes)?;
