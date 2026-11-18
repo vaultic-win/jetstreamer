@@ -1531,6 +1531,13 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   After changing tracked campaign code, documentation or this skill, run the relevant checks,
   commit with the repository's configured Git identity and push to `origin/account-updates` in
   the same work cycle. Verify the remote branch contains the commit before reporting it pushed.
+  **Before admitting any epoch**, commit and push every required epoch-specific compatibility,
+  runtime, launcher and admission-tool change to `origin/account-updates`. Fetch and verify that
+  the deployed source commits are contained in that remote branch, and bind that source-control
+  proof to the admission. If history was rebased, establish the exact merged source equivalence;
+  a local commit, untracked preparation source, sealed binary or passing test alone is insufficient.
+  Resolve missing source publication before admission; preserve already healthy workers while
+  reconciling historical provenance. Publication later in the same cycle does not satisfy this gate.
 - Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
   active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
   from an earlier session. Check the inherited environment for required service credentials before
