@@ -501,7 +501,7 @@ pub(super) async fn run() -> Result<()> {
     let plan: Plan = serde_json::from_slice(&bound_bytes(&plan_bound, MAX_STATUS_BYTES, "plan")?)?;
     ensure!(
         plan.schema == PLAN_SCHEMA
-            && matches!(plan.epoch, 211 | 223 | 226 | 227 | 265)
+            && matches!(plan.epoch, 208 | 211 | 223 | 226 | 227 | 265)
             && plan.exclusive_local_epoch_ownership
             && plan.authenticated_other_host_handoffs.is_empty()
             && plan.no_archive_or_sidecar_mutations,
