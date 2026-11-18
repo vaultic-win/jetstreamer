@@ -156,6 +156,37 @@ fn run() -> Result<()> {
             "--property=MemoryMax=4G","--property=TasksMax=128","--property=LimitNOFILE=1048576",
             &prepare_image,p["path"].as_str().context("prepare plan")?,"--plan-sha256",p["sha256"].as_str().context("prepare plan SHA")?,
             "--self-sha256",&prepare_sha,"--prepare"]))?;
+    } else if args[1]=="holding141" {
+        let source="/home/sol/.jetstreamer-private/epoch141-ledger-source-20261020-v1/download/rocksdb.tar.bz2";
+        let hash="7af478aec31809cebdeae761d44c19bb90bf06e15d2430813b3b0fe691e6a70b";
+        let hash_output="/var/lib/jetstreamer/epoch167-disk-fit-recovery-20261118-v1/epoch141-source-sha256.txt";
+        ensure!(fs::read_to_string(hash_output)?.trim()==format!("{hash}  {source}"),"completed source digest missing");
+        let hash_native=native("horizon-epoch141-closed-input-hash-20261118-v1.service","holding141-hash-native.txt")?;
+        use std::os::unix::fs::MetadataExt;
+        let m=fs::symlink_metadata(source)?;
+        ensure!(m.is_file() && m.dev()==64512 && m.ino()==105526093 && m.uid()==0 && m.gid()==0
+            && m.mode()&0o7777==0o444 && m.nlink()==1 && m.len()==189_943_475_031,"closed source identity changed");
+        let destination="/usr/local/lib/jetstreamer/horizon-closed141-input-holding-plan-20261118-v1";
+        let eligibility=json!({"schema":"jetstreamer-horizon-holding-eligibility-v2","host":"dev-samjohnson",
+            "source":source,"length":m.len(),"sha256":hash,"closed":true,"content_class":"public-chain-artifact",
+            "credentials_config_and_logs_excluded":true,"canonical_archive":false,"local_retirement_authorized":false,
+            "purpose":"Park the closed compressed epoch141 ledger source while its extracted input remains local, to recover capacity for epoch167 replay. The Rust parker independently rejects live process references and rehashes the source before and after remote readback.",
+            "source_hash_native":hash_native,"source_hash_output":bind(hash_output)?,
+            "identity":{"device":m.dev(),"inode":m.ino(),"uid":m.uid(),"gid":m.gid(),"mode":m.mode(),"length":m.len(),"allocated_bytes":m.blocks()*512},
+            "restore_route":"Authenticated holding-restore into private staging with a freshly qualified restore admission before epoch141 needs this compressed source again.",
+            "rotation_budget":{"candidate_epoch":167,"native_free_bytes":7_261_548_232_704u64,"required_bytes":7_493_617_796_914u64,
+                "deficit_bytes":232_069_564_210u64,"potential_reclaim_bytes":m.blocks()*512,"credited_reclaim_bytes":0,
+                "restore_overlap_bytes":m.len(),"upload_local_growth_bytes":0,"readback_streamed":true,
+                "additional_recovery_required":"Qualify at least 43 GB of duplicate snapshot-cache cleanup; no capacity credit until actual retirement.",
+                "transfer_readback_planning_seconds":10800,"restore_planning_seconds":7200},
+            "runtime_checkpoint_qualified":false,"replay_launch_authorized":false});
+        let e=json_file("holding141-eligibility.json",&eligibility)?;
+        let p=json_file("holding141-plan.json",&json!({"schema":"jetstreamer-horizon-holding-park-plan-v2",
+            "mapping":bind("/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json")?,
+            "eligibility":{"path":format!("{destination}/eligibility.json"),"sha256":e["sha256"]},
+            "source":source,"length":m.len(),"sha256":hash}))?;
+        seal("holding141-seal-plan.json",destination,json!([member(e["path"].as_str().unwrap(),"eligibility.json",256)?,member(p["path"].as_str().unwrap(),"plan.json",256)?]))?;
+        println!("{}",bind(&format!("{destination}/plan.json"))?);
     } else { anyhow::bail!("unknown operation"); }
     Ok(())
 }
