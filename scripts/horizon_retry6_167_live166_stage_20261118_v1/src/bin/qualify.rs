@@ -45,7 +45,7 @@ fn git(args: &[&str]) -> Result<String> { output(Command::new("git").arg("-C").a
 fn run() -> Result<()> {
     ensure!(unsafe {libc::geteuid()} == 0,"Root required");
     let args:Vec<_>=std::env::args().collect();
-    ensure!(args.len()==2,"qualify source|runtime|stage");
+    ensure!(args.len()==2,"qualify source|runtime|stage|cycle");
     let commit=git(&["rev-parse","HEAD"])? .trim().to_owned();
     git(&["merge-base","--is-ancestor",&commit,"origin/account-updates"])?;
     ensure!(git(&["status","--porcelain","--untracked-files=no"])?.is_empty(),"tracked tree changed");
@@ -83,6 +83,33 @@ fn run() -> Result<()> {
             "replay_launch_authorized":false}))?;
         println!("{}",seal("stage-runtime-seal-plan.json","/usr/local/lib/jetstreamer/horizon-epoch167-live166-stage-20261118-v3",
             json!([member(&binary,"stage",365)?,member(&source,"main.rs",292)?,member(&manifest,"Cargo.toml",292)?,member(&lock,"Cargo.lock",292)?,member(p["path"].as_str().unwrap(),"artifact-proof.json",292)?]))?);
+    } else if args[1]=="cycle" {
+        let observer="/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root2049-live166-20261118-v1.json";
+        let status="/home/sol/.jetstreamer-private/r2-status-receipts/cycle2049-live166-19-20261118-v1/COMPLETED.json";
+        let sample:Value=serde_json::from_slice(&fs::read(observer)?)?;
+        let audit:Value=serde_json::from_slice(&fs::read(status)?)?;
+        ensure!(sample["recorded_at_utc"]=="2026-11-18T20:49:25Z"
+            && sample["cadence"]["next_routine_observation_not_before_utc"]=="2026-11-18T21:19:25Z"
+            && audit["observer"]==bind(observer)? && audit["authenticated_readback"]==true,
+            "exact accepted next cycle required");
+        let mut next:Value=serde_json::from_slice(&fs::read("/usr/local/lib/jetstreamer/horizon-live166-observer-config-20261118-v3/next-observer.json")?)?;
+        next["previous_sample"]=json!(observer);
+        next["not_before_utc"]=sample["cadence"]["next_routine_observation_not_before_utc"].clone();
+        next["output"]=json!("/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root2119-live166-20261118-v1.json");
+        let next_source=json_file("next-observer.json",&next)?;
+        let next_package="/usr/local/lib/jetstreamer/horizon-live166-observer-config-20261118-v4";
+        seal("next-observer-seal-plan.json",next_package,json!([member(next_source["path"].as_str().unwrap(),"next-observer.json",292)?]))?;
+        let mut cfg:Value=serde_json::from_slice(&fs::read("/var/lib/jetstreamer/epoch167-live166-stage-20261118-v1/stage-config2033.json")?)?;
+        let root="/var/lib/jetstreamer/root2054-live166-prepare167-20261118-v1";
+        fs::create_dir(root)?;fs::set_permissions(root,fs::Permissions::from_mode(0o700))?;
+        cfg["output_root"]=json!(root);
+        cfg["observer"]=bind(observer)?;cfg["status_audit"]=bind(status)?;
+        cfg["next_observer"]=bind(&format!("{next_package}/next-observer.json"))?;
+        cfg["booking_path"]=json!("/var/lib/jetstreamer/epoch167-retry6-zeropeer-20261118-v1/ROOT_DATA_BOOKING-20261118T2054Z.json");
+        cfg["measurement"]=bind("/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry6/physical-1795035019-1492131.json")?;
+        cfg["preparer_image"]=json!(format!("{RUNTIME}/prepare"));
+        cfg["preparer_qualification"]=bind(&format!("{STATE}/artifact-proof.json"))?;
+        println!("{}",json_file("stage-config2054.json",&cfg)?);
     } else { anyhow::bail!("unknown operation"); }
     Ok(())
 }
