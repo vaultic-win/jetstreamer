@@ -94,3 +94,12 @@ manifest. Existing healthy owners retain their immutable deployments while
 historical source gaps are resolved. The original sealed launcher v1 is retained;
 this new capture command has not yet been sealed or used for native admission.
 The expanded launcher suite has 21 passing tests and strict Clippy passes.
+
+The `horizon251-standalone-guard` target compiles the repository's existing four
+standalone-guard source modules directly. It provides a bounded build route for
+a new candidate with complete source/compiler capture, without replacing any
+running guard. The selected `epoch223-native20-prefix-guard` feature preserves
+the older guard's profile in addition to the ordinary standalone namespace;
+the other declared features remain disabled. This target passed 38 tests and
+strict Clippy. Native isolated qualification and new immutable candidate unit
+bindings remain necessary before selecting its artifact for epoch 251.
