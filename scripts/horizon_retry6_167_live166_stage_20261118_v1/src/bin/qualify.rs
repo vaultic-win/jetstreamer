@@ -45,7 +45,9 @@ fn git(args: &[&str]) -> Result<String> { output(Command::new("git").arg("-C").a
 fn run() -> Result<()> {
     ensure!(unsafe {libc::geteuid()} == 0,"Root required");
     let args:Vec<_>=std::env::args().collect();
-    ensure!(args.len()==2 || (args.len()==3 && args[1]=="prepare"),"qualify source|runtime|stage|cycle|prepare HHMM");
+    ensure!((args.len()==2 && matches!(args[1].as_str(),"source"|"runtime"|"stage"|"cycle"|"close-hash141"|"holding141"))
+        || (args.len()==6 && args[1]=="measure") || (args.len()==7 && args[1]=="prepare"),
+        "qualify source|runtime|stage|cycle|measure HHMM OBSERVER STATUS NEXT_OBSERVER|prepare HHMM OBSERVER STATUS NEXT_OBSERVER MEASUREMENT");
     let commit=git(&["rev-parse","HEAD"])? .trim().to_owned();
     git(&["merge-base","--is-ancestor",&commit,"origin/account-updates"])?;
     ensure!(git(&["status","--porcelain","--untracked-files=no"])?.is_empty(),"tracked tree changed");
@@ -110,7 +112,8 @@ fn run() -> Result<()> {
         cfg["preparer_image"]=json!(format!("{RUNTIME}/prepare"));
         cfg["preparer_qualification"]=bind(&format!("{STATE}/artifact-proof.json"))?;
         println!("{}",json_file("stage-config2054.json",&cfg)?);
-    } else if args[1]=="prepare" {
+    } else if args[1]=="prepare" || args[1]=="measure" {
+        let measure=args[1]=="measure";
         let tag=&args[2];
         ensure!(tag.len()==4 && tag.bytes().all(|b|b.is_ascii_digit()),"four-digit attempt label");
         let root=format!("/var/lib/jetstreamer/root{tag}-live166-prepare167-20261118-v1");
@@ -120,6 +123,14 @@ fn run() -> Result<()> {
         let witness_path=format!("{witness_root}/NATIVE_WITNESS.json");
         let witness_unit=format!("horizon-167-live166retry7-data-witness-{tag}-20261118-v1");
         let mut cfg:Value=serde_json::from_slice(&fs::read(format!("{STATE}/stage-config2054.json"))?)?;
+        cfg["observer"]=bind(&args[3])?;
+        cfg["status_audit"]=bind(&args[4])?;
+        cfg["next_observer"]=bind(&args[5])?;
+        cfg["measurement"]=if measure {Value::Null} else {bind(&args[6])?};
+        // A measurement cannot launch and does not consume a fresh witness.
+        // The preparation route obtains its own short-lived native witness only
+        // after the caller supplies the completed physical measurement.
+        if !measure {
         let guard=cfg["data_fulfillment"]["runtime"]["path"].as_str().context("guard path")?;
         let guard_sha=cfg["data_fulfillment"]["runtime"]["sha256"].as_str().context("guard SHA")?;
         ensure!(sha(&fs::read(guard)?)==guard_sha,"guard runtime changed");
@@ -139,6 +150,7 @@ fn run() -> Result<()> {
         let contract_seal=seal(&format!("contract-seal-plan-{tag}.json"),&contract_runtime,
             json!([member(contract_source["path"].as_str().unwrap(),"contract.json",292)?]))?;
         cfg["data_fulfillment"]["contract"]=json!({"contract":bind(&format!("{contract_runtime}/contract.json"))?,"deployment_seal":contract_seal});
+        }
         cfg["output_root"]=json!(root);
         cfg["booking_path"]=json!(format!("/var/lib/jetstreamer/epoch167-retry6-zeropeer-20261118-v1/ROOT_DATA_BOOKING-20261118T{tag}Z.json"));
         let c=json_file(&format!("stage-config{tag}.json"),&cfg)?;
@@ -148,14 +160,15 @@ fn run() -> Result<()> {
         let generated:Value=serde_json::from_str(&stage_result)?;
         let p=&generated["plan"];
         println!("{stage_result}");
-        let prepare_unit=format!("horizon-167-live166retry7-prepare-operation-{tag}-20261118-v1");
+        let operation=if measure {"measure"} else {"prepare"};
+        let prepare_unit=format!("horizon-167-live166retry7-{operation}-operation-{tag}-20261118-v1");
         let prepare_image=format!("{RUNTIME}/prepare");
         let prepare_sha=sha(&fs::read(&prepare_image)?);
         output(Command::new("/usr/bin/systemd-run").args(["--unit",&prepare_unit,
             "--property=Type=oneshot","--property=RemainAfterExit=yes","--property=CPUQuota=200%",
             "--property=MemoryMax=4G","--property=TasksMax=128","--property=LimitNOFILE=1048576",
             &prepare_image,p["path"].as_str().context("prepare plan")?,"--plan-sha256",p["sha256"].as_str().context("prepare plan SHA")?,
-            "--self-sha256",&prepare_sha,"--prepare"]))?;
+            "--self-sha256",&prepare_sha,if measure {"--measure-only"} else {"--prepare"}]))?;
     } else if args[1]=="close-hash141" {
         let unit="horizon-epoch141-closed-input-hash-20261118-v1.service";
         let iid="24688356ca3f4f5c91ee225680f4d596";
