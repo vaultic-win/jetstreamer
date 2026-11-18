@@ -22,6 +22,11 @@
 //!   filenames.
 //! - `JETSTREAMER_FORCE_LEGACY_INDEX`: Set to `1`/`true` to skip the slot-ranges index and use
 //!   the legacy compactindex pair directly (debugging escape hatch).
+//! - `JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST`: Absolute path to a JSON manifest of local,
+//!   digest-pinned slot-ranges files. Requires `JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256`.
+//!   A configured local file is never replaced by a remote or legacy fallback on failure.
+//!   The manifest is `{"schema":"jetstreamer-local-slot-ranges-overrides-v1","entries":[
+//!   {"epoch":253,"path":"/absolute/repaired.raw","sha256":"<lowercase hex>"}]}`.
 //!
 //! ### Example
 //!
@@ -55,10 +60,16 @@ use futures_util::StreamExt;
 use log::{info, warn};
 use once_cell::sync::{Lazy, OnceCell as SyncOnceCell};
 use reqwest::{Client, StatusCode, Url, header::RANGE};
+use serde::Deserialize;
 use serde_cbor::Value;
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
+    fs::OpenOptions,
+    io::Read,
     ops::RangeInclusive,
+    os::unix::fs::OpenOptionsExt,
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -110,6 +121,9 @@ pub enum SlotOffsetIndexError {
     /// Index payload was malformed.
     #[error("invalid index format at {0}: {1}")]
     IndexFormatError(Url, String),
+    /// A configured local slot-ranges override failed its exact binding.
+    #[error("local slot-ranges override: {0}")]
+    LocalOverrideError(String),
     /// CAR header could not be read or decoded.
     #[error("failed to read CAR header {0}: {1}")]
     CarHeaderError(Url, String),
@@ -287,6 +301,137 @@ pub struct SlotOffsetIndex {
     cache_namespace: Arc<str>,
     backend: IndexBackend,
     force_legacy: bool,
+    local_slot_ranges: HashMap<u64, LocalSlotRangesOverride>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocalSlotRangesManifest {
+    schema: String,
+    entries: Vec<LocalSlotRangesEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LocalSlotRangesEntry {
+    epoch: u64,
+    path: PathBuf,
+    sha256: String,
+}
+
+struct LocalSlotRangesOverride {
+    path: PathBuf,
+    sha256: String,
+}
+
+const LOCAL_SLOT_RANGES_SCHEMA: &str = "jetstreamer-local-slot-ranges-overrides-v1";
+
+fn read_regular_nofollow(path: &Path, max_bytes: u64) -> Result<Vec<u8>, SlotOffsetIndexError> {
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|e| {
+            SlotOffsetIndexError::LocalOverrideError(format!("{}: {e}", path.display()))
+        })?;
+    let metadata = file.metadata().map_err(|e| {
+        SlotOffsetIndexError::LocalOverrideError(format!("{}: {e}", path.display()))
+    })?;
+    if !metadata.is_file() || metadata.len() > max_bytes {
+        return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+            "{} is not a regular file of at most {max_bytes} bytes",
+            path.display()
+        )));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(max_bytes + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| {
+            SlotOffsetIndexError::LocalOverrideError(format!("{}: {e}", path.display()))
+        })?;
+    if bytes.len() as u64 != metadata.len() {
+        return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+            "{} changed size while reading",
+            path.display()
+        )));
+    }
+    Ok(bytes)
+}
+
+fn valid_sha256(s: &str) -> bool {
+    s.len() == 64
+        && s.bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+}
+
+fn digest_matches(bytes: &[u8], expected: &str) -> bool {
+    format!("{:x}", Sha256::digest(bytes)) == expected
+}
+
+fn parse_local_slot_ranges_manifest(
+    bytes: &[u8],
+) -> Result<HashMap<u64, LocalSlotRangesOverride>, SlotOffsetIndexError> {
+    let manifest: LocalSlotRangesManifest = serde_json::from_slice(bytes).map_err(|e| {
+        SlotOffsetIndexError::LocalOverrideError(format!("invalid manifest JSON: {e}"))
+    })?;
+    if manifest.schema != LOCAL_SLOT_RANGES_SCHEMA || manifest.entries.is_empty() {
+        return Err(SlotOffsetIndexError::LocalOverrideError(
+            "manifest schema mismatch or no entries".into(),
+        ));
+    }
+    let mut entries = HashMap::new();
+    for entry in manifest.entries {
+        if !entry.path.is_absolute() || !valid_sha256(&entry.sha256) {
+            return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+                "epoch {} requires an absolute path and lowercase SHA-256",
+                entry.epoch
+            )));
+        }
+        if entries
+            .insert(
+                entry.epoch,
+                LocalSlotRangesOverride {
+                    path: entry.path,
+                    sha256: entry.sha256,
+                },
+            )
+            .is_some()
+        {
+            return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+                "duplicate epoch {} in manifest",
+                entry.epoch
+            )));
+        }
+    }
+    Ok(entries)
+}
+
+fn load_local_slot_ranges_manifest()
+-> Result<(HashMap<u64, LocalSlotRangesOverride>, Option<String>), SlotOffsetIndexError> {
+    let path = std::env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST");
+    let sha = std::env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").ok();
+    match (path, sha) {
+        (None, None) => Ok((HashMap::new(), None)),
+        (Some(path), Some(sha)) => {
+            let path = PathBuf::from(path);
+            if !path.is_absolute() || !valid_sha256(&sha) {
+                return Err(SlotOffsetIndexError::LocalOverrideError(
+                    "manifest requires an absolute path and lowercase SHA-256".into(),
+                ));
+            }
+            let bytes = read_regular_nofollow(&path, 64 * 1024)?;
+            if !digest_matches(&bytes, &sha) {
+                return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+                    "manifest SHA-256 mismatch: {}",
+                    path.display()
+                )));
+            }
+            Ok((parse_local_slot_ranges_manifest(&bytes)?, Some(sha)))
+        }
+        _ => Err(SlotOffsetIndexError::LocalOverrideError(
+            "both override manifest path and SHA-256 are required".into(),
+        )),
+    }
 }
 
 struct EpochEntry {
@@ -320,8 +465,13 @@ impl SlotOffsetIndex {
     pub fn new(base_url: Url) -> Result<Self, SlotOffsetIndexError> {
         let network =
             std::env::var("JETSTREAMER_NETWORK").unwrap_or_else(|_| "mainnet".to_string());
-        let cache_namespace =
-            Arc::<str>::from(format!("{}|{}", base_url.as_str(), network.as_str()));
+        let (local_slot_ranges, manifest_sha) = load_local_slot_ranges_manifest()?;
+        let cache_namespace = Arc::<str>::from(format!(
+            "{}|{}|{}",
+            base_url.as_str(),
+            network.as_str(),
+            manifest_sha.as_deref().unwrap_or("remote")
+        ));
         let location = archive::index_location();
         let backend = if location.is_http() {
             IndexBackend::Http
@@ -348,6 +498,11 @@ impl SlotOffsetIndex {
                     || value.eq_ignore_ascii_case("yes")
             })
             .unwrap_or(false);
+        if force_legacy && !local_slot_ranges.is_empty() {
+            return Err(SlotOffsetIndexError::LocalOverrideError(
+                "local slot-ranges overrides cannot be combined with forced legacy indexes".into(),
+            ));
+        }
         Ok(Self {
             client: crate::network::create_http_client(),
             base_url,
@@ -355,6 +510,7 @@ impl SlotOffsetIndex {
             cache_namespace,
             backend,
             force_legacy,
+            local_slot_ranges,
         })
     }
 
@@ -386,6 +542,9 @@ impl SlotOffsetIndex {
         &self,
         epoch: u64,
     ) -> Result<SlotRangesIndex, SlotOffsetIndexError> {
+        if let Some(local) = self.local_slot_ranges.get(&epoch) {
+            return SlotRangesIndex::open_local(local, epoch);
+        }
         let path = format!("{0}/epoch-{0}-slot-ranges.raw", epoch);
         let object = self.remote_for_path(&path)?;
         SlotRangesIndex::open(object, epoch).await
@@ -586,6 +745,45 @@ struct SlotRangesIndex {
 }
 
 impl SlotRangesIndex {
+    fn open_local(
+        local: &LocalSlotRangesOverride,
+        epoch: u64,
+    ) -> Result<Self, SlotOffsetIndexError> {
+        let (slot_start, slot_end_inclusive) = epoch_to_slot_range(epoch);
+        let expected_len = (slot_end_inclusive - slot_start + 1)
+            .checked_mul(SLOT_RANGES_RECORD_SIZE as u64)
+            .ok_or_else(|| {
+                SlotOffsetIndexError::LocalOverrideError(format!(
+                    "epoch {epoch} slot-ranges length overflow"
+                ))
+            })?;
+        let bytes = read_regular_nofollow(&local.path, expected_len)?;
+        if !digest_matches(&bytes, &local.sha256) {
+            return Err(SlotOffsetIndexError::LocalOverrideError(format!(
+                "epoch {epoch} slot-ranges SHA-256 mismatch: {}",
+                local.path.display()
+            )));
+        }
+        let url = Url::from_file_path(&local.path).map_err(|_| {
+            SlotOffsetIndexError::LocalOverrideError(format!(
+                "epoch {epoch} invalid local path: {}",
+                local.path.display()
+            ))
+        })?;
+        info!(
+            target: LOG_MODULE,
+            "Using digest-pinned local slot-ranges index for epoch {epoch}: {}",
+            local.path.display()
+        );
+        Self::from_file(
+            RemoteIndexFile {
+                url,
+                data: Arc::from(bytes),
+            },
+            slot_start..=slot_end_inclusive,
+        )
+    }
+
     async fn open(object: RemoteObject, epoch: u64) -> Result<Self, SlotOffsetIndexError> {
         info!(
             target: LOG_MODULE,
@@ -1932,6 +2130,71 @@ pub fn get_index_base_url() -> Result<Url, SlotOffsetIndexError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_slot_ranges_manifest_rejects_ambiguous_bindings() {
+        let entry = serde_json::json!({
+            "epoch": 253,
+            "path": "/private/epoch-253.repaired.raw",
+            "sha256": "a".repeat(64)
+        });
+        let manifest = serde_json::json!({
+            "schema": LOCAL_SLOT_RANGES_SCHEMA,
+            "entries": [entry.clone(), entry]
+        });
+        assert!(parse_local_slot_ranges_manifest(&serde_json::to_vec(&manifest).unwrap()).is_err());
+
+        let mut manifest = serde_json::json!({
+            "schema": LOCAL_SLOT_RANGES_SCHEMA,
+            "entries": [{
+                "epoch": 253,
+                "path": "relative.raw",
+                "sha256": "a".repeat(64)
+            }]
+        });
+        assert!(parse_local_slot_ranges_manifest(&serde_json::to_vec(&manifest).unwrap()).is_err());
+        manifest["entries"][0]["path"] = "/private/epoch-253.repaired.raw".into();
+        assert_eq!(
+            parse_local_slot_ranges_manifest(&serde_json::to_vec(&manifest).unwrap())
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn local_slot_ranges_read_is_digest_pinned_and_nofollow() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("epoch-253.repaired.raw");
+        let (first, last) = epoch_to_slot_range(253);
+        let mut data = vec![0; ((last - first + 1) as usize) * SLOT_RANGES_RECORD_SIZE];
+        data[..8].copy_from_slice(&123u64.to_le_bytes());
+        data[8..12].copy_from_slice(&42u32.to_le_bytes());
+        std::fs::write(&path, &data).unwrap();
+        let expected = format!("{:x}", Sha256::digest(&data));
+        let local = LocalSlotRangesOverride {
+            path: path.clone(),
+            sha256: expected,
+        };
+        let index = SlotRangesIndex::open_local(&local, 253).unwrap();
+        assert_eq!(index.lookup_range(first).unwrap(), (123, 42));
+
+        data[0] ^= 1;
+        std::fs::write(&path, &data).unwrap();
+        let error = match SlotRangesIndex::open_local(&local, 253) {
+            Ok(_) => panic!("changed bytes must fail the digest pin"),
+            Err(error) => error,
+        };
+        assert!(!slot_ranges_error_allows_legacy_fallback(&error));
+
+        let link = dir.path().join("linked.raw");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        let linked = LocalSlotRangesOverride {
+            path: link,
+            sha256: format!("{:x}", Sha256::digest(&data)),
+        };
+        assert!(SlotRangesIndex::open_local(&linked, 253).is_err());
+    }
 
     struct LiveEpochIndexFixture {
         epoch: u64,
