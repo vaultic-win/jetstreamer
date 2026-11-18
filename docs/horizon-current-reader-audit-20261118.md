@@ -312,3 +312,15 @@ matching this constraint, and tests malformed and wrong-length parent and
 terminal hashes. All seven tests pass. The failed native build and journal
 remain preserved; actual uploader-target compilation/tests must be repeated
 from the published correction before operational use.
+
+Published correction `823c2f19` subsequently passed all seven current-reader
+tests in the actual standalone uploader target. That native build completed
+normally in 2m18s with a 2.3 GiB peak, and the source manifest remained unchanged.
+The same actual harness also passed ten tests selected by `restore` and the
+instrumented transport test covering successful readback, digest rejection and
+writer failure. Journals with genuine test output are preserved under
+`horizon-current-uploader-native-tests-20261118-v2`; the selected transport and
+restore services use suffix `v2` to capture output in the journal rather than
+only forwarding it to the terminal. The production uploader release build from
+that corrected source is the next qualification step, followed by immutable
+sealing and the actual epoch-205 restore/readback audit.
