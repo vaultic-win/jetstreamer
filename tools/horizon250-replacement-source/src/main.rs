@@ -1,5 +1,6 @@
 //! Dormant producer/guard source packets. No service mutation or replay launch.
 mod epoch251;
+mod network251;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -102,6 +103,9 @@ fn save(name: &str, bytes: &[u8]) -> Result<Value> {
     Ok(json!({"path":p,"sha256":digest(bytes),"bytes":bytes.len()}))
 }
 fn run() -> Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("capture-251-network") {
+        return network251::run();
+    }
     if std::env::args().nth(1).as_deref() == Some("prepare-251") {
         return epoch251::run();
     }

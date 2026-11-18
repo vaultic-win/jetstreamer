@@ -50,3 +50,9 @@ that claim released and preserve 248–250, or separately qualify a capacity
 transition. Hard limits remain unchanged; the RSS scheduling allowance is recorded
 separately. The packet names the remaining exact-node, namespace, launcher,
 admission and first-guard gates and grants no launch or publication authority.
+
+`capture-251-network OUTPUT_JSON` captures the retained successful 4 KiB CAR
+header probe. It checks the exact invocation, command, sandbox properties, cache
+and genesis mounts, HTTP 206 range, canonical CAR header and expected root CID.
+Manager and file identities must remain stable during capture. This establishes
+the tested network route, not deployed-node cache-reader or replay qualification.
