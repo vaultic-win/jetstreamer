@@ -1,0 +1,193 @@
+# Chronological Horizon R2 plugin audit
+
+This standalone Rust controller audits every canonical `epoch-N.jet` in a frozen,
+authenticated, bucket-wide inventory, in numeric epoch order. It uses a private
+scratch download, runs the current `account-updates` `horizon_pipeline` with the
+read-only `VerificationPlugin`, commits a pass/failure receipt, deletes only that
+audit download, and continues. It does not issue any R2 mutation, publish readiness
+sidecars, alter campaign status JSONs, retire existing local archives, or launch
+replay lanes. An archive without a checksum sidecar is included and its absence is
+recorded; it is never promoted to ready by this audit.
+
+The independent service is the owner. An agent can inspect its JSONs or journal,
+but need not stay alive for the work to continue. The filesystem lock prevents
+overlapping owners of the same audit state. `KillMode=control-group` is required:
+the direct child also receives a parent-death signal, while systemd must kill any
+compiler grandchildren before restarting the controller. Each guarded subprocess
+also owns a private process group; an in-process guard failure kills that whole
+group before the controller enters its retry wait.
+
+## Current source status and inventory
+
+This is a source candidate for parent review and publication, not an admitted
+deployment. The parent must publish it to `origin/account-updates`, bind its exact
+build/source identity, seal the controller/config, approve resource accounting,
+and install the unit before production work. No downloads were launched during
+source preparation. The test/debug image was used only for an authenticated
+`ListObjectsV2` inventory at 2026-11-18 21:25:14 UTC:
+
+- 225 canonical archives, epochs 0 through 960, with gaps.
+- Total: 16,504,898,595,724 bytes.
+- Smallest: epoch 0, 398,594,860 bytes.
+- Largest: epoch 941, 385,290,386,716 bytes.
+
+The inventory evidence is currently in the root-private directory
+`/tmp/horizon-r2-chronological-audit-inventory-20261118-v1/inventory.json`.
+The production run should capture a fresh inventory when its new state is created.
+Once captured, inventory membership/ETags are frozen; restart does not silently
+add epochs or accept replaced remote objects. A later sweep uses another state
+directory. Existing success and failure receipts both mean "attempted"; a later
+repair sweep uses another state directory and preserves the first sweep.
+
+## Configuration and budgets
+
+`config.example.json` is an initial **root-filesystem** example, not permission to
+start work: preserve 32 GiB free, cap an individual archive at 20 GiB, and reserve
+16 GiB for the private source checkout/build/artifact/logs. Before each download,
+free space must cover `reserve_bytes + actual_object_bytes + remaining_work_budget`.
+The remaining working reservation subtracts the audit's already allocated
+source/build/log bytes from `build_reserve_bytes`, so resident audit files are
+charged once rather than twice.
+During transfer and child execution, the free-space floor remains enforced; source,
+build and logs are also measured against the working budget. Only one archive can
+exist in scratch. Logs are bounded individually. Build jobs and playback threads
+are fixed at two and four in the example; parent-approved systemd CPU/memory/task
+limits remain mandatory.
+
+A deployment on `/home/sol` must instead preserve the current campaign's admitted
+growth reservation. The parent specified 7,493,617,796,914 bytes as the pending
+whole-fleet baseline, which must not be replaced by the smaller root-filesystem
+floor. No other filesystem is implicitly authorized. This implementation keeps
+scratch, source/build, evidence, and sealed reader generations on the same
+filesystem. Reader generations are held separately under the root-owned
+`/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1` and are charged
+to the same working budget. The current deployment therefore requires state on
+the root filesystem; a later larger-volume migration needs qualified destination
+ancestry and accounting, not merely a path edit.
+
+If the next archive exceeds the admitted archive cap or free space is insufficient,
+the service writes `waiting_for_capacity` and stays alive, rechecking after 1800
+seconds. It never skips that epoch to fit a later one. Therefore the root example
+can process early small epochs, then waits until the parent moves the audit state
+under a separately qualified allocation or increases the budget. Keep the entire
+state together when moving it; paths in receipts preserve their historical meaning,
+and source/artifact/config custody must be requalified. In ordinary operation,
+prefer provisioning enough space for the largest archive from the start.
+
+To alter only the three byte budgets, stop the service and finish qualified capacity
+planning, prepare a newly sealed config with the same other fields, then run:
+
+```text
+SEALED_BINARY reconfigure NEW_CONFIG.json
+```
+
+This command acquires the same exclusive lock and saves old/new configuration
+evidence before replacing the accepted config. Update the service to use that
+sealed config and restart it. It does not itself authorize the new allocation.
+
+## Reader provenance and playback
+
+For each epoch the controller fetches `account-updates` from the approved SSH origin
+into a dedicated checkout. SSH explicitly reads `/home/sol/.ssh/config`, uses the
+absolute Vaultic key and known-hosts paths, and selects a currently loaded agent
+by `ssh-add -l`; it also reads keychain socket metadata without executing it. R2
+credentials are passed only to the SDK. Git/build/plugin children receive a cleared
+environment; only Git receives the SSH socket.
+
+The controller hashes the actual tracked files of the root playback binary and
+every local transitive Cargo dependency, `Cargo.lock`, workspace/package manifests,
+toolchain and Cargo configuration, and the exact compiler/Cargo images and flags.
+It rebuilds the release binary with `--locked --no-default-features` when this
+fingerprint changes. It reuses only an artifact whose hash and complete stored
+fingerprint match the freshly fetched source. Thus unrelated operator/documentation
+commits need no rebuild. The first run builds its own reader; this candidate does
+not blindly import an existing campaign binary without its full equivalence proof.
+
+Every newly built reader is installed by the existing root Rust sealer, with its
+independently supplied self hash and hash-bound plan. Each generation gets a new
+immutable directory containing the executable and full source/build proof. The
+controller verifies the root-owned sealed image and deployment receipt before
+reuse. It does not overwrite a reader deployment. The unprivileged service needs
+its existing noninteractive sudo route to the exact sealer; do not set
+`NoNewPrivileges=yes` on this service. The parent provisions the root-owned 0755
+reader root and exposes only that exact root in `ReadWritePaths`.
+
+The pipeline is statically linked, so the recorded `horizon_pipeline` artifact hash
+also identifies its linked plugin. It must pass the exact linked decoder capacity
+probe. Playback receives the full `EPOCH:EPOCH` interval and `--verify-only`, with
+the canonical scratch directory and configured thread count. It never receives
+ClickHouse or R2 credentials. Acceptance requires zero exit, verification-only
+mode, the exact complete expected slot range, all VerificationPlugin counters,
+the stream digest, and terminal epoch completion in order. The pipeline's durable
+`--verification-report` JSON must additionally bind the exact invocation, source,
+observed first/last slots, all counters and stream digest to the same playback.
+Legitimate leader-skipped
+slots count toward the full epoch; they are distinct from silently omitted corrupt
+records. First/last slots come from actual plugin observations in that report.
+
+The authenticated stream is bound to bucket/key, exact ETag/version, byte length,
+and whole SHA-256. Canonical checksum sidecars and archive hash metadata must match
+when present. The downloaded file is independently hashed and made read-only before
+playback, then rehashed afterward. The remote identity and executable hash are
+rechecked. Another branch fetch follows playback: relevant code changes cause a
+fresh entire-epoch playback; unrelated commits are recorded with equivalence proof.
+
+## State, failures, and restart
+
+- `inventory.json`: immutable ordered scope and pinned remote identities.
+- `progress.json`: current phase, epoch, transfer bytes, timestamp, wait reason.
+- `child.json`: current/last subprocess PID, log path, heartbeat, elapsed time,
+  log size, and terminal exit or guard-stop reason.
+- `summary.json`: attempted/passed/failed/pending counts after each epoch.
+- `results/epoch-N.json`: immutable terminal outcome, object/hash, reader source
+  fingerprint, actual invocation, verification evidence or error.
+- `attempts/epoch-N-TIMESTAMP/`: start record, fetch/build/playback logs, capacity
+  probe, remote download evidence, invocation and completion reports, cleanup record.
+- `scratch-owner.json`: exact owned download inode; it is not a success marker.
+
+The terminal receipt is fsynced before the audit download is unlinked. Cleanup
+requires the same regular-file inode, UID, device, and single link, under the
+private audit scratch directory. A substituted inode, symlink, unknown scratch
+file, or malformed state fails closed. The tiny crash window between creation of
+the empty scratch file and its owner journal deliberately requires inspection if
+hit; an unknown file is never guessed to be disposable.
+
+On ordinary interruption the script records recovery, deletes only the journaled
+partial/download, and retries the unfinished epoch from byte zero and slot zero.
+It never treats an interrupted tail as full playback. If a receipt was already
+committed, it completes cleanup and proceeds. Reader/build/credential preparation
+problems wait persistently rather than declaring an archive corrupt. Download or
+playback failures produce an explicit failed result and continue to the next epoch;
+the result says what failed, not that the archive is necessarily corrupt. No remote
+object is deleted, overwritten, or repaired by this tool.
+
+## Build, deploy, inspect
+
+Use the configured repository identity for source publication; no coauthor trailers.
+Build/test in an isolated, capacity-approved target, with the explicit Rust 1.98.0
+compiler (do not let a detached shell select/update the global stable toolchain):
+
+```text
+RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo test --locked --manifest-path scripts/horizon_r2_chronological_plugin_audit_20261118_v1/Cargo.toml --target-dir APPROVED_TARGET -j 2
+RUSTC=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc /home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo build --release --locked --manifest-path scripts/horizon_r2_chronological_plugin_audit_20261118_v1/Cargo.toml --target-dir APPROVED_TARGET -j 2
+```
+
+The parent uses the repository Rust sealer for the final controller/config and
+selects the exact service properties from the example. Precreate the state directory
+owned by the service identity (`sol`) with mode 0700. Use a root-owned 0600 systemd environment file for
+`HORIZON_S3_ENDPOINT`, `HORIZON_ACCESS_KEY_ID`, and `HORIZON_SECRET_ACCESS_KEY`; never
+put secret values in argv or logs. Keep the source checkout separate from the live
+repository. `PrivateTmp=no` is needed for existing SSH agent sockets. Run the final
+metadata-only command with the final service credentials and mounts first:
+
+```text
+SEALED_BINARY inventory SEALED_CONFIG.json
+sudo systemctl start horizon-r2-chronological-audit.service
+SEALED_BINARY status SEALED_CONFIG.json
+sudo journalctl -u horizon-r2-chronological-audit.service --no-pager -n 30
+```
+
+`inventory` only lists canonical metadata and creates audit state; it does not fetch
+source, build a plugin, or download an archive. `status` is local/read-only and does
+not acquire the writer lock. Routine campaign observations remain on their existing
+30-minute cadence; this tool's transfer/resource checks are internal audit guards.

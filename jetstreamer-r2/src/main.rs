@@ -3515,6 +3515,8 @@ async fn main() -> Result<()> {
                 | "holding-disable136-retry"
                 | "holding-check-retire136"
                 | "holding-retire136"
+                | "holding-check-retire141"
+                | "holding-retire141"
                 | "holding-check-retire166"
                 | "holding-retire166"
         )
