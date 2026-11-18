@@ -33,7 +33,7 @@ fn memory(
     );
     Ok(obligation)
 }
-fn floor(rows: &Value) -> Result<u64> {
+pub(super) fn floor(rows: &Value) -> Result<u64> {
     let rows = rows.as_array().context("century census")?;
     ensure!(!rows.is_empty(), "no qualified century samples");
     let mut seen = BTreeSet::new();

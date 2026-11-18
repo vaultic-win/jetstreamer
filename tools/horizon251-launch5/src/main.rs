@@ -3,6 +3,7 @@
 //! Preparation and launch require a separate fresh, Main-accepted admission.
 mod capacity;
 mod live;
+mod admission_source;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -1442,6 +1443,9 @@ fn plan_validate(p: &Value) -> Result<()> {
 }
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 5 && args[1] == "capture-admission" {
+        return admission_source::capture(&args[2], &args[3], &args[4]);
+    }
     if args.len() == 3 && args[1] == "emit-source-templates" {
         let root = Path::new(&args[2]);
         absent(root)?;

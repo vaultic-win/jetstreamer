@@ -72,3 +72,25 @@ no new verification of the inherited 29 epochs and grants no launch authority.
 New or missing ready epochs require adjudication before changing its accepted
 input set. Four tests cover incomplete census, changed verification identity,
 readback requirements and overflow/rounding; strict Clippy also passes.
+
+`capture-admission REVIEW REVIEW_SHA SELF_SHA` captures fresh normalized owner,
+observer, fleet, capacity, census and guard evidence from a root-owned Main
+review. The review binds the exact launch plan, unaccepted admission template,
+observer, fleet, century census and source-publication proof, along with the
+actual Main PID/start ticks/boot, prospective launcher unit and explicitly
+reviewed coexisting services. It grants no unit mutation or replay start itself.
+The final admission is issued only after the production validator accepts its
+full resource arithmetic and the native census identifies all four unchanged
+owners with no unknown worker. Captured guard receipts must still satisfy the
+launcher's 120-second freshness bound at use; admission expires in five minutes.
+
+Source publication records must bind node, worker, launcher, guard, sealer,
+producer/guard templates and the admission-capture executable to root-owned
+provenance, exact artifact hashes and full source commits. Read-only Git checks
+verify each commit against the fetched remote head and reject a changed head.
+Main must establish the actual artifact/source correspondence before accepting
+that review; a seal containing only an executable is not a compiler/source
+manifest. Existing healthy owners retain their immutable deployments while
+historical source gaps are resolved. The original sealed launcher v1 is retained;
+this new capture command has not yet been sealed or used for native admission.
+The expanded launcher suite has 21 passing tests and strict Clippy passes.
