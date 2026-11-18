@@ -387,6 +387,21 @@ fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
         // later. Other repositories and the active release profile are distinct.
         return process_references::encoded_reference(bytes, SOL_PRIVATE_DEBUG.as_bytes(), true);
     }
+    if target == Path::new(SOL_TARGET) || target == Path::new(SOL_RELEASE_DEPS) {
+        // A binary anywhere in a selected dependency profile can load its
+        // shared libraries later. Keep the whole profile as a consumer scope,
+        // while retiring only the fixed subtree selected by the plan.
+        let (scope, relative) = if target == Path::new(SOL_RELEASE_DEPS) {
+            (
+                b"/home/sol/workspace/jetstreamer/target/release".as_slice(),
+                b"target/release".as_slice(),
+            )
+        } else {
+            (SOL_TARGET.as_bytes(), b"target/debug".as_slice())
+        };
+        return process_references::encoded_reference(bytes, scope, true)
+            || relative_profile_token(bytes, relative);
+    }
     if target == Path::new(UBUNTU_DEBUG_DEPS) {
         // A same-workspace debug binary may load deps later. An absolute
         // private build elsewhere is not a reference to this cache merely
@@ -415,6 +430,20 @@ fn relative_cache_reference(bytes: &[u8], target: &Path) -> bool {
     } else {
         bytes.windows(relative.len()).any(|s| s == relative)
     }
+}
+
+fn relative_profile_token(bytes: &[u8], relative: &[u8]) -> bool {
+    let mut dotted = b"./".to_vec();
+    dotted.extend_from_slice(relative);
+    [relative, dotted.as_slice()].iter().any(|needle| {
+        bytes.windows(needle.len()).enumerate().any(|(i, word)| {
+            let end = i + needle.len();
+            word == *needle
+                && (i == 0 || b"=\0\n\r\t '\";|&()<>[]{}:".contains(&bytes[i - 1]))
+                && (end == bytes.len()
+                    || b"/\0\n\r\t '\";|&()<>[]{}:".contains(&bytes[end]))
+        })
+    })
 }
 fn persist(path: &Path, v: &Value) -> Result<()> {
     let parent = path.parent().context("output parent")?;
@@ -648,6 +677,8 @@ pub fn run() -> Result<()> {
     let staged = staged_references(&staged_roots, target, &mut missing)?;
     let reference_scope = if sol_private_deps {
         Path::new(SOL_PRIVATE_DEBUG)
+    } else if sol_deps {
+        target.parent().context("release profile parent")?
     } else {
         target
     };
@@ -1073,14 +1104,58 @@ mod tests {
             b"ExecStart=target/release/deps/tool\n",
             Path::new(SOL_RELEASE_DEPS)
         ));
-        for bytes in [
-            b"ExecStart=target/release/tool\n".as_slice(),
-            b"ExecStart=target/release/deps-sibling/tool\n",
-        ] {
-            assert!(!relative_cache_reference(
-                bytes,
-                Path::new(SOL_RELEASE_DEPS)
-            ));
+        // A retained executable outside deps may still load libraries in deps.
+        assert!(relative_cache_reference(
+            b"ExecStart=target/release/tool\n",
+            Path::new(SOL_RELEASE_DEPS)
+        ));
+        assert!(!relative_cache_reference(
+            b"ExecStart=target/release-sibling/deps/tool\n",
+            Path::new(SOL_RELEASE_DEPS)
+        ));
+    }
+
+    #[test]
+    fn sol_cache_scope_ignores_other_absolute_builds_but_keeps_real_consumers() {
+        for (target, profile) in [(SOL_TARGET, "debug"), (SOL_RELEASE_DEPS, "release")] {
+            for command in [
+                format!("ExecStart=/private/other/target/{profile}/deps/test\n"),
+                format!("ExecStart=/private/other/./target/{profile}/test\n"),
+                format!("Environment=LIB=/private/other/target/{profile}/deps\n"),
+                format!("ExecStart=target/{profile}-sibling/test\n"),
+                // A later nested match must not supply the end boundary for
+                // an earlier relative token with an invalid suffix.
+                format!("ExecStart=target/{profile}-other /private/target/{profile}/test\n"),
+            ] {
+                assert!(!relative_cache_reference(command.as_bytes(), Path::new(target)), "{command}");
+            }
+            for command in [
+                format!("ExecStart=target/{profile}/worker\n"),
+                format!("ExecStart=./target/{profile}/worker\n"),
+                format!("ExecStart={SOL_REPO}/target/{profile}/worker\n"),
+                format!("ExecStart=/rustc --extern crate=target/{profile}/deps/libcrate.rlib\n"),
+                format!("Environment=LD_LIBRARY_PATH=/other:./target/{profile}/deps\n"),
+                format!("ReadOnlyPaths=\"{SOL_REPO}/target/{profile}\"\n"),
+            ] {
+                assert!(relative_cache_reference(command.as_bytes(), Path::new(target)), "{command}");
+            }
+        }
+    }
+
+    #[test]
+    fn sol_staged_census_preserves_only_selected_profiles_and_relative_consumers() {
+        let directory = tempfile::tempdir().unwrap();
+        let unrelated = directory.path().join("other.service");
+        fs::write(&unrelated, "ExecStart=/private/other/target/debug/test\nReadOnlyPaths=/private/other/target/release/deps\n").unwrap();
+        for target in [SOL_TARGET, SOL_RELEASE_DEPS] {
+            assert!(staged_references(&[directory.path()], Path::new(target), &mut Vec::new()).unwrap().is_empty());
+        }
+        let debug = directory.path().join("debug.service");
+        fs::write(&debug, "ExecStart=./target/debug/test\n").unwrap();
+        let release = directory.path().join("release.service");
+        fs::write(&release, format!("ExecStart={SOL_REPO}/target/release/worker\n")).unwrap();
+        for (target, consumer) in [(SOL_TARGET, debug), (SOL_RELEASE_DEPS, release)] {
+            assert_eq!(staged_references(&[directory.path()], Path::new(target), &mut Vec::new()).unwrap(), vec![consumer.display().to_string()]);
         }
     }
     #[test]
