@@ -1528,16 +1528,22 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   fast-forward that branch before new Git changes, preserving local edits; reconcile divergence
   without discarding another agent's commits. Do not continue development on a PR head branch
   after merging it. Keep sealed deployment copies immutable and qualify new deployments separately.
+  **Before admitting or launching any epoch, merge every source change required by that epoch
+  into `origin/account-updates` and verify remote containment.** This includes epoch-specific
+  compatibility fixes, preparers, launchers, guards, verifiers and their source dependencies;
+  untracked files, local commits, another branch, or a deployment seal do not satisfy this gate.
+  Fetch the branch, verify the required commit is an ancestor of `origin/account-updates`, and
+  bind that commit plus the exact deployed source/build provenance in the admission evidence.
+  Check that the files used to build the admitted artifacts match the committed versions; a
+  clean unrelated checkout or a matching commit label alone is insufficient. Repeat this check
+  after any code change before retrying admission. If a required push or merge fails, continue
+  repair work and preserve healthy running lanes, but do not admit the new epoch until it succeeds.
+  If history was rebased, establish exact merged source equivalence and record it in the
+  admission evidence. Publication later in the same cycle does not satisfy this gate.
+  Source publication does not replace build, integrity, capacity or guard qualification.
   After changing tracked campaign code, documentation or this skill, run the relevant checks,
   commit with the repository's configured Git identity and push to `origin/account-updates` in
   the same work cycle. Verify the remote branch contains the commit before reporting it pushed.
-  **Before admitting any epoch**, commit and push every required epoch-specific compatibility,
-  runtime, launcher and admission-tool change to `origin/account-updates`. Fetch and verify that
-  the deployed source commits are contained in that remote branch, and bind that source-control
-  proof to the admission. If history was rebased, establish the exact merged source equivalence;
-  a local commit, untracked preparation source, sealed binary or passing test alone is insufficient.
-  Resolve missing source publication before admission; preserve already healthy workers while
-  reconciling historical provenance. Publication later in the same cycle does not satisfy this gate.
 - Use SSH URLs for Git network operations. Select a currently loaded keychain agent socket for the
   active login session by verifying it with `ssh-add -l`; never hard-code an ephemeral socket path
   from an earlier session. Check the inherited environment for required service credentials before

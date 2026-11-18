@@ -1,0 +1,36 @@
+Epoch 167 local3retry5 progress — 2026-11-17 16:01 UTC
+
+The fifth guarded build phase ran under its actual first timer guard and
+passed 95 Rust tests, 0 failures. Its invocation is
+9772d96df61b4f2a997be8947d140139. Completion receipt:
+/var/lib/jetstreamer/epoch167-retry5-live166-20261117-v1/
+build-preparation-v3/tests-v1/SEQUENCE-COMPLETED.json.
+
+All four compiler phases have successful native terminal receipts. The
+source overlay manifest is sealed at
+/var/lib/jetstreamer/epoch167-retry5-live166-20261117-v1/
+guard-source-manifest-sealed-v1/SOURCE_MANIFEST.json (SHA-256
+bf4be2f37bf7248ee10278f4f4f824dd91e21974d18330275f4aada7bfeb597f).
+The guard artifact proof is at
+/var/lib/jetstreamer/epoch167-retry5-cap512-guard-qualification-20261117-v1/
+artifact-proof.json (SHA-256
+15334ddfd24a5614206ccb581180a70caa5112cff70a8f213000888a5089cd39).
+The normal immutable guard image is sealed at
+/usr/local/lib/jetstreamer/horizon-epoch167-retry5-cap512-data-guard-20261117-v1/
+guard (SHA-256
+5d53a2da4be9c50073421d4c8748cc519722734e0815a2b52c3e0e873fb3601f).
+Its deployment receipt SHA-256 is
+0f47e86295326cbf7a12d8ca4fe91a6827d1a46242fd00aec3b8fecc6adcb7a4.
+
+The mutable preparer source retry167_native_guard.rs now pins those exact
+hashes and has a positive native-evidence test. It has been rustfmt parsed,
+but the preparer has not yet been built, tested, qualified, or sealed. This
+guard image does not itself authorize replay launch. Next: guard the preparer
+build and test execution, run its actual positive authentication test,
+qualify and seal the preparer, obtain a fresh booking, DATA witness and
+replay admission, then arm the actual epoch 167 replay guard and launch.
+
+Epoch 166 remains the sole replay lane. The 15:55:57 coordinated observer
+confirmed its original invocation b3992e492e1a4d49a9e4e4a01a13c815.
+All 19 active R2 status objects were refreshed with authenticated readback.
+The next observer timer is armed for 16:25:57 UTC.

@@ -1,5 +1,5 @@
 //! Self-only page identity/charge mechanics. Never grants campaign memory credit.
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
