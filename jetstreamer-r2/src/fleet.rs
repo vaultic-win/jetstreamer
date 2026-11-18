@@ -444,7 +444,17 @@ struct Gate {
     next_action: String,
     evidence: Vec<BoundFile>,
     #[serde(default)]
+    operator_status: Option<OperatorStatusEvidence>,
+    #[serde(default)]
     reserve_stop: Option<reserve_stop::Evidence>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperatorStatusEvidence {
+    basis: BoundFile,
+    completion: BoundFile,
+    raw_status: BoundFile,
 }
 
 #[derive(Deserialize)]
@@ -2303,6 +2313,75 @@ fn status_matches(
         && producer["NRestarts"] == "0"
 }
 
+fn operator_status_owner_matches(
+    evidence: &OperatorStatusEvidence,
+    epoch: u64,
+    status: &EpochStatus,
+    object: &MutableRemoteObject,
+    observer: &BoundFile,
+) -> Result<bool> {
+    if epoch != 251 {
+        return Ok(false);
+    }
+    for bound in [&evidence.basis, &evidence.completion, &evidence.raw_status] {
+        let metadata = fs::symlink_metadata(&bound.path)?;
+        ensure!(
+            bound.path.canonicalize()? == bound.path
+                && metadata.is_file()
+                && metadata.uid() == 0
+                && metadata.nlink() == 1
+                && metadata.mode() & 0o022 == 0,
+            "operator status evidence is not root-owned immutable input"
+        );
+    }
+    let basis = bound_json(&evidence.basis)?;
+    let completion = bound_json(&evidence.completion)?;
+    let raw_status = bound_json(&evidence.raw_status)?;
+    let key = format!("epoch-{epoch}.epoch-status.json");
+    let totals = [
+        "nearest_lane_remaining_millis",
+        "qualification_allowance_millis",
+        "replay_millis",
+        "delivery_allowance_millis",
+    ]
+    .iter()
+    .try_fold(0_u64, |sum, field| {
+        basis[*field]
+            .as_u64()
+            .and_then(|part| sum.checked_add(part))
+    });
+    let observer_time = utc_seconds(
+        basis["status"]["sampled_at_utc"]
+            .as_str()
+            .context("operator status sample absent")?,
+    )?;
+    let current_time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    Ok(
+        basis["schema"] == "horizon-operator-status251-source-basis-v3"
+            && basis["epoch"] == epoch
+            && basis["owner"] == "/root"
+            && basis["stage"] == "input-and-native-qualification"
+            && basis["observer"] == observer.path.to_string_lossy().as_ref()
+            && basis["observer_sha256"] == observer.sha256
+            && basis["archive_or_sidecar_mutation"] == false
+            && basis["estimate_high_uncertainty"] == true
+            && basis["status"] == serde_json::to_value(status)?
+            && totals == Some(status.estimated_remaining_millis)
+            && raw_status == serde_json::to_value(status)?
+            && evidence.raw_status.sha256 == hex_lower(&Sha256::digest(&object.bytes))
+            && completion["epoch"] == epoch
+            && completion["key"] == key
+            && completion["owner"] == "/root"
+            && completion["new_sha256"] == evidence.raw_status.sha256
+            && completion["new_etag"] == format!("\"{}\"", object.etag)
+            && completion["sampled_at_utc"] == status.sampled_at_utc
+            && completion["authenticated_exact_byte_readback"] == true
+            && completion["archive_or_sidecar_mutation"] == false
+            && observer_time <= current_time
+            && current_time - observer_time <= 1800,
+    )
+}
+
 fn production_status_binding_matches(owner_matches: bool, state: &str) -> bool {
     // A live private qualification can own an old status receipt without
     // claiming an archive that is eligible for production publication.
@@ -2421,7 +2500,12 @@ pub(super) async fn run() -> Result<()> {
             .eq(plan.first_epoch..=plan.last_epoch),
         "fleet gates must cover every assigned epoch exactly"
     );
-    for gate in plan.gates.values() {
+    for (epoch, gate) in &plan.gates {
+        ensure!(
+            gate.operator_status.is_none()
+                || (*epoch == 251 && gate.state == "blocked-qualification"),
+            "operator status evidence is scoped to epoch 251 input qualification"
+        );
         ensure!(
             matches!(
                 gate.state.as_str(),
@@ -3452,9 +3536,20 @@ pub(super) async fn run() -> Result<()> {
                     })
                 }
             });
+            let operator_matches = gate
+                .operator_status
+                .as_ref()
+                .is_some_and(|_| epoch == 251 && state == "blocked-qualification")
+                && operator_status_owner_matches(
+                    gate.operator_status.as_ref().expect("checked"),
+                    epoch,
+                    &status,
+                    &object,
+                    &plan.observer,
+                )?;
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
-            json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":production_matches && status.sampled_at_utc == sample})
+            json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else if operator_matches {"bound-operator-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches || operator_matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":(production_matches && status.sampled_at_utc == sample) || operator_matches})
         } else {
             Value::Null
         };
