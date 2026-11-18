@@ -5303,6 +5303,9 @@ fn usage(program: &str) -> String {
          SLOT must be a nonzero epoch boundary; no other arguments are accepted.\n\
          This runs the production boundary reader with a 60-second total timeout,\n\
          writes only diagnostic JSON to stdout, and never starts replay or publication.\n\
+         Read-only local index diagnostic: {program} --probe-local-slot-ranges=253-255\n\
+         Requires a digest-pinned local override manifest and reads six repaired\n\
+         CAR boundaries through the production slot-range loader.\n\
          \n\
          <epoch|range> is a single epoch (950) or an inclusive range (950-955).\n\
          Replays each epoch and writes a horizon archive to <dest-dir>/epoch-<N>.jet.\n\
@@ -19500,6 +19503,59 @@ async fn main() {
 
     if epoch_arg == "-h" || epoch_arg == "--help" {
         println!("{}", usage(&program));
+        return;
+    }
+
+    if epoch_arg == "--probe-local-slot-ranges=253-255" {
+        if args.next().is_some()
+            || env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST").is_none()
+            || env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").is_none()
+        {
+            eprintln!("the local index probe requires a pinned manifest and no extra arguments");
+            exit(2);
+        }
+        // This executes the same index loader as replay, before any destination,
+        // snapshot, lease, archive, or publication setup.
+        let result = async {
+            let base = jetstreamer_firehose::index::get_index_base_url()?;
+            let index = jetstreamer_firehose::index::SlotOffsetIndex::new(base)?;
+            let mut rows = Vec::new();
+            for slot in [
+                109_428_260_u64,
+                109_741_316,
+                110_101_500,
+                110_170_056,
+                110_193_392,
+                110_349_344,
+            ] {
+                let (offset, length) = index.get_range(slot).await?;
+                rows.push(serde_json::json!({"slot": slot, "offset": offset, "length": length}));
+            }
+            Ok::<_, jetstreamer_firehose::index::SlotOffsetIndexError>(rows)
+        };
+        match tokio::time::timeout(Duration::from_secs(60), result).await {
+            Ok(Ok(rows)) => println!(
+                "{}",
+                serde_json::json!({
+                    "schema": "jetstreamer-local-slot-ranges-production-probe-v1",
+                    "source_revision": env!("JETSTREAMER_BUILD_REVISION"),
+                    "rows": rows,
+                    "production_index_loader": true,
+                    "replay_launch_authorized": false,
+                    "publication_authorized": false,
+                    "remote_mutations": false,
+                    "r2_mutations": false
+                })
+            ),
+            Ok(Err(error)) => {
+                eprintln!("local index probe failed: {error}");
+                exit(1);
+            }
+            Err(_) => {
+                eprintln!("local index probe exceeded its 60-second total timeout");
+                exit(1);
+            }
+        }
         return;
     }
 
