@@ -382,3 +382,18 @@ The memory target remains nine against five executing lanes. Conservative free
 disk is 4,374,135,558,144 bytes while the explicitly budgeted restore runs.
 The next ordinary observation is due no earlier than 23:53:03 UTC; its sealed
 configuration preserves the same five owners and has passed static validation.
+
+The Git-owner production build completed normally in 2m14s with a 1.9 GiB
+peak. Its sealed uploader is
+`/var/lib/jetstreamer/horizon-current-uploader-0711b1f2-20261118-v4/jetstreamer-r2`,
+SHA-256 `4b9e46bd60da9085e94645cbaed3891fe808c4f7a116313f392fdcc231c6c217`.
+The source manifest remained unchanged, and reader/uploader equivalence was
+established against fetched `50ba80e8`. Actual Cargo features remain empty.
+A separate sandbox preflight fetched the real branch as Ubuntu with
+`ProtectSystem=strict`, `ProtectHome=read-only`, only the repository's `.git`
+directory writable, and the current keychain socket. It completed normally;
+no root-owned objects remained in the operator repository. The audited reader
+and strict epoch-205 expectations retain their existing seals. The subsequent
+verification service must allow Git writes only to that metadata directory,
+in addition to the exact private audit outputs, while keeping the restored
+archive read-only.
