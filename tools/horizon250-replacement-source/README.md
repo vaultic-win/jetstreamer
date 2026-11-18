@@ -33,3 +33,20 @@ worker root. The corrected immutable `packet-v2/` adds the entire accepted
 `/var/lib/jetstreamer/horizon250-reboot-20261117-static-v2`; receipt SHA-256
 `9bbc1af99e689c1ddf614a8a79c91d561e18a66716782658f6b2c8688de6be1f`.
 The v1 package remains historical evidence and is not a launch source.
+
+## Epoch 251 replacement
+
+`prepare-251 OUTPUT_DIRECTORY` renders a distinct dormant 251 packet from the
+hash-bound 250 v2 templates. It binds the completed native input test, sealed
+singleton manifest, structural index receipt, and the original successor probe's
+exact PID1 start/success journal records and output. The probe used a diagnostic
+node: the packet does not promote it to qualification of the deployed replay node.
+
+The candidate reads the already sealed bootstrap directly and mounts sealed
+genesis read-only, avoiding duplicate input storage. Canonical checkpoint
+expectations come from the manifest; no final-root snapshot copy is required.
+CPU affinity targets the 247 replacement claim. The future launcher must prove
+that claim released and preserve 248–250, or separately qualify a capacity
+transition. Hard limits remain unchanged; the RSS scheduling allowance is recorded
+separately. The packet names the remaining exact-node, namespace, launcher,
+admission and first-guard gates and grants no launch or publication authority.
