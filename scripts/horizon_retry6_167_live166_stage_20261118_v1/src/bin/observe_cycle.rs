@@ -93,11 +93,31 @@ fn main() -> Result<()> {
         completed_cleanup.push(bind(path)?);
     }
     fleet["completed_cleanup_after_2249"]=json!(completed_cleanup);
+    let custody141="/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/receipts/custody-435e917094c39e05a8df2ac97cbba71e8470261112dcc2be30fdf56a013c0688.json";
+    let custody=read(custody141)?;
+    ensure!(custody["source"]=="/home/sol/.jetstreamer-private/epoch141-ledger-source-20261020-v1/download/rocksdb.tar.bz2"
+        && custody["sha256"]=="7af478aec31809cebdeae761d44c19bb90bf06e15d2430813b3b0fe691e6a70b"
+        && custody["length"]==189943475031u64,"foreign epoch141 custody");
+    fleet["completed_holding141_custody"]=bind(custody141)?;
+    let retirement141="/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch141-completion.json";
+    let retired=Path::new(retirement141).try_exists()?;
+    if retired {
+        let completion=read(retirement141)?;
+        ensure!(completion["schema"]=="jetstreamer-holding-retire141-completion-v1"
+            && completion["source_absent"]==true && completion["quarantine_absent"]==true
+            && completion["authenticated_custody_revalidated"]==true
+            && completion["retired_censused_physical_bytes"]==189943668736u64
+            && completion["actual_free_delta_claimed"]==false && completion["r2_mutations"]==false,
+            "epoch141 retirement incomplete");
+        fleet["completed_holding141_retirement"]=bind(retirement141)?;
+    }
     fleet["next_lane_recovery"]=json!({"epoch":167,"last_attempt_unit":"horizon-167-live166retry7-prepare-operation-2058-20261118-v1.service",
         "last_result":"complete166/167/169/170 growth does not fit","required_available_bytes":7493617796914u64,
         "holding_unit":"horizon-closed141-input-park-20261118-v1.service","credited_reclamation_bytes":0,
         "cache_check_result":"Both workspace caches and the two obsolete epoch152 snapshots have been retired with durable receipts. Admission must use actual measured free space, not summed cache-entry blocks.",
-        "next_action":"Complete authenticated epoch141 holding then exact local retirement, and use a fresh admission including the audit allocation."});
+        "holding_custody_complete":true,"holding_local_retirement_complete":retired,
+        "next_action":if retired {"Refresh epoch167 physical measurement and run fresh preparation and guarded launch including the audit allocation; use actual available bytes."}
+            else {"Finish the qualified exact epoch141 local retirement after completed holding custody, then refresh epoch167 measurement and admission including the audit allocation."}});
     println!("{}",write(&format!("{root}/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),&fleet)?);
     println!("next_observer={sealed}; timer={unit}.timer; at={next}");
     Ok(())

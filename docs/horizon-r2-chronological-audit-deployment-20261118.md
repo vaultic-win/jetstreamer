@@ -223,3 +223,37 @@ The old v1 retirement image retains the mismatch and must not be selected.
 Native build/test state, test output, changed source and artifact provenance are
 sealed alongside v2. The existing `deploy_retire141 check-plan` and `retire-plan`
 metadata commands remain usable; execute those plans through the v2 image.
+
+## Completed holding custody and audit throughput
+
+Epoch 141 holding completed at approximately **23:21 UTC**, with the original
+parker invocation `1c113358b7a14265a4e2d8d16576d6ae` exiting successfully. Its
+custody receipt is
+`/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/receipts/custody-435e917094c39e05a8df2ac97cbba71e8470261112dcc2be30fdf56a013c0688.json`.
+It binds complete authenticated remote readback and local source revalidation for
+189,943,475,031 bytes, SHA-256
+`7af478aec31809cebdeae761d44c19bb90bf06e15d2430813b3b0fe691e6a70b`.
+The corrected v2 retirement check started at approximately 23:24 UTC using
+`/var/lib/jetstreamer/holding141-retirement-deployment-20261118-v1/check-plan.json`
+(SHA-256 `bc98dfd68f4c144ab03bec877711cfe093ddf5cdd09d94f1769ffce312c1d616`).
+It is rehashing the exact local source. This is not yet a retirement completion
+or a free-space credit. Preserve the parker's terminal identity through retirement.
+
+At the user-requested **23:24 UTC** audit check, 16 archives had passed, none had
+failed, and epoch 16 was downloading. The ten complete cycles for epochs 6–15
+took 1,790 seconds from epoch 6's attempt start to epoch 16's attempt start:
+**20.11 epochs/hour**, or 179 seconds per epoch, including download, source checks,
+playback and cleanup. Epoch 15's playback itself took 29.605064950 seconds for
+432,000 slots and 25,738,617 transactions: approximately 14,592 slots/sec and
+869,399 transactions/sec. This small-archive rate is not a forecast for the
+remaining larger archives. The next routine audit check is no earlier than
+23:54 UTC; the campaign observer remains scheduled for 23:49:25 UTC.
+
+The metadata-only `plan_launch167` helper now binds the completed preparation and
+its exact DATA contract into the sealed launcher's plan. It creates only private,
+no-clobber metadata and cannot start replay. Both it and the updated observation
+helper passed strict Clippy and release builds; the midnight observation test
+also passed. The observation helper carries completed epoch 141 custody and,
+once present, the validated retirement receipt without treating its block count
+as actual reclaimed space. Fresh measurement, preparation, launch checks and
+real guard protection remain required before counting epoch 167 as running.
