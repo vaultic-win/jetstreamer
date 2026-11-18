@@ -26,6 +26,10 @@ struct Plan {
     archive_or_sidecar_mutations: bool,
     fallback_completion: Bound,
     raw_status: Bound,
+    #[serde(default)]
+    operator_intent: Option<Bound>,
+    #[serde(default)]
+    operator_before: Option<Bound>,
     archive_receipt: Bound,
     deletion_intent: PathBuf,
     deletion_receipt: PathBuf,
@@ -48,6 +52,33 @@ struct FallbackCompletion {
     archive_or_sidecar_mutation: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperatorCompletion {
+    epoch: u64,
+    key: String,
+    before_etag: String,
+    new_etag: String,
+    new_sha256: String,
+    sampled_at_utc: String,
+    owner: String,
+    authenticated_exact_byte_readback: bool,
+    archive_or_sidecar_mutation: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperatorIntent {
+    epoch: u64,
+    key: String,
+    before_etag: String,
+    before_sha256: String,
+    replacement_sha256: String,
+    owner: String,
+    basis: String,
+    remote_archive_mutations: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct DeleteIntent {
@@ -58,6 +89,10 @@ struct DeleteIntent {
     key: String,
     fallback_completion: Bound,
     raw_status: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operator_intent: Option<Bound>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    operator_before: Option<Bound>,
     archive_receipt: Bound,
     archive_sha256: String,
     archive_etag: String,
@@ -167,6 +202,46 @@ fn validate_completion(
     Ok(etag.to_owned())
 }
 
+fn validate_operator_completion(
+    completion: &OperatorCompletion,
+    intent: &OperatorIntent,
+    before_raw: &[u8],
+    epoch: u64,
+    raw_sha: &str,
+    status: &EpochStatus,
+) -> Result<String> {
+    let key = format!("epoch-{epoch}.epoch-status.json");
+    let etag = quoted_etag(&completion.new_etag)?;
+    quoted_etag(&completion.before_etag)?;
+    let before: EpochStatus = serde_json::from_slice(before_raw)?;
+    validate_epoch_status(&before, epoch)?;
+    validate_epoch_status(status, epoch)?;
+    ensure!(
+        completion.epoch == epoch
+            && completion.key == key
+            && intent.epoch == epoch
+            && intent.key == key
+            && completion.before_etag == intent.before_etag
+            && completion.new_sha256 == raw_sha
+            && intent.replacement_sha256 == raw_sha
+            && intent.before_sha256 == sha(before_raw)
+            && completion.sampled_at_utc == status.sampled_at_utc
+            && before.sampled_at_utc < status.sampled_at_utc
+            && completion.owner == intent.owner
+            && !completion.owner.is_empty()
+            && !intent.basis.is_empty()
+            && completion.authenticated_exact_byte_readback
+            && !completion.archive_or_sidecar_mutation
+            && !intent.remote_archive_mutations
+            && matches!(
+                status.phase.as_str(),
+                "replay" | "verification" | "upload" | "readback"
+            ),
+        "operator fallback completion does not bind the exact status publication"
+    );
+    Ok(etag.to_owned())
+}
+
 fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Vec<u8>)> {
     ensure!(
         plan.schema == PLAN_SCHEMA
@@ -186,10 +261,36 @@ fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Ve
         MAX_STATUS_BYTES,
         "fallback completion",
     )?;
-    let completion: FallbackCompletion = serde_json::from_slice(&completion_raw)?;
     let raw_status = bound_bytes(&plan.raw_status, MAX_STATUS_BYTES, "raw fallback status")?;
     let status: EpochStatus = serde_json::from_slice(&raw_status)?;
-    let object_etag = validate_completion(&completion, plan.epoch, &sha(&raw_status), &status)?;
+    let object_etag = if plan.operator_intent.is_some() || plan.operator_before.is_some() {
+        let operator_intent = plan
+            .operator_intent
+            .as_ref()
+            .context("missing operator intent")?;
+        let operator_before = plan
+            .operator_before
+            .as_ref()
+            .context("missing operator before")?;
+        let original: OperatorIntent = serde_json::from_slice(&bound_bytes(
+            operator_intent,
+            MAX_STATUS_BYTES,
+            "operator publication intent",
+        )?)?;
+        let before_raw = bound_bytes(operator_before, MAX_STATUS_BYTES, "operator prior status")?;
+        let completion: OperatorCompletion = serde_json::from_slice(&completion_raw)?;
+        validate_operator_completion(
+            &completion,
+            &original,
+            &before_raw,
+            plan.epoch,
+            &sha(&raw_status),
+            &status,
+        )?
+    } else {
+        let completion: FallbackCompletion = serde_json::from_slice(&completion_raw)?;
+        validate_completion(&completion, plan.epoch, &sha(&raw_status), &status)?
+    };
     let receipt_raw = bound_bytes(
         &plan.archive_receipt,
         MAX_STATUS_BYTES,
@@ -215,6 +316,8 @@ fn binding(plan: &Plan, plan_bound: &Bound) -> Result<(DeleteIntent, Receipt, Ve
         key: format!("epoch-{}.epoch-status.json", plan.epoch),
         fallback_completion: plan.fallback_completion.clone(),
         raw_status: plan.raw_status.clone(),
+        operator_intent: plan.operator_intent.clone(),
+        operator_before: plan.operator_before.clone(),
         archive_receipt: plan.archive_receipt.clone(),
         archive_sha256: archive.archive_sha256.clone(),
         archive_etag: archive.archive_etag.clone(),
@@ -439,6 +542,53 @@ mod tests {
         assert!(validate_completion(&completion(), 239, &"d".repeat(64), &status()).is_err());
     }
     #[test]
+    fn binds_operator_fallback_and_rejects_changed_evidence() {
+        let before = EpochStatus {
+            sampled_at_utc: "2026-11-17T12:00:00Z".into(),
+            ..status()
+        };
+        let before_raw = serde_json::to_vec(&before).unwrap();
+        let after = status();
+        let raw_sha = "c".repeat(64);
+        let mut completion = OperatorCompletion {
+            epoch: 239,
+            key: "epoch-239.epoch-status.json".into(),
+            before_etag: format!("\"{}\"", "a".repeat(32)),
+            new_etag: format!("\"{}\"", "b".repeat(32)),
+            new_sha256: raw_sha.clone(),
+            sampled_at_utc: after.sampled_at_utc.clone(),
+            owner: "/root".into(),
+            authenticated_exact_byte_readback: true,
+            archive_or_sidecar_mutation: false,
+        };
+        let mut intent = OperatorIntent {
+            epoch: 239,
+            key: completion.key.clone(),
+            before_etag: completion.before_etag.clone(),
+            before_sha256: sha(&before_raw),
+            replacement_sha256: raw_sha.clone(),
+            owner: completion.owner.clone(),
+            basis: "measured upload progress".into(),
+            remote_archive_mutations: false,
+        };
+        assert_eq!(
+            validate_operator_completion(&completion, &intent, &before_raw, 239, &raw_sha, &after)
+                .unwrap(),
+            "b".repeat(32)
+        );
+        intent.before_sha256 = "d".repeat(64);
+        assert!(
+            validate_operator_completion(&completion, &intent, &before_raw, 239, &raw_sha, &after)
+                .is_err()
+        );
+        intent.before_sha256 = sha(&before_raw);
+        completion.authenticated_exact_byte_readback = false;
+        assert!(
+            validate_operator_completion(&completion, &intent, &before_raw, 239, &raw_sha, &after)
+                .is_err()
+        );
+    }
+    #[test]
     fn status_race_rejects_changed_bytes_or_etag() {
         let intent = DeleteIntent {
             schema: INTENT_SCHEMA.into(),
@@ -457,6 +607,8 @@ mod tests {
                 path: "/c".into(),
                 sha256: "c".repeat(64),
             },
+            operator_intent: None,
+            operator_before: None,
             archive_receipt: Bound {
                 path: "/d".into(),
                 sha256: "d".repeat(64),
