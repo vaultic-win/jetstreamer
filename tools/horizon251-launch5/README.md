@@ -162,3 +162,27 @@ are sealed at
 The bound review SHA-256 is
 `26b1a2a123fb5848e42e241758e1fda264baa5ee3b528ad0f7ad19d89e10099a`.
 These probes do not claim worker initialization or complete replay.
+
+Launcher v2 was built with captured source/compiler evidence from published
+`d8d48839`, sealed at `/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v2`,
+and passed read-only inspection. Executable SHA-256:
+`8c3cc2e4fdd632bcb5e20a14825f9b35bb0a533828c56348c791731a2e9336cb`;
+launch plan SHA-256:
+`33b60420175a86814689e8766ebc25501c6e8932b61dde509c7a1be22286b256`.
+
+At 2026-11-18 21:11 UTC, fresh admission, preparation, loaded-unit preflight
+and the original first-timer startup transaction passed. The source-publication
+record binds nine artifact roles to published source and captured evidence;
+the freshly captured admission retained all four original owner identities,
+hard limits and guard receipts. Epoch 251 invocation
+`cd2477bfec7f4e498545762c633e7bb0` passed the real first guard invocation
+`af5b0ac8b0394f519365f7ca7ff795b1`. The handoff is
+`/var/lib/jetstreamer/horizon251-fifth-20261118-state-v1/launch-v1/guarded-startup-handoff.json`,
+SHA-256 `257c38a1a32aa57980a53289a385d8e4b3dc9b6cd0edb148d4f3a87861a4404f`.
+PID1 started the node at 21:12:07 UTC; it accepted the exact manifest and began
+revalidating the cached bootstrap. Useful transaction replay and a clean expanded
+fleet observation are not yet proven. This is four established replay lanes
+plus one admitted initialization, not a proven five-lane operating point.
+The epoch 251 status was conditionally refreshed and read back with a 102-hour,
+high-uncertainty allowance: two hours startup/restore, 80 hours replay and
+20 hours current-reader verification and delivery. No archive was published.

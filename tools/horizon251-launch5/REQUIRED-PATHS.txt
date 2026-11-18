@@ -1,4 +1,19 @@
 Retain until the epoch 251 fifth-lane attempt and its evidence are disposed:
+/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v2
+/var/lib/jetstreamer/horizon251-fifth-20261118-static-v3
+/var/lib/jetstreamer/horizon251-published-guard-20261118-v1
+/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1
+/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1
+/var/lib/jetstreamer/horizon251-captured-node-auth-20261118-v1
+/var/lib/jetstreamer/horizon251-captured-node-probe-acceptance-20261118-v1
+/var/lib/jetstreamer/horizon251-main-source-provenance-20261118-v1
+/var/lib/jetstreamer/horizon251-main-admission-review-20261118-v1
+/home/ubuntu/.codex/diagnostics/horizon251-captured-node-input-20261118-v1/acceptance.json
+/home/ubuntu/.codex/diagnostics/horizon251-fresh-admission-20261118-v1
+/var/lib/jetstreamer/horizon251-fifth-20261118-state-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-guard-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-tokens-v1
+/var/lib/jetstreamer/horizon251-replacement-20261118-receipts-v1
 /var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v1
 /var/lib/jetstreamer/horizon251-fifth-20261118-static-v2
 /var/lib/jetstreamer/horizon251-native-input-20261118-v1
