@@ -9,6 +9,16 @@ when their kernel-owned `PF_KTHREAD` flag is set. An unavailable host census is
 explicit diagnostic evidence and does not invalidate otherwise valid replay
 progress or authorize an increase in concurrency.
 
+Linux can release an exiting userspace process's address space before its state
+becomes a zombie. When resident fields are missing, a freshly read `PF_EXITING`
+flag is positive exit evidence, like a changed start time or terminal task state:
+discard the entire attempt and retry within the existing three-attempt bound.
+Never omit that PID or substitute zero. Missing fields without such evidence
+remain a hard failure. Saved errors include PID, state, flags and observed versus
+expected start ticks so diagnosis can use the existing receipt without polling
+again. Fixture tests live in `tools/horizon-rss-tests`; native observer artifact,
+feature and downstream-consumer qualification remain separate requirements.
+
 `MemAvailable` includes reclaimable resident file mappings. Subtracting summed
 lane RSS from `MemTotal - MemAvailable` can therefore produce negative apparent
 non-lane usage. The capacity report instead uses a consistent resident planning

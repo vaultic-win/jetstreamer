@@ -210,6 +210,16 @@ fn start_ticks(stat: &str, pid: u32) -> Result<u64> {
         .parse()
         .map_err(Into::into)
 }
+fn process_flags(stat: &str) -> Result<u64> {
+    stat.rsplit_once(')')
+        .context("RSS stat comm")?
+        .1
+        .split_whitespace()
+        .nth(6)
+        .context("RSS flags")?
+        .parse()
+        .map_err(Into::into)
+}
 fn status(text: &str, pid: u32) -> Result<(u64, u64)> {
     let mut rss = None;
     let mut high = None;
@@ -279,13 +289,25 @@ fn process_status(root: &Path, pid: u32, start: u64, host_census: bool) -> Resul
                 .split_whitespace()
                 .next()
                 .context("RSS process state")?;
-            if start_ticks(&stat, pid)? != start || matches!(state, "Z" | "X" | "x") {
-                return Err(CensusChurn(
+            let observed_start = start_ticks(&stat, pid)?;
+            let flags = process_flags(&stat)?;
+            // Linux PF_EXITING is set before exit_mm releases the address
+            // space, while task state can still be R/S rather than Z/X.
+            // This is positive kernel exit evidence, not permission to count
+            // a missing VmRSS as zero. Discard and retry the whole census.
+            if observed_start != start
+                || matches!(state, "Z" | "X" | "x")
+                || flags & 0x0000_0004 != 0
+            {
+                return Err(anyhow::Error::new(CensusChurn(
                     "RSS process exited or changed identity during status capture",
-                )
-                .into());
+                ))).with_context(|| format!(
+                    "RSS process {pid} missing-resident evidence: state={state} flags={flags:#x} start={observed_start} expected_start={start}"
+                ));
             }
-            Err(error)
+            Err(error).with_context(|| format!(
+                "RSS process {pid} missing-resident evidence: state={state} flags={flags:#x} start={observed_start} expected_start={start}"
+            ))
         }
         result => result,
     }
@@ -309,20 +331,12 @@ fn capture_processes(
         };
         let stat = read("stat")?;
         let start = start_ticks(&stat, *pid)?;
-        let kernel = stat
-            .rsplit_once(')')
-            .context("RSS stat comm")?
-            .1
-            .split_whitespace()
-            .nth(6)
-            .context("RSS flags")?
-            .parse::<u64>()?
-            & 0x0020_0000
-            != 0;
+        let kernel = process_flags(&stat)? & 0x0020_0000 != 0;
         let (rss, high) = if allow_kernel && kernel {
             (0, 0)
         } else {
-            process_status(&root, *pid, start, allow_kernel)?
+            process_status(&root, *pid, start, allow_kernel)
+                .with_context(|| format!("RSS process {pid} resident capture"))?
         };
         let membership = read("cgroup")?;
         let current = membership
@@ -570,6 +584,61 @@ mod tests {
                 .unwrap()
                 .contains("process exited")
         );
+    }
+
+    #[test]
+    fn exiting_flag_retries_complete_host_census_before_zombie_state() {
+        let temp = tempfile::tempdir().unwrap();
+        let cg = temp.path().join("cg");
+        let proc_root = temp.path().join("proc");
+        fs::create_dir_all(&cg).unwrap();
+        fs::write(cg.join("cgroup.procs"), "7\n8\n").unwrap();
+        fixture_process(&proc_root, 7, 10);
+        fixture_process(&proc_root, 8, 11);
+        let root = proc_root.join("8");
+        let mut fields = vec!["0"; 20];
+        fields[0] = "R";
+        fields[6] = "4"; // PF_EXITING, independently defined by Linux sched.h.
+        fields[19] = "11";
+        fs::write(
+            root.join("stat"),
+            format!("8 (exiting) {}", fields.join(" ")),
+        )
+        .unwrap();
+        fs::write(root.join("status"), "Pid: 8\nTgid: 8\n").unwrap();
+        let mut attempts = 0;
+        let result = host_resident_attempts(|| {
+            attempts += 1;
+            if attempts == 2 {
+                fixture_process(&proc_root, 8, 12);
+            }
+            let rss = capture_processes(&cg, Path::new("/"), &proc_root, true)?;
+            Ok(serde_json::json!({"status":"observed", "rss":rss}))
+        });
+        assert_eq!(attempts, 2);
+        assert_eq!(result["rss"]["aggregate_rss_bytes"], 204800);
+        assert_eq!(result["rss"]["processes"].as_array().unwrap().len(), 2);
+        assert_eq!(result["rss"]["processes"][1]["start_ticks"], 12);
+        let error = result["discarded_attempt_errors"][0].as_str().unwrap();
+        assert!(error.contains("process 8"));
+        assert!(error.contains("state=R flags=0x4 start=11 expected_start=11"));
+
+        // A missing field from a stable, non-exiting process remains a hard
+        // failure, with enough evidence to diagnose it from the saved receipt.
+        fs::write(root.join("status"), "Pid: 8\nTgid: 8\n").unwrap();
+        let result = host_resident_attempts(|| {
+            process_status(&root, 8, 12, true)?;
+            unreachable!()
+        });
+        assert_eq!(result["census_attempts"], 1);
+        assert_eq!(result["status"], "unavailable");
+        assert!(
+            result["error"]
+                .as_str()
+                .unwrap()
+                .contains("state=S flags=0x0 start=12")
+        );
+        assert!(result.get("rss").is_none());
     }
 
     #[test]

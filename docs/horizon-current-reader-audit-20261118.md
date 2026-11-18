@@ -190,3 +190,17 @@ acceptance never proves a canonical epoch or authenticated R2 readback. Adding
 this example changes the conservative reader path set, so the subsequent build
 and qualification must bind the new published revision; preserve the already
 running build and reuse its dependency work after normal closure.
+
+At 22:22:23 UTC all five replay owners were stable and advancing with zero
+restarts. Native status publication and authenticated readback succeeded for
+247–251. Fleet reconciliation found 34 ready pairs, 66 missing and zero object
+anomalies. The final host-resident census was unavailable after membership churn
+and a missing `VmRSS` field, so this observation does not establish a new memory
+target or authorize expansion. The earlier target of nine is historical planning
+evidence only. The saved failure lacks the affected PID/state, so its precise
+cause cannot be established retrospectively. RSS observer source now records
+that context and recognizes Linux's positive `PF_EXITING` evidence before zombie
+state, while retaining complete-census retries and rejecting unexplained missing
+fields. Thirteen fixture tests and strict Clippy pass; this observer change still
+needs its own artifact/feature qualification before deployment. Existing guards
+and the next 30-minute observation remain unchanged.
