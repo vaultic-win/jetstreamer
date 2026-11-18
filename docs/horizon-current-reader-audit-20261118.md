@@ -119,3 +119,30 @@ and qualified cleanup. The ETag-only bypass is rejected.
 without the full uploader dependency graph. The source integration still needs
 full-crate compilation, native end-to-end qualification, sealed deployment and
 operational admission. No new publication has been performed with this code.
+
+At published merge `72751e30`, the full uploader and its test targets passed
+`cargo check --offline --locked -p jetstreamer-r2 --bin jetstreamer-r2 --tests
+--jobs 1` from an isolated clean checkout. The gate's six tests and coordinator's
+15 tests passed, as did strict Clippy for both directly compiled targets.
+This is compilation and bounded unit/integration evidence, not a native R2 run.
+
+The 21:51:54 UTC observation proves epoch 251 entered transaction replay at
+1.888 slots/s alongside the four unchanged advancing owners. All five native
+status objects now use measured replay rates and authenticated readback; the
+range census remains 34 ready, 66 missing, zero anomalies and no diagnostics.
+The memory model now selects nine desired lanes from five executing lanes.
+Existing hard obligations plus host/control reserves still leave only 9.64 GB;
+another 128 GB candidate does not fit without qualified reservation changes or
+a released lane. No sixth lane was admitted.
+
+An isolated release build from `72751e30` started in
+`horizon-current-reader-release-build-20261118-v1.service`, invocation
+`2d731ba76f644a62b6310a1d45143fa7`. It targets the full verifier, plugin pipeline,
+uploader and progressive coordinator with one Cargo job, a 7 GB hard limit,
+CPUs 48–55, 400% CPU quota, LTO disabled and 16 root codegen units. Verbose Cargo
+JSON and compiler commands are retained in the unthrottled journal. Source
+hashes, compiler version and the resource budget are under
+`/home/ubuntu/.codex/diagnostics/horizon-current-reader-release-build-20261118-v1`.
+The candidate build remains unqualified until normal completion, captured
+source/artifact review, immutable sealing and genuine native capability and
+end-to-end playback checks. It does not replace any live worker or guard.
