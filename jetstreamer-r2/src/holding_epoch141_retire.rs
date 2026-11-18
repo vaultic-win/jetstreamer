@@ -90,8 +90,7 @@ fn closure(path: &Path) -> Result<Value> {
     Ok(json!({"download":download,"park":park,"processes":processes,"staged":staged}))
 }
 
-async fn remote(client: &Client, m: &Mapping, c: &Value) -> Result<RemoteArchive> {
-    let (key, etag, sha, length) = custody(c, m)?;
+fn exact_custody(c: &Value) -> Result<()> {
     ensure!(
         c["source"] == SOURCE
             && c["sha256"] == SHA
@@ -102,9 +101,15 @@ async fn remote(client: &Client, m: &Mapping, c: &Value) -> Result<RemoteArchive
                 == "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json"
             && c["manifest"]["uid"] == 0
             && c["manifest"]["gid"] == 0
-            && c["manifest"]["mode"] == 0o100444,
+            && c["manifest"]["mode"] == 0o444,
         "141 custody does not bind the exact closed source"
     );
+    Ok(())
+}
+
+async fn remote(client: &Client, m: &Mapping, c: &Value) -> Result<RemoteArchive> {
+    let (key, etag, sha, length) = custody(c, m)?;
+    exact_custody(c)?;
     let owner = owner_bytes(m)?;
     ensure!(
         get_mutable_object(client, BUCKET, &format!("{}owner.json", m.prefix))
@@ -363,7 +368,32 @@ pub(super) async fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::transition_shape;
+    use super::*;
+
+    #[test]
+    fn retirement_accepts_the_manifest_written_by_the_holding_producer() {
+        let mapping = Mapping {
+            schema: "jetstreamer-horizon-host-holding-prefix-v2".into(),
+            host: HOST.into(), prefix: "node_02/".into(), user_provided_prefix: true,
+            authorization_reference: "test fixture".into(),
+        };
+        let plan = Park {
+            schema: "jetstreamer-horizon-holding-park-plan-v2".into(),
+            mapping: Bound {path: "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json".into(),sha256:"a".repeat(64)},
+            eligibility: Bound {path:ELIGIBILITY.into(),sha256:ELIGIBILITY_SHA.into()},
+            source:SOURCE.into(),length:LENGTH,sha256:SHA.into(),
+        };
+        let manifest: Value = serde_json::from_slice(&manifest_bytes(
+            &mapping, &plan, &object_key(&mapping,SHA).unwrap(), 0, 0, 0o100444,
+        ).unwrap()).unwrap();
+        let mut receipt = json!({"source":SOURCE,"sha256":SHA,"length":LENGTH,
+            "eligibility":plan.eligibility,"mapping":plan.mapping,"manifest":manifest});
+        exact_custody(&receipt).unwrap();
+        for bad_mode in [0o100444,0o644,0o400] {
+            receipt["manifest"]["mode"] = json!(bad_mode);
+            assert!(exact_custody(&receipt).is_err());
+        }
+    }
 
     #[test]
     fn retirement_markers_require_durable_predecessors() {
