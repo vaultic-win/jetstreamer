@@ -95,6 +95,11 @@ unchanged on the fetched branch. If compatibility requires a fix, merge it into 
 and qualify the resulting reader before publishing the archive. Never publish an archive that only
 an unmerged fork, local patch or private reader understands. This rule does not authorize
 overwriting or deleting an existing archive or sidecar.
+Recheck the remote branch before committing the archive's readiness sidecar. If relevant reader
+code or dependencies changed, qualify that reader and repeat full/current-plugin verification;
+ancestor containment alone is insufficient. Unrelated documentation or operator changes need
+no redundant archive scan when exact reader equivalence is established. Preserve existing R2
+objects during historical compatibility audits; a failure authorizes diagnosis, not replacement.
 
 Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
@@ -1167,18 +1172,6 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   This never authorizes deleting the immutable deployment member, its receipts, or anything in R2.
 - For adaptive ranges, start the controller with `--r2-receipt-directory "$HOME/.jetstreamer-private/r2-receipts" --r2-bucket BUCKET`. The controller accepts receipts from that exact bucket only for bytes already bound by its root-owned local completion attestation; R2 can replace local storage, but can never establish initial completion.
 - Start the current Horizon verification plugin as soon as each local archive is available. R2 work may run concurrently with replay of other epochs. An archive is eligible for upload only after its full and current-plugin receipts bind the same archive SHA-256. It is not eligible for local retirement until both adjacent-boundary receipts bind that digest as well. Preserve the canonical lowercase coreutils sidecar format: `<64 hex>  epoch-N.jet\n`.
-- **Every archive published to R2 must be readable by the latest `origin/account-updates` reader.**
-  Fetch that branch before publication and bind its exact commit, the reader/plugin source and
-  dependency closure, verifier build provenance and archive digest to the full/current-plugin
-  acceptance. An older verifier is usable only when its effective reader/plugin source and
-  dependencies are proven equivalent to that fetched revision; ancestor containment alone does
-  not prove reader compatibility. If relevant code changed, qualify the latest reader and rerun
-  full and plugin verification before upload or sidecar publication. Unrelated documentation or
-  operator changes need no redundant archive scan when exact reader equivalence is established.
-  Recheck the remote branch before the readiness sidecar is committed. Whole-object SHA-256
-  readback proves byte integrity, not reader compatibility. Preserve existing R2 objects when
-  auditing historical compatibility; a failed compatibility audit authorizes repair and diagnosis,
-  not archive replacement or deletion.
 - When a verifier starts on the first archive of a long continuous cohort, size its oneshot
   `TimeoutStartSec` for the remaining replay plus final validation, not just one archive scan. While
   waiting for later sidecars, dispatch the plugin verifier through

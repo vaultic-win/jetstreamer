@@ -45,7 +45,7 @@ fn read(p: &Path) -> Result<Vec<u8>> {
     let m = f.metadata()?;
     ensure!(
         m.is_file()
-            && m.uid() == 0
+            && [0, 1000].contains(&m.uid())
             && m.mode() & 0o022 == 0
             && m.nlink() == 1
             && m.len() <= 4 << 20,
@@ -81,6 +81,10 @@ fn binding(p: &Path, b: &[u8]) -> Value {
     json!({"path":p,"sha256":digest(b)})
 }
 fn bound(p: &Path, sha: &str) -> Result<Value> {
+    ensure!(
+        fs::symlink_metadata(p)?.uid() == 0,
+        "bound authority must be root-owned"
+    );
     let b = read(p)?;
     ensure!(digest(&b) == sha, "digest mismatch {}", p.display());
     Ok(serde_json::from_slice(&b)?)
@@ -249,9 +253,11 @@ fn run() -> Result<()> {
             format!("/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-{epoch}.r2.json")
         };
         let raw = read(Path::new(&rp))?;
-        let r: Value = serde_json::from_slice(&raw)?;
+        let mut r: Value = serde_json::from_slice(&raw)?;
         receipt(&r, e)?;
         let remote = binding(Path::new(&rp), &raw);
+        r["original_receipt"] = remote.clone();
+        r["original_receipt_uid"] = json!(fs::symlink_metadata(&rp)?.uid());
         let mut gates = Vec::new();
         for (role, verifier) in [("full", FULL), ("plugin", PLUGIN)] {
             let mut doc = json!({"schema":"horizon251-normalized-canonical-gate-v1","epoch":epoch,"role":role,"canonical_jet_bytes":e["archive_length"],"archive_sha256":e["sidecar_sha256"],"remote_readback":remote});
@@ -277,7 +283,7 @@ fn run() -> Result<()> {
             }
             gates.push(doc);
         }
-        inputs.push((e.clone(), remote, gates));
+        inputs.push((e.clone(), r, gates));
     }
     let root = Path::new(&a[5]);
     ensure!(root.is_absolute(), "absolute output required");
@@ -285,8 +291,12 @@ fn run() -> Result<()> {
     fs::set_permissions(root, fs::Permissions::from_mode(0o700))?;
     ensure!(root.canonicalize()? == root, "noncanonical output");
     let mut rows = Vec::new();
-    for (e, remote, gates) in inputs {
+    for (e, remote_receipt, mut gates) in inputs {
         let epoch = number(&e, "epoch")?;
+        let remote = write(root, &format!("epoch-{epoch}.remote.json"), &remote_receipt)?;
+        for gate in &mut gates {
+            gate["remote_readback"] = remote.clone();
+        }
         let full = write(root, &format!("epoch-{epoch}.full.json"), &gates[0])?;
         let plugin = write(root, &format!("epoch-{epoch}.plugin.json"), &gates[1])?;
         rows.push(json!({"epoch":epoch,"canonical_jet_bytes":e["archive_length"],"archive_sha256":e["sidecar_sha256"],"normal_full_plugin_and_remote_gates_accepted":true,"full_verification":full,"current_plugin":plugin,"remote_readback":remote}));
@@ -296,7 +306,7 @@ fn run() -> Result<()> {
             .iter()
             .map(|e| e["archive_length"].as_u64().unwrap_or(0)),
     )?;
-    let doc = json!({"schema":"horizon251-qualified-century-census-v1","first_epoch":200,"last_epoch":300,"source_fleet":{"path":a[1],"sha256":a[2]},"epoch200_inventory":{"path":a[3],"sha256":a[4]},"accepted_prior_floor":{"path":PRIOR,"sha256":PRIOR_SHA},"count":count,"sum_bytes":sum,"floor_bytes":current_floor,"century_floor_census":rows,"new_verification_claimed_for_inherited_epochs":false,"replay_launch_authorized":false,"remote_mutations":false});
+    let doc = json!({"schema":"horizon251-qualified-century-census-v1","first_epoch":200,"last_epoch":300,"source_fleet":{"path":a[1],"sha256":a[2]},"epoch200_inventory":{"path":a[3],"sha256":a[4]},"accepted_prior_floor":{"path":PRIOR,"sha256":PRIOR_SHA},"count":count,"sum_bytes":sum,"floor_bytes":current_floor,"century_floor_census":rows,"new_verification_claimed_for_inherited_epochs":false,"latest_account_updates_reader_compatibility_proven":false,"replay_launch_authorized":false,"remote_mutations":false});
     println!("{}", write(root, "century-floor.json", &doc)?);
     Ok(())
 }
