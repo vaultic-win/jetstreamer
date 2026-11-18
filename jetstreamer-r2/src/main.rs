@@ -69,6 +69,7 @@ mod cohort191_queue_run;
 mod cohort198_finalization;
 mod cohort198_handoff;
 mod cohort_finalization;
+mod current_reader;
 mod fleet;
 mod fleet_memory;
 mod holding;
@@ -104,7 +105,6 @@ struct Config {
     part_size: u64,
     legacy_part_size: Option<u64>,
     concurrency: usize,
-    legacy_etag_only: bool,
     overwrite_existing: bool,
     repair_orphaned_archive: bool,
     observer_receipt: Option<PathBuf>,
@@ -118,6 +118,8 @@ struct Config {
     status_publication_receipt: Option<PathBuf>,
     status_publication_sha256: Option<String>,
     latest_status_publication_receipt: bool,
+    current_reader_plan: Option<PathBuf>,
+    current_reader_plan_sha256: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -186,6 +188,8 @@ struct Receipt {
     r2_composite_sha256: Option<String>,
     #[serde(default)]
     remote_sha256_readback: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    current_reader_playback: Option<current_reader::Bound>,
     multipart_part_size: u64,
     verified_unix_seconds: u64,
 }
@@ -263,6 +267,7 @@ fn usage() -> ! {
         "[--receipt-directory DIRECTORY] [--public-receipt-directory DIRECTORY] [--delete-local] [--part-size-mib N] ",
         "[--legacy-part-size-mib N] [--legacy-etag-only] [--overwrite-existing] ",
         "[--repair-orphaned-archive] ",
+        "[--current-reader-plan FILE --current-reader-plan-sha256 HEX] ",
         "[--concurrency N] [--observer-receipt FILE] [--observer-sha256 HEX] ",
         "[--expected-controller-invocation-id ID] [--expected-producer-invocation-id ID] ",
         "[--elapsed-execution-millis N] [--estimated-remaining-millis N] [--phase PHASE] ",
@@ -311,6 +316,8 @@ fn parse_args() -> Result<Config> {
     let mut status_publication_receipt = None;
     let mut status_publication_sha256 = None;
     let mut latest_status_publication_receipt = false;
+    let mut current_reader_plan = None;
+    let mut current_reader_plan_sha256 = None;
     while let Some(argument) = args.next() {
         let argument = argument
             .into_string()
@@ -331,6 +338,8 @@ fn parse_args() -> Result<Config> {
             "--part-size-mib" => part_size = parse_mib(&value()?)?,
             "--legacy-part-size-mib" => legacy_part_size = Some(parse_mib(&value()?)?),
             "--legacy-etag-only" => legacy_etag_only = true,
+            "--current-reader-plan" => current_reader_plan = Some(PathBuf::from(value()?)),
+            "--current-reader-plan-sha256" => current_reader_plan_sha256 = Some(value()?),
             "--overwrite-existing" => overwrite_existing = true,
             "--repair-orphaned-archive" => repair_orphaned_archive = true,
             "--observer-receipt" => observer_receipt = Some(PathBuf::from(value()?)),
@@ -442,6 +451,26 @@ fn parse_args() -> Result<Config> {
         !legacy_etag_only || matches!(command, Command::Sync | Command::Verify),
         "--legacy-etag-only is valid only with sync or verify"
     );
+    if matches!(command, Command::Sync | Command::Verify) {
+        ensure!(
+            current_reader_plan
+                .as_ref()
+                .is_some_and(|p| p.is_absolute())
+                && current_reader_plan_sha256
+                    .as_deref()
+                    .is_some_and(|s| is_lower_hex(s, 64)),
+            "sync/verify require --current-reader-plan and --current-reader-plan-sha256"
+        );
+        ensure!(
+            !legacy_etag_only,
+            "checksum-only verification cannot replace full remote plugin playback"
+        );
+    } else {
+        ensure!(
+            current_reader_plan.is_none() && current_reader_plan_sha256.is_none(),
+            "current reader options apply only to sync/verify"
+        );
+    }
     let status_options_present = observer_receipt.is_some()
         || observer_sha256.is_some()
         || expected_controller_invocation_id.is_some()
@@ -567,7 +596,6 @@ fn parse_args() -> Result<Config> {
         part_size,
         legacy_part_size,
         concurrency,
-        legacy_etag_only,
         overwrite_existing,
         repair_orphaned_archive,
         observer_receipt,
@@ -581,6 +609,8 @@ fn parse_args() -> Result<Config> {
         status_publication_receipt,
         status_publication_sha256,
         latest_status_publication_receipt,
+        current_reader_plan,
+        current_reader_plan_sha256,
     })
 }
 
@@ -3187,7 +3217,6 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         config.repair_orphaned_archive,
     )
     .with_context(|| format!("invalid remote pair state for epoch {epoch}"))?;
-    let was_existing = existing.is_some() && !config.overwrite_existing;
     let effective_part_size = if let Some(remote) = &existing {
         if config.overwrite_existing {
             config.part_size
@@ -3212,6 +3241,31 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         proof.sha256_hex == local.sha256_hex,
         "local SHA-256 mismatch for epoch {epoch}"
     );
+    // No remote mutation is allowed until the exact local archive passes the
+    // qualified current reader's full verifier and complete plugin playback.
+    let reader_binding = current_reader::Bound {
+        path: config
+            .current_reader_plan
+            .clone()
+            .context("missing current reader plan")?,
+        sha256: config
+            .current_reader_plan_sha256
+            .clone()
+            .context("missing reader plan digest")?,
+    };
+    let reader_archive = local.archive_path.clone();
+    let reader_digest = local.sha256_hex.clone();
+    let reader_length = local.length;
+    let mut reader_gate = tokio::task::spawn_blocking(move || {
+        current_reader::Gate::prepare(
+            reader_binding,
+            epoch,
+            &reader_archive,
+            reader_length,
+            &reader_digest,
+        )
+    })
+    .await??;
     let (etag, _upload_composite_sha256) = if let Some(remote) =
         existing.filter(|_| !config.overwrite_existing)
     {
@@ -3292,23 +3346,37 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         );
     }
     let native_sha256_proven = remote.composite_sha256.is_some();
-    let remote_sha256_readback =
-        if native_sha256_proven || (was_existing && config.legacy_etag_only) {
-            false
-        } else {
-            eprintln!("epoch {epoch}: reading the completed R2 object back for whole-file SHA-256");
-            verify_remote_sha256(
-                client,
-                &r2.bucket,
-                &archive_key,
-                &etag,
-                local.length,
-                &local.sha256_hex,
-                config.concurrency,
-            )
-            .await?;
-            true
-        };
+    // Always materialize actual authenticated R2 bytes, including when native
+    // checksums are present. A local archive or checksum-only proof is insufficient.
+    let mut readback_file = reader_gate.create_readback()?;
+    read_remote_sha256_resumable(
+        client,
+        RemoteReadSpec {
+            bucket: &r2.bucket,
+            key: &archive_key,
+            etag: &etag,
+            expected_length: local.length,
+            expected_sha256: &local.sha256_hex,
+            concurrency: config.concurrency,
+        },
+        &mut readback_file,
+    )
+    .await?;
+    readback_file.sync_all()?;
+    drop(readback_file);
+    let remote_object = current_reader::RemoteObject {
+        bucket: r2.bucket.clone(),
+        key: archive_key.clone(),
+        etag: etag.clone(),
+        length: local.length,
+        sha256: local.sha256_hex.clone(),
+    };
+    let reader_gate = tokio::task::spawn_blocking(move || -> Result<_> {
+        reader_gate.verify_remote(remote_object)?;
+        Ok(reader_gate)
+    })
+    .await??;
+    let remote_sha256_readback = true;
     let revalidation_started = Instant::now();
     eprintln!("epoch {epoch}: local source revalidation started after remote integrity proof");
     revalidate_local(&local)?;
@@ -3317,9 +3385,24 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         revalidation_started.elapsed().as_millis()
     );
 
+    let before_sidecar = head_archive(client, &r2.bucket, &archive_key)
+        .await?
+        .context("remote archive disappeared during plugin playback")?;
+    ensure!(
+        before_sidecar.length == local.length && before_sidecar.etag == etag,
+        "remote archive changed during plugin playback"
+    );
+    let playback_receipt =
+        tokio::task::spawn_blocking(move || reader_gate.publication_receipt()).await??;
+    eprintln!(
+        "epoch {epoch}: full remote plugin playback accepted, receipt {} sha256={}",
+        playback_receipt.path.display(),
+        playback_receipt.sha256
+    );
+
     // The sidecar is the public completion marker. Publish it only after the
-    // complete archive has passed every available remote integrity proof and
-    // the source files have been revalidated. Consumers may therefore treat a
+    // complete archive has passed authenticated readback, full current-plugin
+    // playback, the final branch recheck and local source revalidation. Consumers may treat a
     // canonical sidecar as meaning that the corresponding archive was fully
     // uploaded and verified by this publisher.
     match remote_sidecar(client, &r2.bucket, &checksum_key).await? {
@@ -3370,6 +3453,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         );
     }
     let receipt = Receipt {
+        current_reader_playback: Some(playback_receipt),
         schema: RECEIPT_SCHEMA.to_owned(),
         bucket: r2.bucket.clone(),
         epoch,
@@ -4672,6 +4756,7 @@ mod tests {
     #[test]
     fn receipt_time_is_not_part_of_identity() {
         let receipt = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.to_owned(),
             bucket: "bucket".to_owned(),
             epoch: 7,
@@ -4703,6 +4788,7 @@ mod tests {
         let part_size = 5 * 1024 * 1024;
         let proof = hash_and_etag(&archive_path, local.identity, part_size).unwrap();
         let mut receipt = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.to_owned(),
             bucket: "bucket".to_owned(),
             epoch,
@@ -4743,6 +4829,7 @@ mod tests {
     fn receipt_replacement_requires_explicit_overwrite() {
         let directory = tempfile::tempdir().unwrap();
         let receipt = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.to_owned(),
             bucket: "bucket".to_owned(),
             epoch: 7,
@@ -4789,6 +4876,7 @@ mod tests {
     fn restore_receipt_accepts_legacy_evidence_for_fresh_readback() {
         let directory = tempfile::tempdir().unwrap();
         let receipt = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.to_owned(),
             bucket: "bucket".to_owned(),
             epoch: 7,
@@ -4845,6 +4933,7 @@ mod tests {
         let part_size = 5 * 1024 * 1024;
         let proof = hash_and_etag(&path, regular_identity(&path).unwrap(), part_size).unwrap();
         let receipt = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.to_owned(),
             bucket: "bucket".to_owned(),
             epoch: 7,
@@ -4995,10 +5084,19 @@ mod tests {
         let start = source.find("async fn sync_epoch(").unwrap();
         let end = source[start..].find("\nasync fn main(").unwrap() + start;
         let sync_epoch = &source[start..end];
-        let remote_readback = sync_epoch.find("verify_remote_sha256(").unwrap();
+        let remote_readback = sync_epoch.find("read_remote_sha256_resumable(").unwrap();
+        let remote_playback = sync_epoch.find("reader_gate.verify_remote(").unwrap();
+        let current_branch_receipt = sync_epoch
+            .find("reader_gate.publication_receipt()")
+            .unwrap();
         let local_revalidation = sync_epoch.find("revalidate_local(&local)").unwrap();
         let sidecar_publication = sync_epoch.find("put_sidecar(").unwrap();
-        assert!(remote_readback < sidecar_publication);
+        assert!(
+            remote_readback < remote_playback
+                && remote_playback < local_revalidation
+                && local_revalidation < current_branch_receipt
+                && current_branch_receipt < sidecar_publication
+        );
         assert!(local_revalidation < sidecar_publication);
         assert!(
             sync_epoch.contains("validate_remote_pair_state(")

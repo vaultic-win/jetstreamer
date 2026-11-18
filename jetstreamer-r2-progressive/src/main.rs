@@ -58,6 +58,8 @@ struct Config {
     plugin: Gate,
     boundary: Gate,
     defer_epochs: Vec<(u64, u64)>,
+    current_reader_plan: Option<PathBuf>,
+    current_reader_plan_sha256: Option<String>,
 }
 
 #[derive(Debug)]
@@ -134,6 +136,7 @@ fn usage() -> ! {
         "FIRST_EPOCH LAST_EPOCH [--poll-seconds N] [--concurrency N] ",
         "[--legacy-part-size-mib N] [--delete-local] [--retirement-only|--check-retirement-only] [--local-mutation-lock PATH] ",
         "[--public-receipt-directory DIR] ",
+        "[--current-reader-plan FILE --current-reader-plan-sha256 HEX] ",
         "--full-receipt-directory DIR --full-verifier-sha256 HASH[,HASH...] ",
         "--full-verifier-script-sha256 HASH[,HASH...] --plugin-receipt-directory DIR ",
         "--plugin-pipeline-sha256 HASH[,HASH...] ",
@@ -259,6 +262,8 @@ fn parse_args() -> Result<Config> {
     let mut boundary_verifier = None;
     let mut boundary_script = None;
     let mut defer_epochs = Vec::new();
+    let mut current_reader_plan = None;
+    let mut current_reader_plan_sha256 = None;
     while let Some(argument) = args.next() {
         let argument = argument
             .into_string()
@@ -295,6 +300,16 @@ fn parse_args() -> Result<Config> {
             "--legacy-part-size-mib" => {
                 legacy_part_size_mib =
                     parse_positive(&option_value(&mut args, option, inline_value)?, option)?
+            }
+            "--current-reader-plan" => {
+                current_reader_plan = Some(PathBuf::from(option_value(
+                    &mut args,
+                    option,
+                    inline_value,
+                )?));
+            }
+            "--current-reader-plan-sha256" => {
+                current_reader_plan_sha256 = Some(option_value(&mut args, option, inline_value)?);
             }
             "--delete-local" => {
                 ensure!(
@@ -438,12 +453,29 @@ fn parse_args() -> Result<Config> {
         plugin,
         boundary,
         defer_epochs,
+        current_reader_plan,
+        current_reader_plan_sha256,
     };
     validate_retirement_mode(&config)?;
     Ok(config)
 }
 
 fn validate_retirement_mode(config: &Config) -> Result<()> {
+    if !config.retirement_only {
+        ensure!(
+            config
+                .current_reader_plan
+                .as_ref()
+                .is_some_and(|p| p.is_absolute())
+                && config
+                    .current_reader_plan_sha256
+                    .as_deref()
+                    .is_some_and(|s| s.len() == 64
+                        && s.bytes()
+                            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))),
+            "publication requires a current reader plan and SHA-256"
+        );
+    }
     ensure!(
         !config.retirement_check_only || config.retirement_only,
         "retirement check needs bounded retirement mode"
@@ -767,6 +799,16 @@ fn sync_command(config: &Config, epoch: u64, delete_local: bool) -> Command {
         .arg(config.legacy_part_size_mib.to_string())
         .arg("--concurrency")
         .arg(config.concurrency.to_string());
+    if let (Some(path), Some(digest)) = (
+        &config.current_reader_plan,
+        &config.current_reader_plan_sha256,
+    ) {
+        command
+            .arg("--current-reader-plan")
+            .arg(path)
+            .arg("--current-reader-plan-sha256")
+            .arg(digest);
+    }
     if delete_local {
         command.arg("--delete-local");
     }
@@ -1155,6 +1197,8 @@ mod tests {
             plugin: gate(&root.join("plugin"), &verifier, &script),
             boundary: gate(&root.join("boundary"), &verifier, &script),
             defer_epochs: Vec::new(),
+            current_reader_plan: Some(root.join("current-reader-plan.json")),
+            current_reader_plan_sha256: Some(digest("f")),
         }
     }
 
@@ -1320,7 +1364,31 @@ mod tests {
             .map(|value| value.to_string_lossy().into_owned())
             .collect();
         assert!(arguments.contains(&"--delete-local".to_owned()));
+        assert!(arguments.windows(2).any(|p| {
+            p[0] == "--current-reader-plan"
+                && p[1]
+                    == config
+                        .current_reader_plan
+                        .as_ref()
+                        .unwrap()
+                        .to_string_lossy()
+        }));
+        assert!(
+            arguments
+                .windows(2)
+                .any(|p| p[0] == "--current-reader-plan-sha256"
+                    && p[1] == config.current_reader_plan_sha256.as_deref().unwrap())
+        );
         assert_eq!(command.get_program(), config.uploader.as_os_str());
+    }
+
+    #[test]
+    fn publication_refuses_missing_reader_plan() {
+        let temporary = TempDir::new().unwrap();
+        let mut config = test_config(temporary.path());
+        validate_retirement_mode(&config).unwrap();
+        config.current_reader_plan = None;
+        assert!(validate_retirement_mode(&config).is_err());
     }
 
     #[test]

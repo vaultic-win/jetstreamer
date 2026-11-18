@@ -84,3 +84,38 @@ status now uses its actual producer start instead of the earlier repair-owner
 elapsed time. Its 102-hour initial planning allowance includes two hours of
 startup, 80 of replay and 20 of delivery/current-reader qualification; only
 actual elapsed startup time was deducted while replay remains unmeasured.
+
+The complete pipeline passed `cargo check --offline --locked -p jetstreamer
+--bin horizon_pipeline --jobs 2` from the isolated published `3a410a30` checkout
+at 21:42:43 UTC. The process completed normally in 10m10s under a 7 GB cap,
+with a reported 4.5 GiB peak. This checks integration compilation; it does not
+produce or qualify a playback executable.
+
+The uploader/coordinator source now adds mandatory `--current-reader-plan` and
+`--current-reader-plan-sha256` options for publication/verification. Other
+commands retain their existing interfaces. The sealed plan binds the repository
+and SSH origin, qualified reader source commit, exact full-verifier/pipeline
+artifacts, a sealed Main acceptance with compiler/features/build evidence,
+bounded threads, maximum archive length, private readback scratch and admitted
+filesystem floor. Main acceptance must follow genuine captured-build and native
+capability evidence; creating a plan alone supplies neither.
+
+The gate fetches `account-updates` and conservatively compares the reader crates,
+workspace manifest/lockfile, vendor inputs and compiler/build configuration.
+It runs the full verifier and plugin on the staged local archive before upload.
+It then requires whole-object authenticated R2 readback into a newly created
+separate file even when a native checksum is available, freezes that file,
+checks its length/SHA and plays it through the full plugin. It validates the
+actual invocation, full observed slot range, counts, digest and clean exit,
+then rechecks the readback identity/hash. Before the sidecar step it revalidates
+the local source, checks the remote object's identity, fetches the branch again
+and writes immutable playback acceptance. New canonical local delivery receipts
+reference that evidence; existing historical receipts remain preserved. A
+re-audit may retain an existing canonical receipt while writing its new playback
+acceptance separately. Failed attempts preserve their readback files for diagnosis
+and qualified cleanup. The ETag-only bypass is rejected.
+
+`tools/horizon-current-reader-tests` exercises the production gate and coordinator
+without the full uploader dependency graph. The source integration still needs
+full-crate compilation, native end-to-end qualification, sealed deployment and
+operational admission. No new publication has been performed with this code.

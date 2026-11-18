@@ -927,6 +927,7 @@ mod tests {
     fn documents(epoch: u64) -> Documents {
         let (kind, unit, iid) = profile(epoch).unwrap();
         let archive = Receipt {
+            current_reader_playback: None,
             schema: RECEIPT_SCHEMA.into(),
             bucket: "test-bucket".into(),
             epoch,

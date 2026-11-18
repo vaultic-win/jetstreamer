@@ -78,6 +78,7 @@ fn sample(p: &RetirePlan) -> Value {
 }
 fn receipt(length: u64, sha: &str, etag: &str) -> Receipt {
     Receipt {
+        current_reader_playback: None,
         schema: RECEIPT_SCHEMA.into(),
         bucket: "fixture".into(),
         epoch: 203,

@@ -91,6 +91,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
 fn proof_receipt(plan: &Plan) -> Receipt {
     // In-memory adapter only. Never serialize this as a producer/R2 completion receipt.
     Receipt {
+        current_reader_playback: None,
         schema: RECEIPT_SCHEMA.to_owned(),
         bucket: plan.bucket.clone(),
         epoch: plan.epoch,
