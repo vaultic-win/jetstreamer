@@ -156,6 +156,28 @@ fn run() -> Result<()> {
             "--property=MemoryMax=4G","--property=TasksMax=128","--property=LimitNOFILE=1048576",
             &prepare_image,p["path"].as_str().context("prepare plan")?,"--plan-sha256",p["sha256"].as_str().context("prepare plan SHA")?,
             "--self-sha256",&prepare_sha,"--prepare"]))?;
+    } else if args[1]=="close-hash141" {
+        let unit="horizon-epoch141-closed-input-hash-20261118-v1.service";
+        let iid="24688356ca3f4f5c91ee225680f4d596";
+        let captured=native(unit,"hash141-terminal-before-close.txt")?;
+        let raw=fs::read_to_string(captured["path"].as_str().unwrap())?;
+        ensure!(raw.lines().any(|l|l==format!("InvocationID={iid}"))
+            && raw.lines().any(|l|l=="MainPID=0") && raw.lines().any(|l|l=="ControlPID=0")
+            && raw.lines().any(|l|l=="Job="),"hash141 exact terminal invocation required");
+        let fragment=format!("/run/systemd/transient/{unit}");
+        let definition=write("hash141-terminal-fragment.service",&fs::read(&fragment)?)?;
+        let journal=output(Command::new("/usr/bin/journalctl").args(["--no-pager","--all","-o","json",&format!("_SYSTEMD_INVOCATION_ID={iid}")]))?;
+        let journal=write("hash141-terminal-journal.jsonl",journal.as_bytes())?;
+        json_file("hash141-close-intent.json",&json!({"unit":unit,"invocation_id":iid,"before":captured,
+            "fragment":definition,"journal":journal,"source_hash_native_history_preserved":true,
+            "only_completed_hash_control_stopped":true,"replay_mutations":false,"r2_mutations":false}))?;
+        output(Command::new("/usr/bin/systemctl").args(["stop",unit]))?;
+        let after=output(Command::new("/usr/bin/systemctl").args(["show",unit,"-p","Id,LoadState,ActiveState,SubState,MainPID,ControlPID"]))?;
+        ensure!(after.lines().any(|l|l=="ActiveState=inactive") && after.lines().any(|l|l=="MainPID=0")
+            && after.lines().any(|l|l=="ControlPID=0"),"hash141 did not close");
+        let after=write("hash141-terminal-after-close.txt",after.as_bytes())?;
+        println!("{}",json_file("hash141-close-completion.json",&json!({"unit":unit,"original_invocation_id":iid,
+            "after":after,"data_removed":false,"replay_mutations":false,"r2_mutations":false}))?);
     } else if args[1]=="holding141" {
         let source="/home/sol/.jetstreamer-private/epoch141-ledger-source-20261020-v1/download/rocksdb.tar.bz2";
         let hash="7af478aec31809cebdeae761d44c19bb90bf06e15d2430813b3b0fe691e6a70b";
