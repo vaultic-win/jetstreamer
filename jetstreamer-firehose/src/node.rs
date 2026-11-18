@@ -745,6 +745,11 @@ impl<R: Read> NodeReader<R> {
         Ok(node_reader)
     }
 
+    /// Returns the underlying source after parsing, allowing exact range coverage checks.
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
     /// Returns the raw Old Faithful CAR header, caching it for subsequent calls.
     pub fn read_raw_header(&mut self) -> Result<Vec<u8>, SharedError> {
         if !self.header.is_empty() {
