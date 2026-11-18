@@ -19,7 +19,20 @@ production allocation call sites.
 Validation: 303 tests passed, production Clippy -D warnings passed, using
 /var/lib/jetstreamer/epoch170-retry6-source-tests-20261118-v1/target.
 No runtime package, live worker, resource booking or R2 object was changed.
-Not committed or pushed by child; root owns publication and admission.
+Source was subsequently published by root to account-updates.
+
+Nov18 23:40 qualification follow-up:
+- The same localized source packet now exposes its guard as a separate Cargo
+  binary. Historical cfg feature names are declared without enabling any, and
+  the prepare binary explicitly requires its existing preparation feature.
+- Guard production and test builds pass with warnings denied. Strict Clippy
+  passes for production and tests. All 98 guard tests pass.
+- Exact persistent qualification units are horizon-170-live166retry7-guard-
+  production-20261118-v3, build-tests-20261118-v2, clippy-production-20261118-v2,
+  clippy-tests-20261118-v2, and ordinary-tests-20261118-v1 (all .service).
+- deploy_guard170 captures those actual executions and seals their image and
+  published source. Runtime sealing, own-image native witness and fresh
+  two-peer preparation remain operational gates; no epoch170 launch is claimed.
 
 Remaining gates:
 - Genuine epoch167 retry6 admission/protection must exist for the two-peer route.

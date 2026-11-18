@@ -257,3 +257,29 @@ also passed. The observation helper carries completed epoch 141 custody and,
 once present, the validated retirement receipt without treating its block count
 as actual reclaimed space. Fresh measurement, preparation, launch checks and
 real guard protection remain required before counting epoch 167 as running.
+
+The v2 retirement check was stopped without mutation at approximately 23:38 UTC.
+Its debug executable had read only 10,955,522,048 bytes after about 13 minutes
+(PID 1648218, start ticks 339093373), roughly 14 MB/sec. A complete pass at that
+speed would exceed the retirement consumer's 900-second prior-check freshness
+limit. The exact original source was present and neither retirement intent nor
+completion existed before the check process was terminated. No ready archive,
+holding object or replay service was changed. Preserve this failed attempt;
+do not weaken the freshness or whole-file proof requirements.
+
+An optimized successor build is running in
+`horizon-holding141-retirement-optimized-build-20261118-v2.service`, using the
+original Sol-owned Cargo cache and target. It retains the dev profile with
+debug info disabled, optimizes the r2 package at level 1 and SHA-256, MD5, digest
+and block-buffer packages at level 3. The first optimization attempt failed
+before compilation because its Root Cargo cache lacked the offline index;
+the corrected attempt uses the original build identity. Qualification and normal
+immutable sealing must precede another check. The existing custody/check plan
+remains usable; no check receipt was produced by the slow attempt.
+
+Epoch 170 guard qualification also advanced: 98 tests pass, along with strict
+production/test compilation and Clippy. The localized manifest now exposes the
+guard separately and requires the existing `preparation` feature for the
+preparer. `deploy_guard170` preserves the five genuine executions and prepares
+the exact successor deployment. Epoch 170 still requires a sealed guard, its
+own native witness, and genuine epoch 167 admission/protection before preparation.
