@@ -103,3 +103,32 @@ the older guard's profile in addition to the ordinary standalone namespace;
 the other declared features remain disabled. This target passed 38 tests and
 strict Clippy. Native isolated qualification and new immutable candidate unit
 bindings remain necessary before selecting its artifact for epoch 251.
+
+The fresh guard build from published commit
+`c63c73b4149fae3a869e82b52ea3fd6e8a596e8a` is sealed at
+`/var/lib/jetstreamer/horizon251-published-guard-20261118-v1`. Its executable
+SHA-256 is `938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d`.
+That package retains all four Rust modules, Cargo manifest/lockfile, Git source
+identities, unchanged before/after source hashes, compiler version, actual
+verbose rustc commands, Cargo artifact/fingerprint evidence and the genuine
+PID1 build journal. The clean offline build used Rust 1.98.0, two jobs, a 2 GiB
+hard limit and the single declared profile feature; PID1 recorded success.
+
+Its explicit non-signaling native root capability passed on the unchanged epoch
+250 invocation in `horizon251-published-guard-native-20261118-v1.service`.
+Receipt:
+`/home/ubuntu/.codex/diagnostics/horizon251-published-guard-native-20261118-v1/receipts/root-capability-2c5e860ecf66498d819639dc2ae5476c.json`.
+The receipt records no trip, `producer_signaled=false` and
+`protective_guard_proven=false`. No existing guard, timer or worker was replaced.
+The old guard's required source patch is already published as `62363cf5`, with
+the same stable patch ID as the historically recorded `48924289`; the new build
+addresses missing original compiler/source capture, not a missing guard patch.
+
+Next: complete source provenance for every selected candidate artifact, bind a
+qualified guard into a new candidate-only immutable configuration and launcher,
+then capture fresh Main admission and execute the actual first-timer startup.
+Keep retained-owner guard hashes separate from the candidate's new hash.
+The current launcher v1 still selects the old guard; the new guard is not yet
+selected for epoch 251. Latest account-updates reader qualification remains a
+separate archive-publication gate described in
+`docs/horizon-current-reader-audit-20261118.md` at repository root.
