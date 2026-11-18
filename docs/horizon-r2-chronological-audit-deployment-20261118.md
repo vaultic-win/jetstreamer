@@ -199,3 +199,27 @@ explicit inputs. The observation helper also derives successor filenames from
 the successor's date, with a passing midnight regression test, so its cadence
 does not stop at November 18. Epoch 141 custody and exact local retirement remain
 the next capacity dependency; no future reclamation is counted as available.
+
+At the 23:13 UTC audit check, **12 archives passed and none failed**; the service
+was playing epoch 12 with the same v3 invocation and zero restarts. Its next
+routine audit observation is no earlier than 23:43 UTC. The independent epoch166
+resource/status cadence remains 23:19:25 UTC.
+
+Epoch 141's full 189,943,475,031-byte authenticated readback completed successfully
+at approximately 23:10 UTC. Its original holding process remained active during
+the subsequent local source revalidation; no custody or local retirement was
+claimed at the 23:15 check. Preserve that process and advance retirement when
+its exact successful terminal invocation and custody receipt become available.
+
+Before retirement, source review found a producer/consumer mode mismatch: the
+holding manifest stores `st_mode & 0777`, but the exact141 consumer expected
+`0100444`. Published fix `c1fca70c` accepts the producer's `0444` representation
+while retaining the exact root-owned immutable local source checks. Both the
+new test using the actual manifest writer and the existing transition test pass.
+Use the new sealed retirement executable:
+`/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v2/jetstreamer-r2`,
+SHA-256 `045d10440c6c9a01eefe240aa0fefa09e8daceae2527baf4dc62dcd8ee67742e`.
+The old v1 retirement image retains the mismatch and must not be selected.
+Native build/test state, test output, changed source and artifact provenance are
+sealed alongside v2. The existing `deploy_retire141 check-plan` and `retire-plan`
+metadata commands remain usable; execute those plans through the v2 image.
