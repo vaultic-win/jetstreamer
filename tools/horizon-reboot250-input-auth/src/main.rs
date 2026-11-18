@@ -47,7 +47,11 @@ fn restore(receipt:&Value, source:&Value, path:&str, digest:&str) -> Result<()> 
 }
 
 fn run() -> Result<()> {
-    if std::env::args().nth(1).as_deref()==Some("check-251") { return epoch251::run(); }
+    match std::env::args().nth(1).as_deref() {
+        Some("check-251") => return epoch251::run(false),
+        Some("check-251-published-node") => return epoch251::run(true),
+        _ => {}
+    }
     ensure!(std::env::args().len()==1,"no arguments accepted");
     ensure!(unsafe {libc::geteuid()}==0,"root required");
     ensure!(!Path::new(OUT).exists(),"acceptance generation exists");

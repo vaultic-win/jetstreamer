@@ -124,6 +124,19 @@ The old guard's required source patch is already published as `62363cf5`, with
 the same stable patch ID as the historically recorded `48924289`; the new build
 addresses missing original compiler/source capture, not a missing guard patch.
 
+The `horizon251-sealer` target directly compiles the repository deployment sealer.
+It passed eight tests, strict Clippy and release compilation. A fresh offline,
+locked, verbose build from published commit `db7a9bea562a5f18ce42de394e064d4675e54fa9`
+used Rust 1.98.0, two jobs and a 2 GiB cap. Its source, manifest/lockfile, compiler
+commands, Cargo artifact/fingerprint and successful PID1 journal are sealed at
+`/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1`.
+Executable SHA-256:
+`faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a`.
+Native positive sealing and refusal to replace the same destination both passed;
+evidence is in
+`/home/ubuntu/.codex/diagnostics/horizon251-published-sealer-native-20261118-v1`.
+The candidate launcher has not yet migrated to this sealer.
+
 Next: complete source provenance for every selected candidate artifact, bind a
 qualified guard into a new candidate-only immutable configuration and launcher,
 then capture fresh Main admission and execute the actual first-timer startup.

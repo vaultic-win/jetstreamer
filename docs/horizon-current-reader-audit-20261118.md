@@ -44,3 +44,13 @@ capacity evidence only. It explicitly sets
 `latest_account_updates_reader_compatibility_proven` to false. No existing R2
 archive has been modified by this audit, and no complete latest-reader audit of
 all historical R2 archives is claimed.
+
+The uploader's `sync_epoch` implementation was inspected at published commit
+`db7a9bea562a5f18ce42de394e064d4675e54fa9`. It still permits the canonical sidecar
+step after remote checksum proof and local revalidation without a receipt for
+full playback of the actual remote archive through the current plugin. This
+implementation does not yet enforce the skill's remote-playback requirement.
+Do not select that path for a new archive publication until the Rust uploader
+and coordinator enforce the required playback and current-reader evidence.
+Status-only publication remains independently usable. Existing remote pairs
+remain preserved; this finding is not evidence that their contents are corrupt.

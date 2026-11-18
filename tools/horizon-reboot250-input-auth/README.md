@@ -14,3 +14,11 @@ native input test, and validates the singleton manifest and canonical checkpoint
 No final-checkpoint snapshot copy is required. The acceptance is input custody,
 not replay admission or publication authority; the output parent must already
 be root-private, and existing receipts cannot be overwritten.
+
+`check-251-published-node OUTPUT_JSON` preserves those input and worker checks
+but selects the sealed `eabd0b6a` node. It also binds the clean source manifest,
+actual production build proof and deployment seal, requiring the exact node
+digest, successful build and empty feature set. It emits a distinct v2 custody
+schema and explicitly leaves exact epoch 251 node replay qualification and fresh
+source-publication admission checks outstanding. The old modes retain their
+original node and receipt schema; no live worker is changed.

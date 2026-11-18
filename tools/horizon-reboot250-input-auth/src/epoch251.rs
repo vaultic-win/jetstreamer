@@ -5,6 +5,22 @@ const MANIFEST251: (&str, &str) = (
     "e40e8d0341440d29cff7cd35e79e5f713d7908ce42f3a1c4995e1b2924551f14",
 );
 const INPUT: &str = "/var/lib/jetstreamer/horizon251-native-input-20261118-v1";
+const PUBLISHED_NODE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/jetstreamer-node",
+    "02f42f2988dd31437e2c874414f247667200663c874042783406b5517b0d519b",
+);
+const NODE_SOURCE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/source-manifest.json",
+    "e389f94315910f81fc7e63337a62498b09ddafbe303d9b5e066b4290360eee55",
+);
+const NODE_BUILD: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/production-build-proof.json",
+    "817e6ae6f82cdc3b688d8e148d81a076a2d08ca429e43ea70efdfc7d78369b27",
+);
+const NODE_SEAL: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/deployment-seal-receipt.json",
+    "ebfb9bea01effdf7da4aaa92ff9f752bcccae368139860e79f320f3c063f052c",
+);
 const BOOTSTRAP251: (&str, &str) = (
     "/var/lib/jetstreamer/horizon251-native-input-20261118-v1/snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst",
     "b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311",
@@ -60,11 +76,49 @@ fn validate_scope(m: &Value) -> Result<()> {
     );
     Ok(())
 }
-pub(super) fn run() -> Result<()> {
+fn validate_node_build(source: &Value, build: &Value) -> Result<()> {
+    ensure!(
+        source["source_commit"] == "eabd0b6a78464130d1e30eff30bb75267502abde"
+            && source["no_tracked_diffs"] == true
+            && build["all_source_members_revalidated_at_natural_closure"] == true
+            && build["actual_terminal"]["Result"] == "success"
+            && build["actual_terminal"]["ExecMainStatus"] == "0"
+            && build["clean_full_source_manifest"]["sha256"] == NODE_SOURCE.1,
+        "node source/build evidence differs"
+    );
+    let nodes: Vec<_> = build["artifacts"]
+        .as_array()
+        .context("build artifacts")?
+        .iter()
+        .filter(|a| a["target"] == "jetstreamer-node")
+        .collect();
+    ensure!(nodes.len() == 1, "node build artifact must be unique");
+    ensure!(
+        nodes[0]["binary"]["sha256"] == PUBLISHED_NODE.1 && nodes[0]["actual_features"] == "[]",
+        "node build binding differs"
+    );
+    Ok(())
+}
+fn captured_node_evidence() -> Result<Value> {
+    let source = pin(NODE_SOURCE)?;
+    let build = pin(NODE_BUILD)?;
+    let seal = pin(NODE_SEAL)?;
+    for value in [&source, &build, &seal] {
+        sealed(value)?;
+    }
+    validate_node_build(
+        &serde_json::from_slice(&fs::read(NODE_SOURCE.0)?)?,
+        &serde_json::from_slice(&fs::read(NODE_BUILD.0)?)?,
+    )?;
+    Ok(json!({"source":source,"build":build,"seal":seal,
+        "exact_epoch251_node_replay_qualified":false,
+        "fresh_source_publication_admission_check_required":true}))
+}
+pub(super) fn run(published_node: bool) -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     ensure!(
         args.len() == 3 && unsafe { libc::geteuid() } == 0,
-        "usage as root: check-251 OUTPUT_JSON"
+        "usage as root: check-251[-published-node] OUTPUT_JSON"
     );
     let output = Path::new(&args[2]);
     let parent = output.parent().context("output parent")?;
@@ -109,7 +163,12 @@ pub(super) fn run() -> Result<()> {
     eprintln!("epoch 251: hashing sealed bootstrap and exact deployed binaries");
     let bootstrap = pin(BOOTSTRAP251)?;
     let genesis = pin((&format!("{INPUT}/genesis.tar.bz2"), GENESIS.1))?;
-    let node = pin(NODE)?;
+    let node = pin(if published_node { PUBLISHED_NODE } else { NODE })?;
+    let node_build = if published_node {
+        Some(captured_node_evidence()?)
+    } else {
+        None
+    };
     let worker = pin(WORKER)?;
     for v in [&bootstrap, &genesis, &node, &worker, &input_seal] {
         sealed(v)?;
@@ -118,7 +177,11 @@ pub(super) fn run() -> Result<()> {
         bootstrap["identity"]["size"] == m["manifest"]["epochs"][0]["bootstrap"]["size"],
         "bootstrap size mismatch"
     );
-    let receipt = json!({"schema":"horizon251-exact-input-custody-v1","epoch":251,"manifest":manifest,"bootstrap":bootstrap,"genesis":genesis,"node":node,"worker":worker,"input_seal":input_seal,"original_restore_receipt":restore_pin,"native_test_terminal":native,"native_test_source":source,"canonical_checkpoint":m["manifest"]["epochs"][0]["post_bootstrap_root_checkpoints"][0],"final_root_snapshot_copy_required":false,"accepted_input_custody":true,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    let mut receipt = json!({"schema":"horizon251-exact-input-custody-v1","epoch":251,"manifest":manifest,"bootstrap":bootstrap,"genesis":genesis,"node":node,"worker":worker,"input_seal":input_seal,"original_restore_receipt":restore_pin,"native_test_terminal":native,"native_test_source":source,"canonical_checkpoint":m["manifest"]["epochs"][0]["post_bootstrap_root_checkpoints"][0],"final_root_snapshot_copy_required":false,"accepted_input_custody":true,"recorded_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),"replay_launch_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+    if let Some(evidence) = node_build {
+        receipt["schema"] = json!("horizon251-captured-node-input-custody-v2");
+        receipt["node_build_evidence"] = evidence;
+    }
     let mut f = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -134,6 +197,38 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn captured_node_rejects_mismatched_source_build_and_features() {
+        let source = json!({"source_commit":"eabd0b6a78464130d1e30eff30bb75267502abde","no_tracked_diffs":true});
+        let build = json!({"all_source_members_revalidated_at_natural_closure":true,
+            "actual_terminal":{"Result":"success","ExecMainStatus":"0"},
+            "clean_full_source_manifest":{"sha256":NODE_SOURCE.1},
+            "artifacts":[{"target":"jetstreamer-node","binary":{"sha256":PUBLISHED_NODE.1},"actual_features":"[]"}]});
+        validate_node_build(&source, &build).unwrap();
+        for pointer in ["/no_tracked_diffs", "/source_commit"] {
+            let mut bad = source.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(validate_node_build(&bad, &build).is_err());
+        }
+        for pointer in [
+            "/all_source_members_revalidated_at_natural_closure",
+            "/actual_terminal/Result",
+            "/actual_terminal/ExecMainStatus",
+            "/clean_full_source_manifest/sha256",
+            "/artifacts/0/binary/sha256",
+            "/artifacts/0/actual_features",
+        ] {
+            let mut bad = build.clone();
+            *bad.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(validate_node_build(&source, &bad).is_err());
+        }
+        let mut duplicate = build.clone();
+        duplicate["artifacts"]
+            .as_array_mut()
+            .unwrap()
+            .push(build["artifacts"][0].clone());
+        assert!(validate_node_build(&source, &duplicate).is_err());
+    }
     #[test]
     fn sealed_input_rejects_writable_or_foreign_ownership() {
         let good = json!({"identity":{"uid":0,"gid":0,"mode":0o100444}});
