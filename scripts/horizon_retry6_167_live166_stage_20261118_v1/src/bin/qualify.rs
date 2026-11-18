@@ -45,7 +45,7 @@ fn git(args: &[&str]) -> Result<String> { output(Command::new("git").arg("-C").a
 fn run() -> Result<()> {
     ensure!(unsafe {libc::geteuid()} == 0,"Root required");
     let args:Vec<_>=std::env::args().collect();
-    ensure!(args.len()==2,"qualify source|runtime|stage|cycle");
+    ensure!(args.len()==2 || (args.len()==3 && args[1]=="prepare"),"qualify source|runtime|stage|cycle|prepare HHMM");
     let commit=git(&["rev-parse","HEAD"])? .trim().to_owned();
     git(&["merge-base","--is-ancestor",&commit,"origin/account-updates"])?;
     ensure!(git(&["status","--porcelain","--untracked-files=no"])?.is_empty(),"tracked tree changed");
@@ -110,6 +110,52 @@ fn run() -> Result<()> {
         cfg["preparer_image"]=json!(format!("{RUNTIME}/prepare"));
         cfg["preparer_qualification"]=bind(&format!("{STATE}/artifact-proof.json"))?;
         println!("{}",json_file("stage-config2054.json",&cfg)?);
+    } else if args[1]=="prepare" {
+        let tag=&args[2];
+        ensure!(tag.len()==4 && tag.bytes().all(|b|b.is_ascii_digit()),"four-digit attempt label");
+        let root=format!("/var/lib/jetstreamer/root{tag}-live166-prepare167-20261118-v1");
+        fs::create_dir(&root)?;fs::set_permissions(&root,fs::Permissions::from_mode(0o700))?;
+        let witness_root=format!("{STATE}/native-witness-{tag}");
+        fs::create_dir(&witness_root)?;fs::set_permissions(&witness_root,fs::Permissions::from_mode(0o700))?;
+        let witness_path=format!("{witness_root}/NATIVE_WITNESS.json");
+        let witness_unit=format!("horizon-167-live166retry7-data-witness-{tag}-20261118-v1");
+        let mut cfg:Value=serde_json::from_slice(&fs::read(format!("{STATE}/stage-config2054.json"))?)?;
+        let guard=cfg["data_fulfillment"]["runtime"]["path"].as_str().context("guard path")?;
+        let guard_sha=cfg["data_fulfillment"]["runtime"]["sha256"].as_str().context("guard SHA")?;
+        ensure!(sha(&fs::read(guard)?)==guard_sha,"guard runtime changed");
+        output(Command::new("/usr/bin/systemd-run").args(["--wait","--collect","--unit",&witness_unit,
+            "--property=Type=oneshot","--property=CPUQuota=200%","--property=MemoryMax=4G","--property=TasksMax=128",
+            "--property=LimitNOFILE=1048576",guard,"--qualify-data-witness",
+            "/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/witness-set.json",
+            "--seed-sha256","8eb041519cba5c3f6368cb1432be9e289489ce1acdc28aa8b49f3d6ec7f382ee","--seal",
+            "/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/deployment-seal-receipt.json",
+            "--seal-sha256","611c29b18c52e02fce0be67314cdaae4ff780bea72b0e8e6c22a7dd248dfc24f",
+            "--output",&witness_path,"--self-sha256",guard_sha]))?;
+        let original_contract=cfg["data_fulfillment"]["contract"]["contract"]["path"].as_str().context("contract path")?;
+        let mut contract:Value=serde_json::from_slice(&fs::read(original_contract)?)?;
+        contract["qualified_native_witness"]=bind(&witness_path)?;
+        let contract_source=json_file(&format!("contract-{tag}.json"),&contract)?;
+        let contract_runtime=format!("/usr/local/lib/jetstreamer/horizon-epoch167-live166-data-contract-{tag}-20261118-v1");
+        let contract_seal=seal(&format!("contract-seal-plan-{tag}.json"),&contract_runtime,
+            json!([member(contract_source["path"].as_str().unwrap(),"contract.json",292)?]))?;
+        cfg["data_fulfillment"]["contract"]=json!({"contract":bind(&format!("{contract_runtime}/contract.json"))?,"deployment_seal":contract_seal});
+        cfg["output_root"]=json!(root);
+        cfg["booking_path"]=json!(format!("/var/lib/jetstreamer/epoch167-retry6-zeropeer-20261118-v1/ROOT_DATA_BOOKING-20261118T{tag}Z.json"));
+        let c=json_file(&format!("stage-config{tag}.json"),&cfg)?;
+        let stage="/usr/local/lib/jetstreamer/horizon-epoch167-live166-stage-20261118-v3/stage";
+        let stage_result=output(Command::new(stage).args([c["path"].as_str().unwrap(),"--plan-sha256",c["sha256"].as_str().unwrap(),
+            "--self-sha256","52044dca4abdd49a153f7998af0e6197171390c241bd05950cb2a7cc43d2a445"]))?;
+        let generated:Value=serde_json::from_str(&stage_result)?;
+        let p=&generated["plan"];
+        println!("{stage_result}");
+        let prepare_unit=format!("horizon-167-live166retry7-prepare-operation-{tag}-20261118-v1");
+        let prepare_image=format!("{RUNTIME}/prepare");
+        let prepare_sha=sha(&fs::read(&prepare_image)?);
+        output(Command::new("/usr/bin/systemd-run").args(["--unit",&prepare_unit,
+            "--property=Type=oneshot","--property=RemainAfterExit=yes","--property=CPUQuota=200%",
+            "--property=MemoryMax=4G","--property=TasksMax=128","--property=LimitNOFILE=1048576",
+            &prepare_image,p["path"].as_str().context("prepare plan")?,"--plan-sha256",p["sha256"].as_str().context("prepare plan SHA")?,
+            "--self-sha256",&prepare_sha,"--prepare"]))?;
     } else { anyhow::bail!("unknown operation"); }
     Ok(())
 }
