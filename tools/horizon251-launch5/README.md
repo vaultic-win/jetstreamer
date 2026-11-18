@@ -60,3 +60,15 @@ No candidate unit has been installed or launched by this qualification.
 Full replay at this smaller memory profile remains unproven. Fresh admission,
 the actual guard transaction and a later clean expanded-fleet sample remain
 required before the fifth lane can become the proven operating point.
+
+`century FLEET FLEET_SHA INVENTORY200 INVENTORY200_SHA OUTPUT SELF_SHA` is
+a separate metadata-only helper for the admission's century census. It retains
+the exact, previously accepted 29-epoch floor and checks the five subsequent
+deliveries (205, 210, 239, 244 and 246) against full/plugin receipts with pinned
+verifier and runner hashes. All 34 entries must match canonical R2 readback
+receipts and the complete 200–300 inventory. It writes root-owned, digest-bound
+JSON documents suitable for the launcher's existing gate bindings. It claims
+no new verification of the inherited 29 epochs and grants no launch authority.
+New or missing ready epochs require adjudication before changing its accepted
+input set. Four tests cover incomplete census, changed verification identity,
+readback requirements and overflow/rounding; strict Clippy also passes.
