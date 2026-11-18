@@ -88,8 +88,8 @@ Source publication alone is not compatibility evidence. Fetch the branch and bin
 exact reader artifact/features and archive format to the publication evidence. Fully decode and
 verify the exact staged archive through that current reader before upload. A checksum match or
 successful upload alone does not prove readability. Retain authenticated remote readback and the
-existing full/plugin/boundary gates; use the current reader on the readback or prove it is
-byte-identical to the archive that passed the current reader. An already-qualified reader may be
+existing full/plugin/boundary gates and the remote plugin playback gate below. Byte equality with a
+locally verified archive does not substitute for playing the R2 readback. An already-qualified reader may be
 reused only when its relevant source, dependencies, features and format support are demonstrably
 unchanged on the fetched branch. If compatibility requires a fix, merge it into `account-updates`
 and qualify the resulting reader before publishing the archive. Never publish an archive that only
@@ -101,7 +101,34 @@ ancestor containment alone is insufficient. Unrelated documentation or operator 
 no redundant archive scan when exact reader equivalence is established. Preserve existing R2
 objects during historical compatibility audits; a failure authorizes diagnosis, not replacement.
 
-Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
+### Full plugin playback of R2 archive readback
+
+An archive's R2 readback is successful only after the epoch has played through the current
+`origin/account-updates` Horizon plugin from beginning to end without issue. Feed the plugin the
+actual authenticated remote stream or an immutable scratch copy produced by that readback, bound
+to the exact bucket/key, ETag or version, length and whole-file SHA-256. Do not substitute the
+original local archive, an earlier local plugin receipt, a prefix/sample, header-only decoding,
+checksum-only success, or an interrupted/resumed tail that omits earlier epoch content.
+
+Fetch `account-updates`, build or prove exact source/dependency/feature equivalence of the plugin
+and its playback pipeline, and require the full expected epoch slot range, terminal boundary,
+normal plugin integrity checks and clean process completion. Skipped/corrupt records, suppressed
+plugin errors, premature EOF or missing terminal evidence fail the gate. Record the branch commit,
+plugin/pipeline artifact hashes, remote object identity and digest, actual invocation, observed
+first/last slot and full-range completion evidence in a durable readback-playback receipt. Recheck
+relevant branch changes before sidecar commit and repeat playback with the new plugin if needed.
+
+For a new upload, complete whole-object authenticated readback and this full remote plugin playback,
+then revalidate the local source before publishing the canonical `.sha256` readiness sidecar.
+Keep the uploaded archive staged if playback fails; fix and merge compatibility code, qualify it,
+and repeat the full remote playback. Do not publish the sidecar or retire local data on a failed
+or missing playback receipt. Require the Rust uploader/coordinator to enforce this receipt before
+its sidecar step; an existing upload path that commits the sidecar immediately after hashing the
+readback is insufficient and must be upgraded before the next archive publication. This gate also
+applies when auditing an existing remote archive, while preserving its existing objects and
+reporting failures without unauthorized replacement or deletion.
+
+Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, pass full beginning-to-end playback of that remote archive through the current `account-updates` plugin, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
 ## Rust-first implementation policy
 
@@ -1195,7 +1222,7 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   than cumulative rates; preserve invocation identity and do not restart a healthy replay merely to
   obtain a cleaner sample.
 - Time replay terminal, archive close/fsync, each full validation, plugin verification, boundary
-  verification, upload, remote readback, and sidecar publication as distinct phases. Parallelize or
+  verification, upload, remote readback, full remote plugin playback, and sidecar publication as distinct phases. Parallelize or
   overlap independent work when safe, but do not collapse a producer scan and an independent durable
   reread into one trust event or remove a verification gate merely to improve end-to-end latency.
 - Before launching an independent focused-qualification validator, read the durable segment
@@ -1577,7 +1604,7 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   ready-pair completion or positively proven inactive/orphaned work, with authenticated conditional
   deletion and durable evidence. No prefix or bulk deletion is authorized.
 - Never use `--overwrite-existing` without both positive evidence that the existing remote `.jet` is erroneous and explicit user authorization for its replacement.
-- Upload the sidecar only after the complete `.jet` has passed remote readback and local source revalidation; the matching sidecar is the readiness marker.
+- Upload the sidecar only after the complete `.jet` has passed remote readback, full beginning-to-end playback of the readback through the current `account-updates` plugin, and local source revalidation; the matching sidecar is the readiness marker.
 - Never remove a local archive before its durable receipt exists and both remote objects have been re-observed.
 - Refuse to begin upload without exact full and current-plugin receipts. Refuse local retirement without both adjacent-boundary receipts as well.
 - Do not treat a sidecar alone as proof that the archive was uploaded.
