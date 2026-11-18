@@ -8,6 +8,10 @@ publish = false
 name = "horizon251-standalone-guard"
 path = "../../jetstreamer-utils/src/horizon_standalone_guard_bin.rs"
 
+[[bin]]
+name = "horizon251-sealer"
+path = "../../jetstreamer-utils/src/seal_deployment_bin.rs"
+
 [features]
 epoch207-native-main-guard = []
 epoch209-native-main-guard = []
