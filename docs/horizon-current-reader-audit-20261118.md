@@ -365,3 +365,20 @@ attempt requested HEAD from an empty remote and correctly failed; the corrected
 wildcard-refspec fixture passes, with both journals preserved. Qualify the
 resulting uploader before the audit's Git-fetching verify stage. The existing
 restore needs no Git operation and continues with its sealed artifact.
+
+The Git-owner change is published as `0711b1f2`. Its actual uploader-target
+build completed normally in 2m21s with a 2.3 GiB peak: seven tests passed, with
+the root-only test explicitly unselected in that Ubuntu invocation. The same
+actual target's root-only test was then executed as root and passed, confirming
+the ownership transition without changing the parent verification identity.
+The corresponding production release is qualified separately; it does not
+replace the artifact used by the already-running restore.
+
+At 23:23:03 UTC the coordinated observation again found all five replay owners
+stable and advancing, with both host RSS censuses observed. All five status
+objects were refreshed and authenticated-readback verified. Reconciliation
+remained 34 ready pairs, 66 missing, zero anomalies and no diagnostic incidents.
+The memory target remains nine against five executing lanes. Conservative free
+disk is 4,374,135,558,144 bytes while the explicitly budgeted restore runs.
+The next ordinary observation is due no earlier than 23:53:03 UTC; its sealed
+configuration preserves the same five owners and has passed static validation.
