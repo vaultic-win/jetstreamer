@@ -54,3 +54,33 @@ Do not select that path for a new archive publication until the Rust uploader
 and coordinator enforce the required playback and current-reader evidence.
 Status-only publication remains independently usable. Existing remote pairs
 remain preserved; this finding is not evidence that their contents are corrupt.
+
+The first implementation step adds `horizon_pipeline --verification-report PATH`
+for single-epoch `--verify-only` runs. The plugin records observed minimum and
+maximum delivered slots, including legitimate leader-skipped notifications, and
+checks those boundaries alongside its existing coverage and callback checks.
+After normal pipeline completion, the CLI writes a private, no-clobber, fsynced
+JSON report containing the actual source, invocation, observed boundaries,
+counts and stream digest. Missing reports, interruption or write failures cause
+failure. The uploader must independently require clean process exit and bind
+this report to its authenticated readback copy, reader artifact and current
+branch evidence; the report alone grants no publication authority.
+
+The bounded package `tools/horizon-playback-report-tests` compiles the production
+report module directly. Four tests cover successful persistence, incomplete
+coverage, invalid ranges, relative paths, existing files and symlinks. Full
+plugin/pipeline compilation and execution remain separate qualification steps.
+The uploader and progressive coordinator still need integration: actual remote
+scratch readback, full playback, current-reader equivalence recheck, and receipt
+enforcement before sidecar commit. No new archive publication is authorized by
+this prerequisite implementation.
+
+At the 2026-11-18 21:21:48 UTC coordinated sample, epochs 247–250 continued
+advancing and epoch 251 remained in snapshot restore with no transaction rate.
+All five status JSONs were refreshed through the native publisher with
+authenticated readback. The full-range fleet census remained 34 ready pairs,
+66 missing and zero anomalies, with no diagnostic incidents. Epoch 251's native
+status now uses its actual producer start instead of the earlier repair-owner
+elapsed time. Its 102-hour initial planning allowance includes two hours of
+startup, 80 of replay and 20 of delivery/current-reader qualification; only
+actual elapsed startup time was deducted while replay remains unmeasured.

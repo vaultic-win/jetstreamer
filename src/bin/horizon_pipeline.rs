@@ -52,10 +52,12 @@ fn usage() -> ! {
         "usage: horizon-pipeline --archive-capacity-probe\n\
          or: horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
          [--threads N] [--clickhouse-dsn URL] [--bench|--verify-only] \
-         [--no-account-bytes] [--no-preload]\n\
+         [--no-account-bytes] [--no-preload] [--verification-report PATH]\n\
          --verify-only runs the read-only Horizon verification plugin over \
          every decoded record and account-data byte; it does not start or \
          write to ClickHouse\n\
+         --verification-report writes a new durable JSON result after successful \
+         --verify-only playback of a single epoch; PATH must be absolute\n\
          --no-account-bytes (with --bench): declare account-update data \
          unconsumed so the decoder skips diff reconstruction — benchmarks \
          the metadata-only fast path (update counts stay real, bytes read 0)\n\
@@ -287,6 +289,7 @@ async fn main() {
     let mut verify_only = false;
     let mut no_account_bytes = false;
     let mut no_preload = false;
+    let mut verification_report = None;
     while let Some(flag) = args.next() {
         match flag.as_str() {
             "--threads" => {
@@ -299,6 +302,11 @@ async fn main() {
             "--clickhouse-dsn" => dsn = args.next().unwrap_or_else(|| usage()),
             "--bench" => bench = true,
             "--verify-only" => verify_only = true,
+            "--verification-report" => {
+                verification_report = Some(std::path::PathBuf::from(
+                    args.next().unwrap_or_else(|| usage()),
+                ));
+            }
             "--no-account-bytes" => no_account_bytes = true,
             "--no-preload" => no_preload = true,
             _ => usage(),
@@ -340,6 +348,18 @@ async fn main() {
     }
 
     let (start_epoch, end_epoch) = parse_range(&range);
+    if let Some(path) = &verification_report {
+        if !verify_only || start_epoch != end_epoch || !path.is_absolute() {
+            eprintln!(
+                "--verification-report requires --verify-only, one epoch, and an absolute path"
+            );
+            usage();
+        }
+        if path.try_exists().unwrap_or(true) {
+            eprintln!("verification report path already exists or is inaccessible");
+            std::process::exit(1);
+        }
+    }
     let src = if location.starts_with("http://") || location.starts_with("https://") {
         JetSource::http(&location).unwrap_or_else(|err| {
             eprintln!("error: {err}");
@@ -378,8 +398,9 @@ async fn main() {
     }
 
     let bench_counters = Arc::new(BenchCounters::default());
+    let verification_plugin = Arc::new(VerificationPlugin::new());
     let plugins: Vec<Arc<dyn HorizonPlugin>> = if verify_only {
-        vec![Arc::new(VerificationPlugin::new())]
+        vec![verification_plugin.clone()]
     } else if bench {
         vec![Arc::new(BenchPlugin {
             counters: bench_counters.clone(),
@@ -535,5 +556,23 @@ async fn main() {
     if let Some(err) = failure {
         eprintln!("error: {err}");
         std::process::exit(1);
+    }
+    if let Some(path) = verification_report {
+        let result = verification_plugin
+            .last_report()
+            .filter(|report| report.epoch == start_epoch)
+            .ok_or_else(|| std::io::Error::other("missing completed plugin verification result"))
+            .and_then(|report| {
+                report.write_json(
+                    &path,
+                    &location,
+                    &std::env::args().collect::<Vec<_>>(),
+                    epoch_to_slot_range(start_epoch),
+                )
+            });
+        if let Err(err) = result {
+            eprintln!("error: cannot persist plugin verification report: {err}");
+            std::process::exit(1);
+        }
     }
 }

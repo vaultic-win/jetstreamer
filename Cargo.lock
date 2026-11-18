@@ -4947,6 +4947,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-transaction",
  "solana-transaction-status",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "url 2.5.8",

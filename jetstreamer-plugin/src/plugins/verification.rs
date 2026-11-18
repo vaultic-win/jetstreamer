@@ -36,6 +36,8 @@ struct Counts {
     slot_sum: u128,
     slot_square_sum: u128,
     slot_xor: u64,
+    first_slot: Option<u64>,
+    last_slot: Option<u64>,
 }
 
 impl Counts {
@@ -52,6 +54,8 @@ impl Counts {
         self.slot_sum += other.slot_sum;
         self.slot_square_sum += other.slot_square_sum;
         self.slot_xor ^= other.slot_xor;
+        self.first_slot = self.first_slot.into_iter().chain(other.first_slot).min();
+        self.last_slot = self.last_slot.into_iter().chain(other.last_slot).max();
     }
 }
 
@@ -87,34 +91,9 @@ impl RunState {
     }
 }
 
-/// Aggregated result from one verified epoch.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct VerificationReport {
-    /// Epoch whose callbacks were verified.
-    pub epoch: u64,
-    /// Number of parallel plugin workers that participated.
-    pub worker_count: usize,
-    /// Slot notifications delivered to the plugin.
-    pub slots: u64,
-    /// Non-skipped block notifications.
-    pub blocks: u64,
-    /// Leader-skipped slot notifications.
-    pub skipped: u64,
-    /// PoH entry records attached to blocks.
-    pub entries: u64,
-    /// Transaction callbacks.
-    pub transactions: u64,
-    /// Account updates attributed to transactions.
-    pub transaction_updates: u64,
-    /// Runtime-direct account updates attributed to blocks.
-    pub orphan_updates: u64,
-    /// Account updates attributed to the epoch boundary.
-    pub epoch_updates: u64,
-    /// Account-data bytes consumed across every update category.
-    pub account_data_bytes: u64,
-    /// SHA-256 over the ordered list of per-worker stream digests.
-    pub stream_digest: [u8; 32],
-}
+#[path = "verification/report.rs"]
+mod report;
+pub use report::VerificationReport;
 
 /// Verifies delivery through [`crate::horizon::HorizonPluginRunner`].
 ///
@@ -356,6 +335,8 @@ impl PluginWorker for VerificationWorker {
         self.counts.slot_sum += u128::from(slot);
         self.counts.slot_square_sum += u128::from(slot) * u128::from(slot);
         self.counts.slot_xor ^= slot;
+        self.counts.first_slot = Some(self.counts.first_slot.map_or(slot, |v| v.min(slot)));
+        self.counts.last_slot = Some(self.counts.last_slot.map_or(slot, |v| v.max(slot)));
         self.hasher.update(b"slot");
         self.hasher.update(slot.to_le_bytes());
 
@@ -475,6 +456,8 @@ fn validate_run(run: &RunState) -> Result<VerificationReport, String> {
         || counts.slot_sum != expected_sum
         || counts.slot_square_sum != expected_square_sum
         || counts.slot_xor != expected_xor
+        || counts.first_slot != Some(run.start_slot)
+        || counts.last_slot != run.end_slot_exclusive.checked_sub(1)
     {
         errors.push(format!(
             "slot coverage mismatch: delivered={} blocks={} skipped={} sum={} squares={} xor={}; \
@@ -509,6 +492,8 @@ fn validate_run(run: &RunState) -> Result<VerificationReport, String> {
         epoch: run.epoch,
         worker_count: workers.len(),
         slots: counts.slots,
+        first_slot: counts.first_slot.expect("validated first slot"),
+        last_slot: counts.last_slot.expect("validated last slot"),
         blocks: counts.blocks,
         skipped: counts.skipped,
         entries: counts.entries,
@@ -558,6 +543,8 @@ mod tests {
                 slot_sum: 201,
                 slot_square_sum: 20_201,
                 slot_xor: 1,
+                first_slot: Some(100),
+                last_slot: Some(101),
                 ..Counts::default()
             },
             digest: [1; 32],
@@ -571,6 +558,8 @@ mod tests {
                 slot_sum: 102,
                 slot_square_sum: 10_404,
                 slot_xor: 102,
+                first_slot: Some(102),
+                last_slot: Some(102),
                 ..Counts::default()
             },
             digest: [2; 32],
@@ -585,6 +574,8 @@ mod tests {
         assert_eq!(report.epoch, 9);
         assert_eq!(report.worker_count, 2);
         assert_eq!(report.slots, 3);
+        assert_eq!(report.first_slot, 100);
+        assert_eq!(report.last_slot, 102);
         assert_eq!(report.blocks, 2);
         assert_eq!(report.skipped, 1);
     }
@@ -603,5 +594,22 @@ mod tests {
         run.workers[0].errors.push("bad callback".into());
         let error = validate_run(&run).unwrap_err();
         assert!(error.contains("bad callback"));
+    }
+
+    #[test]
+    fn rejects_missing_observed_boundaries_even_with_matching_totals() {
+        for first in [true, false] {
+            let mut run = complete_run();
+            if first {
+                run.workers[0].counts.first_slot = None;
+            } else {
+                run.workers[1].counts.last_slot = None;
+            }
+            assert!(
+                validate_run(&run)
+                    .unwrap_err()
+                    .contains("slot coverage mismatch")
+            );
+        }
     }
 }
