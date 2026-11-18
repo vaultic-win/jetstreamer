@@ -691,10 +691,15 @@ impl RuntimeState {
     /// manufacture an account update that the archive would fail to observe.
     fn maintain_accounts_storage(&mut self) -> Result<(), String> {
         let write_version = self.bank.accounts().accounts_db.next_write_version();
-        self.accounts_shrink_consumed_budget = self.bank.process_stale_slot_with_budget(
-            self.accounts_shrink_consumed_budget,
-            ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
-        );
+        // Match the pinned AccountsBackgroundService: one large shrink must
+        // not suppress storage maintenance for hundreds of rooted banks.
+        self.accounts_shrink_consumed_budget = self
+            .bank
+            .process_stale_slot_with_budget(
+                self.accounts_shrink_consumed_budget,
+                ACCOUNTS_SHRINK_RECOVERY_PER_ROOT,
+            )
+            .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
 
         let block_height = self.bank.block_height();
         if block_height.saturating_sub(self.last_accounts_clean_block_height)
@@ -2158,6 +2163,44 @@ mod tests {
     }
 
     #[test]
+    fn storage_maintenance_caps_shrink_debt_like_pinned_background_service() {
+        let (mut state, mint_keypair) = test_state(1, Some(2));
+        let tick = request_for(&state, 0, 0, 2, &[]);
+        state.process_entry(tick).unwrap();
+        state.freeze_checkpoint(0).unwrap();
+        let original_cursor = state.bank.accounts().accounts_db.next_write_version();
+        let original_balance = state.bank.get_balance(&mint_keypair.pubkey());
+        let original_capitalization = state.bank.capitalization();
+        let original_blockhash = state.bank.last_blockhash();
+        let original_bank_hash = state.bank.hash();
+        for debt in &[251usize, 500, 25_000, usize::MAX] {
+            state.accounts_shrink_consumed_budget = *debt;
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
+                debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
+                    .min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT),
+                "a large shrink must not defer cleanup for hundreds of roots"
+            );
+            state.maintain_accounts_storage().unwrap();
+            assert_eq!(state.accounts_shrink_consumed_budget, 0);
+            state.maintain_accounts_storage().unwrap();
+            assert!(state.accounts_shrink_consumed_budget <= ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                original_cursor
+            );
+            assert_eq!(
+                state.bank.get_balance(&mint_keypair.pubkey()),
+                original_balance
+            );
+            assert_eq!(state.bank.capitalization(), original_capitalization);
+            assert_eq!(state.bank.last_blockhash(), original_blockhash);
+            assert_eq!(state.bank.hash(), original_bank_hash);
+        }
+    }
+
+    #[test]
     fn completed_slots_are_squashed_without_losing_state_or_writes() {
         let (mut state, mint_keypair) = test_state(1, Some(2));
         let preserved_key = Pubkey::new_from_array([42; 32]);
@@ -2276,6 +2319,31 @@ mod tests {
         assert_eq!(
             Hash::new(&checkpoint.accounts_hash).to_string(),
             "C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn initializes_and_checkpoints_epoch235_bootstrap() {
+        let archive = std::env::var("JETSTREAMER_SNAPSHOT_101519444")
+            .expect("set JETSTREAMER_SNAPSHOT_101519444");
+        let ledger =
+            std::env::var("JETSTREAMER_MAINNET_LEDGER").expect("set JETSTREAMER_MAINNET_LEDGER");
+        let (mut state, initialized) = RuntimeState::initialize(
+            &ledger,
+            &jetstreamer_historical_protocol::InitialState::SnapshotArchive {
+                archive_path: archive,
+            },
+            None,
+        )
+        .unwrap();
+        assert_eq!(initialized.slot, 101_519_444);
+        let checkpoint = state.freeze_checkpoint(101_519_444).unwrap();
+        assert_eq!(checkpoint.slot, 101_519_444);
+        assert!(checkpoint.slot_complete);
+        assert_eq!(
+            Hash::new(&checkpoint.accounts_hash).to_string(),
+            "CmB38ALs6edig3rZfqUUVFkkZHFqgq33cxihUWt44X7Q"
         );
     }
 
