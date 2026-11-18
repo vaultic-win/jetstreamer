@@ -1933,6 +1933,82 @@ pub fn get_index_base_url() -> Result<Url, SlotOffsetIndexError> {
 mod tests {
     use super::*;
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "requires live Old Faithful epoch 251 CAR and index"]
+    async fn test_epoch_251_index_ranges_decode_to_their_blocks() {
+        use crate::{node::Node, node_reader::NodeReader};
+        use sha2::{Digest, Sha256};
+        use std::io::Cursor;
+
+        let base = Url::parse("https://files.old-faithful.net/").unwrap();
+        let index = SlotOffsetIndex::new(base).unwrap();
+        let ranges = index.load_slot_ranges_index(251).await.unwrap();
+        assert_eq!(
+            format!("{:x}", Sha256::digest(ranges.file.bytes())),
+            "4a7110e60c64e6d0b303907278b5fea3cd0cd6430c663b43ede21dac8f856c91"
+        );
+
+        let client = Client::new();
+        let url = "https://files.old-faithful.net/251/epoch-251.car";
+        let header_response = client
+            .get(url)
+            .header(RANGE, "bytes=0-4095")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(header_response.status(), StatusCode::PARTIAL_CONTENT);
+        let header = header_response.bytes().await.unwrap();
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&header)),
+            "c68541c8f32523f7868b8bb57eeb80965668843bba2b266008e35d1aee6669ce"
+        );
+        assert_eq!(header[0], 58, "the CAR header is a 58-byte CBOR value");
+        let car_header = &header[..59];
+
+        // Cover the first indexed slot, both sides of an unindexed CAR gap,
+        // and the final indexed slot. Each range must end at its own Block.
+        for slot in [108432004, 108462795, 108462801, 108863995] {
+            let (offset, length) = ranges.lookup_range(slot).unwrap();
+            let end = offset.checked_add(length).unwrap() - 1;
+            let response = client
+                .get(url)
+                .header(RANGE, format!("bytes={offset}-{end}"))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::PARTIAL_CONTENT,
+                "slot {slot}"
+            );
+            assert_eq!(
+                response.headers()[reqwest::header::CONTENT_RANGE]
+                    .to_str()
+                    .unwrap(),
+                format!("bytes {offset}-{end}/420666863585"),
+                "slot {slot} content range"
+            );
+            let body = response.bytes().await.unwrap();
+            assert_eq!(body.len() as u64, length, "slot {slot} length");
+            let mut bytes = Vec::with_capacity(car_header.len() + body.len());
+            bytes.extend_from_slice(car_header);
+            bytes.extend_from_slice(&body);
+            let expected_len = bytes.len() as u64;
+            let mut reader = NodeReader::new(Cursor::new(bytes));
+            let nodes = reader.read_until_block().await.unwrap();
+            let block = nodes.0.last().expect("slot has a block").get_node();
+            let Node::Block(block) = block else {
+                panic!("slot {slot} range did not end in a Block node");
+            };
+            assert_eq!(block.slot, slot);
+            assert_eq!(
+                reader.reader.position(),
+                expected_len,
+                "slot {slot} range coverage"
+            );
+        }
+    }
+
     fn init_logger() {
         static INIT: std::sync::Once = std::sync::Once::new();
         INIT.call_once(|| {
