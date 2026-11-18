@@ -11,6 +11,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+mod epoch251;
+
 const CACHE: &str = "/var/lib/jetstreamer/horizon250-index-reboot-20261117-cache-v1";
 const AUTH: &str = "/var/lib/jetstreamer/horizon250-reboot-20261117-input-auth-v1/acceptance.json";
 const AUTH_SHA: &str = "8c7bcf8828827081f6005e0be006aa8bb3b25fb64a03b55dc5ebf1919943bf04";
@@ -112,6 +114,22 @@ fn metadata(data: &[u8]) -> Result<BTreeMap<Vec<u8>, Vec<u8>>> {
 }
 
 fn inspect_index(path: &Path, size: u64, epoch: u64, kind: &str) -> Result<Value> {
+    inspect_index_root(
+        path,
+        size,
+        epoch,
+        kind,
+        (epoch == 250).then_some(ROOT_CID_HEX),
+    )
+}
+
+fn inspect_index_root(
+    path: &Path,
+    size: u64,
+    epoch: u64,
+    kind: &str,
+    expected_root_hex: Option<&str>,
+) -> Result<Value> {
     let mut file = File::open(path)?;
     let mut prefix = [0u8; 25];
     file.read_exact(&mut prefix)?;
@@ -145,12 +163,12 @@ fn inspect_index(path: &Path, size: u64, epoch: u64, kind: &str) -> Result<Value
         actual_epoch.len() == 8 && u64::from_le_bytes(actual_epoch[..8].try_into()?) == epoch,
         "index epoch mismatch"
     );
-    if epoch == 250 {
+    if let Some(expected_root_hex) = expected_root_hex {
         let root = meta
             .get(b"rootCid".as_slice())
             .context("missing root CID")?;
         ensure!(
-            root.iter().map(|b| format!("{b:02x}")).collect::<String>() == ROOT_CID_HEX,
+            root.iter().map(|b| format!("{b:02x}")).collect::<String>() == expected_root_hex,
             "root CID mismatch"
         );
     }
@@ -277,7 +295,12 @@ fn run() -> Result<()> {
 }
 
 fn main() {
-    if let Err(error) = run() {
+    let result = if std::env::args().nth(1).as_deref() == Some("check-251") {
+        epoch251::run()
+    } else {
+        run()
+    };
+    if let Err(error) = result {
         eprintln!("Error: {error:#}");
         std::process::exit(1);
     }

@@ -1,5 +1,13 @@
 # Epoch 250 compact-index capability check
 
+The `check-251 PLAN PLAN_SHA256 SELF_SHA256` subcommand checks a separately
+sealed epoch 251 cache: its two indexes and the epoch 250 predecessor slot
+index. It verifies the running image, immutable plan and deployment receipt,
+all file digests and identities, exact epochs, root CIDs, index kinds and
+bucket bounds. Its root-private, no-clobber receipt accepts structural input
+only; a production reader probe and fresh replay admission remain required.
+The original no-argument epoch 250 route retains its exact accepted bindings.
+
 This isolated Rust checker reads the exact accepted epoch 250 input-custody
 receipt and the sealed index cache. It authenticates the seal and every cache
 member, then parses the compact-index metadata and all bucket spans. It requires
