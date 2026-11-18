@@ -1,4 +1,5 @@
 //! Exact epoch 167 retry 6 launch. The prepare receipt is an input, never launch authority.
+mod audit_budget;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -310,9 +311,13 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         memory >= memory_required,
         "current memory below admitted demand"
     );
-    Ok(
-        json!({"available_DATA_bytes":available,"required_DATA_bytes":required,"available_memory_bytes":memory,"required_memory_bytes":memory_required}),
-    )
+    let audit_native = audit_budget::observe()?;
+    let cores = u64::try_from(unsafe { libc::sysconf(libc::_SC_NPROCESSORS_ONLN) })?;
+    let audit_resources = audit_budget::requirements(prepared, total_kib.checked_mul(1024).context("total memory overflow")?, memory, cores)?;
+    Ok(json!({"available_DATA_bytes":available,"required_DATA_bytes":required,
+        "available_memory_bytes":memory,"historical_required_memory_bytes":memory_required,
+        "required_memory_bytes":audit_resources["required_available_memory_bytes"],
+        "audit_additive_resources":audit_resources,"audit_native":audit_native}))
 }
 fn exact_producer(argv: &[String]) -> Result<()> {
     ensure!(
@@ -991,6 +996,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     let argv: Vec<String> = serde_json::from_value(prepared["producer_argv"].clone())?;
     let launch_started = monotonic_seconds()?;
     let initial_peer = live_peer(prepared)?;
+    ensure!(audit_budget::observe()? == capacity["audit_native"], "audit changed since additive admission");
     let mut guard_timer_start_confirmed = false;
     let attempt = (|| -> Result<Value> {
         command(
