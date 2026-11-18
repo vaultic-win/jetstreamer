@@ -2085,6 +2085,22 @@ mod tests {
         .await;
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "requires live Old Faithful epoch 256 CAR and index"]
+    async fn test_epoch_256_index_ranges_decode_to_their_blocks() {
+        check_live_epoch_index_ranges(LiveEpochIndexFixture {
+            epoch: 256,
+            index_sha256: "7fd2e109d93533c85f597f843a39ff4a34d34d69b962911452bc41f42f0d8548",
+            header_sha256: "67f09a1f3d08e4a287a0c490f15335fb4555a2ffedb56e95af0fddd730b64a87",
+            car_bytes: 420045146364,
+            present_slots: 396598,
+            first_slot: 110592000,
+            last_slot: 111023999,
+            gaps: 21,
+        })
+        .await;
+    }
+
     fn init_logger() {
         static INIT: std::sync::Once = std::sync::Once::new();
         INIT.call_once(|| {
