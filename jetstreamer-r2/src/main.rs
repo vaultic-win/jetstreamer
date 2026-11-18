@@ -86,6 +86,7 @@ mod resource_audit;
 mod resource_verify;
 mod scan203_retention;
 mod status_fallback_complete;
+mod status_fallback_inactive;
 mod status_fallback_ready;
 mod status_inactive;
 mod status_inspect;
@@ -3633,6 +3634,9 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("status-delete-fallback-ready") {
         return status_fallback_ready::run().await;
+    }
+    if env::args().nth(1).as_deref() == Some("status-delete-fallback-inactive") {
+        return status_fallback_inactive::run().await;
     }
     if env::args().nth(1).as_deref() == Some("private-resource-audit-verify") {
         return resource_verify::run();
