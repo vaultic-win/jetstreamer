@@ -397,3 +397,40 @@ and strict epoch-205 expectations retain their existing seals. The subsequent
 verification service must allow Git writes only to that metadata directory,
 in addition to the exact private audit outputs, while keeping the restored
 archive read-only.
+
+At 23:44 UTC the main checkout fast-forwarded to `d205a91e`, with no tracked
+local edits. The conservative reader source/dependency closure remained byte
+equivalent to qualified reader commit `ed61722d`. Epoch 205's restore completed
+normally: all 104,772,252,720 bytes passed authenticated whole-file SHA-256
+verification, followed by the restore command's final local/remote validation.
+The completed journal is retained in
+`/home/ubuntu/.codex/diagnostics/horizon-205-restore-completed-20261118-v1.jsonl`.
+
+The actual audit then started at 23:44:27 UTC in
+`horizon-current-reader-205-audit-20261118-v1.service`, invocation
+`a5678a9273d74b4da89805b156c7a3d2`, using the sealed `0711b1f2` uploader and
+existing independent epoch-205 plan. Its startup journal confirms hashing of
+the restored archive. The nonrestarting service has a 7 GB memory limit,
+400% CPU quota, CPUs 48–55, two verification threads and a six-hour execution
+bound. Only playback, receipt, temporary-output and Git-metadata directories
+are writable. This is an audit in progress, not a compatibility pass. All 34
+historical ready pairs still require completed latest-reader audit evidence.
+
+Independent public Solana RPC queries found a publication prerequisite for
+epoch 251. `getBlocks` ends that epoch at slot 108863995; the next returned block
+is 108864012. Separate `getBlock` responses show consecutive block heights
+98044689 and 98044690, with the latter naming parent 108863995 and previous
+blockhash `86y6Vyi2ZFR8e9wXhnsS2NSrnuH7rFwZYdu3pHLVHufa`, matching the former.
+This establishes the trailing skip across the epoch boundary independently of
+the archive. Raw responses are retained in
+`/home/ubuntu/.codex/diagnostics/horizon-active-reader-boundaries-20261118-v1`.
+
+Both the uploader's terminal-slot equality and the full verifier's strict-tail
+check currently reject this legitimate case. Changing only the uploader check
+would be insufficient. A successor must retain full epoch coverage and strict
+PoH/linkage verification while checking independently bound successor evidence
+for the skipped tail, with positive and negative native qualification. Do not
+bypass the strict-tail check, derive trusted boundaries from the archive under
+test, or alter the running epoch-205 artifacts. Any reader change requires
+fresh reader qualification and affects the running audit's final branch
+equivalence gate. No repair for this finding has yet been deployed.
