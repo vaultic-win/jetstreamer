@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     if !(253..=255).contains(&epoch)
         || slot / 432_000 != epoch
         || length == 0
-        || length > 16 * 1024 * 1024
+        || length > 32 * 1024 * 1024
         || offset < 59
         || offset.checked_add(length).is_none_or(|end| end > car_bytes)
     {
