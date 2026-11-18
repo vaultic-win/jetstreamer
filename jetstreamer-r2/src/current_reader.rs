@@ -8,7 +8,10 @@ use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{Read, Write},
-    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
+    os::unix::{
+        fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
+        process::CommandExt,
+    },
     path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
@@ -256,7 +259,12 @@ fn write_json(path: &Path, value: &Value) -> Result<Bound> {
 }
 
 fn git(plan: &Plan, args: &[&str]) -> Result<String> {
+    // Verification runs as root, but a fetch must not leave root-owned objects
+    // in the operator's repository and prevent subsequent commits or pushes.
+    let owner = fs::metadata(&plan.repository)?;
     let output = Command::new("/usr/bin/git")
+        .uid(owner.uid())
+        .gid(owner.gid())
         .arg("-c")
         .arg(format!("safe.directory={}", plan.repository.display()))
         .arg("-C")
@@ -770,6 +778,38 @@ mod tests {
                 .contains("playback is missing")
         );
         assert!(!dir.path().join("remote-playback-acceptance.json").exists());
+    }
+
+    #[test]
+    #[ignore = "requires root and uid/gid 1000 for native repository-owner qualification"]
+    fn root_fetch_preserves_repository_owner() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        let remote = dir.path().join("remote.git");
+        fs::create_dir(&repo).unwrap();
+        fs::create_dir(&remote).unwrap();
+        for path in [dir.path(), repo.as_path(), remote.as_path()] {
+            std::os::unix::fs::chown(path, Some(1000), Some(1000)).unwrap();
+        }
+        git(&plan(&remote), &["init", "--bare"]).unwrap();
+        let p = plan(&repo);
+        git(&p, &["init"]).unwrap();
+        git(
+            &p,
+            &[
+                "fetch",
+                remote.to_str().unwrap(),
+                "+refs/heads/*:refs/remotes/fixture/*",
+            ],
+        )
+        .unwrap();
+        for path in [repo.join(".git/objects"), repo.join(".git/FETCH_HEAD")] {
+            let metadata = fs::metadata(path).unwrap();
+            assert_eq!(metadata.uid(), 1000);
+            assert_eq!(metadata.gid(), 1000);
+        }
+        assert_eq!(unsafe { libc::geteuid() }, 0);
     }
 
     #[test]

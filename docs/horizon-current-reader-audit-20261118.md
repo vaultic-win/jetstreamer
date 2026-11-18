@@ -324,3 +324,44 @@ restore services use suffix `v2` to capture output in the journal rather than
 only forwarding it to the terminal. The production uploader release build from
 that corrected source is the next qualification step, followed by immutable
 sealing and the actual epoch-205 restore/readback audit.
+
+The corrected production uploader then built normally in 2m11s. Actual package
+features are empty and `bs58` has only `alloc`; the original feature-unification
+failure is resolved in the production executable too. Its SHA-256 is
+`4a416cfb85ceeb9923bee89b2233e24d02895a94adb0bb2a6c0b0bb7ca4856a0`.
+The Rust-sealed deployment, including native tests and build/source evidence, is
+`/var/lib/jetstreamer/horizon-current-uploader-823c2f19-20261118-v3`.
+Source containment was confirmed against fetched `c1fca70c`. That revision adds
+an unrelated epoch-141 holding-retirement change; the selected restore/verify
+route and complete reader path set remain equivalent. The scoped acceptance
+permits the exact historical epoch-205 restore and verification, with no remote
+mutation or new archive publication.
+
+The bounded restore actually started in
+`horizon-current-reader-205-restore-20261118-v1.service`, invocation
+`9d68f017539e4c1d89d3d12cf4a6485e`. It reads the existing 104,772,252,720-byte
+R2 object into root-private audit scratch with two transfer requests, a 2 GB
+memory cap, 200% CPU quota and a two-hour runtime limit. An operation-specific
+capacity check found 4,407,707,054,080 available bytes against the required
+3,104,772,252,720 bytes, preserving the raised 3 TB floor. Startup evidence
+records the exact ETag/SHA and 2,214,592,512 bytes hashed after 37.463 seconds.
+This is a live restore, not completed verification. Existing R2 objects and the
+five replay workers remain unchanged.
+
+The prepared audit budget charges both the restore and a separate verification
+readback copy. Once the complete audit passes, retire its private copies promptly
+through the qualified local-retirement tools with exact identities, durable
+proof and no-consumer checks; keep the compact audit evidence. Do not let the
+new reader gate's retained diagnostic copy become an untracked permanent file.
+
+The earlier root-run branch-fetch preflight created root-owned Git object
+directories and later prevented an ordinary commit. Their ownership was repaired
+to the repository's configured operator account. The gate now runs Git under the
+repository directory owner's UID/GID, while verification keeps its root identity.
+Seven normal tests and strict Clippy pass. An additional native root-run fixture
+creates an Ubuntu-owned repository and verifies that both object directories
+and FETCH_HEAD retain UID/GID 1000; the parent remains root. Its first fixture
+attempt requested HEAD from an empty remote and correctly failed; the corrected
+wildcard-refspec fixture passes, with both journals preserved. Qualify the
+resulting uploader before the audit's Git-fetching verify stage. The existing
+restore needs no Git operation and continues with its sealed artifact.
