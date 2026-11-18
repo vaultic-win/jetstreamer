@@ -119,6 +119,10 @@ pub(super) fn peer_preparation(epoch: u64, row: &Value, prep: &Value, retained: 
     {
         "local3retry3"
     } else if epoch == 166
+        && unit == "horizon-qualify-166-replacement-local3retry7-20261110-v1.service"
+    {
+        "local3retry7"
+    } else if epoch == 166
         && unit == "horizon-qualify-166-replacement-local3retry6-20261110-v1.service"
     {
         "local3retry6"

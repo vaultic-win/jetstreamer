@@ -606,6 +606,12 @@ mod tests {
         resident_memory::peer_admissions(p.resident_memory.as_ref().unwrap()).unwrap();
         assert_eq!(protected166_guard_floor(166, NEW_PEER_UNIT, NEW_PEER_IID), Some(6_584_106_303_282));
         assert_eq!(protected166_guard_floor(166, NEW_PEER_UNIT, PEER_IID), None);
+        let actual_prep = actual("/var/lib/jetstreamer/retry7-preparation-20261118-v1/epoch166/local3retry7/prepared.json",
+            "778d8569453e451849570cab7a6927c697b8c4065f22c6341bf7b4ba73bc2499");
+        let baseline = actual_prep["actual_full_lane_ledger"]["physical_bytes"].as_u64().unwrap();
+        let row = json!({"producer_unit":NEW_PEER_UNIT});
+        retry3::peer_preparation(166, &row, &actual_prep, baseline).unwrap();
+        assert!(retry3::peer_preparation(166, &row, &actual_prep, baseline + 1).is_err());
         assert_eq!(complete_data(&p), 6_794_761_027_378);
         assert_eq!(raw_floor(&p), 6_829_053_656_882);
         assert_eq!(terminal169::data(&p), complete_data(&p));
