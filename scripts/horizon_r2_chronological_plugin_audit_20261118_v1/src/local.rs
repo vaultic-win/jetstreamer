@@ -180,22 +180,48 @@ pub fn require_space(path: &Path, floor: u64, additional: u64) -> Result<()> {
     );
     Ok(())
 }
-pub fn working_bytes(state: &Path) -> Result<u64> {
-    fn count(path: &Path) -> Result<u64> {
-        let meta = fs::symlink_metadata(path)?;
-        let mut bytes = meta
-            .blocks()
-            .checked_mul(512)
-            .context("allocation overflow")?;
-        if meta.is_dir() {
-            for item in fs::read_dir(path)? {
-                bytes = bytes
-                    .checked_add(count(&item?.path())?)
-                    .context("allocation overflow")?;
-            }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AllocationStage {
+    BeforeMetadata,
+    BeforeReadDirectory,
+}
+
+// The callback is a no-op in production. Tests use it to reproduce removal
+// precisely between directory enumeration, metadata, and directory opening.
+fn count_allocation(
+    path: &Path,
+    visit: &mut impl FnMut(&Path, AllocationStage) -> Result<()>,
+) -> Result<u64> {
+    visit(path, AllocationStage::BeforeMetadata)?;
+    // Cargo creates and removes temporary files while this guard walks its
+    // owned build tree. An entry that has vanished contributes no retained
+    // allocation; all other inspection errors still stop the operation.
+    let meta = match fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => return Err(error.into()),
+    };
+    let mut bytes = meta
+        .blocks()
+        .checked_mul(512)
+        .context("allocation overflow")?;
+    if meta.is_dir() {
+        visit(path, AllocationStage::BeforeReadDirectory)?;
+        let entries = match fs::read_dir(path) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+            Err(error) => return Err(error.into()),
+        };
+        for item in entries {
+            bytes = bytes
+                .checked_add(count_allocation(&item?.path(), visit)?)
+                .context("allocation overflow")?;
         }
-        Ok(bytes)
     }
+    Ok(bytes)
+}
+
+pub fn working_bytes(state: &Path) -> Result<u64> {
     let mut total = 0_u64;
     for entry in fs::read_dir(state)? {
         let entry = entry?;
@@ -203,7 +229,7 @@ pub fn working_bytes(state: &Path) -> Result<u64> {
             continue;
         }
         total = total
-            .checked_add(count(&entry.path())?)
+            .checked_add(count_allocation(&entry.path(), &mut |_, _| Ok(()))?)
             .context("allocation overflow")?;
     }
     // Production's dedicated immutable reader generations are on the same
@@ -212,7 +238,7 @@ pub fn working_bytes(state: &Path) -> Result<u64> {
     let readers = Path::new(crate::source::READER_ROOT);
     if state.join("accepted-config.json").try_exists()? && readers.try_exists()? {
         total = total
-            .checked_add(count(readers)?)
+            .checked_add(count_allocation(readers, &mut |_, _| Ok(()))?)
             .context("reader allocation overflow")?;
     }
     Ok(total)
@@ -430,6 +456,93 @@ pub fn set_readonly(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn allocation_walk_tolerates_cargo_removal_after_enumeration() {
+        let d = tempfile::tempdir().unwrap();
+        let build = d.path().join("build");
+        fs::create_dir(&build).unwrap();
+        let temporary = build.join(".tmp-rustc-object");
+        let retained = build.join("retained.rlib");
+        fs::write(&temporary, vec![1; 65536]).unwrap();
+        fs::write(&retained, vec![2; 32768]).unwrap();
+        let mut removed = false;
+        let observed = count_allocation(&build, &mut |path, stage| {
+            if path == temporary && stage == AllocationStage::BeforeMetadata {
+                // The parent read_dir yielded this path; Cargo removes it
+                // before the guard can call symlink_metadata, reproducing ENOENT.
+                fs::remove_file(path)?;
+                removed = true;
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert!(removed);
+        let expected = (fs::metadata(&build).unwrap().blocks()
+            + fs::metadata(&retained).unwrap().blocks())
+            * 512;
+        assert_eq!(observed, expected);
+        assert!(
+            observed >= 32768,
+            "the retained compiler artifact must still be charged"
+        );
+    }
+    #[test]
+    fn allocation_walk_tolerates_directory_removal_after_metadata() {
+        let d = tempfile::tempdir().unwrap();
+        let temporary = d.path().join(".tmp-cargo-dir");
+        fs::create_dir(&temporary).unwrap();
+        let mut removed = false;
+        let observed = count_allocation(&temporary, &mut |path, stage| {
+            if stage == AllocationStage::BeforeReadDirectory {
+                fs::remove_dir(path)?;
+                removed = true;
+            }
+            Ok(())
+        })
+        .unwrap();
+        assert!(removed);
+        assert_eq!(observed, 0);
+    }
+    #[test]
+    fn allocation_walk_still_rejects_other_errors_and_missing_state() {
+        let d = tempfile::tempdir().unwrap();
+        let file = d.path().join("file");
+        fs::write(&file, b"x").unwrap();
+        let error =
+            count_allocation(&file.join("not-a-directory"), &mut |_, _| Ok(())).unwrap_err();
+        assert_eq!(
+            error
+                .downcast_ref::<std::io::Error>()
+                .unwrap()
+                .raw_os_error(),
+            Some(libc::ENOTDIR)
+        );
+        for kind in [
+            std::io::ErrorKind::PermissionDenied,
+            std::io::ErrorKind::Other,
+        ] {
+            let error = count_allocation(d.path(), &mut |_, _| {
+                Err(std::io::Error::new(kind, "injected inspection failure").into())
+            })
+            .unwrap_err();
+            assert_eq!(error.downcast_ref::<std::io::Error>().unwrap().kind(), kind);
+        }
+        assert!(working_bytes(&d.path().join("missing-state")).is_err());
+    }
+    #[test]
+    fn allocation_walk_never_follows_symlinks() {
+        let d = tempfile::tempdir().unwrap();
+        let archive = d.path().join("external-archive");
+        fs::write(&archive, vec![1; 65536]).unwrap();
+        let link = d.path().join("build-link");
+        std::os::unix::fs::symlink(&archive, &link).unwrap();
+        let observed = count_allocation(&link, &mut |_, _| Ok(())).unwrap();
+        assert_eq!(
+            observed,
+            fs::symlink_metadata(&link).unwrap().blocks() * 512
+        );
+        assert!(observed < fs::metadata(archive).unwrap().blocks() * 512);
+    }
     #[test]
     fn cleanup_refuses_substitution_and_paths() {
         let d = tempfile::tempdir().unwrap();
