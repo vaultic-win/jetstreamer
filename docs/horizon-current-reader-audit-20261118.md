@@ -204,3 +204,44 @@ state, while retaining complete-census retries and rejecting unexplained missing
 fields. Thirteen fixture tests and strict Clippy pass; this observer change still
 needs its own artifact/feature qualification before deployment. Existing guards
 and the next 30-minute observation remain unchanged.
+
+At 22:47 UTC the checkout and freshly fetched `origin/account-updates` both
+resolved to `c1c9fe4898de188e59d064ab7ef508389931afa0`, with no tracked edits.
+The corrected successor release build from published `ed61722d` completed
+normally in 4m21s, using 4.4 GiB peak memory. Its source manifest remained
+unchanged. The conservative reader path set, uploader and coordinator have no
+source differences against that fetched branch. Cargo reports pipeline features
+`["default"]`; the full verifier, native fixture, uploader and coordinator have
+empty package feature lists. The complete Cargo journal and compiler artifacts
+are retained, including fresh-cache artifact records.
+
+The Rust sealer published the candidate binaries and build evidence at
+`/var/lib/jetstreamer/horizon-current-reader-ed61722d-20261118-v2`:
+
+- Pipeline: `e7356f5397d90f1a65a44ab322301e45cf88d23628f32ac172e1180a5f9fb9b9`.
+- Full verifier: `d18723f637fca14622c22cff8303a3815b5e22ce3cf3963298d1a2374050e751`.
+- Uploader: `411213a7193c73eb0f588c378e3458fd53ce0bd14aa67ced25c49542b6c766ec`.
+- Coordinator: `dcd778ac618623ba56d5ab39cda226cde21052ced7cd394d13a2c9b37e157ba0`.
+
+The actual native fixture invocation `8d33e99d733f488faa79001071312e47`
+completed normally in 3.7 seconds with a 476.6 MiB peak. Complete synthetic
+epoch playback and strict full verification both exited zero. Partial coverage,
+missing epoch notification and invalid PoH each exited one as expected; failed
+plugin runs produced no success report. Native results and the genuine journal
+are sealed at `horizon-current-reader-native-evidence-20261118-v1` under the
+same deployment root. The separate `horizon-current-reader-acceptance-20261118-v1`
+accepts source/artifact correspondence and these reader capabilities only.
+It does not establish canonical epoch integrity, authenticated R2 playback,
+operational uploader acceptance or historical compatibility of the 34 pairs.
+Those remain required next steps; no archive publication occurred in this check.
+
+The RSS observer successor from published `663c476d` also completed qualification:
+91 actual binary tests passed, with 12 unselected native-route tests ignored.
+Direct strict Clippy passed for the production and test targets. Full-package
+Clippy failed on 14 existing unrelated library warnings; that failure remains
+preserved. Release compilation completed normally, actual package features are
+empty, and the native 210/227 telemetry branches remain included. The sealed
+artifact `3906038397ce2c6d6a60446988631b3a97f3256b246090009a8034dbdfcb91fe`
+accepted the exact next observer config and rejected overlapping replay entries.
+Its acceptance permits the next scheduled ordinary five-lane observation only.
+Recovery of the missing RSS census remains unproven until that observation.
