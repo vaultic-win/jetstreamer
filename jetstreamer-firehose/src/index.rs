@@ -1933,25 +1933,37 @@ pub fn get_index_base_url() -> Result<Url, SlotOffsetIndexError> {
 mod tests {
     use super::*;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires live Old Faithful epoch 251 CAR and index"]
-    async fn test_epoch_251_index_ranges_decode_to_their_blocks() {
+    struct LiveEpochIndexFixture {
+        epoch: u64,
+        index_sha256: &'static str,
+        header_sha256: &'static str,
+        car_bytes: u64,
+        present_slots: usize,
+        first_slot: u64,
+        last_slot: u64,
+        gaps: usize,
+    }
+
+    async fn check_live_epoch_index_ranges(fixture: LiveEpochIndexFixture) {
         use crate::{node::Node, node_reader::NodeReader};
         use sha2::{Digest, Sha256};
         use std::io::Cursor;
 
         let base = Url::parse("https://files.old-faithful.net/").unwrap();
         let index = SlotOffsetIndex::new(base).unwrap();
-        let ranges = index.load_slot_ranges_index(251).await.unwrap();
+        let ranges = index.load_slot_ranges_index(fixture.epoch).await.unwrap();
         assert_eq!(
             format!("{:x}", Sha256::digest(ranges.file.bytes())),
-            "4a7110e60c64e6d0b303907278b5fea3cd0cd6430c663b43ede21dac8f856c91"
+            fixture.index_sha256
         );
 
         let client = Client::new();
-        let url = "https://files.old-faithful.net/251/epoch-251.car";
+        let url = format!(
+            "https://files.old-faithful.net/{0}/epoch-{0}.car",
+            fixture.epoch
+        );
         let header_response = client
-            .get(url)
+            .get(url.as_str())
             .header(RANGE, "bytes=0-4095")
             .send()
             .await
@@ -1960,7 +1972,7 @@ mod tests {
         let header = header_response.bytes().await.unwrap();
         assert_eq!(
             format!("{:x}", Sha256::digest(&header)),
-            "c68541c8f32523f7868b8bb57eeb80965668843bba2b266008e35d1aee6669ce"
+            fixture.header_sha256
         );
         assert_eq!(header[0], 58, "the CAR header is a 58-byte CBOR value");
         let car_header = &header[..59];
@@ -1973,15 +1985,15 @@ mod tests {
             .filter_map(|(index, record)| {
                 let offset = u64::from_le_bytes(record[..8].try_into().unwrap());
                 let length = u32::from_le_bytes(record[8..].try_into().unwrap()) as u64;
-                (length != 0).then_some((108432000 + index as u64, offset, length))
+                (length != 0).then_some((fixture.epoch * 432000 + index as u64, offset, length))
             })
             .collect();
-        assert_eq!(present.len(), 401659);
-        assert_eq!(present.first().unwrap().0, 108432004);
-        assert_eq!(present.last().unwrap().0, 108863995);
+        assert_eq!(present.len(), fixture.present_slots);
+        assert_eq!(present.first().unwrap().0, fixture.first_slot);
+        assert_eq!(present.last().unwrap().0, fixture.last_slot);
         for &(_, offset, length) in &present {
             assert!(offset >= car_header.len() as u64);
-            assert!(offset.checked_add(length).unwrap() <= 420666863585);
+            assert!(offset.checked_add(length).unwrap() <= fixture.car_bytes);
         }
 
         // Every indexed CAR gap gets a decoded Block on each side. The full
@@ -1996,14 +2008,14 @@ mod tests {
                 edge_slots.extend([pair[0].0, pair[1].0]);
             }
         }
-        assert_eq!(gaps, 15);
+        assert_eq!(gaps, fixture.gaps);
         edge_slots.sort_unstable();
         edge_slots.dedup();
         for slot in edge_slots {
             let (offset, length) = ranges.lookup_range(slot).unwrap();
             let end = offset.checked_add(length).unwrap() - 1;
             let response = client
-                .get(url)
+                .get(url.as_str())
                 .header(RANGE, format!("bytes={offset}-{end}"))
                 .send()
                 .await
@@ -2017,7 +2029,7 @@ mod tests {
                 response.headers()[reqwest::header::CONTENT_RANGE]
                     .to_str()
                     .unwrap(),
-                format!("bytes {offset}-{end}/420666863585"),
+                format!("bytes {offset}-{end}/{}", fixture.car_bytes),
                 "slot {slot} content range"
             );
             let body = response.bytes().await.unwrap();
@@ -2039,6 +2051,38 @@ mod tests {
                 "slot {slot} range coverage"
             );
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "requires live Old Faithful epoch 251 CAR and index"]
+    async fn test_epoch_251_index_ranges_decode_to_their_blocks() {
+        check_live_epoch_index_ranges(LiveEpochIndexFixture {
+            epoch: 251,
+            index_sha256: "4a7110e60c64e6d0b303907278b5fea3cd0cd6430c663b43ede21dac8f856c91",
+            header_sha256: "c68541c8f32523f7868b8bb57eeb80965668843bba2b266008e35d1aee6669ce",
+            car_bytes: 420666863585,
+            present_slots: 401659,
+            first_slot: 108432004,
+            last_slot: 108863995,
+            gaps: 15,
+        })
+        .await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "requires live Old Faithful epoch 252 CAR and index"]
+    async fn test_epoch_252_index_ranges_decode_to_their_blocks() {
+        check_live_epoch_index_ranges(LiveEpochIndexFixture {
+            epoch: 252,
+            index_sha256: "fbc8ddad13636d10bff0f32028d976abff1c86fb73442e207756fa45e2c63a42",
+            header_sha256: "8f265fc27dafe52a2c14a4cfac66485c5a9dfabd9077cadc3c672b294f802ca0",
+            car_bytes: 423163950224,
+            present_slots: 403355,
+            first_slot: 108864012,
+            last_slot: 109295999,
+            gaps: 18,
+        })
+        .await;
     }
 
     fn init_logger() {
