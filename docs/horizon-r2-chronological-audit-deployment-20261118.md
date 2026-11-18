@@ -283,3 +283,40 @@ guard separately and requires the existing `preparation` feature for the
 preparer. `deploy_guard170` preserves the five genuine executions and prepares
 the exact successor deployment. Epoch 170 still requires a sealed guard, its
 own native witness, and genuine epoch 167 admission/protection before preparation.
+
+The v3 optimization-only retirement image (`07b86621ad56341731a60a284a92198c7fb5e6a85ad8c230f05975b1dcb80518`)
+passed all four targeted tests but still hashed only about 120 MB/sec: its
+read-only check reached 17,381,195,776 bytes in 145 seconds. That check was also
+stopped before any retirement intent or mutation. At that rate the next full
+pre-retirement hash would still exceed the unchanged 900-second freshness gate.
+
+The exact141 path now has a bounded parallel implementation of the same three
+digests, retaining file descriptor/path identity checks before and after reading.
+It uses one buffer of at most 64 MiB and at most three concurrent hashers. The
+ordinary archive uploader's hash path is unchanged. Cross-checks cover empty,
+partial and multiple parts, changed input, invalid part sizes and symlinks.
+Three retirement tests pass; the separately invoked throughput test also passes.
+With r2 and the digest packages optimized at level 3, the median 128 MiB test
+took 0.269550363 seconds versus 0.380176613 seconds serially (about 498 MB/sec
+versus 353 MB/sec). All three digests match in each of three rounds. This is a
+bounded benchmark, not yet a completed full-file check. Production build and
+v4 sealing remain required before retrying retirement.
+
+Epoch 170's guard is now sealed at
+`/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard`,
+SHA-256 `2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b`.
+Its 98 tests and four strict configurations passed. The actual own-image witness
+also succeeded in invocation `2ec28eb7bff842da86337b3e25d4c245`, saved as
+`/var/lib/jetstreamer/epoch170-retry6-live166retry7-guard-deployment-20261118-v1/own-native-witness.json`.
+A fresh witness will still be needed for admission; this receipt does not launch
+epoch 170 or supply the missing live epoch 167 identity.
+
+At **23:49:25 UTC**, epoch 166 reached slot 71,750,479 at 2.3964 slots/sec and
+1,100.66 transactions/sec, with zero restarts. All 19 status objects were
+refreshed and authenticated in `cycle2349-live166-19-20261118-v1`. The next
+observer is armed for **2026-11-19 00:19:25 UTC**. Conservative DATA available
+was 7,305,799,737,344 bytes; epoch 141's local input has not been retired.
+
+At the **23:56 UTC** audit check, **26 archives had passed, none had failed**,
+and epoch 26 was downloading under the unchanged controller PID 1590101.
+The next routine audit check is no earlier than **00:26:39 UTC**.

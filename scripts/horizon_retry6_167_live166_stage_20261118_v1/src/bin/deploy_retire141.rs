@@ -56,7 +56,54 @@ fn main() -> Result<()> {
     let commit = git(&["rev-parse","HEAD"])?.trim().to_owned();
     git(&["merge-base","--is-ancestor",&commit,"origin/account-updates"])?;
     ensure!(git(&["status","--porcelain","--untracked-files=no","--","jetstreamer-r2","jetstreamer-horizon-observe","Cargo.toml","Cargo.lock","scripts/horizon_retry6_167_live166_stage_20261118_v1"])?.is_empty(),"relevant source changed");
-    if a[1]=="seal-optimized" {
+    if a[1]=="seal-parallel" {
+        ensure!(a.len()==3 && a[2].len()==40 && a[2].bytes().all(|b|b.is_ascii_hexdigit()),"seal-parallel BUILD_COMMIT");
+        git(&["merge-base","--is-ancestor",&a[2],"origin/account-updates"])?;
+        git(&["diff","--exit-code",&a[2],"HEAD","--","jetstreamer-r2","jetstreamer-horizon-observe","Cargo.toml","Cargo.lock"])?;
+        ensure!(sha(&fs::read(SEALER)?)==SEALER_SHA,"sealer changed");
+        let build=native("horizon-holding141-retirement-parallel-opt3-build-20261118-v1.service",None,"parallel-build-native.txt")?;
+        let native_build=fs::read_to_string(build["path"].as_str().unwrap())?;
+        ensure!(native_build.contains(&format!("JETSTREAMER_BUILD_SOURCE_COMMIT={}",a[2]))
+            && native_build.contains("profile.dev.package.jetstreamer-r2.opt-level=3"),"parallel production source or optimization differs");
+        let mut tests=Vec::new();
+        let mut benchmark=Vec::new();
+        for (phase,count) in [("tests",3),("benchmark",1)] {
+            let unit=format!("horizon-holding141-retirement-parallel-opt3-{phase}-20261118-v1.service");
+            let observed=native(&unit,None,&format!("parallel-{phase}-native.txt"))?;
+            let log=run(Command::new("/usr/bin/journalctl").args(["-u",&unit,"--no-pager","--all","-o","cat"]))?;
+            ensure!(log.contains(&format!("test result: ok. {count} passed; 0 failed;")),"parallel {phase} failed");
+            if phase=="benchmark" {
+                for line in log.lines().filter(|l|l.starts_with('{')) {
+                    let row:Value=serde_json::from_str(line)?;
+                    ensure!(row["bytes"]==134217728u64 && row["all_three_digests_match"]==true
+                        && row["parallel_seconds"].as_f64().is_some_and(|t|t>0.0)
+                        && row["serial_seconds"].as_f64().is_some_and(|t|t>row["parallel_seconds"].as_f64().unwrap()),"parallel benchmark invalid");
+                    benchmark.push(row);
+                }
+            }
+            tests.push(json!({"native":observed,"log":save(&format!("parallel-{phase}.log"),log.as_bytes())?,"passed":count}));
+        }
+        ensure!(benchmark.len()==3,"three native benchmark rounds required");
+        let mut seconds:Vec<_>=benchmark.iter().map(|r|r["parallel_seconds"].as_f64().unwrap()).collect();
+        seconds.sort_by(f64::total_cmp);
+        ensure!(134217728.0/seconds[1]>=300_000_000.0,"parallel benchmark misses freshness planning rate");
+        let image_sha=sha(&fs::read(IMAGE)?);
+        let source_path=format!("{REPO}/jetstreamer-r2/src/holding_epoch141_retire.rs");
+        let proof=json_file("parallel-artifact-proof.json",&json!({"schema":"horizon-exact141-retirement-artifact-v4",
+            "source_commit":commit,"equivalent_build_source_commit":a[2],"source_contained_in_fetched_origin":true,
+            "image_sha256":image_sha,"build":build,"tests":tests,"native_benchmark":benchmark,
+            "retirement_source":bind(&source_path)?,"cargo_lock":bind(&format!("{REPO}/Cargo.lock"))?,
+            "package_optimization_levels":{"jetstreamer-r2":3,"sha2":3,"md-5":3,"digest":3,"block-buffer":3},
+            "maximum_hashers":3,"maximum_input_buffer_bytes":67108864u64,"prior_check_freshness_seconds":900,
+            "scope":"Exact141 holding check/retirement only. Full SHA256, multipart ETag, composite SHA256 and identity checks retained.",
+            "replay_launch_authorized":false,"canonical_publication_authorized":false,"remote_mutations_authorized":false}))?;
+        let destination="/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v4";
+        let plan=json_file("parallel-seal-plan.json",&json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
+            "members":[member(IMAGE,"jetstreamer-r2",0o555)?,member(proof["path"].as_str().unwrap(),"artifact-proof.json",0o444)?,
+                member(&source_path,"holding_epoch141_retire.rs",0o444)?]}))?;
+        run(Command::new(SEALER).args([plan["path"].as_str().unwrap(),"--plan-sha256",plan["sha256"].as_str().unwrap(),"--self-sha256",SEALER_SHA]))?;
+        println!("{}",json!({"runtime":format!("{destination}/jetstreamer-r2"),"sha256":image_sha,"retirement_performed":false}));
+    } else if a[1]=="seal-optimized" {
         ensure!(a.len()==2,"seal-optimized takes no argument");
         git(&["diff","--exit-code","6fa8202b","HEAD","--","jetstreamer-r2","jetstreamer-horizon-observe","Cargo.toml","Cargo.lock"])?;
         ensure!(sha(&fs::read(SEALER)?)==SEALER_SHA,"sealer changed");

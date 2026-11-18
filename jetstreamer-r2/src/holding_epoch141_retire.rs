@@ -164,6 +164,46 @@ fn transition_shape(intent: bool, moved: bool, unlink: bool, complete: bool) -> 
     Ok(())
 }
 
+// Only this closed-input retirement uses the wider CPU envelope. Hash all three
+// required digests over the same immutable part bytes, with at most three active
+// hashers and one 64 MiB buffer. Preserve the ordinary proof's identity checks.
+fn parallel_hash(path: &Path, expected: FileIdentity, part_size: u64) -> Result<LocalProof> {
+    ensure!(part_size > 0 && part_size <= DEFAULT_PART_SIZE, "invalid bounded hash part size");
+    let mut file = OpenOptions::new().read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW).open(path)?;
+    ensure!(identity(&file.metadata()?) == expected, "archive changed before hashing");
+    let mut whole = Sha256::new();
+    let mut combined_md5 = Md5::new();
+    let mut combined_sha256 = Sha256::new();
+    let mut remaining = expected.length;
+    let mut parts = 0u64;
+    let mut buffer = vec![0u8; usize::try_from(part_size.min(remaining))?];
+    while remaining > 0 {
+        let count = usize::try_from(remaining.min(part_size))?;
+        file.read_exact(&mut buffer[..count])?;
+        let bytes = &buffer[..count];
+        let (md5, sha256) = std::thread::scope(|scope| -> Result<_> {
+            let whole_worker = scope.spawn(|| whole.update(bytes));
+            let md5_worker = scope.spawn(|| Md5::digest(bytes));
+            let part_sha256 = Sha256::digest(bytes);
+            whole_worker.join().map_err(|_| anyhow::anyhow!("whole-file hasher panicked"))?;
+            let part_md5 = md5_worker.join().map_err(|_| anyhow::anyhow!("part MD5 hasher panicked"))?;
+            Ok((part_md5, part_sha256))
+        })?;
+        combined_md5.update(md5);
+        combined_sha256.update(sha256);
+        parts += 1;
+        remaining -= count as u64;
+    }
+    ensure!(identity(&file.metadata()?) == expected, "archive changed while hashing");
+    ensure!(regular_identity(path)? == expected, "archive namespace changed while hashing");
+    Ok(LocalProof {
+        sha256_hex: format!("{:x}", whole.finalize()),
+        multipart_etag: format!("{:x}-{parts}", combined_md5.finalize()),
+        composite_sha256: BASE64_STANDARD.encode(combined_sha256.finalize()),
+    })
+}
+
 pub(super) async fn run(
     client: &Client,
     m: &Mapping,
@@ -275,7 +315,7 @@ pub(super) async fn run(
             "141 duplicate transition source"
         );
         let id = source_identity(current)?;
-        let proof = hash_and_etag(current, id, DEFAULT_PART_SIZE)?;
+        let proof = parallel_hash(current, id, DEFAULT_PART_SIZE)?;
         ensure!(
             proof.sha256_hex == SHA && proof.multipart_etag == c["object_etag"],
             "141 local source differs from authenticated custody"
@@ -329,7 +369,7 @@ pub(super) async fn run(
     }
     if quarantine.exists() {
         let id = source_identity(quarantine)?;
-        let proof = hash_and_etag(quarantine, id, DEFAULT_PART_SIZE)?;
+        let proof = parallel_hash(quarantine, id, DEFAULT_PART_SIZE)?;
         ensure!(
             proof.sha256_hex == SHA && proof.multipart_etag == c["object_etag"],
             "141 quarantined bytes differ"
@@ -369,6 +409,56 @@ pub(super) async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parallel_proof_matches_serial_across_part_boundaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input");
+        for length in [0, 1, 63, 64, 65, 1007, 65537] {
+            let bytes: Vec<u8> = (0..length).map(|i| (i % 251) as u8).collect();
+            fs::write(&path, &bytes).unwrap();
+            let id = regular_identity(&path).unwrap();
+            for part_size in [63, 64, 1007, 65536, DEFAULT_PART_SIZE] {
+                let serial = hash_and_etag(&path, id, part_size).unwrap();
+                let parallel = parallel_hash(&path, id, part_size).unwrap();
+                assert_eq!(parallel.sha256_hex, serial.sha256_hex);
+                assert_eq!(parallel.multipart_etag, serial.multipart_etag);
+                assert_eq!(parallel.composite_sha256, serial.composite_sha256);
+                assert_eq!(parallel.sha256_hex, format!("{:x}", Sha256::digest(&bytes)));
+            }
+        }
+        let id = regular_identity(&path).unwrap();
+        assert!(parallel_hash(&path, id, 0).is_err());
+        assert!(parallel_hash(&path, id, DEFAULT_PART_SIZE + 1).is_err());
+        fs::write(&path, b"changed").unwrap();
+        assert!(parallel_hash(&path, id, DEFAULT_PART_SIZE).is_err());
+        let link = dir.path().join("link");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(parallel_hash(&link, regular_identity(&path).unwrap(), DEFAULT_PART_SIZE).is_err());
+    }
+
+    #[test]
+    #[ignore = "bounded native throughput qualification; 128 MiB temporary input"]
+    fn parallel_hash_throughput() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("input");
+        let bytes: Vec<u8> = (0..128usize * 1024 * 1024).map(|i| (i % 251) as u8).collect();
+        fs::write(&path, &bytes).unwrap();
+        let id = regular_identity(&path).unwrap();
+        for round in 0..3 {
+            let start = std::time::Instant::now();
+            let serial = hash_and_etag(&path, id, DEFAULT_PART_SIZE).unwrap();
+            let serial_seconds = start.elapsed().as_secs_f64();
+            let start = std::time::Instant::now();
+            let parallel = parallel_hash(&path, id, DEFAULT_PART_SIZE).unwrap();
+            let parallel_seconds = start.elapsed().as_secs_f64();
+            assert_eq!(serial.sha256_hex, parallel.sha256_hex);
+            assert_eq!(serial.multipart_etag, parallel.multipart_etag);
+            assert_eq!(serial.composite_sha256, parallel.composite_sha256);
+            println!("{}", json!({"round":round,"bytes":id.length,"serial_seconds":serial_seconds,
+                "parallel_seconds":parallel_seconds,"all_three_digests_match":true}));
+        }
+    }
 
     #[test]
     fn retirement_accepts_the_manifest_written_by_the_holding_producer() {
