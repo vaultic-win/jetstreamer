@@ -1965,9 +1965,41 @@ mod tests {
         assert_eq!(header[0], 58, "the CAR header is a 58-byte CBOR value");
         let car_header = &header[..59];
 
-        // Cover the first indexed slot, both sides of an unindexed CAR gap,
-        // and the final indexed slot. Each range must end at its own Block.
-        for slot in [108432004, 108462795, 108462801, 108863995] {
+        let present: Vec<_> = ranges
+            .file
+            .bytes()
+            .chunks_exact(12)
+            .enumerate()
+            .filter_map(|(index, record)| {
+                let offset = u64::from_le_bytes(record[..8].try_into().unwrap());
+                let length = u32::from_le_bytes(record[8..].try_into().unwrap()) as u64;
+                (length != 0).then_some((108432000 + index as u64, offset, length))
+            })
+            .collect();
+        assert_eq!(present.len(), 401659);
+        assert_eq!(present.first().unwrap().0, 108432004);
+        assert_eq!(present.last().unwrap().0, 108863995);
+        for &(_, offset, length) in &present {
+            assert!(offset >= car_header.len() as u64);
+            assert!(offset.checked_add(length).unwrap() <= 420666863585);
+        }
+
+        // Every indexed CAR gap gets a decoded Block on each side. The full
+        // index is also checked for overlap and out-of-bounds ranges.
+        let mut edge_slots = vec![present.first().unwrap().0, present.last().unwrap().0];
+        let mut gaps = 0;
+        for pair in present.windows(2) {
+            let end = pair[0].1 + pair[0].2;
+            assert!(end <= pair[1].1, "indexed ranges overlap");
+            if end < pair[1].1 {
+                gaps += 1;
+                edge_slots.extend([pair[0].0, pair[1].0]);
+            }
+        }
+        assert_eq!(gaps, 15);
+        edge_slots.sort_unstable();
+        edge_slots.dedup();
+        for slot in edge_slots {
             let (offset, length) = ranges.lookup_range(slot).unwrap();
             let end = offset.checked_add(length).unwrap() - 1;
             let response = client
