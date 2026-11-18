@@ -271,3 +271,33 @@ evidence before exercising that publication path; never manufacture trusted
 expectations from the archive being tested. A historical restore/readback must
 use explicit scratch, retain remote identities, and leave existing R2 objects
 unchanged.
+
+At 22:57 UTC, independent HTTPS `getBlock` responses from
+`https://api.mainnet-beta.solana.com` supplied epoch 205's boundaries. Slot
+88,560,000 identifies parent 88,559,999 with blockhash
+`2KxsnPENjXtiY2EYhtVnRQe4mESeVQ6nkMjQU1G94xoe`; a separate query of that
+parent returned the same hash. Terminal slot 88,991,999 returned
+`HuZtkhXnzaJ9BvDazHHSUgQWTFg3u2Uvf12AHBWqYuji`. These are external RPC
+expectations, independent of the archive under test. The three raw responses
+and retrieval context are sealed at
+`/var/lib/jetstreamer/horizon-205-independent-boundaries-20261118-v1`.
+The strict reader expectation is sealed separately with SHA-256
+`3164efa2d021d46343eeac18464a2923bbaf8037bf998d2de3b5250ebc47799a`.
+
+The prepared epoch-205 plan at
+`/var/lib/jetstreamer/horizon-205-current-reader-plan-20261118-v1/plan.json`
+has SHA-256 `4e29bcfa8ca775919b91c37e1fe53de656f0b2e7b3ccb3740b719105ce955e4e`.
+It binds the qualified reader, independent expectations, two reader threads,
+a 105 GB maximum archive, a 3 TB free-space floor and explicit private readback
+scratch. Preparing this plan does not start an audit or authorize publication.
+Root's branch fetch succeeded with the current loaded keychain socket and an
+explicit SSH command selecting Ubuntu's host alias, key and known-hosts file.
+The reader path set still matches the fetched branch through `eb81d477`.
+
+Native tests of the actual uploader Cargo target started in
+`horizon-current-uploader-native-tests-20261118-v1.service`, invocation
+`bc067a97175e4cfdaf66af7ff60d5eba`, from the same immutable `ed61722d` source.
+The 7 GB/one-job build reuses the closed release cache and preserves every live
+worker. Its initial filter is `current_reader::`; genuine transport and restore
+tests remain to be run from that resulting harness before selecting the new
+uploader for the historical restore/readback operation.
