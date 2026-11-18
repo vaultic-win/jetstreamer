@@ -136,8 +136,9 @@ fn native(names: &BTreeSet<String>) -> Result<BTreeMap<String, Value>> {
         let mut command = Command::new("/usr/bin/systemctl");
         command
             .arg("show")
-            .args(chunk)
-            .arg(format!("-p{PROPERTIES}"));
+            .arg(format!("-p{PROPERTIES}"))
+            .arg("--")
+            .args(chunk);
         let text = output(&mut command)?;
         for (id, row) in parse_blocks(&text)? {
             ensure!(
@@ -405,6 +406,12 @@ mod tests {
         for key in ["Id","InvocationID","MainPID","ControlPID","ActiveState","SubState","NRestarts","Job"] {
             let mut bad=row.clone();bad[key]=json!("changed");assert!(live_peer(&bad).is_err());
         }
+    }
+    #[test]
+    fn native_census_accepts_leading_dash_mount_name() {
+        let rows = native(&BTreeSet::from(["-.mount".to_owned()])).unwrap();
+        assert_eq!(rows["-.mount"]["Id"], "-.mount");
+        assert_eq!(rows["-.mount"]["LoadState"], "loaded");
     }
     #[test]
     fn additive_budget_keeps_existing_reservations() {
