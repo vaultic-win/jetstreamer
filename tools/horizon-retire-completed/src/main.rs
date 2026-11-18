@@ -23,6 +23,9 @@ use std::{
 const PRIVATE: &str = "/home/ubuntu/.jetstreamer-private";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const LIMIT: u64 = 16 << 20;
+const EPOCH246_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/snapshot-106271618-6LSJUywaryX8vRn53cbWqLJiTwBCCb3wnNTPevWfqtQD.tar.zst";
+const EPOCH246_BOOTSTRAP_SHA: &str =
+    "c5abfce5d852b78860d22d71f1ce57f6752f45bb428257a73e037895ec6a03e7";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -53,6 +56,22 @@ struct Target {
     path: PathBuf,
     identity: Stamp,
     reason: String,
+    #[serde(default)]
+    external_bootstrap_review: Option<Bound>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BootstrapReview {
+    schema: String,
+    epoch: u64,
+    path: PathBuf,
+    identity: Stamp,
+    snapshot_sha256: String,
+    no_staged_consumers_confirmed: bool,
+    original_copy_completion: Bound,
+    evidence: Vec<Bound>,
+    inactive_units: Vec<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -188,7 +207,7 @@ fn check_target(t: &Target) -> Result<()> {
         "invalid target authorization"
     );
     ensure!(
-        t.path.starts_with(PRIVATE) && !t.path.starts_with(Path::new(PRIVATE).join("r2-receipts")),
+        ordinary_private_path(&t.path) || external_bootstrap_path(t.epoch, &t.path),
         "target outside private data"
     );
     ensure!(
@@ -197,6 +216,71 @@ fn check_target(t: &Target) -> Result<()> {
         t.path.display()
     );
     ensure!(t.identity.len > 1 << 20, "retain compact metadata");
+    if external_bootstrap_path(t.epoch, &t.path) {
+        let binding = t
+            .external_bootstrap_review
+            .as_ref()
+            .context("external bootstrap needs Main review")?;
+        let metadata = exact(&binding.path)?;
+        ensure!(
+            metadata.uid() == 0 && metadata.mode() & 0o222 == 0,
+            "external review must be sealed"
+        );
+        let review: BootstrapReview = serde_json::from_slice(&bound(binding, LIMIT)?)?;
+        validate_bootstrap_review(t, &review)?;
+        for evidence in &review.evidence {
+            bound(evidence, LIMIT)?;
+        }
+        let completion: Value =
+            serde_json::from_slice(&bound(&review.original_copy_completion, LIMIT)?)?;
+        ensure!(
+            completion["schema"] == "horizon246-guarded-exact-Rust-sealer-copy1024-completion-v1"
+                && completion["Main_accepted_copy_only"] == true
+                && completion["snapshot"]["path"] == EPOCH246_BOOTSTRAP
+                && completion["snapshot"]["sha256"] == EPOCH246_BOOTSTRAP_SHA
+                && completion["snapshot"]["bytes"] == t.identity.len,
+            "external bootstrap differs from original copy evidence"
+        );
+        inactive(&review.inactive_units)?;
+    } else {
+        ensure!(
+            t.external_bootstrap_review.is_none(),
+            "external review on ordinary private target"
+        );
+    }
+    Ok(())
+}
+
+fn ordinary_private_path(path: &Path) -> bool {
+    path.starts_with(PRIVATE) && !path.starts_with(Path::new(PRIVATE).join("r2-receipts"))
+}
+fn external_bootstrap_path(epoch: u64, path: &Path) -> bool {
+    epoch == 246 && path == Path::new(EPOCH246_BOOTSTRAP)
+}
+fn validate_bootstrap_review(t: &Target, r: &BootstrapReview) -> Result<()> {
+    ensure!(
+        r.schema == "horizon246-obsolete-bootstrap-main-review-v1"
+            && r.epoch == 246
+            && r.path == t.path
+            && r.identity == t.identity
+            && r.snapshot_sha256 == EPOCH246_BOOTSTRAP_SHA
+            && r.no_staged_consumers_confirmed
+            && t.identity.uid == 0
+            && t.identity.len == 13110128323
+            && !r.evidence.is_empty(),
+        "invalid external bootstrap review"
+    );
+    for required in [
+        "horizon-qualify-246-general-shrink-debt-budget506-e3f15eb2-v1.service",
+        "horizon-qualify-246-bootstrap-copy1636-v2.service",
+        "horizon-monitor-246-bootstrap-copy1636-v2.service",
+        "horizon-monitor-246-bootstrap-copy1636-v2.timer",
+    ] {
+        ensure!(
+            r.inactive_units.iter().any(|u| u == required),
+            "missing historical bootstrap consumer {required}"
+        );
+    }
     Ok(())
 }
 fn inactive(units: &[String]) -> Result<()> {
@@ -368,6 +452,13 @@ fn run() -> Result<()> {
         ensure!(paths.insert(&t.path), "duplicate target");
         epochs.insert(t.epoch);
         check_target(t)?;
+        if external_bootstrap_path(t.epoch, &t.path) {
+            ensure!(
+                digest(&t.path)? == EPOCH246_BOOTSTRAP_SHA,
+                "external bootstrap content changed"
+            );
+            check_target(t)?;
+        }
     }
     let proof_epochs: BTreeSet<_> = p.proofs.iter().map(|x| x.epoch).collect();
     ensure!(
@@ -485,6 +576,56 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn external_route_is_one_epoch_one_file_and_never_metadata() {
+        assert!(external_bootstrap_path(246, Path::new(EPOCH246_BOOTSTRAP)));
+        for path in [
+            "/var/lib/jetstreamer/other/snapshot.tar.zst",
+            "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/deployment-seal-receipt.json",
+            "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap",
+        ] {
+            assert!(!external_bootstrap_path(246, Path::new(path)));
+        }
+        assert!(!external_bootstrap_path(247, Path::new(EPOCH246_BOOTSTRAP)));
+        assert!(ordinary_private_path(Path::new(
+            "/home/ubuntu/.jetstreamer-private/old/archive"
+        )));
+        assert!(!ordinary_private_path(Path::new(
+            "/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-246.r2.json"
+        )));
+    }
+
+    #[test]
+    fn external_review_requires_exact_identity_and_complete_inactive_consumer_set() {
+        let mut r: BootstrapReview = serde_json::from_value(json!({
+            "schema":"horizon246-obsolete-bootstrap-main-review-v1", "epoch":246,
+            "path":EPOCH246_BOOTSTRAP,"snapshot_sha256":EPOCH246_BOOTSTRAP_SHA,
+            "identity":{"dev":1,"ino":2,"len":13110128323u64,"blocks":25605744,
+                "uid":0,"gid":0,"mode":33060,"nlink":1,"mtime":1,"mtime_ns":0,"ctime":1,"ctime_ns":0},
+            "no_staged_consumers_confirmed":true,
+            "original_copy_completion":{"path":"/completion","sha256":"a".repeat(64)},
+            "evidence":[{"path":"/review","sha256":"b".repeat(64)}],
+            "inactive_units":["horizon-qualify-246-general-shrink-debt-budget506-e3f15eb2-v1.service",
+                "horizon-qualify-246-bootstrap-copy1636-v2.service","horizon-monitor-246-bootstrap-copy1636-v2.service",
+                "horizon-monitor-246-bootstrap-copy1636-v2.timer"]
+        })).unwrap();
+        let t = Target {
+            epoch: 246,
+            path: EPOCH246_BOOTSTRAP.into(),
+            identity: r.identity.clone(),
+            reason: "obsolete".into(),
+            external_bootstrap_review: None,
+        };
+        validate_bootstrap_review(&t, &r).unwrap();
+        r.identity.ino += 1;
+        assert!(validate_bootstrap_review(&t, &r).is_err());
+        r.identity = t.identity.clone();
+        r.no_staged_consumers_confirmed = false;
+        assert!(validate_bootstrap_review(&t, &r).is_err());
+        r.no_staged_consumers_confirmed = true;
+        r.inactive_units.pop();
+        assert!(validate_bootstrap_review(&t, &r).is_err());
+    }
     #[test]
     fn running_executable_can_be_hashed() {
         assert_eq!(

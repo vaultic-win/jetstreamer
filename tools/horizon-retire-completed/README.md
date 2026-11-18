@@ -26,7 +26,14 @@ Both invocations acquire the existing local mutation lock, inspect consumers,
 and obtain fresh authenticated inventory. Execution repeats identity and consumer
 checks and fsyncs intent/completion records around each unlink. It refuses
 symlinks, multiply linked files, small metadata and files outside the private
-root. The audit is created without overwriting any existing evidence. If a run
+root, except the exact obsolete epoch 246 bootstrap snapshot selected by the
+`external_bootstrap_review` route. That route permits one hard-coded path and
+epoch, requires an immutable Main review binding its exact identity, original
+copy completion, staged-consumer evidence and all four original consumer units,
+and hashes the file against its original accepted SHA-256. It retains all normal
+R2 readiness, no-consumer, mutation-lock and identity checks. It does not allow
+retiring the deployment directory, sibling metadata, or any other external file.
+The audit is created without overwriting any existing evidence. If a run
 is interrupted, retain its audit and prepare a new exact plan and audit filename
 for only the remaining files; never reuse an old identity or claim a planned
 deletion succeeded without checking its outcome.
