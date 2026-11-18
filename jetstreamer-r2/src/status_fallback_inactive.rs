@@ -33,6 +33,10 @@ struct Plan {
     raw_status: Bound,
     owner_release: Bound,
     #[serde(default)]
+    operator_initial_intent: Option<Bound>,
+    #[serde(default)]
+    operator_initial_completion: Option<Bound>,
+    #[serde(default)]
     prior_intent: Option<Bound>,
     public_archive_directory: PathBuf,
     deletion_intent: PathBuf,
@@ -215,7 +219,63 @@ fn validate_release(plan: &Plan, status: &EpochStatus) -> Result<OwnerRelease> {
         "operator release",
     )?)?;
     validate_release_fields(&release, plan.epoch, &plan.fallback_completion, status)?;
+    validate_operator_initial(plan, &release)?;
     Ok(release)
+}
+
+fn validate_operator_initial(plan: &Plan, release: &OwnerRelease) -> Result<()> {
+    if plan.epoch != 211 {
+        ensure!(
+            plan.operator_initial_intent.is_none() && plan.operator_initial_completion.is_none(),
+            "unexpected operator-only origin evidence"
+        );
+        return Ok(());
+    }
+    ensure!(
+        release.prior_controller_invocation_id.is_empty()
+            && release.prior_producer_invocation_id.is_empty(),
+        "epoch 211 has no prior native producer claim"
+    );
+    let intent_bound = plan
+        .operator_initial_intent
+        .as_ref()
+        .context("epoch 211 initial operator intent is required")?;
+    let completion_bound = plan
+        .operator_initial_completion
+        .as_ref()
+        .context("epoch 211 initial operator completion is required")?;
+    let intent: Value = serde_json::from_slice(&bound_bytes(
+        intent_bound,
+        MAX_STATUS_BYTES,
+        "initial operator intent",
+    )?)?;
+    let completion: Value = serde_json::from_slice(&bound_bytes(
+        completion_bound,
+        MAX_STATUS_BYTES,
+        "initial operator completion",
+    )?)?;
+    let key = format!("epoch-{}.epoch-status.json", plan.epoch);
+    ensure!(
+        intent["schema"] == "horizon1019-active211-input-qualification-initial-status-intent-v1"
+            && intent["epoch"] == plan.epoch
+            && intent["bucket"] == plan.bucket
+            && intent["key"] == key
+            && intent["only_if_absent"] == true
+            && intent["no_archive_sidecar_or_other_key_mutation"] == true
+            && intent["actual_owner"]["controller"] == "/root"
+            && intent["actual_owner"]["native_producer_or_admission_claimed"] == false
+            && completion["schema"]
+                == "horizon1019-active211-input-qualification-status-completion-v1"
+            && completion["epoch"] == plan.epoch
+            && completion["intent"] == serde_json::to_value(intent_bound)?
+            && completion["actual_owner"] == intent["actual_owner"]
+            && completion["after_sha256"] == intent["replacement"]["sha256"]
+            && completion["conditional_create_only"] == true
+            && completion["authenticated_exact_byte_readback"] == true
+            && completion["archive_or_sidecar_mutation"] == false,
+        "epoch 211 did not originate as authenticated operator-only status"
+    );
+    Ok(())
 }
 
 fn validate_release_fields(
@@ -234,8 +294,12 @@ fn validate_release_fields(
             && release.no_active_operator_or_subagent_repair
             && release.no_other_host_handoff
             && !release.next_repair_action.trim().is_empty()
-            && release.prior_controller_invocation_id.len() == 32
-            && release.prior_producer_invocation_id.len() == 32
+            && ((epoch == 211
+                && release.prior_controller_invocation_id.is_empty()
+                && release.prior_producer_invocation_id.is_empty())
+                || (epoch != 211
+                    && release.prior_controller_invocation_id.len() == 32
+                    && release.prior_producer_invocation_id.len() == 32))
             && release
                 .prior_controller_invocation_id
                 .bytes()
@@ -660,7 +724,7 @@ mod tests {
 
     fn status() -> EpochStatus {
         EpochStatus {
-            epoch: 211,
+            epoch: 223,
             jet_size_bytes: 0,
             elapsed_execution_millis: 10,
             estimated_remaining_millis: 100,
@@ -672,8 +736,8 @@ mod tests {
     fn release() -> OwnerRelease {
         OwnerRelease {
             schema: RELEASE_SCHEMA.into(),
-            epoch: 211,
-            key: "epoch-211.epoch-status.json".into(),
+            epoch: 223,
+            key: "epoch-223.epoch-status.json".into(),
             fallback_completion: Bound {
                 path: "/a".into(),
                 sha256: "a".repeat(64),
@@ -693,32 +757,62 @@ mod tests {
     fn release_rejects_active_repair_newer_owner_and_ambiguous_history() {
         let expected = release();
         assert!(
-            validate_release_fields(&expected, 211, &expected.fallback_completion, &status())
+            validate_release_fields(&expected, 223, &expected.fallback_completion, &status())
                 .is_ok()
         );
         let mut changed = expected.clone();
         changed.no_active_operator_or_subagent_repair = false;
         assert!(
-            validate_release_fields(&changed, 211, &expected.fallback_completion, &status())
+            validate_release_fields(&changed, 223, &expected.fallback_completion, &status())
                 .is_err()
         );
         changed = expected.clone();
         changed.fallback_completion.sha256 = "b".repeat(64);
         assert!(
-            validate_release_fields(&changed, 211, &expected.fallback_completion, &status())
+            validate_release_fields(&changed, 223, &expected.fallback_completion, &status())
                 .is_err()
         );
         changed = expected.clone();
         changed.prior_producer_invocation_id.clear();
         assert!(
-            validate_release_fields(&changed, 211, &expected.fallback_completion, &status())
+            validate_release_fields(&changed, 223, &expected.fallback_completion, &status())
                 .is_err()
         );
         changed = expected.clone();
         changed.released_at_utc = status().sampled_at_utc;
         assert!(
-            validate_release_fields(&changed, 211, &expected.fallback_completion, &status())
+            validate_release_fields(&changed, 223, &expected.fallback_completion, &status())
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn operator_only_211_release_rejects_a_fabricated_producer() {
+        let mut operator_only = release();
+        operator_only.epoch = 211;
+        operator_only.key = "epoch-211.epoch-status.json".into();
+        operator_only.prior_controller_invocation_id.clear();
+        operator_only.prior_producer_invocation_id.clear();
+        let mut operator_status = status();
+        operator_status.epoch = 211;
+        assert!(
+            validate_release_fields(
+                &operator_only,
+                211,
+                &operator_only.fallback_completion,
+                &operator_status,
+            )
+            .is_ok()
+        );
+        operator_only.prior_producer_invocation_id = "a".repeat(32);
+        assert!(
+            validate_release_fields(
+                &operator_only,
+                211,
+                &operator_only.fallback_completion,
+                &operator_status,
+            )
+            .is_err()
         );
     }
 
