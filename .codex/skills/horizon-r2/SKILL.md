@@ -1152,6 +1152,18 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   This never authorizes deleting the immutable deployment member, its receipts, or anything in R2.
 - For adaptive ranges, start the controller with `--r2-receipt-directory "$HOME/.jetstreamer-private/r2-receipts" --r2-bucket BUCKET`. The controller accepts receipts from that exact bucket only for bytes already bound by its root-owned local completion attestation; R2 can replace local storage, but can never establish initial completion.
 - Start the current Horizon verification plugin as soon as each local archive is available. R2 work may run concurrently with replay of other epochs. An archive is eligible for upload only after its full and current-plugin receipts bind the same archive SHA-256. It is not eligible for local retirement until both adjacent-boundary receipts bind that digest as well. Preserve the canonical lowercase coreutils sidecar format: `<64 hex>  epoch-N.jet\n`.
+- **Every archive published to R2 must be readable by the latest `origin/account-updates` reader.**
+  Fetch that branch before publication and bind its exact commit, the reader/plugin source and
+  dependency closure, verifier build provenance and archive digest to the full/current-plugin
+  acceptance. An older verifier is usable only when its effective reader/plugin source and
+  dependencies are proven equivalent to that fetched revision; ancestor containment alone does
+  not prove reader compatibility. If relevant code changed, qualify the latest reader and rerun
+  full and plugin verification before upload or sidecar publication. Unrelated documentation or
+  operator changes need no redundant archive scan when exact reader equivalence is established.
+  Recheck the remote branch before the readiness sidecar is committed. Whole-object SHA-256
+  readback proves byte integrity, not reader compatibility. Preserve existing R2 objects when
+  auditing historical compatibility; a failed compatibility audit authorizes repair and diagnosis,
+  not archive replacement or deletion.
 - When a verifier starts on the first archive of a long continuous cohort, size its oneshot
   `TimeoutStartSec` for the remaining replay plus final validation, not just one archive scan. While
   waiting for later sidecars, dispatch the plugin verifier through

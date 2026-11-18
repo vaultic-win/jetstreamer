@@ -140,9 +140,10 @@ fn raw_gate(bytes: &[u8], archive: &str, verifier: &str) -> Result<()> {
 }
 fn inventory(v: &Value, first: u64, last: u64) -> Result<Vec<Value>> {
     ensure!(
-        v["first_epoch"] == first
+        v["schema"] == "jetstreamer-horizon-r2-inventory-v1"
+            && v["first_epoch"] == first
             && v["last_epoch"] == last
-            && v["anomalies"] == json!([])
+            && v["anomalies"] == 0
             && v["archive_only"] == 0,
         "incomplete/anomalous inventory"
     );
@@ -320,7 +321,7 @@ mod tests {
     }
     #[test]
     fn complete_inventory_required() {
-        let mut v = json!({"first_epoch":200,"last_epoch":201,"anomalies":[],"archive_only":0,"ready_pairs":1,"missing":1,"entries":[{"epoch":200,"state":"missing"},{"epoch":201,"state":"ready-pair"}]});
+        let mut v = json!({"schema":"jetstreamer-horizon-r2-inventory-v1","first_epoch":200,"last_epoch":201,"anomalies":0,"archive_only":0,"ready_pairs":1,"missing":1,"entries":[{"epoch":200,"state":"missing"},{"epoch":201,"state":"ready-pair"}]});
         assert_eq!(inventory(&v, 200, 201).unwrap().len(), 1);
         v["entries"][1]["epoch"] = json!(200);
         assert!(inventory(&v, 200, 201).is_err());
