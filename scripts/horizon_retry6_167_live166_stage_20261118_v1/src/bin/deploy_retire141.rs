@@ -52,11 +52,47 @@ fn native(unit: &str, iid: Option<&str>, leaf: &str) -> Result<Value> {
 fn main() -> Result<()> {
     ensure!(unsafe{libc::geteuid()}==0,"Root required");
     let a: Vec<_> = std::env::args().collect();
-    ensure!(a.len() >= 2,"deploy_retire141 seal | check-plan CUSTODY | retire-plan CUSTODY CHECK");
+    ensure!(a.len() >= 2,"deploy_retire141 seal | seal-optimized | check-plan CUSTODY | retire-plan CUSTODY CHECK");
     let commit = git(&["rev-parse","HEAD"])?.trim().to_owned();
     git(&["merge-base","--is-ancestor",&commit,"origin/account-updates"])?;
     ensure!(git(&["status","--porcelain","--untracked-files=no","--","jetstreamer-r2","jetstreamer-horizon-observe","Cargo.toml","Cargo.lock","scripts/horizon_retry6_167_live166_stage_20261118_v1"])?.is_empty(),"relevant source changed");
-    if a[1]=="seal" {
+    if a[1]=="seal-optimized" {
+        ensure!(a.len()==2,"seal-optimized takes no argument");
+        git(&["diff","--exit-code","6fa8202b","HEAD","--","jetstreamer-r2","jetstreamer-horizon-observe","Cargo.toml","Cargo.lock"])?;
+        ensure!(sha(&fs::read(SEALER)?)==SEALER_SHA,"sealer changed");
+        let build=native("horizon-holding141-retirement-optimized-build-20261118-v2.service",
+            Some("2376aaa3deaa49ab930c6d5627f4c6a6"),"optimized-build-native.txt")?;
+        let mut tests=Vec::new();
+        for (phase,filter,count) in [
+            ("tests","holding::epoch141_retire::tests",2),
+            ("hash-tests","tests::hash_proof_binds_sha_and_etag",1),
+            ("stream-tests","tests::streaming_part_digests_preserve_empty_single_and_many_part_proofs",1),
+        ] {
+            let unit=format!("horizon-holding141-retirement-optimized-{phase}-20261118-v1.service");
+            let observed=native(&unit,None,&format!("optimized-{phase}-native.txt"))?;
+            let log=run(Command::new("/usr/bin/journalctl").args(["-u",&unit,"--no-pager","--all","-o","cat"]))?;
+            ensure!(log.contains(filter) && log.contains(&format!("test result: ok. {count} passed; 0 failed;")),"optimized {phase} failed");
+            tests.push(json!({"native":observed,"log":save(&format!("optimized-{phase}.log"),log.as_bytes())?,"passed":count}));
+        }
+        let image_sha=sha(&fs::read(IMAGE)?);
+        let source_path=format!("{REPO}/jetstreamer-r2/src/holding_epoch141_retire.rs");
+        let proof=json_file("optimized-artifact-proof.json",&json!({
+            "schema":"horizon-exact141-retirement-artifact-v3","source_commit":commit,
+            "equivalent_build_source_commit":"6fa8202b","source_contained_in_fetched_origin":true,
+            "image_sha256":image_sha,"build":build,"tests":tests,
+            "retirement_source":bind(&source_path)?,"cargo_lock":bind(&format!("{REPO}/Cargo.lock"))?,
+            "package_optimization_levels":{"jetstreamer-r2":1,"sha2":3,"md-5":3,"digest":3,"block-buffer":3},
+            "performance_claim":"Optimized build; actual whole-file rate still requires native check execution.",
+            "scope":"holding-check-retire141 and holding-retire141 only; exact original input after custody",
+            "whole_file_checks_unchanged":true,"prior_check_freshness_seconds":900,
+            "replay_launch_authorized":false,"canonical_publication_authorized":false,"remote_mutations_authorized":false}))?;
+        let destination="/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v3";
+        let plan=json_file("optimized-seal-plan.json",&json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
+            "members":[member(IMAGE,"jetstreamer-r2",0o555)?,member(proof["path"].as_str().unwrap(),"artifact-proof.json",0o444)?,
+                member(&source_path,"holding_epoch141_retire.rs",0o444)?]}))?;
+        run(Command::new(SEALER).args([plan["path"].as_str().unwrap(),"--plan-sha256",plan["sha256"].as_str().unwrap(),"--self-sha256",SEALER_SHA]))?;
+        println!("{}",json!({"runtime":format!("{destination}/jetstreamer-r2"),"sha256":image_sha,"retirement_performed":false}));
+    } else if a[1]=="seal" {
         ensure!(a.len()==2,"seal takes no argument");
         // Changes after this build are operational source only. Require exact
         // equivalence for the built package and its observation dependency.
