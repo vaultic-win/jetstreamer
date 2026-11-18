@@ -190,15 +190,20 @@ fn network_git(cfg: &Config) -> Result<Command> {
         .env("GIT_SSH_COMMAND", ssh_command);
     Ok(c)
 }
-fn cargo(cfg: &Config, source: &Path) -> Command {
+fn cargo(cfg: &Config, source: &Path) -> Result<Command> {
+    // ProtectSystem=strict makes the service's global /tmp read-only. Native
+    // dependency build scripts must use scratch included in our allocation walk.
+    let temporary = cfg.state_directory.join("build-tmp");
+    private_dir(&temporary)?;
     let mut c = clean_command(&cfg.cargo);
     c.current_dir(source)
         .env("CARGO_HOME", &cfg.cargo_home)
         .env("RUSTC", &cfg.rustc)
         .env("HOME", &cfg.git_home)
+        .env("TMPDIR", temporary)
         .env("CARGO_TARGET_DIR", cfg.state_directory.join("build"))
         .env("CARGO_BUILD_JOBS", cfg.build_jobs.to_string());
-    c
+    Ok(c)
 }
 pub fn fetch(cfg: &Config, attempt: &Path, seq: u64) -> Result<String> {
     let source = cfg.state_directory.join("source");
@@ -303,7 +308,7 @@ pub fn fingerprint_files(
 }
 fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, String>> {
     let source = cfg.state_directory.join("source");
-    let mut command = cargo(cfg, &source);
+    let mut command = cargo(cfg, &source)?;
     command.args([
         "metadata",
         "--quiet",
@@ -408,6 +413,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
     let cargo_sha256 = hash_file(&cfg.cargo)?;
     let rustc_sha256 = hash_file(&cfg.rustc)?;
     let features = vec!["--no-default-features".to_owned()];
+    let build_environment = serde_json::json!({"temporary_directory":"owned-state/build-tmp","build_jobs":cfg.build_jobs});
     let fingerprint = digest(&serde_json::to_vec(&(
         &files,
         &rustc_version,
@@ -415,6 +421,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
         &features,
         &cargo_sha256,
         &rustc_sha256,
+        &build_environment,
     ))?);
     let old = cfg.state_directory.join("reader.json");
     if old.try_exists()? {
@@ -433,7 +440,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
         cfg.reserve_bytes,
         remaining_working_budget(&cfg.state_directory, cfg.build_reserve_bytes)?,
     )?;
-    let mut command = cargo(cfg, &source);
+    let mut command = cargo(cfg, &source)?;
     command.args([
         "build",
         "--release",
@@ -496,7 +503,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
         &serde_json::json!({"schema":"horizon-r2-audit-reader-build-v1","branch":"account-updates",
         "branch_commit":commit,"source_fingerprint":fingerprint,"source_files":files,"artifact_sha256":artifact_sha256,
         "cargo_lock_sha256":files["Cargo.lock"],"cargo_sha256":cargo_sha256,"rustc_sha256":rustc_sha256,
-        "cargo_version":cargo_version,"rustc_version":rustc_version,"features":features,"remote_mutations":false}),
+        "cargo_version":cargo_version,"rustc_version":rustc_version,"features":features,"build_environment":build_environment,"remote_mutations":false}),
         false,
     )?;
     let plan = serde_json::json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,"members":[
@@ -589,6 +596,28 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_build_temporary_files_stay_in_accounted_state() {
+        let state = tempfile::tempdir().unwrap();
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.state_directory = state.path().to_owned();
+        cfg.cargo = "/usr/bin/mktemp".into();
+        let output = cargo(&cfg, state.path()).unwrap().arg("-d").output().unwrap();
+        assert!(output.status.success());
+        let created = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());
+        assert_eq!(created.parent().unwrap(), state.path().join("build-tmp"));
+        fs::write(created.join("native-build-output"), vec![1; 65536]).unwrap();
+        assert!(working_bytes(state.path()).unwrap() >= 65536);
+    }
+    #[test]
+    fn native_build_temporary_directory_cannot_escape_through_symlink() {
+        let state = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(outside.path(), state.path().join("build-tmp")).unwrap();
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.state_directory = state.path().to_owned();
+        assert!(cargo(&cfg, state.path()).is_err());
+    }
     #[test]
     fn relevant_changes_invalidate_but_operator_notes_do_not() {
         let root = tempfile::tempdir().unwrap();
