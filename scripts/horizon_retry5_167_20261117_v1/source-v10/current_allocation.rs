@@ -73,7 +73,7 @@ fn declaration(v: &Value, p: &Plan, r: &Review, fleet: &Value, at: u64) -> Resul
             .as_ref()
             .context("terminal resident request")?;
         terminal169::memory_scope(request, p.epoch)?;
-        let expected_peers: BTreeSet<u64> = if retry167::retry6(p) {
+        let expected_peers: BTreeSet<u64> = if retry167::retry6(p) && retry167::retained_peer_data(p) == 0 {
             BTreeSet::new()
         } else if retry167::selected(p) {
             BTreeSet::from([166])
@@ -158,7 +158,7 @@ fn declaration(v: &Value, p: &Plan, r: &Review, fleet: &Value, at: u64) -> Resul
                     .and_then(|r| r.terminal170.as_ref())
                     .context("terminal170 request")?,
             )?;
-        } else if e == 166 && retry167::retry6(p) {
+        } else if e == 166 && retry167::retry6(p) && retry167::retained_peer_data(p) == 0 {
             retry167::stopped166_declaration(row)?;
         } else {
             let peer = peers

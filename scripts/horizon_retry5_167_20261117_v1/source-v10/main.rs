@@ -62,7 +62,7 @@ mod retry167_native_guard;
 use local::LocalInputs;
 use profile::{Profile, profile};
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-prepare-20261118-v1/prepare";
+    "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-prepare-20261118-v2/prepare";
 const EVENT: &str = "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/ORIGINAL_SEVEN_RESERVE_STOPS_AND_REPAIR_MODEL.json";
 const EVENT_SHA: &str = "b3bff5d44d24dc507313d8dfdb8e5cd5bec50a7732b288327106ee20b7a7b0eb";
 const RETIRED167_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
