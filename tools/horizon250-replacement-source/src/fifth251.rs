@@ -113,6 +113,9 @@ fn memory(total: u64, non_lane: u64, ceiling: u64, candidate: u64) -> Result<Val
 fn render(mut s: String) -> Result<String> {
     replace_one(&mut s, "MemoryMax=251041591296", "MemoryMax=128000000000")?;
     replace_one(&mut s, "MemoryHigh=167361060864", "MemoryHigh=100000000000")?;
+    // The smaller cache profile is planned at 80 hours of replay. Retaining
+    // the predecessor's 72-hour limit would terminate it before that estimate.
+    replace_one(&mut s, "RuntimeMaxSec=259200", "RuntimeMaxSec=432000")?;
     ensure!(
         s.contains("AllowedCPUs=0-15")
             && s.contains("CPUAffinity=0-15")
@@ -266,7 +269,7 @@ pub(super) fn run() -> Result<()> {
         &out,
         "deployment-plan.json",
         &serde_json::to_vec_pretty(
-            &json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon251-fifth-20261118-static-v1","members":members}),
+            &json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon251-fifth-20261118-static-v2","members":members}),
         )?,
     )?;
     File::open(&out)?.sync_all()?;
@@ -277,6 +280,14 @@ pub(super) fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn smaller_profile_runtime_covers_the_replay_planning_allowance() {
+        let source = "MemoryMax=251041591296\nMemoryHigh=167361060864\nRuntimeMaxSec=259200\nAllowedCPUs=0-15\nCPUAffinity=0-15\n${INVOCATION_ID}/guard-admission.json\nRestart=no\nMemorySwapMax=0\n";
+        let output = render(source.into()).unwrap();
+        assert!(output.contains("RuntimeMaxSec=432000"));
+        assert!(output.contains("MemoryMax=128000000000"));
+        assert!(render(source.replace("RuntimeMaxSec=259200", "RuntimeMaxSec=infinity")).is_err());
+    }
     #[test]
     fn candidate_fits_without_releasing_live_caps() {
         let v = memory(1212136964096, 32464052224, 223779342336, CANDIDATE_MAX).unwrap();
