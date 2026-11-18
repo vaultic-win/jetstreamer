@@ -158,3 +158,14 @@ the archive being checked. Missing evidence or an incomplete epoch range fails
 before upload. The currently running `72751e30` build predates this correction:
 its reader artifacts can still be qualified, but its uploader must be rebuilt
 from the corrected published source before deployment.
+
+At the subsequent branch check, the main checkout fast-forwarded to
+`bf365e75d2a424efe08c5757e17de63aac836943`, with zero commits ahead or behind
+the fetched `origin/account-updates`. The boundary-expectation correction
+`bed735bd` is contained in that remote branch. Comparing the running release
+build's `72751e30` source against that fetched revision produced no differences
+over the gate's complete conservative reader path set. This permits continued
+qualification of those reader artifacts; it does not qualify the older uploader
+or replace executable/readback acceptance. Historical archives still require
+their actual latest-reader audit. Future changes to the relevant reader sources
+or dependencies invalidate equivalence and require renewed qualification.
