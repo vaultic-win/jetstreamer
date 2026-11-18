@@ -123,3 +123,36 @@ epoch 185/186 work snapshots were retired with durable receipts, totaling
 43,702,026,240 allocated bytes. Epoch 183's additional 7,042,052,096-byte copy
 is qualified in published source `a3a8913c`, but still needs sealed execution.
 Epoch 136 duplicate cleanup remains blocked by retained accounting-reader inputs.
+
+## First completed audit cycles
+
+At the user-requested 22:43 UTC check, the v3 service was active with its unchanged
+invocation and zero restarts. Epochs **0, 1 and 2 passed**, with no failed results
+and 222 archives pending; epoch 3 was downloading. The durable results are
+`results/epoch-{0,1,2}.json` beneath the audit state directory. Each binds the
+authenticated object, complete plugin report, actual counters and clean exit.
+Reader equivalence was established against `account-updates` commit
+`c1c9fe4898de188e59d064ab7ef508389931afa0`.
+
+Epoch 2's playback log runs from 22:42:34.057902509 to 22:43:03.722435923 UTC:
+29.664533414 seconds for 432,000 slots and 25,536,956 transactions, approximately
+14,563 slots/sec and 860,858 transactions/sec. Epochs 1 and 2 consumed 138 and
+169 seconds between successive attempt starts, respectively: approximately
+23.45 epochs/hour including transfer, source checks and cleanup. This early
+small-archive sample is not a completion forecast for the full 16.5 TB inventory.
+Epoch 0's 745-second attempt included the initial build and is excluded from
+that cycle-rate estimate.
+
+Epoch 183's obsolete private snapshot has now been retired. Its durable receipt
+is `/var/lib/jetstreamer/snapshot183-private-retire-20261118-v1/target-0-completion.json`:
+7,042,052,096 allocated bytes removed, source and quarantine absent, sealed
+retained input preserved. Together with the six epoch 185/186 copies this is
+50,744,078,336 allocated bytes retired. Actual free space remains a separate
+admission measurement because epoch 166 continues to grow.
+
+The two workspace cache checks failed closed on staged unit references; neither
+cache has been retired. The debug check includes unrelated private build paths
+whose names contain `target/debug`; the release-deps check has similar matches.
+Qualify exact path matching without dropping real current or staged consumers.
+Epoch 141's holding object remains in authenticated readback; no local retirement
+or capacity credit is claimed before custody and the separate retirement gates.

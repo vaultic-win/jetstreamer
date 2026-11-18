@@ -65,10 +65,20 @@ fn main() -> Result<()> {
     for row in fleet["epochs"].as_array_mut().context("fleet epochs")? { row["current_coordinated_observer"]=bind(&a[1])?; }
     fleet["new_resource_observations"]=json!(false);fleet["replay_launch_authorized"]=json!(false);
     fleet["cycle_reconciliation_scope"]=json!("Same accepted observer and authenticated statuses; prior census/history retained explicitly; not fresh admission authority.");
+    let audit_allocation="/var/lib/jetstreamer/r2-audit-additive-budget-20261118-v1/allocation.json";
+    let audit_binding=bind(audit_allocation)?;
+    ensure!(audit_binding["sha256"]=="f99e0d79b062a86f13d808eafed4cb4d53c7325c154934b0c2b59f4f78fa8a46","audit allocation changed");
+    fleet["continuing_audit_obligation"]=json!({"allocation":audit_binding,
+        "additional_memory_bytes":25769803776u64,"additional_cpu_quota_micros":4000000u64,
+        "root_filesystem_archive_cap_bytes":17179869184u64,"DATA_reservation_bytes":0,
+        "original_promises_ended":false,"fresh_native_observation_claimed":false,
+        "admission_requirement":"The epoch167 launcher must revalidate the current audit image, invocation and cgroup limits, and add this full allocation to the preserved campaign commitments."});
+    fleet["completed_snapshot183_retirement"]=bind("/var/lib/jetstreamer/snapshot183-private-retire-20261118-v1/target-0-completion.json")?;
     fleet["next_lane_recovery"]=json!({"epoch":167,"last_attempt_unit":"horizon-167-live166retry7-prepare-operation-2058-20261118-v1.service",
         "last_result":"complete166/167/169/170 growth does not fit","required_available_bytes":7493617796914u64,
         "holding_unit":"horizon-closed141-input-park-20261118-v1.service","credited_reclamation_bytes":0,
-        "next_action":"Complete authenticated holding then exact local retirement and duplicate-cache cleanup before a fresh admission."});
+        "cache_check_result":"Both workspace cache checks found staged references; no cache bytes reclaimed. Repair unrelated absolute-path matches while preserving real dependencies.",
+        "next_action":"Complete authenticated holding then exact local retirement and qualified cache cleanup before a fresh admission including the audit allocation."});
     println!("{}",write(&format!("{root}/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),&fleet)?);
     println!("next_observer={sealed}; timer={unit}.timer; at={next}");
     Ok(())
