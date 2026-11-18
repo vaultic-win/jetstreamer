@@ -1528,6 +1528,17 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   fast-forward that branch before new Git changes, preserving local edits; reconcile divergence
   without discarding another agent's commits. Do not continue development on a PR head branch
   after merging it. Keep sealed deployment copies immutable and qualify new deployments separately.
+  **Before admitting or launching any epoch, merge every source change required by that epoch
+  into `origin/account-updates` and verify remote containment.** This includes epoch-specific
+  compatibility fixes, preparers, launchers, guards, verifiers and their source dependencies;
+  untracked files, local commits, another branch, or a deployment seal do not satisfy this gate.
+  Fetch the branch, verify the required commit is an ancestor of `origin/account-updates`, and
+  bind that commit plus the exact deployed source/build provenance in the admission evidence.
+  Check that the files used to build the admitted artifacts match the committed versions; a
+  clean unrelated checkout or a matching commit label alone is insufficient. Repeat this check
+  after any code change before retrying admission. If a required push or merge fails, continue
+  repair work and preserve healthy running lanes, but do not admit the new epoch until it succeeds.
+  Source publication does not replace build, integrity, capacity or guard qualification.
   After changing tracked campaign code, documentation or this skill, run the relevant checks,
   commit with the repository's configured Git identity and push to `origin/account-updates` in
   the same work cycle. Verify the remote branch contains the commit before reporting it pushed.

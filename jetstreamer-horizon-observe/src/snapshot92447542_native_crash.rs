@@ -1141,7 +1141,7 @@ fn sdk_group(pid: u32, group: &str, stopped: bool) -> Result<Vec<SdkGroupMember>
                 if e.downcast_ref::<std::io::Error>()
                     .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
             {
-                continue
+                continue;
             }
             Err(e) => return Err(e),
         };

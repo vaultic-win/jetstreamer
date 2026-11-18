@@ -23,3 +23,6 @@ epoch-hashes-*.txt
 genesis.bin
 genesis.tar.bz2
 *.jet
+
+# Build output from standalone campaign Cargo packages
+/scripts/**/target/

@@ -1,0 +1,27 @@
+Epoch 167 retry5 source progress at 2026-11-17 13:53 UTC
+
+The isolated source now selects local3retry5 and the 512 GiB root cap. It
+binds live epoch166 retry6 to the exact admission and guard-protection
+receipts in RETRY5_REBINDING_INPUTS.json. It adds an exact stopped epoch170
+retry4 terminal check, retains all four original root growth promises, and
+accepts live166 retry6 only at the unchanged current DATA floor and 288 GiB
+historical root cap. Both stopped retry4 partials remain preserved.
+
+The guard source candidate (guard_main.rs plus data_fulfillment.rs) is sealed
+read-only at /var/lib/jetstreamer/epoch167-retry5-live166-20261117-v1/
+guard-source-sealed-v1. Its deployment receipt denies replay launch and R2
+mutation. Rustfmt parsed the copied source; it has not been compiled or
+tested. The prepare source is still mutable and unqualified.
+
+Next build dependency: adapt and review the prior guarded build admission
+and compiler recipe for the sealed retry5 guard source. Start useful build
+work only after the actual invocation-bound build guard's first timer proof.
+Run production and test graphs, record exact feature/rustc flags and tests,
+qualify the native guard and seal it. Then pin its exact hashes in
+retry167_native_guard.rs, build and qualify the prepare binary with a fresh
+fleet-bound additive booking, recheck DATA witness ancestry, and obtain
+fresh launch admission and actual guard-timer proof. The old build and old
+retry4 images provide no authority for retry5 launch.
+
+No second replay lane has started. The live epoch166 producer was not
+stopped or changed. No R2 archive or sidecar was changed.

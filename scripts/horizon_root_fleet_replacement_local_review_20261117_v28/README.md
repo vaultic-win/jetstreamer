@@ -1,0 +1,1 @@
+Corrects the status owner binding reader for authenticated status-only correction receipts. The existing publisher records the coordinated and fresh observer bindings inside `owner_evidence`; the fleet review now accepts that exact pair as well as the earlier top-level `observer` field. No resource, archive, or launch authority changes.
