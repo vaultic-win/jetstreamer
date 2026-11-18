@@ -245,3 +245,29 @@ artifact `3906038397ce2c6d6a60446988631b3a97f3256b246090009a8034dbdfcb91fe`
 accepted the exact next observer config and rejected overlapping replay entries.
 Its acceptance permits the next scheduled ordinary five-lane observation only.
 Recovery of the missing RSS census remains unproven until that observation.
+
+The scheduled 22:52:42 UTC observation subsequently completed both host RSS
+censuses successfully, without discarded attempts in the final census. All
+five owners remained stable and advanced. All five estimates were refreshed
+and authenticated-readback verified. Full-range reconciliation again found
+34 ready pairs, 66 missing, zero anomalies and no diagnostics. The current
+memory estimate now validly selects nine desired lanes from five executing
+lanes; this is a target, not admission. Existing lane hard obligations plus
+host/control reservations remain 1,202,496,454,656 bytes against
+1,212,136,964,096 total. Both reader builds and the native fixture have closed,
+leaving 9,640,509,440 bytes of uncommitted hard budget, still insufficient for
+a sixth 128 GB candidate without qualified reservation or policy changes.
+Conservative available disk is 4,410,331,877,376 bytes. The next ordinary
+observation is due no earlier than 23:22:42 UTC.
+
+Historical-audit preparation must not assume that epoch 205 is retained in
+`/home/ubuntu/horizon`: both its local archive and checksum were absent at the
+privileged 22:44 check. Its prior full-verification receipt represents ordered
+and internal-full checks. The 204–205 bridge binds archive identities and
+successful adjacency verification, but contains no independent parent or
+terminal blockhash expectations. Neither record alone supplies the new strict
+uploader plan's external expectations. Obtain and bind independent source
+evidence before exercising that publication path; never manufacture trusted
+expectations from the archive being tested. A historical restore/readback must
+use explicit scratch, retain remote identities, and leave existing R2 objects
+unchanged.
