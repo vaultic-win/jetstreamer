@@ -14,6 +14,16 @@ fn write(p: &str, v: &Value) -> Result<Value> {
     let mut f=OpenOptions::new().write(true).create_new(true).mode(0o400).custom_flags(libc::O_NOFOLLOW).open(p)?;
     f.write_all(&serde_json::to_vec_pretty(v)?)?;f.sync_all()?;File::open(Path::new(p).parent().context("parent")?)?.sync_all()?;bind(p)
 }
+fn clock_labels(stamp: &str) -> Result<(String,String)> {
+    ensure!(stamp.len()==20 && stamp.is_ascii(),"canonical UTC clock required");
+    for (i,b) in stamp.bytes().enumerate() {
+        let separator=match i {4|7=>Some(b'-'),10=>Some(b'T'),13|16=>Some(b':'),19=>Some(b'Z'),_=>None};
+        ensure!(separator.map_or_else(||b.is_ascii_digit(),|s|b==s),"invalid UTC clock");
+    }
+    ensure!((1..=12).contains(&stamp[5..7].parse::<u32>()?) && (1..=31).contains(&stamp[8..10].parse::<u32>()?)
+        && stamp[11..13].parse::<u32>()?<24 && stamp[14..16].parse::<u32>()?<60 && stamp[17..19].parse::<u32>()?<60,"invalid clock fields");
+    Ok((format!("{}{}{}",&stamp[..4],&stamp[5..7],&stamp[8..10]),format!("{}{}",&stamp[11..13],&stamp[14..16])))
+}
 fn main() -> Result<()> {
     ensure!(unsafe{libc::geteuid()}==0,"Root required");
     let a:Vec<_>=std::env::args().collect();
@@ -30,25 +40,24 @@ fn main() -> Result<()> {
         && rows[0]["producer_after"]["active_state"]=="active" && rows[0]["producer_after"]["restarts"]==0,"exact healthy166 required");
     let stamp=sample["recorded_at_utc"].as_str().context("stamp")?;
     let next=sample["cadence"]["next_routine_observation_not_before_utc"].as_str().context("next")?;
-    ensure!(stamp.len()==20 && next.len()==20 && stamp.starts_with("2026-11-18T") && next.starts_with("2026-11-18T"),"Nov18 cycle only");
-    let tag=format!("{}{}",&stamp[11..13],&stamp[14..16]);
-    let next_tag=format!("{}{}",&next[11..13],&next[14..16]);
-    ensure!(tag.bytes().chain(next_tag.bytes()).all(|b|b.is_ascii_digit()),"bad time label");
-    let root=format!("/var/lib/jetstreamer/root{tag}-live166-observation-20261118-v1");
+    let (date,tag)=clock_labels(stamp)?;
+    let (next_date,next_tag)=clock_labels(next)?;
+    ensure!(next>stamp,"successor clock must advance");
+    let root=format!("/var/lib/jetstreamer/root{tag}-live166-observation-{date}-v1");
     fs::create_dir(&root)?;fs::set_permissions(&root,fs::Permissions::from_mode(0o700))?;
     let mut config=read(&a[3])?;
     ensure!(config["output"]==a[1] && config["minimum_interval_seconds"]==1800,"predecessor observer mismatch");
     config["previous_sample"]=json!(a[1]);config["not_before_utc"]=json!(next);
-    config["output"]=json!(format!("/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root{next_tag}-live166-20261118-v1.json"));
+    config["output"]=json!(format!("/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root{next_tag}-live166-{next_date}-v1.json"));
     let cpath=format!("{root}/next-observer.json");let cb=write(&cpath,&config)?;
-    let destination=format!("/usr/local/lib/jetstreamer/horizon-live166-observer-config-{tag}-20261118-v1");
+    let destination=format!("/usr/local/lib/jetstreamer/horizon-live166-observer-config-{tag}-{date}-v1");
     let ppath=format!("{root}/seal-plan.json");
     let p=write(&ppath,&json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
         "members":[{"source":cpath,"name":"next-observer.json","sha256":cb["sha256"],"mode":292}]}))?;
     ensure!(sha(&fs::read(SEALER)?)==SEALER_SHA,"sealer changed");
     run(Command::new(SEALER).args([&ppath,"--plan-sha256",p["sha256"].as_str().unwrap(),"--self-sha256",SEALER_SHA]))?;
     let sealed=format!("{destination}/next-observer.json");
-    let unit=format!("horizon-observer-root{next_tag}-live166-20261118-v1");
+    let unit=format!("horizon-observer-root{next_tag}-live166-{next_date}-v1");
     let calendar=format!("{} {} UTC",&next[..10],&next[11..19]);
     run(Command::new("/usr/bin/systemd-run").args(["--unit",&unit,"--on-calendar",&calendar,"--timer-property=AccuracySec=1s",
         "--property=Type=oneshot","--property=CPUQuota=200%","--property=MemoryMax=2G","--property=TasksMax=128",
@@ -74,12 +83,35 @@ fn main() -> Result<()> {
         "original_promises_ended":false,"fresh_native_observation_claimed":false,
         "admission_requirement":"The epoch167 launcher must revalidate the current audit image, invocation and cgroup limits, and add this full allocation to the preserved campaign commitments."});
     fleet["completed_snapshot183_retirement"]=bind("/var/lib/jetstreamer/snapshot183-private-retire-20261118-v1/target-0-completion.json")?;
+    let mut completed_cleanup=Vec::new();
+    for path in ["/var/lib/jetstreamer/snapshot152-private-retire-20261118-v1/target-0-completion.json",
+        "/var/lib/jetstreamer/snapshot152-private-retire-20261118-v1/target-1-completion.json",
+        "/var/lib/jetstreamer/horizon-dev-cache-check-sol-debug-retire-20261118-v2/completion.json",
+        "/var/lib/jetstreamer/horizon-dev-cache-check-sol-release-deps-retire-20261118-v2/completion.json"] {
+        let receipt=read(path)?;
+        ensure!(receipt["r2_mutations"]==false && (receipt["cache_absent"]==true || (receipt["source_absent"]==true && receipt["quarantine_absent"]==true)),"cleanup completion missing");
+        completed_cleanup.push(bind(path)?);
+    }
+    fleet["completed_cleanup_after_2249"]=json!(completed_cleanup);
     fleet["next_lane_recovery"]=json!({"epoch":167,"last_attempt_unit":"horizon-167-live166retry7-prepare-operation-2058-20261118-v1.service",
         "last_result":"complete166/167/169/170 growth does not fit","required_available_bytes":7493617796914u64,
         "holding_unit":"horizon-closed141-input-park-20261118-v1.service","credited_reclamation_bytes":0,
-        "cache_check_result":"Both workspace cache checks found staged references; no cache bytes reclaimed. Repair unrelated absolute-path matches while preserving real dependencies.",
-        "next_action":"Complete authenticated holding then exact local retirement and qualified cache cleanup before a fresh admission including the audit allocation."});
+        "cache_check_result":"Both workspace caches and the two obsolete epoch152 snapshots have been retired with durable receipts. Admission must use actual measured free space, not summed cache-entry blocks.",
+        "next_action":"Complete authenticated epoch141 holding then exact local retirement, and use a fresh admission including the audit allocation."});
     println!("{}",write(&format!("{root}/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),&fleet)?);
     println!("next_observer={sealed}; timer={unit}.timer; at={next}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clock_labels;
+    #[test]
+    fn midnight_successor_uses_its_own_date() {
+        assert_eq!(clock_labels("2026-11-18T23:49:25Z").unwrap(),("20261118".into(),"2349".into()));
+        assert_eq!(clock_labels("2026-11-19T00:19:25Z").unwrap(),("20261119".into(),"0019".into()));
+        for bad in ["2026/11/19T00:19:25Z","2026-11-19T24:19:25Z","2026-11-19T00:19:25+00:00",""] {
+            assert!(clock_labels(bad).is_err());
+        }
+    }
 }

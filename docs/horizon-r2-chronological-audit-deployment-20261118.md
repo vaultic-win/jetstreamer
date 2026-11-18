@@ -156,3 +156,46 @@ whose names contain `target/debug`; the release-deps check has similar matches.
 Qualify exact path matching without dropping real current or staged consumers.
 Epoch 141's holding object remains in authenticated readback; no local retirement
 or capacity credit is claimed before custody and the separate retirement gates.
+
+## Cleanup and launch preparation after the 22:49 observation
+
+The 22:49:25 UTC sample records epoch 166 at slot 71,742,367, 2.4393 slots/sec,
+1,149.62 transactions/sec and zero restarts. All 19 active status objects were
+conditionally refreshed and authenticated through readback. The sole next
+observer is armed for 23:19:25 UTC. The operational fleet now carries the audit's
+additional 24 GiB and four CPU cores explicitly; it confers no admission authority.
+
+The corrected cache matcher is published as `b97eb77a`. Nineteen targeted tests
+and strict Clippy for the complete checker module closure passed. Whole-library
+Clippy still reports 14 unrelated snapshot-module diagnostics. Eight obsolete
+failed diagnostic units were closed after preserving their raw native state,
+fragments, journals and historical qualification evidence under
+`/var/lib/jetstreamer/sol-cache-terminal-custody-20261118-v1`.
+
+Both workspace cache retirements completed: `target/debug` and
+`target/release/deps`. Their receipts are respectively
+`/var/lib/jetstreamer/horizon-dev-cache-check-sol-debug-retire-20261118-v2/completion.json`
+and `/var/lib/jetstreamer/horizon-dev-cache-check-sol-release-deps-retire-20261118-v2/completion.json`.
+The two private epoch 152 snapshot copies also retired successfully, removing
+3,134,062,592 allocated bytes and preserving the authenticated legacy deployment
+input. Their receipts are `target-{0,1}-completion.json` under
+`/var/lib/jetstreamer/snapshot152-private-retire-20261118-v1`.
+Cache-entry block sums are not a measurement of net reclaimed filesystem space;
+actual DATA available space after these retirements was 7,310,603,911,168 bytes.
+
+Epoch 167's launcher is sealed at
+`/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261118-v1/launch`,
+SHA-256 `664196244f6beb1e874533e25dedaac341b4adae933618680d197a59f17cf99d`.
+Eight tests and strict Clippy passed; source, manifests, logs and artifact proof
+are sealed alongside it. It enforces the audit allocation in addition to the
+original campaign promises. This is prepared launch tooling, not an admitted lane.
+
+Fresh candidate measurement completed through the native 22:56 control:
+`/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry6/physical-1795042581-1629353.json`
+(SHA-256 `6c513918d01aba3db6add4a2969122f2834f28a184803b142838e121e4fd6110`).
+It retains 119,201,542,144 bytes with two complete stable captures. The preparation
+helper now takes the current observer, status, successor and physical receipt as
+explicit inputs. The observation helper also derives successor filenames from
+the successor's date, with a passing midnight regression test, so its cadence
+does not stop at November 18. Epoch 141 custody and exact local retirement remain
+the next capacity dependency; no future reclamation is counted as available.
