@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     fn plan() -> Plan {
         let mut p: Plan =
-            serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json"))
+            serde_json::from_str(include_str!("dep_58bd338ae33e_epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json"))
                 .unwrap();
         p.data_fulfillment = Some(crate::prelaunch_data::tests::request());
         p
@@ -179,7 +179,7 @@ mod tests {
     }
     #[test]
     fn exact_retained_lineage_and_changed_iid_or_released_promise() {
-        let f: Value = serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry4-lineage-fixture.json")).unwrap();
+        let f: Value = serde_json::from_str(include_str!("dep_4b82a0e39e7e_retry4-lineage-fixture.json")).unwrap();
         validate(&f["stop"], &f["retired"], &f["completion"]).unwrap();
         let mut bad = f.clone();
         bad["stop"]["original_claim"]["expected_producer_invocation_id"] =

@@ -427,5 +427,5 @@ pub(super) fn endpoint(request: &Request) -> Result<Value> {
     )
 }
 #[cfg(test)]
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/terminal169_tests.rs"]
+#[path = "dep_91f960682d4b_terminal169_tests.rs"]
 pub(super) mod tests;

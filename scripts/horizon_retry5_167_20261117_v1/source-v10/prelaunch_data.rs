@@ -12,6 +12,12 @@ const RETRY6_167_SHA: &str = "46de4a2461fba0d807ebc581809285ca3f2c67098db0f0824c
 const RETRY6_167_SEAL_SHA: &str = "9a9816783ce496d784baee9e4535e2165628af993b63ea277c42af6104d312cb";
 const RETRY6_167_PROOF_SHA: &str = "1ae7fdcc48ce72f6dac78139d8510ebf580b73afec63357c89c829d53cc89218";
 const RETRY6_167_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-original-slot-guard-20261118-v1/artifact-proof.json";
+pub(super) const RETRY6_LIVE166_RUNTIME: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-guard-20261118-v1/guard";
+const RETRY6_LIVE166_SHA: &str = "2d6c455e385045e554ad08de8f0b1909e52fb7aa700c006d12817449e74a8f14";
+const RETRY6_LIVE166_SEAL_SHA: &str = "a51da067e2428462f5ae8d2753cb3765d9b08da1be4b61843151bd4b2ce7cf8b";
+const RETRY6_LIVE166_PROOF_SHA: &str = "4ef203ce7537301ddb56f750c42372ec9c1624aa323d6d42fc2e51b96886d69a";
+const RETRY6_LIVE166_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-guard-20261118-v1/artifact-proof.json";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -29,7 +35,8 @@ pub(super) fn shape(r: &Request) -> Result<()> {
             Path::new(TERMINAL_RUNTIME),
             Path::new(completed167_native_guard::RUNTIME),
             Path::new(retry167_native_guard::RUNTIME),
-            Path::new(RETRY6_167_RUNTIME)
+            Path::new(RETRY6_167_RUNTIME),
+            Path::new(RETRY6_LIVE166_RUNTIME)
         ]
         .contains(&r.runtime.path.as_path())
             && lower_hex(&r.runtime.sha256, 64),
@@ -95,34 +102,47 @@ fn proof_shape(r: &Request, seal: &Value, qualified: &Value) -> Result<()> {
 }
 pub(super) fn authenticate(r: &Request) -> Result<()> {
     shape(r)?;
-    if r.runtime.path == Path::new(RETRY6_167_RUNTIME) {
-        ensure!(r.runtime.sha256 == RETRY6_167_SHA
-            && r.runtime_seal.sha256 == RETRY6_167_SEAL_SHA
-            && r.qualification.path == Path::new(RETRY6_167_PROOF)
-            && r.qualification.sha256 == RETRY6_167_PROOF_SHA,
+    if [Path::new(RETRY6_167_RUNTIME), Path::new(RETRY6_LIVE166_RUNTIME)].contains(&r.runtime.path.as_path()) {
+        let live_peer = r.runtime.path == Path::new(RETRY6_LIVE166_RUNTIME);
+        let (runtime, runtime_sha, seal_sha, proof_path, proof_sha) = if live_peer {
+            (RETRY6_LIVE166_RUNTIME, RETRY6_LIVE166_SHA, RETRY6_LIVE166_SEAL_SHA, RETRY6_LIVE166_PROOF, RETRY6_LIVE166_PROOF_SHA)
+        } else {
+            (RETRY6_167_RUNTIME, RETRY6_167_SHA, RETRY6_167_SEAL_SHA, RETRY6_167_PROOF, RETRY6_167_PROOF_SHA)
+        };
+        ensure!(r.runtime.sha256 == runtime_sha
+            && r.runtime_seal.sha256 == seal_sha
+            && r.qualification.path == Path::new(proof_path)
+            && r.qualification.sha256 == proof_sha,
             "exact retry6 guard image, seal and artifact proof required");
-        fixed(RETRY6_167_RUNTIME, RETRY6_167_SHA, 32 << 20)?;
-        ensure!(fs::symlink_metadata(RETRY6_167_RUNTIME)?.mode() & 0o7777 == 0o555,
+        fixed(runtime, runtime_sha, 32 << 20)?;
+        ensure!(fs::symlink_metadata(runtime)?.mode() & 0o7777 == 0o555,
             "retry6 guard image must be sealed 0555");
         let seal = bound(&r.runtime_seal)?;
         let proof = bound(&r.qualification)?;
         ensure!(seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
             && seal["sealer_sha256"] == SEALER_SHA
-            && seal["destination"] == Path::new(RETRY6_167_RUNTIME).parent().unwrap().to_str().unwrap()
+            && seal["destination"] == Path::new(runtime).parent().unwrap().to_str().unwrap()
             && seal["replay_launch_authorized"] == false
             && seal["remote_mutations"] == false
             && seal["members"].as_array().is_some_and(|m| m.iter().any(|row|
-                row["name"] == "guard" && row["sha256"] == RETRY6_167_SHA && row["mode"] == "0555"))
+                row["name"] == "guard" && row["sha256"] == runtime_sha && row["mode"] == "0555"))
             && proof["schema"] == "horizon-revised-original-slot-witness-guard-artifact-proof-v1"
             && proof["owner"] == "/root" && proof["primary_thread"] == THREAD
             && proof["epoch"] == 167
-            && proof["production"]["sha256"] == RETRY6_167_SHA
+            && proof["production"]["sha256"] == runtime_sha
             && proof["tests"]["passed"].as_u64().is_some_and(|n| n >= 96)
             && proof["tests"]["failed"] == 0
             && proof["tests"]["includes_current_twelve_file_witness"] == true
             && proof["source_and_production_hash_match"] == true
             && proof["replay_launch_authorized"] == false,
             "retry6 exact-image source, tests or normal seal differs");
+        if live_peer {
+            ensure!(proof["source_commit"] == "f94557d9b56563391441f4ed1f8fe11c2d057736"
+                && proof["source_commit_verified_on_origin_account_updates"] == true
+                && proof["tests"]["passed"] == 97
+                && proof["tests"]["includes_live166_retry7_additive_floor_scope"] == true,
+                "live166 successor requires exact merged source and strengthened-floor qualification");
+        }
         return Ok(());
     }
     if r.runtime.path == Path::new(retry167_native_guard::RUNTIME) {

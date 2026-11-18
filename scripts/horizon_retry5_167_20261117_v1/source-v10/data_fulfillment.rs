@@ -190,7 +190,7 @@ fn expected(path: &str, sha256: &str) -> Bound {
 }
 fn pins() -> Result<Value> {
     Ok(serde_json::from_str(include_str!(
-        "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/PINNED_INPUTS.json"
+        "dep_19beee2d9044_PINNED_INPUTS.json"
     ))?)
 }
 fn stable(m: &fs::Metadata) -> [u64; 12] {
@@ -1164,7 +1164,9 @@ pub(super) fn observe_preparation(
                 ),
                 Path::new("/usr/local/lib/jetstreamer/horizon-peer170-terminal169-data-guard-20261115-v1/guard"),
                 Path::new(crate::completed167_native_guard::RUNTIME),
-                Path::new(RETRY167_GUARD)
+                Path::new(RETRY167_GUARD),
+                Path::new(crate::prelaunch_data::RETRY6_167_RUNTIME),
+                Path::new(crate::prelaunch_data::RETRY6_LIVE166_RUNTIME)
             ]
             .contains(&qualified_guard.path.as_path()),
         "exact prelaunch filesystem and qualified successor guard required"
@@ -1203,7 +1205,9 @@ pub(super) fn observe_preparation_with<F: FnOnce() -> Result<()>>(
                 ),
                 Path::new("/usr/local/lib/jetstreamer/horizon-peer170-terminal169-data-guard-20261115-v1/guard"),
                 Path::new(crate::completed167_native_guard::RUNTIME),
-                Path::new(RETRY167_GUARD)
+                Path::new(RETRY167_GUARD),
+                Path::new(crate::prelaunch_data::RETRY6_167_RUNTIME),
+                Path::new(crate::prelaunch_data::RETRY6_LIVE166_RUNTIME)
             ]
             .contains(&qualified_guard.path.as_path()),
         "exact shared prelaunch filesystem and guard required"
@@ -1645,7 +1649,7 @@ mod tests {
         fs::create_dir(&root).unwrap();
         let file = root.join("witness");
         fs::write(&file, vec![7; 8192]).unwrap();
-        let mut seed: WitnessSet = serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/witness-set.json")).unwrap();
+        let mut seed: WitnessSet = serde_json::from_str(include_str!("dep_731806c5b1f4_witness-set.json")).unwrap();
         seed.slots = vec![Slot {
             epoch: 166,
             lane_root: root,

@@ -108,6 +108,10 @@ pub(super) fn is_protected166(epoch: u64, unit: &str, iid: &str) -> bool {
     epoch == 166 && ((unit == PEER_UNIT && iid == PEER_IID)
         || (unit == NEW_PEER_UNIT && iid == NEW_PEER_IID))
 }
+pub(super) fn protected166_guard_floor(epoch: u64, unit: &str, iid: &str) -> Option<u64> {
+    if !is_protected166(epoch, unit, iid) { return None; }
+    Some(current_budget::CURRENT_FLOOR + if unit == NEW_PEER_UNIT { ROOT_CAP } else { 0 })
+}
 fn peer_rows(v: &Value) -> Result<()> {
     let rows = v.as_array().context("exact166 resident owner array")?;
     ensure!(rows.len() == 1, "one exact protected166 peer is required");
@@ -205,7 +209,9 @@ pub(super) fn shape(p: &Plan) -> Result<()> {
             "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1"
         })
         && p.current_allocation.as_ref().is_some_and(|v| v.schema == if retry6(p) { RETRY6_SCHEMA } else { SCHEMA })
-        && p.data_fulfillment.as_ref().is_some_and(|v| v.runtime.path == Path::new(if retry6(p) {
+        && p.data_fulfillment.as_ref().is_some_and(|v| v.runtime.path == Path::new(if retained_peer_data(p) > 0 {
+            prelaunch_data::RETRY6_LIVE166_RUNTIME
+        } else if retry6(p) {
             prelaunch_data::RETRY6_167_RUNTIME
         } else {
             retry167_native_guard::RUNTIME
@@ -580,7 +586,26 @@ mod tests {
             "admission":exact(NEW_PEER_ADMISSION,NEW_PEER_ADMISSION_SHA),
             "guard_protection":exact(NEW_PEER_PROTECTION,NEW_PEER_PROTECTION_SHA)
         }])).unwrap();
+        assert!(crate::shapes(&p).is_err(), "old lower-floor guard must fail for a live retry7 peer");
+        let d = p.data_fulfillment.as_mut().unwrap();
+        d.runtime = exact(prelaunch_data::RETRY6_LIVE166_RUNTIME,
+            "2d6c455e385045e554ad08de8f0b1909e52fb7aa700c006d12817449e74a8f14");
+        d.runtime_seal = exact("/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-guard-20261118-v1/deployment-seal-receipt.json",
+            "a51da067e2428462f5ae8d2753cb3765d9b08da1be4b61843151bd4b2ce7cf8b");
+        d.qualification = exact("/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-guard-20261118-v1/artifact-proof.json",
+            "4ef203ce7537301ddb56f750c42372ec9c1624aa323d6d42fc2e51b96886d69a");
+        d.contract = data_fulfillment::Binding {
+            contract: data_fulfillment::Bound { path: "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-data-contract-20261118-v1/contract.json".into(), sha256: "6096d816cbe2bc1b15e37268d736785be018da0dfd05deca03d40551d307902c".into() },
+            deployment_seal: data_fulfillment::Bound { path: "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-data-contract-20261118-v1/deployment-seal-receipt.json".into(), sha256: "22fa7d9c94214c1584d2ce03eade50d1ed961f788419aba1c632b38262de1eca".into() },
+        };
+        prelaunch_data::authenticate(d).unwrap();
+        let mut crossed: prelaunch_data::Request = serde_json::from_value(serde_json::to_value(&d).unwrap()).unwrap();
+        crossed.runtime.sha256 = "0".repeat(64);
+        assert!(prelaunch_data::authenticate(&crossed).is_err());
         crate::shapes(&p).unwrap();
+        resident_memory::peer_admissions(p.resident_memory.as_ref().unwrap()).unwrap();
+        assert_eq!(protected166_guard_floor(166, NEW_PEER_UNIT, NEW_PEER_IID), Some(6_584_106_303_282));
+        assert_eq!(protected166_guard_floor(166, NEW_PEER_UNIT, PEER_IID), None);
         assert_eq!(complete_data(&p), 6_794_761_027_378);
         assert_eq!(raw_floor(&p), 6_829_053_656_882);
         assert_eq!(terminal169::data(&p), complete_data(&p));

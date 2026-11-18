@@ -494,7 +494,7 @@ fn exact_peer_attempts_reject_unknown_and_cross_epoch_retry4_units() {
 #[test]
 fn actual_three_owner_bindings_select_their_exact_attempts() {
     let actual: Value =
-        serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/actual-three-owner-native.json")).unwrap();
+        serde_json::from_str(include_str!("dep_05d3c4e05078_actual-three-owner-native.json")).unwrap();
     let event = &actual["event"];
     let mut epochs = BTreeSet::new();
     for row in event["active_replay_invocations"]
@@ -561,7 +561,7 @@ fn retry4_peer_fixture() -> (Request, Value, Value, Value, BTreeMap<String, u64>
     let mut fleet_rows = Vec::new();
     let mut live = BTreeMap::new();
     let mut host_processes = vec![json!({"pid":1,"start_ticks":1,"rss_bytes":2u64<<30})];
-    for o in serde_json::from_str::<Vec<Owner>>(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry4-exact-peers.json")).unwrap() {
+    for o in serde_json::from_str::<Vec<Owner>>(include_str!("dep_97e29106102e_retry4-exact-peers.json")).unwrap() {
         let epoch = o.epoch;
         let pid = o.main_pid;
         let worker = pid + 1; // Synthetic RSS endpoint; owner identities remain actual pins.
@@ -672,7 +672,7 @@ fn retry4_exact_peer_set_rejects_omission_extra_duplicate_and_changed_identity()
 fn retry4_scope_does_not_open_legacy166_attempts() {
     let f = retry4_peer_fixture();
     let mut p: Plan =
-        serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json")).unwrap();
+        serde_json::from_str(include_str!("dep_58bd338ae33e_epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json")).unwrap();
     p.data_fulfillment = Some(crate::prelaunch_data::tests::request());
     admission_scope(&f.0, &p).unwrap();
     for attempt in ["local3retry2", "local3retry3", "local3"] {

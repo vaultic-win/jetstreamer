@@ -1,7 +1,7 @@
 //! Existing resident allocations are realized portions of retained promises,
 //! never new resource credits. No non-lane RSS is subtracted from promises.
 use super::*;
-#[path = "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/admission_capture.rs"]
+#[path = "dep_2cf853d17a6e_admission_capture.rs"]
 mod admission_capture;
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -241,7 +241,7 @@ fn matched(lane: &Census, host: &Census) -> Result<u64> {
 // genuinely admitted/protected peers; never widen the legacy166 route.
 fn retry4_exact_peers(request: &Request) -> Result<()> {
     let expected: Vec<Owner> = serde_json::from_str(include_str!(
-        "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry4-exact-peers.json"
+        "dep_97e29106102e_retry4-exact-peers.json"
     ))?;
     ensure!(
         request.owners.len() == 2,
@@ -675,7 +675,7 @@ fn sample_role(o: &Owner, native: &Value) -> Result<Value> {
         json!({"unit":o.unit,"invocation_id":o.invocation_id,"active_state":native["ActiveState"],"sub_state":native["SubState"],"restarts":native["NRestarts"].as_str().context("restarts")?.parse::<u64>()?,"main_pid":o.main_pid,"control_group":group,"memory_current_bytes":current,"memory_events":events,"rss":rss}),
     )
 }
-fn peer_admissions(request: &Request) -> Result<()> {
+pub(super) fn peer_admissions(request: &Request) -> Result<()> {
     for o in &request.owners {
         let s = profile(o.epoch)?;
         let a = bound(&o.admission)?;
@@ -710,13 +710,10 @@ fn peer_admissions(request: &Request) -> Result<()> {
                 && gp["invocation_id"] == o.invocation_id
                 && gp["worker_root"] == s.lane
                 && gp["minimum_free_bytes"]
-                    == if retry167::is_protected166(o.epoch, &o.unit, &o.invocation_id)
-                        || qualified_peer_attempt(o.epoch, &o.unit).is_ok()
-                    {
-                        current_budget::CURRENT_FLOOR
-                    } else {
-                        FLOOR
-                    }
+                    == retry167::protected166_guard_floor(o.epoch, &o.unit, &o.invocation_id)
+                        .unwrap_or_else(|| if qualified_peer_attempt(o.epoch, &o.unit).is_ok() {
+                            current_budget::CURRENT_FLOOR
+                        } else { FLOOR })
                 && gp["maximum_root_physical_bytes"] == ROOT_CAP
                 && gp["maximum_worker_vmas"] == 3500000,
             "peer protection/floor/profile differs"
@@ -930,5 +927,5 @@ pub(super) fn fresh(
     )
 }
 #[cfg(test)]
-#[path = "/var/lib/jetstreamer/epoch167-retry5-live166-20261117-v1/prepare-source-sealed-v3/resident_memory_tests.rs"]
+#[path = "dep_d0d7e21bba06_resident_memory_tests.rs"]
 mod tests;

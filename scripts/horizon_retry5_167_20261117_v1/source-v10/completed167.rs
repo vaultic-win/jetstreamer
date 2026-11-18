@@ -22,7 +22,7 @@ pub(super) fn route_shape(p: &Plan) -> Result<()> {
     let successor = p
         .data_fulfillment
         .as_ref()
-        .is_some_and(|r| [Path::new(completed167_native_guard::RUNTIME), Path::new(retry167_native_guard::RUNTIME), Path::new(prelaunch_data::RETRY6_167_RUNTIME)].contains(&r.runtime.path.as_path()));
+        .is_some_and(|r| [Path::new(completed167_native_guard::RUNTIME), Path::new(retry167_native_guard::RUNTIME), Path::new(prelaunch_data::RETRY6_167_RUNTIME), Path::new(prelaunch_data::RETRY6_LIVE166_RUNTIME)].contains(&r.runtime.path.as_path()));
     ensure!(
         successor == terminal167::selected(p),
         "completed167 output route and successor guard must be selected together"
@@ -82,5 +82,5 @@ pub(super) fn equal_reports(p: &Plan, before: &Option<Value>, after: &Option<Val
     Ok(())
 }
 #[cfg(test)]
-#[path = "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/completed167_tests.rs"]
+#[path = "dep_a241c8074b06_completed167_tests.rs"]
 mod tests;

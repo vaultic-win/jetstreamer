@@ -21,39 +21,39 @@ use std::{
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/allocation_window.rs"]
+#[path = "dep_c9c98847e9b9_allocation_window.rs"]
 mod allocation_window;
 mod completed167;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/completed167_native_guard.rs"]
+#[path = "dep_b91d6447dc16_completed167_native_guard.rs"]
 mod completed167_native_guard;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/completed_output_report.rs"]
+#[path = "dep_bc5e37e91e4a_completed_output_report.rs"]
 mod completed_output_report;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/completed_output_scope.rs"]
+#[path = "dep_b08f73821177_completed_output_scope.rs"]
 mod completed_output_scope;
 mod current_allocation;
 mod current_budget;
 mod data_fulfillment;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/host_fulfillment.rs"]
+#[path = "dep_27eebadac385_host_fulfillment.rs"]
 mod host_fulfillment;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/local.rs"]
+#[path = "dep_8319089e637c_local.rs"]
 mod local;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v2/source-sealed/native_guard.rs"]
+#[path = "dep_411e1c18281d_native_guard.rs"]
 mod native_guard;
 mod prelaunch_data;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/profile.rs"]
+#[path = "dep_ad904595bb77_profile.rs"]
 mod profile;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/resident_capture.rs"]
+#[path = "dep_64bfeee3982f_resident_capture.rs"]
 pub mod resident_capture;
 mod resident_memory;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retirement_terminal.rs"]
+#[path = "dep_65577392d1ef_retirement_terminal.rs"]
 mod retirement_terminal;
 mod retry3;
 mod retry4;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry_path.rs"]
+#[path = "dep_7b57870bebd4_retry_path.rs"]
 mod retry_path;
-#[path = "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/terminal166.rs"]
+#[path = "dep_e6501427d5b2_terminal166.rs"]
 mod terminal166;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/terminal167.rs"]
+#[path = "dep_64aa3fc725dc_terminal167.rs"]
 mod terminal167;
 mod terminal169;
 mod terminal170;
@@ -1402,16 +1402,16 @@ mod retry_outer_tests {
     fn retry_plan(epoch: u64) -> Plan {
         let s = match epoch {
             166 => include_str!(
-                "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch166-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+                "dep_38ee794434b7_epoch166-RETRY1_PLAN.SOURCE_TEMPLATE.json"
             ),
             167 => include_str!(
-                "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch167-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+                "dep_48cbea177c18_epoch167-RETRY1_PLAN.SOURCE_TEMPLATE.json"
             ),
             169 => include_str!(
-                "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch169-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+                "dep_2a5c2c911638_epoch169-RETRY1_PLAN.SOURCE_TEMPLATE.json"
             ),
             170 => include_str!(
-                "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch170-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+                "dep_c6e982fa6ae4_epoch170-RETRY1_PLAN.SOURCE_TEMPLATE.json"
             ),
             _ => panic!("unsupported fixture"),
         };

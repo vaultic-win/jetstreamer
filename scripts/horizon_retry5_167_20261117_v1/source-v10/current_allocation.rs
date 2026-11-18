@@ -429,7 +429,7 @@ mod tests {
     use super::*;
     fn actual_declaration_fixture() -> (Plan, Review, Value, Value) {
         let actual: Value =
-            serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/actual-three-owner-native.json")).unwrap();
+            serde_json::from_str(include_str!("dep_05d3c4e05078_actual-three-owner-native.json")).unwrap();
         let mut p = crate::tests::plan();
         p.epoch = 170;
         p.attempt = "local3retry3".into();

@@ -11,7 +11,7 @@ fn selected(p: &Plan) -> bool {
     p.attempt == "local3retry3" || crate::retry4::selected(p) || crate::retry167::selected(p)
 }
 fn stopped(epoch: u64) -> Result<Value> {
-    let rows: Vec<Value> = serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry2-stopped-profiles.json"))?;
+    let rows: Vec<Value> = serde_json::from_str(include_str!("dep_b4d024aaefdc_retry2-stopped-profiles.json"))?;
     rows.into_iter()
         .find(|r| r["epoch"] == epoch)
         .context("exact stopped retry2 profile")
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn actual_three_owner_forecast_retains_full_growth_and_one_byte_gate() {
         let actual: Value =
-            serde_json::from_str(include_str!("/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/actual-three-owner-native.json")).unwrap();
+            serde_json::from_str(include_str!("dep_05d3c4e05078_actual-three-owner-native.json")).unwrap();
         let (mut p, mut r, mut f, mut v) = fixture();
         p.epoch = 170;
         p.producer_unit = "horizon-qualify-170-replacement-local3retry3-20261110-v1.service".into();

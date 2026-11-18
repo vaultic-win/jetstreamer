@@ -18,19 +18,19 @@ use {
 };
 
 #[cfg(test)]
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/allocation_window.rs"]
+#[path = "dep_c9c98847e9b9_allocation_window.rs"]
 pub mod allocation_window;
 #[path = "data_fulfillment.rs"]
 mod data_fulfillment;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/completed_output_scope.rs"]
+#[path = "dep_b08f73821177_completed_output_scope.rs"]
 mod completed_output_scope;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/completed_output_report.rs"]
+#[path = "dep_bc5e37e91e4a_completed_output_report.rs"]
 mod completed_output_report;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_handoff.rs"]
+#[path = "dep_8398eca5b4ed_horizon_standalone_guard_handoff.rs"]
 mod handoff;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_native227.rs"]
+#[path = "dep_6dd43961e4d4_horizon_standalone_guard_native227.rs"]
 mod native227;
-#[path = "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_root.rs"]
+#[path = "dep_ad7de942180b_horizon_standalone_guard_root.rs"]
 mod root_budget;
 
 #[derive(Debug, Deserialize)]
