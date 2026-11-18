@@ -90,11 +90,7 @@ fn publication(v: &Value, clock: u64) -> Result<()> {
         ("sealer", SEALER.to_owned()),
         ("producer-template", format!("{STATIC}/{UNIT}")),
         ("guard-template", format!("{STATIC}/{GUARD_UNIT}")),
-        (
-            "launcher",
-            "/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v1/horizon251-launch5"
-                .to_owned(),
-        ),
+        ("launcher", LAUNCHER.to_owned()),
         (
             "admission-capture",
             fs::canonicalize("/proc/self/exe")?

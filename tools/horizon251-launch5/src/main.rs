@@ -36,12 +36,14 @@ const GUARD_UNIT: &str = "horizon-251-replacement-20261118-protective-v1.service
 const TIMER: &str = "horizon-251-replacement-20261118-protective-v1.timer";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1";
 const STATE: &str = "/var/lib/jetstreamer/horizon251-fifth-20261118-state-v1";
-const STATIC: &str = "/var/lib/jetstreamer/horizon251-fifth-20261118-static-v2";
+const STATIC: &str = "/var/lib/jetstreamer/horizon251-fifth-20261118-static-v3";
+const LAUNCHER: &str = "/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v2/horizon251-launch5";
 const BOUND: &str = "/var/lib/jetstreamer/horizon251-replacement-20261118-guard-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon251-replacement-20261118-tokens-v1";
 const RECEIPTS: &str = "/var/lib/jetstreamer/horizon251-replacement-20261118-receipts-v1";
 const NODE: &str =
-    "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-node";
+    "/var/lib/jetstreamer/horizon234-production-eabd0b6a-candidate922-v1/jetstreamer-node";
+const NODE_SHA: &str = "02f42f2988dd31437e2c874414f247667200663c874042783406b5517b0d519b";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const MANIFEST: &str = "/var/lib/jetstreamer/horizon251-single-epoch-manifest-20261118-v1/preflight-251-single-epoch.json";
 const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon251-native-input-20261118-v1/snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst";
@@ -50,16 +52,20 @@ const NETWORK: &str = "/home/ubuntu/.codex/diagnostics/horizon251-network-proof-
 const NETWORK_SHA: &str = "8e3e1b71f18e31eba24fb18d6ae90fcc9bc9fe91ca85e0cb5709b589aad192bb";
 const GENESIS: &str = "/var/lib/jetstreamer/horizon251-native-input-20261118-v1/genesis.tar.bz2";
 const AUTH: &str =
-    "/home/ubuntu/.codex/diagnostics/horizon251-input-auth-20261118-v1/acceptance.json";
-const AUTH_SHA: &str = "698c99194d403e433cd44cf820f0072ab364f358e1827c9d6945808ef8a34496";
+    "/home/ubuntu/.codex/diagnostics/horizon251-captured-node-input-20261118-v1/acceptance.json";
+const AUTH_SHA: &str = "02227422d85616cb060bce6a001dab5ee104c0ff39a0f7d554b67466344b83f7";
+const NODE_PROBES: &str = "/var/lib/jetstreamer/horizon251-captured-node-probe-acceptance-20261118-v1/main-review.json";
+const NODE_PROBES_SHA: &str = "26b1a2a123fb5848e42e241758e1fda264baa5ee3b528ad0f7ad19d89e10099a";
 const CACHE: &str = "/var/lib/jetstreamer/horizon251-index-cache-20261118-v1";
 const CACHE_RECEIPT_SHA: &str = "ad854d8f62068240efcccb68cbfa334da47b786ea93a701c5742663de28a5a9f";
-const STATIC_RECEIPT_SHA: &str = "41810c86451801ca5c9e05ac92165b0a04f3ad9694c1466cbd4c7c7f22820f0b";
+const STATIC_RECEIPT_SHA: &str = "e51f372e7d499a9a1b8e972fcb731726d8138e204564b26867eb2117a8f41d83";
 const SEALER: &str =
-    "/var/lib/jetstreamer/horizon-live-observe-a1afd55-v147/jetstreamer-seal-deployment";
-const SEALER_SHA: &str = "96521c2edb8d0d3add79da92eed6b5f4fc3c3fed7eb5eea49cedcc3cc779ae24";
-const GUARD: &str = "/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard";
-const GUARD_SHA: &str = "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f";
+    "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
+const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
+const GUARD: &str = "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
+const GUARD_SHA: &str = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d";
+// Retained owners keep their exact original image and invocation-bound receipts.
+const RETAINED_GUARD_SHA: &str = "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f";
 const LIVE247_UNIT: &str = "horizon-qualify-247-reboot-20261117-v2.service";
 const LIVE247_IID: &str = "d091bb68ff2648159c76f690b3b7fee3";
 const LIVE247_HANDOFF: &str = "/var/lib/jetstreamer/horizon247-reboot-20261117-state-v2/launch-v2/guarded-startup-handoff.json";
@@ -340,7 +346,7 @@ fn check_inputs() -> Result<Value> {
     ensure!(hash_bytes(&b) == AUTH_SHA, "251 input receipt changed");
     let v: Value = serde_json::from_slice(&b)?;
     ensure!(
-        v["schema"] == "horizon251-exact-input-custody-v1"
+        v["schema"] == "horizon251-captured-node-input-custody-v2"
             && v["epoch"] == 251
             && v["accepted_input_custody"] == true
             && v["replay_launch_authorized"] == false,
@@ -350,7 +356,7 @@ fn check_inputs() -> Result<Value> {
         (
             "node",
             NODE,
-            "362e928c778c171dff190c2efcf631a7fc9675b96be4f1b699e433993ac365a1",
+            NODE_SHA,
         ),
         (
             "worker",
@@ -392,6 +398,7 @@ fn check_inputs() -> Result<Value> {
             "{key} size changed"
         );
     }
+    validate_node_probes(&bound(&json!({"path":NODE_PROBES,"sha256":NODE_PROBES_SHA}))?)?;
     check_network()?;
     check_cache()?;
     check_static()?;
@@ -400,6 +407,27 @@ fn check_inputs() -> Result<Value> {
         "sealed tool changed"
     );
     Ok(v)
+}
+fn validate_node_probes(v: &Value) -> Result<()> {
+    ensure!(v["schema"] == "horizon251-main-captured-node-input-probes-v1"
+        && v["node"]["path"] == NODE && v["node"]["sha256"] == NODE_SHA
+        && v["manifest"]["path"] == MANIFEST
+        && v["manifest"]["sha256"] == "e40e8d0341440d29cff7cd35e79e5f713d7908ce42f3a1c4995e1b2924551f14",
+        "foreign node capability binding");
+    for key in ["Main_accepted", "candidate_runtime_opt_in", "fingerprint_rejection_passed",
+        "manifest_decoded_before_snapshot_filename_rejection", "output_and_work_directories_empty"] {
+        yes(v, key)?;
+    }
+    for (key, expected_iid) in [("fingerprint_terminal", "63db3d36523447ca88013139029db22d"),
+        ("schema_terminal", "a720df223e724318a8fe18369e97adfb")] {
+        let t = &v[key];
+        ensure!(t["ActiveState"] == "failed" && t["Result"] == "exit-code"
+            && t["ExecMainCode"] == "1" && t["ExecMainStatus"] == "1"
+            && t["InvocationID"] == expected_iid && t["MainPID"] == "0"
+            && t["ControlPID"] == "0" && t["ControlGroup"] == ""
+            && t["NRestarts"] == "0", "node probe did not reach its expected terminal gate");
+    }
+    Ok(())
 }
 fn check_cache() -> Result<()> {
     let receipt_path = Path::new(CACHE).join("deployment-seal-receipt.json");
@@ -473,11 +501,11 @@ fn check_static() -> Result<()> {
     for (name, sha) in [
         (
             UNIT,
-            "9aa40714b07bdd1425a472b48048251cdca718f7b405a3ee9becc917cf5992b8",
+            "de90bece06921e385b4e75ab8250632cee0a304cca8a11c1efc3f96f3d62a9e0",
         ),
         (
             GUARD_UNIT,
-            "b3b5eb3c4d710cfd2ae5828b125ad28afb69c14eff88dc15d56c21381de1b94c",
+            "f43b122b8b3c6e36ca3350d8845baf57b0d306f7b320881c64fe8fe7ded52f99",
         ),
         (
             TIMER,
@@ -485,7 +513,7 @@ fn check_static() -> Result<()> {
         ),
         (
             "source-plan.json",
-            "7ca1bdc6264c705ecb7a3b9fa61c6aff583e82b8a3771d938883a36ed013b029",
+            "4c18ca26374dda8f0d87226c1ddc68938cae81b88a8340aadaefdef99f30beed",
         ),
         (
             "capacity-assessment.json",
@@ -1428,6 +1456,7 @@ fn plan_validate(p: &Value) -> Result<()> {
             && p["memory_max_bytes"] == MAX
             && p["maximum_worker_vmas"] == 3500000
             && p["input_auth"] == pin(Path::new(AUTH))?
+            && p["node_capability"] == json!({"path":NODE_PROBES,"sha256":NODE_PROBES_SHA})
             && p["static_seal"] == pin(&Path::new(STATIC).join("deployment-seal-receipt.json"))?
             && p["fifth_lane_experiment_required"] == true
             && p["fifth_lane_fit_proven"] == false,
@@ -1450,10 +1479,10 @@ fn run() -> Result<()> {
         let root = Path::new(&args[2]);
         absent(root)?;
         fs::create_dir(root)?;
-        let p = json!({"schema":"horizon251-reboot-launch-plan-five-v1","candidate_epoch":251,"worker_root":ROOT,"state_directory":STATE,"producer_unit":UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER,"setup_seconds":60,"operator_deadline_seconds":50,"maximum_root_physical_bytes":CAP,"memory_high_bytes":HIGH,"memory_max_bytes":MAX,"maximum_worker_vmas":3500000,"input_auth":{"path":AUTH,"sha256":AUTH_SHA},"static_seal":{"path":format!("{STATIC}/deployment-seal-receipt.json"),"sha256":STATIC_RECEIPT_SHA},"fifth_lane_experiment_required":true,"fifth_lane_fit_proven":false,"remote_mutations":false,"archive_retirement_authorized":false,"reuse_original_invocation_authorized":false});
+        let p = json!({"schema":"horizon251-reboot-launch-plan-five-v1","candidate_epoch":251,"worker_root":ROOT,"state_directory":STATE,"producer_unit":UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER,"setup_seconds":60,"operator_deadline_seconds":50,"maximum_root_physical_bytes":CAP,"memory_high_bytes":HIGH,"memory_max_bytes":MAX,"maximum_worker_vmas":3500000,"input_auth":{"path":AUTH,"sha256":AUTH_SHA},"node_capability":{"path":NODE_PROBES,"sha256":NODE_PROBES_SHA},"static_seal":{"path":format!("{STATIC}/deployment-seal-receipt.json"),"sha256":STATIC_RECEIPT_SHA},"fifth_lane_experiment_required":true,"fifth_lane_fit_proven":false,"remote_mutations":false,"archive_retirement_authorized":false,"reuse_original_invocation_authorized":false});
         let pref = save_at(root, "launch-plan.json", &serde_json::to_vec_pretty(&p)?)?;
         let executable = fs::canonicalize("/proc/self/exe")?;
-        let deployment = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":"/var/lib/jetstreamer/horizon251-fifth-20261118-launcher-v1","members":[{"source":executable,"name":"horizon251-launch5","sha256":hash(&executable)?,"mode":365},{"source":pref["path"],"name":"launch-plan.json","sha256":pref["sha256"],"mode":292}]});
+        let deployment = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":Path::new(LAUNCHER).parent().context("launcher parent")?,"members":[{"source":executable,"name":"horizon251-launch5","sha256":hash(&executable)?,"mode":365},{"source":pref["path"],"name":"launch-plan.json","sha256":pref["sha256"],"mode":292}]});
         save_at(
             root,
             "deployment-plan.json",
@@ -1566,6 +1595,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn captured_node_probes_reject_early_failure_or_changed_artifact() {
+        let accepted: Value = serde_json::from_str(include_str!("../config-v3/node-input-probes.json")).unwrap();
+        validate_node_probes(&accepted).unwrap();
+        for pointer in ["/node/sha256", "/manifest/sha256", "/candidate_runtime_opt_in",
+            "/fingerprint_rejection_passed", "/manifest_decoded_before_snapshot_filename_rejection",
+            "/output_and_work_directories_empty", "/schema_terminal/ExecMainStatus",
+            "/schema_terminal/InvocationID", "/fingerprint_terminal/InvocationID"] {
+            let mut changed = accepted.clone();
+            *changed.pointer_mut(pointer).unwrap() = Value::Null;
+            assert!(validate_node_probes(&changed).is_err(), "{pointer}");
+        }
+    }
     fn admission() -> Value {
         json!({"schema":"horizon251-reboot-main-admission-five-v1","candidate_epoch":251,"Main_accepted":true,"complete_native_census_reviewed":true,"all_other_obligations_preserved":true,"fifth_lane_experiment_accepted":true,"fifth_lane_fit_proven":true,"clean_1800_second_observer":true,"current_guard_receipts_verified":true,"no_overlapping_campaign_controller":true,"first_guard_before_useful_work_required":true,"issued_unix_seconds":1000,"expires_unix_seconds":1200,"observer_unix_seconds":900,"candidate_memory_max_bytes":MAX,"candidate_memory_high_bytes":HIGH,"candidate_root_cap_bytes":CAP,"candidate_control_memory_bytes":CONTROL,"guard_minimum_free_bytes":3000000000000u64,"required_initial_free_bytes":3000000000000u64+CAP,"century_floor_bytes":200000000000u64,"memory_obligation_after_bytes":RETAINED_MEMORY_OBLIGATION,"host_memory_total_bytes":1212136964096u64,"actual_executing_before":4,"coexisting_services":[],"initializing_before":0,"proposed_replay_lanes":5,"proven_operating_count":4,"desired_replay_lanes":8,"live247_unit":LIVE247_UNIT,"live247_invocation_id":LIVE247_IID,"live247_handoff":{"path":LIVE247_HANDOFF,"sha256":LIVE247_HANDOFF_SHA},"live248_unit":LIVE248_UNIT,"live248_invocation_id":LIVE248_IID,"live249_unit":LIVE249_UNIT,"live249_invocation_id":LIVE249_IID,"live250_unit":live::OWNERS[3].unit,"live250_invocation_id":live::OWNERS[3].iid,"live250_handoff":{"path":live::OWNERS[3].handoff,"sha256":live::OWNERS[3].handoff_sha},"worker_root":ROOT,"producer_unit":UNIT,"guard_unit":GUARD_UNIT,"timer_unit":TIMER})
     }

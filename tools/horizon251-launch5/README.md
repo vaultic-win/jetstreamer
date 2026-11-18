@@ -135,13 +135,30 @@ Executable SHA-256:
 Native positive sealing and refusal to replace the same destination both passed;
 evidence is in
 `/home/ubuntu/.codex/diagnostics/horizon251-published-sealer-native-20261118-v1`.
-The candidate launcher has not yet migrated to this sealer.
+The candidate launcher source now selects this sealer.
 
 Next: complete source provenance for every selected candidate artifact, bind a
 qualified guard into a new candidate-only immutable configuration and launcher,
 then capture fresh Main admission and execute the actual first-timer startup.
 Keep retained-owner guard hashes separate from the candidate's new hash.
-The current launcher v1 still selects the old guard; the new guard is not yet
-selected for epoch 251. Latest account-updates reader qualification remains a
+The retained launcher v1 still selects the old guard. The next launcher v2
+selects the captured node, new guard/sealer, captured-node input receipt and
+static v3 package. Retained owners continue to require the original guard hash.
+The v2 source passed 22 tests and strict Clippy. Its deployment and fresh
+admission remain separate steps. Latest account-updates reader qualification remains a
 separate archive-publication gate described in
 `docs/horizon-current-reader-audit-20261118.md` at repository root.
+
+The captured node passed both required no-replay input probes with candidate
+runtime opt-in: the wrong fingerprint failed at the fingerprint gate, and the
+correct manifest decoded before a deliberately wrong snapshot filename was
+rejected. Probe invocations were `63db3d36523447ca88013139029db22d` and
+`a720df223e724318a8fe18369e97adfb`. The first setup generation stopped earlier
+because intermediate directories were root-owned; those failures are preserved.
+The corrected probes left only logs and empty epoch locks, with no archive or
+replay scratch. Their Main-reviewed evidence and actual terminal/journal files
+are sealed at
+`/var/lib/jetstreamer/horizon251-captured-node-probe-acceptance-20261118-v1`.
+The bound review SHA-256 is
+`26b1a2a123fb5848e42e241758e1fda264baa5ee3b528ad0f7ad19d89e10099a`.
+These probes do not claim worker initialization or complete replay.

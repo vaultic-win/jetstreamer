@@ -179,7 +179,7 @@ pub(super) fn validate(a: &Value, docs: &BTreeMap<String, Value>) -> Result<()> 
             g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
                 && g["producer_invocation_id"] == o.iid
                 && g["producer_stop_enabled"] == true
-                && g["guard_sha256"] == GUARD_SHA
+                && g["guard_sha256"] == RETAINED_GUARD_SHA
                 && g["maximum_root_physical_bytes"] == CAP
                 && g["maximum_worker_vmas"] == 3500000,
             "guard envelope changed"
