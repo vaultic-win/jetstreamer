@@ -180,6 +180,7 @@ pub(super) fn validate_inputs(
     let _ = measured(&inputs.genesis, genesis_size)?;
     Ok(())
 }
+#[cfg(test)]
 fn ledger_at(
     dir: &File,
     prefix: &str,
@@ -280,6 +281,7 @@ fn ledger_at(
     );
     Ok(())
 }
+#[cfg(test)]
 pub(super) fn physical_ledger(root: &Path) -> Result<Value> {
     let dir = directory(root)?;
     let mut previous = None;
@@ -298,6 +300,87 @@ pub(super) fn physical_ledger(root: &Path) -> Result<Value> {
         previous = Some(captured);
     }
     anyhow::bail!("missing second lane capture")
+}
+
+// The full JSON ledger above is retained for small, historical fixtures. Large
+// replay roots need the same two complete captures without retaining every row.
+fn compact_record(
+    path: &str,
+    m: &fs::Metadata,
+    hash: &mut Sha256,
+    count: &mut u64,
+    bytes: &mut u64,
+) -> Result<()> {
+    let allocated = m.blocks().checked_mul(512).context("compact allocation overflow")?;
+    *bytes = bytes.checked_add(allocated).context("compact ledger sum overflow")?;
+    *count = count.checked_add(1).context("compact ledger count overflow")?;
+    ensure!(*count <= 1_000_000, "compact lane ledger bound exceeded");
+    let row = serde_json::to_vec(&json!({"path":path,"identity":identity(m),"physical_bytes":allocated}))?;
+    hash.update((row.len() as u64).to_le_bytes());
+    hash.update(row);
+    Ok(())
+}
+
+fn compact_at(
+    dir: &File,
+    prefix: &str,
+    device: u64,
+    depth: usize,
+    hash: &mut Sha256,
+    count: &mut u64,
+    bytes: &mut u64,
+) -> Result<()> {
+    ensure!(depth <= 64 && *count < 1_000_000, "compact lane ledger bound exceeded");
+    let before = dir.metadata()?;
+    ensure!(before.is_dir() && before.dev() == device, "foreign compact ledger directory");
+    compact_record(prefix, &before, hash, count, bytes)?;
+    let mut names = fs::read_dir(format!("/proc/self/fd/{}", dir.as_raw_fd()))?
+        .map(|e| e.map(|e| e.file_name())).collect::<std::io::Result<Vec<_>>>()?;
+    names.sort();
+    for name in names {
+        let leaf = name.to_str().context("non-UTF8 compact ledger member")?;
+        ensure!(!leaf.contains('/') && leaf != "." && leaf != "..", "compact ledger leaf spelling");
+        let relative = if prefix.is_empty() { leaf.to_string() } else { format!("{prefix}/{leaf}") };
+        ensure!(relative.len() <= 4096, "compact ledger path bound");
+        let c = CString::new(name.as_bytes())?;
+        let fd = unsafe { libc::openat(dir.as_raw_fd(), c.as_ptr(), libc::O_PATH | libc::O_NOFOLLOW | libc::O_CLOEXEC, 0) };
+        ensure!(fd >= 0, "compact ledger member cannot be opened");
+        let child = unsafe { File::from_raw_fd(fd) };
+        let m = child.metadata()?;
+        ensure!(m.dev() == device && (m.is_dir() || m.is_file()) && (!m.is_file() || m.nlink() == 1),
+            "compact ledger link/special/foreign mount rejected");
+        if m.is_dir() {
+            let fd = unsafe { libc::openat(dir.as_raw_fd(), c.as_ptr(), libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC, 0) };
+            ensure!(fd >= 0, "compact ledger subdirectory open");
+            let sub = unsafe { File::from_raw_fd(fd) };
+            ensure!(identity(&m) == identity(&sub.metadata()?), "compact ledger directory changed");
+            compact_at(&sub, &relative, device, depth + 1, hash, count, bytes)?;
+        } else {
+            compact_record(&relative, &m, hash, count, bytes)?;
+        }
+        let path = PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd())).join(&name);
+        ensure!(identity(&m) == identity(&fs::symlink_metadata(path)?), "compact ledger member replaced");
+    }
+    ensure!(identity(&before) == identity(&dir.metadata()?), "compact ledger directory changed during scan");
+    Ok(())
+}
+
+pub(super) fn compact_physical_ledger(root: &Path) -> Result<Value> {
+    let dir = directory(root)?;
+    let mut previous = None;
+    for _ in 0..2 {
+        let (mut hash, mut count, mut bytes) = (Sha256::new(), 0u64, 0u64);
+        compact_at(&dir, "", dir.metadata()?.dev(), 0, &mut hash, &mut count, &mut bytes)?;
+        let captured = json!({"physical_bytes":bytes,"complete_ledger_entry_count":count,
+            "complete_ledger_sha256":format!("{:x}", hash.finalize()),
+            "full_two_capture_identity_and_allocation_check_passed":true,"compact_streaming_ledger":true});
+        if let Some(previous) = previous {
+            ensure!(previous == captured, "lane changed across complete compact ledger capture");
+            return Ok(captured);
+        }
+        previous = Some(captured);
+    }
+    anyhow::bail!("missing second compact lane capture")
 }
 pub(super) fn stage_genesis(fresh: &Path, member: &Bound) -> Result<Value> {
     let input = raw(&member.path, 1 << 20, true)?;
@@ -562,6 +645,14 @@ pub(super) fn staged_genesis(fresh: &Path, expected: &Value) -> Result<Value> {
 }
 
 pub(super) fn ledger_summary(ledger: &Value) -> Result<Value> {
+    if ledger["compact_streaming_ledger"] == true {
+        ensure!(ledger["physical_bytes"].as_u64().is_some()
+            && ledger["complete_ledger_entry_count"].as_u64().is_some_and(|n| n > 0 && n <= 1_000_000)
+            && ledger["complete_ledger_sha256"].as_str().is_some_and(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+            && ledger["full_two_capture_identity_and_allocation_check_passed"] == true,
+            "invalid compact ledger summary");
+        return Ok(ledger.clone());
+    }
     let entries = ledger["entries"]
         .as_object()
         .context("complete ledger entries")?;
@@ -589,5 +680,35 @@ mod summary_tests {
             ledger_summary(&a).unwrap()["complete_ledger_sha256"],
             ledger_summary(&b).unwrap()["complete_ledger_sha256"]
         );
+    }
+    #[test]
+    fn compact_ledger_streams_past_old_count_limit_and_rejects_links() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("file");
+        fs::write(&p, b"a").unwrap();
+        let (mut hash, mut count, mut bytes) = (Sha256::new(), 100_000u64, 0u64);
+        let dir = directory(t.path()).unwrap();
+        compact_at(&dir, "", dir.metadata().unwrap().dev(), 0, &mut hash, &mut count, &mut bytes).unwrap();
+        assert_eq!(count, 100_002);
+        assert!(bytes > 0);
+        let a = compact_physical_ledger(t.path()).unwrap();
+        fs::write(&p, b"bb").unwrap();
+        let b = compact_physical_ledger(t.path()).unwrap();
+        assert_eq!(a["physical_bytes"], b["physical_bytes"]);
+        assert_ne!(a["complete_ledger_sha256"], b["complete_ledger_sha256"]);
+        assert_eq!(ledger_summary(&b).unwrap(), b);
+        std::os::unix::fs::symlink(&p, t.path().join("link")).unwrap();
+        assert!(compact_physical_ledger(t.path()).is_err());
+    }
+    #[test]
+    fn compact_ledger_rejects_hardlinks_and_count_overflow() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("file");
+        fs::write(&p, b"x").unwrap();
+        fs::hard_link(&p, t.path().join("alias")).unwrap();
+        assert!(compact_physical_ledger(t.path()).is_err());
+        let (mut hash, mut count, mut bytes) = (Sha256::new(), 1_000_000u64, 0u64);
+        let dir = directory(t.path()).unwrap();
+        assert!(compact_at(&dir, "", dir.metadata().unwrap().dev(), 0, &mut hash, &mut count, &mut bytes).is_err());
     }
 }

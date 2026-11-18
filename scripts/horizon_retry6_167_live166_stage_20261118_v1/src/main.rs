@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -62,6 +62,9 @@ fn write(root: &Path, name: &str, value: &Value) -> Result<PathBuf> {
         .mode(0o600)
         .open(&path)?;
     file.write_all(&bytes)?;
+    if name.ends_with("PLAN.json") {
+        file.set_permissions(fs::Permissions::from_mode(0o400))?;
+    }
     file.sync_all()?;
     File::open(root)?.sync_all()?;
     Ok(path)
@@ -255,6 +258,101 @@ fn observe(v: &Value) -> Result<()> {
         "stale observation");
     Ok(())
 }
+
+fn retained_measurement(v: &Value, at: u64) -> Result<u64> {
+    let measured_at = v["recorded_unix_seconds"].as_u64().context("measurement clock")?;
+    let retained = v["physical"]["physical_bytes"].as_u64().context("physical bytes")?;
+    ensure!(v["schema"] == "horizon-standard-replacement-local-physical-ledger-v1"
+        && v["owner"] == "/root" && v["epoch"] == 167 && v["read_only"] == true
+        && v["resource_credit_bytes"] == 0 && v["replay_launch_authorized"] == false
+        && v["lane_root"] == "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1"
+        && measured_at <= at && at - measured_at <= 1800 && retained > 0 && retained < CAP,
+        "fresh complete candidate167 physical measurement required");
+    Ok(retained)
+}
+
+fn prepare_review(cfg: &Value, root: &Path, plan: &mut Value, census: &Path) -> Result<PathBuf> {
+    let measurement = bound(&cfg["measurement"])?;
+    let retained = retained_measurement(&measurement, now()?)?;
+    let candidate_cap = 512u64 << 30;
+    let qualification = bound(&cfg["preparer_qualification"])?;
+    let image = cfg["preparer_image"].as_str().context("preparer image")?;
+    ensure!(image == "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-prepare-20261118-v3/prepare"
+        && qualification["epoch"] == 167 && qualification["attempt"] == "local3retry6"
+        && qualification["source_commit_verified_on_origin_account_updates"] == true
+        && qualification["tests_failed"] == 0
+        && qualification["production"]["sha256"] == sha(&fs::read(image)?),
+        "current published qualified preparer required");
+    let mut review = bound(&plan["review"])?;
+    let mut working = bound(&plan["retry3"]["concurrent_working_set"])?;
+    let mut input = bound(&plan["input_proof"])?;
+    ensure!(input["epoch"] == 167 && input["local_inputs"] == plan["local_inputs"]
+        && input["authentication_qualified"] == false && input["network_GCS_probe_performed"] == false,
+        "exact local input route template");
+    input["recorded_unix_seconds"] = json!(now()?);
+    plan["input_proof"] = binding(&write(root, "LOCAL_INPUT_REQUEST.json", &input)?)?;
+    working["schema"] = json!("horizon-epoch167-retry6-cap512-working-set-v1");
+    working["recorded_unix_seconds"] = json!(now()?);
+    working["fleet"] = plan["fleet"].clone();
+    working["native_preparer_image"] = json!(image);
+    working["native_preparer_qualification"] = cfg["preparer_qualification"].clone();
+    working["immutable_raw_guard_floor_bytes"] = json!(RAW_FLOOR);
+    working["complete_DATA_bytes"] = json!(COMPLETE_DATA);
+    working["candidate_root_cap_booking"] = plan["retry167"]["additive_data_booking"].clone();
+    working["retained_epoch167_additive_data_booking"] = plan["retry167"]["additive_data_booking"].clone();
+    working["candidate_root_cap_bytes"] = json!(candidate_cap);
+    working["additive_root_cap_reservation_bytes"] = json!(candidate_cap - CAP);
+    working["protected166_root_cap_bytes"] = json!(CAP);
+    working["stopped170_root_cap_bytes"] = json!(CAP);
+    working["retained_retry6_166_DATA_bytes"] = json!(CAP);
+    working.as_object_mut().context("working set object")?.remove("terminal166_retained");
+    let admission = bound(&cfg["peer_admission"])?;
+    let peer_preparation = bound(&admission["fresh_native_Rust_preparation"])?;
+    let peer_retained = peer_preparation["actual_full_lane_ledger"]["physical_bytes"].as_u64().context("peer ledger")?;
+    ensure!(peer_retained > 0 && peer_retained < CAP, "peer baseline cap");
+    let rows = working["lanes"].as_array_mut().context("four working set rows")?;
+    ensure!(rows.len() == 4 && rows.iter().filter_map(|r|r["epoch"].as_u64()).collect::<BTreeSet<_>>() == BTreeSet::from([166,167,169,170]), "complete working set");
+    for row in rows {
+        match row["epoch"].as_u64().context("row epoch")? {
+            166 => *row = json!({"epoch":166,"state":"active","producer_unit":PEER,
+                "invocation_id":IID,"retained_lane_physical_bytes":peer_retained,"remaining_growth_bytes":CAP-peer_retained}),
+            167 => *row = json!({"epoch":167,"state":"candidate","producer_unit":plan["producer_unit"],
+                "retained_lane_physical_bytes":retained,"remaining_growth_bytes":candidate_cap-retained}),
+            170 => {
+                row["producer_unit"] = json!("horizon-qualify-170-replacement-local3retry4-20261110-v1.service");
+                row["invocation_id"] = json!("aabba5ff4c8e4c22ad18c80472713aa9");
+                row["terminal_event"] = plan["resident_memory"]["terminal170"]["stop_completion"].clone();
+            }
+            169 => (),
+            _ => unreachable!(),
+        }
+    }
+    plan["retry3"]["concurrent_working_set"] = binding(&write(root,"CONCURRENT_WORKING_SET.json",&working)?)?;
+    let slot = json!({"schema":"horizon-standard-replacement-exclusive-slot-mapping-v1","owner":"/root",
+        "epoch":167,"recorded_unix_seconds":now()?,"physical_ledger":cfg["measurement"],
+        "retained_lane_physical_bytes":retained,"combined_original_lane_cap_bytes":candidate_cap,
+        "old_remaining_future_promise_bytes":CAP-retained,"proposed_fresh_working_maximum_bytes":candidate_cap-retained,
+        "additional_DATA_bytes":candidate_cap-CAP,"all_original_promises_retained":true,
+        "guard_root_remains_whole_original_lane":true,"original_stop":measurement["original_stop"],
+        "replay_launch_authorized":false});
+    review["exact_slot_mapping_and_physical_ledger"] = binding(&write(root,"EXCLUSIVE_SLOT_MAPPING.json",&slot)?)?;
+    review["attempt"] = plan["attempt"].clone();
+    review["recorded_unix_seconds"] = json!(now()?);
+    review["source_fleet"] = plan["fleet"].clone();
+    review["source_inventory"] = plan["inventory"].clone();
+    review["input_proof"] = plan["input_proof"].clone();
+    review["cleanup_completion"] = plan["cleanup_completion"].clone();
+    review["full_current_proc_and_unit_census"] = binding(census)?;
+    review["data_fulfillment"] = plan["data_fulfillment"].clone();
+    review["minimum_initial_available_data_bytes"] = json!(RAW_FLOOR + (64u64 << 20));
+    review["retained_lane_physical_bytes"] = json!(retained);
+    review["existing_original_slot_future_growth_bytes"] = json!(CAP-retained);
+    review["proposed_fresh_working_maximum_bytes"] = json!(candidate_cap-retained);
+    review["candidate_remaining_growth_bytes"] = json!(candidate_cap-retained);
+    review["additional_growth_not_covered_by_existing_promise_bytes"] = json!(candidate_cap-CAP);
+    plan["review"] = binding(&write(root,"PRELAUNCH_REVIEW.json",&review)?)?;
+    write(root,"PREPARE_PLAN.json",plan)
+}
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     ensure!(args.len() == 6 && args[2] == "--plan-sha256" && args[4] == "--self-sha256"
@@ -390,7 +488,10 @@ fn run() -> Result<()> {
     plan["fleet"] = binding(&fleet_path)?;
     plan["inventory"] = cfg["inventory"].clone();
     let plan_path = write(&root,"MEASURE_PLAN.json",&plan)?;
-    println!("{}",json!({"plan":binding(&plan_path)?,"fleet":binding(&fleet_path)?,"booking":binding(&booking_path)?,"replay_launch_authorized":false}));
+    let selected_plan = if cfg["measurement"].is_object() {
+        prepare_review(&cfg,&root,&mut plan,&census_path)?
+    } else { plan_path };
+    println!("{}",json!({"plan":binding(&selected_plan)?,"fleet":binding(&fleet_path)?,"booking":binding(&booking_path)?,"replay_launch_authorized":false}));
     Ok(())
 }
 fn main() { if let Err(e)=run() { eprintln!("{e:#}"); std::process::exit(1); } }
@@ -398,6 +499,27 @@ fn main() { if let Err(e)=run() { eprintln!("{e:#}"); std::process::exit(1); } }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn measurement_must_be_recent_complete_and_for_the_exact_lane() {
+        let v = json!({"schema":"horizon-standard-replacement-local-physical-ledger-v1",
+            "owner":"/root","epoch":167,"recorded_unix_seconds":1000,"read_only":true,
+            "resource_credit_bytes":0,"replay_launch_authorized":false,
+            "lane_root":"/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+            "physical":{"physical_bytes":100}});
+        assert_eq!(retained_measurement(&v,2800).unwrap(),100);
+        assert!(retained_measurement(&v,2801).is_err());
+        assert!(retained_measurement(&v,999).is_err());
+        for (key,value) in [("epoch",json!(166)),("read_only",json!(false)),
+            ("resource_credit_bytes",json!(1)),("replay_launch_authorized",json!(true)),
+            ("lane_root",json!("/tmp/foreign"))] {
+            let mut bad=v.clone(); bad[key]=value;
+            assert!(retained_measurement(&bad,1000).is_err());
+        }
+        for bytes in [0,CAP,CAP+1] {
+            let mut bad=v.clone();bad["physical"]["physical_bytes"]=json!(bytes);
+            assert!(retained_measurement(&bad,1000).is_err());
+        }
+    }
     #[test]
     fn peer_identity_and_closure_are_disjoint() {
         let row=json!({"Id":PEER,"InvocationID":IID,"MainPID":"1450368","ControlPID":"0",

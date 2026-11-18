@@ -62,7 +62,7 @@ mod retry167_native_guard;
 use local::LocalInputs;
 use profile::{Profile, profile};
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-prepare-20261118-v2/prepare";
+    "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry7-prepare-20261118-v3/prepare";
 const EVENT: &str = "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/ORIGINAL_SEVEN_RESERVE_STOPS_AND_REPAIR_MODEL.json";
 const EVENT_SHA: &str = "b3bff5d44d24dc507313d8dfdb8e5cd5bec50a7732b288327106ee20b7a7b0eb";
 const RETIRED167_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
@@ -1208,7 +1208,7 @@ fn run() -> Result<()> {
             before.insert(unit.clone(), n);
         }
         let original_stop = stop_chain(s)?;
-        let measured = local::physical_ledger(Path::new(s.lane))?;
+        let measured = local::compact_physical_ledger(Path::new(s.lane))?;
         for unit in &p.closed_units {
             let n = native(unit)?;
             closed(&n, unit)?;
@@ -1293,7 +1293,7 @@ fn run() -> Result<()> {
         native_before.insert(u.clone(), n);
     }
     let fresh = fresh_state(&p)?;
-    let actual_ledger = local::ledger_summary(&local::physical_ledger(Path::new(s.lane))?)?;
+    let actual_ledger = local::ledger_summary(&local::compact_physical_ledger(Path::new(s.lane))?)?;
     ensure!(
         actual_ledger["physical_bytes"].as_u64() == Some(r.retained_lane_physical_bytes),
         "actual full lane ledger differs from reviewed retained bytes"
@@ -1316,7 +1316,7 @@ fn run() -> Result<()> {
     }
     ensure!(fresh_state(&p)? == fresh, "fresh subtree changed");
     ensure!(
-        local::ledger_summary(&local::physical_ledger(Path::new(s.lane))?)? == actual_ledger,
+        local::ledger_summary(&local::compact_physical_ledger(Path::new(s.lane))?)? == actual_ledger,
         "lane changed during preparation"
     );
     let genesis_stage = if let Some(prior) = &p.existing_preparation {
