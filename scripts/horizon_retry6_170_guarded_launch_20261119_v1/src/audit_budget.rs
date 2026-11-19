@@ -135,10 +135,10 @@ fn shape(v: &Value) -> Result<()> {
         v["Id"] == UNIT
             && v["ActiveState"] == "active"
             && v["SubState"] == "running"
-            && v["MainPID"] == PID.to_string()
+            && v["MainPID"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(PID)
             && v["InvocationID"] == IID
-            && v["MemoryMax"] == MEMORY.to_string()
-            && v["MemoryHigh"] == (20u64 << 30).to_string()
+            && v["MemoryMax"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(MEMORY)
+            && v["MemoryHigh"].as_str().and_then(|s| s.parse::<u64>().ok()) == Some(20u64 << 30)
             && v["MemorySwapMax"] == "0"
             && v["CPUQuotaPerSecUSec"] == "4s"
             && v["TasksMax"] == "512"
