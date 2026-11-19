@@ -1005,3 +1005,24 @@ retained in `/home/ubuntu/.codex/diagnostics/horizon-pressure-car-native-2026111
 Production firehose and reader source did not change. Controller interruption
 recovery, epoch-scoped private resume CLI, complete epoch assembly/delivery and
 mainnet pressure admission remain unqualified; this test releases no reservation.
+
+The transaction-bearing extension closes the source-batch gap above. A separate
+native generator creates a v2 pressure transcript with a successful transfer and
+tick at slot 1, then independently compares the restored slot-2 suffix with the
+uninterrupted run. The HTTP mirror encodes both entries and transaction indexes;
+the node requests pressure during real callback delivery and drains both entries
+through native execution. Its authentic paused report records two source entries,
+one source transaction and a native transaction-count increase from zero to one.
+
+Export invocation `b97a870dad7240b3903376f0f717d882` passed in 1.21 seconds.
+The qualified exit helper proved producer PID 1081376 and its worker had exited;
+fresh resume `4e31fdcf0c144d3691c7947ed460ff03` consumed that proof and the complete
+bundle, then passed the exact suffix terminal comparison in 427 ms. The synthetic
+CAR is 726 bytes, SHA-256
+`35e3458481500424a89ff6d6ce61426565bea9d1b27a03d42bb992f03b33b171`.
+The earlier tick-only transcript remains supported and passed through the new
+node artifact. The new generator keeps ordinary v1 transcript output separate.
+Evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-car-transactions-20261119-v1`.
+These are test-only changes; controller interruption/recovery, epoch-scoped CLI,
+whole-epoch assembly/delivery and mainnet pressure admission still need qualification.

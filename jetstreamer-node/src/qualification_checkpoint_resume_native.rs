@@ -8,12 +8,12 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::atomic::AtomicBool};
 #[path = "qualification_checkpoint_car_native.rs"]
 mod source_car;
 
-type Transcript = (
+type Transcript<P = EntryRequest, R = EntryProcessed> = (
     String,
     Vec<u8>,
     Checkpoint,
-    EntryRequest,
-    EntryProcessed,
+    P,
+    R,
     Checkpoint,
     SnapshotExport,
     Vec<EntryRequest>,
@@ -31,7 +31,19 @@ type Transcript = (
 fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     let input = PathBuf::from(std::env::var_os("JETSTREAMER_RESUME_NATIVE_FIXTURE").unwrap());
     let launcher = PathBuf::from(std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER").unwrap());
-    let bytes = fs::read(input.join("native-transcript.bin")).unwrap();
+    let transaction_prefix = std::env::var("JETSTREAMER_PRESSURE_NATIVE_TRANSACTIONS").ok();
+    assert!(
+        transaction_prefix
+            .as_deref()
+            .is_none_or(|value| value == "1")
+    );
+    let transaction_prefix = transaction_prefix.is_some();
+    let bytes = fs::read(input.join(if transaction_prefix {
+        "native-pressure-transcript.bin"
+    } else {
+        "native-transcript.bin"
+    }))
+    .unwrap();
     assert_eq!(
         format!("{:x}", Sha256::digest(&bytes)),
         std::env::var("JETSTREAMER_RESUME_NATIVE_TRANSCRIPT_SHA256").unwrap()
@@ -44,8 +56,8 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         schema,
         genesis,
         bootstrap,
-        prefix_entry,
-        _,
+        prefix_entries,
+        prefix_results,
         boundary,
         baseline_export,
         entries,
@@ -56,8 +68,69 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         restored_terminal,
         parent,
         child,
-    ): Transcript = bincode::deserialize(&bytes).unwrap();
-    assert_eq!(schema, "horizon-native-checkpoint-recorder-transcript-v1");
+    ): Transcript<Vec<EntryRequest>, Vec<EntryProcessed>> = if transaction_prefix {
+        bincode::deserialize(&bytes).unwrap()
+    } else {
+        let (
+            schema,
+            genesis,
+            bootstrap,
+            entry,
+            result,
+            boundary,
+            export,
+            entries,
+            results,
+            terminal,
+            restored,
+            restored_results,
+            restored_terminal,
+            parent,
+            child,
+        ): Transcript = bincode::deserialize(&bytes).unwrap();
+        (
+            schema,
+            genesis,
+            bootstrap,
+            vec![entry],
+            vec![result],
+            boundary,
+            export,
+            entries,
+            results,
+            terminal,
+            restored,
+            restored_results,
+            restored_terminal,
+            parent,
+            child,
+        )
+    };
+    assert_eq!(
+        schema,
+        if transaction_prefix {
+            "horizon-native-pressure-recorder-transcript-v2"
+        } else {
+            "horizon-native-checkpoint-recorder-transcript-v1"
+        }
+    );
+    assert_eq!(prefix_entries.len(), prefix_results.len());
+    assert_eq!(prefix_entries.len(), if transaction_prefix { 2 } else { 1 });
+    let source_transactions = prefix_entries
+        .iter()
+        .map(|entry| entry.transactions.len() as u64)
+        .sum::<u64>();
+    assert_eq!(source_transactions, u64::from(transaction_prefix));
+    assert_eq!(
+        boundary.transaction_count - bootstrap.transaction_count,
+        source_transactions
+    );
+    assert!(
+        prefix_results
+            .iter()
+            .flat_map(|entry| &entry.outcomes)
+            .all(|outcome| outcome.error.is_none())
+    );
     assert_ne!(parent, child);
     assert_eq!(baseline_results, restored_results);
     assert_eq!(terminal, restored_terminal);
@@ -114,7 +187,7 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
             &launcher,
             profile,
             &bootstrap,
-            &prefix_entry,
+            &prefix_entries,
             &boundary,
             &terminal,
             &directory,
@@ -250,7 +323,7 @@ fn export_from_pressure_notifiers(
     launcher: &std::path::Path,
     profile: crate::historical::WorkerProfile,
     bootstrap: &Checkpoint,
-    prefix: &EntryRequest,
+    prefix_entries: &[EntryRequest],
     boundary: &Checkpoint,
     terminal: &Checkpoint,
     directory: &std::path::Path,
@@ -258,6 +331,11 @@ fn export_from_pressure_notifiers(
     use crate::*;
     let _serial = source_checkpoint::SIGNAL_TEST_LOCK.lock().unwrap();
     let _signal = source_checkpoint::SignalGuard::install().unwrap();
+    let prefix = prefix_entries.first().unwrap();
+    for (index, entry) in prefix_entries.iter().enumerate() {
+        assert_eq!(entry.slot, prefix.slot);
+        assert_eq!(entry.entry_index, index as u64);
+    }
     assert_eq!(
         (bootstrap.slot, prefix.slot, boundary.slot, terminal.slot),
         (0, 1, 1, 2)
@@ -420,15 +498,18 @@ fn export_from_pressure_notifiers(
         }),
     };
     let notifiers = producers.geyser_notifiers();
-    let completed = source_car::deliver(bootstrap, prefix, &producers, shutdown.clone());
+    let completed = source_car::deliver(bootstrap, prefix_entries, &producers, shutdown.clone());
     assert_eq!(
         completed,
         jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
             slot: prefix.slot,
             parent_slot: bootstrap.slot,
             blockhash: boundary.last_blockhash.clone().try_into().unwrap(),
-            entries: 1,
-            transactions: prefix.transactions.len() as u64,
+            entries: prefix_entries.len() as u64,
+            transactions: prefix_entries
+                .iter()
+                .map(|entry| entry.transactions.len() as u64)
+                .sum(),
         }
     );
     checkpoint_boundary.verify(completed).unwrap();
@@ -463,7 +544,7 @@ fn export_from_pressure_notifiers(
         })
         .unwrap();
     let drained = ready_entry_drain::close(notifiers, producers, sender, consumer).unwrap();
-    assert_eq!(drained.entries, 1);
+    assert_eq!(drained.entries, prefix_entries.len() as u64);
     scheduler.verify_complete(boundary.slot).unwrap();
     assert!(scheduler.verify_complete(terminal.slot).is_err());
     replay.freeze_latest_bank().unwrap();
@@ -475,6 +556,10 @@ fn export_from_pressure_notifiers(
         boundary.accounts_hash
     );
     assert_eq!(before.terminal.last_blockhash, completed.blockhash);
+    assert_eq!(
+        before.terminal.transaction_count,
+        boundary.transaction_count
+    );
     assert!(before.terminal.slot_complete);
     assert!(
         verifier.finish().is_err(),
