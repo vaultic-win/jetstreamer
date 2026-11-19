@@ -124,7 +124,10 @@ pub(super) fn run(
         ..historical::SOLANA_V1_7_15_CANDIDATE
     };
     let scratch = output.join("live-scratch");
-    fs::create_dir(&scratch)?;
+    let parent_phase = std::env::var(checkpoint_parent_handoff::PHASE).ok();
+    if parent_phase.as_deref() != Some("resume") {
+        fs::create_dir(&scratch)?;
+    }
     let spawn = |archive: &Path, start: &Checkpoint| -> Result<Client> {
         Ok(Client::spawn(
             profile,
@@ -142,74 +145,102 @@ pub(super) fn run(
             },
         )?)
     };
-    let initial_archive = output.join(format!(
-        "snapshot-{}-{}.tar.bz2",
-        bootstrap.slot,
-        hash(&bootstrap.accounts_hash)?
-    ));
-    let mut initial_copy = create(&initial_archive)?;
-    std::io::copy(
-        &mut File::open(input.join("native-bootstrap.tar.bz2"))?,
-        &mut initial_copy,
-    )?;
-    initial_copy.sync_all()?;
-    let mut client = spawn(&initial_archive, bootstrap)?;
-    require(
-        client.executable_sha256() == digest(launcher)?,
-        "parent launcher identity differs",
-    )?;
-    let initial = frozen(client.freeze_checkpoint(bootstrap.slot)?);
-    let mut expected_initial = bootstrap.clone();
-    expected_initial.writes.clear();
-    require(
-        initial == expected_initial,
-        "live bootstrap differs from native baseline",
-    )?;
-    let prefix_result = process(&mut client, prefix)?;
-    require(
-        &prefix_result == prefix_expected,
-        "live prefix output differs from native baseline",
-    )?;
-    let frozen_prefix = frozen(client.freeze_checkpoint(boundary.slot)?);
-    require(&frozen_prefix == boundary, "live prefix checkpoint differs")?;
-    // Close the real recorder while the source worker is still alive and before
-    // exporting the checkpoint. These are actual IPC outputs, not replayed rows.
-    segment(
-        &output.join("prefix.jet"),
-        genesis_hash,
-        digest(image)?,
-        &initial,
-        &frozen_prefix,
-        std::slice::from_ref(prefix),
-        std::slice::from_ref(&prefix_result),
-    )?;
-    let export_dir = output.join("live-export");
-    fs::create_dir(&export_dir)?;
-    checkpoint_export::validate_checkpoint_export_directory(&export_dir)?;
-    let export = client.export_snapshot(
-        boundary.slot,
-        &export_dir,
-        boundary.accounts_hash.as_slice().try_into()?,
-        ".tar.bz2",
-    )?;
-    let after = frozen(client.freeze_checkpoint(boundary.slot)?);
-    let before_evidence = checkpoint_export::HistoricalReplayEvidence {
-        bootstrap: summary(&initial)?,
-        terminal: summary(&frozen_prefix)?,
-        emitted_write_versions: initial.next_write_version..frozen_prefix.next_write_version,
+    let (export, after) = if parent_phase.as_deref() == Some("resume") {
+        let state =
+            checkpoint_parent_handoff::read(input, output, launcher, image, genesis, boundary)?;
+        require(
+            fs::read_dir(&scratch)?.next().is_none(),
+            "parent restart scratch still retained",
+        )?;
+        state
+    } else {
+        let initial_archive = output.join(format!(
+            "snapshot-{}-{}.tar.bz2",
+            bootstrap.slot,
+            hash(&bootstrap.accounts_hash)?
+        ));
+        let mut initial_copy = create(&initial_archive)?;
+        std::io::copy(
+            &mut File::open(input.join("native-bootstrap.tar.bz2"))?,
+            &mut initial_copy,
+        )?;
+        initial_copy.sync_all()?;
+        let mut client = spawn(&initial_archive, bootstrap)?;
+        require(
+            client.executable_sha256() == digest(launcher)?,
+            "parent launcher identity differs",
+        )?;
+        let initial = frozen(client.freeze_checkpoint(bootstrap.slot)?);
+        let mut expected_initial = bootstrap.clone();
+        expected_initial.writes.clear();
+        require(
+            initial == expected_initial,
+            "live bootstrap differs from native baseline",
+        )?;
+        let prefix_result = process(&mut client, prefix)?;
+        require(
+            &prefix_result == prefix_expected,
+            "live prefix output differs from native baseline",
+        )?;
+        let frozen_prefix = frozen(client.freeze_checkpoint(boundary.slot)?);
+        require(&frozen_prefix == boundary, "live prefix checkpoint differs")?;
+        // Close the real recorder while the source worker is still alive and before
+        // exporting the checkpoint. These are actual IPC outputs, not replayed rows.
+        segment(
+            &output.join("prefix.jet"),
+            genesis_hash,
+            digest(image)?,
+            &initial,
+            &frozen_prefix,
+            std::slice::from_ref(prefix),
+            std::slice::from_ref(&prefix_result),
+        )?;
+        let export_dir = output.join("live-export");
+        fs::create_dir(&export_dir)?;
+        checkpoint_export::validate_checkpoint_export_directory(&export_dir)?;
+        let export = client.export_snapshot(
+            boundary.slot,
+            &export_dir,
+            boundary.accounts_hash.as_slice().try_into()?,
+            ".tar.bz2",
+        )?;
+        let after = frozen(client.freeze_checkpoint(boundary.slot)?);
+        let before_evidence = checkpoint_export::HistoricalReplayEvidence {
+            bootstrap: summary(&initial)?,
+            terminal: summary(&frozen_prefix)?,
+            emitted_write_versions: initial.next_write_version..frozen_prefix.next_write_version,
+        };
+        let after_evidence = checkpoint_export::HistoricalReplayEvidence {
+            terminal: summary(&after)?,
+            ..before_evidence.clone()
+        };
+        checkpoint_export::validate_checkpoint_export_evidence(&before_evidence, &after_evidence)?;
+        client.shutdown()?;
+        drop(client);
+        require(
+            fs::read_dir(&scratch)?.next().is_none(),
+            "source worker scratch not reaped",
+        )?;
+        let export = SnapshotExport {
+            slot: export.slot,
+            archive_path: export
+                .archive_path
+                .to_str()
+                .ok_or("non-UTF8 export path")?
+                .into(),
+            archive_size: export.archive_size,
+            archive_sha256: export.archive_sha256.to_vec(),
+            accounts_hash: export.accounts_hash.to_vec(),
+        };
+        if parent_phase.as_deref() == Some("export") {
+            checkpoint_parent_handoff::publish(
+                input, output, launcher, image, genesis, boundary, &after, &export,
+            )?;
+            return Ok(export);
+        }
+        (export, after)
     };
-    let after_evidence = checkpoint_export::HistoricalReplayEvidence {
-        terminal: summary(&after)?,
-        ..before_evidence.clone()
-    };
-    checkpoint_export::validate_checkpoint_export_evidence(&before_evidence, &after_evidence)?;
-    client.shutdown()?;
-    drop(client);
-    require(
-        fs::read_dir(&scratch)?.next().is_none(),
-        "source worker scratch not reaped",
-    )?;
-    let mut resumed = spawn(&export.archive_path, &after)?;
+    let mut resumed = spawn(Path::new(&export.archive_path), &after)?;
     let restored = frozen(resumed.freeze_checkpoint(boundary.slot)?);
     require(restored == after, "fresh live restore changed checkpoint")?;
     let results = suffix
@@ -238,25 +269,15 @@ pub(super) fn run(
         "restored worker scratch not reaped",
     )?;
     require(
-        digest(&export.archive_path)? == export.archive_sha256,
+        digest(Path::new(&export.archive_path))?.as_slice() == export.archive_sha256,
         "export changed during restore",
     )?;
     let mut report = create(&output.join("live-client-results.json"))?;
     serde_json::to_writer_pretty(
         &mut report,
-        &json!({"schema":"horizon-synthetic-live-parent-checkpoint-v1","launcher_sha256":hex(&digest(launcher)?),"native_test_image_sha256":hex(&digest(image)?),"snapshot_sha256":hex(&export.archive_sha256),"source_scratch_reaped":true,"restored_scratch_reaped":true,"all_outputs_match_uninterrupted":true,"full_parent_firehose_qualified":false,"mainnet_qualified":false,"pressure_admission_authorized":false}),
+        &json!({"schema":"horizon-synthetic-live-parent-checkpoint-v1","launcher_sha256":hex(&digest(launcher)?),"native_test_image_sha256":hex(&digest(image)?),"snapshot_sha256":hex(&export.archive_sha256),"source_scratch_reaped":true,"restored_scratch_reaped":true,"fresh_parent_resume":parent_phase.as_deref()==Some("resume"),"all_outputs_match_uninterrupted":true,"full_parent_firehose_qualified":false,"mainnet_qualified":false,"pressure_admission_authorized":false}),
     )?;
     report.sync_all()?;
     File::open(output)?.sync_all()?;
-    Ok(SnapshotExport {
-        slot: export.slot,
-        archive_path: export
-            .archive_path
-            .to_str()
-            .ok_or("non-UTF8 export path")?
-            .into(),
-        accounts_hash: export.accounts_hash.to_vec(),
-        archive_size: export.archive_size,
-        archive_sha256: export.archive_sha256.to_vec(),
-    })
+    Ok(export)
 }

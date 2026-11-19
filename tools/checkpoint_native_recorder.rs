@@ -1,7 +1,16 @@
 //! Native synthetic export/restore -> production recorder -> V4 -> full PoH.
 //! This partial fixture grants no mainnet, full-epoch or admission authority.
 #![allow(dead_code)]
+#[path = "../jetstreamer-node/src/archive_checksum.rs"]
+mod archive_checksum;
 mod checkpoint_live_client;
+mod checkpoint_parent_handoff;
+#[path = "../jetstreamer-node/src/handoff_snapshot.rs"]
+mod handoff_snapshot;
+#[path = "../jetstreamer-node/src/segment_manifest.rs"]
+mod segment_manifest;
+#[path = "../jetstreamer-node/src/segment_progress.rs"]
+mod segment_progress;
 #[path = "../jetstreamer-node/src/slot_presence.rs"]
 mod slot_presence;
 use slot_presence::{SlotPresenceMap, SlotPresenceState};
@@ -374,10 +383,29 @@ fn main() -> Result<()> {
         meta.is_dir() && meta.uid() == unsafe { libc::geteuid() } && meta.mode() & 0o077 == 0,
         "output ownership/mode mismatch",
     )?;
+    let parent_phase = std::env::var(checkpoint_parent_handoff::PHASE).ok();
     require(
-        fs::read_dir(output)?.next().is_none(),
-        "output must be empty",
+        matches!(
+            parent_phase.as_deref(),
+            None | Some("controller" | "export" | "resume")
+        ),
+        "unknown synthetic parent phase",
     )?;
+    if parent_phase.is_some() {
+        require(
+            std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER").is_some(),
+            "parent restart requires live worker",
+        )?;
+    }
+    if parent_phase.as_deref() == Some("controller") {
+        return checkpoint_parent_handoff::controller(&args);
+    }
+    if parent_phase.as_deref() != Some("resume") {
+        require(
+            fs::read_dir(output)?.next().is_none(),
+            "output must be empty",
+        )?;
+    }
     let transcript_path = input.join("native-transcript.bin");
     let transcript_sha = digest(&transcript_path)?;
     let (
@@ -445,6 +473,9 @@ fn main() -> Result<()> {
             &expected_results,
             &terminal,
         )?;
+        if parent_phase.as_deref() == Some("export") {
+            return Ok(());
+        }
         snapshot_sha = live_export.archive_sha256.as_slice().try_into()?;
         exported_snapshot = PathBuf::from(live_export.archive_path);
     } else {
