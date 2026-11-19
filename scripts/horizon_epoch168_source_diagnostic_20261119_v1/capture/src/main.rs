@@ -239,6 +239,11 @@ async fn capture(client: &Client,out: &mut Output,deadline: Deadline,plan_bytes:
     // the original deadline, the guard receipt, all hashes and absence of failure.json.
     out.bytes("COMPLETION.sha256",format!("{completion}  completion.json\n").as_bytes())?;deadline.check()?;Ok(())
 }
+fn client_builder() -> reqwest::ClientBuilder {
+    Client::builder().https_only(true).http1_only().redirect(reqwest::redirect::Policy::none()).retry(reqwest::retry::never()).no_proxy()
+        .no_gzip().no_brotli().no_deflate().no_zstd().connect_timeout(Duration::from_secs(10)).read_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(60)).user_agent("jetstreamer-epoch168-diagnostic-capture/1")
+}
 fn run() -> Res<()> {
     let a:Vec<_>=std::env::args().collect();
     require(a.len()==6 && a[2]=="--plan-sha256" && a[4]=="--self-sha256","usage: capture168 PLAN --plan-sha256 HEX --self-sha256 HEX")?;
@@ -251,9 +256,7 @@ fn run() -> Res<()> {
     let funding_bytes=bound(Path::new(string(&p["current_funding"],"path")?),string(&p["current_funding"],"sha256")?,1<<20)?;
     let funding:Value=serde_json::from_slice(&funding_bytes)?;let deadline=budget(&funding)?;
     let mut out=Output::create(Path::new(string(&p,"output_directory")?))?;
-    let client=Client::builder().https_only(true).http1_only().redirect(reqwest::redirect::Policy::none()).retry(reqwest::retry::never()).no_proxy()
-        .no_gzip().no_brotli().no_deflate().no_zstd().connect_timeout(Duration::from_secs(10)).read_timeout(Duration::from_secs(30))
-        .timeout(Duration::from_secs(60)).user_agent("jetstreamer-epoch168-diagnostic-capture/1").build()?;
+    let client=client_builder().build()?;
     let rt=tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     let result=rt.block_on(capture(&client,&mut out,deadline,&plan_bytes,&funding_bytes));
     if let Err(ref e)=result {let _=out.json("failure.json",&json!({"schema":"horizon168-capture-failure-v1","error":e.to_string().chars().take(8192).collect::<String>(),"complete":false,"replay_launch_authorized":false,"resource_credit_bytes":0}));}
@@ -261,3 +264,5 @@ fn run() -> Res<()> {
 }
 fn main(){if let Err(e)=run(){eprintln!("exact168 capture rejected: {e}");std::process::exit(1);}}
 #[cfg(test)]mod tests;
+#[cfg(all(test, feature = "native-transport-tests"))]
+mod native_transport_tests;

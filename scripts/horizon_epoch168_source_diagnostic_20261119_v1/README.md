@@ -5,9 +5,11 @@ extractor source buildable through explicit Cargo packages. It does not
 implement a replay correction. Root owns publication, builds, native
 qualification, resource admission, source capture and replay.
 
-All 13 copied source/fixture files are byte-identical to the reviewed
+The initial 13 copied source/fixture files were byte-identical to the reviewed
 `/tmp/root-terminal168-next-executable-diagnostic-source-20261111-v1` packet.
-`SOURCE_COPY.json` records the mapping and hashes. The original flat extractor
+`SOURCE_COPY.json` and `SOURCE_MANIFEST.json` preserve that initial inventory.
+Later capture changes and qualification are recorded in
+[`QUALIFICATION.md`](QUALIFICATION.md). The original flat extractor
 layout is retained under `extractor/src`, so its module declarations and all
 seven fixture references resolve without source edits. The target remains
 epoch 168, slot 72,728,191, entry 433, within-slot transaction 532 and the exact
@@ -58,11 +60,12 @@ bind current source/dependency provenance through the normal campaign gates.
 ## Checks completed without building
 
 Offline `cargo metadata` resolution and locked `cargo tree` selection passed.
-Both package targets resolve to files in this directory; all copied files
-match their retained originals and all literal fixture includes exist.
+Both package targets resolved to files in this directory; all copied files
+matched their retained originals and all literal fixture includes existed.
 `CARGO_RESOLUTION.json` and `DEPENDENCIES.*.txt` retain that metadata. No Rust
 compiler build, Clippy invocation, unit test, native control, network capture,
-runtime service or replay was run. All 69 tests remain unrun.
+runtime service or replay was run during this initial packaging stage. All 69
+tests were then unrun; this paragraph describes the historical source handoff.
 
 The metadata closure in `CARGO_RESOLUTION.json` includes workspace-wide feature
 resolution and is not a count of the objects a package-only build will
