@@ -13,7 +13,7 @@ fn closed_profile_rejects_other_target_and_schema() {
         schema: PROFILE.into(),
         source_commit: "a".repeat(40),
         cargo_lock_sha256: "b".repeat(64),
-        output: "/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json".into(),
+        output: "/var/lib/jetstreamer/holding141-incremental-check-v6-20261119/check.json".into(),
         prior_check: None,
     };
     validate_plan(&p).unwrap();
@@ -24,10 +24,10 @@ fn closed_profile_rejects_other_target_and_schema() {
     assert!(validate_plan(&p).is_err());
     p.output = "/var/lib/jetstreamer/holding141-incremental-check-v3-20261119/check.json".into();
     assert!(validate_plan(&p).is_err());
-    p.output = "/var/lib/jetstreamer/holding141-incremental-retire-v4-20261119/check.json".into();
+    p.output = "/var/lib/jetstreamer/holding141-incremental-retire-v6-20261119/check.json".into();
     assert!(validate_plan(&p).is_err());
     p.prior_check = Some(Bound {
-        path: "/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json".into(),
+        path: "/var/lib/jetstreamer/holding141-incremental-check-v6-20261119/check.json".into(),
         sha256: "c".repeat(64),
     });
     validate_plan(&p).unwrap();

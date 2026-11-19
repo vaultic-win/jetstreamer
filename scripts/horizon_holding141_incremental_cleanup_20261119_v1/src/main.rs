@@ -27,8 +27,8 @@ const ROOT: &str = "/tmp/holding141-target";
 const DEBUG: &str = "/tmp/holding141-target/debug";
 const TARGET: &str = "/tmp/holding141-target/debug/incremental";
 const LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock";
-const PROFILE: &str = "horizon-holding141-incremental-partial-cleanup-plan-v4";
-const SCHEMA: &str = "horizon-holding141-incremental-partial-cleanup-check-v4";
+const PROFILE: &str = "horizon-holding141-incremental-partial-cleanup-plan-v6";
+const SCHEMA: &str = "horizon-holding141-incremental-partial-cleanup-check-v6";
 // A full selection binds every selected/shared path and directory, not just a digest.
 // Keep ordinary plans at 1 MiB; only these immutable check receipts get a larger bound.
 const PARTIAL_CHECK_MAX_BYTES: u64 = 64 << 20;
@@ -53,15 +53,15 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "wrong fixed profile or reproduction binding"
     );
     let check =
-        Path::new("/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json");
+        Path::new("/var/lib/jetstreamer/holding141-incremental-check-v6-20261119/check.json");
     let retire =
-        Path::new("/var/lib/jetstreamer/holding141-incremental-retire-v4-20261119/check.json");
+        Path::new("/var/lib/jetstreamer/holding141-incremental-retire-v6-20261119/check.json");
     ensure!(
         match &p.prior_check {
             None => p.output == check,
             Some(prior) => p.output == retire && prior.path == check,
         },
-        "output/prior check is outside fixed v4 partial-cleanup evidence scope"
+        "output/prior check is outside fixed v6 partial-cleanup evidence scope"
     );
     Ok(())
 }
@@ -259,7 +259,7 @@ fn run() -> Result<()> {
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v5/cleanup"
+            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v6/cleanup"
         ),
         "sealed image path required"
     );
@@ -361,7 +361,7 @@ fn run() -> Result<()> {
         let parent = plan.output.parent().unwrap();
         persist(
             &parent.join("intent.json"),
-            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-intent-v4","partial_cleanup":true,"cache":tree,"prior_check":{"path":prior.path,"sha256":prior.sha256},"current_check":{"path":plan.output,"sha256":hash_file(&plan.output,PARTIAL_CHECK_MAX_BYTES)?.0},"retained":preserved}),
+            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-intent-v6","partial_cleanup":true,"cache":tree,"prior_check":{"path":prior.path,"sha256":prior.sha256},"current_check":{"path":plan.output,"sha256":hash_file(&plan.output,PARTIAL_CHECK_MAX_BYTES)?.0},"retained":preserved}),
         )?;
         no_builders()?;
         lock_unchanged(&shared, Path::new(LOCK))?;
@@ -385,7 +385,7 @@ fn run() -> Result<()> {
         lock_unchanged(&cargo, &Path::new(DEBUG).join(".cargo-lock"))?;
         persist(
             &parent.join("completion.json"),
-            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-completion-v4","partial_cleanup":true,"cache":tree,"selected_files_absent":true,"removed_files":selection.selected_files.len(),"preserved_shared_files":after.preserved_shared_files,"all_directories_preserved":true,"selected_allocated_bytes":selection.selected_allocated_bytes,"post_operation_allocated_bytes":after.cache["physical_bytes"],"post_operation_cache":after.cache,"retained":preserved,"DATA_credit_bytes":0,"actual_free_delta_claimed":false,"r2_mutations":false}),
+            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-completion-v6","partial_cleanup":true,"cache":tree,"selected_files_absent":true,"removed_files":selection.selected_files.len(),"preserved_shared_files":after.preserved_shared_files,"all_directories_preserved":true,"selected_allocated_bytes":selection.selected_allocated_bytes,"post_operation_allocated_bytes":after.cache["physical_bytes"],"post_operation_cache":after.cache,"retained":preserved,"DATA_credit_bytes":0,"actual_free_delta_claimed":false,"r2_mutations":false}),
         )?;
     }
     println!("{}", plan.output.display());

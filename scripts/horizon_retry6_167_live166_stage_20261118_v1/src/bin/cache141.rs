@@ -10,8 +10,8 @@ use std::{
     process::Command,
 };
 const REPO: &str = "/home/sol/workspace/jetstreamer";
-const ROOT: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v5";
-const DEST: &str = "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v5";
+const ROOT: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v6";
+const DEST: &str = "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v6";
 const IMAGE: &str = "/home/sol/.jetstreamer-private/holding141-incremental-qualification-target-20261119-v1/debug/horizon-holding141-incremental-cleanup";
 const CLOSED: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v1/closed-build-units/completion.json";
 const CLOSED_SHA: &str = "e60d30c769ca38322a28fcb565c045c910f59d9be8a54310bc202e36bb552ac4";
@@ -166,7 +166,7 @@ fn deploy(image_sha: &str) -> Result<()> {
         ("clippy", ""),
         ("build", ""),
     ] {
-        let version = "v5";
+        let version = "v6";
         let u = format!("horizon-holding141-incremental-{phase}-20261119-{version}.service");
         let n = native(&u)?;
         let s = std::str::from_utf8(&n)?;
@@ -212,7 +212,7 @@ fn deploy(image_sha: &str) -> Result<()> {
 fn check(retire: bool) -> Result<()> {
     let _ = closed()?;
     let image_sha = installed_image_sha()?;
-    let label = if retire { "retire-v5" } else { "check-v5" };
+    let label = if retire { "retire-v6" } else { "check-v6" };
     let root = std::path::PathBuf::from(format!(
         "/var/lib/jetstreamer/holding141-incremental-{label}-20261119"
     ));
@@ -220,7 +220,7 @@ fn check(retire: bool) -> Result<()> {
     let commit = String::from_utf8(git(&["rev-parse", "HEAD"])?)?;
     let prior = if retire {
         bind(Path::new(
-            "/var/lib/jetstreamer/holding141-incremental-check-v5-20261119/check.json",
+            "/var/lib/jetstreamer/holding141-incremental-check-v6-20261119/check.json",
         ))?
     } else {
         Value::Null
@@ -229,7 +229,7 @@ fn check(retire: bool) -> Result<()> {
         &root,
         "plan.json",
         &serde_json::to_vec_pretty(
-            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-plan-v4","source_commit":commit.trim(),"cargo_lock_sha256":sha(&fs::read(Path::new(REPO).join("Cargo.lock"))?),"output":root.join("check.json"),"prior_check":prior}),
+            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-plan-v6","source_commit":commit.trim(),"cargo_lock_sha256":sha(&fs::read(Path::new(REPO).join("Cargo.lock"))?),"output":root.join("check.json"),"prior_check":prior}),
         )?,
     )?;
     let dest = std::path::PathBuf::from(format!("{DEST}-{label}-plan"));

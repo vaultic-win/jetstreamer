@@ -61,7 +61,7 @@ pub(crate) fn bound_partial_check(bound: &Bound) -> Result<Value> {
     let value = bound_json_with_limit(bound, PARTIAL_CHECK_MAX_BYTES)?;
     ensure!(
         value["schema"] == SCHEMA && value["profile"] == PROFILE,
-        "not a v4 partial-cleanup check"
+        "not a v6 partial-cleanup check"
     );
     Ok(value)
 }
