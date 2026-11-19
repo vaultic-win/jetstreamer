@@ -1,5 +1,49 @@
 # Chronological R2 audit deployment
 
+## Current home-storage deployment — 2026-11-19
+
+At 19:51:42 UTC the same audit service started its explicit downloaded-epoch77
+recovery on the home filesystem. Invocation `99c7ddc48af140efb131b784a6b064d2`,
+controller PID `2227285`. At 19:53:18 UTC its child began full epoch77 plugin
+playback. This records an active replay, not a new completed audit result.
+
+State and reader paths below are now persistent bind mounts from
+`/home/sol/.jetstreamer-private/horizon-root-runtime-data/r2-audit-storage-20261119-v1/`:
+`state` backs the original `/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1`,
+and `readers` backs the original `/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1`.
+Downloads, source checkout, build cache, temporary files, logs, receipts and
+sealed reader generations all reside on home. Both mounts are required by the
+service. Original logical paths, result receipts and reader seals are preserved.
+The verified old ROOT copies were removed after the switch, recovering about
+28 GB on root. Existing replay workers were not restarted.
+
+The sealed controller is `runtime-v8/audit` below the same home-backed directory,
+SHA256 `60bd1919c887aebace36a64c6abbda51c8834dd4bc918e123f9d56835cfe341a`.
+Source commit `a3c8d610` was merged and pushed to `account-updates` at `6ac1dc0d`.
+All 56 tests passed, with one preexisting external-scratch native test ignored;
+strict all-target Clippy and release build passed. The actual service sandbox
+was separately checked for home-backed identities and write access.
+
+The audit preserves the campaign's 6,794,761,027,378-byte DATA obligation and a
+2-GiB Cargo-cache allowance as its configured free-space floor. Its 16-GiB
+working cap, 24-GiB memory cap, CPU quota 400%, two build jobs and four playback
+workers remain bounded. Each new download reserves the exact archive size;
+385,290,386,716 bytes is the acceptance ceiling, not a per-epoch reservation.
+Future replay admissions must include the audit's home allocation and actual
+current runtime, rather than the obsolete zero-DATA/ROOT configuration.
+
+The recovery verifies the copied epoch77 archive's entire digest and current
+authenticated remote identity, records the old scratch ownership before
+rebinding the new inode, and repeats full playback with the current branch's
+reader. Retry1 and all earlier outcomes remain intact. `Restart=no` prevents
+an interrupted recovery from resetting its retry budget. After its durable
+completion, future controlled restarts use `run`; this controller continues
+chronologically without restarting when recovery succeeds.
+
+Migration and native evidence are retained under `migration-evidence` and
+`qualification` beside `runtime-v8`. The sections below describe earlier
+deployments and their historical resource settings.
+
 The persistent service `horizon-r2-chronological-plugin-audit-20261118-v1.service`
 was enabled and started at 2026-11-18 21:46:22 UTC. Its initial invocation is
 `9273f20a0025480bb12809beb52dea82`, controller PID 1534775. It fetched
