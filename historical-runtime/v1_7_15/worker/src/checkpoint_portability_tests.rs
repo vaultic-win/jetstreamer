@@ -132,7 +132,7 @@ fn isolated_native_checkpoint_archive_restore_probe() {
         loaded.bank.accounts().accounts_db.next_write_version(),
         cursor
     );
-    assert!(loaded.bank.verify_snapshot_bank());
+    assert!(loaded.bank.verify_snapshot_bank(true, false));
 
     let mut restored = RuntimeState::from_test_bank(loaded.bank, false, restored_dir);
     let recipient = Keypair::new();
