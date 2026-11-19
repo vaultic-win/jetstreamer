@@ -252,7 +252,7 @@ fn run() -> Result<()> {
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v1/cleanup"
+            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v2/cleanup"
         ),
         "sealed image path required"
     );

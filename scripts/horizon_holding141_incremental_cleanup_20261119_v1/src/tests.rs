@@ -130,3 +130,63 @@ fn staged_target_and_debug_binary_both_preserve_cache() {
         t
     ));
 }
+
+#[test]
+fn raw_pre_lto_bitcode_requires_exact_name_and_magic() {
+    let (_d, r, uid) = fixture();
+    let p = r.join("2puf9b8c8u53gnrrsp5hrpwxi.pre-lto.bc");
+    fs::write(&p, b"BC\xc0\xde\x35\x14\x00\x00").unwrap();
+    cache_tree_with_policy(&r, uid, true).unwrap();
+    for bytes in [
+        b"".as_slice(),
+        b"BC\xc0",
+        b"\x7fELF",
+        b"BC\xc0\xdf",
+        b"\xde\xc0\x17\x0b",
+    ] {
+        fs::write(&p, bytes).unwrap();
+        assert!(cache_tree_with_policy(&r, uid, true).is_err());
+    }
+    fs::remove_file(&p).unwrap();
+    for name in [
+        ".pre-lto.bc",
+        "a-b.pre-lto.bc",
+        "a.pre-lto.bc.bak",
+        "a.bc",
+        "a.pre-lto.bc.jet",
+    ] {
+        let bad = r.join(name);
+        fs::write(&bad, b"BC\xc0\xde").unwrap();
+        assert!(
+            cache_tree_with_policy(&r, uid, true).is_err(),
+            "accepted {name}"
+        );
+        fs::remove_file(bad).unwrap();
+    }
+}
+
+#[test]
+fn pre_lto_bitcode_keeps_executable_symlink_and_external_link_rejections() {
+    let (d, r, uid) = fixture();
+    let p = r.join("abc123.pre-lto.bc");
+    fs::write(&p, b"BC\xc0\xde").unwrap();
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(cache_tree_with_policy(&r, uid, true).is_err());
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::hard_link(&p, d.path().join("retained.bc")).unwrap();
+    assert!(cache_tree_with_policy(&r, uid, true).is_err());
+    fs::remove_file(&p).unwrap();
+    std::os::unix::fs::symlink(d.path().join("retained.bc"), &p).unwrap();
+    assert!(cache_tree_with_policy(&r, uid, true).is_err());
+}
+
+#[test]
+fn pre_lto_bitcode_rejects_replaced_identity() {
+    let (_d, r, _uid) = fixture();
+    let p = r.join("abc123.pre-lto.bc");
+    fs::write(&p, b"BC\xc0\xde").unwrap();
+    let before = fs::symlink_metadata(&p).unwrap();
+    fs::rename(&p, r.join("preserved.pre-lto.bc")).unwrap();
+    fs::write(&p, b"BC\xc0\xde").unwrap();
+    assert!(incremental::pre_lto_bitcode(&p, &before).is_err());
+}
