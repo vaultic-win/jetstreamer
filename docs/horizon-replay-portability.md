@@ -609,3 +609,66 @@ The package retains the actual node compiler commands, Cargo artifact, terminal
 unit evidence and source manifest; the complete build journal remains in the
 private diagnostics directory. Compilation does not qualify the full production
 controller, pressure-triggered checkpoint selection or mainnet replay.
+
+### Closing an earlier production-recorder checkpoint
+
+Published source `fce21056` adds `close_checkpoint_prefix_source` to the
+production recorder. After producers have drained and freeze writes have
+arrived, it accepts a complete checkpoint strictly inside the declared range.
+It rejects future buffered metadata or account writes and requires the last
+recorded block and blockhash to match the checkpoint. Closing writes and fsyncs
+the index/footer without inventing skipped frames for the unexecuted suffix.
+The original header, provenance and epoch metadata retain their longer range;
+this closed source therefore remains explicitly incomplete and private.
+
+The separate `reencode_closed_checkpoint_prefix` API reads every source bucket
+and frame, requires exact contiguous coverage through the checkpoint with no
+extra frames, checks cross-bucket anchors and strict blockhash links, and requires
+a nonzero terminal blockhash on the final frame. It writes a fresh dense V2
+prefix with narrowed range/epoch metadata, preserving runtime provenance,
+write versions and semantic event order. Ordinary `reencode_archive_prefix`
+still requires a complete source. Callers remain responsible for source
+custody/digests, a no-clobber sink, independent output validation and native
+snapshot equality; this transformation is not a torn-file recovery route.
+
+All 138 archive tests passed (one preexisting ignored test), including exact
+and mid-bucket cuts with several destination bucket sizes, missing/extra
+frames, wrong terminal hashes, metadata/range errors and truncated input.
+All 13 production-recorder tests passed, including preservation of freeze
+writes, rejection of future buffered input and explicit incomplete coverage.
+The first new recorder fixture incorrectly expected a post-transaction write
+after a zero-transaction block; it was corrected to execute a transaction.
+No production write-phase semantics were changed to accommodate that fixture.
+
+With `JETSTREAMER_NATIVE_EARLY_PREFIX=1`, the real-worker fixture now opens a
+three-slot recorder, closes it at the first frozen block, rereads and converts
+the incomplete source, then uses the ordinary independently validated bundle
+for export-parent exit/reap and fresh-parent restore/suffix execution. V4
+assembly retained all 12 writes and the transaction across both executed slots;
+strict full PoH passed, wrong receipt binding and duplicate resume were rejected.
+The successful invocation was `18c5d159100c49c8b98ea14147d4351f`, 3.145 seconds
+and 502.9 MiB reported peak under a 2 GB hard cap. An earlier attempt failed the
+worker's private-directory gate because its unit lacked `UMask=0077`; its
+artifacts and failure are retained, and the successful attempt uses a distinct
+empty private output directory with that unit setting.
+
+The Rust-sealed harness is
+`/var/lib/jetstreamer/horizon-checkpoint-prefix-fce21056-20261119-v1/checkpoint_native_recorder`,
+SHA-256 `9924491298b36f04517c1ca9d94366294d6098347a8547172ffdb65242774c90`.
+Results are in
+`/home/ubuntu/.jetstreamer-private/checkpoint-prefix-20261119-v1/native-early-v2`.
+Its `parent-controller-results.json` SHA-256 is
+`fff195b1c6f793238e2a1f7c6bce20b2184b4aa653171c5ea7527ae5062d4236`.
+The retained incomplete source SHA-256 is
+`9ae9bfe42900b9938c91bf1be11c4d63cd86564c44abec202c30ee6c2a2a4122`;
+the dense prefix SHA-256 is
+`df1806f660647d840ae3506dec9ee2bc7c62fc63340085e5ee432bb8550318ea`.
+Build/test/native journals, exact compiler commands and source bindings are in
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-prefix-20261119-v1`.
+
+Production firehose quiescence, pressure-selected checkpoint/reap/resume,
+mainnet export/restore and holding remain separate outstanding gates. This
+library change also requires qualification against the latest reader branch
+before closing epoch 205's final audit. An isolated current-reader and full
+node build is in progress from the published revision, preserving the active
+audit's original dependency closure; no running replay has been changed.
