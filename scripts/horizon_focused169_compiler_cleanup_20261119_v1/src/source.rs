@@ -53,7 +53,7 @@ fn deployment(p: &Plan) -> Result<Value> {
     ensure!(
         proof["source_commit"] == p.source_commit
             && proof["production_sha256"] == image
-            && proof["tests_passed"] == 26
+            && proof["tests_passed"] == 29
             && proof["clippy_all_targets_passed"] == true,
         "artifact provenance differs"
     );

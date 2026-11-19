@@ -1,10 +1,15 @@
 # Focused169 compiler output cleanup
 
-The isolated build passes **26 tests** (18 policy/filesystem, 6 process-reference
+The isolated build passes **29 tests** (18 policy/filesystem, 9 process-reference
 and 2 staged-alias tests), strict Clippy on all targets, and rustfmt. The special
 inode test uses a FIFO so the long isolated TMPDIR does not exceed the Unix socket
 pathname limit. Native consumer review, check, deployment and retirement remain
 separate gates; passing these tests grants no deletion or capacity credit.
+
+The process reader accepts ENOENT or ESRCH only after a separate metadata read
+positively establishes that the PID directory is absent. This also handles task
+exit after a proc file was opened. A present or reused PID, permission error,
+alias, or other metadata/read failure remains fatal.
 
 The fixed profile selects these three existing DATA directories, by device,
 inode, owner and mode:
@@ -77,10 +82,10 @@ between the positive check and retirement.
 Commit/push the package and verify remote containment before operational use.
 Normally seal the new executable to:
 
-`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v4/cleanup`
+`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v5/cleanup`
 
 The same package must contain root-owned immutable `artifact-proof.json` with
-`source_commit`, `production_sha256`, `tests_passed: 26`,
+`source_commit`, `production_sha256`, `tests_passed: 29`,
 `clippy_all_targets_passed: true`, and `sources` mapping **every tracked file in
 this package** to its SHA256. Preserve the actual test/build/native evidence in
 that proof. The runtime validates the ordinary deployment seal's cleanup and

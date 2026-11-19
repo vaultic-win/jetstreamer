@@ -57,18 +57,26 @@ fn stream_reference(mut reader: impl Read, needle: &[u8], maximum: u64) -> Resul
     }
 }
 fn disappearing(error: &std::io::Error, process: &Path) -> bool {
-    error.kind() == ErrorKind::NotFound && !process.exists()
+    // ESRCH can occur after opening a proc file when its task exits. Require
+    // positive absence of the PID directory: exists() would hide access errors.
+    (error.kind() == ErrorKind::NotFound || error.raw_os_error() == Some(libc::ESRCH))
+        && matches!(fs::symlink_metadata(process), Err(e) if e.kind() == ErrorKind::NotFound)
 }
 fn read_process(path: &Path, process: &Path) -> Result<Option<Vec<u8>>> {
-    let mut file = match File::open(path) {
+    let file = match File::open(path) {
         Ok(f) => f,
         Err(e) if disappearing(&e, process) => return Ok(None),
         Err(e) => return Err(e).context("incomplete live command read"),
     };
+    read_command(file, process)
+}
+fn read_command(reader: impl Read, process: &Path) -> Result<Option<Vec<u8>>> {
     let mut bytes = Vec::new();
-    Read::by_ref(&mut file)
-        .take(1 << 20)
-        .read_to_end(&mut bytes)?;
+    match reader.take(1 << 20).read_to_end(&mut bytes) {
+        Ok(_) => (),
+        Err(e) if disappearing(&e, process) => return Ok(None),
+        Err(e) => return Err(e).context("incomplete live command read"),
+    }
     ensure!(bytes.len() < 1 << 20, "process command bound");
     Ok(Some(bytes))
 }
@@ -323,6 +331,94 @@ mod tests {
                 Path::new("/closed/body"),
                 Path::new("/closed"),
                 &[]
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn disappearance_requires_absent_pid_and_expected_errno() {
+        let temp = tempfile::tempdir().unwrap();
+        let pid = temp.path().join("12345");
+        for errno in [libc::ENOENT, libc::ESRCH] {
+            assert!(disappearing(
+                &std::io::Error::from_raw_os_error(errno),
+                &pid
+            ));
+        }
+        for errno in [libc::EACCES, libc::EPERM, libc::EIO] {
+            assert!(!disappearing(
+                &std::io::Error::from_raw_os_error(errno),
+                &pid
+            ));
+        }
+        fs::create_dir(&pid).unwrap();
+        for errno in [libc::ENOENT, libc::ESRCH, libc::EACCES] {
+            assert!(!disappearing(
+                &std::io::Error::from_raw_os_error(errno),
+                &pid
+            ));
+        }
+        fs::remove_dir(&pid).unwrap();
+        // A reused PID is present again and must never be excused as gone.
+        fs::create_dir(&pid).unwrap();
+        assert!(!disappearing(
+            &std::io::Error::from_raw_os_error(libc::ESRCH),
+            &pid
+        ));
+    }
+    #[test]
+    fn disappearance_does_not_follow_pid_aliases_or_hide_metadata_errors() {
+        let temp = tempfile::tempdir().unwrap();
+        let pid = temp.path().join("12345");
+        symlink(temp.path().join("absent"), &pid).unwrap();
+        assert!(!disappearing(
+            &std::io::Error::from_raw_os_error(libc::ESRCH),
+            &pid
+        ));
+        let file = temp.path().join("file");
+        fs::write(&file, b"").unwrap();
+        assert!(!disappearing(
+            &std::io::Error::from_raw_os_error(libc::ESRCH),
+            &file.join("pid")
+        ));
+    }
+    #[test]
+    fn task_exit_after_open_is_accepted_only_when_pid_is_absent() {
+        struct ExitRead {
+            pid: PathBuf,
+            replace: bool,
+        }
+        impl Read for ExitRead {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                fs::remove_dir(&self.pid)?;
+                if self.replace {
+                    fs::create_dir(&self.pid)?;
+                }
+                Err(std::io::Error::from_raw_os_error(libc::ESRCH))
+            }
+        }
+        let temp = tempfile::tempdir().unwrap();
+        let pid = temp.path().join("12345");
+        fs::create_dir(&pid).unwrap();
+        assert!(
+            read_command(
+                ExitRead {
+                    pid: pid.clone(),
+                    replace: false
+                },
+                &pid
+            )
+            .unwrap()
+            .is_none()
+        );
+        fs::create_dir(&pid).unwrap();
+        assert!(
+            read_command(
+                ExitRead {
+                    pid: pid.clone(),
+                    replace: true
+                },
+                &pid
             )
             .is_err()
         );
