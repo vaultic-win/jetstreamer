@@ -1,0 +1,26 @@
+# SOURCE TEMPLATE ONLY. Render and seal exact qualified artifact/plan bindings.
+[Unit]
+Description=Epoch 265 native harness and exact child protective guard
+StartLimitIntervalSec=0
+[Service]
+Type=oneshot
+User=root
+Restart=no
+KillMode=control-group
+Delegate=no
+MemoryMax=268435456
+MemorySwapMax=0
+TasksMax=64
+CPUQuota=100%
+TimeoutStartSec=60
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectControlGroups=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+ReadWritePaths=@EXACT_RECEIPT_DIRECTORY@
+UMask=0077
+ExecStart=@SEALED_GUARD_PATH@ @SEALED_PLAN_PATH@ --plan-sha256 @PLAN_SHA256@ --self-sha256 @GUARD_SHA256@

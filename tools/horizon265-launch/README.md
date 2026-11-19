@@ -26,6 +26,37 @@ fetched `origin/account-updates`. It requires room below the memory-selected
 target and a separately accepted bounded replacement experiment. It does not
 manufacture a qualified runtime or a release from low RSS.
 
+Booking extraction supports both `horizon265-existing-booking-v1` and `v2`.
+The v2 form replaces `original_admission_or_handoff` and
+`original_field_pointers` with exactly five `field_sources`: `unit`,
+`invocation_id`, `maximum_memory_bytes`, `remaining_disk_growth_bytes`, and
+`minimum_free_bytes`. Each is `{document:{path,sha256},pointer}` and must resolve
+to the corresponding accepted extraction value through the existing stable,
+root-owned evidence reader. Mixed provenance forms and missing/extra fields
+fail closed; documents shared by fields are read once per path/digest.
+
+`horizon265-retained-reservations-v2` requires a matching accepted
+`horizon265-prior-host-booking-v2`; both retain the same `auxiliary_overhead`:
+
+```json
+{
+  "schema": "horizon265-fixed-auxiliary-overhead-v1",
+  "memory_bytes": 2640509440,
+  "source": {
+    "path": "/home/ubuntu/.codex/diagnostics/horizon-hard-memory-accounting-20261119-v1/capacity-correction.json",
+    "sha256": "64456f938ab522c91848a8c93a32f95e1eeedef97f0e1cdd143923895f090631"
+  },
+  "source_field_pointer": "/auxiliary_envelope_bytes"
+}
+```
+
+This exact fixed envelope counts against both physical memory and remaining
+hard growth, including after a producer's qualified memory release. It has no
+synthetic service identity and does not replace any actual owner booking. V1
+ledgers retain their original arithmetic and reject an auxiliary field instead
+of ignoring it. Neither route changes epoch 265's 128000000000-byte memory
+limit or 506191984640-byte whole-root allowance.
+
 ## Actual input prerequisite
 
 The input packet is pinned to:
