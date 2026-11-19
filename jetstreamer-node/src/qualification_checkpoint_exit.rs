@@ -6,6 +6,10 @@ use serde_json::Value;
 // Qualified issuer: e0045863 source, three rejection tests plus real clean-exit
 // and remaining-descendant systemd controls. A new issuer requires qualification.
 const ISSUER: &str = "52cd459e6e21b2e6ed6063269ddd88968a330bab97b39ad3830411ed5a003517";
+// Adds exact-byte receipt reuse only after repeating all live exit checks.
+// Qualified with root-private conflict/link tests and a controller crash after
+// publication of an authentic native producer's proof, followed by fresh reuse.
+const RECOVERABLE_ISSUER: &str = "ea70093e85a113c5879e8625a2bf90730da94ac6a335ff248f9e38689e1047e6";
 
 pub(crate) fn load(
     evidence: &Evidence,
@@ -42,7 +46,9 @@ fn validate(
     super::checkpoint_continuation::sha(report_sha)?;
     require(
         proof["schema"] == "horizon-pressure-exit-proof-v1"
-            && proof["tool_sha256"] == ISSUER
+            && proof["tool_sha256"]
+                .as_str()
+                .is_some_and(|issuer| [ISSUER, RECOVERABLE_ISSUER].contains(&issuer))
             && plan["schema"] == "horizon-pressure-exit-plan-v1"
             && proof["epoch"] == epoch
             && plan["epoch"] == epoch
@@ -162,7 +168,9 @@ mod tests {
     }
     #[test]
     fn binds_issuer_plan_report_epoch_and_exit_scope() {
-        let (proof, plan, report) = fixture();
+        let (mut proof, plan, report) = fixture();
+        validate(&proof, &plan, &report, &"b".repeat(64), 252).unwrap();
+        proof["tool_sha256"] = json!(RECOVERABLE_ISSUER);
         validate(&proof, &plan, &report, &"b".repeat(64), 252).unwrap();
         assert!(validate(&proof, &plan, &report, &"c".repeat(64), 252).is_err());
         assert!(validate(&proof, &plan, &report, &"b".repeat(64), 253).is_err());

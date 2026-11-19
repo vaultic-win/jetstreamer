@@ -8,7 +8,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     os::unix::fs::{MetadataExt, OpenOptionsExt},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
 };
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -230,6 +230,50 @@ fn cgroup_empty(unit: &str) -> Result<Value> {
         }
     }
 }
+
+// Repeating a completed observation must not overwrite its receipt. This also
+// covers a controller dying after the no-clobber rename but before directory
+// fsync. The caller always repeats every live identity/absence check first.
+fn persist_receipt(path: &Path, receipt: &Value) -> Result<bool> {
+    let directory = path.parent().ok_or("receipt parent absent")?;
+    let mut bytes = serde_json::to_vec_pretty(receipt)?;
+    bytes.push(b'\n');
+    let mut output = tempfile::NamedTempFile::new_in(directory)?;
+    output.write_all(&bytes)?;
+    output.as_file().sync_all()?;
+    match output.persist_noclobber(path) {
+        Ok(_) => {
+            File::open(directory)?.sync_all()?;
+            Ok(false)
+        }
+        Err(e) if e.error.kind() == std::io::ErrorKind::AlreadyExists => {
+            // bound_bytes checks owner, mode, regular-file/no-follow custody,
+            // link count, size, exact bytes and stable path/file identity.
+            let binding = Evidence {
+                path: path.into(),
+                sha256: digest(&bytes),
+            };
+            require(
+                bound_bytes(&binding, false)? == bytes,
+                "existing exit receipt differs from the fresh observation",
+            )?;
+            let file = OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(path)?;
+            let before = identity(&file.metadata()?);
+            file.sync_all()?;
+            File::open(directory)?.sync_all()?;
+            require(
+                before == identity(&fs::symlink_metadata(path)?)
+                    && bound_bytes(&binding, false)? == bytes,
+                "existing exit receipt changed during durability recovery",
+            )?;
+            Ok(true)
+        }
+        Err(e) => Err(e.error.into()),
+    }
+}
 fn run(args: &[String]) -> Result<()> {
     require(
         args.len() == 5 && args[1] == "--plan-sha256" && args[3] == "--self-sha256",
@@ -255,10 +299,6 @@ fn run(args: &[String]) -> Result<()> {
             && parent.mode() & 0o077 == 0
             && directory.canonicalize()? == directory,
         "output requires root-private canonical parent",
-    )?;
-    require(
-        fs::symlink_metadata(&p.output).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
-        "output already exists or is inaccessible",
     )?;
     let before = inspect(&p.unit)?;
     validate_terminal(&p, &before)?;
@@ -287,15 +327,10 @@ fn run(args: &[String]) -> Result<()> {
         "cgroup_before":cgroup_before,"cgroup_after":cgroup_after,"producer_pid_absent":true,"worker_pid_absent":true,
         "checkpoint_bundle_validation_required":true,"full_parent_firehose_qualified":false,
         "resource_release_authorized":false,"resume_authorized":false,"publication_authorized":false});
-    let mut output = tempfile::NamedTempFile::new_in(directory)?;
-    serde_json::to_writer_pretty(output.as_file_mut(), &receipt)?;
-    output.write_all(b"\n")?;
-    output.as_file().sync_all()?;
-    output.persist_noclobber(&p.output)?;
-    File::open(directory)?.sync_all()?;
+    let reused = persist_receipt(&p.output, &receipt)?;
     println!(
         "{}",
-        json!({"outcome":"exit-proven","receipt":p.output,"resource_release_authorized":false,"resume_authorized":false})
+        json!({"outcome":"exit-proven","receipt":p.output,"receipt_reused":reused,"resource_release_authorized":false,"resume_authorized":false})
     );
     Ok(())
 }
@@ -419,8 +454,66 @@ mod tests {
         assert!(absent_pid(std::process::id() as i32).is_err());
     }
 
+    #[test]
+    #[ignore = "root-private receipt recovery; run the sealed test as root"]
+    fn receipt_retry_preserves_original_and_rejects_conflicts_and_links() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("proof.json");
+        let receipt = json!({"producer":1234,"publication_authorized":false});
+        assert!(!persist_receipt(&path, &receipt).unwrap());
+        let before = identity(&fs::metadata(&path).unwrap());
+        let bytes = fs::read(&path).unwrap();
+        // A second process after publication must reuse the exact inode/bytes.
+        assert!(persist_receipt(&path, &receipt).unwrap());
+        assert_eq!(before, identity(&fs::metadata(&path).unwrap()));
+        assert_eq!(bytes, fs::read(&path).unwrap());
+        let changed = json!({"producer":4321,"publication_authorized":false});
+        assert!(persist_receipt(&path, &changed).is_err());
+        assert_eq!(bytes, fs::read(&path).unwrap());
+        let link = temp.path().join("linked.json");
+        symlink(&path, &link).unwrap();
+        assert!(persist_receipt(&link, &receipt).is_err());
+        fs::remove_file(&link).unwrap();
+        fs::hard_link(&path, &link).unwrap();
+        assert!(persist_receipt(&path, &receipt).is_err());
+        fs::remove_file(link).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(persist_receipt(&path, &receipt).is_err());
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        fs::write(&path, b"truncated").unwrap();
+        assert!(persist_receipt(&path, &receipt).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"truncated");
+    }
+
     // This fixture validates controller/systemd mechanics only. It deliberately
     // creates no archive or checkpoint bundle and cannot qualify replay recovery.
+    #[test]
+    #[ignore = "isolated controller crash after exit-proof publication"]
+    fn exit_fixture_controller_interrupted_after_receipt() {
+        let tool = std::env::var("HORIZON_EXIT_FIXTURE_TOOL").unwrap();
+        let plan = std::env::var("HORIZON_EXIT_FIXTURE_PLAN").unwrap();
+        let plan_sha = std::env::var("HORIZON_EXIT_FIXTURE_PLAN_SHA256").unwrap();
+        let tool_sha = std::env::var("HORIZON_EXIT_FIXTURE_TOOL_SHA256").unwrap();
+        assert!(
+            Command::new(tool)
+                .args([
+                    plan,
+                    "--plan-sha256".into(),
+                    plan_sha,
+                    "--self-sha256".into(),
+                    tool_sha
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+        // No controller completion receipt or successful process exit. A fresh
+        // controller must discover and revalidate the actual durable result.
+        unsafe { libc::_exit(86) }
+    }
+
     #[test]
     #[ignore = "isolated systemd exit-proof fixture; no archive/recovery authority"]
     fn exit_fixture_producer() {

@@ -1074,3 +1074,27 @@ This proves native suffix recording and production assembly for a two-slot
 synthetic scope, not a full epoch or mainnet publication. The real CLI, controller
 interruption/recovery, complete-epoch plugin playback and exact production-worker
 pressure admission remain required before relying on this route for capacity.
+
+The exit-proof helper now supports recovery when its controller dies after proof
+publication. Every retry repeats the live service identity, clean exit, absent
+producer/worker, empty cgroup and bound-input checks. It then accepts only an
+existing root-private, singly linked regular receipt whose bytes exactly match
+the fresh observation, and fsyncs that file and its parent directory. A mismatch,
+symlink, hard link, changed custody or changed producer is rejected without
+overwriting the original. New receipts still use no-clobber publication. The node
+accepts the separately qualified new helper digest while retaining the old issuer.
+
+An isolated controller exited with status 86 immediately after the new helper
+published a proof for authentic native producer
+`4d8805250b3d4df68f1d9b45a0ce2012`. A fresh invocation reused the exact original
+receipt, preserving bytes, inode and timestamps. Fresh native resume
+`a45d36cdf89c4181bad74d90b30ebe9a` consumed the recovered proof and passed suffix
+recording, V4 assembly and full reader decode in 2.16 seconds. After explicit
+producer-unit retirement, another retry correctly rejected the lost invocation
+identity and left the proof untouched. Root-private receipt conflict/link tests,
+the original helper rejection tests, and both old/new issuer consumer checks passed.
+Evidence is under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-exit-recovery-20261119-v1`.
+This closes the post-proof-publication controller interruption window only;
+it does not qualify interrupted producer export, automatic launch orchestration,
+full-epoch playback, mainnet recovery or reservation release.
