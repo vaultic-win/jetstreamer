@@ -377,3 +377,58 @@ exited 2 with its expected diagnostic before runtime initialization, under
 journals and effective settings are retained with the build evidence. These
 qualify the actual CLI rejection paths, not successful parent replay/export,
 mainnet restoration or a pressure-stop transition. No live worker was replaced.
+
+The next synthetic qualification drives a live native worker through the
+production `HistoricalRuntimeClient`, export validator and recorder, rather
+than consuming only a completed native transcript. Source `3096ee7d` adds a
+test-only IPC fixture with its own synthetic backend and genesis identity;
+`049d3c67` adds the parent harness, and `e7bafc92` binds the new live export
+digest separately from the retained baseline snapshot. The fixture does not
+add a mainnet handshake bypass to the production runtime.
+
+The parent executes the prefix, freezes and closes its recorder, exports the
+snapshot, then requires a fresh freeze to preserve every checkpoint field and
+the write cursor without new writes. After ordered shutdown it verifies that
+the source scratch has been reaped. A fresh native process restores the export;
+its complete checkpoint and suffix outputs match the uninterrupted baseline.
+The suffix recorder closes and the restored worker's scratch is also reaped.
+V4 assembly preserves both slots, all 12 account writes and one transaction.
+The strict full verifier passes PoH, and an altered restored checkpoint fails
+assembly. These results exercise production IPC and recorder components, not
+the full firehose-driven `run_geyser_replay`, mainnet, a full epoch, R2 plugin
+playback, or a durable pressure-stop/restart controller. They authorize no
+additional replay admission or local retirement.
+
+Native unit `horizon-checkpoint-live-parent-native-20261119-v2.service`,
+invocation `d80e486536fc4a93b2b832b39c953e1f`, completed normally in 1.400s
+with a reported 477.9 MiB peak under a 2 GB cap. Its Rust-sealed parent is
+`/var/lib/jetstreamer/horizon-checkpoint-live-parent-e7bafc92-20261119-v2/checkpoint_native_recorder`,
+SHA-256 `36fcfa4c0b6a01eeaafab26a8d79f06cfddc6ba86fd4aa6a9e0b7eaa708857a8`.
+The native test image is
+`/var/lib/jetstreamer/horizon-checkpoint-live-ipc-worker-3096ee7d-20261119-v1/native-tests`,
+SHA-256 `b83fc678eee23b08f7a113de75d635e6400c16c000199ef967288585db2825a4`.
+The sealed package retains the synthetic baseline, launcher, source and
+dependency evidence. Its seal-plan SHA-256 is
+`ff74c97c36433bb9ed52de05ee93fee8cc04de4aedf30d567e373421753b8ff1`.
+
+Results are retained in
+`/home/ubuntu/.jetstreamer-private/checkpoint-live-ipc-20261119-v1/native-v2/`:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `native-results.json` | `7daf8b3235617779f9713d267e6b7dc70bc0ba554f345e81c30fb56103e041e7` |
+| `live-client-results.json` | `344265a05867ca506d9a182ed036d0021d38e8df451ea7b5b10e41ccc4ff798f` |
+| Assembled archive | `63ef6b02f806267d53a962d1dd65fda349dbc46f906e92c2021445610c12d11a` |
+| Live exported snapshot | `b7f2c9829a68936cc40d6c1616e55265ebd940992763466375be96f6f9731669` |
+| Strict full verifier | `d18723f637fca14622c22cff8303a3815b5e22ce3cf3963298d1a2374050e751` |
+
+Build, seal and invocation evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-live-ipc-20261119-v1`.
+The first modern build failed for missing direct-source dependency bindings;
+the corrected build retained the qualified reader dependencies. Native v1,
+invocation `52390a43848c4705b5161b9b1a8f3c3a`, passed live recovery and strict
+verification but failed its final check by comparing the live export to the
+older baseline snapshot digest. That failure and its outputs are preserved.
+The corrected v2 reran the complete path and independently revalidated both
+snapshot identities; no live fleet deployment or epoch-205 reader binding
+changed.
