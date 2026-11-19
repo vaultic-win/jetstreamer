@@ -1,0 +1,22 @@
+{
+  "schema": "horizon-native211-permission-fixture-plan-v1",
+  "attempt": "20261119-v1",
+  "fixture": {
+    "path": "/var/lib/jetstreamer/horizon-native211-permission-fixture-20261119-v1/sandbox-permissions",
+    "sha256": "REPLACE_WITH_MAIN_BUILT_AND_SEALED_FIXTURE_SHA256"
+  },
+  "launcher": {
+    "path": "/var/lib/jetstreamer/horizon-native211-launch-248c9b49-20261119-v1/horizon-native211-launch",
+    "sha256": "de4d986c624bc462f687923efd99d8d5846b6ab1c2f969fd46993ebaadb00821"
+  },
+  "read_evidence": [
+    {
+      "path": "/var/lib/jetstreamer/horizon-native211-launch-248c9b49-20261119-v1/qualification.json",
+      "sha256": "5373d489cd4608d99cfe2e891456d0d8a679b0c51af786383d035d178af1cbc4"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon-native211-prior-booking-v3-20261119-v1/prior-host-booking.json",
+      "sha256": "e94bb4e6d38c595bfeb8cf1e0e59a6206f88cfad25458ddfaa667a616cd74531"
+    }
+  ]
+}
