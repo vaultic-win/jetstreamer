@@ -1,4 +1,4 @@
-//! Standalone, unbuilt exact168 transport capture. No shared helper linkage.
+//! Exact epoch168 transport capture with fixed production endpoints and selector.
 use reqwest::{Client, Response, header::{HeaderMap, ACCEPT_ENCODING, IF_MATCH, RANGE}};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};

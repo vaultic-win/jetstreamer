@@ -18,7 +18,18 @@ Rustls 0.23.40 is an explicit dev dependency, already present in the pinned
 graph. `capture-native-build.service` compiles the test binary without running
 it as the unprivileged builder, then applies strict Clippy to all targets with
 that feature. The native tests must subsequently run as root with bounded
-private output. They were unrun when this source revision was authored.
+private output.
+
+All 24 tests (the original 16 and eight TLS tests) passed, with no ignored or
+filtered tests, in native invocation `f3a3ef28982e438fbe45bbd81e9e3420`.
+The exact test binary SHA-256 was
+`ddf100fe538ddaa94ffaff864328afcd98b05efc60055224e1ea7856bcc6889b`.
+The test build and strict feature-enabled all-target Clippy passed in invocation
+`cf8cd310ebe94cdaba68b1e709caf7be`. Logs, terminal native properties and the
+original baseline image are retained in the bounded build workspace's `work/logs`.
+This exercises genuine local TLS, headers, response status, truncated streams,
+the original deadline, output permissions and untrusted certificate rejection.
+It does not cover the entire black-box capture/funding/fsync acceptance matrix.
 
 The 53 extractor tests, full transport/native acceptance matrix and historical
 source/state proof remain required before any epoch168 recovery. No epoch168
