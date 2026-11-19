@@ -47,14 +47,14 @@ fn main() -> Result<()> {
     let (date,tag)=clock_labels(stamp)?;
     let (next_date,next_tag)=clock_labels(next)?;
     ensure!(next>stamp,"successor clock must advance");
-    let root=format!("/var/lib/jetstreamer/root{tag}-live166167-observation-{date}-v1");
+    let root=format!("/var/lib/jetstreamer/root{tag}-live166167-observation-{date}-v2");
     fs::create_dir(&root)?;fs::set_permissions(&root,fs::Permissions::from_mode(0o700))?;
     let mut config=read(&a[3])?;
     ensure!(config["output"]==a[1] && config["minimum_interval_seconds"]==1800,"predecessor observer mismatch");
     config["previous_sample"]=json!(a[1]);config["not_before_utc"]=json!(next);
     config["output"]=json!(format!("/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root{next_tag}-live166167-{next_date}-v1.json"));
     let cpath=format!("{root}/next-observer.json");let cb=write(&cpath,&config)?;
-    let destination=format!("/usr/local/lib/jetstreamer/horizon-live166167-observer-config-{tag}-{date}-v1");
+    let destination=format!("/usr/local/lib/jetstreamer/horizon-live166167-observer-config-{tag}-{date}-v2");
     let ppath=format!("{root}/seal-plan.json");
     let p=write(&ppath,&json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
         "members":[{"source":cpath,"name":"next-observer.json","sha256":cb["sha256"],"mode":292}]}))?;
