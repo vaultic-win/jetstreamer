@@ -276,8 +276,77 @@ fn fragment(v: &Value, source: &Bound, unit: &str) -> Result<()> {
         path == Path::new("/run/systemd/system").join(unit),
         "periodic fragment path changed"
     );
-    let b = Bound::new(path, &source.sha256);
-    b.bytes(false)?;
+    let m = fs::symlink_metadata(path)?;
+    if m.file_type().is_symlink() {
+        // This is an installed-unit adapter, not a relaxation of Bound::bytes.
+        trusted_parents(path)?;
+        let parents: Vec<_> = path
+            .ancestors()
+            .skip(1)
+            .map(|p| Ok((p, metadata_identity(&fs::symlink_metadata(p)?))))
+            .collect::<Result<_>>()?;
+        installed_link(path, &source.path, 0, || {
+            trusted_parents(&source.path)?;
+            source.bytes(true)?;
+            Ok(())
+        })?;
+        for (parent, before) in parents {
+            ensure!(
+                metadata_identity(&fs::symlink_metadata(parent)?) == before,
+                "installed fragment ancestor changed"
+            );
+        }
+        trusted_parents(path)?;
+    } else {
+        // Preserve the original regular-file path and its strict no-link reader.
+        Bound::new(path, &source.sha256).bytes(false)?;
+    }
+    Ok(())
+}
+// The owner argument permits an unprivileged filesystem regression fixture.
+// Production calls this only after all ancestors pass the root trust check.
+fn installed_link(
+    path: &Path,
+    expected: &Path,
+    owner: u32,
+    verify_source: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    let parent = path.parent().context("installed fragment parent")?;
+    ensure!(
+        path.is_absolute() && parent.canonicalize()? == parent,
+        "noncanonical installed parent"
+    );
+    let parent_before = fs::symlink_metadata(parent)?;
+    ensure!(
+        parent_before.is_dir() && parent_before.uid() == owner && parent_before.mode() & 0o022 == 0,
+        "untrusted installed fragment parent"
+    );
+    let before = fs::symlink_metadata(path)?;
+    ensure!(
+        before.file_type().is_symlink()
+            && before.uid() == owner
+            && before.nlink() == 1
+            && expected.is_absolute()
+            && fs::read_link(path)? == expected
+            && expected.canonicalize()? == expected,
+        "installed link owner/target differs or contains a chain"
+    );
+    let target = fs::symlink_metadata(expected)?;
+    ensure!(
+        target.is_file() && target.nlink() == 1,
+        "installed source is not regular"
+    );
+    verify_source()?;
+    ensure!(
+        metadata_identity(&before) == metadata_identity(&fs::symlink_metadata(path)?)
+            && fs::read_link(path)? == expected
+            && expected.canonicalize()? == expected
+            && metadata_identity(&target) == metadata_identity(&fs::symlink_metadata(expected)?)
+            && metadata_identity(&parent_before)
+                == metadata_identity(&fs::symlink_metadata(parent)?)
+            && parent.canonicalize()? == parent,
+        "installed fragment changed during verification"
+    );
     Ok(())
 }
 fn process_census(c: &Control, s: &Value, dormant: bool) -> Result<()> {
@@ -524,5 +593,86 @@ mod tests {
         bad["Unit"] = json!("unrelated.service");
         assert!(timer_values(c, &bad, false).is_err());
         assert_eq!(total(&pins()).unwrap(), 4 * CAP);
+    }
+}
+
+#[cfg(test)]
+mod installed_fragment_tests {
+    use super::*;
+    use std::os::unix::fs::symlink;
+    fn setup() -> (tempfile::TempDir, PathBuf, PathBuf, u32) {
+        let d = tempfile::tempdir().unwrap();
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let source = d.path().join("sealed.service");
+        fs::write(&source, b"exact sealed source").unwrap();
+        fs::set_permissions(&source, fs::Permissions::from_mode(0o444)).unwrap();
+        let link = d.path().join("installed.service");
+        symlink(&source, &link).unwrap();
+        let uid = unsafe { libc::geteuid() };
+        (d, source, link, uid)
+    }
+    #[test]
+    fn exact_direct_installed_link_uses_original_sealed_source_without_loosening_reader() {
+        let (_d, source, link, uid) = setup();
+        let expected_digest = digest(&fs::read(&source).unwrap());
+        installed_link(&link, &source, uid, || {
+            ensure!(digest(&fs::read(&source)?) == expected_digest, "digest");
+            Ok(())
+        })
+        .unwrap();
+        // The normal bound reader must still reject the installed symlink.
+        assert!(Bound::new(&link, &expected_digest).bytes(false).is_err());
+        assert!(installed_link(&link, &source, uid + 1, || Ok(())).is_err());
+    }
+    #[test]
+    fn wrong_target_chain_or_untrusted_link_parent_is_rejected() {
+        let (d, source, link, uid) = setup();
+        let other = d.path().join("other.service");
+        fs::write(&other, b"exact sealed source").unwrap();
+        assert!(installed_link(&link, &other, uid, || Ok(())).is_err());
+        let chain = d.path().join("chain.service");
+        symlink(&source, &chain).unwrap();
+        fs::remove_file(&link).unwrap();
+        symlink(&chain, &link).unwrap();
+        assert!(installed_link(&link, &source, uid, || Ok(())).is_err());
+        assert!(installed_link(&link, &chain, uid, || Ok(())).is_err());
+        fs::remove_file(&link).unwrap();
+        symlink(&source, &link).unwrap();
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(installed_link(&link, &source, uid, || Ok(())).is_err());
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let alias = d.path().join("alias");
+        symlink(d.path(), &alias).unwrap();
+        assert!(installed_link(&alias.join("installed.service"), &source, uid, || Ok(())).is_err());
+    }
+    #[test]
+    fn link_replacement_and_source_changes_during_verification_fail_closed() {
+        let (d, source, link, uid) = setup();
+        let replacement = d.path().join("replacement");
+        symlink(&source, &replacement).unwrap();
+        assert!(
+            installed_link(&link, &source, uid, || {
+                fs::rename(&replacement, &link)?;
+                Ok(())
+            })
+            .is_err()
+        );
+        assert!(
+            installed_link(&link, &source, uid, || {
+                fs::set_permissions(&source, fs::Permissions::from_mode(0o644))?;
+                fs::write(&source, b"different source bytes")?;
+                Ok(())
+            })
+            .is_err()
+        );
+        assert!(installed_link(&link, &source, uid, || bail!("sealed digest mismatch")).is_err());
+        assert!(
+            installed_link(&link, &source, uid, || {
+                fs::set_permissions(d.path(), fs::Permissions::from_mode(0o777))?;
+                Ok(())
+            })
+            .is_err()
+        );
+        fs::set_permissions(d.path(), fs::Permissions::from_mode(0o700)).unwrap();
     }
 }
