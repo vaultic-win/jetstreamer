@@ -320,3 +320,31 @@ was 7,305,799,737,344 bytes; epoch 141's local input has not been retired.
 At the **23:56 UTC** audit check, **26 archives had passed, none had failed**,
 and epoch 26 was downloading under the unchanged controller PID 1590101.
 The next routine audit check is no earlier than **00:26:39 UTC**.
+
+## November 19 audit rate and next-lane preparation
+
+At the user-requested **00:01 UTC** audit check, **28 archives had passed, none
+had failed**, and epoch 28 was downloading. The ten completed cycles for epochs
+18–27 covered 30,819,625,246 archive bytes in 1,974 seconds: **18.24 epochs/hour**,
+or 197.4 seconds per epoch including download, plugin playback and cleanup.
+Epoch 27's native log records playback from 00:00:34.812194120 to
+00:01:09.425871283 UTC: about 34.614 seconds for 432,000 slots and 33,582,495
+transactions, approximately 12,480 slots/sec and 970,208 transactions/sec.
+This is a small-archive measurement, not a forecast for the larger remaining
+inventory. The next routine audit check is no earlier than **00:32 UTC**.
+The independent campaign observer remains scheduled for **00:19:25 UTC**.
+
+The optimized parallel epoch 141 retirement image is sealed at
+`/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v4/jetstreamer-r2`,
+SHA-256 `821539a5dd4e66b85de336646479e7abe07494174ec44cfc9ad55b81094a48dc`.
+Its full-file check started at approximately 00:04 UTC. No local deletion or
+free-space credit is claimed before a durable retirement completion. The exact
+check plan remains `bc98dfd68f4c144ab03bec877711cfe093ddf5cdd09d94f1769ffce312c1d616`.
+
+Epoch 170's preparer production build, all **303 tests**, and strict production
+Clippy completed successfully under the three retained
+`horizon-170-live166retry7-preparer-{production,tests,clippy}-20261118-v1.service`
+units. The `deploy_prepare170` metadata helper checks their exact invocation IDs,
+source equivalence to published build commit `00745fa4`, features, artifact and
+test evidence before normal runtime sealing. This does not supply genuine live
+epoch 167 evidence, fresh admission, or the outstanding operational positive test.
