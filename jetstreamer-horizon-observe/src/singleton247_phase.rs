@@ -178,10 +178,7 @@ pub fn capture(p: Profile, u: &Value, sample: u64) -> Result<Option<Value>> {
             &format!("@{sample}"),
         ])
         .output()?;
-    ensure!(
-        out.status.success() && out.stdout.len() <= 1 << 20,
-        "singleton phase journal failed/oversized"
-    );
+    validate_journal_result(out.status.code(), &out.stdout, &out.stderr)?;
     let records = out
         .stdout
         .split(|b| *b == b'\n')
@@ -190,9 +187,29 @@ pub fn capture(p: Profile, u: &Value, sample: u64) -> Result<Option<Value>> {
         .collect::<std::result::Result<Vec<Value>, _>>()?;
     select_event(p, &records, sample)
 }
+fn validate_journal_result(code: Option<i32>, stdout: &[u8], stderr: &[u8]) -> Result<()> {
+    // journalctl --grep returns 1 when no record matches. An advancing replay
+    // normally has no completion marker; that empty result is not a failure.
+    ensure!(
+        (code == Some(0) || (code == Some(1) && stdout.is_empty() && stderr.is_empty()))
+            && stdout.len() <= 1 << 20,
+        "singleton phase journal failed/oversized"
+    );
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn journal_no_match_is_empty_but_actual_failures_remain_errors() {
+        assert!(validate_journal_result(Some(1), b"", b"").is_ok());
+        assert!(validate_journal_result(Some(0), b"{}\n", b"").is_ok());
+        assert!(validate_journal_result(Some(1), b"{}\n", b"").is_err());
+        assert!(validate_journal_result(Some(1), b"", b"permission denied").is_err());
+        assert!(validate_journal_result(Some(2), b"", b"").is_err());
+        assert!(validate_journal_result(None, b"", b"").is_err());
+        assert!(validate_journal_result(Some(0), &vec![0; (1 << 20) + 1], b"").is_err());
+    }
     fn record(p: Profile) -> Value {
         json!({"MESSAGE":format!("[x INFO {MARKER}"),"_SYSTEMD_UNIT":p.unit,"_SYSTEMD_INVOCATION_ID":p.iid,"_PID":p.pid.to_string(),"_UID":"1000","_EXE":p.node,"_CMDLINE":p.command,"__REALTIME_TIMESTAMP":"1795100497145709"})
     }
