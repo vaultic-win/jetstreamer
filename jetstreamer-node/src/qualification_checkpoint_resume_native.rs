@@ -7,6 +7,8 @@ use std::{collections::BTreeMap, fs, path::PathBuf, sync::atomic::AtomicBool};
 
 #[path = "qualification_checkpoint_car_native.rs"]
 mod source_car;
+#[path = "qualification_checkpoint_suffix_native.rs"]
+mod source_suffix;
 
 type Transcript<P = EntryRequest, R = EntryProcessed> = (
     String,
@@ -281,52 +283,67 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     if let Some(proof) = &resume_guard {
         proof.require_terminal(Some(&verifier)).unwrap();
     }
-    let failure = Arc::new(ReplayFailure::new(shutdown));
-    let replay = HistoricalReplay::from_restored_checkpoint(
-        client,
-        HistoricalCheckpointSummary::try_from(&actual).unwrap(),
-        verifier.clone(),
-        failure.clone(),
-        Arc::new(ReplayCursor::new()),
-        Arc::new(ReplayProgress::new(boundary.slot + 1)),
-        boundary.slot + 1,
-        trust,
-    )
-    .unwrap();
+    let failure = Arc::new(ReplayFailure::new(shutdown.clone()));
+    let replay = Arc::new(
+        HistoricalReplay::from_restored_checkpoint(
+            client,
+            HistoricalCheckpointSummary::try_from(&actual).unwrap(),
+            verifier.clone(),
+            failure.clone(),
+            Arc::new(ReplayCursor::new()),
+            Arc::new(ReplayProgress::new(boundary.slot + 1)),
+            boundary.slot + 1,
+            trust,
+        )
+        .unwrap(),
+    );
     assert!(verifier.finish().is_err());
-    let mut transaction_index = 0;
-    for entry in entries {
-        let txs = entry
-            .transactions
-            .iter()
-            .map(|bytes| {
-                let legacy: solana_transaction::Transaction = bincode::deserialize(bytes).unwrap();
-                let tx = solana_transaction::versioned::VersionedTransaction::from(legacy);
-                assert_eq!(encode_legacy_transaction(&tx).unwrap(), *bytes);
-                super::super::ScheduledTransaction {
-                    tx,
-                    expected_status: None,
-                    reconstruct_fee: true,
-                    status_meta: solana_transaction_status::TransactionStatusMeta::default(),
-                }
-            })
-            .collect::<Vec<_>>();
-        let count = txs.len();
-        replay.process_ready_entries(vec![ReadyEntry {
-            slot: entry.slot,
-            entry_index: entry.entry_index.try_into().unwrap(),
-            start_index: transaction_index,
-            txs,
-            hash: Hash::new_from_array(entry.hash.try_into().unwrap()),
-            num_hashes: entry.num_hashes,
-            tx_count: count,
-        }]);
-        transaction_index += count;
-        assert!(
-            failure.error_message().is_none(),
-            "{:?}",
-            failure.error_message()
+    if resume_guard.is_some() {
+        source_suffix::record(
+            &directory,
+            &boundary,
+            &terminal,
+            &entries,
+            &replay,
+            shutdown,
+            failure.clone(),
         );
+    } else {
+        let mut transaction_index = 0;
+        for entry in entries {
+            let txs = entry
+                .transactions
+                .iter()
+                .map(|bytes| {
+                    let legacy: solana_transaction::Transaction =
+                        bincode::deserialize(bytes).unwrap();
+                    let tx = solana_transaction::versioned::VersionedTransaction::from(legacy);
+                    assert_eq!(encode_legacy_transaction(&tx).unwrap(), *bytes);
+                    super::super::ScheduledTransaction {
+                        tx,
+                        expected_status: None,
+                        reconstruct_fee: true,
+                        status_meta: solana_transaction_status::TransactionStatusMeta::default(),
+                    }
+                })
+                .collect::<Vec<_>>();
+            let count = txs.len();
+            replay.process_ready_entries(vec![ReadyEntry {
+                slot: entry.slot,
+                entry_index: entry.entry_index.try_into().unwrap(),
+                start_index: transaction_index,
+                txs,
+                hash: Hash::new_from_array(entry.hash.try_into().unwrap()),
+                num_hashes: entry.num_hashes,
+                tx_count: count,
+            }]);
+            transaction_index += count;
+            assert!(
+                failure.error_message().is_none(),
+                "{:?}",
+                failure.error_message()
+            );
+        }
     }
     replay.verify_latest_bank().unwrap();
     verifier.finish().unwrap();
@@ -348,6 +365,9 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     );
     assert_eq!(evidence.terminal.tick_height, terminal.tick_height);
     assert!(evidence.terminal.slot_complete);
+    if let Some(proof) = &resume_guard {
+        source_suffix::assemble(&directory, &export, &evidence, proof);
+    }
     let outcome = replay.shutdown_for_checkpoint().unwrap();
     assert!(outcome.worker_reap_verified());
     eprintln!(
@@ -457,9 +477,12 @@ fn export_from_pressure_notifiers(
             genesis_hash: profile.required_genesis_hash.parse().unwrap(),
             bootstrap_state_kind: jetstreamer_horizon::archive::BootstrapStateKind::SnapshotArchive,
             bootstrap_slot: bootstrap.slot,
-            bootstrap_state_hash: Hash::new_from_array(bootstrap.accounts_hash.clone().try_into().unwrap()),
-            requested_slot_start: prefix.slot, requested_slot_count: 2,
-            transaction_metadata: jetstreamer_horizon::archive::TransactionMetadataPolicy::runtime_reconstructed_before(u64::MAX),
+            bootstrap_state_hash: Hash::new_from_array(
+                bootstrap.accounts_hash.clone().try_into().unwrap(),
+            ),
+            requested_slot_start: prefix.slot,
+            requested_slot_count: 2,
+            transaction_metadata: archive_transaction_metadata_policy(prefix.slot, 2),
         },
         worker_executable_sha256: Sha256::digest(fs::read(launcher).unwrap()).into(),
     };

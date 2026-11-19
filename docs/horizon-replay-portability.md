@@ -1049,3 +1049,28 @@ index-expectation attempts, remains under
 `/home/ubuntu/.codex/diagnostics/horizon-pressure-epoch-scope-20261119-v1`.
 The real CLI, controller interruption/recovery, full-epoch assembly/delivery and
 exact production-worker mainnet pressure qualification remain outstanding.
+
+The epoch-aligned fixture now records the resumed suffix through normal HTTP CAR
+delivery, production transaction/entry/parent/metadata callbacks, scheduler drain
+and the real native worker. The source mirror has separate pressure and normal
+completion modes; both require the decoder's genuine completed-block callback.
+The suffix recorder closes with its actual terminal evidence and snapshot digest,
+rereads its segment manifest, and calls `ValidatedResume::assemble` unchanged.
+The test completely decodes the resulting V4 archive with chain mismatches rejected
+and checks two slots, two transactions, one handoff and all 16 normalized updates.
+Prefix provenance uses the production transaction-metadata policy. An initial
+attempt using the older test-only policy was correctly rejected by the assembler;
+the fixture was corrected without relaxing that check.
+
+Producer `17e3ee914ed8406c99e4220643bd6ab3` and fresh resume
+`3fdc1c2d20e1492aae4441fdfaeccd25` passed with a separately sealed clean-exit proof.
+The independent `verify_archive --full` consumer passed both blocks' PoH, the
+bootstrap anchor and independently generated synthetic terminal. The ordinary
+plugin consumed the two slots but correctly rejected their incomplete epoch
+coverage and wrote no full-epoch receipt. The older interior-slot transaction
+fixture also passed. Evidence, including the rejected first assembly, is under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-suffix-assembly-20261119-v1`.
+This proves native suffix recording and production assembly for a two-slot
+synthetic scope, not a full epoch or mainnet publication. The real CLI, controller
+interruption/recovery, complete-epoch plugin playback and exact production-worker
+pressure admission remain required before relying on this route for capacity.
