@@ -1,8 +1,9 @@
 # Epoch167 retry7 recovery qualification
 
 The guard and preparer are built, tested and normally sealed. The launcher
-production build and eight source tests pass. Its two native tests, native
-witness, fleet admission and production launch remain pending.
+production build and eight source tests pass. The refreshed native witness
+passed actual preparation; full DATA capacity, two native launcher tests,
+fleet admission and production launch remain pending.
 
 Guard release image SHA256:
 `e2821006426c497f25ecfdc8da26b63136d174a92c0ac15f78068bbc1078e581`.
@@ -77,3 +78,36 @@ use the actual epoch166 retry8 identity and accepted current fleet, preserve
 all earlier retained promises plus the audit allocation, and requalify native
 DATA witness/preflight. Reuse the existing epoch167 retry7 root; no witness
 ancestor directory creation is permitted beside the live166 producer.
+
+Actual preparation attempts at 02:55–03:08 UTC November 19:
+
+- `horizon-retry7-167-prepare-20261119-v1.service` failed with EMFILE under
+  a 1024-descriptor soft limit. No producer launched.
+- `...-v2.service`, IID `8e5e35a3fc1d45f5b1207e17282a959a`, used
+  `LimitNOFILE=1048576` and passed that gate, then rejected the expired native
+  witness. The native witness maximum age remains 120 seconds.
+- `...-v3.service`, IID `8c0d1e74152b4819bb55dfb509beabc4`, used a newly
+  captured own-image witness and normally sealed contract v2. It passed
+  witness freshness and failed complete growth fit: available DATA
+  7,413,741,199,360 bytes; required 7,447,501,842,226 bytes. The shortfall is
+  33,760,642,866 bytes, before later producer growth. All reservations remain.
+
+The v3 plan is `/var/lib/jetstreamer/root0308-prepare167retry7-20261119-v1/PREPARE_PLAN.json`,
+SHA256 `0010d27ca6d879a1662383f302fcc402457422e4dbab5845e354bb5ea3af5f02`.
+No new preparation receipt or epoch167 producer exists. Both failures were
+immediately reassessed in conditional status-only R2 updates with authenticated
+readback; latest receipt is
+`/home/sol/.jetstreamer-private/r2-status-receipts/event-capacity-167-20261119-v1/RECEIPT.json`.
+The reviewed 02:58 planning arrival is retained, less elapsed time: two hours
+recovery/qualification, 72 hours replay and 30 hours delivery. These are planning
+allowances, not measured completion bounds.
+
+Next capacity action: qualify the closed 56,565,561,764-byte epoch169 local2
+partial for holding or independently justified retirement. The new read-only
+`scripts/horizon_epoch169_closed_prefix_20261119_v1` tool pins its exact inode,
+checks the original owners and whole-run native references, hashes only a
+consumer-free candidate, and preserves a private result. It explicitly grants
+no deletion or resource credit; transitive reader references and any required
+holding custody remain separate gates. Previously qualified snapshot152,
+snapshot160, snapshot183 and six snapshot185/186 copies are already retired;
+their historical allocation cannot be credited again.
