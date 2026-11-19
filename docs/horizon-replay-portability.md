@@ -273,3 +273,53 @@ These checks qualify the build and that bounded input-gate path. No live
 worker, reader or guard was replaced. Predeclared segment replay/export/fresh
 restore, canonical root equality and resource-pressure qualification remain
 required before replay deployment; no additional lane was admitted.
+
+The synthetic native fixture now retains a durable transcript for production
+recorder qualification. The prefix tick is executed by the historical runtime;
+the snapshot is exported through its actual handler. After the original banks
+and storage are dropped, a fresh process restores that snapshot and repeats the
+suffix transaction and tick. The transcript compares the entire restored
+checkpoint, transaction outcomes, account writes and terminal checkpoint, and
+retains the exported snapshot bytes. Select the ignored test
+`runtime::tests::checkpoint_export_recorder_transcript_probe` with
+`JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT` set to a new empty canonical private
+directory. Use umask 0077 for the historical tempfile implementation. The
+initial sandbox's broader temporary-directory mode was correctly rejected;
+the private-mode retry passed without relaxing the exporter.
+
+Source `edd3057c` built under the 2 GB cap in 5m57s, with empty test features
+and a reported 1.8 GiB peak. The sealed native test image is
+`/var/lib/jetstreamer/horizon-checkpoint-transcript-edd3057c-20261119-v1/native-tests`,
+SHA-256 `2dcf1e7e597d3d87bbe5a75342ecae4db1fc97494dbde39eea13da9d2e978a4a`.
+Invocation `394431cf77c8438f84349bbd274f13b0` passed exactly one selected test
+in 0.69s. Its journal SHA-256 is
+`d32fd5f88bccb279c498cf0dddeff72571bed8f022b8c3759dc0389aef54a4a3`.
+
+`tools/checkpoint_native_recorder.rs` consumes that real transcript through
+the production recorder modules, closes two exact checkpoint segments, merges
+them through the existing V4 implementation, and compares every encoded account
+field, payload, transaction attribution, normalized write version, signature
+and fee. The first segment carries the already-frozen synthetic bank at slot 0;
+it is not a genesis replay beginning at slot 1. The initial merger rejection
+of that incorrect genesis label is preserved, and the corrected label describes
+the actual fixture state without changing reader validation.
+
+The final harness is sealed at
+`/var/lib/jetstreamer/horizon-native-recorder-a733e258-20261119-v2/checkpoint_native_recorder`,
+SHA-256 `015e2715ecf2dcd6609994996ae094cdb9866d9fc5bdb8ee236bddfdafc66163`.
+Invocation `30bbe67954ac430996ded2eafb57f677` completed normally with a
+500,146,176-byte peak under its 2 GB cap. Both slots, all 12 account writes
+and the transaction matched. The qualified strict full verifier recomputed
+both blocks with zero PoH mismatches and matched the supplied synthetic
+terminal. An altered restored bank hash was rejected by the merger. Result
+SHA-256 is `c91da93bf08d7bd125ed63960a54059d914635a35be58e3264d2d4bf38a20da3`;
+its native journal SHA-256 is
+`d1fe5afa1e33464aa9ae2a2536c4d3a28a425ffc1169c4bfdb6141b1e4a4a87d`.
+Evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-transcript-20261119-v1`.
+
+This joins native recovery outputs to the real archive writer and reader, but
+the recorder consumes the retained transcript after the native run. It does
+not exercise a live parent checkpoint/stop/resume controller, a full epoch,
+mainnet state, canonical-mainnet terminal evidence, or full plugin playback
+of an R2 object. Those gates remain open, and no live deployment changed.
