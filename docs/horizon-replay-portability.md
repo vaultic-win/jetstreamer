@@ -480,3 +480,60 @@ it does not establish crash recovery at intermediate publication steps,
 pressure-triggered stopping, the complete firehose parent, mainnet recovery,
 holding upload/restore, full-epoch or R2 playback qualification. Those gates
 remain required before controlled oversubscription or another lane admission.
+
+The independent-parent fixture originally bound the prefix digest but deferred
+its deep decode until final assembly. Source `c2b0f908` closes that recovery
+gap with the production `checkpoint_bundle` module. Before restoring the suffix
+worker, the reader fully validates the retained prefix and snapshot, then
+requires the same source runtime, worker image, complete terminal tuple and
+exact output boundary. It retains open-file identities for both archives and
+both manifests across the combined validation. The caller still owns plan
+authentication and custody through subsequent use.
+
+The production focused-export completion path now uses this shared relationship
+check before publishing the snapshot manifest. It reuses the segment manifest
+returned by the existing complete source reread, avoiding a third archive scan
+during normal completion. The independent-parent fixture now writes and reads
+the production prefix manifest too; its v2 checkpoint receipt binds that
+manifest's digest. This supplies a recovery validation component without
+creating a general replay-admission or pressure-stop route.
+
+Two direct-source tests reject changed runtime/worker identities, every
+terminal field, unbound source digests and a segment extending beyond the
+snapshot. The native export-parent/fresh-resume-parent test also passed with
+the deep prefix validation preceding suffix-worker initialization. Its unit
+`horizon-checkpoint-bundle-native-20261119-v1.service`, invocation
+`49483fddbdec4357be3ccf7a9a61649d`, completed in 1.954s with a reported
+486.4 MiB peak under a 2 GB cap. Both slots, 12 writes and one transaction
+survived V4 assembly and strict full PoH verification; changed receipt,
+duplicate resume and altered assembled checkpoint rejection still passed.
+
+The Rust-sealed harness is
+`/var/lib/jetstreamer/horizon-checkpoint-bundle-c2b0f908-20261119-v1/checkpoint_native_recorder`,
+SHA-256 `72765a21eebf1e57fa9c7037e980b14fcbf22cc2169e3c763b143a4f393e3353`.
+The test image SHA-256 is
+`c29c5ad9ca1f3a5930476d27fd4283219e42e02de1ce77453d80cabea5cd3296`;
+the seal-plan SHA-256 is
+`e10267ba1efdcf26ff0a4b08253ff82f26f1fd3f3fad5f436ef914e2830be659`.
+Build and invocation evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-bundle-20261119-v1`.
+Results in the corresponding private `native-v1/` directory are bound by:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `parent-controller-results.json` | `e528ddf7c06200739b3078718576b57f74baa91ba31f1f8ccce6d885baca6fc1` |
+| `parent-checkpoint.json` | `1ebd7e4cf19546b6d224aa8e4432dcf59e6f40186dbc227d7ee23a2c0935ba72` |
+| `native-results.json` | `49fcb91231a2b86828982b5211613f5c5e6388ad7827bc7af1fa258489c22286` |
+
+The full default-feature node then built from clean published `c2b0f908` in
+`horizon-checkpoint-bundle-node-build-20261119-v1.service`, invocation
+`91af16b7b5224237b15ddbde873f5cfb`. It completed in 4m16.657s with a reported
+1.2 GiB peak under the 2 GB cap. Cargo reported a freshly built executable;
+the complete tracked source manifest was revalidated afterward. Its immutable
+Rust-sealed candidate is
+`/var/lib/jetstreamer/horizon-checkpoint-bundle-node-c2b0f908-20261119-v1/jetstreamer-node`,
+SHA-256 `08b32810ec40eae0de8da24fe8d78a7e57c1b574941db39c236fd511aa2f8739`.
+The node seal-plan SHA-256 is
+`682fd4c6bba65c1bad1679731e6520bbff5765e57d93df43dedf8027e703f0c1`.
+This verifies the production integration builds; it does not claim a successful
+full firehose/mainnet checkpoint run or authorize replacing a healthy worker.
