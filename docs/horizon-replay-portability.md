@@ -134,6 +134,53 @@ evidence tuple. It sends no replay entries and grants no canonical-root or
 archive-continuation authority. A bounded synthetic pass does not authorize
 its large mainnet restore: prepare a separate full-resource admission first.
 
+That integration target compiled normally from published `d4fe2ada` in
+`horizon-v1715-mainnet-export-probe-build-20261119-v1.service`, invocation
+`a4d8ac5c50f84f8b922e7c7e2694f25b`: 2m21s, 1.2 GiB peak, empty package features.
+The 103-file source manifest remained unchanged, and the rebuilt production
+worker is byte-identical to the already sealed `8275e240` candidate. The probe
+is sealed at
+`/var/lib/jetstreamer/horizon-v1715-mainnet-export-probe-d4fe2ada-20261119-v1/mainnet-probe`,
+SHA-256 `c6b077b43ac030e483795ea265f7be8364043fb482994a00516db111a89477ff`.
+Its static listing contains exactly the intended test. This is compilation
+evidence only: no mainnet round trip was executed.
+
+An admitted invocation must pass `--ignored --exact --nocapture --test-threads=1`
+and the exact test name, with these inputs:
+
+- `JETSTREAMER_CHECKPOINT_EXPORT_WORKER`: the sealed `335af895` worker above.
+- `JETSTREAMER_SNAPSHOT_114479281`: the existing root-owned epoch-265 snapshot
+  recorded in `docs/horizon-252-cohort-readiness-20261118.md`.
+- `JETSTREAMER_MAINNET_LEDGER`:
+  `/var/lib/jetstreamer/horizon-foundation-holding-probe-input-v1`, whose 20,144-byte
+  `genesis.tar.bz2` freshly matches
+  `133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945`.
+- `JETSTREAMER_CHECKPOINT_EXPORT_PROBE_ROOT`: a new empty, canonical,
+  operator-owned 0700 attempt directory with separately admitted growth.
+
+The host-visible genesis file in the live epoch-251 output directory is a
+zero-length mount placeholder, not reusable input. Preserve that live namespace
+and use the authenticated immutable genesis above. Do not infer file absence
+from `sudo rg` on this host: sudo's default PATH lacks rg; use the resolved
+absolute executable or the intended privileged filesystem reader.
+
+The existing five-lane hard obligations plus host/control reserves total
+1,202,496,454,656 bytes against 1,212,136,964,096 physical bytes. The live
+epoch-205 reader audit reserves another 7 GB, leaving 2,640,509,440 bytes after
+the small builds close. A proposed 128 GB mainnet restore does not fit that
+non-oversubscribed envelope. Preserve all healthy producers and the audit;
+qualify the required admission/policy transition or use a naturally released
+lane before executing the large probe. No dormant unit or trigger is armed.
+
+Archive continuation can reuse `merge_checkpoint_restart_segments` and its
+explicit V4 provenance, source-handle digests, PoH links and write-version
+normalization. The existing epoch-203/213 continuation runners are intentionally
+input-bound; their authority must not be generalized by reusing their flags.
+The recorder still finalizes a predeclared slot range and cannot safely label
+an arbitrary in-flight prefix complete. A new pressure path must close a real
+segment, bind its checkpoint/export evidence, qualify native restart and
+complete assembly through the normal latest-reader and canonical-root gates.
+
 Even a successful synthetic probe leaves protocol export, actual mainnet
 checkpoint/restore, partial `.jet` continuation and idempotent pressure recovery
 unqualified. Before oversubscribed admission, select a genuinely resumable
