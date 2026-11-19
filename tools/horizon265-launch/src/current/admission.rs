@@ -117,9 +117,14 @@ fn auxiliary_overhead(
             );
             Ok(0)
         }
-        Some("horizon265-retained-reservations-v2") => {
+        Some("horizon265-retained-reservations-v2" | "horizon265-retained-reservations-v3") => {
             ensure!(
-                previous["schema"] == "horizon265-prior-host-booking-v2"
+                previous["schema"]
+                    == if ledger["schema"] == "horizon265-retained-reservations-v3" {
+                        "horizon265-prior-host-booking-v3"
+                    } else {
+                        "horizon265-prior-host-booking-v2"
+                    }
                     && previous["auxiliary_overhead"] == ledger["auxiliary_overhead"],
                 "previous auxiliary booking changed or omitted"
             );
@@ -151,12 +156,18 @@ fn auxiliary_overhead(
         _ => bail!("unknown retained booking schema"),
     }
 }
-pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>, u64)> {
+pub(super) fn reservations(
+    review: &Value,
+) -> Result<(Vec<capacity::Reservation>, u64, Vec<periodic::Control>)> {
     let ledger = binding(&review["reservation_ledger"])?.sealed()?;
     ensure!(
         matches!(
             ledger["schema"].as_str(),
-            Some("horizon265-retained-reservations-v1" | "horizon265-retained-reservations-v2")
+            Some(
+                "horizon265-retained-reservations-v1"
+                    | "horizon265-retained-reservations-v2"
+                    | "horizon265-retained-reservations-v3"
+            )
         ) && ledger["Main_accepted"] == true
             && ledger["all_active_and_dormant_obligations_preserved"] == true
             && ledger["fleet"] == review["fleet"]
@@ -185,7 +196,11 @@ pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>
     ensure!(
         matches!(
             previous["schema"].as_str(),
-            Some("horizon265-prior-host-booking-v1" | "horizon265-prior-host-booking-v2")
+            Some(
+                "horizon265-prior-host-booking-v1"
+                    | "horizon265-prior-host-booking-v2"
+                    | "horizon265-prior-host-booking-v3"
+            )
         ) && previous["Main_accepted"] == true
             && previous["complete_host_booking"] == true,
         "missing prior complete host booking"
@@ -209,7 +224,8 @@ pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>
             "historical booking lowered without separate qualified transition"
         );
     }
-    Ok((rows, overhead))
+    let periodic = periodic::booking(&ledger, &previous, &rows)?;
+    Ok((rows, overhead, periodic))
 }
 pub(super) fn validate(
     n: &mut Native,
@@ -283,7 +299,9 @@ pub(super) fn validate(
         "complete cadence observation required"
     );
     super::super::inputs::capabilities(&binding(&review["input_capability"])?.sealed()?)?;
-    let (rows, auxiliary_overhead) = reservations(review)?;
+    let (rows, auxiliary_overhead, periodic) = reservations(review)?;
+    finalization::validate(&fleet, &observer, &rows, &boot)?;
+    finalization::verify_inputs(&fleet)?;
     ensure!(
         review["bounded_replacement_experiment_accepted"] == true
             && num(&fleet["memory_target"], "executing_lanes")?
@@ -291,7 +309,7 @@ pub(super) fn validate(
             && MEMORY <= num(&fleet["memory_target"], "reservation_ceiling_bytes")?,
         "replacement is not within the accepted memory-selected target and century allowance"
     );
-    let currents = live::census(n, review, &fleet, &rows, candidate)?;
+    let currents = live::census(n, review, &fleet, &rows, &periodic, candidate)?;
     let (total, available, disk) = live::resources()?;
     let obs_total = num(&observer["host_memory"], "total_kib")?
         .checked_mul(1024)
@@ -305,7 +323,7 @@ pub(super) fn validate(
         century,
         &rows,
         &currents,
-        auxiliary_overhead,
+        (auxiliary_overhead, periodic::total(&periodic)?),
     )?;
     let mut admission = json!({"schema":"horizon265-current-fleet-admission-v1","epoch":265,"mode":"ordinary-replay","unit":UNIT,
         "private_run_root":ROOT,"maximum_memory_bytes":MEMORY,"candidate_incremental_peak_bytes":SCRATCH,

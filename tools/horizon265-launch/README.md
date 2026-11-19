@@ -20,6 +20,37 @@ Private diagnostic owners remain unsupported and fail closed. All coexisting
 audit/delivery/build/launcher obligations must be represented. Guard/control
 maxima and measured non-lane resident use must fit the host reserve.
 
+The periodic-control v3 port from reviewed native211 commit `248c9b49` keeps the
+four original248–251 recurring guard caps as a separate4294967296-byte commitment,
+including between timer firings. Both hard physical-memory obligations and
+remaining growth retain that full amount without RSS credit. The fixed
+2640509440-byte auxiliary overhead and original per-field booking provenance
+remain unchanged. Epoch265 still reserves its own1073741824-byte guard inside
+the1610612736-byte ordinary control reserve; native211's smaller guard cap is
+not substituted. Candidate replay bounds remain128000000000 bytes memory and
+506191984640 bytes scratch.
+
+Use matching `horizon265-retained-reservations-v3` and
+`horizon265-prior-host-booking-v3` documents with identical `auxiliary_overhead`
+and `periodic_controls` objects. `periodic-controls.example.json` contains all
+four exact original service/timer/plan/executable bindings. Missing, reduced,
+duplicated or replaced members fail; legacy ledgers cannot omit the envelope
+while retaining any of those producers. These controls cannot also appear in
+ordinary `control_units` or producer reservations. Each original cap, immutable
+source, stable command, timer deadline, mapped image, process membership and
+kernel bound is checked twice. Only volatile PID1 execution history is excluded
+from command comparison; changed argv or ignore-errors policy still fails.
+
+The same port admits only the registered original248–251 `producer-finalization`
+rows, preserving exact original IID/PID/node/manifest/command and matching EOF
+events between fleet and observer. Epoch251 keeps its128000000000-byte cap;
+248–250 keep251041591296 bytes each, plus full disk growth/floor. EOF changes
+phase only: no memory release, archive verification, publication or ordinary
+replay claim follows. Unknown pipeline/diagnostic owners fail closed. Exact
+profiles and input-image checks are retained from the reviewed source without
+changing original pins. Existing epoch265 capability, startup, source publication
+and guarded token checks remain required.
+
 The admission uses the entire fresh fleet and observer, complete canonical
 century census, original per-owner bookings and source containment in freshly
 fetched `origin/account-updates`. It requires room below the memory-selected

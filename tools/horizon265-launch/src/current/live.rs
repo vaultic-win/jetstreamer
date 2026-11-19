@@ -1,5 +1,7 @@
 //! Fresh PID1/kernel census, twice, with strict owner and terminal drainage checks.
 use super::*;
+// Preserve epoch265's actual 1GiB guard; native211's 256MiB guard is not its cap.
+const CANDIDATE_GUARD_CAP: u64 = 1_073_741_824;
 pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainStatus,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
 fn scalar(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
@@ -78,7 +80,7 @@ pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result
     ensure!(current <= cap, "kernel memory exceeds cap");
     Ok(current)
 }
-fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
+pub(super) fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
     ensure!(*budget > 0, "cgroup descendant bound");
     *budget -= 1;
     ensure!(
@@ -198,6 +200,7 @@ pub(super) fn census(
     review: &Value,
     fleet: &Value,
     rows: &[capacity::Reservation],
+    periodic: &[periodic::Control],
     candidate: bool,
 ) -> Result<BTreeMap<String, u64>> {
     let controls = review["control_units"]
@@ -205,7 +208,7 @@ pub(super) fn census(
         .context("control units")?;
     let mut control_names = BTreeSet::new();
     // The candidate's new protective guard is not yet installed in the old fleet.
-    let mut control_cap = 1_073_741_824;
+    let mut control_cap = CANDIDATE_GUARD_CAP;
     for c in controls {
         let unit = text(c, "unit")?;
         ensure!(
@@ -214,13 +217,23 @@ pub(super) fn census(
         );
         control_cap = capacity::add(control_cap, num(c, "maximum_memory_bytes")?)?;
     }
+    ensure!(control_cap <= CONTROL, "controls exceed control reserve");
     ensure!(
         capacity::add(
             control_cap,
             num(&fleet["memory_target"], "non_lane_resident_planning_bytes")?
         )? <= HOST,
-        "host resident allowance and all guard/control caps exceed host reserve"
+        "host resident allowance and candidate/ordinary control caps exceed host reserve"
     );
+    let periodic_names: BTreeSet<_> = periodic.iter().map(|c| c.unit.as_str()).collect();
+    ensure!(
+        periodic_names.len() == periodic.len()
+            && periodic_names.iter().all(|u| !control_names.contains(u)),
+        "duplicate periodic/ordinary control"
+    );
+    for c in periodic {
+        periodic::observe(n, c)?;
+    }
     let current_units = n.run(
         "/usr/bin/systemctl",
         &[
@@ -239,7 +252,8 @@ pub(super) fn census(
             r.unit.ends_with(".service")
                 && !r.unit.contains('/')
                 && r.unit != UNIT
-                && !control_names.contains(r.unit.as_str()),
+                && !control_names.contains(r.unit.as_str())
+                && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
         if r.release.is_some() {
@@ -269,16 +283,16 @@ pub(super) fn census(
         }
     }
     for a in fleet["active"].as_array().context("fleet active")? {
-        let owners = if a["producer"].is_object() && a["controller"].is_object() {
-            vec![&a["producer"], &a["controller"]]
-        } else {
-            ensure!(a["unit"].is_object(), "unknown active fleet owner shape");
-            vec![&a["unit"]]
-        };
-        for owner in owners {
-            let unit = text(owner, "Id")?;
+        if a["phase"] == "producer-finalization" {
+            let unit = text(&a["unit"], "Id")?;
+            let v = before.get(unit).context("dropped finalization owner")?;
+            same_owner(&a["unit"], v)?;
+            continue;
+        }
+        for role in ["producer", "controller"] {
+            let unit = text(&a[role], "Id")?;
             let v = before.get(unit).context("dropped active fleet owner")?;
-            same_owner(owner, v)?;
+            same_owner(&a[role], v)?;
         }
     }
     for line in std::str::from_utf8(&current_units)?.lines() {
@@ -291,13 +305,17 @@ pub(super) fn census(
         if candidate && matches!(unit, UNIT | GUARD_UNIT) {
             continue;
         }
+        if periodic_names.contains(unit) {
+            continue;
+        }
         if control_names.contains(unit) {
             let c = controls.iter().find(|c| c["unit"] == unit).unwrap();
             let v = n.show(unit)?;
             ensure!(
                 scalar(&v, "MemoryMax")? == num(c, "maximum_memory_bytes")?
                     && v["MemorySwapMax"] == "0"
-                    && v["ExecStart"] == c["expected_exec_start"]
+                    && periodic::stable_command(text(&v, "ExecStart")?)?
+                        == periodic::stable_command(text(c, "expected_exec_start")?)?
                     && v["Restart"] == "no",
                 "control service changed"
             );
@@ -322,6 +340,7 @@ pub(super) fn census(
         if campaign(unit) {
             ensure!(
                 control_names.contains(unit)
+                    || periodic_names.contains(unit)
                     || (candidate && matches!(unit, UNIT | GUARD_UNIT | TIMER)),
                 "unadmitted campaign job {unit}"
             );
@@ -332,6 +351,7 @@ pub(super) fn census(
         .keys()
         .map(|u| cg(u))
         .chain(control_names.iter().map(|u| cg(u)))
+        .chain(periodic_names.iter().map(|u| cg(u)))
         .chain(candidate.then(|| cg(UNIT)))
         .chain(candidate.then(|| cg(GUARD_UNIT)))
         .collect();
@@ -386,6 +406,10 @@ pub(super) fn census(
         let current = finite_owner(&after, &unit, text(&old, "InvocationID")?, cap)?;
         currents.entry(unit).and_modify(|v| *v = (*v).min(current));
     }
+    for c in periodic {
+        periodic::observe(n, c)?;
+    }
+    finalization::verify_inputs(fleet)?;
     Ok(currents)
 }
 pub(super) fn resources() -> Result<(u64, u64, u64)> {
@@ -412,4 +436,20 @@ pub(super) fn resources() -> Result<(u64, u64, u64)> {
         .checked_mul(stat.f_frsize as u64)
         .context("disk overflow")?;
     Ok((value("MemTotal")?, value("MemAvailable")?, disk))
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn epoch265_candidate_guard_keeps_original_cap_inside_ordinary_control_reserve() {
+        let template =
+            include_str!("../../config/horizon-265-replacement-20261119-protective-v1.service");
+        assert!(
+            template
+                .lines()
+                .any(|line| line == format!("MemoryMax={CANDIDATE_GUARD_CAP}"))
+        );
+        assert_eq!(CANDIDATE_GUARD_CAP, 1_073_741_824);
+        assert_eq!(CONTROL - CANDIDATE_GUARD_CAP, 536_870_912);
+    }
 }

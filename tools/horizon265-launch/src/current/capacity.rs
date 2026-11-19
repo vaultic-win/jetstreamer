@@ -22,11 +22,14 @@ pub(super) fn arithmetic(
     century: u64,
     rows: &[Reservation],
     currents: &BTreeMap<String, u64>,
-    auxiliary_overhead: u64,
+    (auxiliary_overhead, periodic_controls): (u64, u64),
 ) -> Result<Value> {
     ensure!(century > 0, "missing canonical century reserve");
-    let mut hard = add(add(HOST, CONTROL)?, auxiliary_overhead)?;
-    let mut growth = add(add(HOST, CONTROL)?, auxiliary_overhead)?;
+    let mut hard = add(
+        add(add(HOST, CONTROL)?, auxiliary_overhead)?,
+        periodic_controls,
+    )?;
+    let mut growth = hard;
     let mut disk_growth = 0;
     let mut inherited = century;
     let mut seen = BTreeSet::new();
@@ -77,7 +80,7 @@ pub(super) fn arithmetic(
         json!({"memory_obligation_after_bytes":hard,"remaining_hard_growth_bytes":growth,
         "protected_existing_floor_bytes":floor,"required_initial_free_bytes":disk_required,
         "host_memory_total_bytes":total,"available_memory_bytes":available,"observed_available_bytes":disk,
-        "host_reserve_bytes":HOST,"control_reserve_bytes":CONTROL,"fixed_auxiliary_overhead_bytes":auxiliary_overhead,"century_floor_bytes":century,
+        "host_reserve_bytes":HOST,"control_reserve_bytes":CONTROL,"fixed_auxiliary_overhead_bytes":auxiliary_overhead,"periodic_control_envelope_bytes":periodic_controls,"century_floor_bytes":century,
         "retained_disk_growth_bytes":disk_growth,"allocation_credit_taken_bytes":0}),
     )
 }
@@ -138,7 +141,8 @@ mod tests {
         assert_eq!(MEMORY, 128_000_000_000);
         assert_eq!(SCRATCH, 506_191_984_640);
         let auxiliary = 2_640_509_440;
-        let total = HOST + CONTROL + MEMORY + auxiliary;
+        let periodic = 4_294_967_296;
+        let total = HOST + CONTROL + MEMORY + auxiliary + periodic;
         let result = arithmetic(
             total,
             total,
@@ -146,7 +150,7 @@ mod tests {
             100,
             &[],
             &BTreeMap::new(),
-            auxiliary,
+            (auxiliary, periodic),
         )
         .unwrap();
         assert_eq!(result["memory_obligation_after_bytes"], total);
@@ -159,7 +163,7 @@ mod tests {
                 100,
                 &[],
                 &BTreeMap::new(),
-                auxiliary
+                (auxiliary, periodic)
             )
             .is_err()
         );
@@ -190,7 +194,7 @@ mod tests {
                 100,
                 &rows,
                 &BTreeMap::new(),
-                0
+                (0, 0)
             )
             .is_err()
         );
@@ -207,7 +211,7 @@ mod tests {
                 100,
                 &[row.clone()],
                 &BTreeMap::new(),
-                0
+                (0, 0)
             )
             .is_err()
         );
@@ -219,7 +223,7 @@ mod tests {
             100,
             &[row.clone()],
             &BTreeMap::new(),
-            0,
+            (0, 0),
         )
         .unwrap();
         assert_eq!(result["protected_existing_floor_bytes"], 110);
@@ -231,7 +235,7 @@ mod tests {
                 100,
                 &[row],
                 &BTreeMap::from([("peer.service".into(), 1)]),
-                0
+                (0, 0)
             )
             .is_err()
         );
@@ -244,13 +248,44 @@ mod tests {
         released.release = Some(Bound::new("/drain", "b".repeat(64)));
         let rows = [released];
         let currents = BTreeMap::new();
-        let v = arithmetic(total, total, u64::MAX, 100, &rows, &currents, auxiliary).unwrap();
+        let v = arithmetic(
+            total,
+            total,
+            u64::MAX,
+            100,
+            &rows,
+            &currents,
+            (auxiliary, 0),
+        )
+        .unwrap();
         assert_eq!(v["memory_obligation_after_bytes"], total);
         assert_eq!(v["remaining_hard_growth_bytes"], total);
         assert_eq!(v["fixed_auxiliary_overhead_bytes"], auxiliary);
         assert_eq!(v["protected_existing_floor_bytes"], 110);
-        assert!(arithmetic(total - 1, total, u64::MAX, 100, &rows, &currents, auxiliary).is_err());
-        assert!(arithmetic(total, total - 1, u64::MAX, 100, &rows, &currents, auxiliary).is_err());
+        assert!(
+            arithmetic(
+                total - 1,
+                total,
+                u64::MAX,
+                100,
+                &rows,
+                &currents,
+                (auxiliary, 0)
+            )
+            .is_err()
+        );
+        assert!(
+            arithmetic(
+                total,
+                total - 1,
+                u64::MAX,
+                100,
+                &rows,
+                &currents,
+                (auxiliary, 0)
+            )
+            .is_err()
+        );
         assert!(
             arithmetic(
                 u64::MAX,
@@ -259,7 +294,7 @@ mod tests {
                 100,
                 &rows,
                 &currents,
-                u64::MAX
+                (u64::MAX, 0)
             )
             .is_err()
         );
@@ -275,7 +310,7 @@ mod tests {
                 1,
                 &[r.clone(), r],
                 &BTreeMap::new(),
-                0
+                (0, 0)
             )
             .is_err()
         );
@@ -287,7 +322,7 @@ mod tests {
                 u64::MAX,
                 &[],
                 &BTreeMap::new(),
-                0
+                (0, 0)
             )
             .is_err()
         );
@@ -299,7 +334,65 @@ mod tests {
                 1,
                 &[],
                 &BTreeMap::from([("missing".into(), 1)]),
-                0
+                (0, 0)
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn periodic_controls_are_additional_full_hard_and_growth_even_without_active_processes() {
+        let periodic = 4_294_967_296;
+        let auxiliary = 2_640_509_440;
+        let total = HOST + CONTROL + MEMORY + auxiliary + periodic;
+        let rows = [];
+        let current = BTreeMap::new();
+        let result = arithmetic(
+            total,
+            total,
+            u64::MAX,
+            100,
+            &rows,
+            &current,
+            (auxiliary, periodic),
+        )
+        .unwrap();
+        assert_eq!(result["memory_obligation_after_bytes"], total);
+        assert_eq!(result["remaining_hard_growth_bytes"], total);
+        assert_eq!(result["periodic_control_envelope_bytes"], periodic);
+        assert_eq!(result["control_reserve_bytes"], CONTROL);
+        assert!(
+            arithmetic(
+                total - 1,
+                total,
+                u64::MAX,
+                100,
+                &rows,
+                &current,
+                (auxiliary, periodic)
+            )
+            .is_err()
+        );
+        assert!(
+            arithmetic(
+                total,
+                total - 1,
+                u64::MAX,
+                100,
+                &rows,
+                &current,
+                (auxiliary, periodic)
+            )
+            .is_err()
+        );
+        assert!(
+            arithmetic(
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                100,
+                &rows,
+                &current,
+                (0, u64::MAX)
             )
             .is_err()
         );
