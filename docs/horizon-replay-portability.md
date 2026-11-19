@@ -935,3 +935,26 @@ orphan proof and duplicate proof. Evidence is retained under
 The whole source-pressure, export, parent/cgroup exit, fresh restore and assembly
 lifecycle still needs qualification; accepting a standalone exit receipt does not
 establish that a usable mainnet checkpoint exists.
+
+The native adapter fixture now starts at the sealed synthetic bootstrap and
+delivers the prefix through the production transaction, entry, parent and block
+metadata notifiers. It requests SIGUSR1 during block delivery and deliberately
+leaves native execution queued until whole-block selection. Producer closure
+then drains the real scheduler into the historical adapter; the test freezes the
+native state, closes and independently converts the recorded prefix, exports a
+snapshot, verifies unchanged post-export state and reaps the source worker.
+A fresh worker restores that newly exported snapshot and executes the suffix
+against the uninterrupted transcript. The future terminal remains unsatisfied
+at pause and must match before suffix completion.
+
+Sealed native invocation `305ba9f6dd2147c190fcf44fcef75f43` passed under a 2 GB
+hard cap in 730 ms with a reported 252.6 MiB peak. Two earlier fixture attempts
+correctly rejected nonprivate test directories; their failure evidence remains
+preserved. The corrected package is
+`/var/lib/jetstreamer/horizon-pressure-notifier-native-20261119-v3`, with build
+and native journals under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-notifier-native-20261119-v1`.
+This joins real node callbacks, native execution, recording, export and restore.
+It still injects a synthetic decoded transcript and keeps the parent alive;
+CAR/network delivery, durable controller/parent restart, assembled full-epoch
+verification and mainnet pressure admission remain separate outstanding gates.

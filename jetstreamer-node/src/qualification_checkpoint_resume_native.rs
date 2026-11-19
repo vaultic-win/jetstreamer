@@ -25,7 +25,7 @@ type Transcript = (
 
 #[test]
 #[ignore = "requires hash-bound native v1.7.15 fixture and its sealed test launcher"]
-fn pressure_resume_native_adapter_executes_suffix_and_consumes_terminal() {
+fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     let input = PathBuf::from(std::env::var_os("JETSTREAMER_RESUME_NATIVE_FIXTURE").unwrap());
     let launcher = PathBuf::from(std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER").unwrap());
     let bytes = fs::read(input.join("native-transcript.bin")).unwrap();
@@ -40,11 +40,11 @@ fn pressure_resume_native_adapter_executes_suffix_and_consumes_terminal() {
     let (
         schema,
         genesis,
-        _,
-        _,
+        bootstrap,
+        prefix_entry,
         _,
         boundary,
-        export,
+        baseline_export,
         entries,
         baseline_results,
         terminal,
@@ -68,22 +68,28 @@ fn pressure_resume_native_adapter_executes_suffix_and_consumes_terminal() {
     saved.writes.clear();
     assert_eq!(saved, restored);
     let directory = tempfile::tempdir().unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    }
     let accounts_hash: [u8; 32] = boundary.accounts_hash.clone().try_into().unwrap();
-    let snapshot = directory.path().join(format!(
-        "snapshot-{}-{}.tar.bz2",
-        boundary.slot,
-        Hash::new_from_array(accounts_hash)
-    ));
-    fs::copy(input.join("native-snapshot.tar.bz2"), &snapshot).unwrap();
-    assert_eq!(
-        Sha256::digest(fs::read(&snapshot).unwrap()).as_slice(),
-        export.archive_sha256
-    );
+    assert_eq!(baseline_export.slot, boundary.slot);
     let profile = crate::historical::WorkerProfile {
         backend_id: "synthetic-v1.7.15-checkpoint-ipc-fixture",
         required_genesis_hash: Box::leak(genesis_hash.into_boxed_str()),
         ..crate::historical::SOLANA_V1_7_15_CANDIDATE
     };
+    let export = export_from_pressure_notifiers(
+        &input,
+        &launcher,
+        profile,
+        &bootstrap,
+        &prefix_entry,
+        &boundary,
+        &terminal,
+        directory.path(),
+    );
+    let snapshot = export.archive_path.clone();
     let mut client = HistoricalRuntimeClient::spawn(
         profile,
         crate::historical::WorkerSpawn {
@@ -94,7 +100,7 @@ fn pressure_resume_native_adapter_executes_suffix_and_consumes_terminal() {
                     archive_path: snapshot,
                     expected_slot: boundary.slot,
                     expected_accounts_hash: accounts_hash,
-                    expected_archive_sha256: Some(export.archive_sha256.try_into().unwrap()),
+                    expected_archive_sha256: Some(export.archive_sha256),
                     expected_archive_size: Some(export.archive_size),
                     scratch_parent: Some(directory.path().into()),
                 },
@@ -194,6 +200,326 @@ fn pressure_resume_native_adapter_executes_suffix_and_consumes_terminal() {
     let outcome = replay.shutdown_for_checkpoint().unwrap();
     assert!(outcome.worker_reap_verified());
     eprintln!(
-        "native pressure resume adapter: suffix executed, exact future terminal consumed, worker reaped; full firehose/controller/mainnet qualification=false"
+        "native pressure integration: production notifiers selected a queued complete block; scheduler drained through native execution; prefix recorded/converted; snapshot exported and source worker reaped; fresh worker executed suffix and consumed exact future terminal; full firehose/controller/mainnet qualification=false"
     );
+}
+
+/// Drive the real node callbacks with the sealed synthetic source transcript.
+/// The consumer starts only after selection, proving queued native work survives
+/// pressure. This deliberately does not impersonate a CAR/network-source test.
+#[allow(clippy::too_many_arguments)]
+fn export_from_pressure_notifiers(
+    input: &std::path::Path,
+    launcher: &std::path::Path,
+    profile: crate::historical::WorkerProfile,
+    bootstrap: &Checkpoint,
+    prefix: &EntryRequest,
+    boundary: &Checkpoint,
+    terminal: &Checkpoint,
+    directory: &std::path::Path,
+) -> crate::historical::HistoricalSnapshotExport {
+    use crate::*;
+    let _serial = source_checkpoint::SIGNAL_TEST_LOCK.lock().unwrap();
+    let _signal = source_checkpoint::SignalGuard::install().unwrap();
+    assert_eq!(
+        (bootstrap.slot, prefix.slot, boundary.slot, terminal.slot),
+        (0, 1, 1, 2)
+    );
+    let initial = directory.join(format!(
+        "snapshot-0-{}.tar.bz2",
+        Hash::new_from_array(bootstrap.accounts_hash.clone().try_into().unwrap())
+    ));
+    fs::copy(input.join("native-bootstrap.tar.bz2"), &initial).unwrap();
+    let client = HistoricalRuntimeClient::spawn(
+        profile,
+        historical::WorkerSpawn {
+            executable: launcher.into(),
+            initialization: historical::HistoricalInitialization::SnapshotArchive(
+                historical::SnapshotInitialization {
+                    ledger_path: input.into(),
+                    archive_path: initial.clone(),
+                    expected_slot: bootstrap.slot,
+                    expected_accounts_hash: bootstrap.accounts_hash.clone().try_into().unwrap(),
+                    expected_archive_sha256: Some(
+                        Sha256::digest(fs::read(&initial).unwrap()).into(),
+                    ),
+                    expected_archive_size: Some(fs::metadata(&initial).unwrap().len()),
+                    scratch_parent: Some(directory.into()),
+                },
+            ),
+        },
+    )
+    .unwrap();
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let failure = Arc::new(ReplayFailure::new(shutdown.clone()));
+    let progress = Arc::new(ReplayProgress::new(prefix.slot));
+    let verifier = Arc::new(SnapshotVerifier::new(
+        BTreeMap::from([
+            (
+                bootstrap.slot,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_from_array(
+                    bootstrap.accounts_hash.clone().try_into().unwrap(),
+                )),
+            ),
+            (
+                terminal.slot,
+                BankHashExpectation::LegacyAccountsHash(Hash::new_from_array(
+                    terminal.accounts_hash.clone().try_into().unwrap(),
+                )),
+            ),
+        ]),
+        None,
+    ));
+    let replay = Arc::new(
+        HistoricalReplay::new(
+            client,
+            Some(verifier.clone()),
+            failure.clone(),
+            Arc::new(ReplayCursor::new()),
+            progress.clone(),
+            prefix.slot,
+        )
+        .unwrap(),
+    );
+    let presence = Arc::new(SlotPresenceMap {
+        start: prefix.slot,
+        end_inclusive: terminal.slot,
+        states: vec![SlotPresenceState::Present; 2],
+        next_present_after: vec![None; 2],
+    });
+    let source = directory.join("closed-source.jet");
+    let provenance = jetstreamer_horizon::archive::ArchiveProvenanceV2 {
+        base: jetstreamer_horizon::archive::ArchiveProvenanceV1 {
+            generation_profile: "synthetic/pressure-notifier-native-v1".into(),
+            runtime_profile: "solana-v1.7.15".into(),
+            runtime_admission: jetstreamer_horizon::archive::RuntimeAdmission::Candidate,
+            runtime_revision: profile.solana_commit.into(),
+            runtime_toolchain: "sealed-native-test-image".into(),
+            genesis_hash: profile.required_genesis_hash.parse().unwrap(),
+            bootstrap_state_kind: jetstreamer_horizon::archive::BootstrapStateKind::SnapshotArchive,
+            bootstrap_slot: bootstrap.slot,
+            bootstrap_state_hash: Hash::new_from_array(bootstrap.accounts_hash.clone().try_into().unwrap()),
+            requested_slot_start: prefix.slot, requested_slot_count: 2,
+            transaction_metadata: jetstreamer_horizon::archive::TransactionMetadataPolicy::runtime_reconstructed_before(u64::MAX),
+        },
+        worker_executable_sha256: Sha256::digest(fs::read(launcher).unwrap()).into(),
+    };
+    horizon::init(
+        &source,
+        0,
+        prefix.slot,
+        2,
+        presence.clone(),
+        &provenance.into(),
+        Some((
+            bootstrap.slot,
+            Hash::new_from_array(bootstrap.last_blockhash.clone().try_into().unwrap()),
+        )),
+    )
+    .unwrap();
+    let scheduler = Arc::new(TransactionScheduler::new(
+        prefix.slot,
+        presence,
+        Arc::new(RestartTracker::new()),
+        0,
+    ));
+    let checkpoint_boundary =
+        Arc::new(source_checkpoint::Boundary::new(prefix.slot, terminal.slot).unwrap());
+    let (sender, receiver) = crossbeam_channel::bounded(16);
+    let gate = Arc::new(Mutex::new(()));
+    let active = Arc::new(Mutex::new(None));
+    let backpressure = Arc::new(AtomicBool::new(false));
+    let producers = ReplayReadyEntryProducers {
+        transaction: Arc::new(BankTransactionNotifier {
+            progress: progress.clone(),
+            scheduler: scheduler.clone(),
+            failure: failure.clone(),
+            ready_sender: sender.clone(),
+            shutdown: shutdown.clone(),
+            active_firehose_stop: active.clone(),
+            backpressure_stop_requested: backpressure.clone(),
+            firehose_backpressure_slot_gap_limit: 100,
+            firehose_gate: gate.clone(),
+        }),
+        entry: Arc::new(BankEntryNotifier {
+            progress: progress.clone(),
+            scheduler: scheduler.clone(),
+            failure: failure.clone(),
+            ready_sender: sender.clone(),
+            shutdown: shutdown.clone(),
+            active_firehose_stop: active.clone(),
+            backpressure_stop_requested: backpressure.clone(),
+            firehose_backpressure_slot_gap_limit: 100,
+            firehose_gate: gate.clone(),
+        }),
+        block_parent: Arc::new(BankBlockParentNotifier {
+            scheduler: scheduler.clone(),
+            failure: failure.clone(),
+            ready_sender: sender.clone(),
+            firehose_gate: gate.clone(),
+            checkpoint_boundary: Some(checkpoint_boundary.clone()),
+        }),
+        block_metadata: Arc::new(BankBlockMetadataNotifier {
+            scheduler: scheduler.clone(),
+            progress,
+            failure: failure.clone(),
+            ready_sender: sender.clone(),
+            live_start_slot: prefix.slot,
+            shutdown: shutdown.clone(),
+            active_firehose_stop: active,
+            backpressure_stop_requested: backpressure,
+            firehose_backpressure_slot_gap_limit: 100,
+            firehose_gate: gate,
+        }),
+    };
+    let notifiers = producers.geyser_notifiers();
+    producers
+        .block_parent
+        .notify_block_parent(bootstrap.slot, prefix.slot);
+    // Request while the source block is still being delivered. No callback is
+    // permitted to cancel shared execution or select a partial block.
+    assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+    for (index, bytes) in prefix.transactions.iter().enumerate() {
+        let legacy: solana_transaction::Transaction = bincode::deserialize(bytes).unwrap();
+        let tx = solana_transaction::versioned::VersionedTransaction::from(legacy);
+        assert_eq!(encode_legacy_transaction(&tx).unwrap(), *bytes);
+        producers
+            .transaction
+            .notify_transaction(SourcedTransaction {
+                slot: prefix.slot,
+                transaction_slot_index: index,
+                signature: &tx.signatures[0],
+                message_hash: &tx.message.hash(),
+                is_vote: false,
+                status: SourcedTransactionStatus::Missing,
+                transaction: &tx,
+            });
+    }
+    producers.entry.notify_entry(
+        prefix.slot,
+        prefix.entry_index.try_into().unwrap(),
+        &solana_entry::entry::EntrySummary {
+            num_hashes: prefix.num_hashes,
+            hash: Hash::new_from_array(prefix.hash.clone().try_into().unwrap()),
+            num_transactions: prefix.transactions.len() as u64,
+        },
+        0,
+    );
+    producers.block_metadata.notify_block_metadata(
+        bootstrap.slot,
+        &Hash::new_from_array(bootstrap.last_blockhash.clone().try_into().unwrap()).to_string(),
+        prefix.slot,
+        &Hash::new_from_array(boundary.last_blockhash.clone().try_into().unwrap()).to_string(),
+        &solana_runtime::bank::KeyedRewardsAndNumPartitions {
+            keyed_rewards: vec![],
+            num_partitions: None,
+        },
+        None,
+        None,
+        prefix.transactions.len() as u64,
+        1,
+    );
+    let completed = jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
+        slot: prefix.slot,
+        parent_slot: bootstrap.slot,
+        blockhash: boundary.last_blockhash.clone().try_into().unwrap(),
+        entries: 1,
+        transactions: prefix.transactions.len() as u64,
+    };
+    assert_eq!(
+        producers.block_parent.source_block_completed(completed),
+        jetstreamer_firehose::source_quiescence::SourceBlockAction::Quiesce
+    );
+    checkpoint_boundary.verify(completed).unwrap();
+    assert!(
+        !receiver.is_empty(),
+        "native work must still be queued at selection"
+    );
+    assert!(!shutdown.load(Ordering::SeqCst));
+    assert!(
+        failure.error_message().is_none(),
+        "{:?}",
+        failure.error_message()
+    );
+    send_ready_entries(&sender, &failure, scheduler.drain_ready_entries().unwrap());
+    let consumer = std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn({
+            let replay = replay.clone();
+            let failure = failure.clone();
+            let shutdown = shutdown.clone();
+            move || {
+                ready_entry_drain::consume(
+                    receiver,
+                    &shutdown,
+                    |entries| {
+                        replay.process_ready_entries(entries);
+                        failure.error_message().map_or(Ok(()), Err)
+                    },
+                    |_, _| {},
+                )
+            }
+        })
+        .unwrap();
+    let drained = ready_entry_drain::close(notifiers, producers, sender, consumer).unwrap();
+    assert_eq!(drained.entries, 1);
+    scheduler.verify_complete(boundary.slot).unwrap();
+    assert!(scheduler.verify_complete(terminal.slot).is_err());
+    replay.freeze_latest_bank().unwrap();
+    let before = replay.evidence().unwrap();
+    assert_eq!(before.terminal.slot, boundary.slot);
+    assert_eq!(before.terminal.bank_hash.as_slice(), boundary.bank_hash);
+    assert_eq!(
+        before.terminal.accounts_hash.as_slice(),
+        boundary.accounts_hash
+    );
+    assert_eq!(before.terminal.last_blockhash, completed.blockhash);
+    assert!(before.terminal.slot_complete);
+    assert!(
+        verifier.finish().is_err(),
+        "pause cannot discharge future terminal"
+    );
+    let checkpoint =
+        runtime_checkpoint_from_manifest(&segment_checkpoint_summary(&before.terminal)).unwrap();
+    horizon::close_checkpoint_prefix_source(&checkpoint).unwrap();
+    let export_directory = directory.join("export");
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&export_directory)
+            .unwrap();
+    }
+    let exported = replay
+        .export_snapshot(
+            boundary.slot,
+            &export_directory,
+            boundary.accounts_hash.clone().try_into().unwrap(),
+            ".tar.bz2",
+        )
+        .unwrap();
+    replay.freeze_latest_bank().unwrap();
+    checkpoint_export::validate_checkpoint_export_evidence(&before, &replay.evidence().unwrap())
+        .unwrap();
+    assert!(
+        replay
+            .shutdown_for_checkpoint()
+            .unwrap()
+            .worker_reap_verified()
+    );
+    let converted = jetstreamer_node::checkpoint_prefix::convert_closed_prefix(
+        &source,
+        &directory.join("prefix.jet"),
+        &jetstreamer_node::checkpoint_prefix::ClosedPrefixRange {
+            epoch: 0,
+            first_slot: prefix.slot,
+            intended_terminal: terminal.slot,
+            selected_terminal: boundary.slot,
+            terminal_blockhash: Hash::new_from_array(completed.blockhash),
+        },
+    )
+    .unwrap();
+    assert_eq!(converted.slot_count, 1);
+    assert!(failure.error_message().is_none());
+    exported
 }
