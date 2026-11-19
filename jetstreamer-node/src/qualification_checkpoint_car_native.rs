@@ -40,28 +40,37 @@ fn frame(bytes: Vec<u8>) -> Value {
     Array(vec![Integer(6), Null, Null, Null, Bytes(bytes)])
 }
 
-fn car_and_index(bootstrap: &Checkpoint, prefix: &EntryRequest) -> (Vec<u8>, Vec<u8>) {
+fn car_and_index(bootstrap: &Checkpoint, prefix_entries: &[EntryRequest]) -> (Vec<u8>, Vec<u8>) {
+    let prefix = prefix_entries.first().unwrap();
     assert_eq!((bootstrap.slot, prefix.slot, prefix.entry_index), (0, 1, 0));
     let mut payload = Vec::new();
-    let mut transactions = Vec::new();
-    for (index, tx) in prefix.transactions.iter().enumerate() {
+    let mut entries = Vec::new();
+    let mut transaction_index = 0;
+    for (entry_index, entry) in prefix_entries.iter().enumerate() {
+        assert_eq!(entry.slot, prefix.slot);
+        assert_eq!(entry.entry_index, entry_index as u64);
+        let mut transactions = Vec::new();
+        for tx in &entry.transactions {
+            let (cid, bytes) = node(Array(vec![
+                Integer(0),
+                frame(tx.clone()),
+                frame(vec![]),
+                Integer(entry.slot.into()),
+                Integer(transaction_index),
+            ]));
+            transaction_index += 1;
+            transactions.push(link(cid));
+            payload.extend(bytes);
+        }
         let (cid, bytes) = node(Array(vec![
-            Integer(0),
-            frame(tx.clone()),
-            frame(vec![]),
-            Integer(prefix.slot.into()),
-            Integer(index as i128),
+            Integer(1),
+            Integer(entry.num_hashes.into()),
+            Bytes(entry.hash.clone()),
+            Array(transactions),
         ]));
-        transactions.push(link(cid));
+        entries.push(link(cid));
         payload.extend(bytes);
     }
-    let (entry, bytes) = node(Array(vec![
-        Integer(1),
-        Integer(prefix.num_hashes.into()),
-        Bytes(prefix.hash.clone()),
-        Array(transactions),
-    ]));
-    payload.extend(bytes);
     let (rewards, bytes) = node(Array(vec![
         Integer(5),
         Integer(prefix.slot.into()),
@@ -72,7 +81,7 @@ fn car_and_index(bootstrap: &Checkpoint, prefix: &EntryRequest) -> (Vec<u8>, Vec
         Integer(2),
         Integer(prefix.slot.into()),
         Array(vec![]),
-        Array(vec![link(entry)]),
+        Array(entries),
         Array(vec![Integer(bootstrap.slot.into()), Integer(0), Null]),
         link(rewards),
     ]));
@@ -104,7 +113,7 @@ struct Mirror {
 }
 
 impl Mirror {
-    fn start(bootstrap: &Checkpoint, prefix: &EntryRequest) -> Self {
+    fn start(bootstrap: &Checkpoint, prefix_entries: &[EntryRequest]) -> Self {
         let base =
             reqwest::Url::parse(&std::env::var("JETSTREAMER_HTTP_BASE_URL").unwrap()).unwrap();
         assert_eq!(base.scheme(), "http");
@@ -121,7 +130,7 @@ impl Mirror {
         assert!(std::env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST").is_none());
         let listener = TcpListener::bind(("127.0.0.1", base.port().unwrap())).unwrap();
         listener.set_nonblocking(true).unwrap();
-        let (car, index) = car_and_index(bootstrap, prefix);
+        let (car, index) = car_and_index(bootstrap, prefix_entries);
         eprintln!(
             "synthetic HTTP CAR sha256={:x} bytes={} slot_index_sha256={:x}",
             Sha256::digest(&car),
@@ -263,14 +272,15 @@ impl jetstreamer_firehose::firehose::BlockParentNotifier for PressureParent {
 
 pub(super) fn deliver(
     bootstrap: &Checkpoint,
-    prefix: &EntryRequest,
+    prefix_entries: &[EntryRequest],
     producers: &crate::ReplayReadyEntryProducers,
     shutdown: Arc<AtomicBool>,
 ) -> jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
     use jetstreamer_firehose::firehose::{
         FirehoseError, firehose_geyser_with_notifiers_and_block_parent,
     };
-    let mirror = Mirror::start(bootstrap, prefix);
+    let prefix = prefix_entries.first().unwrap();
+    let mirror = Mirror::start(bootstrap, prefix_entries);
     let (confirmed_sender, _confirmed_receiver) = crossbeam_channel::unbounded();
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()

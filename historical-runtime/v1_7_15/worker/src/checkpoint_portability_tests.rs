@@ -19,6 +19,18 @@ fn checkpoint_export_recorder_transcript_probe() {
 }
 
 fn checkpoint_archive_restore_probe(use_export: bool) {
+    checkpoint_archive_restore_probe_with_prefix(use_export, false);
+}
+
+#[test]
+#[ignore]
+fn checkpoint_export_pressure_transcript_probe() {
+    assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT").is_some());
+    assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_LIVE_FIXTURE").is_some());
+    checkpoint_archive_restore_probe_with_prefix(true, true);
+}
+
+fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_prefix: bool) {
     use solana_runtime::{bank_forks::ArchiveFormat, snapshot_utils};
     const CHILD: &str = "JETSTREAMER_V1715_CHECKPOINT_PROBE_CHILD";
     if let Some(path) = std::env::var_os(CHILD) {
@@ -85,16 +97,48 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
     // Keep it distinct from the exported slot-1 checkpoint being qualified.
     let bootstrap_archives = tempfile::tempdir().unwrap();
     let bootstrap_export = if std::env::var_os("JETSTREAMER_CHECKPOINT_LIVE_FIXTURE").is_some() {
-        Some(uninterrupted.export_snapshot(
-            0, bootstrap_archives.path().to_str().unwrap(), &bootstrap.accounts_hash,
-        ).unwrap())
-    } else { None };
-    let prefix_tick = request_for(&uninterrupted, 1, 0, 1, &[]);
+        Some(
+            uninterrupted
+                .export_snapshot(
+                    0,
+                    bootstrap_archives.path().to_str().unwrap(),
+                    &bootstrap.accounts_hash,
+                )
+                .unwrap(),
+        )
+    } else {
+        None
+    };
+    let mut prefix_entries = Vec::new();
+    let mut prefix_results = Vec::new();
+    if transaction_prefix {
+        let recipient = Keypair::new();
+        let transaction = system_transaction::transfer(
+            &genesis.mint_keypair,
+            &recipient.pubkey(),
+            17,
+            uninterrupted.bank.last_blockhash(),
+        );
+        let entry = request_for(&uninterrupted, 1, 0, 1, &[transaction]);
+        let result = uninterrupted.process_entry(entry.clone()).unwrap();
+        assert_eq!(result.outcomes.len(), 1);
+        assert_eq!(result.outcomes[0].error, None);
+        assert_eq!(uninterrupted.bank.get_balance(&recipient.pubkey()), 17);
+        prefix_entries.push(entry);
+        prefix_results.push(result);
+    }
+    let prefix_tick = request_for(&uninterrupted, 1, prefix_entries.len() as u64, 1, &[]);
     let prefix_processed = uninterrupted.process_entry(prefix_tick.clone()).unwrap();
+    prefix_entries.push(prefix_tick.clone());
+    prefix_results.push(prefix_processed.clone());
 
     // Bind the real worker checkpoint before serializer housekeeping. Preparing
     // hashes after housekeeping could conceal an export-induced consensus change.
     let before = uninterrupted.freeze_checkpoint(1).unwrap();
+    assert_eq!(
+        before.transaction_count - bootstrap.transaction_count,
+        u64::from(transaction_prefix)
+    );
     let cursor = uninterrupted
         .bank
         .accounts()
@@ -310,26 +354,54 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
         assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
         assert_eq!(metadata.mode() & 0o077, 0);
         assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
-        let transcript = bincode::serialize(&(
-            "horizon-native-checkpoint-recorder-transcript-v1".to_string(),
-            genesis.genesis_config.hash().as_ref().to_vec(),
-            bootstrap,
-            prefix_tick,
-            prefix_processed,
-            before,
-            export_evidence.expect("transcript requires actual export"),
-            vec![entry, tick],
-            vec![expected, expected_tick],
-            expected_checkpoint,
-            restored_bootstrap,
-            vec![processed, ticked],
-            checkpoint,
-            std::process::id(),
-            pid,
-        ))
-        .unwrap();
+        let transcript = if transaction_prefix {
+            bincode::serialize(&(
+                "horizon-native-pressure-recorder-transcript-v2".to_string(),
+                genesis.genesis_config.hash().as_ref().to_vec(),
+                bootstrap,
+                prefix_entries,
+                prefix_results,
+                before,
+                export_evidence.expect("transcript requires actual export"),
+                vec![entry, tick],
+                vec![expected, expected_tick],
+                expected_checkpoint,
+                restored_bootstrap,
+                vec![processed, ticked],
+                checkpoint,
+                std::process::id(),
+                pid,
+            ))
+            .unwrap()
+        } else {
+            bincode::serialize(&(
+                "horizon-native-checkpoint-recorder-transcript-v1".to_string(),
+                genesis.genesis_config.hash().as_ref().to_vec(),
+                bootstrap,
+                prefix_tick,
+                prefix_processed,
+                before,
+                export_evidence.expect("transcript requires actual export"),
+                vec![entry, tick],
+                vec![expected, expected_tick],
+                expected_checkpoint,
+                restored_bootstrap,
+                vec![processed, ticked],
+                checkpoint,
+                std::process::id(),
+                pid,
+            ))
+            .unwrap()
+        };
         for (name, bytes) in &[
-            ("native-transcript.bin", transcript),
+            (
+                if transaction_prefix {
+                    "native-pressure-transcript.bin"
+                } else {
+                    "native-transcript.bin"
+                },
+                transcript,
+            ),
             ("native-snapshot.tar.bz2", std::fs::read(&archive).unwrap()),
         ] {
             let mut file = std::fs::OpenOptions::new()
@@ -343,11 +415,21 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
         }
         if let Some(initial) = bootstrap_export {
             for (name, bytes) in &[
-                ("native-genesis.bin", bincode::serialize(&genesis.genesis_config).unwrap()),
-                ("native-bootstrap.tar.bz2", std::fs::read(&initial.archive_path).unwrap()),
+                (
+                    "native-genesis.bin",
+                    bincode::serialize(&genesis.genesis_config).unwrap(),
+                ),
+                (
+                    "native-bootstrap.tar.bz2",
+                    std::fs::read(&initial.archive_path).unwrap(),
+                ),
             ] {
-                let mut file = std::fs::OpenOptions::new().write(true).create_new(true)
-                    .mode(0o400).open(root.join(name)).unwrap();
+                let mut file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .mode(0o400)
+                    .open(root.join(name))
+                    .unwrap();
                 file.write_all(bytes).unwrap();
                 file.sync_all().unwrap();
             }
