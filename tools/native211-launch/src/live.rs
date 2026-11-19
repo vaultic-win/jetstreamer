@@ -4,6 +4,14 @@ pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,M
 fn scalar(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
 }
+fn kernel_memory_cap(configured: u64, page_size: i64) -> Result<u64> {
+    let page = u64::try_from(page_size).context("invalid native page size")?;
+    ensure!(
+        page.is_power_of_two() && configured >= page,
+        "invalid memory page/cap"
+    );
+    Ok(configured / page * page)
+}
 fn cg(unit: &str) -> String {
     format!("/system.slice/{unit}")
 }
@@ -56,7 +64,7 @@ pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result
         fs::read_to_string(root.join("memory.max"))?
             .trim()
             .parse::<u64>()?
-            == cap
+            == kernel_memory_cap(cap, unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?
             && fs::read_to_string(root.join("memory.swap.max"))?.trim() == "0",
         "kernel cap differs {unit}"
     );
@@ -490,6 +498,21 @@ pub(super) fn resources() -> Result<(u64, u64, u64)> {
 #[cfg(test)]
 mod drain_tests {
     use super::*;
+    #[test]
+    fn kernel_cap_matches_linux_page_rounding_without_reducing_booking() {
+        assert_eq!(
+            kernel_memory_cap(7_000_000_000, 4096).unwrap(),
+            6_999_998_464
+        );
+        assert_eq!(
+            kernel_memory_cap(128_000_000_000, 4096).unwrap(),
+            128_000_000_000
+        );
+        assert!(kernel_memory_cap(7_000_000_000, -1).is_err());
+        assert!(kernel_memory_cap(7_000_000_000, 0).is_err());
+        assert!(kernel_memory_cap(7_000_000_000, 3000).is_err());
+        assert!(kernel_memory_cap(1, 4096).is_err());
+    }
     // Actual epoch247 terminal-drain v1 producer.unit, retained 2026-11-19.
     // Events and unrelated proof fields are omitted: this tests the identity reader,
     // not a substitute drain/admission receipt.
