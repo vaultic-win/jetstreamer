@@ -51,14 +51,26 @@ inherit that artifact's runtime qualification. The build recipe, verbose compile
 commands, source digests, resolver output and PID1 journal are retained under
 `/home/ubuntu/.codex/diagnostics/horizon-native211-build-20261119-v1`.
 
-Native admission, a persistent service, exact MainPID guard tuple, running and
-terminal capture, fleet/status lifecycle and observer registration remain to be
+Native admission, a persistent service, running and terminal capture,
+fleet/status lifecycle and observer registration remain to be
 implemented and qualified for 211. The 210 lifecycle supplies integrity and
 terminal-capture patterns, but its admission depends on historical 209/227 peer
 identities and is not a current-fleet admission route. A new admission must
 preserve every actual live/terminal obligation, existing guard floor and actual
 hard-memory cap, with fresh complete-fleet evidence and race checks. A future
 producer completion releases no reservation until independently proved.
+
+The `epoch211-native-main-guard` feature now provides the closed guard tuple
+for `archive-211-v1616-native-input-actual-v1.service`, run root
+`/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1`, and the exact
+sealed harness at
+`/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test`
+with the digest above. It retains the 300 GB physical root and 3,500,000 VMA
+ceilings, requires an actual MainPID greater than one, and admits no bounded
+experiment exceptions. The separate candidate guard includes the existing
+`epoch223-native20-prefix-guard` feature as well. This does not replace any
+running guard or prove an actual first guard fire; the native service and
+complete current-fleet lifecycle remain required before execution.
 
 Publish all required source to `origin/account-updates` before admission. Native
 success still does not admit full replay: the full singleton needs its own

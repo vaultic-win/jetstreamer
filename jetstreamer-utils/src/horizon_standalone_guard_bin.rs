@@ -1182,6 +1182,13 @@ mod tests {
                 cfg!(feature = "epoch210-native-main-guard"),
             ),
             (
+                "archive-211-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1",
+                "/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test",
+                "b0b1185584680eae2b644c38a0c7d3f4240e0f4af392caa8e419300f2ac17df5",
+                cfg!(feature = "epoch211-native-main-guard"),
+            ),
+            (
                 "horizon-native-input-228-capped-1bfa8d51-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1",
                 "/var/lib/jetstreamer/horizon-228-native-test-optimized-d3fe9c72-v1/native-input-test",

@@ -11,6 +11,7 @@ documentation.workspace = true
 
 [features]
 epoch210-native-main-guard = ["epoch227-native-main-guard"]
+epoch211-native-main-guard = ["epoch227-native-main-guard"]
 epoch227-native-main-guard = []
 # Reuse the native observer, with one additional closed 207 tuple. Each plan
 # must match its full tuple; this remains compatible with utils --all-features.

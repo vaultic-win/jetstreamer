@@ -54,6 +54,15 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
             )
         && n.sha256 == "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6";
+    let profile211 = cfg!(feature = "epoch211-native-main-guard")
+        && p.unit == "archive-211-v1616-native-input-actual-v1.service"
+        && p.worker_root
+            == Path::new("/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1")
+        && n.executable
+            == Path::new(
+                "/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test",
+            )
+        && n.sha256 == "b0b1185584680eae2b644c38a0c7d3f4240e0f4af392caa8e419300f2ac17df5";
     let profile228 = cfg!(feature = "epoch228-native-main-guard")
         && p.unit == "horizon-native-input-228-capped-1bfa8d51-v1.service"
         && p.worker_root
@@ -80,6 +89,7 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
             || profile207
             || profile209
             || profile210
+            || profile211
             || profile228
             || profile251)
             && n.main_pid > 1
