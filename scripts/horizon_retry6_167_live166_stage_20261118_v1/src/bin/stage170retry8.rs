@@ -235,8 +235,7 @@ fn process_claims() -> Result<Vec<Value>> {
 const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
-const PREPARER: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
+const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
 const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V3_SHA256");
 const GUARD: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
@@ -312,7 +311,7 @@ fn generation(v: &Value) -> Result<(PathBuf, String, String)> {
     let root = Path::new(ROOT).join(format!("guard-witness-{tag}"));
     let unit = format!("horizon-170-retry8-witness-{tag}-20261119.service");
     let dest = format!(
-        "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}"
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/data-contract-{tag}"
     );
     ensure!(
         v["output_root"] == root.to_str().unwrap()
@@ -395,6 +394,18 @@ fn own_witness() -> Result<()> {
     ensure!(
         load.trim() == "not-found",
         "witness unit generation already consumed"
+    );
+    let parent = Path::new(&contract_destination)
+        .parent()
+        .context("contract parent")?;
+    let meta = fs::symlink_metadata(parent)?;
+    ensure!(
+        parent.canonicalize()? == parent
+            && meta.is_dir()
+            && meta.uid() == 0
+            && meta.mode() & 0o022 == 0
+            && meta.dev() == fs::metadata("/home/sol")?.dev(),
+        "fresh contract parent must be protected and HOME-backed"
     );
     private_new(&root)?;
     ensure!(
@@ -935,8 +946,13 @@ mod tests {
     }
     #[test]
     fn generation_requires_disjoint_exact_names() {
-        let good = json!({"generation":"v2","output_root":format!("{ROOT}/guard-witness-v2"),"unit":"horizon-170-retry8-witness-v2-20261119.service","contract_destination":"/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2"});
+        let good = json!({"generation":"v2","output_root":format!("{ROOT}/guard-witness-v2"),"unit":"horizon-170-retry8-witness-v2-20261119.service","contract_destination":"/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/data-contract-v2"});
         generation(&good).unwrap();
+        let mut root_backed = good.clone();
+        root_backed["contract_destination"] = json!(
+            "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2"
+        );
+        assert!(generation(&root_backed).is_err());
         for k in ["generation", "output_root", "unit", "contract_destination"] {
             let mut bad = good.clone();
             bad[k] = json!("../v1");
@@ -1094,7 +1110,10 @@ mod launch_plan {
     pub(super) fn published_sources() -> Result<String> {
         let commit = git(&["rev-parse", "HEAD"])?;
         git(&[
-            "merge-base", "--is-ancestor", commit.trim(), "origin/account-updates",
+            "merge-base",
+            "--is-ancestor",
+            commit.trim(),
+            "origin/account-updates",
         ])?;
         for (path, compiled_sha) in [
             (
@@ -1143,9 +1162,9 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v5/launch";
+        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v6/launch";
         ensure!(
-            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V5_SHA256"),
+            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V6_SHA256"),
             "sealed launcher differs"
         );
         let commit = published_sources()?;
