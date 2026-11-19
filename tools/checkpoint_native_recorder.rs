@@ -273,7 +273,12 @@ fn segment(
                 },
             ));
         }
-        recorder.record_committed_entry(slot, entry.entry_index, entry.num_hashes, committed);
+        recorder.record_committed_entry(
+            slot,
+            entry.entry_index.try_into()?,
+            entry.num_hashes,
+            committed,
+        );
     }
     require(
         previous == hash(&end.last_blockhash)?,
@@ -331,8 +336,20 @@ impl SlotVisitor for Observed {
             .as_ref()
             .to_vec();
         self.transactions.push((slot, signature.clone(), tx.fee));
-        for u in tx.iter_account_updates() {
-            self.update(slot, Some(signature.clone()), &u);
+        for (u, data) in tx.iter_account_updates() {
+            self.update(
+                slot,
+                Some(signature.clone()),
+                &AccountUpdateView {
+                    pubkey: u.pubkey,
+                    lamports: u.lamports,
+                    owner: u.owner,
+                    executable: u.executable,
+                    rent_epoch: u.rent_epoch,
+                    write_version: u.write_version,
+                    data,
+                },
+            );
         }
     }
 }
