@@ -157,10 +157,20 @@ pub(super) fn proof(p: &Plan) -> Result<Value> {
     let top = Path::new("/tmp/holding141-target/debug/jetstreamer-r2");
     let top_md = fs::symlink_metadata(top)?;
     ensure!(
-        top_md.is_file() && top_md.dev() == 2304 && top_md.ino() == 6702706 && top_md.nlink() == 2,
+        top_md.is_file() && top_md.dev() == 2304 && top_md.ino() == 6714227 && top_md.nlink() == 2,
         "preserved working image changed"
     );
+    let successor = "/usr/local/lib/jetstreamer/horizon-holding166-retry6-retirement-20261119-v1/jetstreamer-r2";
+    let (successor_sha, successor_md) = hash_file(Path::new(successor), 256 << 20)?;
+    ensure!(
+        successor_sha == "cedb4ac0d62af1d2c9f7d90368348bbc094e6a12934c6b743f5c6bf82a18cf6d"
+            && successor_md.uid() == 0
+            && successor_md.mode() & 0o222 == 0
+            && hash_file(top, 256 << 20)?.0 == successor_sha,
+        "working successor lacks its independent sealed copy"
+    );
     let retained = json!({"sealed_image":sealed,"sealed_sha256":sealed_sha,"top_level_image":top,
+        "sealed_successor":successor,"sealed_successor_sha256":successor_sha,
         "top_level_identity":evidence::identity(&top_md)});
     let deployed = deployment(p)?;
     Ok(
