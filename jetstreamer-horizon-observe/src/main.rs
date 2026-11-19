@@ -26,6 +26,7 @@ use {
 
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
+mod cgroup_limits;
 mod host_pressure;
 mod native_input_diagnostic;
 mod prefix_output204205;
@@ -968,7 +969,15 @@ fn split_memory_stat(
 fn observe_cgroup(control_group: &str) -> Result<CgroupObservation> {
     let path = resolve_cgroup(control_group)?;
     let mut gauges = BTreeMap::new();
-    for name in ["memory.current", "memory.peak", "pids.current", "pids.peak"] {
+    for name in [
+        "memory.current",
+        "memory.peak",
+        "memory.max",
+        "memory.high",
+        "memory.swap.max",
+        "pids.current",
+        "pids.peak",
+    ] {
         gauges.insert(name.to_owned(), parse_integer_file(&path.join(name))?);
     }
     let memory_stat = parse_counter_file(&path.join("memory.stat"), "memory_stat")?;
@@ -2044,6 +2053,7 @@ fn run(config: Config) -> Result<()> {
         }
     });
     value["lane_rss_history"] = rss::history(&previous_value, &value)?;
+    value["observed_cgroup_memory_limits"] = cgroup_limits::report(&value);
     write_no_clobber(&config.output, &value)
 }
 
@@ -2062,6 +2072,31 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "isolated cgroup limit telemetry with fixed native service caps"]
+    fn native_cgroup_limits_match_kernel_and_deduplicate_self() {
+        let unit = env::var("JETSTREAMER_OBSERVER_LIMITS_NATIVE_UNIT").unwrap();
+        assert!(unit.starts_with("horizon-hard-memory-observer-native-"));
+        let invocation = env::var("INVOCATION_ID").unwrap();
+        let before = observe_unit(&unit, &invocation).unwrap();
+        let after = observe_unit(&unit, &invocation).unwrap();
+        for observation in [&before, &after] {
+            assert_eq!(observation.cgroup.gauges["memory.max"], Some(268435456));
+            assert_eq!(observation.cgroup.gauges["memory.high"], Some(134217728));
+            assert_eq!(observation.cgroup.gauges["memory.swap.max"], Some(0));
+        }
+        let report = cgroup_limits::report(&serde_json::json!({"replays":[{
+            "invocation_binding_stable":true,"controller_before":before,"producer_before":before,
+            "controller_after":after,"producer_after":after
+        }]}));
+        assert_eq!(report["status"], "observed", "{report}");
+        assert_eq!(report["distinct_cgroup_count"], 1);
+        assert_eq!(report["sum_memory_max_bytes"], 268435456);
+        assert_eq!(report["owners"][0]["invocation_id"], invocation);
+        assert_eq!(report["admission_authorized"], false);
+        println!("native cgroup limits and deduplicated claim: {report}");
+    }
 
     fn preflight_fixture(root: &Path) -> Value {
         serde_json::json!({
