@@ -1,5 +1,30 @@
 # Epoch 211 native input preparation
 
+## Accepted native execution on 2026-11-19
+
+The gated native input test completed successfully under invocation
+`9267f2c2c64949c29b9da7c27a46df94` of
+`archive-211-v1616-native-input-actual-v1.service`. The original MainPID was
+1264515. Its first genuine protective timer completion opened the startup gate;
+the test then restored slot 91151575, matched canonical accounts hash
+`xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx`, and reported zero replay entries
+and bootstrap writes. The single native test passed in 522.25 seconds, followed
+by clean PID1 completion.
+
+The qualified capture helper accepted the immutable terminal proof at
+`/var/lib/jetstreamer/horizon-native211-terminal-proof-1836-v1/proof.json`,
+SHA-256 `97b3ae139f81af08fed1f0e94ccd9606b838d742fb679939969dd79e0ae357e5`.
+Its running origin, actual guard evidence, raw child/PID1 journal, original
+admission and source provenance remain bound through that proof. The terminal
+fleet event preserves the original resource sample and historical claim.
+
+This supersedes the pending native admission/execution statements in the
+preparation history below. Full singleton replay still requires its own
+capability, current-fleet admission, guard and lifecycle qualification. Do not
+rerun the successful cold-input test or treat its result as full-epoch proof.
+
+## Preparation history
+
 The test-only `worker/src/native211_input.rs` profile uses the shared v1.6.16
 cold-input checks to restore and freeze epoch 211's exact bootstrap. It requires
 the canonical accounts commitment, zero replay entries/bootstrap writes and
