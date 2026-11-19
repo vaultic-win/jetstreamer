@@ -98,6 +98,8 @@ struct ProcessIdentity {
     start: u64,
     optional_links: bool,
     kernel_thread: bool,
+    terminal: bool,
+    threads: u64,
 }
 fn process_identity(root: &Path) -> Result<Option<ProcessIdentity>> {
     let Some(raw) = read_process(&root.join("stat"), root)? else {
@@ -113,7 +115,29 @@ fn process_identity(root: &Path) -> Result<Option<ProcessIdentity>> {
         start,
         optional_links: flags & 0x00200000 != 0 || matches!(fields[0], "Z" | "X"),
         kernel_thread: flags & 0x00200000 != 0,
+        terminal: matches!(fields[0], "Z" | "X"),
+        threads: fields[17].parse()?,
     }))
+}
+fn has_no_userspace_environment(root: &Path, before: ProcessIdentity) -> Result<bool> {
+    if before.kernel_thread {
+        return Ok(true);
+    }
+    if !before.terminal || before.threads != 1 {
+        return Ok(false);
+    }
+    // A zombie group leader may still have live sibling threads. Only a
+    // complete one-task census with the same terminal identity proves absence.
+    let mut tasks = fs::read_dir(root.join("task"))?;
+    let Some(task) = tasks.next().transpose()? else {
+        return Ok(false);
+    };
+    ensure!(
+        tasks.next().transpose()?.is_none(),
+        "terminal task has sibling threads"
+    );
+    Ok(root.file_name() == Some(task.file_name().as_os_str())
+        && process_identity(&task.path())? == Some(before))
 }
 fn environment(root: &Path, before: ProcessIdentity) -> Result<Option<Vec<u8>>> {
     environment_result(read_process(&root.join("environ"), root), root, before)
@@ -129,13 +153,13 @@ fn environment_result(
             if error
                 .downcast_ref::<std::io::Error>()
                 .is_some_and(|e| e.raw_os_error() == Some(libc::ESRCH))
-                && before.kernel_thread =>
+                && has_no_userspace_environment(root, before)? =>
         {
             // Kernel threads have no userspace mm/environment. Still inspect
             // their links, maps and descriptors, and require the same identity.
             ensure!(
                 process_identity(root)? == Some(before),
-                "kernel task changed while reading environment"
+                "task changed while reading absent environment"
             );
             Ok(Some(Vec::new()))
         }
@@ -313,6 +337,34 @@ mod tests {
         let user = process_identity(root).unwrap().unwrap();
         assert!(environment_result(error(libc::ESRCH), root, user).is_err());
         assert!(environment_result(error(libc::ESRCH), root, before).is_err());
+    }
+    #[test]
+    fn zombie_environment_requires_complete_single_terminal_task_census() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("12345");
+        let task = root.join("task/12345");
+        fs::create_dir_all(&task).unwrap();
+        let stat = b"12345 (node) Z 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 0 1 0 10 1\n";
+        fs::write(root.join("stat"), stat).unwrap();
+        fs::write(task.join("stat"), stat).unwrap();
+        let before = process_identity(&root).unwrap().unwrap();
+        let error = || Err(std::io::Error::from_raw_os_error(libc::ESRCH).into());
+        assert!(before.terminal && before.threads == 1);
+        assert_eq!(
+            environment_result(error(), &root, before).unwrap(),
+            Some(vec![])
+        );
+        fs::create_dir(root.join("task/12346")).unwrap();
+        assert!(environment_result(error(), &root, before).is_err());
+        fs::remove_dir(root.join("task/12346")).unwrap();
+        fs::write(
+            task.join("stat"),
+            String::from_utf8_lossy(stat).replace(") Z", ") S"),
+        )
+        .unwrap();
+        assert!(environment_result(error(), &root, before).is_err());
+        fs::remove_file(task.join("stat")).unwrap();
+        assert!(environment_result(error(), &root, before).is_err());
     }
     #[test]
     fn exact_reference_has_both_boundaries() {

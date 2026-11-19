@@ -1,6 +1,6 @@
 # Focused169 compiler output cleanup
 
-The isolated build passes **30 tests** (18 policy/filesystem, 10 process-reference
+The isolated build defines **31 tests** (18 policy/filesystem, 11 process-reference
 and 2 staged-alias tests), strict Clippy on all targets, and rustfmt. The special
 inode test uses a FIFO so the long isolated TMPDIR does not exceed the Unix socket
 pathname limit. Native consumer review, check, deployment and retirement remain
@@ -14,6 +14,9 @@ The native check additionally exposed `/proc/2/environ` returning ESRCH for
 `kthreadd`. Only a positively identified kernel thread with the same before/after
 identity may treat that error as an absent userspace environment. Its links,
 maps and descriptors are still scanned. Other errors and userspace tasks fail.
+For terminal userspace tasks, a complete task-directory census must prove that
+only the same terminal task remains; a zombie leader with other threads is not
+exempt. The successor also verifies the task identity after this census.
 
 The fixed profile selects these three existing DATA directories, by device,
 inode, owner and mode:
@@ -86,10 +89,10 @@ between the positive check and retirement.
 Commit/push the package and verify remote containment before operational use.
 Normally seal the new executable to:
 
-`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v6/cleanup`
+`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v7/cleanup`
 
 The same package must contain root-owned immutable `artifact-proof.json` with
-`source_commit`, `production_sha256`, `tests_passed: 30`,
+`source_commit`, `production_sha256`, `tests_passed: 31`,
 `clippy_all_targets_passed: true`, and `sources` mapping **every tracked file in
 this package** to its SHA256. Preserve the actual test/build/native evidence in
 that proof. The runtime validates the ordinary deployment seal's cleanup and
