@@ -1039,6 +1039,15 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     }
     attempt
 }
+const LAUNCH_IMAGE: &str =
+    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch";
+fn require_launch_image(exe: &Path) -> Result<()> {
+    ensure!(
+        exe == Path::new(LAUNCH_IMAGE),
+        "sealed successor launch image required"
+    );
+    Ok(())
+}
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
     ensure!(
@@ -1050,12 +1059,7 @@ fn run() -> Result<()> {
     );
     ensure!(unsafe { libc::geteuid() } == 0, "Root identity required");
     let exe = fs::read_link("/proc/self/exe")?;
-    ensure!(
-        exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch"
-        ),
-        "sealed launch image required"
-    );
+    require_launch_image(&exe)?;
     fixed(exe.to_str().context("executable UTF8")?, &args[5], 64 << 20)?;
     let plan_bytes = read_regular(Path::new(&args[1]), 1 << 20, true)?;
     ensure!(digest(&plan_bytes) == args[3], "launch plan digest differs");
@@ -1082,6 +1086,17 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn successor_image_rejects_both_predecessor_destinations() {
+        require_launch_image(Path::new(LAUNCH_IMAGE)).unwrap();
+        for path in [
+            "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch",
+            "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v1/launch",
+            "/tmp/launch",
+        ] {
+            assert!(require_launch_image(Path::new(path)).is_err());
+        }
+    }
     #[test]
     fn producer_route_requires_exact_epoch_and_unit() {
         let good = vec![
