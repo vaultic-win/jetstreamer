@@ -486,3 +486,26 @@ is not before 00:54:41; the sealed v70 configuration passes static validation.
 The synthetic v1.7.15 recovery probe now passes, as recorded in
 `docs/horizon-replay-portability.md`, but production recovery and another lane's
 admission remain unqualified. The goal and all five replay owners remain active.
+
+At 2026-11-19 00:58 UTC the checkout fast-forwarded to freshly fetched
+`d968b7854b6365a99b5852077f8c8c1923dc1531`. Comparison against qualified
+`ed61722d` returned no differences across every path in the current-reader
+gate's conservative source/dependency/build closure. Remote containment passed
+for export `335af895`, actual-worker mainnet probe `d4fe2ada`, results
+`03dbd907`, uploader `0711b1f2` and repaired node `1ae137f7`; the checkout has
+no tracked edits. These checks establish published source and reader equivalence,
+not a completed historical compatibility audit. Epoch admission still requires
+its exact deployed source/build provenance and all required code merged first.
+
+The 00:55:21 coordinated sample and all five authenticated status readbacks are
+now reconciled in `horizon-fleet-cycle0055-20261119-v1/fleet-ledger-v1.json`
+(SHA-256 `27fe8b9132629fda1539c9feef1445a9413732dacf9da0145ff1c918bfd606f9`).
+The inventory is 34 archive/sidecar pairs, 66 missing and zero anomalies;
+diagnostics are empty. Five replay lanes, 247–251, are active against a desired
+target of nine. This pair count does not claim latest-reader audit completion.
+Epoch 205's full PoH stage was 258,076 of 432,000 slots at this cadence;
+local plugin, authenticated remote playback and final branch checks remain.
+Preserve its audit and the five healthy replay limits. The next observer's v71
+configuration is sealed and statically checked for no earlier than 01:25:21 UTC;
+no timer was installed. The mainnet checkpoint-export probe remains dormant
+because its 128 GB restore does not fit the existing hard reservations.
