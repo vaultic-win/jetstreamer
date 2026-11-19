@@ -25,7 +25,8 @@ pub enum SourceBlockAction {
     Quiesce,
 }
 
-/// Do not acknowledge a metadata callback whose enclosing block batch failed.
+/// Commit retry progress and acknowledge only a successful whole block batch.
+/// A metadata notification alone must not advance the caller's retry watermark.
 /// The source loop must propagate Quiesce without its ordinary retry path.
 pub(crate) fn acknowledge<E>(
     processed: Result<(), E>,
@@ -92,6 +93,37 @@ mod tests {
             Err("remaining block decoding failed")
         );
         assert!(metadata_delivered);
+    }
+
+    #[test]
+    fn failed_batch_keeps_retry_parent_until_successful_redelivery() {
+        let previous = (40, [3; 32]);
+        let mut retry_parent = previous;
+        let mut acknowledged = Vec::new();
+        // The metadata callback has run, but the decoder then rejects a node.
+        let failed_batch = Err("node after metadata failed");
+        let result = acknowledge(failed_batch, block(), |completed| {
+            retry_parent = (completed.slot, completed.blockhash);
+            acknowledged.push(completed);
+            SourceBlockAction::Quiesce
+        });
+        assert_eq!(result, Err("node after metadata failed"));
+        assert_eq!(retry_parent, previous);
+        assert!(acknowledged.is_empty());
+        assert!(
+            block().slot > retry_parent.0,
+            "failed block must be retried"
+        );
+
+        // Redeliver the entire block; commit before exposing a quiesced boundary.
+        let result = acknowledge(Ok::<_, &str>(()), block(), |completed| {
+            retry_parent = (completed.slot, completed.blockhash);
+            acknowledged.push(completed);
+            SourceBlockAction::Quiesce
+        });
+        assert_eq!(result, Ok(SourceBlockAction::Quiesce));
+        assert_eq!(retry_parent, (42, [7; 32]));
+        assert_eq!(acknowledged, [block()]);
     }
 
     #[test]

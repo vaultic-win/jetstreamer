@@ -3785,8 +3785,6 @@ async fn firehose_geyser_thread(
                                 confirmed_bank_sender.send(notification).unwrap();
 
                                 if block_meta_notifier_maybe.is_none() {
-                                    last_counted_slot = block.slot;
-                                    has_counted_slot = true;
                                     return Ok(());
                                 }
                                 let DecodedRewards {
@@ -3809,10 +3807,6 @@ async fn firehose_geyser_thread(
                                     this_block_executed_transaction_count,
                                     this_block_entry_count,
                                 );
-                                todo_previous_blockhash = todo_latest_entry_blockhash;
-                                retry_parent = Some((block.slot, todo_latest_entry_blockhash));
-                                last_counted_slot = block.slot;
-                                has_counted_slot = true;
                                 std::thread::yield_now();
                             }
                             Subset(_subset) => (),
@@ -3843,6 +3837,15 @@ async fn firehose_geyser_thread(
                         block_callbacks,
                         completed,
                         |completed| {
+                            // Metadata can be delivered before a later node fails.
+                            // Commit the retry cursor and parent chain only once
+                            // the entire batch succeeds, including without a
+                            // metadata subscriber. Otherwise a retry can skip
+                            // the incomplete block.
+                            todo_previous_blockhash = todo_latest_entry_blockhash;
+                            retry_parent = Some((completed.slot, todo_latest_entry_blockhash));
+                            last_counted_slot = completed.slot;
+                            has_counted_slot = true;
                             if sequential_mode {
                                 if let Some(notifier) = block_parent_notifier_maybe.as_ref() {
                                     return notifier.source_block_completed(completed);
