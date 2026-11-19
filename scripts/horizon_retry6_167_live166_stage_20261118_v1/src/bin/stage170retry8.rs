@@ -306,7 +306,7 @@ fn own_witness() -> Result<()> {
     );
     let witness = root.join("NATIVE_WITNESS.json");
     output(Command::new("/usr/bin/systemd-run").args(["--unit","horizon-170-two-peer-own-witness-20261119-v1",
-        "--property=Type=oneshot","--property=RemainAfterExit=yes","--property=CPUQuota=200%","--property=MemoryMax=4G","--property=TasksMax=128","--property=LimitNOFILE=1048576",
+        "--property=Type=oneshot","--property=RemainAfterExit=yes","--property=CPUQuota=200%","--property=MemoryMax=2G","--property=MemorySwapMax=0","--property=TasksMax=128","--property=LimitNOFILE=1048576",
         GUARD,"--qualify-data-witness","/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/witness-set.json",
         "--seed-sha256","8eb041519cba5c3f6368cb1432be9e289489ce1acdc28aa8b49f3d6ec7f382ee","--seal",
         "/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/deployment-seal-receipt.json","--seal-sha256","611c29b18c52e02fce0be67314cdaae4ff780bea72b0e8e6c22a7dd248dfc24f",
@@ -643,6 +643,17 @@ fn stage(tag: &str, measurement: Option<&Path>) -> Result<()> {
 }
 static CONFIG: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
 static PEER167: std::sync::OnceLock<(String, u64, u64)> = std::sync::OnceLock::new();
+fn root_entries_for_operation(operation: &str, names: &BTreeSet<String>) -> Result<()> {
+    match operation {
+        "witness" | "measure" | "prepare" => ensure!(names.is_empty(), "fresh root occupied"),
+        "launch-plan" => ensure!(
+            names == &BTreeSet::from(["output".to_owned()]),
+            "prepared root must contain only its staged output"
+        ),
+        _ => anyhow::bail!("unknown staging operation"),
+    }
+    Ok(())
+}
 fn cfg_path(k: &str) -> Result<&'static str> {
     CONFIG.get().context("config")?[k]["path"]
         .as_str()
@@ -781,7 +792,15 @@ fn main() -> Result<()> {
             && Path::new(FRESH).canonicalize()? == Path::new(FRESH),
         "precreated170 root changed"
     );
-    ensure!(fs::read_dir(FRESH)?.next().is_none(), "fresh root occupied");
+    let entries = fs::read_dir(FRESH)?
+        .map(|entry| {
+            entry?
+                .file_name()
+                .into_string()
+                .map_err(|_| anyhow::anyhow!("non-UTF8 entry in fresh root"))
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
+    root_entries_for_operation(&a[6], &entries)?;
     let rm = fs::symlink_metadata(ROOT)?;
     ensure!(
         rm.is_dir() && rm.uid() == 0 && rm.mode() & 0o7777 == 0o700,
@@ -802,6 +821,25 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
+    fn preparation_and_launch_require_distinct_root_states() {
+        let empty = BTreeSet::new();
+        let staged = BTreeSet::from(["output".to_owned()]);
+        for operation in ["witness", "measure", "prepare"] {
+            root_entries_for_operation(operation, &empty).unwrap();
+            assert!(root_entries_for_operation(operation, &staged).is_err());
+        }
+        root_entries_for_operation("launch-plan", &staged).unwrap();
+        assert!(root_entries_for_operation("launch-plan", &empty).is_err());
+        assert!(
+            root_entries_for_operation(
+                "launch-plan",
+                &BTreeSet::from(["output".to_owned(), "scratch".to_owned()])
+            )
+            .is_err()
+        );
+        assert!(root_entries_for_operation("unknown", &empty).is_err());
+    }
+    #[test]
     fn measurement_rejects_wrong_epoch_expiry_and_nonphysical_credit() {
         let mut v = json!({"schema":"horizon-standard-replacement-local-physical-ledger-v1","owner":"/root","epoch":170,"read_only":true,
             "resource_credit_bytes":0,"replay_launch_authorized":false,"lane_root":"/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
@@ -817,7 +855,8 @@ mod tests {
     }
     #[test]
     fn live_peer_rejects_foreign_identity_and_restart() {
-        for e in [166] {
+        {
+            let e = 166;
             let (u, i, p, _, _) = peer(e);
             let v = json!({"Id":u,"InvocationID":i,"MainPID":p.to_string(),"ActiveState":"active","SubState":"running","NRestarts":"0","ControlPID":"0","Job":""});
             peer_shape(e, &v).unwrap();
@@ -852,6 +891,87 @@ mod launch_plan {
 
     fn sha(bytes: &[u8]) -> String {
         format!("{:x}", Sha256::digest(bytes))
+    }
+    fn identity(m: &fs::Metadata) -> Value {
+        json!([
+            m.dev(),
+            m.ino(),
+            m.uid(),
+            m.gid(),
+            m.mode(),
+            m.nlink(),
+            m.len(),
+            m.mtime(),
+            m.mtime_nsec(),
+            m.ctime(),
+            m.ctime_nsec()
+        ])
+    }
+    fn validate_staged_genesis(prepared: &Value) -> Result<()> {
+        staged_genesis_at(Path::new(super::FRESH), prepared)
+    }
+    fn staged_genesis_at(root: &Path, prepared: &Value) -> Result<()> {
+        let root_meta = fs::symlink_metadata(root)?;
+        let recorded = &prepared["fresh_subtree"];
+        ensure!(
+            recorded["path"] == root.to_str().context("root UTF8")?
+                && recorded["identity"][0] == root_meta.dev()
+                && recorded["identity"][1] == root_meta.ino(),
+            "preparation root identity differs"
+        );
+        let output = root.join("output");
+        let output_meta = fs::symlink_metadata(&output)?;
+        ensure!(
+            output_meta.is_dir()
+                && output_meta.uid() == 1001
+                && output_meta.mode() & 0o7777 == 0o700
+                && output.canonicalize()? == output,
+            "unsafe prepared output"
+        );
+        let names = fs::read_dir(&output)?
+            .map(|e| e.map(|e| e.file_name()))
+            .collect::<std::io::Result<Vec<_>>>()?;
+        ensure!(
+            names == ["genesis.tar.bz2"],
+            "unexpected prepared output content"
+        );
+        let path = output.join("genesis.tar.bz2");
+        let stage = &prepared["genesis_stage"];
+        ensure!(
+            stage["path"] == path.to_str().context("genesis UTF8")?
+                && stage["source"] == prepared["local_inputs"]["genesis"]
+                && stage["no_clobber"] == true,
+            "unbound staged genesis"
+        );
+        let m = fs::symlink_metadata(&path)?;
+        ensure!(
+            m.is_file()
+                && m.uid() == 1001
+                && m.nlink() == 1
+                && m.mode() & 0o7777 == 0o600
+                && m.len() <= 1 << 20
+                && identity(&m) == stage["identity"],
+            "staged genesis identity differs"
+        );
+        let mut file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&path)?;
+        let mut bytes = Vec::new();
+        Read::by_ref(&mut file)
+            .take((1 << 20) + 1)
+            .read_to_end(&mut bytes)?;
+        ensure!(
+            !bytes.is_empty()
+                && bytes.len() as u64 == m.len()
+                && stage["bytes"] == m.len()
+                && stage["sha256"] == sha(&bytes)
+                && stage["source"]["sha256"] == sha(&bytes)
+                && identity(&file.metadata()?) == stage["identity"]
+                && identity(&fs::symlink_metadata(&path)?) == stage["identity"],
+            "staged genesis changed"
+        );
+        Ok(())
     }
     fn git(args: &[&str]) -> Result<String> {
         let result = Command::new("git")
@@ -954,6 +1074,7 @@ mod launch_plan {
                 && prepared["remote_mutations"] == false,
             "foreign or already consumed preparation"
         );
+        validate_staged_genesis(&prepared)?;
         let contract = &prepared["data_fulfillment"]["contract"];
         ensure!(
             contract["contract"]["path"].is_string()
@@ -989,5 +1110,44 @@ mod launch_plan {
             json!({"path":path,"sha256":sha(&encoded),"replay_launched":false})
         );
         Ok(())
+    }
+    #[cfg(test)]
+    mod staged_tests {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+        #[test]
+        fn genuine_staging_accepts_only_unchanged_bound_genesis() {
+            let root = std::env::temp_dir()
+                .join(format!("horizon170-staged-genesis-{}", std::process::id()));
+            fs::create_dir(&root).unwrap();
+            let output = root.join("output");
+            fs::create_dir(&output).unwrap();
+            fs::set_permissions(&output, fs::Permissions::from_mode(0o700)).unwrap();
+            let path = output.join("genesis.tar.bz2");
+            fs::write(&path, b"genesis fixture").unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            let source =
+                json!({"path":"/immutable/genesis.tar.bz2","sha256":sha(b"genesis fixture")});
+            let prepared = json!({"fresh_subtree":{"path":root,"identity":identity(&fs::metadata(&root).unwrap())},
+                "local_inputs":{"genesis":source},"genesis_stage":{"path":path,"source":source,
+                "no_clobber":true,"identity":identity(&fs::metadata(&path).unwrap()),
+                "bytes":15,"sha256":sha(b"genesis fixture")}});
+            // Fixture length is taken from the file, independently of the recorded digest.
+            let mut prepared = prepared;
+            prepared["genesis_stage"]["bytes"] = json!(fs::metadata(&path).unwrap().len());
+            staged_genesis_at(&root, &prepared).unwrap();
+            let mut bad = prepared.clone();
+            bad["fresh_subtree"]["identity"][1] = json!(0);
+            assert!(staged_genesis_at(&root, &bad).is_err());
+            bad = prepared.clone();
+            bad["local_inputs"]["genesis"]["sha256"] = json!("0".repeat(64));
+            assert!(staged_genesis_at(&root, &bad).is_err());
+            fs::write(output.join("unexpected"), b"x").unwrap();
+            assert!(staged_genesis_at(&root, &prepared).is_err());
+            fs::remove_file(output.join("unexpected")).unwrap();
+            fs::write(&path, b"changed fixture").unwrap();
+            assert!(staged_genesis_at(&root, &prepared).is_err());
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 }
