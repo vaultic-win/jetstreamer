@@ -160,3 +160,18 @@ systemd service, then accepts its normal exit and empty cgroup. A test-only
 target retains the completed unit's original properties. The initial fixture
 failure is retained in the private qualification journal; no production owner
 was stopped or used as a terminal fixture.
+
+The qualified retention fixture uses only `After=` references. Starting its
+target leaves the test producer unstarted; restarting the target after the
+producer exits preserves the original single invocation and clean terminal
+evidence without replaying the command. This matters because PID1 can collect
+an otherwise unreferenced inactive unit and discard its original exit fields.
+
+`tools/horizon-foundation-terminal-retention.target` applies those ordering-only
+references to the original five Foundation singletons. It has no `Wants=`,
+`Requires=`, `BindsTo=`, `Upholds=` or boot installation section. Before activating
+its sealed copy, bind the exact original producer identities and unchanged unit
+files; capture them again afterward and require the target to be active with no
+activation dependencies. Retain the target until the actual terminal handoff,
+drain and downstream consumers have preserved their required manager evidence.
+The target does not grant capacity, archive success or publication authority.

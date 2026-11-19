@@ -843,7 +843,7 @@ mod tests {
             .unwrap();
         write!(
             target_handle,
-            "[Unit]\nDescription=Retain disjoint native terminal evidence\nWants={unit}\n"
+            "[Unit]\nDescription=Retain disjoint native terminal evidence\nAfter={unit}\n"
         )
         .unwrap();
         target_handle.sync_all().unwrap();
@@ -861,6 +861,19 @@ mod tests {
                 .unwrap()
                 .success()
         );
+        let unused = Command::new("/usr/bin/systemctl")
+            .args([
+                "show",
+                &unit,
+                "--property=MainPID,ExecMainCode,InvocationID",
+            ])
+            .output()
+            .unwrap();
+        assert!(unused.status.success());
+        let unused = String::from_utf8(unused.stdout).unwrap();
+        assert!(unused.lines().any(|l| l == "MainPID=0"));
+        assert!(unused.lines().any(|l| l == "ExecMainCode=0"));
+        assert!(unused.lines().any(|l| l == "InvocationID="));
         assert!(
             Command::new("/usr/bin/systemctl")
                 .args(["start", &unit])
@@ -885,6 +898,15 @@ mod tests {
         assert_eq!(proof["descendant_processes"], 0);
         assert!(proof["process_cgroups_inspected"].as_u64().unwrap() > 1);
         terminal(&p).unwrap();
+        assert!(
+            Command::new("/usr/bin/systemctl")
+                .args(["restart", &target])
+                .status()
+                .unwrap()
+                .success()
+        );
+        terminal(&p).unwrap();
+        drained(&p).unwrap();
     }
     #[test]
     #[ignore = "root native PID1 terminal capture with a disjoint bounded service"]

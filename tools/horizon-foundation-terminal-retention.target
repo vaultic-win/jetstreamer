@@ -1,0 +1,6 @@
+[Unit]
+Description=Retain Foundation singleton terminal manager evidence
+# Ordering references retain the loaded manager records. They do not activate
+# producers. Do not replace these with Wants, Requires, BindsTo or Upholds.
+After=horizon-qualify-247-reboot-20261117-v2.service horizon-qualify-248-reboot-20261117-v1.service horizon-qualify-249-reboot-20261117-v1.service horizon-qualify-250-reboot-20261117-v1.service horizon-qualify-251-replacement-20261118-v1.service
+IgnoreOnIsolate=yes
