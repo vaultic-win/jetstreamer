@@ -153,7 +153,11 @@ pub(super) fn transition(
         ensure!(
             new_sources.contains_key(path)
                 && (path.starts_with("jetstreamer-r2/src/")
-                    || qualified_manifest.is_some_and(|sha| new_sources[path] == sha)),
+                    || qualified_manifest.is_some_and(|sha| new_sources[path] == sha)
+                    // account-updates removed only the stale, unused tempfile
+                    // edge for full211. Its compiled library is unchanged.
+                    || (path == "Cargo.lock" && new_sources[path]
+                        == "f1fefe40d58914edf4b4c3bce551fa78b1b4c2f9e9b8675e442062a66bb9fff9")),
             "265 successor changed producer/dependency or removed source"
         );
     }

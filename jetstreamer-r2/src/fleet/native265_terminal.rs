@@ -582,6 +582,42 @@ pub(super) fn capture() -> Result<()> {
 
 /// A terminal-only timer stop must already have completed. Never stop a firing
 /// guard here: retaining every successful firing is part of the evidence gate.
+fn final_guard_invocation(manager: &Value, rows: &[Value]) -> Result<String> {
+    let start = rows
+        .iter()
+        .rev()
+        .find(|r| {
+            r["MESSAGE"]
+                .as_str()
+                .is_some_and(|m| m.starts_with(&format!("Starting {} -", c::GUARD_UNIT)))
+        })
+        .context("265 final guard start absent")?;
+    let end = rows
+        .iter()
+        .rev()
+        .find(|r| r["MESSAGE"] == format!("{}: Deactivated successfully.", c::GUARD_UNIT))
+        .context("265 final guard completion absent")?;
+    let iid = c::text(start, "INVOCATION_ID")?;
+    ensure!(
+        c::hex(iid, 32)
+            && end["INVOCATION_ID"] == iid
+            && c::text(end, "__MONOTONIC_TIMESTAMP")?.parse::<u64>()?
+                > c::text(start, "__MONOTONIC_TIMESTAMP")?.parse::<u64>()?,
+        "265 final guard invocation incomplete"
+    );
+    // Stopping the timer can release PID1's last inactive oneshot invocation.
+    // Only its fully reset display is accepted, using the complete real journal
+    // as identity evidence; a different nonempty invocation still fails.
+    ensure!(
+        manager["InvocationID"] == iid
+            || (manager["InvocationID"] == ""
+                && manager["ExecMainPID"] == "0"
+                && manager["ExecMainStartTimestampMonotonic"] == "0"
+                && manager["ExecMainExitTimestampMonotonic"] == "0"),
+        "265 final guard manager identity differs"
+    );
+    Ok(iid.to_owned())
+}
 fn actual_guard_history(bundle: &Value, h: &Value) -> Result<()> {
     let timer = json!(singleton227_capture::properties(
         "horizon-native265-protective-v1.timer",
@@ -596,7 +632,7 @@ fn actual_guard_history(bundle: &Value, h: &Value) -> Result<()> {
             && timer["DropInPaths"] == "",
         "265 terminal guard timer not stably stopped"
     );
-    let fields = "LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,Job,Result,ExecMainStatus,TimeoutStartUSec,DropInPaths";
+    let fields = "LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,Job,Result,ExecMainStatus,TimeoutStartUSec,DropInPaths,ExecMainPID,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic";
     let manager = json!(singleton227_capture::properties(c::GUARD_UNIT, fields)?);
     ensure!(
         manager["LoadState"] == "loaded"
@@ -652,6 +688,7 @@ fn actual_guard_history(bundle: &Value, h: &Value) -> Result<()> {
         !actual.is_empty() && actual == retained,
         "265 supplied full guard history differs from actual PID1 history"
     );
+    let final_iid = final_guard_invocation(&manager, &actual)?;
     ensure!(
         bundle["records"]
             .as_array()
@@ -661,7 +698,7 @@ fn actual_guard_history(bundle: &Value, h: &Value) -> Result<()> {
             .collect::<Result<Vec<_>>>()?
             .iter()
             .any(|r| r["schema"] == "horizon265-native-guard-terminal-v1"
-                && r["guard_invocation_id"] == manager["InvocationID"]),
+                && r["guard_invocation_id"] == final_iid),
         "265 final completed guard has no exact terminal drain receipt"
     );
     ensure!(
@@ -678,6 +715,29 @@ fn actual_guard_history(bundle: &Value, h: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stopped_timer_uses_complete_guard_history_when_pid1_resets_display() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("fixtures/native265-terminal-20261119.json"))
+                .unwrap();
+        let rows = fixture["guard_pid1"].as_array().unwrap();
+        let mut manager = json!({"InvocationID":"", "ExecMainPID":"0",
+            "ExecMainStartTimestampMonotonic":"0", "ExecMainExitTimestampMonotonic":"0"});
+        let iid = final_guard_invocation(&manager, rows).unwrap();
+        assert_eq!(iid, "15db5416a1824bdd89fca75359eda35e");
+        manager["InvocationID"] = json!("a".repeat(32));
+        assert!(final_guard_invocation(&manager, rows).is_err());
+        manager["InvocationID"] = json!("");
+        manager["ExecMainPID"] = json!("42");
+        assert!(final_guard_invocation(&manager, rows).is_err());
+        manager["ExecMainPID"] = json!("0");
+        let mut incomplete = rows.clone();
+        incomplete.push(
+            json!({"MESSAGE":format!("Starting {} - guard...",c::GUARD_UNIT),
+            "INVOCATION_ID":"b".repeat(32),"__MONOTONIC_TIMESTAMP":"999999999999"}),
+        );
+        assert!(final_guard_invocation(&manager, &incomplete).is_err());
+    }
     fn rows() -> Vec<Value> {
         vec![
             json!({"_PID":"42","_UID":"1000","_BOOT_ID":"00000000000000000000000000000001","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":"a".repeat(32),"__REALTIME_TIMESTAMP":"20","__MONOTONIC_TIMESTAMP":"20","MESSAGE":"epoch265 exact cold input completed; native PID1 and complete guard-history acceptance remain required"}),
