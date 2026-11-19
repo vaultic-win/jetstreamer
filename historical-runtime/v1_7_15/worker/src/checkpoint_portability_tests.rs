@@ -81,6 +81,14 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
     bank0.freeze();
     let mut uninterrupted = RuntimeState::from_test_bank(bank0, false, source_dir);
     let bootstrap = uninterrupted.freeze_checkpoint(0).unwrap();
+    // Optional test-only initial snapshot for the live parent IPC fixture.
+    // Keep it distinct from the exported slot-1 checkpoint being qualified.
+    let bootstrap_archives = tempfile::tempdir().unwrap();
+    let bootstrap_export = if std::env::var_os("JETSTREAMER_CHECKPOINT_LIVE_FIXTURE").is_some() {
+        Some(uninterrupted.export_snapshot(
+            0, bootstrap_archives.path().to_str().unwrap(), &bootstrap.accounts_hash,
+        ).unwrap())
+    } else { None };
     let prefix_tick = request_for(&uninterrupted, 1, 0, 1, &[]);
     let prefix_processed = uninterrupted.process_entry(prefix_tick.clone()).unwrap();
 
@@ -332,6 +340,17 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
                 .unwrap();
             file.write_all(bytes).unwrap();
             file.sync_all().unwrap();
+        }
+        if let Some(initial) = bootstrap_export {
+            for (name, bytes) in &[
+                ("native-genesis.bin", bincode::serialize(&genesis.genesis_config).unwrap()),
+                ("native-bootstrap.tar.bz2", std::fs::read(&initial.archive_path).unwrap()),
+            ] {
+                let mut file = std::fs::OpenOptions::new().write(true).create_new(true)
+                    .mode(0o400).open(root.join(name)).unwrap();
+                file.write_all(bytes).unwrap();
+                file.sync_all().unwrap();
+            }
         }
         std::fs::File::open(root).unwrap().sync_all().unwrap();
     }
