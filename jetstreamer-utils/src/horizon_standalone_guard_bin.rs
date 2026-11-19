@@ -719,6 +719,18 @@ fn supported_unit(plan: &Plan) -> bool {
             && plan.bounded_measurement.is_none()
             && plan.bounded_canary.is_none();
     }
+    if plan.unit == "horizon-singleton-211-capped-4aeca563-v1.service" {
+        return cfg!(feature = "epoch211-singleton-guard")
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1",
+                )
+            && plan.maximum_root_physical_bytes == Some(471_798_691_840)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan.unit.starts_with("horizon-qualify-") {
         return true;
     }
@@ -1531,6 +1543,68 @@ mod tests {
                 validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
                 "{pointer}"
             );
+        }
+    }
+    #[test]
+    fn full211_plan_requires_its_own_feature_and_complete_resource_tuple() {
+        let value = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-singleton-211-capped-4aeca563-v1.service","invocation_id":"a".repeat(32),
+            "filesystem":"/","minimum_free_bytes":1,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1",
+            "maximum_worker_vmas":3500000,"maximum_root_physical_bytes":471_798_691_840u64,
+            "receipt_directory":"/sealed/receipts"});
+        let plan: Plan = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            validate_plan(&plan).is_ok(),
+            cfg!(feature = "epoch211-singleton-guard")
+        );
+        for (pointer, replacement) in [
+            ("/schema", json!("unknown")),
+            (
+                "/unit",
+                json!("horizon-singleton-212-capped-4aeca563-v1.service"),
+            ),
+            ("/invocation_id", json!("invalid")),
+            ("/filesystem", json!("/tmp")),
+            ("/minimum_free_bytes", json!(0)),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/qualification-209-singleton-capped-v1"),
+            ),
+            (
+                "/worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1"),
+            ),
+            ("/maximum_root_physical_bytes", Value::Null),
+            ("/maximum_root_physical_bytes", json!(300_000_000_000u64)),
+            ("/maximum_root_physical_bytes", json!(471_798_691_841u64)),
+            ("/maximum_worker_vmas", json!(3_500_001)),
+        ] {
+            let mut bad = value.clone();
+            *bad.pointer_mut(pointer).unwrap() = replacement;
+            assert!(
+                validate_plan(&serde_json::from_value(bad).unwrap()).is_err(),
+                "{pointer}"
+            );
+        }
+        for (key, replacement) in [
+            (
+                "bounded_measurement",
+                json!({"producer_uid":1000,"target_slot":91583512,"intent_path":"/tmp/intent","maximum_drain_seconds":180}),
+            ),
+            (
+                "bounded_canary",
+                json!({"expected_uid":1000,"target_stop_intent":"/tmp/intent","maximum_drainage_seconds":180}),
+            ),
+            (
+                "native_main",
+                json!({"executable":"/other","sha256":"a".repeat(64),"main_pid":42}),
+            ),
+        ] {
+            let mut bad = value.clone();
+            bad[key] = replacement;
+            let bad: Plan = serde_json::from_value(bad).unwrap();
+            assert!(validate_plan(&bad).is_err(), "{key}");
         }
     }
     #[test]
