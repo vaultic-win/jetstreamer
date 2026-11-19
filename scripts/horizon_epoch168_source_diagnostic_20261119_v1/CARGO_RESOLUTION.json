@@ -1,0 +1,249 @@
+{
+  "schema": "horizon-epoch168-cargo-source-resolution-v1",
+  "command": [
+    "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+    "metadata",
+    "--offline",
+    "--format-version=1",
+    "--filter-platform",
+    "x86_64-unknown-linux-gnu",
+    "--manifest-path",
+    "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/Cargo.toml"
+  ],
+  "exit_status": 0,
+  "metadata_only": true,
+  "builds_run": false,
+  "tests_run": false,
+  "workspace_root": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1",
+  "workspace_members": [
+    {
+      "name": "horizon-epoch168-capture",
+      "version": "0.1.0",
+      "manifest_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/capture/Cargo.toml",
+      "features": {},
+      "targets": [
+        {
+          "name": "capture168",
+          "kind": [
+            "bin"
+          ],
+          "src_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/capture/src/main.rs",
+          "required_features": []
+        }
+      ]
+    },
+    {
+      "name": "horizon-epoch168-source-extractor",
+      "version": "0.1.0",
+      "manifest_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/extractor/Cargo.toml",
+      "features": {
+        "default": [
+          "epoch168-source-diagnostic"
+        ],
+        "epoch168-source-diagnostic": [
+          "jetstreamer-firehose/verify-transaction-signatures",
+          "solana-transaction/verify"
+        ]
+      },
+      "targets": [
+        {
+          "name": "epoch168-source-extract",
+          "kind": [
+            "bin"
+          ],
+          "src_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/extractor/src/main.rs",
+          "required_features": [
+            "epoch168-source-diagnostic"
+          ]
+        }
+      ]
+    }
+  ],
+  "lock_sha256": "38fd5ecc5c0663b87acccd7c6ef7bb4c94dee5a1b369a3b2a48b47541a558a76",
+  "root_lock_sha256": "f1fefe40d58914edf4b4c3bce551fa78b1b4c2f9e9b8675e442062a66bb9fff9",
+  "resolved_package_count": 906,
+  "dependency_closure_counts": {
+    "horizon-epoch168-capture": 175,
+    "horizon-epoch168-source-extractor": 905
+  },
+  "resolver_stderr": "",
+  "resolved_features": [
+    {
+      "name": "aws-lc-rs",
+      "version": "1.16.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "aws-lc-sys",
+        "prebuilt-nasm"
+      ]
+    },
+    {
+      "name": "aws-lc-sys",
+      "version": "0.40.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "prebuilt-nasm"
+      ]
+    },
+    {
+      "name": "jetstreamer-firehose",
+      "version": "0.9.0",
+      "source": null,
+      "features": [
+        "verify-transaction-signatures"
+      ]
+    },
+    {
+      "name": "librocksdb-sys",
+      "version": "0.17.3+10.4.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "lz4",
+        "lz4-sys",
+        "static"
+      ]
+    },
+    {
+      "name": "protobuf-src",
+      "version": "1.1.0+21.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": []
+    },
+    {
+      "name": "reqwest",
+      "version": "0.11.27",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "__tls",
+        "blocking",
+        "default-tls",
+        "hyper-tls",
+        "json",
+        "native-tls-crate",
+        "serde_json",
+        "tokio-native-tls"
+      ]
+    },
+    {
+      "name": "reqwest",
+      "version": "0.12.28",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "__rustls",
+        "__rustls-ring",
+        "__tls",
+        "blocking",
+        "brotli",
+        "deflate",
+        "gzip",
+        "json",
+        "rustls-tls",
+        "rustls-tls-webpki-roots",
+        "rustls-tls-webpki-roots-no-provider"
+      ]
+    },
+    {
+      "name": "reqwest",
+      "version": "0.13.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "__native-tls",
+        "__native-tls-alpn",
+        "__rustls",
+        "__rustls-aws-lc-rs",
+        "__tls",
+        "blocking",
+        "brotli",
+        "charset",
+        "default",
+        "default-tls",
+        "deflate",
+        "gzip",
+        "http2",
+        "json",
+        "native-tls",
+        "rustls",
+        "stream",
+        "system-proxy"
+      ]
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.150",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "alloc",
+        "default",
+        "std"
+      ]
+    },
+    {
+      "name": "sha2",
+      "version": "0.9.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "std"
+      ]
+    },
+    {
+      "name": "sha2",
+      "version": "0.10.9",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "default",
+        "std"
+      ]
+    },
+    {
+      "name": "solana-signature",
+      "version": "3.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "alloc",
+        "default",
+        "serde",
+        "std",
+        "verify"
+      ]
+    },
+    {
+      "name": "solana-transaction",
+      "version": "3.0.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "bincode",
+        "blake3",
+        "serde",
+        "verify"
+      ]
+    },
+    {
+      "name": "tokio",
+      "version": "1.52.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "features": [
+        "bytes",
+        "default",
+        "fs",
+        "full",
+        "io-std",
+        "io-util",
+        "libc",
+        "macros",
+        "mio",
+        "net",
+        "parking_lot",
+        "process",
+        "rt",
+        "rt-multi-thread",
+        "signal",
+        "signal-hook-registry",
+        "socket2",
+        "sync",
+        "time",
+        "tokio-macros",
+        "windows-sys"
+      ]
+    }
+  ]
+}

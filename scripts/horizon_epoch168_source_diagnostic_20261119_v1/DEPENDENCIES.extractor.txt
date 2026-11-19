@@ -1,0 +1,3945 @@
+horizon-epoch168-source-extractor v0.1.0 (/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/extractor) [epoch168-source-diagnostic]
+bincode v1.3.3 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std]
+serde_core v1.0.229 [alloc,rc,result,std]
+serde_derive v1.0.229 (proc-macro) [default]
+proc-macro2 v1.0.106 [default,proc-macro]
+unicode-ident v1.0.24 []
+quote v1.0.45 [default,proc-macro]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+syn v3.0.3 [clone-impls,derive,full,parsing,printing,proc-macro]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+unicode-ident v1.0.24 []
+cid v0.11.3 [alloc,default,std]
+multibase v0.9.2 []
+base-x v0.2.11 []
+base256emoji v1.0.2 []
+const-str v0.4.3 [default]
+match-lookup v0.1.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+unicode-ident v1.0.24 []
+data-encoding v2.11.0 [alloc,default,std]
+data-encoding-macro v0.1.20 []
+data-encoding v2.11.0 [alloc,default,std]
+data-encoding-macro-internal v0.1.18 (proc-macro) []
+data-encoding v2.11.0 [alloc]
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+multihash v0.19.5 [alloc,std]
+unsigned-varint v0.8.0 [std]
+unsigned-varint v0.8.0 [std]
+jetstreamer-firehose v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-firehose) [verify-transaction-signatures]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std]
+cfg-if v1.0.4 []
+const-random v0.1.18 []
+const-random-macro v0.1.16 (proc-macro) []
+getrandom v0.2.17 []
+cfg-if v1.0.4 []
+libc v0.2.189 [default,std]
+once_cell v1.21.4 [alloc,default,race,std]
+tiny-keccak v2.0.2 [default,shake]
+crunchy v0.2.4 [default,limit_128]
+getrandom v0.3.4 [std]
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+zerocopy v0.8.48 [simd]
+version_check v0.9.5 []
+base64 v0.23.1 [alloc,default,simd-unsafe,std]
+bincode v1.3.3 [] (*)
+cid v0.11.3 [alloc,default,std] (*)
+crc v3.4.0 []
+crc-catalog v2.5.0 []
+crossbeam-channel v0.5.15 [default,std]
+crossbeam-utils v0.8.21 [default,std]
+dashmap v6.1.0 []
+cfg-if v1.0.4 []
+crossbeam-utils v0.8.21 [default,std]
+hashbrown v0.14.5 [raw]
+lock_api v0.4.14 [atomic_usize,default]
+scopeguard v1.2.0 [default,use_std]
+once_cell v1.21.4 [alloc,default,race,std]
+parking_lot_core v0.9.12 []
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+smallvec v1.15.1 [const_generics,const_new,union]
+fnv v1.0.7 [default,std]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable]
+futures v0.1.31 [default,use_std,with-deprecated]
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-io v0.3.32 [default,std,unstable]
+futures-macro v0.3.32 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+futures-sink v0.3.32 [alloc,default,std]
+futures-task v0.3.32 [alloc,std,unstable]
+libc v0.2.189 [default,extra_traits,std]
+memchr v2.8.0 [alloc,default,std,use_std]
+pin-project-lite v0.2.17 []
+slab v0.4.12 [default,std]
+jetstreamer-horizon v0.9.0 (/home/sol/workspace/jetstreamer/jetstreamer-horizon) []
+agave-geyser-plugin-interface v3.1.12 []
+log v0.4.29 [std]
+solana-clock v3.0.0 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 []
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema]
+borsh-derive v1.6.1 (proc-macro) [default,schema]
+once_cell v1.21.4 [alloc,default,race,std]
+proc-macro-crate v3.5.0 []
+toml_edit v0.25.11+spec-1.1.0 [parse]
+indexmap v2.14.0 [default,std]
+equivalent v1.0.2 []
+hashbrown v0.17.0 []
+toml_datetime v1.1.1+spec-1.1.0 [alloc,default,std]
+toml_parser v1.1.2+spec-1.1.0 [alloc,default,std]
+winnow v1.0.2 [alloc,ascii,binary,default,parser,std]
+winnow v1.0.2 [alloc,ascii,binary,default,parser,std]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+cfg_aliases v0.2.1 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast]
+bytemuck_derive v1.10.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize]
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+curve25519-dalek-derive v0.1.1 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle]
+block-buffer v0.10.4 []
+generic-array v0.14.7 [more_lengths,zeroize]
+typenum v1.20.0 [const-generics]
+zeroize v1.8.2 [alloc,default,zeroize_derive]
+zeroize_derive v1.4.3 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+version_check v0.9.5 []
+const-oid v0.9.6 []
+crypto-common v0.1.7 [getrandom,rand_core,std]
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+rand_core v0.6.4 [alloc,getrandom,std]
+getrandom v0.2.17 [std]
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+typenum v1.20.0 [const-generics]
+subtle v2.6.1 [default,i128,std]
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+rustc_version v0.4.1 []
+semver v1.0.28 [default,std]
+five8 v1.0.0 []
+five8_core v0.1.2 []
+five8_const v1.0.0 []
+five8_core v0.1.2 []
+rand v0.9.4 [alloc,default,os_rng,small_rng,std,std_rng,thread_rng]
+rand_chacha v0.9.0 [std]
+ppv-lite86 v0.2.21 [simd,std]
+zerocopy v0.8.48 [simd]
+rand_core v0.9.5 [os_rng,std]
+getrandom v0.3.4 [std] (*)
+rand_core v0.9.5 [os_rng,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+sha2-const-stable v0.1.0 []
+solana-atomic-u64 v3.0.1 []
+solana-program-error v3.0.1 [borsh]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+solana-sanitize v3.0.1 []
+solana-sha256-hasher v3.1.0 [sha2]
+sha2 v0.10.9 [default,std]
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std]
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+five8 v1.0.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-atomic-u64 v3.0.1 []
+solana-sanitize v3.0.1 []
+solana-sdk-macro v3.0.1 (proc-macro) []
+bs58 v0.5.1 [alloc]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+solana-sysvar-id v3.1.0 []
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std]
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify]
+ed25519-dalek v2.2.0 [alloc,default,fast,rand_core,std,zeroize]
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+ed25519 v2.2.3 [alloc,std]
+signature v2.2.0 [alloc,digest,rand_core,std]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+sha2 v0.10.9 [default,std] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+five8 v0.2.1 []
+five8_core v0.1.2 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde-big-array v0.5.1 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sanitize v3.0.1 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction-error v2.3.0 [num-traits,serde]
+num-traits v0.2.19 [default,i128,std]
+autocfg v1.5.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng]
+libc v0.2.189 [default,extra_traits,std]
+rand_chacha v0.3.1 [default,std]
+ppv-lite86 v0.2.21 [simd,std] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls]
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-message v3.0.1 [bincode,blake3,serde]
+bincode v1.3.3 [] (*)
+blake3 v1.8.5 [default,std,traits-preview]
+arrayref v0.3.9 []
+arrayvec v0.7.6 [default,std]
+cfg-if v1.0.4 []
+constant_time_eq v0.4.2 [std]
+cpufeatures v0.3.0 []
+digest v0.11.2 [block-api,default,mac]
+block-buffer v0.12.0 []
+hybrid-array v0.4.11 []
+typenum v1.20.0 [const-generics]
+crypto-common v0.2.1 []
+hybrid-array v0.4.11 [] (*)
+ctutils v0.4.2 []
+cmov v0.5.3 []
+cc v1.2.61 [parallel]
+find-msvc-tools v0.1.9 []
+jobserver v0.1.34 []
+libc v0.2.189 [default,std]
+libc v0.2.189 [default,std]
+shlex v1.3.0 [default,std]
+lazy_static v1.5.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-sanitize v3.0.1 []
+solana-sdk-ids v3.1.0 [] (*)
+solana-short-vec v3.0.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-transaction-error v3.2.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-sanitize v3.0.1 []
+solana-sanitize v3.0.1 []
+solana-sdk-ids v3.1.0 [] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api]
+Inflector v0.11.4 [default,heavyweight,lazy_static,regex]
+lazy_static v1.5.0 []
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment]
+aho-corasick v1.1.4 [default,perf-literal,std]
+memchr v2.8.0 [alloc,default,std,use_std]
+memchr v2.8.0 [alloc,default,std,use_std]
+regex-automata v0.4.14 [alloc,dfa-onepass,hybrid,meta,nfa,nfa-backtrack,nfa-pikevm,nfa-thompson,perf,perf-inline,perf-literal,perf-literal-multisubstring,perf-literal-substring,std,syntax,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment,unicode-word-boundary]
+aho-corasick v1.1.4 [default,perf-literal,std] (*)
+memchr v2.8.0 [alloc,default,std,use_std]
+regex-syntax v0.8.10 [default,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment]
+regex-syntax v0.8.10 [default,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment]
+agave-reserved-account-keys v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-svm-feature-set v3.1.12 [agave-unstable-api]
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+bs58 v0.5.1 [alloc,std]
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std]
+itoa v1.0.18 []
+memchr v2.8.0 [alloc,default,std,use_std]
+serde_core v1.0.229 [alloc,rc,result,std]
+zmij v1.0.21 []
+solana-account-decoder v3.1.12 [agave-unstable-api]
+Inflector v0.11.4 [default,heavyweight,lazy_static,regex] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bs58 v0.5.1 [alloc,std]
+bv v0.11.1 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+feature-probe v0.1.1 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_bytes v0.11.19 [default,std]
+serde_core v1.0.229 [alloc,rc,result,std]
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-account-info v3.1.1 []
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-program-memory v3.1.0 []
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde]
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sysvar v3.0.0 [bincode,serde]
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+lazy_static v1.5.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-account-info v3.1.1 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-epoch-rewards v3.0.1 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-fee-calculator v3.2.0 [serde]
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-last-restart-slot v3.0.0 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-program-entrypoint v3.1.1 []
+solana-account-info v3.1.1 [] (*)
+solana-define-syscall v4.0.1 []
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-program-memory v3.1.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-slot-history v3.0.0 [serde,sysvar]
+bv v0.11.1 [serde] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd]
+base64 v0.22.1 [alloc,default,std]
+bs58 v0.5.1 [alloc,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+zstd v0.13.3 [arrays,default,legacy,zdict_builder]
+zstd-safe v7.2.4 [arrays,legacy,std,zdict_builder]
+zstd-sys v2.0.16+zstd.1.5.7 [legacy,std,zdict_builder]
+cc v1.2.61 [parallel] (*)
+pkg-config v0.3.33 []
+solana-address-lookup-table-interface v3.0.1 [bincode,bytemuck,serde]
+bincode v1.3.3 [] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-config-interface v2.0.0 [bincode,serde]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde]
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-msg v3.1.0 [alloc,default,std]
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_bytes v0.11.19 [default,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-nonce v3.2.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-program-option v3.1.0 []
+solana-program-pack v3.1.0 []
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-slot-history v3.0.0 [serde,sysvar] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar]
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cpi v3.1.0 []
+solana-account-info v3.1.1 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-vote-interface v4.0.4 [bincode,serde]
+bincode v1.3.3 [] (*)
+cfg_eval v0.1.2 (proc-macro) [default]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+num-derive v0.4.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_with v3.18.0 [macros]
+serde_core v1.0.229 [alloc,rc,result,std]
+serde_with_macros v3.18.0 (proc-macro) []
+darling v0.23.0 [default,suggestions]
+darling_core v0.23.0 [strsim,suggestions]
+ident_case v1.0.1 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+strsim v0.11.1 []
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+darling_macro v0.23.0 (proc-macro) []
+darling_core v0.23.0 [strsim,suggestions] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-serde-varint v3.0.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-serialize-utils v3.1.1 []
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-sanitize v3.0.1 []
+solana-short-vec v3.0.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+spl-generic-token v2.0.1 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+spl-token-2022-interface v2.1.0 []
+arrayref v0.3.9 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_enum v0.7.6 [default,std]
+num_enum_derive v0.7.6 (proc-macro) [proc-macro-crate,std]
+proc-macro-crate v3.5.0 [] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+rustversion v1.0.22 (proc-macro) []
+solana-account-info v3.1.1 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-program-option v3.1.0 []
+solana-program-pack v3.1.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-zk-sdk v4.0.0 []
+aes-gcm-siv v0.11.1 [aes,alloc,default,getrandom]
+aead v0.5.2 [alloc,getrandom,rand_core]
+crypto-common v0.1.7 [getrandom,rand_core,std] (*)
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+aes v0.8.4 []
+cfg-if v1.0.4 []
+cipher v0.4.4 []
+crypto-common v0.1.7 [getrandom,rand_core,std] (*)
+inout v0.1.4 []
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+cpufeatures v0.2.17 []
+cipher v0.4.4 [] (*)
+ctr v0.9.2 []
+cipher v0.4.4 [] (*)
+polyval v0.6.2 []
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+opaque-debug v0.3.1 []
+universal-hash v0.5.1 []
+crypto-common v0.1.7 [getrandom,rand_core,std] (*)
+subtle v2.6.1 [default,i128,std]
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+itertools v0.12.1 [default,use_alloc,use_std]
+either v1.15.0 [std,use_std]
+merlin v3.0.0 []
+byteorder v1.5.0 [default,i128,std]
+keccak v0.1.6 []
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_json v1.0.150 [default,std] (*)
+sha3 v0.10.9 [default,std]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+keccak v0.1.6 []
+solana-derivation-path v3.0.0 []
+derivation-path v0.2.0 [std]
+qstring v0.7.2 []
+percent-encoding v2.3.2 [alloc,default,std]
+uriparse v0.6.4 [default]
+fnv v1.0.7 [default,std]
+lazy_static v1.5.0 []
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-seed-derivable v3.0.0 []
+solana-derivation-path v3.0.0 [] (*)
+solana-seed-phrase v3.0.0 []
+hmac v0.12.1 [reset]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+pbkdf2 v0.11.0 []
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+sha2 v0.10.9 [default,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+subtle v2.6.1 [default,i128,std]
+thiserror v2.0.18 [default,std]
+thiserror-impl v2.0.18 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+spl-pod v0.7.3 [borsh]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_enum v0.7.6 [default,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-program-option v3.1.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-zero-copy v1.0.1 [borsh,bytemuck]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+solana-zk-sdk v4.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-confidential-transfer-proof-extraction v0.5.1 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+solana-account-info v3.1.1 [] (*)
+solana-curve25519 v3.1.12 [agave-unstable-api]
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+subtle v2.6.1 [default,i128,std]
+thiserror v2.0.18 [default,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instructions-sysvar v3.0.0 []
+bitflags v2.13.2 [serde,serde_core,std]
+serde_core v1.0.229 [alloc,rc,result,std]
+solana-account-info v3.1.1 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sanitize v3.0.1 []
+solana-sdk-ids v3.1.0 [] (*)
+solana-serialize-utils v3.1.1 [] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-msg v3.1.0 [alloc,default,std]
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-zk-sdk v4.0.0 [] (*)
+spl-pod v0.7.3 [borsh] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-confidential-transfer-proof-generation v0.5.1 []
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+solana-zk-sdk v4.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-group-interface v0.7.1 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_enum v0.7.6 [default,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+spl-discriminator v0.5.2 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+spl-discriminator-derive v0.2.0 (proc-macro) []
+quote v1.0.45 [default,proc-macro] (*)
+spl-discriminator-syn v0.2.1 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+sha2 v0.10.9 [default,std] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+thiserror v1.0.69 []
+thiserror-impl v1.0.69 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+spl-pod v0.7.3 [borsh] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-metadata-interface v0.8.0 []
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+solana-borsh v3.0.2 []
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+spl-discriminator v0.5.2 [] (*)
+spl-pod v0.7.3 [borsh] (*)
+spl-type-length-value v0.9.1 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_enum v0.7.6 [default,std] (*)
+solana-account-info v3.1.1 [] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-zero-copy v1.0.1 [borsh,bytemuck] (*)
+spl-discriminator v0.5.2 [] (*)
+thiserror v2.0.18 [default,std] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-type-length-value v0.9.1 [] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-group-interface v0.7.1 [] (*)
+spl-token-interface v2.0.0 []
+arrayref v0.3.9 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_enum v0.7.6 [default,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-program-option v3.1.0 []
+solana-program-pack v3.1.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+spl-token-metadata-interface v0.8.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+solana-address-lookup-table-interface v3.0.1 [bincode,bytemuck,serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-loader-v2-interface v3.0.0 [bincode,serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_bytes v0.11.19 [default,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-program-option v3.1.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-reward-info v3.0.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api]
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bs58 v0.5.1 [alloc,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-commitment-config v3.1.1 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instructions-sysvar v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sbpf v0.13.1 [jit]
+byteorder v1.5.0 [default,i128,std]
+combine v3.8.1 [default,std]
+ascii v0.9.3 [std]
+byteorder v1.5.0 [default,i128,std]
+either v1.15.0 [std,use_std]
+memchr v2.8.0 [alloc,default,std,use_std]
+unreachable v1.0.0 []
+void v1.0.2 []
+hash32 v0.3.1 []
+byteorder v1.5.0 [default,i128,std]
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rustc-demangle v0.1.27 []
+thiserror v2.0.18 [default,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-vote-interface v4.0.4 [bincode,serde] (*)
+spl-associated-token-account-interface v2.0.0 [borsh]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+spl-memo-interface v2.0.0 []
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+spl-token-2022-interface v2.1.0 [] (*)
+spl-token-group-interface v0.7.1 [] (*)
+spl-token-interface v2.0.0 [] (*)
+spl-token-metadata-interface v0.8.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+thiserror v2.0.18 [default,std] (*)
+lencode v2.0.0 [default,solana-primitives,std]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+endian-cast v2.0.2 []
+generic-array v1.4.2 []
+rustversion v1.0.22 (proc-macro) []
+typenum v1.20.0 [const-generics]
+typenum v1.20.0 [const-generics]
+generic-array v1.4.2 [] (*)
+hashbrown v0.16.1 [allocator-api2,default,default-hasher,equivalent,inline-more,raw-entry]
+allocator-api2 v0.2.21 [alloc]
+equivalent v1.0.2 []
+foldhash v0.2.0 []
+lencode-macros v2.0.0 (proc-macro) []
+proc-macro-crate v3.5.0 [] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+newt-hype v0.2.0 []
+ruint v1.20.0 [alloc,std]
+ruint-macro v1.2.1 (proc-macro) []
+smallbox v0.8.8 []
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+zstd-safe v7.2.4 [arrays,legacy,std,zdict_builder] (*)
+lz4 v1.28.1 []
+lz4-sys v1.11.1+lz4-1.10.0 []
+libc v0.2.189 [default,extra_traits,std]
+cc v1.2.61 [parallel] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+sha2 v0.10.9 [default,std] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cpi v3.1.0 [] (*)
+solana-entry v3.1.12 [agave-unstable-api]
+bincode v1.3.3 [] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+dlopen2 v0.5.0 [default,derive,dlopen2_derive,symbor,wrapper]
+dlopen2_derive v0.3.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+log v0.4.29 [std]
+num_cpus v1.17.0 []
+libc v0.2.189 [default,extra_traits,std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rayon v1.12.0 []
+either v1.15.0 [std,use_std]
+rayon-core v1.13.0 []
+crossbeam-deque v0.8.6 [default,std]
+crossbeam-epoch v0.9.18 [alloc,std]
+crossbeam-utils v0.8.21 [default,std]
+crossbeam-utils v0.8.21 [default,std]
+crossbeam-utils v0.8.21 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-merkle-tree v3.1.12 [agave-unstable-api]
+fast-math v0.1.1 []
+ieee754 v0.2.6 []
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api]
+crossbeam-channel v0.5.15 [default,std] (*)
+gethostname v0.2.3 []
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+reqwest v0.12.28 [__rustls,__rustls-ring,__tls,blocking,brotli,deflate,gzip,json,rustls-tls,rustls-tls-webpki-roots,rustls-tls-webpki-roots-no-provider]
+base64 v0.22.1 [alloc,default,std]
+bytes v1.11.1 [default,serde,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v1.4.0 [default,std]
+bytes v1.11.1 [default,serde,std] (*)
+itoa v1.0.18 []
+http-body v1.0.1 []
+bytes v1.11.1 [default,serde,std] (*)
+http v1.4.0 [default,std] (*)
+http-body-util v0.1.3 [default]
+bytes v1.11.1 [default,serde,std] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+http v1.4.0 [default,std] (*)
+http-body v1.0.1 [] (*)
+pin-project-lite v0.2.17 []
+hyper v1.9.0 [client,default,http1,http2]
+atomic-waker v1.1.2 []
+bytes v1.11.1 [default,serde,std] (*)
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+h2 v0.4.13 []
+atomic-waker v1.1.2 []
+bytes v1.11.1 [default,serde,std] (*)
+fnv v1.0.7 [default,std]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+http v1.4.0 [default,std] (*)
+indexmap v2.14.0 [default,rayon,std]
+equivalent v1.0.2 []
+hashbrown v0.17.0 []
+rayon v1.12.0 [] (*)
+slab v0.4.12 [default,std]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros]
+bytes v1.11.1 [default,serde,std] (*)
+libc v0.2.189 [default,extra_traits,std]
+mio v1.2.0 [net,os-ext,os-poll]
+libc v0.2.189 [default,extra_traits,std]
+parking_lot v0.12.5 [default]
+lock_api v0.4.14 [atomic_usize,default] (*)
+parking_lot_core v0.9.12 [] (*)
+pin-project-lite v0.2.17 []
+signal-hook-registry v1.4.8 []
+errno v0.3.14 [default,std]
+libc v0.2.189 [default,extra_traits,std]
+libc v0.2.189 [default,extra_traits,std]
+socket2 v0.6.3 [all]
+libc v0.2.189 [default,extra_traits,std]
+tokio-macros v2.7.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt]
+bytes v1.11.1 [default,serde,std] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-io v0.3.32 [default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes]
+log v0.4.29 [std]
+pin-project-lite v0.2.17 []
+tracing-attributes v0.1.31 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+tracing-core v0.1.36 [once_cell,std]
+once_cell v1.21.4 [alloc,default,race,std]
+http v1.4.0 [default,std] (*)
+http-body v1.0.1 [] (*)
+httparse v1.10.1 [default,std]
+itoa v1.0.18 []
+pin-project-lite v0.2.17 []
+smallvec v1.15.1 [const_generics,const_new,union]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+want v0.3.1 []
+try-lock v0.2.5 []
+hyper-rustls v0.27.9 [aws-lc-rs,http1,http2,ring,tls12,webpki-roots,webpki-tokio]
+http v1.4.0 [default,std] (*)
+hyper v1.9.0 [client,default,http1,http2] (*)
+hyper-util v0.1.20 [client,client-legacy,client-proxy,client-proxy-system,default,http1,http2,tokio]
+base64 v0.22.1 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v1.4.0 [default,std] (*)
+http-body v1.0.1 [] (*)
+hyper v1.9.0 [client,default,http1,http2] (*)
+ipnet v2.12.0 [default,std]
+libc v0.2.189 [default,extra_traits,std]
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project-lite v0.2.17 []
+socket2 v0.6.3 [all] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower-service v0.3.3 []
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12]
+aws-lc-rs v1.16.3 [aws-lc-sys,prebuilt-nasm]
+aws-lc-sys v0.40.0 [prebuilt-nasm]
+cc v1.2.61 [parallel] (*)
+cmake v0.1.58 []
+cc v1.2.61 [parallel] (*)
+dunce v1.0.5 []
+fs_extra v1.3.0 []
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+ring v0.17.14 [alloc,default,dev_urandom_fallback]
+cfg-if v1.0.4 []
+getrandom v0.2.17 [std] (*)
+untrusted v0.9.0 []
+cc v1.2.61 [parallel] (*)
+rustls-pki-types v1.14.1 [alloc,default,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+rustls-webpki v0.103.13 [alloc,aws-lc-rs,ring,std]
+aws-lc-rs v1.16.3 [aws-lc-sys,prebuilt-nasm] (*)
+ring v0.17.14 [alloc,default,dev_urandom_fallback] (*)
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+untrusted v0.9.0 []
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-rustls v0.26.4 [aws-lc-rs,aws_lc_rs,ring,tls12]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower-service v0.3.3 []
+webpki-roots v1.0.7 []
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+hyper-util v0.1.20 [client,client-legacy,client-proxy,client-proxy-system,default,http1,http2,tokio] (*)
+log v0.4.29 [std]
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project-lite v0.2.17 []
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+serde_urlencoded v0.7.1 []
+form_urlencoded v1.2.2 [alloc,default,std]
+percent-encoding v2.3.2 [alloc,default,std]
+itoa v1.0.18 []
+ryu v1.0.23 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+sync_wrapper v1.0.2 [futures,futures-core]
+futures-core v0.3.32 [alloc,default,std,unstable]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-rustls v0.26.4 [aws-lc-rs,aws_lc_rs,ring,tls12] (*)
+tower v0.5.3 [futures-core,futures-util,pin-project-lite,retry,sync_wrapper,timeout,tokio,util]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+pin-project-lite v0.2.17 []
+sync_wrapper v1.0.2 [futures,futures-core] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+tower-http v0.6.8 [async-compression,decompression-br,decompression-deflate,decompression-gzip,follow-redirect,futures-core,futures-util,iri-string,tokio,tokio-util,tower]
+async-compression v0.4.42 [brotli,gzip,tokio,zlib]
+compression-codecs v0.4.38 [brotli,flate2,gzip,memchr,zlib]
+brotli v8.0.2 [alloc-stdlib,default,std]
+alloc-no-stdlib v2.0.4 []
+alloc-stdlib v0.2.2 []
+alloc-no-stdlib v2.0.4 []
+brotli-decompressor v5.0.0 [alloc-stdlib,std]
+alloc-no-stdlib v2.0.4 []
+alloc-stdlib v0.2.2 [] (*)
+compression-core v0.4.32 []
+flate2 v1.1.9 [any_impl,default,miniz_oxide,rust_backend]
+crc32fast v1.5.0 [default,std]
+cfg-if v1.0.4 []
+miniz_oxide v0.8.9 [simd,simd-adler32,with-alloc]
+adler2 v2.0.1 []
+simd-adler32 v0.3.9 []
+memchr v2.8.0 [alloc,default,std,use_std]
+compression-core v0.4.32 []
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+bitflags v2.13.2 [serde,serde_core,std] (*)
+bytes v1.11.1 [default,serde,std] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v1.4.0 [default,std] (*)
+http-body v1.0.1 [] (*)
+http-body-util v0.1.3 [default] (*)
+iri-string v0.7.12 [alloc,default,std]
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+tower v0.5.3 [futures-core,futures-util,pin-project-lite,retry,sync_wrapper,timeout,tokio,util] (*)
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+tower-service v0.3.3 []
+url v2.5.8 [default,std]
+form_urlencoded v1.2.2 [alloc,default,std] (*)
+idna v1.1.0 [alloc,compiled_data,std]
+idna_adapter v1.2.2 [compiled_data]
+icu_normalizer v2.2.0 [compiled_data]
+icu_collections v2.2.0 []
+displaydoc v0.2.5 (proc-macro) [default,std]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+potential_utf v0.1.5 [zerovec]
+zerovec v0.11.6 [derive,yoke]
+yoke v0.8.2 [derive,zerofrom]
+stable_deref_trait v1.2.1 []
+yoke-derive v0.8.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+synstructure v0.13.2 [default,proc-macro]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+zerofrom v0.1.7 [derive]
+zerofrom-derive v0.1.7 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+synstructure v0.13.2 [default,proc-macro] (*)
+zerofrom v0.1.7 [derive] (*)
+zerovec-derive v0.11.3 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+utf8_iter v1.0.4 []
+yoke v0.8.2 [derive,zerofrom] (*)
+zerofrom v0.1.7 [derive] (*)
+zerovec v0.11.6 [derive,yoke] (*)
+icu_normalizer_data v2.2.0 []
+icu_provider v2.2.0 [baked]
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+icu_locale_core v2.2.0 [zerovec]
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+litemap v0.8.2 []
+tinystr v0.8.3 [zerovec]
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+zerovec v0.11.6 [derive,yoke] (*)
+writeable v0.6.3 []
+zerovec v0.11.6 [derive,yoke] (*)
+writeable v0.6.3 []
+yoke v0.8.2 [derive,zerofrom] (*)
+zerofrom v0.1.7 [derive] (*)
+zerotrie v0.2.4 [yoke,zerofrom]
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+yoke v0.8.2 [derive,zerofrom] (*)
+zerofrom v0.1.7 [derive] (*)
+zerovec v0.11.6 [derive,yoke] (*)
+smallvec v1.15.1 [const_generics,const_new,union]
+zerovec v0.11.6 [derive,yoke] (*)
+icu_properties v2.2.0 [compiled_data]
+icu_collections v2.2.0 [] (*)
+icu_locale_core v2.2.0 [zerovec] (*)
+icu_properties_data v2.2.0 []
+icu_provider v2.2.0 [baked] (*)
+zerotrie v0.2.4 [yoke,zerofrom] (*)
+zerovec v0.11.6 [derive,yoke] (*)
+smallvec v1.15.1 [const_generics,const_new,union]
+utf8_iter v1.0.4 []
+percent-encoding v2.3.2 [alloc,default,std]
+webpki-roots v1.0.7 [] (*)
+solana-cluster-type v3.0.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-time-utils v3.0.0 []
+thiserror v2.0.18 [default,std] (*)
+solana-packet v3.0.0 [bincode,serde]
+bincode v1.3.3 [] (*)
+bitflags v2.13.2 [serde,serde_core,std] (*)
+cfg_eval v0.1.2 (proc-macro) [default] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_with v3.18.0 [macros] (*)
+solana-perf v3.1.12 [agave-unstable-api]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+bincode v1.3.3 [] (*)
+bv v0.11.1 [serde] (*)
+bytes v1.11.1 [default,serde,std] (*)
+caps v0.5.6 []
+libc v0.2.189 [default,extra_traits,std]
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+dlopen2 v0.5.0 [default,derive,dlopen2_derive,symbor,wrapper] (*)
+fnv v1.0.7 [default,std]
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+nix v0.30.1 [default,feature,memoffset,net,poll,process,signal,socket,user]
+bitflags v2.13.2 [serde,serde_core,std] (*)
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+memoffset v0.9.1 [default]
+autocfg v1.5.0 []
+cfg_aliases v0.2.1 []
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rayon v1.12.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api]
+log v0.4.29 [std]
+num_cpus v1.17.0 [] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-time-utils v3.0.0 []
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api]
+agave-transaction-view v3.1.12 [agave-unstable-api]
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api]
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+log v0.4.29 [std]
+solana-compute-budget v3.1.12 [agave-unstable-api]
+solana-fee-structure v3.0.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics]
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+percentage v0.1.0 []
+num v0.2.1 [default,num-bigint,std]
+num-bigint v0.2.6 [std]
+num-integer v0.1.46 [i128,std]
+num-traits v0.2.19 [default,i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+autocfg v1.5.0 []
+num-complex v0.2.4 [std]
+num-traits v0.2.19 [default,i128,std] (*)
+autocfg v1.5.0 []
+num-integer v0.1.46 [i128,std] (*)
+num-iter v0.1.45 [std]
+num-integer v0.1.46 [i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+autocfg v1.5.0 []
+num-rational v0.2.4 [bigint,num-bigint,std]
+num-bigint v0.2.6 [std] (*)
+num-integer v0.1.46 [i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+autocfg v1.5.0 []
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-info v3.1.1 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-epoch-rewards v3.0.1 [serde,sysvar] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-fee-structure v3.0.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-last-restart-slot v3.0.0 [serde,sysvar] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-program-entrypoint v3.1.1 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sbpf v0.13.1 [jit] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-stable-layout v3.0.0 []
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-svm-callback v3.1.12 [agave-unstable-api]
+solana-account v3.4.0 [bincode,serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-precompile-error v3.0.0 []
+num-traits v0.2.19 [default,i128,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-svm-feature-set v3.1.12 [agave-unstable-api]
+solana-svm-log-collector v3.1.12 [agave-unstable-api]
+log v0.4.29 [std]
+solana-svm-measure v3.1.12 [agave-unstable-api]
+solana-svm-timings v3.1.12 [agave-unstable-api]
+eager v0.1.0 []
+enum-iterator v1.5.0 []
+enum-iterator-derive v1.5.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-svm-type-overrides v3.1.12 [agave-unstable-api]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-compute-budget-instruction v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+log v0.4.29 [std]
+solana-borsh v3.0.2 [] (*)
+solana-builtins-default-costs v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+log v0.4.29 [std]
+solana-bpf-loader-program v3.1.12 [agave-unstable-api,default,metrics,svm-internal]
+agave-syscalls v3.1.12 [agave-unstable-api,default,metrics]
+bincode v1.3.3 [] (*)
+libsecp256k1 v0.6.0 [hmac,hmac-drbg,sha2,static-context,std,typenum]
+arrayref v0.3.9 []
+base64 v0.12.3 [std]
+digest v0.9.0 [alloc,std]
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+hmac-drbg v0.3.0 []
+digest v0.9.0 [alloc,std] (*)
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+hmac v0.8.1 []
+crypto-mac v0.8.0 []
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+subtle v2.6.1 [default,i128,std]
+digest v0.9.0 [alloc,std] (*)
+libsecp256k1-core v0.2.2 [std]
+crunchy v0.2.4 [default,limit_128]
+digest v0.9.0 [alloc,std] (*)
+subtle v2.6.1 [default,i128,std]
+rand v0.7.3 [alloc,default,getrandom,getrandom_package,libc,std]
+getrandom v0.1.16 [std]
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+libc v0.2.189 [default,extra_traits,std]
+rand_chacha v0.2.2 [std]
+ppv-lite86 v0.2.21 [simd,std] (*)
+rand_core v0.5.1 [alloc,getrandom,std]
+getrandom v0.1.16 [std] (*)
+rand_core v0.5.1 [alloc,getrandom,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+sha2 v0.9.9 [std]
+block-buffer v0.9.0 []
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+digest v0.9.0 [alloc,std] (*)
+opaque-debug v0.3.1 []
+typenum v1.20.0 [const-generics]
+libsecp256k1-gen-ecmult v0.2.1 []
+libsecp256k1-core v0.2.2 [default,std]
+crunchy v0.2.4 [default,limit_128]
+digest v0.9.0 []
+generic-array v0.14.7 [more_lengths]
+typenum v1.20.0 []
+version_check v0.9.5 []
+subtle v2.6.1 [std]
+libsecp256k1-gen-genmult v0.2.1 []
+libsecp256k1-core v0.2.2 [default,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-info v3.1.1 [] (*)
+solana-big-mod-exp v3.0.0 []
+num-bigint v0.4.6 [default,std]
+num-integer v0.1.46 [i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+solana-blake3-hasher v3.1.0 [blake3]
+blake3 v1.8.5 [default,std,traits-preview] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-bn254 v3.2.1 []
+ark-bn254 v0.5.0 [curve,default,scalar_field]
+ark-ec v0.5.0 [default]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+ark-ff v0.5.0 [default]
+ark-ff-asm v0.5.0 (proc-macro) []
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+ark-ff-macros v0.5.0 (proc-macro) []
+num-bigint v0.4.6 []
+num-integer v0.1.46 [i128]
+num-traits v0.2.19 [i128]
+autocfg v1.5.0 []
+num-traits v0.2.19 [i128] (*)
+num-traits v0.2.19 [i128] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+ark-serialize v0.5.0 [ark-serialize-derive,default,derive]
+ark-serialize-derive v0.5.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+ark-std v0.5.0 []
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+arrayvec v0.7.6 [default,std]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+num-bigint v0.4.6 [default,std] (*)
+ark-std v0.5.0 [] (*)
+arrayvec v0.7.6 [default,std]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+educe v0.6.0 (proc-macro) [Clone,Copy,Debug,Default,Deref,DerefMut,Eq,Hash,Into,Ord,PartialEq,PartialOrd,default]
+enum-ordinalize v4.3.2 [derive]
+enum-ordinalize-derive v4.3.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+itertools v0.13.0 []
+either v1.15.0 [std,use_std]
+num-bigint v0.4.6 [default,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+paste v1.0.15 (proc-macro) []
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+ark-poly v0.5.0 []
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+ark-ff v0.5.0 [default] (*)
+ark-serialize v0.5.0 [ark-serialize-derive,default,derive] (*)
+ark-std v0.5.0 [] (*)
+educe v0.6.0 (proc-macro) [Clone,Copy,Debug,Default,Deref,DerefMut,Eq,Hash,Into,Ord,PartialEq,PartialOrd,default] (*)
+hashbrown v0.15.5 [allocator-api2,default,default-hasher,equivalent,inline-more,raw-entry]
+allocator-api2 v0.2.21 [alloc]
+equivalent v1.0.2 []
+foldhash v0.1.5 []
+ark-serialize v0.5.0 [ark-serialize-derive,default,derive] (*)
+ark-std v0.5.0 [] (*)
+educe v0.6.0 (proc-macro) [Clone,Copy,Debug,Default,Deref,DerefMut,Eq,Hash,Into,Ord,PartialEq,PartialOrd,default] (*)
+hashbrown v0.15.5 [allocator-api2,default,default-hasher,equivalent,inline-more,raw-entry] (*)
+itertools v0.13.0 [] (*)
+num-bigint v0.4.6 [default,std] (*)
+num-integer v0.1.46 [i128,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+ark-ff v0.5.0 [default] (*)
+ark-std v0.5.0 [] (*)
+ark-ec v0.5.0 [default] (*)
+ark-ff v0.5.0 [default] (*)
+ark-serialize v0.5.0 [ark-serialize-derive,default,derive] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cpi v3.1.0 [] (*)
+solana-curve25519 v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keccak-hasher v3.1.0 [sha3]
+sha3 v0.10.9 [default,std] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-poseidon v3.1.12 [agave-unstable-api]
+ark-bn254 v0.4.0 [curve,default,scalar_field]
+ark-ec v0.4.2 []
+ark-ff v0.4.2 [default]
+ark-ff-asm v0.4.2 (proc-macro) []
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+unicode-ident v1.0.24 []
+ark-ff-macros v0.4.2 (proc-macro) []
+num-bigint v0.4.6 [] (*)
+num-traits v0.2.19 [i128] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+ark-serialize v0.4.2 [ark-serialize-derive,derive]
+ark-serialize-derive v0.4.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+ark-std v0.4.0 []
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+num-bigint v0.4.6 [default,std] (*)
+ark-std v0.4.0 [] (*)
+derivative v2.2.0 (proc-macro) [use_core]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+itertools v0.10.5 [default,use_alloc,use_std]
+either v1.15.0 [std,use_std]
+num-bigint v0.4.6 [default,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+paste v1.0.15 (proc-macro) []
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+rustc_version v0.4.1 [] (*)
+ark-poly v0.4.2 []
+ark-ff v0.4.2 [default] (*)
+ark-serialize v0.4.2 [ark-serialize-derive,derive] (*)
+ark-std v0.4.0 [] (*)
+derivative v2.2.0 (proc-macro) [use_core] (*)
+hashbrown v0.13.2 [ahash,default,inline-more]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+ark-serialize v0.4.2 [ark-serialize-derive,derive] (*)
+ark-std v0.4.0 [] (*)
+derivative v2.2.0 (proc-macro) [use_core] (*)
+hashbrown v0.13.2 [ahash,default,inline-more] (*)
+itertools v0.10.5 [default,use_alloc,use_std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+ark-ff v0.4.2 [default] (*)
+ark-std v0.4.0 [] (*)
+ark-bn254 v0.5.0 [curve,default,scalar_field] (*)
+light-poseidon v0.2.0 []
+ark-bn254 v0.4.0 [curve,default,scalar_field] (*)
+ark-ff v0.4.2 [default] (*)
+num-bigint v0.4.6 [default,std] (*)
+thiserror v1.0.69 [] (*)
+light-poseidon v0.4.0 []
+ark-bn254 v0.5.0 [curve,default,scalar_field] (*)
+ark-ff v0.5.0 [default] (*)
+num-bigint v0.4.6 [default,std] (*)
+thiserror v1.0.69 [] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-program-entrypoint v3.1.1 [] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sbpf v0.13.1 [jit] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-secp256k1-recover v3.1.1 []
+k256 v0.13.4 [alloc,arithmetic,default,digest,ecdsa,ecdsa-core,once_cell,pkcs8,precomputed-tables,schnorr,sha2,sha256,signature,std]
+cfg-if v1.0.4 []
+ecdsa v0.16.9 [alloc,arithmetic,der,digest,hazmat,pkcs8,rfc6979,signing,spki,std,verifying]
+der v0.7.10 [alloc,oid,std,zeroize]
+const-oid v0.9.6 []
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+elliptic-curve v0.13.8 [alloc,arithmetic,digest,ff,group,hazmat,pkcs8,sec1,std]
+base16ct v0.2.0 [alloc]
+crypto-bigint v0.5.5 [generic-array,rand_core,zeroize]
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+ff v0.13.1 [alloc,bits,bitvec,default,std]
+bitvec v1.0.1 []
+funty v2.0.0 []
+radium v0.7.0 []
+tap v1.0.1 []
+wyz v0.5.1 []
+tap v1.0.1 []
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+subtle v2.6.1 [default,i128,std]
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+group v0.13.0 [alloc,default,rand,rand_xorshift,tests]
+ff v0.13.1 [alloc,bits,bitvec,default,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+rand_xorshift v0.3.0 []
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+subtle v2.6.1 [default,i128,std]
+pkcs8 v0.10.2 [alloc,std]
+der v0.7.10 [alloc,oid,std,zeroize] (*)
+spki v0.7.3 [alloc,std]
+der v0.7.10 [alloc,oid,std,zeroize] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+sec1 v0.7.3 [alloc,default,der,point,std,subtle,zeroize]
+base16ct v0.2.0 [alloc]
+der v0.7.10 [alloc,oid,std,zeroize] (*)
+generic-array v0.14.7 [more_lengths,zeroize] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+rfc6979 v0.4.0 []
+hmac v0.12.1 [reset] (*)
+subtle v2.6.1 [default,i128,std]
+signature v2.2.0 [alloc,digest,rand_core,std] (*)
+spki v0.7.3 [alloc,std] (*)
+elliptic-curve v0.13.8 [alloc,arithmetic,digest,ff,group,hazmat,pkcs8,sec1,std] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+sha2 v0.10.9 [default,std] (*)
+signature v2.2.0 [alloc,digest,rand_core,std] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-stable-layout v3.0.0 [] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-svm-callback v3.1.12 [agave-unstable-api] (*)
+solana-svm-feature-set v3.1.12 [agave-unstable-api]
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-svm-measure v3.1.12 [agave-unstable-api]
+solana-svm-timings v3.1.12 [agave-unstable-api] (*)
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+thiserror v2.0.18 [default,std] (*)
+bincode v1.3.3 [] (*)
+qualifier_attr v0.2.2 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-bincode v3.1.0 []
+bincode v1.3.3 [] (*)
+serde_core v1.0.229 [alloc,rc,result,std]
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-loader-v4-interface v3.1.0 [bincode,serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_bytes v0.11.19 [default,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-program-entrypoint v3.1.1 [] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sbpf v0.13.1 [jit] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-feature-set v3.1.12 [agave-unstable-api]
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-svm-measure v3.1.12 [agave-unstable-api]
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-compute-budget-program v3.1.12 [agave-unstable-api]
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-loader-v4-program v3.1.12 [agave-unstable-api]
+log v0.4.29 [std]
+solana-account v3.4.0 [bincode,serde] (*)
+solana-bincode v3.1.0 [] (*)
+solana-bpf-loader-program v3.1.12 [agave-unstable-api,default,metrics,svm-internal] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-loader-v4-interface v3.1.0 [bincode,serde] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sbpf v0.13.1 [jit] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-svm-measure v3.1.12 [agave-unstable-api]
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-system-program v3.1.12 [agave-unstable-api]
+bincode v1.3.3 [] (*)
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-bincode v3.1.0 [] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-nonce v3.2.0 [serde] (*)
+solana-nonce-account v3.0.0 []
+solana-account v3.4.0 [bincode,serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-nonce v3.2.0 [serde] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-vote-program v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+bincode v1.3.3 [] (*)
+log v0.4.29 [std]
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-bincode v3.1.0 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable]
+ed25519-dalek v2.2.0 [alloc,default,fast,rand_core,std,zeroize] (*)
+ed25519-dalek-bip32 v0.3.0 [default,std]
+derivation-path v0.2.0 [std]
+ed25519-dalek v2.2.0 [alloc,default,fast,rand_core,std,zeroize] (*)
+hmac v0.12.1 [reset] (*)
+sha2 v0.10.9 [default,std] (*)
+five8 v0.2.1 [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+solana-derivation-path v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-seed-derivable v3.0.0 [] (*)
+solana-seed-phrase v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-signer v3.0.0 [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-vote-interface v4.0.4 [bincode,serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-compute-budget v3.1.12 [agave-unstable-api] (*)
+solana-compute-budget-interface v3.0.0 [borsh]
+borsh v1.6.1 [borsh-derive,default,derive,std,unstable__schema] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+wincode v0.1.2 [alloc,default,derive,solana-short-vec,std]
+solana-short-vec v3.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+wincode-derive v0.1.1 (proc-macro) []
+darling v0.21.3 [default,suggestions]
+darling_core v0.21.3 [strsim,suggestions]
+fnv v1.0.7 [default,std]
+ident_case v1.0.1 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+strsim v0.11.1 []
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+darling_macro v0.21.3 (proc-macro) []
+darling_core v0.21.3 [strsim,suggestions] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+thiserror v2.0.18 [default,std] (*)
+xxhash-rust v0.8.15 [xxh64]
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+multihash v0.19.5 [alloc,std] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+prost v0.11.9 [default,prost-derive,std]
+bytes v1.11.1 [default,serde,std] (*)
+prost-derive v0.11.9 (proc-macro) []
+anyhow v1.0.102 [default,std]
+itertools v0.10.5 [default,use_alloc,use_std] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+reqwest v0.13.3 [__native-tls,__native-tls-alpn,__rustls,__rustls-aws-lc-rs,__tls,blocking,brotli,charset,default,default-tls,deflate,gzip,http2,json,native-tls,rustls,stream,system-proxy]
+base64 v0.22.1 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+encoding_rs v0.8.35 [alloc,default]
+cfg-if v1.0.4 []
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+h2 v0.4.13 [] (*)
+http v1.4.0 [default,std] (*)
+http-body v1.0.1 [] (*)
+http-body-util v0.1.3 [default] (*)
+hyper v1.9.0 [client,default,http1,http2] (*)
+hyper-rustls v0.27.9 [aws-lc-rs,http1,http2,ring,tls12,webpki-roots,webpki-tokio] (*)
+hyper-tls v0.6.0 [alpn]
+bytes v1.11.1 [default,serde,std] (*)
+http-body-util v0.1.3 [default] (*)
+hyper v1.9.0 [client,default,http1,http2] (*)
+hyper-util v0.1.20 [client,client-legacy,client-proxy,client-proxy-system,default,http1,http2,tokio] (*)
+native-tls v0.2.18 [alpn,default]
+log v0.4.29 [std]
+openssl v0.10.78 [default,vendored]
+bitflags v2.13.2 [serde,serde_core,std] (*)
+cfg-if v1.0.4 []
+foreign-types v0.3.2 []
+foreign-types-shared v0.1.1 []
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+openssl-macros v0.1.1 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+openssl-sys v0.9.114 [openssl-src,vendored]
+libc v0.2.189 [default,extra_traits,std]
+cc v1.2.61 [parallel] (*)
+openssl-src v300.6.0+3.6.2 [default,legacy]
+cc v1.2.61 [parallel] (*)
+pkg-config v0.3.33 []
+vcpkg v0.2.15 []
+openssl-probe v0.2.1 []
+openssl-sys v0.9.114 [openssl-src,vendored] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-native-tls v0.3.1 []
+native-tls v0.2.18 [alpn,default] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower-service v0.3.3 []
+hyper-util v0.1.20 [client,client-legacy,client-proxy,client-proxy-system,default,http1,http2,tokio] (*)
+log v0.4.29 [std]
+mime v0.3.17 []
+native-tls v0.2.18 [alpn,default] (*)
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project-lite v0.2.17 []
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+rustls-platform-verifier v0.7.0 []
+log v0.4.29 [std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-native-certs v0.8.3 []
+openssl-probe v0.2.1 []
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+rustls-webpki v0.103.13 [alloc,aws-lc-rs,ring,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+sync_wrapper v1.0.2 [futures,futures-core] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-native-tls v0.3.1 [] (*)
+tokio-rustls v0.26.4 [aws-lc-rs,aws_lc_rs,ring,tls12] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+tower v0.5.3 [futures-core,futures-util,pin-project-lite,retry,sync_wrapper,timeout,tokio,util] (*)
+tower-http v0.6.8 [async-compression,decompression-br,decompression-deflate,decompression-gzip,follow-redirect,futures-core,futures-util,iri-string,tokio,tokio-util,tower] (*)
+tower-service v0.3.3 []
+url v2.5.8 [default,std] (*)
+ripget v0.3.0 []
+clap v4.6.1 [color,default,derive,error-context,help,std,suggestions,usage]
+clap_builder v4.6.0 [color,error-context,help,std,suggestions,usage]
+anstream v1.0.0 [auto,default,wincon]
+anstyle v1.0.14 [default,std]
+anstyle-parse v1.0.0 [default,utf8]
+utf8parse v0.2.2 [default]
+anstyle-query v1.1.5 []
+colorchoice v1.0.5 []
+is_terminal_polyfill v1.70.2 [default]
+utf8parse v0.2.2 [default]
+anstyle v1.0.14 [default,std]
+clap_lex v1.1.0 []
+strsim v0.11.1 []
+clap_derive v4.6.1 (proc-macro) [default]
+heck v0.5.0 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+env_logger v0.11.10 [auto-color,color,default,humantime,regex]
+anstream v1.0.0 [auto,default,wincon] (*)
+anstyle v1.0.14 [default,std]
+env_filter v1.0.1 [regex]
+log v0.4.29 [std]
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment] (*)
+jiff v0.2.24 [alloc,std]
+log v0.4.29 [std]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+indicatif v0.18.4 [default,unicode-width,wasmbind]
+console v0.16.3 [alloc,ansi-parsing,default,std,unicode-width]
+libc v0.2.189 [default,extra_traits,std]
+unicode-width v0.2.0 [cjk,default]
+portable-atomic v1.13.1 [default,fallback,require-cas]
+unicode-width v0.2.0 [cjk,default]
+unit-prefix v0.5.2 [default,std]
+log v0.4.29 [std]
+reqwest v0.13.3 [__native-tls,__native-tls-alpn,__rustls,__rustls-aws-lc-rs,__tls,blocking,brotli,charset,default,default-tls,deflate,gzip,http2,json,native-tls,rustls,stream,system-proxy] (*)
+thiserror v1.0.69 [] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+rseek v0.4.1 []
+bytes v1.11.1 [default,serde,std] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable]
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-executor v0.3.32 [default,std,thread-pool]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-task v0.3.32 [alloc,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+futures-io v0.3.32 [default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+futures-task v0.3.32 [alloc,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+reqwest v0.13.3 [__native-tls,__native-tls-alpn,__rustls,__rustls-aws-lc-rs,__tls,blocking,brotli,charset,default,default-tls,deflate,gzip,http2,json,native-tls,rustls,stream,system-proxy] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_cbor v0.11.2 [default,std]
+half v1.8.3 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+serial_test v4.0.1 [async,default,logging]
+futures-executor v0.3.32 [default,std,thread-pool] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+log v0.4.29 [std]
+once_cell v1.21.4 [alloc,default,race,std]
+parking_lot v0.12.5 [default] (*)
+serial_test_derive v4.0.1 (proc-macro) [async,default]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v3.0.3 [clone-impls,derive,full,parsing,printing,proc-macro] (*)
+sha2 v0.10.9 [default,std] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-geyser-plugin-manager v3.1.12 [agave-unstable-api]
+agave-geyser-plugin-interface v3.1.12 [] (*)
+bs58 v0.5.1 [alloc,std]
+crossbeam-channel v0.5.15 [default,std] (*)
+json5 v0.4.1 []
+pest v2.8.6 [default,memchr,std]
+memchr v2.8.0 [alloc,default,std,use_std]
+ucd-trie v0.1.7 [std]
+pest_derive v2.8.6 (proc-macro) [default,std]
+pest v2.8.6 [default,memchr,std] (*)
+pest_generator v2.8.6 [std]
+pest v2.8.6 [default,memchr,std] (*)
+pest_meta v2.8.6 [default]
+pest v2.8.6 [default,memchr,std] (*)
+sha2 v0.10.9 [default,std] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+jsonrpc-core v18.0.0 [default,futures,futures-executor]
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+futures-executor v0.3.32 [default,std,thread-pool] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_json v1.0.150 [default,std] (*)
+libloading v0.7.4 []
+cfg-if v1.0.4 []
+log v0.4.29 [std]
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-accounts-db v3.1.12 [agave-unstable-api]
+agave-fs v3.1.12 [agave-unstable-api]
+agave-io-uring v3.1.12 [agave-unstable-api]
+io-uring v0.7.12 []
+bitflags v2.13.2 [serde,serde_core,std] (*)
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+slab v0.4.12 [default,std]
+smallvec v1.15.1 [const_generics,const_new,union]
+io-uring v0.7.12 [] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+slab v0.4.12 [default,std]
+smallvec v1.15.1 [const_generics,const_new,union]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+bincode v1.3.3 [] (*)
+blake3 v1.8.5 [default,std,traits-preview] (*)
+bv v0.11.1 [serde] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+dashmap v5.5.3 [raw-api,rayon,serde]
+cfg-if v1.0.4 []
+hashbrown v0.14.5 [raw]
+lock_api v0.4.14 [atomic_usize,default] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+parking_lot_core v0.9.12 [] (*)
+rayon v1.12.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+indexmap v2.14.0 [default,rayon,std] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+lz4 v1.28.1 [] (*)
+memmap2 v0.9.10 []
+libc v0.2.189 [default,extra_traits,std]
+modular-bitfield v0.13.1 []
+modular-bitfield-impl v0.13.1 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+static_assertions v1.1.0 []
+num_cpus v1.17.0 [] (*)
+num_enum v0.7.6 [default,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rayon v1.12.0 [] (*)
+seqlock v0.2.0 []
+parking_lot v0.12.5 [default] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+smallvec v1.15.1 [const_generics,const_new,union]
+solana-account v3.4.0 [bincode,serde] (*)
+solana-address-lookup-table-interface v3.0.1 [bincode,bytemuck,serde] (*)
+solana-bucket-map v3.1.12 [agave-unstable-api]
+bv v0.11.1 [serde] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+memmap2 v0.9.10 [] (*)
+modular-bitfield v0.13.1 [] (*)
+num_enum v0.7.6 [default,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+tempfile v3.27.0 [default,getrandom]
+fastrand v2.4.1 [alloc,default,std]
+getrandom v0.4.2 []
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+rustix v1.1.4 [alloc,default,fs,std]
+bitflags v2.13.2 [serde,serde_core,std] (*)
+linux-raw-sys v0.12.1 [auxvec,elf,errno,general,ioctl,no_std]
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-genesis-config v3.0.0 [serde]
+bincode v1.3.3 [] (*)
+chrono v0.4.44 [alloc,clock,default,iana-time-zone,js-sys,now,oldtime,serde,std,wasm-bindgen,wasmbind,winapi,windows-link]
+iana-time-zone v0.1.65 [fallback]
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+memmap2 v0.5.10 []
+libc v0.2.189 [default,extra_traits,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cluster-type v3.0.0 [serde] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-inflation v3.1.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-poh-config v3.0.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-shred-version v3.0.1 []
+solana-hard-forks v3.1.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-signer v3.0.0 [] (*)
+solana-time-utils v3.0.0 []
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-lattice-hash v3.1.12 [agave-unstable-api]
+base64 v0.22.1 [alloc,default,std]
+blake3 v1.8.5 [default,std,traits-preview] (*)
+bs58 v0.5.1 [alloc,std]
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-nohash-hasher v0.2.1 [default,std]
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-time-utils v3.0.0 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+spl-generic-token v2.0.1 [] (*)
+static_assertions v1.1.0 []
+tempfile v3.27.0 [default,getrandom] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-ledger v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+agave-reserved-account-keys v3.1.12 [agave-unstable-api] (*)
+agave-snapshots v3.1.12 [agave-unstable-api]
+agave-fs v3.1.12 [agave-unstable-api] (*)
+bincode v1.3.3 [] (*)
+bzip2 v0.4.4 []
+bzip2-sys v0.1.13+1.0.8 []
+cc v1.2.61 [parallel] (*)
+pkg-config v0.3.33 []
+libc v0.2.189 [default,extra_traits,std]
+crossbeam-channel v0.5.15 [default,std] (*)
+log v0.4.29 [std]
+lz4 v1.28.1 [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment] (*)
+semver v1.0.28 [default,std]
+solana-accounts-db v3.1.12 [agave-unstable-api] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-lattice-hash v3.1.12 [agave-unstable-api] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+strum v0.24.1 [default,derive,std,strum_macros]
+strum_macros v0.24.3 (proc-macro) []
+heck v0.4.1 [default]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+rustversion v1.0.22 (proc-macro) []
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+symlink v0.1.0 []
+tar v0.4.45 [default,xattr]
+filetime v0.2.27 []
+cfg-if v1.0.4 []
+libc v0.2.189 [default,extra_traits,std]
+libc v0.2.189 [default,extra_traits,std]
+xattr v1.6.1 [default,unsupported]
+rustix v1.1.4 [alloc,default,fs,std] (*)
+tempfile v3.27.0 [default,getrandom] (*)
+thiserror v2.0.18 [default,std] (*)
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+anyhow v1.0.102 [default,std]
+assert_matches v1.5.0 []
+bincode v1.3.3 [] (*)
+bitflags v2.13.2 [serde,serde_core,std] (*)
+bytes v1.11.1 [default,serde,std] (*)
+bzip2 v0.4.4 [] (*)
+chrono v0.4.44 [alloc,clock,default,iana-time-zone,js-sys,now,oldtime,serde,std,wasm-bindgen,wasmbind,winapi,windows-link] (*)
+chrono-humanize v0.2.3 []
+chrono v0.4.44 [alloc,clock,default,iana-time-zone,js-sys,now,oldtime,serde,std,wasm-bindgen,wasmbind,winapi,windows-link] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+eager v0.1.0 []
+fs_extra v1.3.0 []
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+lazy-lru v0.1.4 []
+hashbrown v0.15.5 [allocator-api2,default,default-hasher,equivalent,inline-more,raw-entry] (*)
+log v0.4.29 [std]
+lru v0.7.8 [default,hashbrown]
+hashbrown v0.12.3 [ahash,default,inline-more,raw]
+ahash v0.7.8 []
+getrandom v0.2.17 [std] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+version_check v0.9.5 []
+mockall v0.11.4 []
+cfg-if v1.0.4 []
+downcast v0.11.0 [default,std]
+fragile v2.1.0 [default,future,futures-core,stream]
+futures-core v0.3.32 [alloc,default,std,unstable]
+lazy_static v1.5.0 []
+mockall_derive v0.11.4 (proc-macro) []
+cfg-if v1.0.4 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+predicates v2.1.5 [default,diff,float-cmp,normalize-line-endings,regex]
+difflib v0.4.0 []
+float-cmp v0.9.0 [default,num-traits,ratio]
+num-traits v0.2.19 [default,i128,std] (*)
+itertools v0.10.5 [default,use_alloc,use_std] (*)
+normalize-line-endings v0.3.0 []
+predicates-core v1.0.10 []
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment] (*)
+predicates-tree v1.0.13 []
+predicates-core v1.0.10 []
+termtree v0.5.1 []
+num_cpus v1.17.0 [] (*)
+num_enum v0.7.6 [default,std] (*)
+prost v0.11.9 [default,prost-derive,std] (*)
+qualifier_attr v0.2.2 (proc-macro) [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rand_chacha v0.3.1 [default,std] (*)
+rayon v1.12.0 [] (*)
+reed-solomon-erasure v6.0.0 [cc,default,libc,parking_lot,simd-accel,std]
+libc v0.2.189 [default,extra_traits,std]
+libm v0.2.16 [arch,default]
+lru v0.7.8 [default,hashbrown] (*)
+parking_lot v0.11.2 [default]
+instant v0.1.13 []
+cfg-if v1.0.4 []
+lock_api v0.4.14 [atomic_usize,default] (*)
+parking_lot_core v0.8.6 []
+cfg-if v1.0.4 []
+instant v0.1.13 [] (*)
+libc v0.2.189 [default,extra_traits,std]
+smallvec v1.15.1 [const_generics,const_new,union]
+smallvec v1.15.1 [const_generics,const_new,union]
+spin v0.9.8 [mutex,spin_mutex]
+cc v1.2.61 [parallel] (*)
+rocksdb v0.23.0 [lz4]
+libc v0.2.189 [default,extra_traits,std]
+librocksdb-sys v0.17.3+10.4.2 [lz4,lz4-sys,static]
+libc v0.2.189 [default,extra_traits,std]
+lz4-sys v1.11.1+lz4-1.10.0 [] (*)
+bindgen v0.72.1 []
+bitflags v2.13.2 [std]
+cexpr v0.6.0 []
+nom v7.1.3 [alloc,std]
+memchr v2.8.0 [alloc,default,std]
+minimal-lexical v0.2.1 [std]
+clang-sys v1.8.1 [clang_10_0,clang_11_0,clang_3_5,clang_3_6,clang_3_7,clang_3_8,clang_3_9,clang_4_0,clang_5_0,clang_6_0,clang_7_0,clang_8_0,clang_9_0]
+glob v0.3.3 []
+libc v0.2.189 [default,std]
+glob v0.3.3 []
+itertools v0.13.0 [] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+regex v1.12.3 [std,unicode-bool,unicode-perl]
+regex-automata v0.4.14 [alloc,meta,nfa-pikevm,nfa-thompson,std,syntax,unicode-bool,unicode-perl,unicode-word-boundary]
+regex-syntax v0.8.10 [std,unicode-bool,unicode-perl]
+regex-syntax v0.8.10 [std,unicode-bool,unicode-perl]
+rustc-hash v2.1.2 [default,std]
+shlex v1.3.0 [default,std]
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+cc v1.2.61 [parallel] (*)
+scopeguard v1.2.0 [default,use_std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_bytes v0.11.19 [default,std] (*)
+sha2 v0.10.9 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-decoder v3.1.12 [agave-unstable-api] (*)
+solana-accounts-db v3.1.12 [agave-unstable-api] (*)
+solana-address-lookup-table-interface v3.0.1 [bincode,bytemuck,serde] (*)
+solana-bpf-loader-program v3.1.12 [agave-unstable-api,default,metrics,svm-internal] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cost-model v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+log v0.4.29 [std]
+solana-bincode v3.1.0 [] (*)
+solana-borsh v3.0.2 [] (*)
+solana-builtins-default-costs v3.1.12 [agave-unstable-api] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-compute-budget v3.1.12 [agave-unstable-api] (*)
+solana-compute-budget-instruction v3.1.12 [agave-unstable-api] (*)
+solana-compute-budget-interface v3.0.0 [borsh] (*)
+solana-fee-structure v3.0.0 [serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-genesis-utils v3.1.12 [agave-unstable-api]
+agave-snapshots v3.1.12 [agave-unstable-api] (*)
+log v0.4.29 [std]
+solana-download-utils v3.1.12 [agave-unstable-api]
+agave-snapshots v3.1.12 [agave-unstable-api] (*)
+log v0.4.29 [std]
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-file-download v3.1.4 [default,native-tls]
+console v0.15.11 [ansi-parsing,default,unicode-width]
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+unicode-width v0.2.0 [cjk,default]
+indicatif v0.18.4 [default,unicode-width,wasmbind] (*)
+log v0.4.29 [std]
+reqwest v0.13.3 [__native-tls,__native-tls-alpn,__rustls,__rustls-aws-lc-rs,__tls,blocking,brotli,charset,default,default-tls,deflate,gzip,http2,json,native-tls,rustls,stream,system-proxy] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+agave-fs v3.1.12 [agave-unstable-api] (*)
+agave-precompiles v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+bincode v1.3.3 [] (*)
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+ed25519-dalek v1.0.1 [default,rand,serde_crate,std,u64_backend]
+curve25519-dalek v3.2.0 [alloc,std,u64_backend]
+byteorder v1.5.0 [default,i128,std]
+digest v0.9.0 [alloc,std] (*)
+rand_core v0.5.1 [alloc,getrandom,std] (*)
+subtle v2.6.1 [default,i128,std]
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+ed25519 v1.5.3 [std]
+signature v1.6.4 [std]
+rand v0.7.3 [alloc,default,getrandom,getrandom_package,libc,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+sha2 v0.9.9 [std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+libsecp256k1 v0.6.0 [hmac,hmac-drbg,sha2,static-context,std,typenum] (*)
+openssl v0.10.78 [default,vendored] (*)
+sha3 v0.10.9 [default,std] (*)
+solana-ed25519-program v3.0.0 []
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-precompile-error v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-secp256k1-program v3.0.0 [serde]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+k256 v0.13.4 [alloc,arithmetic,default,digest,ecdsa,ecdsa-core,once_cell,pkcs8,precomputed-tables,schnorr,sha2,sha256,signature,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+sha3 v0.10.9 [default,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-secp256r1-program v3.0.0 [default,openssl-vendored]
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+openssl v0.10.78 [default,vendored] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+agave-reserved-account-keys v3.1.12 [agave-unstable-api] (*)
+agave-snapshots v3.1.12 [agave-unstable-api] (*)
+agave-syscalls v3.1.12 [agave-unstable-api,default,metrics] (*)
+agave-votor-messages v3.1.12 [agave-unstable-api]
+agave-logger v3.1.12 [agave-unstable-api]
+env_logger v0.11.10 [auto-color,color,default,humantime,regex] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+signal-hook v0.3.18 [channel,default,iterator]
+libc v0.2.189 [default,extra_traits,std]
+signal-hook-registry v1.4.8 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-bls-signatures v1.0.0 [bytemuck,default,serde,solana-signer-derive,std]
+base64 v0.22.1 [alloc,default,std]
+blst v0.3.16 [default]
+threadpool v1.8.1 []
+num_cpus v1.17.0 [] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+cc v1.2.61 [parallel] (*)
+blstrs v0.7.1 [default,serde]
+blst v0.3.16 [default] (*)
+byte-slice-cast v1.2.3 [default,std]
+ff v0.13.1 [alloc,bits,bitvec,default,std] (*)
+group v0.13.0 [alloc,default,rand,rand_xorshift,tests] (*)
+pairing v0.23.0 []
+group v0.13.0 [alloc,default,rand,rand_xorshift,tests] (*)
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+subtle v2.6.1 [default,i128,std]
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+cfg_eval v0.1.2 (proc-macro) [default] (*)
+ff v0.13.1 [alloc,bits,bitvec,default,std] (*)
+group v0.13.0 [alloc,default,rand,rand_xorshift,tests] (*)
+pairing v0.23.0 [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+serde_with v3.18.0 [macros] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+subtle v2.6.1 [default,i128,std]
+thiserror v2.0.18 [default,std] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+aquamarine v0.6.0 (proc-macro) []
+include_dir v0.7.4 [default]
+include_dir_macros v0.7.4 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+itertools v0.10.5 [default,use_alloc,use_std] (*)
+proc-macro-error2 v2.0.1 []
+proc-macro-error-attr2 v2.0.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+arc-swap v1.9.1 []
+rustversion v1.0.22 (proc-macro) []
+arrayref v0.3.9 []
+assert_matches v1.5.0 []
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+blake3 v1.8.5 [default,std,traits-preview] (*)
+bv v0.11.1 [serde] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+dir-diff v0.3.3 [default]
+walkdir v2.5.0 []
+same-file v1.0.6 []
+fnv v1.0.7 [default,std]
+im v15.1.0 [rayon,serde]
+bitmaps v2.1.0 [default,std]
+typenum v1.20.0 [const-generics]
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+rand_xoshiro v0.6.0 []
+rand_core v0.6.4 [alloc,getrandom,std] (*)
+rayon v1.12.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+sized-chunks v0.6.5 [default,std]
+bitmaps v2.1.0 [default,std] (*)
+typenum v1.20.0 [const-generics]
+typenum v1.20.0 [const-generics]
+version_check v0.9.5 []
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+lz4 v1.28.1 [] (*)
+memmap2 v0.9.10 [] (*)
+mockall v0.11.4 [] (*)
+modular-bitfield v0.13.1 [] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+num_cpus v1.17.0 [] (*)
+num_enum v0.7.6 [default,std] (*)
+percentage v0.1.0 [] (*)
+qualifier_attr v0.2.2 (proc-macro) [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rayon v1.12.0 [] (*)
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment] (*)
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+serde_with v3.18.0 [macros] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-info v3.1.1 [] (*)
+solana-accounts-db v3.1.12 [agave-unstable-api] (*)
+solana-address-lookup-table-interface v3.0.1 [bincode,bytemuck,serde] (*)
+solana-bls-signatures v1.0.0 [bytemuck,default,serde,solana-signer-derive,std] (*)
+solana-bpf-loader-program v3.1.12 [agave-unstable-api,default,metrics,svm-internal] (*)
+solana-bucket-map v3.1.12 [agave-unstable-api] (*)
+solana-builtins v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+solana-bpf-loader-program v3.1.12 [agave-unstable-api,default,metrics,svm-internal] (*)
+solana-compute-budget-program v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-loader-v4-program v3.1.12 [agave-unstable-api] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-system-program v3.1.12 [agave-unstable-api] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+solana-zk-elgamal-proof-program v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-zk-sdk v4.0.0 [] (*)
+solana-zk-token-proof-program v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-zk-token-sdk v3.1.12 [agave-unstable-api]
+aes-gcm-siv v0.11.1 [aes,alloc,default,getrandom] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bytemuck v1.25.0 [bytemuck_derive,derive,must_cast] (*)
+bytemuck_derive v1.10.2 (proc-macro) [] (*)
+curve25519-dalek v4.1.3 [alloc,default,digest,precomputed-tables,rand_core,serde,zeroize] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+merlin v3.0.0 [] (*)
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+sha3 v0.10.9 [default,std] (*)
+solana-curve25519 v3.1.12 [agave-unstable-api] (*)
+solana-derivation-path v3.0.0 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-seed-derivable v3.0.0 [] (*)
+solana-seed-phrase v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+subtle v2.6.1 [default,i128,std]
+thiserror v2.0.18 [default,std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+solana-client-traits v3.0.0 []
+solana-account v3.4.0 [bincode,serde] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-epoch-info v3.1.0 [serde]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cluster-type v3.0.0 [serde] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-compute-budget v3.1.12 [agave-unstable-api] (*)
+solana-compute-budget-instruction v3.1.12 [agave-unstable-api] (*)
+solana-compute-budget-interface v3.0.0 [borsh] (*)
+solana-config-interface v2.0.0 [bincode,serde] (*)
+solana-cost-model v3.1.12 [agave-unstable-api] (*)
+solana-cpi v3.1.0 [] (*)
+solana-ed25519-program v3.0.0 [] (*)
+solana-epoch-info v3.1.0 [serde] (*)
+solana-epoch-rewards-hasher v3.1.0 []
+siphasher v0.3.11 [default,std]
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-feature-gate-interface v3.1.0 [bincode,serde]
+bincode v1.3.3 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-info v3.1.1 [] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-program-error v3.0.1 [borsh] (*)
+solana-pubkey v4.2.0 [bytemuck,curve25519,serde] (*)
+solana-rent v4.2.0 []
+solana-sdk-macro v3.0.1 (proc-macro) [] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-system-interface v3.0.0 [alloc,bincode,serde]
+num-traits v0.2.19 [default,i128,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+solana-address v2.7.0 [alloc,atomic,borsh,bytemuck,copy,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-msg v3.1.0 [alloc,default,std]
+solana-program-error v3.0.1 [borsh] (*)
+solana-fee v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+solana-fee-structure v3.0.0 [serde] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-fee-structure v3.0.0 [serde] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-hard-forks v3.1.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-inflation v3.1.0 [serde] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-lattice-hash v3.1.12 [agave-unstable-api] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-loader-v4-interface v3.1.0 [bincode,serde] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-native-token v3.0.0 []
+solana-nohash-hasher v0.2.1 [default,std]
+solana-nonce v3.2.0 [serde] (*)
+solana-nonce-account v3.0.0 [] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-poh-config v3.0.0 [serde] (*)
+solana-precompile-error v3.0.0 [] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-secp256k1-program v3.0.0 [serde] (*)
+solana-seed-derivable v3.0.0 [] (*)
+solana-serde v3.0.0 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-slot-hashes v3.0.1 [serde,sysvar] (*)
+solana-slot-history v3.0.0 [serde,sysvar] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-svm v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-svm) [agave-unstable-api]
+ahash v0.8.12 [compile-time-rng,const-random,default,getrandom,runtime-rng,std] (*)
+log v0.4.29 [std]
+percentage v0.1.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-fee-structure v3.0.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-instructions-sysvar v3.0.0 [] (*)
+solana-loader-v3-interface v6.1.0 [bincode,serde] (*)
+solana-loader-v4-interface v3.1.0 [bincode,serde] (*)
+solana-loader-v4-program v3.1.12 [agave-unstable-api] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-nonce v3.2.0 [serde] (*)
+solana-nonce-account v3.0.0 [] (*)
+solana-program-entrypoint v3.1.1 [] (*)
+solana-program-pack v3.1.0 [] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rent v3.1.0 [serde,sysvar] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-svm-callback v3.1.12 [agave-unstable-api] (*)
+solana-svm-feature-set v3.1.12 [agave-unstable-api]
+solana-svm-log-collector v3.1.12 [agave-unstable-api] (*)
+solana-svm-measure v3.1.12 [agave-unstable-api]
+solana-svm-timings v3.1.12 [agave-unstable-api] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+spl-generic-token v2.0.1 [] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-svm-callback v3.1.12 [agave-unstable-api] (*)
+solana-svm-timings v3.1.12 [agave-unstable-api] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-system-transaction v3.0.0 []
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signer v3.0.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-sysvar-id v3.1.0 [] (*)
+solana-time-utils v3.0.0 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+solana-unified-scheduler-logic v3.1.12 [agave-unstable-api]
+assert_matches v1.5.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+static_assertions v1.1.0 []
+unwrap_none v0.1.2 []
+solana-version v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-sanitize v3.0.1 []
+solana-serde-varint v3.0.0 [] (*)
+solana-vote v3.1.12 [agave-unstable-api]
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-bincode v3.1.0 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-serialize-utils v3.1.1 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-vote-interface v4.0.4 [bincode,serde] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-vote-interface v4.0.4 [bincode,serde] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+spl-generic-token v2.0.1 [] (*)
+static_assertions v1.1.0 []
+strum v0.24.1 [default,derive,std,strum_macros] (*)
+strum_macros v0.24.3 (proc-macro) [] (*)
+symlink v0.1.0 []
+tempfile v3.27.0 [default,getrandom] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-rpc-client v3.1.12 [default,spinner]
+async-trait v0.1.89 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bs58 v0.5.1 [alloc,std]
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+indicatif v0.18.4 [default,unicode-width,wasmbind] (*)
+log v0.4.29 [std]
+reqwest v0.12.28 [__rustls,__rustls-ring,__tls,blocking,brotli,deflate,gzip,json,rustls-tls,rustls-tls-webpki-roots,rustls-tls-webpki-roots-no-provider] (*)
+reqwest-middleware v0.4.2 []
+anyhow v1.0.102 [default,std]
+async-trait v0.1.89 (proc-macro) [] (*)
+http v1.4.0 [default,std] (*)
+reqwest v0.12.28 [__rustls,__rustls-ring,__tls,blocking,brotli,deflate,gzip,json,rustls-tls,rustls-tls-webpki-roots,rustls-tls-webpki-roots-no-provider] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+thiserror v1.0.69 [] (*)
+tower-service v0.3.3 []
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-decoder v3.1.12 [agave-unstable-api] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-epoch-info v3.1.0 [serde] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-feature-gate-interface v3.1.0 [bincode,serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rpc-client-api v3.1.12 []
+anyhow v1.0.102 [default,std]
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+reqwest v0.12.28 [__rustls,__rustls-ring,__tls,blocking,brotli,deflate,gzip,json,rustls-tls,rustls-tls-webpki-roots,rustls-tls-webpki-roots-no-provider] (*)
+reqwest-middleware v0.4.2 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-rpc-client-types v3.1.12 []
+base64 v0.22.1 [alloc,default,std]
+bs58 v0.5.1 [alloc,std]
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-address v1.1.0 [alloc,atomic,borsh,bytemuck,curve25519,decode,error,rand,sanitize,serde,sha2,std,syscalls] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-fee-calculator v3.2.0 [serde] (*)
+solana-inflation v3.1.0 [serde] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+solana-version v3.1.12 [agave-unstable-api] (*)
+spl-generic-token v2.0.1 [] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-signer v3.0.0 [] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+solana-version v3.1.12 [agave-unstable-api] (*)
+solana-vote-interface v4.0.4 [bincode,serde] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-native-token v3.0.0 []
+solana-net-utils v3.1.12 [agave-unstable-api]
+anyhow v1.0.102 [default,std]
+bincode v1.3.3 [] (*)
+bytes v1.11.1 [default,serde,std] (*)
+cfg-if v1.0.4 []
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+nix v0.30.1 [default,feature,memoffset,net,poll,process,signal,socket,user] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+socket2 v0.6.3 [all] (*)
+solana-serde v3.0.0 [] (*)
+solana-svm-type-overrides v3.1.12 [agave-unstable-api] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+url v2.5.8 [default,std] (*)
+solana-nohash-hasher v0.2.1 [default,std]
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-program-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-program-runtime) [agave-unstable-api,metrics] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api] (*)
+solana-seed-derivable v3.0.0 [] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-shred-version v3.0.1 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-storage-bigtable v3.1.12 [agave-unstable-api]
+agave-reserved-account-keys v3.1.12 [agave-unstable-api] (*)
+backoff v0.4.0 [default,futures,futures-core,pin-project-lite,tokio,tokio_1]
+futures-core v0.3.32 [alloc,default,std,unstable]
+getrandom v0.2.17 [std] (*)
+instant v0.1.13 [] (*)
+pin-project-lite v0.2.17 []
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+bincode v1.3.3 [] (*)
+bytes v1.11.1 [default,serde,std] (*)
+bzip2 v0.4.4 [] (*)
+enum-iterator v1.5.0 [] (*)
+flate2 v1.1.9 [any_impl,default,miniz_oxide,rust_backend] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+goauth v0.13.1 [default]
+arc-swap v1.9.1 [] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+log v0.4.29 [std]
+reqwest v0.11.27 [__tls,blocking,default-tls,hyper-tls,json,native-tls-crate,serde_json,tokio-native-tls]
+base64 v0.21.7 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+encoding_rs v0.8.35 [alloc,default] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+h2 v0.3.27 []
+bytes v1.11.1 [default,serde,std] (*)
+fnv v1.0.7 [default,std]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v0.2.12 []
+bytes v1.11.1 [default,serde,std] (*)
+fnv v1.0.7 [default,std]
+itoa v1.0.18 []
+indexmap v2.14.0 [default,rayon,std] (*)
+slab v0.4.12 [default,std]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+http v0.2.12 [] (*)
+http-body v0.4.6 []
+bytes v1.11.1 [default,serde,std] (*)
+http v0.2.12 [] (*)
+pin-project-lite v0.2.17 []
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp]
+bytes v1.11.1 [default,serde,std] (*)
+futures-channel v0.3.32 [alloc,default,futures-sink,sink,std,unstable] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+h2 v0.3.27 [] (*)
+http v0.2.12 [] (*)
+http-body v0.4.6 [] (*)
+httparse v1.10.1 [default,std]
+httpdate v1.0.3 []
+itoa v1.0.18 []
+pin-project-lite v0.2.17 []
+socket2 v0.5.10 [all]
+libc v0.2.189 [default,extra_traits,std]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower-service v0.3.3 []
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+want v0.3.1 [] (*)
+hyper-tls v0.5.0 []
+bytes v1.11.1 [default,serde,std] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+native-tls v0.2.18 [alpn,default] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-native-tls v0.3.1 [] (*)
+ipnet v2.12.0 [default,std]
+log v0.4.29 [std]
+mime v0.3.17 []
+native-tls v0.2.18 [alpn,default] (*)
+once_cell v1.21.4 [alloc,default,race,std]
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project-lite v0.2.17 []
+rustls-pemfile v1.0.4 []
+base64 v0.21.7 [alloc,default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+serde_urlencoded v0.7.1 [] (*)
+sync_wrapper v0.1.2 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-native-tls v0.3.1 [] (*)
+tower-service v0.3.3 []
+url v2.5.8 [default,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_json v1.0.150 [default,std] (*)
+simpl v0.1.0 []
+smpl_jwt v0.7.1 [default]
+base64 v0.13.1 [alloc,default,std]
+log v0.4.29 [std]
+openssl v0.10.78 [default,vendored] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_derive v1.0.229 (proc-macro) [default] (*)
+serde_json v1.0.150 [default,std] (*)
+simpl v0.1.0 []
+time v0.3.47 [alloc,default,formatting,macros,parsing,std]
+deranged v0.5.8 [default,powerfmt]
+powerfmt v0.2.0 []
+itoa v1.0.18 []
+num-conv v0.2.1 []
+powerfmt v0.2.0 []
+time-core v0.1.8 []
+time-macros v0.2.27 (proc-macro) [formatting,parsing]
+num-conv v0.2.1 []
+time-core v0.1.8 []
+time v0.3.47 [alloc,default,formatting,macros,parsing,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+http v0.2.12 [] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+hyper-proxy v0.9.1 [default,hyper-tls,native-tls,tls,tokio-native-tls]
+bytes v1.11.1 [default,serde,std] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+headers v0.3.9 []
+base64 v0.21.7 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+headers-core v0.2.0 []
+http v0.2.12 [] (*)
+http v0.2.12 [] (*)
+httpdate v1.0.3 []
+mime v0.3.17 []
+sha1 v0.10.6 [default,std]
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+http v0.2.12 [] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+hyper-tls v0.5.0 [] (*)
+native-tls v0.2.18 [alpn,default] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-native-tls v0.3.1 [] (*)
+tower-service v0.3.3 []
+log v0.4.29 [std]
+openssl v0.10.78 [default,vendored] (*)
+prost v0.11.9 [default,prost-derive,std] (*)
+prost-types v0.11.9 [default,std]
+prost v0.11.9 [default,prost-derive,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+smpl_jwt v0.7.1 [default] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-serde v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-storage-proto v3.1.12 [agave-unstable-api]
+bincode v1.3.3 [] (*)
+bs58 v0.5.1 [alloc,std]
+prost v0.11.9 [default,prost-derive,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-account-decoder v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-serde v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+protobuf-src v1.1.0+21.5 []
+autotools v0.2.7 []
+cc v1.2.61 [parallel] (*)
+tonic-build v0.9.2 [default,prost,prost-build,transport]
+prettyplease v0.1.25 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+prost-build v0.11.9 [default,format,prettyplease,syn]
+bytes v1.11.1 []
+heck v0.4.1 [default]
+itertools v0.10.5 [default,use_alloc,use_std] (*)
+lazy_static v1.5.0 []
+log v0.4.29 []
+multimap v0.8.3 []
+petgraph v0.6.5 []
+fixedbitset v0.4.2 []
+indexmap v2.14.0 [default,std] (*)
+prettyplease v0.1.25 [] (*)
+prost v0.11.9 [prost-derive]
+bytes v1.11.1 []
+prost-derive v0.11.9 (proc-macro) [] (*)
+prost-types v0.11.9 []
+prost v0.11.9 [prost-derive] (*)
+regex v1.12.3 [std,unicode-bool,unicode-perl] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+tempfile v3.27.0 [default,getrandom] (*)
+which v4.4.2 []
+either v1.15.0 [default,std,use_std]
+home v0.5.12 []
+rustix v0.38.44 [alloc,fs,libc-extra-traits,std]
+bitflags v2.13.2 [std]
+linux-raw-sys v0.4.15 [elf,errno,general,ioctl,no_std]
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+solana-time-utils v3.0.0 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tonic v0.9.2 [channel,codegen,default,prost,tls,transport]
+async-stream v0.3.6 []
+async-stream-impl v0.3.6 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+pin-project-lite v0.2.17 []
+async-trait v0.1.89 (proc-macro) [] (*)
+axum v0.6.20 []
+async-trait v0.1.89 (proc-macro) [] (*)
+axum-core v0.3.4 []
+async-trait v0.1.89 (proc-macro) [] (*)
+bytes v1.11.1 [default,serde,std] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v0.2.12 [] (*)
+http-body v0.4.6 [] (*)
+mime v0.3.17 []
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+rustversion v1.0.22 (proc-macro) []
+bitflags v1.3.2 [default]
+bytes v1.11.1 [default,serde,std] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v0.2.12 [] (*)
+http-body v0.4.6 [] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+itoa v1.0.18 []
+matchit v0.7.3 [default]
+memchr v2.8.0 [alloc,default,std,use_std]
+mime v0.3.17 []
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project-lite v0.2.17 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+sync_wrapper v0.1.2 []
+tower v0.4.13 [__common,balance,buffer,discover,futures-core,futures-util,indexmap,limit,load,make,pin-project,pin-project-lite,rand,ready-cache,slab,timeout,tokio,tokio-util,tracing,util]
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+indexmap v1.9.3 []
+hashbrown v0.12.3 [ahash,default,inline-more,raw] (*)
+autocfg v1.5.0 []
+pin-project v1.1.11 []
+pin-project-internal v1.1.11 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+pin-project-lite v0.2.17 []
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+slab v0.4.12 [default,std]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+rustversion v1.0.22 (proc-macro) []
+base64 v0.21.7 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+h2 v0.3.27 [] (*)
+http v0.2.12 [] (*)
+http-body v0.4.6 [] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+hyper-timeout v0.4.1 []
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-io-timeout v1.2.1 []
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+percent-encoding v2.3.2 [alloc,default,std]
+pin-project v1.1.11 [] (*)
+prost v0.11.9 [default,prost-derive,std] (*)
+rustls-pemfile v1.0.4 [] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-rustls v0.24.1 [default,logging,tls12]
+rustls v0.21.12 [log,logging,tls12]
+log v0.4.29 [std]
+ring v0.17.14 [alloc,default,dev_urandom_fallback] (*)
+rustls-webpki v0.101.7 [alloc,default,std]
+ring v0.17.14 [alloc,default,dev_urandom_fallback] (*)
+untrusted v0.9.0 []
+sct v0.7.1 []
+ring v0.17.14 [alloc,default,dev_urandom_fallback] (*)
+untrusted v0.9.0 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-stream v0.1.18 [default,net,time]
+futures-core v0.3.32 [alloc,default,std,unstable]
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tower v0.4.13 [__common,balance,buffer,discover,futures-core,futures-util,indexmap,limit,load,make,pin-project,pin-project-lite,rand,ready-cache,slab,timeout,tokio,tokio-util,tracing,util] (*)
+tower-layer v0.3.3 []
+tower-service v0.3.3 []
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+solana-storage-proto v3.1.12 [agave-unstable-api] (*)
+solana-streamer v3.1.12 [agave-unstable-api]
+anza-quinn v0.11.9-rustsec20260037 [bloom,default,log,platform-verifier,ring,runtime-tokio,rustls-ring]
+anza-quinn-proto v0.11.13-rustsec20260037 [bloom,default,log,platform-verifier,ring,rustls-ring]
+bytes v1.11.1 [default,serde,std] (*)
+fastbloom v0.14.1 [default,rand,std]
+getrandom v0.3.4 [std] (*)
+libm v0.2.16 [arch,default]
+rand v0.9.4 [alloc,default,os_rng,small_rng,std,std_rng,thread_rng] (*)
+siphasher v1.0.2 [default,std]
+lru-slab v0.1.2 []
+rand v0.9.4 [alloc,default,os_rng,small_rng,std,std_rng,thread_rng] (*)
+ring v0.17.14 [alloc,default,dev_urandom_fallback] (*)
+rustc-hash v2.1.2 [default,std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-platform-verifier v0.6.2 []
+log v0.4.29 [std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-native-certs v0.8.3 [] (*)
+rustls-webpki v0.103.13 [alloc,aws-lc-rs,ring,std] (*)
+slab v0.4.12 [default,std]
+thiserror v2.0.18 [default,std] (*)
+tinyvec v1.11.0 [alloc,default,tinyvec_macros]
+tinyvec_macros v0.1.1 []
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+bytes v1.11.1 [default,serde,std] (*)
+pin-project-lite v0.2.17 []
+quinn-udp v0.5.14 [log,tracing]
+libc v0.2.189 [default,extra_traits,std]
+socket2 v0.6.3 [all] (*)
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+cfg_aliases v0.2.1 []
+rustc-hash v2.1.2 [default,std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+socket2 v0.6.3 [all] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tracing v0.1.44 [attributes,default,log,std,tracing-attributes] (*)
+cfg_aliases v0.2.1 []
+anza-quinn-proto v0.11.13-rustsec20260037 [bloom,default,log,platform-verifier,ring,rustls-ring] (*)
+arc-swap v1.9.1 [] (*)
+bytes v1.11.1 [default,serde,std] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+governor v0.6.3 [dashmap,default,futures,futures-timer,jitter,quanta,rand,std]
+cfg-if v1.0.4 []
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+futures-timer v3.0.3 []
+no-std-compat v0.4.1 [alloc,std]
+nonzero_ext v0.3.0 [std]
+parking_lot v0.12.5 [default] (*)
+portable-atomic v1.13.1 [default,fallback,require-cas]
+quanta v0.12.6 [default,flaky_tests]
+crossbeam-utils v0.8.21 [default,std]
+libc v0.2.189 [default,extra_traits,std]
+once_cell v1.21.4 [alloc,default,race,std]
+raw-cpuid v11.6.0 []
+bitflags v2.13.2 [serde,serde_core,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+smallvec v1.15.1 [const_generics,const_new,union]
+spinning_top v0.3.0 []
+lock_api v0.4.14 [atomic_usize,default] (*)
+histogram v0.6.9 []
+indexmap v2.14.0 [default,rayon,std] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+nix v0.30.1 [default,feature,memoffset,net,poll,process,signal,socket,user] (*)
+num_cpus v1.17.0 [] (*)
+pem v1.1.1 []
+base64 v0.13.1 [alloc,default,std]
+percentage v0.1.0 [] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+smallvec v1.15.1 [const_generics,const_new,union]
+socket2 v0.6.3 [all] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-quic-definitions v3.0.0 []
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-time-utils v3.0.0 []
+solana-tls-utils v3.1.12 [agave-unstable-api]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signer v3.0.0 [] (*)
+x509-parser v0.14.0 [default]
+asn1-rs v0.5.2 [datetime,default,std,time]
+asn1-rs-derive v0.4.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+synstructure v0.12.6 [default,proc-macro]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+unicode-xid v0.2.6 [default]
+asn1-rs-impl v0.1.0 (proc-macro) []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+nom v7.1.3 [alloc,default,std]
+memchr v2.8.0 [alloc,default,std,use_std]
+minimal-lexical v0.2.1 [std]
+num-traits v0.2.19 [default,i128,std] (*)
+rusticata-macros v4.1.0 []
+nom v7.1.3 [alloc,default,std] (*)
+thiserror v1.0.69 [] (*)
+time v0.3.47 [alloc,default,formatting,macros,parsing,std] (*)
+base64 v0.13.1 [alloc,default,std]
+data-encoding v2.11.0 [alloc,default,std]
+der-parser v8.2.0 [bigint,default,num-bigint,std]
+asn1-rs v0.5.2 [datetime,default,std,time] (*)
+displaydoc v0.2.5 (proc-macro) [default,std] (*)
+nom v7.1.3 [alloc,default,std] (*)
+num-bigint v0.4.6 [default,std] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+rusticata-macros v4.1.0 [] (*)
+lazy_static v1.5.0 []
+nom v7.1.3 [alloc,default,std] (*)
+oid-registry v0.6.1 [crypto,default,kdf,nist_algs,pkcs1,pkcs12,pkcs7,pkcs9,registry,x509,x962]
+asn1-rs v0.5.2 [datetime,default,std,time] (*)
+rusticata-macros v4.1.0 [] (*)
+thiserror v1.0.69 [] (*)
+time v0.3.47 [alloc,default,formatting,macros,parsing,std] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-metrics-tracker v3.1.12 [agave-unstable-api]
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+log v0.4.29 [std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+x509-parser v0.14.0 [default] (*)
+solana-svm v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-svm) [agave-unstable-api] (*)
+solana-svm-timings v3.1.12 [agave-unstable-api] (*)
+solana-svm-transaction v3.1.12 [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-system-transaction v3.0.0 [] (*)
+solana-time-utils v3.0.0 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+solana-vote v3.1.12 [agave-unstable-api] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+static_assertions v1.1.0 []
+strum v0.24.1 [default,derive,std,strum_macros] (*)
+strum_macros v0.24.3 (proc-macro) [] (*)
+tar v0.4.45 [default,xattr] (*)
+tempfile v3.27.0 [default,getrandom] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-stream v0.1.18 [default,net,time] (*)
+trees v0.4.2 []
+wincode v0.1.2 [alloc,default,derive,solana-short-vec,std] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rpc v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+agave-snapshots v3.1.12 [agave-unstable-api] (*)
+base64 v0.22.1 [alloc,default,std]
+bincode v1.3.3 [] (*)
+bs58 v0.5.1 [alloc,std]
+crossbeam-channel v0.5.15 [default,std] (*)
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+jsonrpc-core-client v18.0.0 []
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+jsonrpc-client-transports v18.0.0 []
+derive_more v0.99.20 (proc-macro) [add,add_assign,as_mut,as_ref,constructor,convert_case,default,deref,deref_mut,display,error,from,from_str,index,index_mut,into,into_iterator,is_variant,iterator,mul,mul_assign,not,rustc_version,sum,try_into,unwrap]
+convert_case v0.4.0 []
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+rustc_version v0.4.1 [] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+jsonrpc-pubsub v18.0.0 []
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+lazy_static v1.5.0 []
+log v0.4.29 [std]
+parking_lot v0.11.2 [default] (*)
+rand v0.7.3 [alloc,default,getrandom,getrandom_package,libc,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+url v1.7.2 []
+idna v0.1.5 []
+matches v0.1.10 []
+unicode-bidi v0.3.18 [default,hardcoded-data,std]
+unicode-normalization v0.1.25 [default,std]
+tinyvec v1.11.0 [alloc,default,tinyvec_macros] (*)
+matches v0.1.10 []
+percent-encoding v1.0.1 []
+jsonrpc-derive v18.0.0 (proc-macro) []
+proc-macro-crate v0.1.5 []
+toml v0.5.11 [default]
+serde v1.0.229 [default,std]
+serde_core v1.0.229 [result,std]
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v1.0.109 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,quote,visit] (*)
+jsonrpc-http-server v18.0.0 []
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+hyper v0.14.32 [client,default,full,h2,http1,http2,runtime,server,socket2,stream,tcp] (*)
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+jsonrpc-server-utils v18.0.0 []
+bytes v1.11.1 [default,serde,std] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+globset v0.4.18 [default,log]
+aho-corasick v1.1.4 [default,perf-literal,std] (*)
+bstr v1.12.1 [alloc,std]
+memchr v2.8.0 [alloc,default,std,use_std]
+log v0.4.29 [std]
+regex-automata v0.4.14 [alloc,dfa-onepass,hybrid,meta,nfa,nfa-backtrack,nfa-pikevm,nfa-thompson,perf,perf-inline,perf-literal,perf-literal-multisubstring,perf-literal-substring,std,syntax,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment,unicode-word-boundary] (*)
+regex-syntax v0.8.10 [default,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment]
+jsonrpc-core v18.0.0 [default,futures,futures-executor] (*)
+lazy_static v1.5.0 []
+log v0.4.29 [std]
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-stream v0.1.18 [default,net,time] (*)
+tokio-util v0.6.10 [codec,default]
+bytes v1.11.1 [default,serde,std] (*)
+futures-core v0.3.32 [alloc,default,std,unstable]
+futures-sink v0.3.32 [alloc,default,std]
+log v0.4.29 [std]
+pin-project-lite v0.2.17 []
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+unicase v2.9.0 []
+log v0.4.29 [std]
+net2 v0.2.39 [default,duration]
+cfg-if v0.1.10 []
+libc v0.2.189 [default,extra_traits,std]
+parking_lot v0.11.2 [default] (*)
+unicase v2.9.0 []
+jsonrpc-pubsub v18.0.0 [] (*)
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+rayon v1.12.0 [] (*)
+regex v1.12.3 [default,perf,perf-backtrack,perf-cache,perf-dfa,perf-inline,perf-literal,perf-onepass,std,unicode,unicode-age,unicode-bool,unicode-case,unicode-gencat,unicode-perl,unicode-script,unicode-segment] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+soketto v0.7.1 [default]
+base64 v0.13.1 [alloc,default,std]
+bytes v1.11.1 [default,serde,std] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+httparse v1.10.1 [default,std]
+log v0.4.29 [std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+sha-1 v0.9.8 []
+block-buffer v0.9.0 [] (*)
+cfg-if v1.0.4 []
+cpufeatures v0.2.17 []
+digest v0.9.0 [alloc,std] (*)
+opaque-debug v0.3.1 []
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-decoder v3.1.12 [agave-unstable-api] (*)
+solana-accounts-db v3.1.12 [agave-unstable-api] (*)
+solana-cli-output v3.1.12 [agave-unstable-api]
+Inflector v0.11.4 [default,heavyweight,lazy_static,regex] (*)
+agave-reserved-account-keys v3.1.12 [agave-unstable-api] (*)
+base64 v0.22.1 [alloc,default,std]
+chrono v0.4.44 [alloc,clock,default,iana-time-zone,js-sys,now,oldtime,serde,std,wasm-bindgen,wasmbind,winapi,windows-link] (*)
+clap v2.34.0 [ansi_term,atty,color,default,strsim,suggestions,vec_map]
+ansi_term v0.12.1 []
+atty v0.2.14 []
+libc v0.2.189 [default,extra_traits,std]
+bitflags v1.3.2 [default]
+strsim v0.8.0 []
+textwrap v0.11.0 []
+unicode-width v0.1.14 [cjk,default]
+unicode-width v0.1.14 [cjk,default]
+vec_map v0.8.2 []
+console v0.16.3 [alloc,ansi-parsing,default,std,unicode-width] (*)
+humantime v2.3.0 []
+indicatif v0.18.4 [default,unicode-width,wasmbind] (*)
+pretty-hex v0.3.0 [alloc,default]
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-account-decoder v3.1.12 [agave-unstable-api] (*)
+solana-bincode v3.1.0 [] (*)
+solana-clap-utils v3.1.12 [agave-unstable-api]
+chrono v0.4.44 [alloc,clock,default,iana-time-zone,js-sys,now,oldtime,serde,std,wasm-bindgen,wasmbind,winapi,windows-link] (*)
+clap v2.34.0 [ansi_term,atty,color,default,strsim,suggestions,vec_map] (*)
+rpassword v7.4.0 []
+libc v0.2.189 [default,extra_traits,std]
+rtoolbox v0.0.5 []
+libc v0.2.189 [default,extra_traits,std]
+solana-bls-signatures v1.0.0 [bytemuck,default,serde,solana-signer-derive,std] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cluster-type v3.0.0 [serde] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-derivation-path v3.0.0 [] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-native-token v3.0.0 []
+solana-presigner v3.0.0 []
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-remote-wallet v3.1.12 [agave-unstable-api]
+console v0.16.3 [alloc,ansi-parsing,default,std,unicode-width] (*)
+dialoguer v0.10.4 [default,editor,password,tempfile,zeroize]
+console v0.15.11 [ansi-parsing,default,unicode-width] (*)
+shell-words v1.1.1 [default,std]
+tempfile v3.27.0 [default,getrandom] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+log v0.4.29 [std]
+num-derive v0.4.2 (proc-macro) [] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+parking_lot v0.12.5 [default] (*)
+qstring v0.7.2 [] (*)
+semver v1.0.28 [default,std]
+solana-derivation-path v3.0.0 [] (*)
+solana-offchain-message v3.0.0 []
+num_enum v0.7.6 [default,std] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-sanitize v3.0.1 []
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+uriparse v0.6.4 [default] (*)
+solana-seed-phrase v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+tiny-bip39 v2.0.0 [chinese-simplified,chinese-traditional,default,default-langs,french,italian,japanese,korean,rand,spanish]
+once_cell v1.21.4 [alloc,default,race,std]
+pbkdf2 v0.12.2 [hmac]
+digest v0.10.7 [alloc,block-buffer,const-oid,core-api,default,mac,oid,std,subtle] (*)
+hmac v0.12.1 [reset] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rustc-hash v1.1.0 [default,std]
+sha2 v0.10.9 [default,std] (*)
+thiserror v1.0.69 [] (*)
+unicode-normalization v0.1.25 [default,std] (*)
+zeroize v1.8.2 [alloc,default,zeroize_derive] (*)
+uriparse v0.6.4 [default] (*)
+url v2.5.8 [default,std] (*)
+solana-cli-config v3.1.12 []
+dirs-next v2.0.0 []
+cfg-if v1.0.4 []
+dirs-sys-next v0.1.2 []
+libc v0.2.189 [default,extra_traits,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_yaml v0.9.34+deprecated []
+indexmap v2.14.0 [default,rayon,std] (*)
+itoa v1.0.18 []
+ryu v1.0.23 []
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+unsafe-libyaml v0.2.11 []
+solana-clap-utils v3.1.12 [agave-unstable-api] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+url v2.5.8 [default,std] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-epoch-info v3.1.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rpc-client-api v3.1.12 [] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-stake-interface v2.0.2 [bincode,serde,sysvar] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+spl-memo-interface v2.0.0 [] (*)
+solana-client v3.1.12 []
+anza-quinn v0.11.9-rustsec20260037 [bloom,default,log,platform-verifier,ring,runtime-tokio,rustls-ring] (*)
+async-trait v0.1.89 (proc-macro) [] (*)
+bincode v1.3.3 [] (*)
+dashmap v5.5.3 [raw-api,rayon,serde] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+indexmap v2.14.0 [default,rayon,std] (*)
+indicatif v0.18.4 [default,unicode-width,wasmbind] (*)
+log v0.4.29 [std]
+rayon v1.12.0 [] (*)
+solana-account v3.4.0 [bincode,serde] (*)
+solana-client-traits v3.0.0 [] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api]
+async-trait v0.1.89 (proc-macro) [] (*)
+bincode v1.3.3 [] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+indexmap v2.14.0 [default,rayon,std] (*)
+log v0.4.29 [std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rayon v1.12.0 [] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-time-utils v3.0.0 []
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+solana-epoch-info v3.1.0 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-pubsub-client v3.1.12 []
+crossbeam-channel v0.5.15 [default,std] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+http v0.2.12 [] (*)
+log v0.4.29 [std]
+semver v1.0.28 [default,std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_json v1.0.150 [default,std] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rpc-client-types v3.1.12 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-stream v0.1.18 [default,net,time] (*)
+tokio-tungstenite v0.28.0 [__rustls-tls,connect,default,handshake,rustls,rustls-pki-types,rustls-tls-webpki-roots,stream,tokio-rustls,webpki-roots]
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+log v0.4.29 [std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-rustls v0.26.4 [aws-lc-rs,aws_lc_rs,ring,tls12] (*)
+tungstenite v0.28.0 [__rustls-tls,data-encoding,default,handshake,http,httparse,rustls,rustls-pki-types,rustls-tls-webpki-roots,sha1,webpki-roots]
+bytes v1.11.1 [default,serde,std] (*)
+data-encoding v2.11.0 [alloc,default,std]
+http v1.4.0 [default,std] (*)
+httparse v1.10.1 [default,std]
+log v0.4.29 [std]
+rand v0.9.4 [alloc,default,os_rng,small_rng,std,std_rng,thread_rng] (*)
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+rustls-pki-types v1.14.1 [alloc,default,std] (*)
+sha1 v0.10.6 [default,std] (*)
+thiserror v2.0.18 [default,std] (*)
+utf-8 v0.7.6 []
+webpki-roots v0.26.11 []
+webpki-roots v1.0.7 [] (*)
+webpki-roots v0.26.11 [] (*)
+tungstenite v0.28.0 [__rustls-tls,data-encoding,default,handshake,http,httparse,rustls,rustls-pki-types,rustls-tls-webpki-roots,sha1,webpki-roots] (*)
+url v2.5.8 [default,std] (*)
+solana-quic-client v3.1.12 [agave-unstable-api]
+anza-quinn v0.11.9-rustsec20260037 [bloom,default,log,platform-verifier,ring,runtime-tokio,rustls-ring] (*)
+anza-quinn-proto v0.11.13-rustsec20260037 [bloom,default,log,platform-verifier,ring,rustls-ring] (*)
+async-lock v3.4.2 [default,std]
+event-listener v5.4.1 [parking,std]
+concurrent-queue v2.5.0 [std]
+crossbeam-utils v0.8.21 [default,std]
+parking v2.2.1 []
+pin-project-lite v0.2.17 []
+event-listener-strategy v0.5.4 [std]
+event-listener v5.4.1 [parking,std] (*)
+pin-project-lite v0.2.17 []
+pin-project-lite v0.2.17 []
+async-trait v0.1.89 (proc-macro) [] (*)
+futures v0.3.32 [alloc,async-await,bilock,compat,default,executor,futures-executor,std,thread-pool,unstable] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rpc-client-api v3.1.12 [] (*)
+solana-signer v3.0.0 [] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-tls-utils v3.1.12 [agave-unstable-api] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rpc-client v3.1.12 [default,spinner] (*)
+solana-rpc-client-api v3.1.12 [] (*)
+solana-rpc-client-nonce-utils v3.1.12 [default]
+solana-account v3.4.0 [bincode,serde] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-nonce v3.2.0 [serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-rpc-client v3.1.12 [default,spinner] (*)
+solana-sdk-ids v3.1.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-time-utils v3.0.0 []
+solana-tpu-client v3.1.12 [agave-unstable-api,default,spinner]
+async-trait v0.1.89 (proc-macro) [] (*)
+bincode v1.3.3 [] (*)
+futures-util v0.3.32 [alloc,async-await,async-await-macro,bilock,channel,compat,default,futures-channel,futures-io,futures-macro,futures-sink,futures_01,io,libc,memchr,sink,slab,std,unstable] (*)
+indexmap v2.14.0 [default,rayon,std] (*)
+indicatif v0.18.4 [default,unicode-width,wasmbind] (*)
+log v0.4.29 [std]
+rayon v1.12.0 [] (*)
+solana-client-traits v3.0.0 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-pubsub-client v3.1.12 [] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rpc-client v3.1.12 [default,spinner] (*)
+solana-rpc-client-api v3.1.12 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status-client-types v3.1.12 [agave-unstable-api] (*)
+solana-udp-client v3.1.12 [agave-unstable-api]
+async-trait v0.1.89 (proc-macro) [] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-commitment-config v3.1.1 [serde] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-epoch-info v3.1.0 [serde] (*)
+solana-epoch-rewards-hasher v3.1.0 [] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-faucet v3.1.12 [agave-unstable-api]
+agave-logger v3.1.12 [agave-unstable-api] (*)
+bincode v1.3.3 [] (*)
+clap v2.34.0 [ansi_term,atty,color,default,strsim,suggestions,vec_map] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+log v0.4.29 [std]
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-clap-utils v3.1.12 [agave-unstable-api] (*)
+solana-cli-config v3.1.12 [] (*)
+solana-cli-output v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-instruction v3.0.0 [bincode,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-signer v3.0.0 [] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-system-transaction v3.0.0 [] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-version v3.1.12 [agave-unstable-api] (*)
+spl-memo-interface v2.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+solana-genesis-config v3.0.0 [serde] (*)
+solana-gossip v3.1.12 [agave-unstable-api]
+agave-feature-set v3.1.12 [agave-unstable-api] (*)
+agave-logger v3.1.12 [agave-unstable-api] (*)
+arc-swap v1.9.1 [] (*)
+arrayvec v0.7.6 [default,std]
+assert_matches v1.5.0 []
+bincode v1.3.3 [] (*)
+bv v0.11.1 [serde] (*)
+clap v2.34.0 [ansi_term,atty,color,default,strsim,suggestions,vec_map] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+flate2 v1.1.9 [any_impl,default,miniz_oxide,rust_backend] (*)
+indexmap v2.14.0 [default,rayon,std] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+lru v0.7.8 [default,hashbrown] (*)
+num-traits v0.2.19 [default,i128,std] (*)
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+rand_chacha v0.3.1 [default,std] (*)
+rayon v1.12.0 [] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde-big-array v0.5.1 [] (*)
+serde_bytes v0.11.19 [default,std] (*)
+siphasher v1.0.2 [default,std]
+solana-bloom v3.1.12 [agave-unstable-api]
+bv v0.11.1 [serde] (*)
+fnv v1.0.7 [default,std]
+rand v0.8.6 [alloc,default,getrandom,libc,rand_chacha,small_rng,std,std_rng] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+solana-sanitize v3.0.1 []
+solana-time-utils v3.0.0 []
+solana-clap-utils v3.1.12 [agave-unstable-api] (*)
+solana-client v3.1.12 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-cluster-type v3.0.0 [serde] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-epoch-schedule v3.0.0 [serde,sysvar] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-ledger v3.1.12 [agave-unstable-api] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-native-token v3.0.0 []
+solana-net-utils v3.1.12 [agave-unstable-api] (*)
+solana-packet v3.0.0 [bincode,serde] (*)
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api] (*)
+solana-rpc-client v3.1.12 [default,spinner] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-sanitize v3.0.1 []
+solana-serde-varint v3.0.0 [] (*)
+solana-sha256-hasher v3.1.0 [sha2] (*)
+solana-short-vec v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-time-utils v3.0.0 []
+solana-tpu-client v3.1.12 [agave-unstable-api,default,spinner] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-version v3.1.12 [agave-unstable-api] (*)
+solana-vote v3.1.12 [agave-unstable-api] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+static_assertions v1.1.0 []
+thiserror v2.0.18 [default,std] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-ledger v3.1.12 [agave-unstable-api] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-native-token v3.0.0 []
+solana-perf v3.1.12 [agave-unstable-api] (*)
+solana-poh v3.1.12 [agave-unstable-api]
+arc-swap v1.9.1 [] (*)
+core_affinity v0.5.10 []
+libc v0.2.189 [default,extra_traits,std]
+num_cpus v1.17.0 [] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+log v0.4.29 [std]
+qualifier_attr v0.2.2 (proc-macro) [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-entry v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-ledger v3.1.12 [agave-unstable-api] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-poh-config v3.0.0 [serde] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-time-utils v3.0.0 []
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+thiserror v2.0.18 [default,std] (*)
+solana-poh-config v3.0.0 [serde] (*)
+solana-program-pack v3.1.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rayon-threadlimit v3.1.12 [agave-unstable-api] (*)
+solana-rpc-client-api v3.1.12 [] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-runtime-transaction v3.1.12 [agave-unstable-api] (*)
+solana-send-transaction-service v3.1.12 [agave-unstable-api]
+async-trait v0.1.89 (proc-macro) [] (*)
+crossbeam-channel v0.5.15 [default,std] (*)
+itertools v0.12.1 [default,use_alloc,use_std] (*)
+log v0.4.29 [std]
+solana-client v3.1.12 [] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-hash v3.1.0 [bytemuck,default,serde,std] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-nonce-account v3.0.0 [] (*)
+solana-pubkey v3.0.0 [borsh,bytemuck,curve25519,default,rand,serde,sha2,std] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-time-utils v3.0.0 []
+solana-tpu-client-next v3.1.12 [agave-unstable-api,default,log,metrics]
+anza-quinn v0.11.9-rustsec20260037 [bloom,default,log,platform-verifier,ring,runtime-tokio,rustls-ring] (*)
+async-trait v0.1.89 (proc-macro) [] (*)
+log v0.4.29 [std]
+lru v0.7.8 [default,hashbrown] (*)
+rustls v0.23.40 [aws-lc-rs,aws_lc_rs,ring,std,tls12] (*)
+solana-clock v3.0.0 [serde,sysvar] (*)
+solana-connection-cache v3.1.12 [agave-unstable-api] (*)
+solana-keypair v3.0.1 [seed-derivable] (*)
+solana-measure v3.1.12 [agave-unstable-api]
+solana-metrics v3.1.12 [agave-unstable-api] (*)
+solana-quic-definitions v3.0.0 [] (*)
+solana-rpc-client v3.1.12 [default,spinner] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-time-utils v3.0.0 []
+solana-tls-utils v3.1.12 [agave-unstable-api] (*)
+solana-tpu-client v3.1.12 [agave-unstable-api,default,spinner] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-signer v3.0.0 [] (*)
+solana-slot-history v3.0.0 [serde,sysvar] (*)
+solana-storage-bigtable v3.1.12 [agave-unstable-api] (*)
+solana-streamer v3.1.12 [agave-unstable-api] (*)
+solana-svm v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-svm) [agave-unstable-api] (*)
+solana-system-interface v2.0.0 [bincode,serde] (*)
+solana-system-transaction v3.0.0 [] (*)
+solana-sysvar v3.0.0 [bincode,serde] (*)
+solana-time-utils v3.0.0 []
+solana-tpu-client v3.1.12 [agave-unstable-api,default,spinner] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-context v3.1.12 [agave-unstable-api,bincode,serde] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+solana-validator-exit v3.0.0 []
+solana-version v3.1.12 [agave-unstable-api] (*)
+solana-vote v3.1.12 [agave-unstable-api] (*)
+solana-vote-program v3.1.12 [agave-unstable-api] (*)
+spl-generic-token v2.0.1 [] (*)
+spl-token-2022-interface v2.1.0 [] (*)
+spl-token-interface v2.0.0 [] (*)
+stream-cancel v0.8.2 []
+futures-core v0.3.32 [alloc,default,std,unstable]
+pin-project v1.1.11 [] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+tokio-util v0.7.18 [codec,compat,default,futures-io,futures-util,io,rt] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+solana-hash v4.3.0 [atomic,bytemuck,copy,decode,default,sanitize,serde,std] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-ledger v3.1.12 [agave-unstable-api] (*)
+solana-logger v3.0.0 []
+env_logger v0.11.10 [auto-color,color,default,humantime,regex] (*)
+lazy_static v1.5.0 []
+libc v0.2.189 [default,extra_traits,std]
+log v0.4.29 [std]
+signal-hook v0.3.18 [channel,default,iterator] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-reward-info v3.0.0 [serde] (*)
+solana-rpc v3.1.12 [agave-unstable-api] (*)
+solana-runtime v3.1.12 (/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12) [agave-unstable-api] (*)
+solana-sdk-ids v3.1.0 [] (*)
+solana-serde v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-storage-proto v3.1.12 [agave-unstable-api] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+thiserror v2.0.18 [default,std] (*)
+tokio v1.52.3 [bytes,default,fs,full,io-std,io-util,libc,macros,mio,net,parking_lot,process,rt,rt-multi-thread,signal,signal-hook-registry,socket2,sync,time,tokio-macros] (*)
+url v2.5.8 [default,std] (*)
+wincode v0.2.5 [alloc,default,derive,solana-short-vec,std]
+solana-short-vec v3.0.0 [] (*)
+thiserror v2.0.18 [default,std] (*)
+wincode-derive v0.2.3 (proc-macro) []
+darling v0.21.3 [default,suggestions] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+syn v2.0.117 [clone-impls,default,derive,extra-traits,fold,full,parsing,printing,proc-macro,visit,visit-mut] (*)
+proc-macro2 v1.0.106 [default,proc-macro] (*)
+quote v1.0.45 [default,proc-macro] (*)
+xxhash-rust v0.8.15 [xxh64]
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+libc v0.2.189 [default,extra_traits,std]
+prost v0.11.9 [default,prost-derive,std] (*)
+serde v1.0.229 [alloc,default,derive,rc,serde_derive,std] (*)
+serde_cbor v0.11.2 [default,std] (*)
+serde_json v1.0.150 [default,std] (*)
+sha2 v0.10.9 [default,std] (*)
+solana-account-decoder-client-types v3.1.12 [agave-unstable-api,zstd] (*)
+solana-instruction-error v2.3.0 [num-traits,serde] (*)
+solana-message v3.0.1 [bincode,blake3,serde] (*)
+solana-serde v3.0.0 [] (*)
+solana-signature v3.1.0 [alloc,default,serde,std,verify] (*)
+solana-storage-proto v3.1.12 [agave-unstable-api] (*)
+solana-transaction v3.0.2 [bincode,blake3,serde,verify] (*)
+solana-transaction-error v3.2.0 [serde] (*)
+solana-transaction-status v3.1.12 [agave-unstable-api] (*)
+zstd v0.13.3 [arrays,default,legacy,zdict_builder] (*)
+base64 v0.23.1 [alloc,default,simd-unsafe,std]
+multihash v0.19.5 [alloc,std] (*)
+tempfile v3.27.0 [default,getrandom] (*)

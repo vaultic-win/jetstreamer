@@ -1,0 +1,126 @@
+{
+  "schema": "horizon-epoch168-source-dependency-basis-v1",
+  "branch": "account-updates",
+  "head": "7b0b5fd04b88c2d7bd0035e681ca79b09d629051",
+  "cached_origin_account_updates": "7b0b5fd04b88c2d7bd0035e681ca79b09d629051",
+  "remote_fetched": false,
+  "remote_source_containment_verified": false,
+  "repository_bindings": [
+    {
+      "path": "/home/sol/workspace/jetstreamer/Cargo.toml",
+      "bytes": 6054,
+      "sha256": "d3b7eb14a1f207bf97b510552462c74656526b451d1f83cc5f4b0553636edd7d"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/Cargo.lock",
+      "bytes": 344093,
+      "sha256": "f1fefe40d58914edf4b4c3bce551fa78b1b4c2f9e9b8675e442062a66bb9fff9"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/rust-toolchain.toml",
+      "bytes": 83,
+      "sha256": "11c321f58f12a33cd9ac00964725f27c61722ed11933f5cca733c911a16d19c4"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/.cargo/config.toml",
+      "bytes": 489,
+      "sha256": "9310658f14f6c6d50900a708057ccd61004ff1a3c89ad51d5736b2f7554a53a3"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/Cargo.toml",
+      "bytes": 2490,
+      "sha256": "0ef153af5b05de58ed911d59946baa106d0dae2674edeef2eec7ccf61bed4ce0"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-horizon/Cargo.toml",
+      "bytes": 2250,
+      "sha256": "8d7ffc01b38767bc031db0569e2bc05c6f191208e31afbc3ac64a364e487be69"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/node.rs",
+      "bytes": 27626,
+      "sha256": "f01dce3ee8b40e9578ab8d7f066c438bd0e477a5da0cd00501d6c198f2440e00"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/node_reader.rs",
+      "bytes": 19939,
+      "sha256": "73ddf6965853cc188523adf03f3fa5f5f524bc8e4fd1192b52c3a1dc920184b6"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/transaction.rs",
+      "bytes": 31726,
+      "sha256": "c8fe12ea1fb3cc8a5e653e225c779c1235e7035b260d2f927cb0eb22f4805a65"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/transaction_status_meta.rs",
+      "bytes": 54787,
+      "sha256": "cd921e64b7383b9f89753649ccaa5abbce81c71bd65b9a763f91756522b82f98"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/dataframe.rs",
+      "bytes": 8957,
+      "sha256": "52f10331365abbf388b35433c42c863f1209bd57e814cae8626c6b7b3662ced0"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/jetstreamer-firehose/src/epochs.rs",
+      "bytes": 18915,
+      "sha256": "8de5fa19c62fe54096abfcffc4c0ecfa0878e18f35a0eae7be1429e4849dd793"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/vendor/solana-program-runtime/Cargo.toml",
+      "bytes": 5211,
+      "sha256": "3f60ac5964d8b22f84ebafc37a986a5d21a63ffb206b18a5a5577431c6c56f6d"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/vendor/solana-svm/Cargo.toml",
+      "bytes": 7588,
+      "sha256": "d09dcfb6a1fcdd009501bf9342b96afa9d0dfc28ba1703427f9e3ab41ed9b138"
+    },
+    {
+      "path": "/home/sol/workspace/jetstreamer/vendor/solana-runtime-3.1.12/Cargo.toml",
+      "bytes": 13553,
+      "sha256": "868780f17957f49800dc2132a1f0a9a1fe91bd6a884aacdda74eda9cb1c684c7"
+    }
+  ],
+  "cached_api_bindings": [
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.13.3/Cargo.toml",
+      "bytes": 13129,
+      "sha256": "fbc8e934d51a8130bc1238e2e5ac3cb17f03f41a6eeea9ff2e6f37f74c49dbc2"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.13.3/src/async_impl/client.rs",
+      "bytes": 113808,
+      "sha256": "a98c4aea9ee178c56f6ed2077bbd46f472ffabbd31f22c7b457bef1e64bd953f"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.13.3/src/async_impl/response.rs",
+      "bytes": 15482,
+      "sha256": "e7ad89c6473ad3adcb96a0adec857cc2c74bbabeffc56346efa270ce7082ea9f"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.13.3/src/retry.rs",
+      "bytes": 15720,
+      "sha256": "ce2c5307a449047a9f7187b52d91ddd369c0468900f4f6b0b390a849515ff525"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.52.3/Cargo.toml",
+      "bytes": 17386,
+      "sha256": "53fbe58d71858bf5364c6f2235a3fd4af4797b61d700424550bbeed776da8ae2"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-transaction-3.0.2/Cargo.toml",
+      "bytes": 3738,
+      "sha256": "8543d9895a73c2a78a89754233c302aba206ecc5b6bd039e9cf0b1735fa2ad40"
+    },
+    {
+      "path": "/home/sol/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-signature-3.1.0/Cargo.toml",
+      "bytes": 2908,
+      "sha256": "098b50b8368a351a6b0774bac287b64b6d051fcae471b3a4d635f0942bbd8167"
+    }
+  ],
+  "new_registry_package_versions_vs_parent_lock": [],
+  "checksum_changes_vs_parent_lock": [],
+  "source_graph_equivalence_claimed": false,
+  "note": "Selected direct versions match parent Cargo.lock. Cargo pruned unused packages/optional dependency edges; reqwest TLS explicitly enabled. Metadata/tree resolution does not prove compiler, cache artifact, TLS/native or runtime acceptance."
+}
