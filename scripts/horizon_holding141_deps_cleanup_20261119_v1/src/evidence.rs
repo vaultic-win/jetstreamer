@@ -23,13 +23,28 @@ pub(super) fn identity(
     )
 }
 pub(crate) fn hash_file(path: &Path, maximum: u64) -> Result<(String, fs::Metadata)> {
+    hash_file_links(path, maximum, 1)
+}
+pub(crate) fn hash_working_image() -> Result<(String, fs::Metadata)> {
+    let path = Path::new("/tmp/holding141-target/debug/jetstreamer-r2");
+    let result = hash_file_links(path, 256 << 20, 2)?;
+    ensure!(
+        result.1.dev() == 2304
+            && result.1.ino() == 6714227
+            && result.1.uid() == 1001
+            && result.1.gid() == 1001,
+        "wrong retained working image identity"
+    );
+    Ok(result)
+}
+fn hash_file_links(path: &Path, maximum: u64, links: u64) -> Result<(String, fs::Metadata)> {
     let mut file = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
         .open(path)?;
     let before = file.metadata()?;
     ensure!(
-        before.is_file() && before.nlink() == 1 && before.len() <= maximum,
+        before.is_file() && before.nlink() == links && before.len() <= maximum,
         "unsafe/oversized retained file"
     );
     let mut hash = Sha256::new();
@@ -109,4 +124,22 @@ pub(crate) fn properties(unit: &str, names: &str) -> Result<BTreeMap<String, Str
         );
     }
     Ok(values)
+}
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+    #[test]
+    fn shared_working_image_hash_does_not_relax_single_link_evidence() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("image");
+        fs::write(&path, b"retained binary fixture").unwrap();
+        fs::hard_link(&path, directory.path().join("alias")).unwrap();
+        assert!(hash_file(&path, 1024).is_err());
+        assert_eq!(
+            hash_file_links(&path, 1024, 2).unwrap().0,
+            sha(b"retained binary fixture")
+        );
+        fs::hard_link(&path, directory.path().join("unexpected-alias")).unwrap();
+        assert!(hash_file_links(&path, 1024, 2).is_err());
+    }
 }

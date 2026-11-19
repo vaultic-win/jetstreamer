@@ -21,7 +21,7 @@ original cache build provenance is not claimed. The exact sealed holding169
 production image remains retained. The working image is now the qualified166
 successor, device2304/inode6714227, with two links. Its bytes must match the
 independent normally sealed retry6 production image before any cache cleanup.
-36 tests are defined; run tests and strict Clippy before production sealing.
+37 tests are defined; run tests and strict Clippy before production sealing.
 
 Parent qualification on 2026-11-19: all 36 tests passed, strict all-target
 Clippy passed, and the production build passed under serial 1 CPU / 1 GiB

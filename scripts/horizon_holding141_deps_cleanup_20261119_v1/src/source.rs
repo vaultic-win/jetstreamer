@@ -102,7 +102,7 @@ fn deployment(p: &Plan) -> Result<Value> {
     ensure!(
         proof["source_commit"] == p.source_commit
             && proof["production_sha256"] == image
-            && proof["tests_passed"] == 36
+            && proof["tests_passed"] == 37
             && proof["clippy_all_targets_passed"] == true,
         "artifact provenance differs"
     );
@@ -166,7 +166,7 @@ pub(super) fn proof(p: &Plan) -> Result<Value> {
         successor_sha == "cedb4ac0d62af1d2c9f7d90368348bbc094e6a12934c6b743f5c6bf82a18cf6d"
             && successor_md.uid() == 0
             && successor_md.mode() & 0o222 == 0
-            && hash_file(top, 256 << 20)?.0 == successor_sha,
+            && evidence::hash_working_image()?.0 == successor_sha,
         "working successor lacks its independent sealed copy"
     );
     let retained = json!({"sealed_image":sealed,"sealed_sha256":sealed_sha,"top_level_image":top,

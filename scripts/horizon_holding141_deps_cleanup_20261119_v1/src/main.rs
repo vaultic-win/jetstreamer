@@ -28,7 +28,7 @@ use std::{
 const REPO: &str = "/home/sol/workspace/jetstreamer";
 const PACKAGE: &str = "scripts/horizon_holding141_deps_cleanup_20261119_v1";
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-holding141-deps-cleanup-20261119-v1/cleanup";
+    "/usr/local/lib/jetstreamer/horizon-holding141-deps-cleanup-20261119-v2/cleanup";
 const PROFILE: &str = "horizon-holding141-deps-partial-cleanup-plan-v1";
 const SCHEMA: &str = "horizon-holding141-deps-partial-cleanup-check-v1";
 const REVIEW_SCHEMA: &str = "horizon-holding141-deps-consumer-closure-v1";
