@@ -1,6 +1,7 @@
 //! Native synthetic export/restore -> production recorder -> V4 -> full PoH.
 //! This partial fixture grants no mainnet, full-epoch or admission authority.
 #![allow(dead_code)]
+mod checkpoint_live_client;
 #[path = "../jetstreamer-node/src/slot_presence.rs"]
 mod slot_presence;
 use slot_presence::{SlotPresenceMap, SlotPresenceState};
@@ -415,7 +416,7 @@ fn main() -> Result<()> {
         "unexpected synthetic range",
     )?;
     let snapshot = input.join("native-snapshot.tar.bz2");
-    let snapshot_sha = digest(&snapshot)?;
+    let mut snapshot_sha = digest(&snapshot)?;
     require(
         export.archive_sha256 == snapshot_sha
             && export.archive_size == fs::metadata(&snapshot)?.len()
@@ -426,24 +427,42 @@ fn main() -> Result<()> {
     let image_sha = digest(image)?;
     let full_sha = digest(full)?;
     let paths = [output.join("prefix.jet"), output.join("suffix.jet")];
-    segment(
-        &paths[0],
-        hash(&genesis)?,
-        image_sha,
-        &bootstrap,
-        &boundary,
-        std::slice::from_ref(&prefix_entry),
-        std::slice::from_ref(&prefix_result),
-    )?;
-    segment(
-        &paths[1],
-        hash(&genesis)?,
-        image_sha,
-        &restored,
-        &actual_terminal,
-        &suffix_entries,
-        &actual_results,
-    )?;
+    if let Some(launcher) = std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER") {
+        let live_export = checkpoint_live_client::run(
+            input,
+            output,
+            image,
+            Path::new(&launcher),
+            &genesis,
+            &bootstrap,
+            &prefix_entry,
+            &prefix_result,
+            &boundary,
+            &suffix_entries,
+            &expected_results,
+            &terminal,
+        )?;
+        snapshot_sha = live_export.archive_sha256.as_slice().try_into()?;
+    } else {
+        segment(
+            &paths[0],
+            hash(&genesis)?,
+            image_sha,
+            &bootstrap,
+            &boundary,
+            std::slice::from_ref(&prefix_entry),
+            std::slice::from_ref(&prefix_result),
+        )?;
+        segment(
+            &paths[1],
+            hash(&genesis)?,
+            image_sha,
+            &restored,
+            &actual_terminal,
+            &suffix_entries,
+            &actual_results,
+        )?;
+    }
     let writes = [
         prefix_result
             .writes
