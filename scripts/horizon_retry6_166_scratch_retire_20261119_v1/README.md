@@ -178,3 +178,35 @@ held-mode regressions; strict all-target Clippy and the optimized build passed.
 The two JSON test fixtures are exact non-sensitive custody/terminal evidence;
 synthetic lifecycle fixtures are not operational receipts. No production scratch
 retirement was performed by this qualification.
+
+## Original build investigation at 11:20 UTC
+
+The exact node image `a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65`
+embeds revision `3de96e71010a8a2f5e629f666227b137483bff7b`. The capability lineage
+and this helper's reviewed-source label instead name
+`e6f48efe2749d35d6875fdd3cbd7f6f4379adf75`; do not describe that label as the
+original compiler revision.
+
+Surviving Cargo build output independently records `3de96e7`, rustc 1.98.0 and
+`x86_64-unknown-linux-gnu`. The node fingerprint's build-script dependency matches
+the retained run-build fingerprint, whose JSON points to that output. This proves
+the association between cache records, not between complete compiler inputs and
+the deployed executable. The fingerprints use `checksum:false`, and the original
+`target/release/deps` directory is absent. All four reviewed no-resume source files
+match at both revisions, but other build inputs, including `Cargo.lock` and
+compatibility code, differ. Whole-build equivalence remains unproven.
+
+Raw cache records, the four source files and the investigation report were retained
+through the normal deployment sealer on `dev-samjohnson` under
+`/var/lib/jetstreamer/holding166-retry6-retirement-evidence/original-build-investigation-20261119-v1`.
+`REPORT.json` has SHA-256
+`3f9362b27dd13ef910432d9cfc1d73e6ae308c258204cfc5da95b679f5130784`.
+This evidence does not qualify scratch retirement or release the retained
+309,237,645,312-byte DATA promise.
+
+The next step is to locate an original compiler-input/output binding or separately
+admit reproducibility qualification targeting the exact existing node and worker
+hashes. A different newly built image cannot prove the old image's behavior. Any
+future gate revision must distinguish the actual build revision from reviewed
+equivalent source while preserving the existing proof requirements. Worker
+production qualification must retain disabled `poh-force-soft`.
