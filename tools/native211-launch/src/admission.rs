@@ -1,5 +1,23 @@
 //! One fresh, complete current-fleet decision. No fixed historical peer count.
 use super::*;
+fn prestart(lifecycle: &Value, review: &Value, self_sha: &str) -> Result<()> {
+    ensure!(
+        lifecycle["schema"] == "horizon-native211-prestart-qualification-v1"
+            && lifecycle["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
+            && lifecycle["guard"] == review["guard"]
+            && lifecycle["source_publication"] == review["source_publication"]
+            && lifecycle["observer_complete_tuple_accepted"] == true
+            && lifecycle["fleet_running_and_terminal_accepted"] == true
+            && lifecycle["inactive_status_exact_owner_accepted"] == true
+            && lifecycle["terminal_retention_accepted"] == true
+            && lifecycle["pre_restore_gate_tests_accepted"] == true
+            && lifecycle["actual_first_guard_required_before_snapshot"] == true
+            && lifecycle["actual_native_startup_qualified"] == false
+            && lifecycle["launcher_artifact_sha256"] == self_sha,
+        "epoch211 pre-start consumers or gate enforcement not qualified"
+    );
+    Ok(())
+}
 pub(super) fn reservations(review: &Value) -> Result<Vec<capacity::Reservation>> {
     let ledger = binding(&review["reservation_ledger"])?.sealed()?;
     ensure!(
@@ -127,20 +145,11 @@ pub(super) fn validate(
     if !candidate {
         publication::validate(n, &source, &guard, self_sha)?;
     }
-    let lifecycle = binding(&review["lifecycle_qualification"])?.sealed()?;
-    ensure!(
-        lifecycle["schema"] == "horizon-native211-lifecycle-qualification-v1"
-            && lifecycle["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
-            && lifecycle["guard"] == review["guard"]
-            && lifecycle["source_publication"] == review["source_publication"]
-            && lifecycle["observer_complete_tuple_accepted"] == true
-            && lifecycle["fleet_running_and_terminal_accepted"] == true
-            && lifecycle["inactive_status_exact_owner_accepted"] == true
-            && lifecycle["terminal_retention_accepted"] == true
-            && lifecycle["genuine_timer_first_fire_gate_accepted"] == true
-            && lifecycle["launcher_artifact_sha256"] == self_sha,
-        "epoch211 lifecycle not qualified"
-    );
+    // Admission may start the exact harness only into its internal waiting gate.
+    // The current invocation's first native guard proof cannot exist yet: launch
+    // must capture and validate it before publishing the restore token.
+    let lifecycle = binding(&review["prestart_qualification"])?.sealed()?;
+    prestart(&lifecycle, review, self_sha)?;
     binding(&lifecycle["qualification_evidence"])?.json()?;
     let fleet = binding(&review["fleet"])?.json()?;
     let observer = binding(&review["observer"])?.json()?;
@@ -182,4 +191,34 @@ pub(super) fn validate(
         "capacity":cap,"actual_current_memory":currents,"recorded_unix_seconds":now()?,"expires_unix_seconds":now()?.checked_add(60).context("clock overflow")?});
     deny_authority(&mut admission);
     Ok(admission)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn prestart_acceptance_requires_live_first_guard_without_claiming_it_already_happened() {
+        let review = json!({"guard":Bound::new(GUARD,GUARD_SHA),"source_publication":{"path":"/var/lib/jetstreamer/source/proof.json","sha256":"a".repeat(64)}});
+        let accepted = json!({"schema":"horizon-native211-prestart-qualification-v1",
+            "harness":Bound::new(HARNESS,HARNESS_SHA),"guard":review["guard"],"source_publication":review["source_publication"],
+            "observer_complete_tuple_accepted":true,"fleet_running_and_terminal_accepted":true,
+            "inactive_status_exact_owner_accepted":true,"terminal_retention_accepted":true,
+            "pre_restore_gate_tests_accepted":true,"actual_first_guard_required_before_snapshot":true,
+            "actual_native_startup_qualified":false,"launcher_artifact_sha256":"b".repeat(64)});
+        prestart(&accepted, &review, &"b".repeat(64)).unwrap();
+        for (key, value) in [
+            (
+                "schema",
+                json!("horizon-native211-lifecycle-qualification-v1"),
+            ),
+            ("actual_first_guard_required_before_snapshot", json!(false)),
+            ("actual_native_startup_qualified", json!(true)),
+            ("pre_restore_gate_tests_accepted", json!(false)),
+            ("fleet_running_and_terminal_accepted", json!(false)),
+        ] {
+            let mut bad = accepted.clone();
+            bad[key] = value;
+            assert!(prestart(&bad, &review, &"b".repeat(64)).is_err(), "{key}");
+        }
+    }
 }

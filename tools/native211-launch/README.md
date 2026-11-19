@@ -53,7 +53,7 @@ the actual `main_controller_pid` and `main_controller_start_ticks`, a fresh
 `remote_mutations`, `r2_mutations`.
 
 It binds `{path,sha256}` objects named `guard`, `fleet`, `observer`,
-`source_publication`, `lifecycle_qualification`, `reservation_ledger`, and
+`source_publication`, `prestart_qualification`, `reservation_ledger`, and
 `century`. `control_units` entries contain exact `unit`, `expected_exec_start`
 and finite `maximum_memory_bytes`; the sum plus the new protective guard cap
 must fit the 1.5 GiB control reserve. Account any additional auxiliary outside
@@ -71,13 +71,19 @@ that pool as a separate reservation. Controls never provide replay capacity.
   enumerate the source actually used by the build, including dependencies and
   features. A commit label or a caller's contained-in-remote boolean is not
   accepted as evidence by itself.
-* `lifecycle_qualification`: schema `horizon-native211-lifecycle-qualification-v1`,
+* `prestart_qualification`: schema `horizon-native211-prestart-qualification-v1`,
   exact harness, guard, source-publication binding, launcher artifact digest,
   bound `qualification_evidence`, and accepted observer-complete-tuple,
-  fleet-running-and-terminal, inactive-status-exact-owner, and genuine-timer-
-  first-fire and terminal-retention qualification fields (see `admission.rs`). This deliberately
-  blocks launch until the separately owned fleet/observer/status integration
-  and native launch capability have been qualified.
+  fleet-running-and-terminal, inactive-status-exact-owner, pre-restore-gate-test
+  and terminal-retention qualification fields (see `admission.rs`). This deliberately
+  blocks launch until the separately owned fleet/observer/status consumers and
+  the pre-restore gate have passed their acceptance checks. It must declare
+  `actual_first_guard_required_before_snapshot:true` and
+  `actual_native_startup_qualified:false`. This permits only the fully admitted
+  128 GiB process to reach its internal wait. The current invocation's genuine
+  first-fire proof is produced and independently checked before the restore
+  token is published; it cannot be a prerequisite to creating that invocation.
+  A small control fixture never substitutes for this actual production proof.
 * `reservation_ledger`: schema `horizon-native211-retained-reservations-v1`,
   Main acceptance, `all_active_and_dormant_obligations_preserved:true`, exact
   fleet/observer bindings, the same false authority flags, a sealed
