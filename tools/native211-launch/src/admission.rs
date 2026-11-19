@@ -19,11 +19,147 @@ fn prestart(lifecycle: &Value, review: &Value, self_sha: &str) -> Result<()> {
     );
     Ok(())
 }
-pub(super) fn reservations(review: &Value) -> Result<Vec<capacity::Reservation>> {
+const BOOKING_FIELDS: [&str; 5] = [
+    "unit",
+    "invocation_id",
+    "maximum_memory_bytes",
+    "remaining_disk_growth_bytes",
+    "minimum_free_bytes",
+];
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FieldSource {
+    document: Bound,
+    pointer: String,
+}
+fn booking_source(
+    source: &Value,
+    reservation: &capacity::Reservation,
+    mut load: impl FnMut(&Bound) -> Result<Value>,
+) -> Result<()> {
+    ensure!(
+        source["Main_accepted"] == true
+            && source["unit"] == reservation.unit
+            && source["invocation_id"] == reservation.invocation_id
+            && source["maximum_memory_bytes"] == reservation.maximum_memory_bytes
+            && source["remaining_disk_growth_bytes"] == reservation.remaining_disk_growth_bytes
+            && source["minimum_free_bytes"] == reservation.minimum_free_bytes,
+        "existing booking differs"
+    );
+    match source["schema"].as_str() {
+        Some("horizon-native211-existing-booking-v1") => {
+            ensure!(
+                source.get("field_sources").is_none(),
+                "ambiguous legacy booking source"
+            );
+            let original = load(&binding(&source["original_admission_or_handoff"])?)?;
+            for key in BOOKING_FIELDS {
+                let pointer = text(&source["original_field_pointers"], key)?;
+                ensure!(
+                    original.pointer(pointer) == Some(&source[key]),
+                    "booking not derived from original evidence {key}"
+                );
+            }
+        }
+        Some("horizon-native211-existing-booking-v2") => {
+            ensure!(
+                source.get("original_admission_or_handoff").is_none()
+                    && source.get("original_field_pointers").is_none(),
+                "ambiguous per-field booking source"
+            );
+            let fields: BTreeMap<String, FieldSource> =
+                serde_json::from_value(source["field_sources"].clone())?;
+            ensure!(
+                fields.keys().map(String::as_str).collect::<BTreeSet<_>>()
+                    == BTreeSet::from(BOOKING_FIELDS),
+                "incomplete/unexpected original booking fields"
+            );
+            let mut documents = BTreeMap::new();
+            for key in BOOKING_FIELDS {
+                let field = &fields[key];
+                ensure!(
+                    field.pointer.starts_with('/') && hex(&field.document.sha256, 64),
+                    "invalid original field binding"
+                );
+                let identity = (field.document.path.clone(), field.document.sha256.clone());
+                if let std::collections::btree_map::Entry::Vacant(entry) =
+                    documents.entry(identity.clone())
+                {
+                    entry.insert(load(&field.document)?);
+                }
+                ensure!(
+                    documents[&identity].pointer(&field.pointer) == Some(&source[key]),
+                    "booking not derived from original field evidence {key}"
+                );
+            }
+        }
+        _ => bail!("unregistered booking source schema"),
+    }
+    Ok(())
+}
+const AUXILIARY_BYTES: u64 = 2_640_509_440;
+const AUXILIARY_SOURCE_PATH: &str = "/home/ubuntu/.codex/diagnostics/horizon-hard-memory-accounting-20261119-v1/capacity-correction.json";
+const AUXILIARY_SOURCE_SHA: &str =
+    "64456f938ab522c91848a8c93a32f95e1eeedef97f0e1cdd143923895f090631";
+fn auxiliary_overhead(
+    ledger: &Value,
+    previous: &Value,
+    mut load: impl FnMut(&Bound) -> Result<Value>,
+) -> Result<u64> {
+    match ledger["schema"].as_str() {
+        Some("horizon-native211-retained-reservations-v1") => {
+            ensure!(
+                previous["schema"] == "horizon-native211-prior-host-booking-v1"
+                    && ledger.get("auxiliary_overhead").is_none()
+                    && previous.get("auxiliary_overhead").is_none(),
+                "legacy ledger cannot silently discard overhead"
+            );
+            Ok(0)
+        }
+        Some("horizon-native211-retained-reservations-v2") => {
+            ensure!(
+                previous["schema"] == "horizon-native211-prior-host-booking-v2"
+                    && previous["auxiliary_overhead"] == ledger["auxiliary_overhead"],
+                "previous auxiliary booking changed or omitted"
+            );
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Overhead {
+                schema: String,
+                memory_bytes: u64,
+                source: Bound,
+                source_field_pointer: String,
+            }
+            let overhead: Overhead = serde_json::from_value(ledger["auxiliary_overhead"].clone())?;
+            ensure!(
+                overhead.schema == "horizon-native211-fixed-auxiliary-overhead-v1"
+                    && overhead.memory_bytes == AUXILIARY_BYTES
+                    && overhead.source == Bound::new(AUXILIARY_SOURCE_PATH, AUXILIARY_SOURCE_SHA)
+                    && overhead.source_field_pointer == "/auxiliary_envelope_bytes",
+                "auxiliary source or full fixed envelope differs"
+            );
+            let original = load(&overhead.source)?;
+            ensure!(
+                original["schema"] == "horizon-capacity-accounting-correction-v1"
+                    && original.pointer(&overhead.source_field_pointer)
+                        == Some(&json!(overhead.memory_bytes)),
+                "auxiliary overhead not derived from original accounting"
+            );
+            Ok(overhead.memory_bytes)
+        }
+        _ => bail!("unknown retained booking schema"),
+    }
+}
+pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>, u64)> {
     let ledger = binding(&review["reservation_ledger"])?.sealed()?;
     ensure!(
-        ledger["schema"] == "horizon-native211-retained-reservations-v1"
-            && ledger["Main_accepted"] == true
+        matches!(
+            ledger["schema"].as_str(),
+            Some(
+                "horizon-native211-retained-reservations-v1"
+                    | "horizon-native211-retained-reservations-v2"
+            )
+        ) && ledger["Main_accepted"] == true
             && ledger["all_active_and_dormant_obligations_preserved"] == true
             && ledger["fleet"] == review["fleet"]
             && ledger["observer"] == review["observer"],
@@ -44,44 +180,22 @@ pub(super) fn reservations(review: &Value) -> Result<Vec<capacity::Reservation>>
         // Per-owner booking is a separately accepted immutable extraction, retaining
         // its original admission/handoff; it cannot be replaced by an unbound number.
         let s = r.source.sealed()?;
-        ensure!(
-            s["schema"] == "horizon-native211-existing-booking-v1"
-                && s["Main_accepted"] == true
-                && s["unit"] == r.unit
-                && s["invocation_id"] == r.invocation_id
-                && s["maximum_memory_bytes"] == r.maximum_memory_bytes
-                && s["remaining_disk_growth_bytes"] == r.remaining_disk_growth_bytes
-                && s["minimum_free_bytes"] == r.minimum_free_bytes,
-            "existing booking differs"
-        );
-        let original = binding(&s["original_admission_or_handoff"])?.json()?;
-        for key in [
-            "maximum_memory_bytes",
-            "remaining_disk_growth_bytes",
-            "minimum_free_bytes",
-        ] {
-            let pointer = text(&s["original_field_pointers"], key)?;
-            ensure!(
-                original.pointer(pointer) == Some(&s[key]),
-                "booking not derived from original evidence {key}"
-            );
-        }
-        for key in ["unit", "invocation_id"] {
-            let pointer = text(&s["original_field_pointers"], key)?;
-            ensure!(
-                original.pointer(pointer) == Some(&s[key]),
-                "booking owner provenance differs"
-            );
-        }
+        booking_source(&s, r, Bound::json)?;
     }
     // Supplied predecessor is the accepted host booking, not a caller-selected subset.
     let previous = binding(&ledger["previous_accepted_booking"])?.sealed()?;
     ensure!(
-        previous["schema"] == "horizon-native211-prior-host-booking-v1"
-            && previous["Main_accepted"] == true
+        matches!(
+            previous["schema"].as_str(),
+            Some(
+                "horizon-native211-prior-host-booking-v1"
+                    | "horizon-native211-prior-host-booking-v2"
+            )
+        ) && previous["Main_accepted"] == true
             && previous["complete_host_booking"] == true,
         "missing prior complete host booking"
     );
+    let overhead = auxiliary_overhead(&ledger, &previous, Bound::json)?;
     let prior = previous["reservations"]
         .as_array()
         .context("prior bookings")?;
@@ -100,7 +214,7 @@ pub(super) fn reservations(review: &Value) -> Result<Vec<capacity::Reservation>>
             "historical booking lowered without separate qualified transition"
         );
     }
-    Ok(rows)
+    Ok((rows, overhead))
 }
 pub(super) fn validate(
     n: &mut Native,
@@ -175,7 +289,7 @@ pub(super) fn validate(
             && num(&observer["cadence"], "observed_interval_seconds")? >= 1800,
         "complete cadence observation required"
     );
-    let rows = reservations(review)?;
+    let (rows, overhead) = reservations(review)?;
     let currents = live::census(n, review, &fleet, &rows, candidate)?;
     let (total, available, disk) = live::resources()?;
     let obs_total = num(&observer["host_memory"], "total_kib")?
@@ -183,7 +297,7 @@ pub(super) fn validate(
         .context("memory overflow")?;
     ensure!(total == obs_total, "host memory changed");
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
-    let cap = capacity::arithmetic(total, available, disk, century, &rows, &currents)?;
+    let cap = capacity::arithmetic(total, available, disk, century, &rows, &currents, overhead)?;
     let mut admission = json!({"schema":"horizon-native211-current-fleet-admission-v1","epoch":211,"mode":"native-cold","unit":UNIT,
         "private_run_root":ROOT,"maximum_memory_bytes":MEMORY,"candidate_incremental_peak_bytes":SCRATCH,
         "protected_existing_floor_bytes":cap["protected_existing_floor_bytes"],"harness":Bound::new(HARNESS,HARNESS_SHA),
@@ -197,6 +311,165 @@ pub(super) fn validate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn booking_fixture() -> (capacity::Reservation, Value, BTreeMap<PathBuf, Value>) {
+        let reservation = capacity::Reservation {
+            unit: "original.service".into(),
+            invocation_id: "a".repeat(32),
+            maximum_memory_bytes: 100,
+            remaining_disk_growth_bytes: 200,
+            minimum_free_bytes: 300,
+            source: Bound::new("/source", "b".repeat(64)),
+            release: None,
+        };
+        let owner = Bound::new("/owner", "1".repeat(64));
+        let admission = Bound::new("/admission", "2".repeat(64));
+        let guard = Bound::new("/guard", "3".repeat(64));
+        let source = json!({"schema":"horizon-native211-existing-booking-v2","Main_accepted":true,
+        "unit":reservation.unit,"invocation_id":reservation.invocation_id,"maximum_memory_bytes":100,
+        "remaining_disk_growth_bytes":200,"minimum_free_bytes":300,
+        "field_sources":{
+            "unit":{"document":owner,"pointer":"/producer/unit"},
+            "invocation_id":{"document":owner,"pointer":"/producer/iid"},
+            "maximum_memory_bytes":{"document":admission,"pointer":"/memory"},
+            "remaining_disk_growth_bytes":{"document":admission,"pointer":"/root"},
+            "minimum_free_bytes":{"document":guard,"pointer":"/floor"}
+        }});
+        let docs = BTreeMap::from([
+            (
+                owner.path,
+                json!({"producer":{"unit":reservation.unit,"iid":reservation.invocation_id}}),
+            ),
+            (admission.path, json!({"memory":100,"root":200})),
+            (guard.path, json!({"floor":300})),
+        ]);
+        (reservation, source, docs)
+    }
+    #[test]
+    fn per_field_booking_authenticates_original_documents_and_deduplicates_reads() {
+        let (r, s, docs) = booking_fixture();
+        let mut reads = 0;
+        booking_source(&s, &r, |b| {
+            reads += 1;
+            docs.get(&b.path).cloned().context("missing original")
+        })
+        .unwrap();
+        assert_eq!(reads, 3);
+        let mut legacy = s.clone();
+        legacy["schema"] = json!("horizon-native211-existing-booking-v1");
+        legacy.as_object_mut().unwrap().remove("field_sources");
+        legacy["original_admission_or_handoff"] = json!(Bound::new("/original", "4".repeat(64)));
+        legacy["original_field_pointers"] = json!({"unit":"/unit","invocation_id":"/invocation_id","maximum_memory_bytes":"/maximum_memory_bytes","remaining_disk_growth_bytes":"/remaining_disk_growth_bytes","minimum_free_bytes":"/minimum_free_bytes"});
+        booking_source(&legacy, &r, |_| Ok(s.clone())).unwrap();
+        legacy["field_sources"] = s["field_sources"].clone();
+        assert!(booking_source(&legacy, &r, |_| Ok(s.clone())).is_err());
+    }
+    #[test]
+    fn per_field_booking_rejects_missing_mutated_or_ambiguous_evidence() {
+        let (r, s, docs) = booking_fixture();
+        for key in BOOKING_FIELDS {
+            let mut bad = s.clone();
+            bad["field_sources"].as_object_mut().unwrap().remove(key);
+            assert!(
+                booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err(),
+                "missing {key}"
+            );
+            let mut bad = s.clone();
+            bad["field_sources"][key]["pointer"] = json!("/missing");
+            assert!(
+                booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err(),
+                "pointer {key}"
+            );
+            let mut bad = s.clone();
+            bad[key] = json!(0);
+            assert!(
+                booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err(),
+                "value {key}"
+            );
+        }
+        for value in [json!(false), Value::Null] {
+            let mut bad = s.clone();
+            bad["Main_accepted"] = value;
+            assert!(booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err());
+        }
+        let mut bad = s.clone();
+        bad["field_sources"]["extra"] = s["field_sources"]["unit"].clone();
+        assert!(booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err());
+        let mut bad = s.clone();
+        bad["field_sources"]["unit"]["document"]["sha256"] = json!("invalid");
+        assert!(booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err());
+        let mut bad = s.clone();
+        bad["original_admission_or_handoff"] = json!({});
+        assert!(booking_source(&bad, &r, |b| Ok(docs[&b.path].clone())).is_err());
+        assert!(booking_source(&s, &r, |_| bail!("original digest mismatch")).is_err());
+        let mut changed = docs.clone();
+        changed.get_mut(&PathBuf::from("/admission")).unwrap()["memory"] = json!(99);
+        assert!(booking_source(&s, &r, |b| Ok(changed[&b.path].clone())).is_err());
+    }
+    fn overhead_fixture() -> (Value, Value, Value) {
+        let overhead = json!({"schema":"horizon-native211-fixed-auxiliary-overhead-v1","memory_bytes":AUXILIARY_BYTES,
+            "source":Bound::new(AUXILIARY_SOURCE_PATH,AUXILIARY_SOURCE_SHA),"source_field_pointer":"/auxiliary_envelope_bytes"});
+        (
+            json!({"schema":"horizon-native211-retained-reservations-v2","auxiliary_overhead":overhead}),
+            json!({"schema":"horizon-native211-prior-host-booking-v2","auxiliary_overhead":overhead}),
+            json!({"schema":"horizon-capacity-accounting-correction-v1","auxiliary_envelope_bytes":AUXILIARY_BYTES}),
+        )
+    }
+    #[test]
+    fn fixed_auxiliary_envelope_is_source_bound_preserved_and_never_a_fake_owner() {
+        let (ledger, previous, original) = overhead_fixture();
+        let mut reads = 0;
+        assert_eq!(
+            auxiliary_overhead(&ledger, &previous, |b| {
+                reads += 1;
+                assert_eq!(*b, Bound::new(AUXILIARY_SOURCE_PATH, AUXILIARY_SOURCE_SHA));
+                Ok(original.clone())
+            })
+            .unwrap(),
+            AUXILIARY_BYTES
+        );
+        assert_eq!(reads, 1);
+        for key in ["schema", "memory_bytes", "source", "source_field_pointer"] {
+            let mut bad = ledger.clone();
+            bad["auxiliary_overhead"][key] = Value::Null;
+            let mut prior = previous.clone();
+            prior["auxiliary_overhead"] = bad["auxiliary_overhead"].clone();
+            assert!(
+                auxiliary_overhead(&bad, &prior, |_| Ok(original.clone())).is_err(),
+                "{key}"
+            );
+        }
+        let mut lowered = ledger.clone();
+        lowered["auxiliary_overhead"]["memory_bytes"] = json!(AUXILIARY_BYTES - 1);
+        assert!(auxiliary_overhead(&lowered, &previous, |_| Ok(original.clone())).is_err());
+        let mut prior = previous.clone();
+        prior["auxiliary_overhead"] = lowered["auxiliary_overhead"].clone();
+        assert!(auxiliary_overhead(&lowered, &prior, |_| Ok(original.clone())).is_err());
+        let mut substituted = ledger.clone();
+        substituted["auxiliary_overhead"]["source"]["sha256"] = json!("a".repeat(64));
+        prior["auxiliary_overhead"] = substituted["auxiliary_overhead"].clone();
+        assert!(auxiliary_overhead(&substituted, &prior, |_| Ok(original.clone())).is_err());
+        let mut bad = original.clone();
+        bad["auxiliary_envelope_bytes"] = json!(0);
+        assert!(auxiliary_overhead(&ledger, &previous, |_| Ok(bad.clone())).is_err());
+        assert!(
+            auxiliary_overhead(&ledger, &previous, |_| bail!("changed source digest")).is_err()
+        );
+        let old = json!({"schema":"horizon-native211-retained-reservations-v1"});
+        let old_prior = json!({"schema":"horizon-native211-prior-host-booking-v1"});
+        assert_eq!(
+            auxiliary_overhead(&old, &old_prior, |_| bail!(
+                "legacy must not read auxiliary source"
+            ))
+            .unwrap(),
+            0
+        );
+        assert!(auxiliary_overhead(&old, &previous, |_| Ok(original.clone())).is_err());
+        let mut old_with_overhead = old;
+        old_with_overhead["auxiliary_overhead"] = ledger["auxiliary_overhead"].clone();
+        assert!(
+            auxiliary_overhead(&old_with_overhead, &old_prior, |_| Ok(original.clone())).is_err()
+        );
+    }
     #[test]
     fn prestart_acceptance_requires_live_first_guard_without_claiming_it_already_happened() {
         let review = json!({"guard":Bound::new(GUARD,GUARD_SHA),"source_publication":{"path":"/var/lib/jetstreamer/source/proof.json","sha256":"a".repeat(64)}});

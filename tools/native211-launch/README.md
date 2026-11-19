@@ -97,6 +97,45 @@ that pool as a separate reservation. Controls never provide replay capacity.
   `complete_host_booking:true`) cannot silently lose a reservation or reduce
   its memory/disk/floor values. A separate qualified source transition is
   required to change this baseline. Dormant jobs retain their full cap.
+  Existing booking extractions may instead use
+  `horizon-native211-existing-booking-v2`: replace the single
+  `original_admission_or_handoff` and `original_field_pointers` with
+  `field_sources`. It must contain exactly `unit`, `invocation_id`,
+  `maximum_memory_bytes`, `remaining_disk_growth_bytes`, and
+  `minimum_free_bytes`; each value is `{document:{path,sha256},pointer}`.
+  Every original document is read through the same root-owned, no-follow,
+  stable hash-bound evidence reader. Every pointed value must exactly equal
+  the accepted extraction. Missing/extra fields, wrong owners/values and mixed
+  old/new provenance forms fail closed. This binds genuine handoff IIDs,
+  admission limits and guard floors without creating a synthetic original
+  admission. The original single-document v1 extraction remains supported.
+
+  The current Foundation booking uses
+  `horizon-native211-retained-reservations-v2` with a matching
+  `horizon-native211-prior-host-booking-v2`. Both carry the exact same
+  `auxiliary_overhead` object:
+
+  ```json
+  {
+    "schema": "horizon-native211-fixed-auxiliary-overhead-v1",
+    "memory_bytes": 2640509440,
+    "source": {
+      "path": "/home/ubuntu/.codex/diagnostics/horizon-hard-memory-accounting-20261119-v1/capacity-correction.json",
+      "sha256": "64456f938ab522c91848a8c93a32f95e1eeedef97f0e1cdd143923895f090631"
+    },
+    "source_field_pointer": "/auxiliary_envelope_bytes"
+  }
+  ```
+
+  This closed source-bound envelope is additional fixed overhead, not a
+  service or invocation. Its full bytes count against physical memory and
+  remaining hard growth, including after a producer's memory release. It
+  cannot substitute for booking any actual live service in the full census.
+  A lower value, different source, missing predecessor overhead or ambiguous
+  extra fields fails. The v1 ledger route retains its original arithmetic and
+  rejects an overhead field rather than silently ignoring it. Moving to v2
+  requires an accepted complete v2 predecessor; do not label an incomplete
+  draft as accepted.
 * `century`: schema `horizon-native211-qualified-century-census-v1`, `entries`
   covering the fleet's exact ready-pair membership and lengths/digests. Every
   entry binds full-verification, current-plugin and remote-readback receipts
