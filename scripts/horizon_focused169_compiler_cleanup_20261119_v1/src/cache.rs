@@ -181,15 +181,16 @@ pub(super) fn select(root: &Path, uid: u32, build_only: bool) -> Result<Selectio
             "compiler census exceeded bound"
         );
         let md = fs::symlink_metadata(&path)?;
+        let symlink = md.file_type().is_symlink();
         let id = Identity::of(&md);
         let relative = path.strip_prefix(root)?.to_path_buf();
         ensure!(
             md.dev() == initial.dev()
                 && md.uid() == uid
                 && md.gid() == uid
-                && md.mode() & 0o7002 == 0
-                && (md.is_dir() || md.is_file()),
-            "foreign/symlink/special/mutable cache entry: {}",
+                && (symlink || md.mode() & 0o7002 == 0)
+                && (md.is_dir() || md.is_file() || symlink),
+            "foreign/special/mutable cache entry: {}",
             path.display()
         );
         ensure!(
@@ -213,6 +214,18 @@ pub(super) fn select(root: &Path, uid: u32, build_only: bool) -> Result<Selectio
             for e in fs::read_dir(&path)? {
                 todo.push((e?.path(), depth + 1));
             }
+        } else if symlink {
+            // Retain libtool aliases without following or selecting their target.
+            // Replacement remains visible in the complete inode census.
+            ensure!(
+                md.nlink() == 1,
+                "shared symlink inode requires separate qualification"
+            );
+            out.allocated_bytes = out
+                .allocated_bytes
+                .checked_add(md.blocks().checked_mul(512).context("symlink blocks")?)
+                .context("allocation overflow")?;
+            out.preserved.insert(relative, id);
         } else {
             let eligible = compiler_file(root, &relative, &id, build_only)?;
             let entry = groups

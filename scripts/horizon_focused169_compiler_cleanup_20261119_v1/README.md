@@ -17,7 +17,7 @@ inode, owner and mode:
 
 These 40,477,052,928 bytes are total tree allocation, **not selected or promised
 reclamation**. The native check computes actual selected allocation. Unknown
-files, generated sources, fingerprints, dependency manifests, logs, every
+files, generated sources, fingerprints, dependency manifests, logs, symlink inodes, every
 directory, every lock and externally linked inode group remain. If this narrow
 selection is insufficient, report the measured shortfall rather than extending
 the profile at runtime. No cargo-home contents are selected.
@@ -77,7 +77,7 @@ between the positive check and retirement.
 Commit/push the package and verify remote containment before operational use.
 Normally seal the new executable to:
 
-`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v3/cleanup`
+`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v4/cleanup`
 
 The same package must contain root-owned immutable `artifact-proof.json` with
 `source_commit`, `production_sha256`, `tests_passed: 26`,

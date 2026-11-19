@@ -129,19 +129,34 @@ fn parent_replacement_cannot_redirect_unlink() {
     assert!(d.path().join("old-deps/a.o").is_file());
 }
 #[test]
-fn symlink_parent_and_member_fail_closed() {
+fn symlinks_are_preserved_without_following_and_cannot_redirect_unlink() {
     let (d, r, uid) = fixture();
     fs::create_dir(r.join("deps")).unwrap();
     elf(&r.join("deps/a.o"));
     let before = cache::select(&r, uid, false).unwrap();
     fs::rename(r.join("deps"), d.path().join("old-deps")).unwrap();
     symlink(d.path().join("old-deps"), r.join("deps")).unwrap();
-    assert!(cache::select(&r, uid, false).is_err());
+    let linked_directory = cache::select(&r, uid, false).unwrap();
+    assert!(linked_directory.selected.is_empty());
+    assert!(linked_directory.preserved.contains_key(Path::new("deps")));
     assert!(cache::unlink_group(&before, &before.selected[0]).is_err());
     fs::remove_file(r.join("deps")).unwrap();
     fs::create_dir(r.join("deps")).unwrap();
     symlink(d.path().join("old-deps/a.o"), r.join("deps/a.o")).unwrap();
-    assert!(cache::select(&r, uid, false).is_err());
+    let linked_file = cache::select(&r, uid, false).unwrap();
+    assert!(linked_file.selected.is_empty());
+    let original = fs::read(d.path().join("old-deps/a.o")).unwrap();
+    cache::retire(&linked_file, uid, false).unwrap();
+    assert!(
+        fs::symlink_metadata(r.join("deps/a.o"))
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(fs::read(d.path().join("old-deps/a.o")).unwrap(), original);
+    fs::remove_file(r.join("deps/a.o")).unwrap();
+    symlink("/a/different/target", r.join("deps/a.o")).unwrap();
+    assert!(cache::retire(&linked_file, uid, false).is_err());
 }
 #[test]
 fn archives_and_replay_data_are_rejected() {
