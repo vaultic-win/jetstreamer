@@ -150,9 +150,9 @@ pub(super) fn validate(
     ensure!(
         !starts.is_empty()
             && starts.len() == ends.len()
-            && starts.iter().all(|(iid, start)| ends
-                .get(iid)
-                .is_some_and(|end| end > start && end - start <= 15_000_000)),
+            && starts.iter().all(|(iid, start)| ends.get(iid).is_some_and(
+                |end| end > start && end - start <= native265_protection::MAX_FIRING_MICROS
+            )),
         "265 guard history incomplete"
     );
     let records = bundle["records"].as_array().context("265 guard records")?;
@@ -231,6 +231,20 @@ pub(super) fn validate(
     );
     Ok(())
 }
+fn root_pin(v: &Value, h: &Value, device: u64, inode: u64, mode: u32) -> Result<()> {
+    ensure!(
+        v["schema"] == "horizon265-native-guard-root-pin-v1"
+            && v["plan_sha256"] == h["guard_plan"]["sha256"]
+            && v["producer_invocation_id"] == h["invocation_id"]
+            && v["device"] == device
+            && v["inode"] == inode
+            && v["mode"] == mode
+            && v["uid"] == 1000
+            && v["gid"] == 1000,
+        "265 retained root pin differs"
+    );
+    Ok(())
+}
 /// Capture must account for every producer-specific guard artifact, including trips.
 pub(super) fn complete_directory(bundle: &Value, h: &Value) -> Result<()> {
     let gp = c::sealed(&c::binding(&h["guard_plan"])?)?;
@@ -253,6 +267,31 @@ pub(super) fn complete_directory(bundle: &Value, h: &Value) -> Result<()> {
         let e = e?;
         let name = e.file_name();
         let name = name.to_str().context("265 guard filename")?;
+        if name == "root-pin.json" {
+            let path = e.path();
+            let metadata = fs::symlink_metadata(&path)?;
+            ensure!(
+                path.canonicalize()? == path
+                    && metadata.is_file()
+                    && metadata.uid() == 0
+                    && metadata.nlink() == 1
+                    && metadata.mode() & 0o077 == 0,
+                "265 root pin custody differs"
+            );
+            let pin: Value =
+                serde_json::from_slice(&read_stable_bounded(&path, 65536, "265 root pin")?)?;
+            let root = fs::symlink_metadata(c::ROOT)?;
+            ensure!(
+                Path::new(c::ROOT).canonicalize()? == Path::new(c::ROOT)
+                    && root.is_dir()
+                    && root.uid() == 1000
+                    && root.gid() == 1000
+                    && root.mode() & 0o777 == 0o700,
+                "265 retained root custody differs"
+            );
+            root_pin(&pin, h, root.dev(), root.ino(), root.mode())?;
+            continue;
+        }
         if matches!(name, "guard.lock" | "main-pin.json" | "worker-pin.json") {
             continue;
         }
@@ -384,6 +423,52 @@ mod tests {
             let mut changed = v.clone();
             *changed.pointer_mut(pointer).unwrap() = bad;
             assert!(result(&changed, &origin, &h).is_err(), "{pointer}");
+        }
+    }
+    #[test]
+    fn terminal_complete_history_uses_same_sixty_second_bound() {
+        let (bundle, h, origin, mut reader) = history();
+        let mut rows = serde_json::Deserializer::from_slice(&reader.journal)
+            .into_iter::<Value>()
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .unwrap();
+        rows[1]["__MONOTONIC_TIMESTAMP"] =
+            json!((110 + native265_protection::MAX_FIRING_MICROS).to_string());
+        rows[2]["__MONOTONIC_TIMESTAMP"] = json!("60000300");
+        rows[3]["__MONOTONIC_TIMESTAMP"] = json!("60000310");
+        let encode = |rows: &Vec<Value>| {
+            rows.iter()
+                .map(|r| serde_json::to_string(r).unwrap())
+                .collect::<Vec<_>>()
+                .join("\n")
+                .into_bytes()
+        };
+        reader.journal = encode(&rows);
+        validate(&bundle, &h, &origin, 60_000_250, 43, &reader).unwrap();
+        rows[1]["__MONOTONIC_TIMESTAMP"] =
+            json!((111 + native265_protection::MAX_FIRING_MICROS).to_string());
+        reader.journal = encode(&rows);
+        assert!(validate(&bundle, &h, &origin, 60_000_250, 43, &reader).is_err());
+    }
+    #[test]
+    fn retained_root_pin_is_recognized_without_allowing_replaced_scratch() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("fixtures/native265-terminal-20261119.json"))
+                .unwrap();
+        let pin = &fixture["data"]["root-pin.json"];
+        let h = json!({"invocation_id":pin["producer_invocation_id"],"guard_plan":{"sha256":pin["plan_sha256"]}});
+        root_pin(pin, &h, 66305, 95092619, 16832).unwrap();
+        assert!(root_pin(pin, &h, 66305, 95092620, 16832).is_err());
+        for key in [
+            "plan_sha256",
+            "producer_invocation_id",
+            "uid",
+            "gid",
+            "mode",
+        ] {
+            let mut bad = pin.clone();
+            bad[key] = Value::Null;
+            assert!(root_pin(&bad, &h, 66305, 95092619, 16832).is_err(), "{key}");
         }
     }
 }

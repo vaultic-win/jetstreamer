@@ -75,6 +75,7 @@ mod native265_guard;
 mod native265_history;
 mod native265_process;
 mod native265_protection;
+mod native265_recovery;
 mod native265_terminal;
 mod operator_successors;
 mod original141;
@@ -474,7 +475,7 @@ pub(super) fn prepare_assembly144_fleet() -> Result<()> {
     assembly144_prepare::run()
 }
 
-#[derive(Deserialize, serde::Serialize, Eq, PartialEq)]
+#[derive(Clone, Deserialize, serde::Serialize, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct BoundFile {
     path: PathBuf,

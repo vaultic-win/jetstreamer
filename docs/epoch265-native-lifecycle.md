@@ -70,3 +70,34 @@ peer preservation, status owner rejection, observer tuple and wrapper passthroug
 Main must run bounded builds/tests/Clippy, seal artifacts and publish exact source
 containment before accepting prestart consumers. These sources do not establish
 that native265 has run or qualified.
+
+## Direct recovery after successful completion
+
+The original native run completed successfully before its running-intent capture
+was accepted. The terminal capture also accepts
+`jetstreamer-native265-terminal-capture-spec-v2`: replace `running_origin` with
+the original `startup_handoff` and a sealed `consumer_transition`. This route
+never creates a retrospective running intent or renews a launch deadline. It is
+restricted to the original invocation `ce5f66a82fdd4c0e93ca99f27b925112` and its
+unchanged admission, token, worker and result.
+
+The successor transition binds published source, the actual compiler argument
+array, immutable build evidence and every original dependency. The sole added
+dependency is the separately qualified full211 consumer library; its exact three
+manifest changes are registered alongside its artifact and qualification receipt.
+Retained native210/native227 modules are unconditional in this R2 crate, so the
+transition preserves the actual predecessor feature set without inventing Cargo
+features. Unknown dependency changes and unreviewed source changes still fail.
+
+The deployed guard has a 60-second execution limit, which PID1 renders as `1min`.
+Live checks and complete-history verification use that same bound. Its genuine
+`root-pin.json` is validated against the original plan and retained root inode,
+ownership and mode; unknown or trip artifacts remain failures.
+
+After successful producer completion and process drainage, stop only the unused
+guard timer and let any in-flight guard finish naturally. Keep the producer unit,
+retention target, inputs and every receipt. Direct capture requires a stopped
+timer, successful drained guard, exact complete PID1 history, all original guard
+records and unchanged terminal identity before and after validation. The terminal
+proof can join the existing fleet without fabricating an earlier active claim;
+it grants no resource release, replay launch or archive publication authority.
