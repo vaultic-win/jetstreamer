@@ -1,5 +1,7 @@
 //! Exact epoch 211 bootstrap, independent of all other epochs' native proofs.
 use super::native_cold_common::{self, Profile};
+#[path = "native211_gate.rs"]
+mod startup_gate;
 
 const INPUT: Profile = Profile {
     epoch: 211,
@@ -21,5 +23,8 @@ fn closed_native211_inputs_reject_changed_writable_or_symlinked_files() {
 #[test]
 #[ignore]
 fn native_epoch211_cold_input_matches_canonical_accounts_commitment() {
-    native_cold_common::native_cold(&INPUT);
+    startup_gate::before_snapshot(startup_gate::admit, || {
+        native_cold_common::native_cold(&INPUT)
+    })
+    .expect("epoch211 first guard must precede all snapshot work");
 }

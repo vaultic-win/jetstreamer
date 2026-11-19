@@ -60,9 +60,9 @@ pub(super) fn validate(p: &Plan, n: &Binding) -> Result<()> {
             == Path::new("/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1")
         && n.executable
             == Path::new(
-                "/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test",
+                "/var/lib/jetstreamer/horizon-211-native-input-gated-20261119-v1/native-input-test",
             )
-        && n.sha256 == "b0b1185584680eae2b644c38a0c7d3f4240e0f4af392caa8e419300f2ac17df5";
+        && n.sha256 == "2b1c0dd8b8cfcf0bbb80e52864c4b78a8348b1bc96dc97cbdfc4fee1094b8773";
     let profile228 = cfg!(feature = "epoch228-native-main-guard")
         && p.unit == "horizon-native-input-228-capped-1bfa8d51-v1.service"
         && p.worker_root

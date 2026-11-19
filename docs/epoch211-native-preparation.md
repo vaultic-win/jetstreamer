@@ -63,14 +63,78 @@ producer completion releases no reservation until independently proved.
 The `epoch211-native-main-guard` feature now provides the closed guard tuple
 for `archive-211-v1616-native-input-actual-v1.service`, run root
 `/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1`, and the exact
-sealed harness at
-`/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test`
-with the digest above. It retains the 300 GB physical root and 3,500,000 VMA
+sealed gated harness at
+`/var/lib/jetstreamer/horizon-211-native-input-gated-20261119-v1/native-input-test`
+with SHA-256 `2b1c0dd8b8cfcf0bbb80e52864c4b78a8348b1bc96dc97cbdfc4fee1094b8773`.
+It retains the 300 GB physical root and 3,500,000 VMA
 ceilings, requires an actual MainPID greater than one, and admits no bounded
 experiment exceptions. The separate candidate guard includes the existing
 `epoch223-native20-prefix-guard` feature as well. This does not replace any
 running guard or prove an actual first guard fire; the native service and
 complete current-fleet lifecycle remain required before execution.
+
+## First guard before restore
+
+The new test-only `native211_gate.rs` runs before `native_cold`, including before
+snapshot hashing. The bounded rebuild passed six focused integrity/startup-gate
+tests, left the cold native test ignored, and listed its exact selector on
+2026-11-19. Source hashes remained unchanged across the build. Evidence is in
+`/home/ubuntu/.codex/diagnostics/horizon-native211-gated-build-20261119-v1`.
+Native qualification remains required. The previously sealed `b0b118...` harness
+and `61a4...` guard do not include this gate. The candidate guard now binds the
+new harness digest; rebuild and qualify that guard, observer and lifecycle
+profiles before execution. Do not launch the older ungated native selector.
+
+The selected service must supply `JETSTREAMER_EPOCH211_STARTUP_PLAN` and
+`JETSTREAMER_EPOCH211_STARTUP_PLAN_SHA256`. The plan is a root-owned immutable
+single-link `plan.json` in a new
+`/var/lib/jetstreamer/horizon-native211-startup-plan-UNIQUE` package. Its schema
+is `horizon-native211-startup-plan-v1`. It binds epoch/unit/root/bootstrap,
+snapshot digest, `harness` and `guard` path/digest objects, `admission`, exact
+guard unit `horizon-native211-protective-v1.service`, 300 GB root/128 GiB memory,
+the protected `minimum_free_bytes`, current boot ID, and absolute
+`issued_monotonic_us` / `expires_monotonic_us` from `CLOCK_MONOTONIC`. The window
+must be positive and at most 60 seconds. The gate never extends that deadline.
+
+After launching the harness, the root launcher must capture its actual
+`INVOCATION_ID`, MainPID and mapped image. The harness verifies its own actual
+PID, exact cgroup, boot and mapped image while waiting; useful snapshot work
+cannot begin during this wait. Bind and seal the actual native guard plan, arm
+its genuine systemd timer, and require the first completed no-trip guard sample
+under the intended sandbox. The guard must observe this harness as the unique
+native MainPID, rather than an `ExecStartPre` sleeper. A capability-only sample,
+fixed delay or `admitted:true` alone cannot open the gate.
+
+The launcher must atomically seal a fresh, no-clobber package at
+`/var/lib/jetstreamer/horizon-native211-startup-tokens/INVOCATION_ID` containing
+`guard-admission.json` and its canonical 64-hex-plus-newline
+`guard-admission.sha256`. The token schema is
+`horizon-native211-first-guard-token-v1`: bind `startup_plan_sha256`, unit,
+invocation, MainPID, harness, guard, boot, admission, original monotonic clock,
+guard invocation, and separately sealed `guard_plan`, `guard_sample`, and
+`guard_pid1_journal` path/digest objects. Preserve the guard sample's original
+plan path/digest. The PID1 journal is the captured JSON array of actual manager
+events, with `_PID:1`, `_UID:0`, the guard unit/invocation and original monotonic
+timestamps; never synthesize those events. The gate requires unique ordered
+start and successful deactivation within its original deadline, the full
+no-trip native guard fields, resource bounds, and freshness. It rejects changed
+or writable files, wrong owners, links, substituted owners/images, missing
+proof and timeout before restoring a Bank.
+
+The root admission producer is still required. Its immutable
+`horizon-native211-current-fleet-admission-v1` receipt must bind the exact
+observer, complete fleet and source-publication evidence, boot, harness/guard,
+128 GiB memory, 300 GB incremental disk and preserved guard floor. It must declare
+`mode: "native-cold"` and keep entry replay, replay launch, runtime promotion,
+full-epoch qualification, canonical sidecar, publication and remote/R2 mutation
+authority false. PID1 guard events must belong to the current boot. The launcher
+must independently verify source containment, exact artifact provenance, all
+live/terminal obligations and drain-backed release, current peer identities,
+actual caps/free space and a fresh expiry before launch and token sealing.
+The gate authenticates that root-written receipt and the actual first-guard
+evidence; it does not replace the launcher's complete capacity validator.
+Implement and qualify that launcher and genuine startup transaction before any
+native execution. No environment option bypasses the gate.
 
 Publish all required source to `origin/account-updates` before admission. Native
 success still does not admit full replay: the full singleton needs its own
