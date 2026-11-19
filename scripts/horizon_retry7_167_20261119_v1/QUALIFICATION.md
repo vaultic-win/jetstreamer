@@ -111,3 +111,41 @@ no deletion or resource credit; transitive reader references and any required
 holding custody remain separate gates. Previously qualified snapshot152,
 snapshot160, snapshot183 and six snapshot185/186 copies are already retired;
 their historical allocation cannot be credited again.
+
+At 03:16 UTC the normally sealed epoch169 local2 inspector completed. Both
+native consumer censuses were empty; original owners remained inactive/dead;
+the entire 56,565,561,764-byte file was stable and hashed to
+`33f3b6d1622bb516ce90cc6a5b535038b2403b6056ddb15c49feaa0c70fb742f`.
+Inspection receipt:
+`/var/lib/jetstreamer/epoch169-local2-holding-review-20261119-v1/INSPECTION.json`,
+SHA256 `1e64267d9d34edd6faeda2d303e977395a5288754bfe3e60b6d087f2ed8cefa6`.
+Release build and strict selected-package Clippy succeeded; source commit
+`1d07675f` was merged and pushed in `b63d29ef` before execution.
+
+The next rotation transition actually started at 03:17:11 UTC:
+`horizon-closed169-local2-park-20261119-v1.service`,
+IID `3bc22adcd63a4b3fa2bcddad22260e4c`, initial PID 1778084.
+It uses the existing qualified holding binary SHA256
+`909248d8e4c1db4c3cd89e1a4f15205b4a59d442494f35b7635038152025bb7e`,
+sealed plan `/usr/local/lib/jetstreamer/horizon-closed169-local2-holding-plan-20261119-v1/plan.json`,
+SHA256 `7130ea293ba07365c01599f9eef7640eb1d702ad3def97f32fec89272973b8d8`.
+The authorized prefix remains `node_02/`. Additional bounded transfer resources
+are two CPUs, 2 GiB RAM, no swap, 256 tasks, IOWeight 10, and zero DATA staging.
+Preserve those additive resources while this service runs. Plan 40 minutes for
+upload, whole-object authenticated readback and local revalidation; a potential
+restore separately needs the full 56,565,561,764 bytes and an estimated 20 minutes.
+No custody completion, local retirement or disk credit is claimed yet.
+
+After custody completes, qualify transitive reader closure and exact local
+retirement without removing directories on witness ancestry. Preserve the newer
+169 partial and the original169 witness members. Only actual retirement can
+fund a new167 measurement, witness, staging and admission. The transfer's next
+routine observation is no earlier than 03:47:11 UTC; completion events may be
+consumed earlier. Do not repeat the park with a new identity or overwrite R2.
+
+The chronological R2 audit's 03:17:28 check reported 53 of225 passed, zero
+failed, epoch53 downloading. Its next routine check is no earlier than03:47:28.
+Generation's sole observer remains03:28:09. That status cycle must use the
+`event-capacity-167-20261119-v1/RECEIPT.json` override for167; its remote bytes
+supersede the167 entry in the02:58 range receipt. Other18 status predecessors
+remain the02:58 cycle. Preserve authenticated conditional ownership checks.
