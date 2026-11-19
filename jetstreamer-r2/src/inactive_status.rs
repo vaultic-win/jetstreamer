@@ -9,6 +9,7 @@ mod missing157;
 mod native207;
 mod native209;
 mod native210;
+mod native211;
 mod native223;
 mod native227;
 mod native227_v1625;
@@ -422,6 +423,10 @@ fn fresh_census(
         native207::validate(&current, terminal_fleet, owners)?;
     }
     let native209 = plan.epoch == 209 && native209::recognized(terminal_fleet, owners);
+    let native211 = plan.epoch == 211 && native211::recognized(terminal_fleet, owners);
+    if native211 {
+        native211::validate(&current, terminal_fleet, owners)?;
+    }
     let native210 = plan.epoch == 210 && native210::recognized(terminal_fleet, owners);
     let native227_v1625 = plan.epoch == 227 && native227_v1625::recognized(terminal_fleet, owners);
     if native227_v1625 {
@@ -468,6 +473,7 @@ fn fresh_census(
             && !native207
             && !native209
             && !native210
+            && !native211
             && !native227_v1625
             && !native228
             && !warmup223
@@ -830,6 +836,16 @@ pub(super) async fn run() -> Result<()> {
     }
     println!("{}", plan.completion.display());
     Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn native211_status_values_test(
+    current: &BTreeMap<String, Value>,
+    f: &Value,
+    owners: &[(String, String)],
+    expected: &(String, String),
+) -> Result<()> {
+    native211::validate_values(current, f, owners, expected)
 }
 
 #[cfg(test)]

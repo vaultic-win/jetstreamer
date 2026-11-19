@@ -47,6 +47,14 @@ mod native210_capture;
 mod native210_event;
 mod native210_peer_history;
 mod native210_terminal;
+mod native211;
+mod native211_capture;
+#[cfg(test)]
+mod native211_chain_tests;
+mod native211_event;
+mod native211_guard;
+mod native211_protection;
+mod native211_terminal;
 mod native227_v1625;
 mod native227_v1625_admission;
 mod native227_v1625_capture;
@@ -317,6 +325,15 @@ pub(super) fn capture_native210_terminal() -> Result<()> {
 pub(super) fn native210_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
     Ok((native210::UNIT.into(), native210_terminal::validate(proof)?))
 }
+pub(super) fn capture_native211_input() -> Result<()> {
+    native211_capture::run()
+}
+pub(super) fn capture_native211_terminal() -> Result<()> {
+    native211_terminal::capture()
+}
+pub(super) fn native211_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    Ok((native211::UNIT.into(), native211_terminal::validate(proof)?))
+}
 pub(super) fn admit_native227_v1625_input() -> Result<()> {
     native227_v1625_admission::run()
 }
@@ -360,6 +377,8 @@ pub(super) fn validate_native_input_status_claim(value: &Value) -> Result<()> {
         native228::claim(&claim)
     } else if claim.epoch == 209 && native209::scope(&claim.phase, &claim.unit) {
         native209::claim(&claim)
+    } else if claim.epoch == 211 && native211::scope(&claim.phase, &claim.unit) {
+        native211::claim(&claim)
     } else if claim.epoch == 210 && native210::scope(&claim.phase, &claim.unit) {
         native210::claim(&claim)
     } else if claim.epoch == 227 && native227_v1625::scope(&claim.phase, &claim.unit) {
@@ -659,6 +678,9 @@ pub(super) fn pipeline_unit_range(
     if native209::scope(phase, unit) {
         return Ok(209..=209);
     }
+    if native211::scope(phase, unit) {
+        return Ok(211..=211);
+    }
     if native210::scope(phase, unit) {
         return Ok(210..=210);
     }
@@ -906,6 +928,8 @@ fn pipeline_live(claim: &PipelineClaim, current: &Value) -> Result<bool> {
             native228::live(claim, current)?;
         } else if native209::scope(&claim.phase, &claim.unit) {
             native209::live(claim, current)?;
+        } else if native211::scope(&claim.phase, &claim.unit) {
+            native211::live(claim, current)?;
         } else if native210::scope(&claim.phase, &claim.unit) {
             native210::live(claim, current)?;
         } else if native227_v1625::scope(&claim.phase, &claim.unit) {
@@ -2126,6 +2150,7 @@ pub(super) fn census(
             || ((first_epoch..=last_epoch).contains(&141) && census141_poh::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&144) && private144_scan::unit_name(name))
             || ((first_epoch..=last_epoch).contains(&223) && name == tail223_scan::UNIT)
+            || ((first_epoch..=last_epoch).contains(&211) && name == native211::UNIT)
         {
             ensure!(
                 names.contains(name),
@@ -2606,6 +2631,8 @@ pub(super) async fn run() -> Result<()> {
                 native207_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native209_terminal::SCHEMA {
                 native209_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
+            } else if event["schema"] == native211_terminal::SCHEMA {
+                native211_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native210_terminal::SCHEMA {
                 native210_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
             } else if event["schema"] == native227_v1625_terminal::SCHEMA {
@@ -2618,6 +2645,14 @@ pub(super) async fn run() -> Result<()> {
                 )?;
             } else if event["schema"] == native227_v1625::SCHEMA {
                 native227_v1625_event::event_predecessor(
+                    &previous,
+                    &plan,
+                    &event,
+                    sample,
+                    started_seconds,
+                )?;
+            } else if event["schema"] == native211::SCHEMA {
+                native211_event::event_predecessor(
                     &previous,
                     &plan,
                     &event,
@@ -2815,6 +2850,8 @@ pub(super) async fn run() -> Result<()> {
             native228::claim(claim)?;
         } else if native209::scope(&claim.phase, &claim.unit) {
             native209::claim(claim)?;
+        } else if native211::scope(&claim.phase, &claim.unit) {
+            native211::claim(claim)?;
         } else if native210::scope(&claim.phase, &claim.unit) {
             native210::claim(claim)?;
         } else if native227_v1625::scope(&claim.phase, &claim.unit) {
@@ -2848,6 +2885,19 @@ pub(super) async fn run() -> Result<()> {
         );
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
+    if before
+        .get(native211::UNIT)
+        .is_some_and(diagnostic_stage_running)
+    {
+        ensure!(
+            plan.pipeline_claims
+                .iter()
+                .filter(|c| c.epoch == 211 && native211::scope(&c.phase, &c.unit))
+                .count()
+                == 1,
+            "native211 live owner requires one complete registered pipeline claim"
+        );
+    }
     publication203::event_census(&plan, &before)?;
     warmup223::event_census(&plan, &before)?;
     warmup223::terminal_census(&plan, &before)?;
@@ -2858,6 +2908,7 @@ pub(super) async fn run() -> Result<()> {
     native207_terminal::census_check(&plan, &before)?;
     native209_terminal::census_check(&plan, &before)?;
     native210_terminal::census_check(&plan, &before)?;
+    native211_terminal::census_check(&plan, &before)?;
     native227_v1625_terminal::census_check(&plan, &before)?;
     native228_terminal::census_check(&plan, &before)?;
     if let Some(binding) = &plan.metadata_event
@@ -2897,6 +2948,25 @@ pub(super) async fn run() -> Result<()> {
             "native 210 event requires one bound new owner"
         );
         native210_event::event_census(&previous, &before, claims[0])?;
+    }
+    if let Some(binding) = &plan.metadata_event
+        && bound_json(binding)?["schema"] == native211::SCHEMA
+    {
+        let previous = bound_json(
+            plan.previous_fleet
+                .as_ref()
+                .context("native 211 prior fleet missing")?,
+        )?;
+        let claims = plan
+            .pipeline_claims
+            .iter()
+            .filter(|c| native211::scope(&c.phase, &c.unit) && c.evidence.first() == Some(binding))
+            .collect::<Vec<_>>();
+        ensure!(
+            claims.len() == 1,
+            "native 211 event requires one bound new owner"
+        );
+        native211_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
         && bound_json(binding)?["schema"] == native227_v1625::SCHEMA
@@ -3094,6 +3164,7 @@ pub(super) async fn run() -> Result<()> {
             || private144_scan::scope(&claim.phase, &claim.unit)
             || native209::scope(&claim.phase, &claim.unit)
             || native210::scope(&claim.phase, &claim.unit)
+            || native211::scope(&claim.phase, &claim.unit)
             || native227_v1625::scope(&claim.phase, &claim.unit)
             || native228::scope(&claim.phase, &claim.unit)
             || native207::scope(&claim.phase, &claim.unit)
@@ -3119,6 +3190,7 @@ pub(super) async fn run() -> Result<()> {
                             || tail223_scan::scope(&claim.phase, &claim.unit)
                             || native209::scope(&claim.phase, &claim.unit)
                             || native210::scope(&claim.phase, &claim.unit)
+                            || native211::scope(&claim.phase, &claim.unit)
                             || native227_v1625::scope(&claim.phase, &claim.unit)
                             || native228::scope(&claim.phase, &claim.unit)
                             || native207::scope(&claim.phase, &claim.unit)

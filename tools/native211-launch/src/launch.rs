@@ -1,5 +1,21 @@
 //! Persistent native unit, real timer first fire, and one invocation-bound token.
 use super::*;
+// Admission sealing consumes the original wall-clock lease. Never renew it
+// when converting to the single monotonic gate deadline.
+fn startup_window(issued: u64, wall_us: u64, expires_s: u64) -> Result<(u64, u64)> {
+    let remaining = expires_s
+        .checked_mul(1_000_000)
+        .and_then(|end| end.checked_sub(wall_us))
+        .context("original admission expired before startup")?;
+    ensure!(remaining > 0, "original admission expired before startup");
+    let gate = issued
+        .checked_add(remaining.min(60_000_000))
+        .context("gate deadline overflow")?;
+    let operator = issued
+        .checked_add(remaining.min(50_000_000))
+        .context("operator deadline overflow")?;
+    Ok((gate, operator))
+}
 const TEST_NAME: &str =
     "runtime::native211_input::native_epoch211_cold_input_matches_canonical_accounts_commitment";
 fn package(attempt: &str, kind: &str) -> PathBuf {
@@ -401,10 +417,15 @@ pub(super) fn run(
     trusted_parents(&token_root.join("future"))?;
     // One original 60s gate window includes plan sealing and all manager work.
     let issued = mono()?;
-    n.deadline = Some(issued + 50_000_000);
+    let wall_us = SystemTime::now()
+        .duration_since(UNIX_EPOCH)?
+        .as_micros()
+        .try_into()?;
+    let (expires, deadline) = startup_window(issued, wall_us, num(a, "expires_unix_seconds")?)?;
+    n.deadline = Some(deadline);
     let p = json!({"schema":"horizon-native211-startup-plan-v1","epoch":211,"unit":UNIT,"guard_unit":GUARD_UNIT,"worker_root":ROOT,"bootstrap_slot":91_151_575u64,
         "snapshot_sha256":SNAPSHOT_SHA,"maximum_root_physical_bytes":SCRATCH,"maximum_memory_bytes":MEMORY,"token_root":TOKENS,"boot_id":a["boot_id"],
-        "harness":Bound::new(HARNESS,HARNESS_SHA),"guard":guard,"admission":ar,"minimum_free_bytes":a["protected_existing_floor_bytes"],"issued_monotonic_us":issued,"expires_monotonic_us":issued+60_000_000});
+        "harness":Bound::new(HARNESS,HARNESS_SHA),"guard":guard,"admission":ar,"minimum_free_bytes":a["protected_existing_floor_bytes"],"issued_monotonic_us":issued,"expires_monotonic_us":expires});
     let pr = save_json(&n.root, "plan.json", &p)?;
     n.seal(&startup, &[("plan.json", pr.clone())])?;
     let pr = Bound::new(startup.join("plan.json"), pr.sha256);
@@ -598,6 +619,11 @@ pub(super) fn run(
             hash(&producer_package.join(UNIT))?,
         );
         let mut handoff = json!({"schema":"horizon-native211-guarded-startup-v1","unit":UNIT,"invocation_id":iid,"main_pid":pid,"producer":producer,"unit_file":unit_file,"retention":retain,"startup_plan":pr,"admission":ar,"guard_plan":deployed_gr,"first_guard_sample":token["guard_sample"],"first_guard_pid1_journal":token["guard_pid1_journal"],"first_guard_token":Bound::new(token_dest.join("guard-admission.json"),tr.sha256),"recorded_monotonic_us":mono()?,"recorded_unix_seconds":now()?,"native_input_qualified":false});
+        ensure!(
+            num(&handoff, "recorded_unix_seconds")? <= num(a, "expires_unix_seconds")?
+                && num(&handoff, "recorded_monotonic_us")? < expires,
+            "original admission expired before handoff"
+        );
         deny_authority(&mut handoff);
         let h = save_json(&n.root, "guarded-startup-handoff.json", &handoff)?;
         println!("{}", serde_json::to_string(&h)?);
@@ -617,6 +643,20 @@ pub(super) fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sealing_delay_consumes_original_admission_lease() {
+        assert_eq!(
+            startup_window(10, 100_000_000, 160).unwrap(),
+            (60_000_010, 50_000_010)
+        );
+        assert_eq!(
+            startup_window(10, 152_500_000, 160).unwrap(),
+            (7_500_010, 7_500_010)
+        );
+        assert!(startup_window(10, 160_000_000, 160).is_err());
+        assert!(startup_window(10, 161_000_000, 160).is_err());
+        assert!(startup_window(u64::MAX, 100_000_000, 160).is_err());
+    }
     #[test]
     fn native_template_uses_internal_gate_and_exact_harness() {
         let p = Bound::new(

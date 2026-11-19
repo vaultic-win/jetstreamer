@@ -1,6 +1,7 @@
 //! One fresh, complete current-fleet decision. No fixed historical peer count.
 use super::*;
 fn prestart(lifecycle: &Value, review: &Value, self_sha: &str) -> Result<()> {
+    no_authority(lifecycle)?;
     ensure!(
         lifecycle["schema"] == "horizon-native211-prestart-qualification-v1"
             && lifecycle["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
@@ -199,12 +200,13 @@ mod tests {
     #[test]
     fn prestart_acceptance_requires_live_first_guard_without_claiming_it_already_happened() {
         let review = json!({"guard":Bound::new(GUARD,GUARD_SHA),"source_publication":{"path":"/var/lib/jetstreamer/source/proof.json","sha256":"a".repeat(64)}});
-        let accepted = json!({"schema":"horizon-native211-prestart-qualification-v1",
+        let mut accepted = json!({"schema":"horizon-native211-prestart-qualification-v1",
             "harness":Bound::new(HARNESS,HARNESS_SHA),"guard":review["guard"],"source_publication":review["source_publication"],
             "observer_complete_tuple_accepted":true,"fleet_running_and_terminal_accepted":true,
             "inactive_status_exact_owner_accepted":true,"terminal_retention_accepted":true,
             "pre_restore_gate_tests_accepted":true,"actual_first_guard_required_before_snapshot":true,
             "actual_native_startup_qualified":false,"launcher_artifact_sha256":"b".repeat(64)});
+        deny_authority(&mut accepted);
         prestart(&accepted, &review, &"b".repeat(64)).unwrap();
         for (key, value) in [
             (
