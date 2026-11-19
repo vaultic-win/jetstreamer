@@ -13,15 +13,15 @@ use std::{
     process::Command,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-const UNIT: &str = "horizon265-prestart-control-v1.service";
-const OVERRIDE: &str = "horizon265-prestart-override-v1.service";
-const RETENTION: &str = "horizon265-prestart-control-retention-v1.target";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v2";
+const UNIT: &str = "horizon265-prestart-control-v2.service";
+const OVERRIDE: &str = "horizon265-prestart-override-v2.service";
+const RETENTION: &str = "horizon265-prestart-control-retention-v2.target";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v3";
 const BINARY: &str =
-    "/var/lib/jetstreamer/horizon265-prestart-control-package-v2/horizon-prestart-controls";
-const STATE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1/tokens";
-const MARKERS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1/markers";
+    "/var/lib/jetstreamer/horizon265-prestart-control-package-v3/horizon-prestart-controls";
+const STATE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2/tokens";
+const MARKERS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2/markers";
 const PROD_TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1";
 const PROD_UNIT: &str = "horizon-qualify-265-replacement-20261119-v1.service";
 const FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecMainPID,ExecStartPre,ExecStart,Job,FragmentPath,DropInPaths,Restart,KillMode,Delegate,ControlGroup,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,MemoryMax,MemorySwapMax,TasksMax,TimeoutStartUSec,NoNewPrivileges,PrivateNetwork,ProtectSystem,ProtectHome,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,ReadOnlyPaths,Type,User,Group,RemainAfterExit";
@@ -190,15 +190,21 @@ fn properties(unit: &str, fields: &str) -> Result<(BTreeMap<String, String>, Vec
         "/usr/bin/systemctl",
         &["show", unit, &format!("--property={fields}")],
     )?;
-    let mut map = BTreeMap::new();
-    for line in std::str::from_utf8(&raw)?.lines() {
+    Ok((parse_properties(&raw)?, raw))
+}
+fn parse_properties(raw: &[u8]) -> Result<BTreeMap<String, String>> {
+    let mut map: BTreeMap<String, String> = BTreeMap::new();
+    for line in std::str::from_utf8(raw)?.lines() {
         let (k, v) = line.split_once('=').context("property framing")?;
-        ensure!(
-            map.insert(k.into(), v.into()).is_none(),
-            "duplicate property"
-        );
+        if let Some(previous) = map.get_mut(k) {
+            ensure!(k == "ExecStartPre", "duplicate scalar property");
+            previous.push('\n');
+            previous.push_str(v);
+        } else {
+            map.insert(k.into(), v.into());
+        }
     }
-    Ok((map, raw))
+    Ok(map)
 }
 fn row<'a>(v: &'a BTreeMap<String, String>, k: &str) -> Result<&'a str> {
     v.get(k)
@@ -812,6 +818,16 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native_prestart_array_preserves_order_and_rejects_duplicate_scalars() {
+        let p = parse_properties(b"ExecStartPre={ path=/usr/bin/sleep ; argv[]=/usr/bin/sleep 60 }\nExecStartPre={ path=/usr/bin/test ; argv[]=/usr/bin/test -f TOKEN }\nExecStartPre={ path=/usr/bin/test ; argv[]=/usr/bin/test ! -L TOKEN }\n").unwrap();
+        let commands = p["ExecStartPre"].lines().collect::<Vec<_>>();
+        assert_eq!(commands.len(), 3);
+        assert!(commands[0].contains("sleep 60"));
+        assert!(commands[1].contains("test -f"));
+        assert!(commands[2].contains("test ! -L"));
+        assert!(parse_properties(b"MainPID=0\nMainPID=1\n").is_err());
+    }
     #[test]
     fn system_link_exception_cannot_read_campaign_evidence() {
         assert!(
