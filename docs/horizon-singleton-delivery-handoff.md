@@ -78,3 +78,54 @@ claim may initially report the dashboard phase `verification`: full local
 verification and plugin playback precede upload. Retain the same live uploader
 identity and original producer clock as the phase advances to `upload` and
 `readback`. This metadata allowance grants no archive publication authority.
+
+## Foundation delivery transition
+
+The qualified uploader with this status support is sealed at
+`/var/lib/jetstreamer/horizon-pipeline-verification-status-ea36a4a6-20261119-v1/jetstreamer-r2`,
+SHA-256 `dd75ef62021401022d6597fc94f1c77e95092e1065b26f694dced66a18463954`.
+Its package retains the exact source build command and qualification journal;
+26 focused pipeline-status tests passed. The reader plans remain under
+`/var/lib/jetstreamer/horizon-reader-delivery247-251-db1c31fe-20261119-v2/epoch-N-plan.json`.
+These paths identify prepared artifacts; they do not establish fresh admission.
+
+At the actual completion event, use this sequence:
+
+1. Capture the exact singleton's terminal handoff using its sealed plan and
+   separately supplied hashes. Keep the producer's terminal unit loaded while
+   consuming its identity evidence. Read the committed archive from the plan's
+   `output_directory`; the former live `work/.../archives` path may have been
+   cleaned by successful node publication.
+2. Admit delivery against fresh hard reservations and disk growth. Count the
+   independent epoch-205 audit's 7 GB reservation while it remains live. A clean
+   producer receipt alone does not release its reservation: prove its cgroup has
+   drained, retain the evidence, then account for the new delivery service and
+   readback scratch separately. The prepared reader plans reserve a maximum
+   300 GB archive and retain a 3 TB minimum free-space check. Reconcile those
+   bounds with all other live growth before launch; never infer capacity merely
+   from producer RSS or an estimated finish time.
+3. Fetch `origin/account-updates`, verify required source containment and exact
+   reader equivalence, and select a currently loaded keychain SSH agent. Run the
+   sealed uploader's `sync` command for exactly `N-N`, with the committed output
+   directory, private receipt directory, and separately hash-bound current-reader
+   plan. Supply only named credentials. Use a persistent non-restarting service
+   and serialize canonical deliveries. Do not use overwrite, repair or deletion
+   options. The command owns full local verification, local plugin playback,
+   upload, authenticated readback, remote plugin playback and sidecar commitment.
+4. Name the service `horizon-upload-N-singleton-...service`, track it in the full
+   fleet census, and bind the actual invocation and complete effective command
+   to an `upload-readback` claim. The claim begins with dashboard phase
+   `verification`. Use an authenticated replay status receipt as `origin_launch`
+   to preserve the original producer clock; a terminal handoff is not a substitute
+   for that publisher input. Bind a fresh coordinated observer/fleet and concrete
+   remaining-time evidence before calling `status-publish-pipeline`. Advance the
+   phase only from actual uploader progress, never merely from service start.
+5. After durable ready-pair and full remote-playback evidence, use a compatible
+   status cleanup helper with the exact latest publication receipt. Complete the
+   adjacent-boundary and no-consumer gates, then promptly retire eligible local
+   epoch data. Preserve the durable receipts and needed lineage evidence.
+
+Register future delivery unit names in the next fleet plan before launch; this
+does not create live pipeline claims. Do not reuse the old legacy watchers or
+publish a pipeline claim with an anticipated invocation ID. A failed gate retains
+the complete local output and its evidence for diagnosis and an isolated retry.

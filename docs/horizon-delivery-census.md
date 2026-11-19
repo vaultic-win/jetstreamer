@@ -31,8 +31,9 @@ In particular, an uploader named for 298–301 cannot claim epoch 300 under a
 These are observational claims, not launch, compatibility, verification,
 publication or status-JSON authority. They do not replace any archive receipt or
 make a ready pair. The identity-bound `status-publish-pipeline` publisher accepts
-`verification` only for a bound full/plugin verifier, `publication` for local
-publication, and `upload`/`readback` for the uploader. Independent live stages may
+`verification` for a bound full/plugin verifier or for the current-reader
+uploader's initial local checks, `publication` for local publication, and
+`upload`/`readback` for the uploader's later phases. Independent live stages may
 coexist, but every non-handoff unit must still match the exact fleet census.
 Never relabel a terminated replay as live. Keep all changes in
 the existing coordinated 30-minute cycle, or an explicitly authorized event or
