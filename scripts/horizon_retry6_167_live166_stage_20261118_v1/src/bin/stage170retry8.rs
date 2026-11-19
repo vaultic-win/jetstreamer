@@ -233,13 +233,11 @@ const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
 const PREPARER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/prepare";
-const PREPARER_SHA: &str = "f33a100bd73c75cb1c1d5f000ab81abdc3fba71040cc72b2949ffd320cae9632";
+    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
+const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V2_SHA256");
 const GUARD: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
-const CONTRACT: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-20261119-v1";
 const TEMPLATE: &str =
     "/var/lib/jetstreamer/epoch170-retry5-recovery-20261117-v1/measure0743-v3/PLAN-FINAL.json";
 const TEMPLATE_SHA: &str = "e7133f6349619370806f475b1c1511cd505e456da330c3f9be38e6e12642de86";
@@ -297,15 +295,111 @@ fn peer_shape(epoch: u64, v: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn generation(v: &Value) -> Result<(PathBuf, String, String)> {
+    let tag = v["generation"]
+        .as_str()
+        .context("explicit witness generation")?;
+    ensure!(
+        (1..=32).contains(&tag.len())
+            && tag
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
+        "unsafe witness generation"
+    );
+    let root = Path::new(ROOT).join(format!("guard-witness-{tag}"));
+    let unit = format!("horizon-170-retry8-witness-{tag}-20261119.service");
+    let dest = format!(
+        "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}"
+    );
+    ensure!(
+        v["output_root"] == root.to_str().unwrap()
+            && v["unit"] == unit
+            && v["contract_destination"] == dest,
+        "generation output/unit/contract mismatch"
+    );
+    Ok((root, unit, dest))
+}
+fn selected_contract(fresh: bool) -> Result<Value> {
+    let cfg = CONFIG.get().context("config")?;
+    let value = &cfg[if fresh {
+        "fresh_contract"
+    } else {
+        "measurement_contract"
+    }];
+    let c = bound(&value["contract"])?;
+    let seal = bound(&value["deployment_seal"])?;
+    let path = Path::new(
+        value["contract"]["path"]
+            .as_str()
+            .context("contract path")?,
+    );
+    ensure!(
+        path.file_name().is_some_and(|n| n == "contract.json")
+            && seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == path.parent().unwrap().to_str().unwrap()
+            && seal["sealer_sha256"] == SEALER_SHA
+            && seal["remote_mutations"] == false
+            && seal["replay_launch_authorized"] == false
+            && value["deployment_seal"]["path"]
+                == path
+                    .parent()
+                    .unwrap()
+                    .join("deployment-seal-receipt.json")
+                    .to_str()
+                    .unwrap()
+            && seal["members"].as_array().is_some_and(|m| m
+                .iter()
+                .any(|r| r["name"] == "contract.json"
+                    && r["sha256"] == value["contract"]["sha256"]
+                    && r["mode"] == "0444")),
+        "contract hash/normal seal differs"
+    );
+    let w = bound(&c["qualified_native_witness"])?;
+    ensure!(
+        w["native_identity"]["executable"] == GUARD
+            && w["native_identity"]["executable_sha256"] == GUARD_SHA,
+        "own-image witness required"
+    );
+    if fresh {
+        let (root, _, dest) = generation(&cfg["witness_generation"])?;
+        ensure!(
+            path == Path::new(&dest).join("contract.json")
+                && c["qualified_native_witness"]["path"]
+                    == root.join("NATIVE_WITNESS.json").to_str().unwrap(),
+            "fresh generation mismatch"
+        );
+        let t = w["recorded_unix_seconds"]
+            .as_u64()
+            .context("witness time")?;
+        let at = now()?;
+        ensure!(t <= at && at - t <= 120, "fresh witness exceeds120seconds");
+    }
+    Ok(value.clone())
+}
 fn own_witness() -> Result<()> {
-    let root = Path::new(ROOT).join("guard-witness");
+    let (root, unit, contract_destination) =
+        generation(&CONFIG.get().context("config")?["witness_generation"])?;
+    ensure!(
+        !root.try_exists()? && !Path::new(&contract_destination).try_exists()?,
+        "generation already consumed"
+    );
+    let load = output(Command::new("/usr/bin/systemctl").args([
+        "show",
+        &unit,
+        "--property=LoadState",
+        "--value",
+    ]))?;
+    ensure!(
+        load.trim() == "not-found",
+        "witness unit generation already consumed"
+    );
     private_new(&root)?;
     ensure!(
         sha(&fs::read(GUARD)?) == GUARD_SHA && sha(&fs::read(SEALER)?) == SEALER_SHA,
         "sealed image changed"
     );
     let witness = root.join("NATIVE_WITNESS.json");
-    output(Command::new("/usr/bin/systemd-run").args(["--unit","horizon-170-two-peer-own-witness-20261119-v1",
+    output(Command::new("/usr/bin/systemd-run").args(["--unit",&unit,
         "--property=Type=oneshot","--property=RemainAfterExit=yes","--property=CPUQuota=200%","--property=MemoryMax=2G","--property=MemorySwapMax=0","--property=TasksMax=128","--property=LimitNOFILE=1048576",
         GUARD,"--qualify-data-witness","/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/witness-set.json",
         "--seed-sha256","8eb041519cba5c3f6368cb1432be9e289489ce1acdc28aa8b49f3d6ec7f382ee","--seal",
@@ -324,7 +418,7 @@ fn own_witness() -> Result<()> {
     let plan = write(
         &root,
         "CONTRACT-SEAL-PLAN.json",
-        &json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":CONTRACT,
+        &json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":contract_destination,
         "members":[{"source":c,"name":"contract.json","sha256":sha(&fs::read(&c)?),"mode":292}]}),
     )?;
     output(Command::new(SEALER).arg(&plan).args([
@@ -333,7 +427,7 @@ fn own_witness() -> Result<()> {
         "--self-sha256",
         SEALER_SHA,
     ]))?;
-    println!("{}", b(&format!("{CONTRACT}/contract.json"))?);
+    println!("{}", b(&format!("{contract_destination}/contract.json"))?);
     Ok(())
 }
 fn measured(v: &Value, at: u64) -> Result<u64> {
@@ -571,7 +665,7 @@ fn stage(tag: &str, measurement: Option<&Path>) -> Result<()> {
     let guard_parent = Path::new(GUARD).parent().unwrap().display();
     plan["data_fulfillment"] = json!({"runtime":b(GUARD)?,"runtime_seal":b(&format!("{guard_parent}/deployment-seal-receipt.json"))?,
         "qualification":b(&format!("{guard_parent}/artifact-proof.json"))?,
-        "contract":{"contract":b(&format!("{CONTRACT}/contract.json"))?,"deployment_seal":b(&format!("{CONTRACT}/deployment-seal-receipt.json"))?}});
+        "contract":selected_contract(measurement.is_some())?});
     let after = native(&names)?;
     for e in [166, 167] {
         ensure!(
@@ -779,7 +873,7 @@ fn main() -> Result<()> {
             && sha(&fs::read(format!(
                 "{}/artifact-proof.json",
                 Path::new(PREPARER).parent().unwrap().display()
-            ))?) == "b94097d4dca6ff4ef342b74bec99e9f3ddb479a2fa8194f543401623b53493d9",
+            ))?) == env!("HORIZON_170_PREPARER_V2_PROOF_SHA256"),
         "qualified preparer/proof changed"
     );
     let m = fs::symlink_metadata(FRESH)?;
@@ -838,6 +932,16 @@ mod tests {
             .is_err()
         );
         assert!(root_entries_for_operation("unknown", &empty).is_err());
+    }
+    #[test]
+    fn generation_requires_disjoint_exact_names() {
+        let good = json!({"generation":"v2","output_root":format!("{ROOT}/guard-witness-v2"),"unit":"horizon-170-retry8-witness-v2-20261119.service","contract_destination":"/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2"});
+        generation(&good).unwrap();
+        for k in ["generation", "output_root", "unit", "contract_destination"] {
+            let mut bad = good.clone();
+            bad[k] = json!("../v1");
+            assert!(generation(&bad).is_err());
+        }
     }
     #[test]
     fn measurement_rejects_wrong_epoch_expiry_and_nonphysical_credit() {
@@ -1008,9 +1112,9 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch";
+        let launcher = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v4/launch";
         ensure!(
-            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V3_SHA256"),
+            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V4_SHA256"),
             "sealed launcher differs"
         );
         let commit = git(&["rev-parse", "HEAD"])?;
