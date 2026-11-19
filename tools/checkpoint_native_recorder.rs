@@ -190,7 +190,9 @@ fn segment(
             runtime_toolchain: "rustc1.52.1-test-image".into(),
             genesis_hash: genesis,
             bootstrap_state_kind: if start.slot == 0 {
-                BootstrapStateKind::Genesis
+                // The fixture starts after the already-frozen bank at slot 0;
+                // it carries that bank into slot 1 rather than replaying genesis.
+                BootstrapStateKind::CarriedBank
             } else {
                 BootstrapStateKind::SnapshotArchive
             },
@@ -273,7 +275,12 @@ fn segment(
                 },
             ));
         }
-        recorder.record_committed_entry(slot, entry.entry_index, entry.num_hashes, committed);
+        recorder.record_committed_entry(
+            slot,
+            entry.entry_index.try_into()?,
+            entry.num_hashes,
+            committed,
+        );
     }
     require(
         previous == hash(&end.last_blockhash)?,
@@ -331,8 +338,20 @@ impl SlotVisitor for Observed {
             .as_ref()
             .to_vec();
         self.transactions.push((slot, signature.clone(), tx.fee));
-        for u in tx.iter_account_updates() {
-            self.update(slot, Some(signature.clone()), &u);
+        for (u, data) in tx.iter_account_updates() {
+            self.update(
+                slot,
+                Some(signature.clone()),
+                &AccountUpdateView {
+                    pubkey: u.pubkey,
+                    lamports: u.lamports,
+                    owner: u.owner,
+                    executable: u.executable,
+                    rent_epoch: u.rent_epoch,
+                    write_version: u.write_version,
+                    data,
+                },
+            );
         }
     }
 }
@@ -473,7 +492,7 @@ fn main() -> Result<()> {
         base: ArchiveProvenanceV3 {
             assembly_profile: "synthetic/native-recorder-restart-v1".into(),
             genesis_hash: hash(&genesis)?,
-            bootstrap_state_kind: BootstrapStateKind::Genesis,
+            bootstrap_state_kind: BootstrapStateKind::CarriedBank,
             bootstrap_state: StateCommitment {
                 slot: 0,
                 kind: StateCommitmentKind::LegacyAccountsHash,
