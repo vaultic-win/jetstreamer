@@ -43,3 +43,24 @@ before the 7 GB epoch-205 audit, so a sixth 128 GB lane cannot use the existing
 non-oversubscribed admission policy. Preserve healthy workers and their hard
 limits; qualify pressure relief and candidate admission before launch. The
 cohort's complete retained working set and inherited guard floors must also fit.
+
+The alternative singleton epoch 265 also passed offline manifest preparation on
+2026-11-19. Its sealed manifest is
+`/var/lib/jetstreamer/horizon265-singleton-manifest-20261119-v1/preflight-265-singleton.json`,
+fingerprint `sha256:a126bce31196effaf656230c7185e92f73db9574e13a45e3976aae1859461e28`.
+The same actual production node accepted it and then rejected the deliberately
+incorrect snapshot filename before initialization, in
+`horizon-265-production-node-filename-20261119-v1.service`, invocation
+`424280351c41494286db281771e6ce00`. The expected exit was 1; the 256 MB probe
+terminated normally at that rejection with 102.9 MB peak memory. Evidence is
+under `/home/ubuntu/.jetstreamer-private/qualification-265-source-20261119-v1`.
+
+Its retained 16,483,458,670-byte bootstrap already exists at
+`/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/`
+`snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst`.
+Recorded GCS generation is `1641500477962489`, CRC32C `+0CPhA==` and MD5
+`Q0FEYKFkXAJiwZNXZtq6rQ==`. Fresh local custody/hash qualification remains
+pending. The canonical final root is slot 114910768, hash
+`HnePfSpTtWaPDFx9RrPeuamDZREhoUXa7xpK6fbtPGyK`, generation
+`1641767242524970`. No duplicate download or epoch-265 replay was launched.
+This shorter candidate remains subject to the same recovery and admission gates.

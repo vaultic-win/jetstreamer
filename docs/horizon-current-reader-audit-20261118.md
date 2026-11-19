@@ -464,3 +464,25 @@ The 252–256 replacement cohort's fresh production-node input probes and
 retained-bootstrap rehash are recorded in
 `docs/horizon-252-cohort-readiness-20261118.md`. These advance candidate
 qualification without changing any healthy replay or claiming a sixth lane.
+
+At 2026-11-19 00:24 UTC the checkout fast-forwarded to freshly fetched
+`842c75d811c316b8984dde6677bf90d17271b861`. The peer's new epoch-170 launcher
+does not change the complete conservative reader path set: an explicit Git
+comparison against qualified `ed61722d` returned no differences. Containment
+also passed for uploader `0711b1f2`, repaired node `1ae137f7` and native recovery
+probe `2e7224fd`. The current uploader enforces full authenticated remote plugin
+playback and a final branch-equivalence recheck before readiness publication.
+This is source/publication-gate evidence, not a historical archive audit pass.
+Epoch 205 was at 138,496 of 432,000 slots in full PoH verification at 00:24:54;
+local plugin and complete authenticated remote playback remain pending.
+
+The coordinated 00:24:41 sample completed at 00:24:57 with both host RSS
+censuses and five unchanged advancing replay owners. All five status objects
+were refreshed and authenticated-readback verified from that sample. Fleet
+reconciliation remained 34 ready pairs, 66 missing, zero anomalies and no
+diagnostics; the memory target is nine against five executing lanes. Available
+disk was conservatively 4,263,803,719,680 bytes. The next routine observation
+is not before 00:54:41; the sealed v70 configuration passes static validation.
+The synthetic v1.7.15 recovery probe now passes, as recorded in
+`docs/horizon-replay-portability.md`, but production recovery and another lane's
+admission remain unqualified. The goal and all five replay owners remain active.

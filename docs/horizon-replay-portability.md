@@ -49,7 +49,7 @@ after both same-process and fresh-process restoration, deleting the original
 fixture state before the latter. This deliberately cannot pass merely because
 the serializer and loader agree on a checkpoint changed during export.
 
-Native v1.7.15 execution remains pending as of 2026-11-19 00:14 UTC. Build
+Native v1.7.15 execution passed at 2026-11-19 00:22:36 UTC. Build
 evidence is retained at
 `/home/ubuntu/.codex/diagnostics/horizon-checkpoint-portability-v1715-20261119-v1`.
 The exact historical Rust 1.52.1 build is isolated from the running workers and
@@ -57,10 +57,28 @@ the epoch-205 reader audit. A target-selection error, an intentionally stopped
 LTO-inconsistent attempt, a missing shared protocol source, and a compiler
 cgroup OOM are retained separately. The source copy now includes and rehashes
 both the v1.7.15 subtree and shared protocol schema against published `2e7224fd`.
-The current build uses the normal binary test target, one Cargo job, a 2 GB
-hard memory limit, no swap, optimization level 3, 16 codegen units and no LTO.
-Its invocation is `1074721553ba4d3592d0801573c8ba05` in
-`horizon-v1715-checkpoint-probe-build-20261119-v5.service`.
+The v5 attempt also exceeded its 2 GB compiler limit while rebuilding crypto
+dependencies. Both failed profile overrides are preserved. The successful v6
+build used the workspace's default release profile with no overrides, one Cargo
+job, the same 2 GB hard limit and no swap. It reused the original crypto cache
+and completed normally in 2m48s with 1.2 GiB peak memory. Its invocation is
+`ccffcbcca2d8442593c63393d5fe79ae` in
+`horizon-v1715-checkpoint-probe-build-20261119-v6.service`. Actual Cargo evidence
+records a test artifact with empty features, optimization 3 and the genuine
+`--test -C embed-bitcode=no` compiler invocation. The complete source manifest
+was revalidated after the build.
+
+The Rust-sealed test executable is
+`/var/lib/jetstreamer/horizon-v1715-checkpoint-probe-2e7224fd-20261119-v1/probe-tests`,
+SHA-256 `c7533b3869d406f86bf7286351a9d0712faf3f181881b8ab5cd3a52f114276b7`.
+The native unit `horizon-v1715-checkpoint-native-20261119-v1.service`, invocation
+`e6619c17368d4a24bdbed2324d2a0bcf`, executed exactly one selected ignored test:
+one passed, zero failed, with normal completion in 0.62s. That parent test
+requires a clean child-process exit and matching complete restored outcomes.
+Its journal is retained as `native-v1.jsonl` in the evidence directory above,
+SHA-256 `50479df35a3dca11c230cd5c754b0b5f7d9449f00e9da112c0096e99e394db87`.
+The production worker still rejects `ExportSnapshot`; this pass establishes
+synthetic native feasibility only.
 
 Even a successful synthetic probe leaves protocol export, actual mainnet
 checkpoint/restore, partial `.jet` continuation and idempotent pressure recovery
