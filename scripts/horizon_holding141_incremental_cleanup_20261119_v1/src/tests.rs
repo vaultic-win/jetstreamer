@@ -68,6 +68,18 @@ fn only_empty_rustc_locks_allow_execute_mode() {
     assert!(cache_tree_with_policy(&r, uid, true).is_err());
 }
 #[test]
+fn thin_lto_keys_require_exact_name_and_nonexecutable_mode() {
+    let (_d, r, uid) = fixture();
+    let p = r.join("thin-lto-past-keys.bin");
+    fs::write(&p, b"compiler cache keys\n").unwrap();
+    cache_tree_with_policy(&r, uid, true).unwrap();
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(cache_tree_with_policy(&r, uid, true).is_err());
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::rename(&p, r.join("thin-lto-past-keys.bin.bak")).unwrap();
+    assert!(cache_tree_with_policy(&r, uid, true).is_err());
+}
+#[test]
 fn member_metadata_changes_are_bound() {
     let (_d, r, uid) = fixture();
     let a = r.join("a.o");

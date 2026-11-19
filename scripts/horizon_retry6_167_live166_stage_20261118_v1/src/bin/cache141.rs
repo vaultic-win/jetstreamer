@@ -10,8 +10,8 @@ use std::{
     process::Command,
 };
 const REPO: &str = "/home/sol/workspace/jetstreamer";
-const ROOT: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v2";
-const DEST: &str = "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v2";
+const ROOT: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v3";
+const DEST: &str = "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v3";
 const IMAGE: &str = "/home/sol/.jetstreamer-private/holding141-incremental-qualification-target-20261119-v1/debug/horizon-holding141-incremental-cleanup";
 const CLOSED: &str = "/var/lib/jetstreamer/holding141-incremental-deployment-20261119-v1/closed-build-units/completion.json";
 const CLOSED_SHA: &str = "e60d30c769ca38322a28fcb565c045c910f59d9be8a54310bc202e36bb552ac4";
@@ -162,11 +162,11 @@ fn deploy(image_sha: &str) -> Result<()> {
     private(Path::new(ROOT))?;
     let mut evidence = Vec::new();
     for (phase, summary) in [
-        ("tests", "test result: ok. 15 passed; 0 failed; 0 ignored;"),
+        ("tests", "test result: ok. 16 passed; 0 failed; 0 ignored;"),
         ("clippy", ""),
         ("build", ""),
     ] {
-        let u = format!("horizon-holding141-incremental-{phase}-20261119-v2.service");
+        let u = format!("horizon-holding141-incremental-{phase}-20261119-v3.service");
         let n = native(&u)?;
         let s = std::str::from_utf8(&n)?;
         for (k, v) in [
@@ -194,7 +194,7 @@ fn deploy(image_sha: &str) -> Result<()> {
         Path::new(ROOT),
         "artifact-proof.json",
         &serde_json::to_vec_pretty(
-            &json!({"source_commit":commit.trim(),"sources":sources,"executions":evidence,"production_sha256":image_sha,"tests_passed":15,"clippy_all_targets_passed":true,"prior_closed_build_units":closed()?,"remote_mutations":false,"retirement_authorized":false}),
+            &json!({"source_commit":commit.trim(),"sources":sources,"executions":evidence,"production_sha256":image_sha,"tests_passed":16,"clippy_all_targets_passed":true,"prior_closed_build_units":closed()?,"remote_mutations":false,"retirement_authorized":false}),
         )?,
     )?;
     let own = fs::read_link("/proc/self/exe")?;
@@ -211,7 +211,7 @@ fn deploy(image_sha: &str) -> Result<()> {
 fn check(retire: bool) -> Result<()> {
     let _ = closed()?;
     let image_sha = installed_image_sha()?;
-    let label = if retire { "retire-v2" } else { "check-v2" };
+    let label = if retire { "retire-v3" } else { "check-v3" };
     let root = std::path::PathBuf::from(format!(
         "/var/lib/jetstreamer/holding141-incremental-{label}-20261119"
     ));
@@ -219,7 +219,7 @@ fn check(retire: bool) -> Result<()> {
     let commit = String::from_utf8(git(&["rev-parse", "HEAD"])?)?;
     let prior = if retire {
         bind(Path::new(
-            "/var/lib/jetstreamer/holding141-incremental-check-v2-20261119/check.json",
+            "/var/lib/jetstreamer/holding141-incremental-check-v3-20261119/check.json",
         ))?
     } else {
         Value::Null

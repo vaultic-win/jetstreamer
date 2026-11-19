@@ -60,9 +60,14 @@ fn incremental_member(path: &Path, m: &fs::Metadata) -> Result<()> {
                 || bitcode
                 || matches!(
                     name,
-                    "dep-graph.bin" | "query-cache.bin" | "work-products.bin" | "metadata.rmeta"
+                    "dep-graph.bin"
+                        | "query-cache.bin"
+                        | "work-products.bin"
+                        | "metadata.rmeta"
+                        | "thin-lto-past-keys.bin"
                 )),
-        "incremental cache contains executable, failed-test artifact or unknown member"
+        "incremental cache contains executable, failed-test artifact or unknown member: {}",
+        path.display()
     );
     Ok(())
 }
