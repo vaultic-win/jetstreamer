@@ -268,7 +268,7 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         .context("DATA overflow")?;
     let required = number(
         &prepared["resource_checks"]["data_accounting"]["current_fit"],
-        "raw_initial_demand_bytes",
+        "required_raw_available_bytes",
     )?;
     ensure!(
         available >= required,
@@ -1126,7 +1126,7 @@ fn run() -> Result<()> {
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261119-v2/launch"
+            "/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261119-v3/launch"
         ),
         "sealed launch image required"
     );
@@ -1156,6 +1156,14 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_preparation_passes_complete_outer_preflight() {
+        let bytes=read_regular(Path::new("/var/lib/jetstreamer/retry6-single167-guarded-launch-20261118-v1/launch-plan.json"),1<<20,true).unwrap();
+        let plan:Value=serde_json::from_slice(&bytes).unwrap();
+        let (_,capacity)=preflight(&plan,now().unwrap()).unwrap();
+        assert_eq!(capacity["required_DATA_bytes"],7_493_274_261_298u64);
+        assert!(capacity["available_DATA_bytes"].as_u64().unwrap()>=7_493_274_261_298);
+    }
     #[test]
     fn actual_complete_preparation_fits_bounded_reader() {
         let bytes=read_regular(Path::new(PREPARED),32<<20,false).unwrap();
