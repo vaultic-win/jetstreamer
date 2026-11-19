@@ -1040,7 +1040,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     attempt
 }
 const LAUNCH_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch";
+    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),
@@ -1087,11 +1087,12 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn successor_image_rejects_both_predecessor_destinations() {
+    fn successor_v3_rejects_all_predecessor_destinations() {
         require_launch_image(Path::new(LAUNCH_IMAGE)).unwrap();
         for path in [
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v1/launch",
+            "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch",
             "/tmp/launch",
         ] {
             assert!(require_launch_image(Path::new(path)).is_err());

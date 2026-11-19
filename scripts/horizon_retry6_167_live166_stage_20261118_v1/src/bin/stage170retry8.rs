@@ -888,9 +888,9 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch";
+        let launcher = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch";
         ensure!(
-            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V2_SHA256"),
+            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V3_SHA256"),
             "sealed launcher differs"
         );
         let commit = git(&["rev-parse", "HEAD"])?;
