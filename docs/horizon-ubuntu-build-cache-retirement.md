@@ -36,6 +36,29 @@ Evidence is under
 Those checks do not themselves authorize deleting build outputs: run a fresh
 positive check and separate retirement using the exact new profile and helper.
 
+Both build-output retirements completed on November 19 at about 10:42 UTC,
+using published source `1a85487e` and sealed checker SHA-256
+`9fb10f85d82eb55faa6418f131139ba5c27186a66fe9d75734e8022c27b096ed`.
+Fresh positive checks found no builders or live/staged profile references;
+separate sealed retirement plans repeated those checks before deletion.
+All original directories and parent Cargo lock inodes were preserved.
+
+| Cache | Original allocation | Remaining directories | Completion SHA-256 |
+| --- | ---: | ---: | --- |
+| `target/debug/build` | 5,932,605,440 bytes | 2,195,456 bytes | `f0e5ab6514d049d5754c841fa1546da7181d13a561f08d7a098ea5b450a5e91c` |
+| `target/release/build` | 7,601,123,328 bytes | 3,223,552 bytes | `3a0cc26b320b570c0850f8ba3a2697ebf76be15eb773961132865dd1b813f897` |
+
+The two selected trees lost 13,528,309,760 bytes of unique-inode allocation.
+Filesystem availability was 3,865,541,894,144 bytes at the first retirement
+intent and 3,872,295,026,688 bytes at the second completion: a net increase of
+6,753,132,544 bytes across that interval. Concurrent replay allocation/release
+and external hardlinks mean this is not a cache-only physical savings measure.
+The retained completion records are under
+`/var/lib/jetstreamer/horizon-dev-cache-check-{debug,release}-build-retirement-20261119-v1`.
+Plans, build/test journals and the aggregate summary are in
+`/home/ubuntu/.codex/diagnostics/horizon-build-cache-retirement-20261119-v1`.
+No replay data, archive, sealed runtime or R2 object was removed.
+
 ## November 19 release dependency retirement
 
 The release dependency cache was retired through the current strict compiler
