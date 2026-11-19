@@ -1,5 +1,8 @@
 use super::*;
 const BASE: &str = "01a0ef21d311c5094f7395b4d38ec434bed9cc0f";
+const BASE_TREE: &str = "81bef707dc6eeee32b26309d155104e94c1fef7b";
+const PUBLISHED_LINEAGE: &str = "9498953f33500675a7203c0f73cd6836a9f63f49";
+const REBASE_DELTA: &str = "723eb0aa923d134fe733b37bd5e9ce3dbe4160aa130198963ab312b8632b5377";
 const PATCH: &str = "cea888c75ff1c2c14e77a02289056f23e0574f421c2c47a4d01dac24935c0c39";
 const SOURCE_SEAL: &str = "/usr/local/lib/jetstreamer/horizon-epoch169-focused-source-20261118-v2";
 pub(super) fn git(repo: &str, args: &[&str]) -> Result<Vec<u8>> {
@@ -129,10 +132,23 @@ pub(super) fn proof(p: &Plan) -> Result<Value> {
         &[
             "merge-base",
             "--is-ancestor",
-            BASE,
+            PUBLISHED_LINEAGE,
             "origin/account-updates",
         ],
     )?;
+    // This is reproduction of a retained historical test cache, not admission
+    // of its fixture as current production code. Preserve the exact old tree
+    // and patch. Bind the published rebased lineage and its entire observed
+    // delta; never silently call the two different source trees identical.
+    ensure!(
+        git(FIXTURE, &["rev-parse", &format!("{BASE}^{{tree}}")])?
+            == format!("{BASE_TREE}\n").as_bytes()
+            && sha(&git(
+                REPO,
+                &["diff", "--no-ext-diff", "--binary", BASE, PUBLISHED_LINEAGE]
+            )?) == REBASE_DELTA,
+        "retained fixture tree or published rebase delta differs"
+    );
     let patch = git(FIXTURE, &["diff", "--no-ext-diff", "--binary", "HEAD"])?;
     ensure!(
         sha(&patch) == PATCH,
@@ -175,6 +191,6 @@ pub(super) fn proof(p: &Plan) -> Result<Value> {
     )?;
     let deployed = deployment(p)?;
     Ok(
-        json!({"cleanup_source_commit":p.source_commit,"deployment":deployed,"workspace_lock_sha256":lock.0,"workspace_lock_identity":evidence::identity(&lock.1),"fixture_base":BASE,"fixture_diff_sha256":PATCH,"fixture_locks":locks,"retained_source_patch":patch_proof,"retained_source_basis":basis}),
+        json!({"cleanup_source_commit":p.source_commit,"deployment":deployed,"workspace_lock_sha256":lock.0,"workspace_lock_identity":evidence::identity(&lock.1),"fixture_base":BASE,"fixture_base_tree":BASE_TREE,"published_rebased_lineage":PUBLISHED_LINEAGE,"rebase_delta_sha256":REBASE_DELTA,"fixture_admission_authorized":false,"fixture_diff_sha256":PATCH,"fixture_locks":locks,"retained_source_patch":patch_proof,"retained_source_basis":basis}),
     )
 }

@@ -52,6 +52,10 @@ The root Cargo.lock and historical v1_4_25 **and v1_5_8** lock digests are pinne
 v1_5_8 is the actual historical test worker's runtime. Cleanup preserves all
 source, patch/basis, test acceptance and terminal evidence. Workspace release
 reproduction binds the current committed Cargo.lock and account-updates commit.
+The retained fixture predates a Git rebase. Its exact tree and patch remain the
+reproduction source; the cleaner separately binds published lineage commit
+`9498953f33500675a7203c0f73cd6836a9f63f49` and the complete rebase delta. It does
+not claim those trees are identical or authorize admission of the old fixture.
 
 ## Parent qualification and deployment
 
@@ -73,7 +77,7 @@ between the positive check and retirement.
 Commit/push the package and verify remote containment before operational use.
 Normally seal the new executable to:
 
-`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v2/cleanup`
+`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v3/cleanup`
 
 The same package must contain root-owned immutable `artifact-proof.json` with
 `source_commit`, `production_sha256`, `tests_passed: 26`,
