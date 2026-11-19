@@ -32,7 +32,8 @@ remain untyped and are not retried. No string matching broadens those classes.
 After the immutable failure result and ordinary exact-inode scratch cleanup,
 the same controller may claim up to two recovery slots. Minimum delays are
 30 seconds after the initial result and 120 seconds after the first retry.
-Each intent is fsynced without replacement before a transfer can start; it binds
+Each intent is fsynced without replacement after the current-reader and capacity
+gates pass, immediately before a transfer can start; it binds
 the original result hash, preceding result hash, exact object, private attempt
 directory and prior transfer identity. Each retry starts at byte zero and runs
 the unchanged full current-plugin playback, whole-file hashes and remote checks.
@@ -54,6 +55,13 @@ and prevents repeated restarts from generating unbounded retries. The preserved
 attempt requires manual evidence review. Completed retries and pending eligibility
 otherwise resume from the original frozen numeric inventory, without resetting
 completed epochs or launching another controller.
+
+Capacity waits, reader qualification and backoff keep the prospective ticket in
+memory. An interruption during those stages leaves the original failure and retry
+budget unchanged. At the transfer boundary, the controller revalidates the exact
+eligible predecessor, ordinal, backoff and empty owned scratch before persisting
+the intent. Existing durable v6 intents retain their conservative interpretation;
+absence of a new marker never reclassifies an already-spent slot.
 
 ## Qualification and deployment handoff
 

@@ -221,7 +221,7 @@ pub fn view(cfg: &Config, object: &Object) -> Result<Option<View>> {
     Ok(Some(view))
 }
 
-fn claim(cfg: &Config, object: &Object) -> Result<RetryTicket> {
+fn prepare_ticket(cfg: &Config, object: &Object) -> Result<RetryTicket> {
     let view = view(cfg, object)?.context("cannot retry an unattempted archive")?;
     ensure!(
         view.retry_available(),
@@ -262,12 +262,53 @@ fn claim(cfg: &Config, object: &Object) -> Result<RetryTicket> {
             .as_ref()
             .map(|e| e.identity.clone()),
     };
-    write_json(&ticket_path(cfg, object.epoch, ordinal), &ticket, false)?;
+    Ok(ticket)
+}
+
+/// Spend a retry only at the transfer boundary, after capacity and current-reader
+/// qualification have succeeded. A controller interrupted during those waits has
+/// only an ordinary attempt directory, not a consumed durable recovery slot.
+pub fn commit_ticket(cfg: &Config, object: &Object, ticket: &RetryTicket) -> Result<()> {
+    commit_ticket_at(cfg, object, ticket, now())
+}
+
+fn commit_ticket_at(cfg: &Config, object: &Object, ticket: &RetryTicket, at: u64) -> Result<()> {
+    let current = view(cfg, object)?.context("retry predecessor disappeared")?;
+    ensure!(
+        current.retry_available(),
+        "retry changed during preparation"
+    );
+    validate_ticket(
+        cfg,
+        object,
+        ticket,
+        &current,
+        current.completed_recoveries + 1,
+    )?;
+    ensure!(at >= ticket.not_before, "retry backoff is incomplete");
+    ensure!(
+        !cfg.state_directory
+            .join("scratch-owner.json")
+            .try_exists()?
+            && fs::read_dir(cfg.scratch_directory())?.next().is_none(),
+        "retry scratch changed during preparation"
+    );
+    write_json(
+        &ticket_path(cfg, object.epoch, ticket.binding.ordinal),
+        ticket,
+        false,
+    )
+}
+
+#[cfg(test)]
+fn claim(cfg: &Config, object: &Object) -> Result<RetryTicket> {
+    let ticket = prepare_ticket(cfg, object)?;
+    commit_ticket_at(cfg, object, &ticket, ticket.not_before)?;
     Ok(ticket)
 }
 
 fn finish_interrupted(cfg: &Config, object: &Object, ticket: &RetryTicket) -> Result<()> {
-    // The ticket consumed its slot durably before any transfer. Never reset its
+    // The ticket consumed its slot durably at the transfer boundary. Never reset its
     // budget or guess whether an interrupted child had reached plugin playback.
     let result = Outcome {
         schema: "horizon-r2-chronological-plugin-audit-result-v1".into(), epoch: object.epoch,
@@ -296,7 +337,7 @@ pub async fn run_pending(cfg: &Config, remote: &Remote, object: &Object) -> Resu
         if !current.retry_available() {
             return Ok(());
         }
-        let ticket = claim(cfg, object)?;
+        let ticket = prepare_ticket(cfg, object)?;
         progress(
             cfg,
             "waiting_for_transfer_retry",
@@ -396,6 +437,52 @@ mod tests {
         )
         .unwrap();
     }
+    #[test]
+    fn preparation_interruptions_leave_the_original_retry_budget_available() {
+        let d = tempfile::tempdir().unwrap();
+        let cfg = config(d.path());
+        let obj = object();
+        write_json(&outcome_path(&cfg, obj.epoch), &failed(&cfg, &obj), false).unwrap();
+        let original = fs::read(outcome_path(&cfg, obj.epoch)).unwrap();
+        for _ in 0..4 {
+            let ticket = prepare_ticket(&cfg, &obj).unwrap();
+            private_dir(&ticket.attempt).unwrap();
+            // The real capacity/reader waits run after this point and before
+            // commit_ticket. A fresh controller sees no spent retry intent.
+            assert_eq!(ticket.binding.ordinal, 1);
+            assert!(!ticket_path(&cfg, obj.epoch, 1).exists());
+            let restored = view(&cfg, &obj).unwrap().unwrap();
+            assert!(restored.retry_available());
+            assert_eq!(restored.completed_recoveries, 0);
+            assert!(restored.incomplete.is_none());
+        }
+        assert_eq!(fs::read(outcome_path(&cfg, obj.epoch)).unwrap(), original);
+        let ticket = claim(&cfg, &obj).unwrap();
+        finish_interrupted(&cfg, &obj, &ticket).unwrap();
+        assert!(!view(&cfg, &obj).unwrap().unwrap().retry_available());
+    }
+
+    #[test]
+    fn transfer_boundary_rechecks_backoff_scratch_and_predecessor() {
+        let d = tempfile::tempdir().unwrap();
+        let cfg = config(d.path());
+        let obj = object();
+        write_json(&outcome_path(&cfg, obj.epoch), &failed(&cfg, &obj), false).unwrap();
+        let ticket = prepare_ticket(&cfg, &obj).unwrap();
+        assert!(commit_ticket_at(&cfg, &obj, &ticket, ticket.not_before - 1).is_err());
+        let unknown = cfg.scratch_directory().join("foreign.jet");
+        fs::write(&unknown, b"preserve").unwrap();
+        assert!(commit_ticket_at(&cfg, &obj, &ticket, ticket.not_before).is_err());
+        assert_eq!(fs::read(&unknown).unwrap(), b"preserve");
+        fs::remove_file(unknown).unwrap();
+        let mut changed = ticket.clone();
+        changed.binding.previous_result_sha256 = "0".repeat(64);
+        assert!(commit_ticket_at(&cfg, &obj, &changed, ticket.not_before).is_err());
+        assert!(!ticket_path(&cfg, obj.epoch, 1).exists());
+        commit_ticket_at(&cfg, &obj, &ticket, ticket.not_before).unwrap();
+        assert!(commit_ticket_at(&cfg, &obj, &ticket, ticket.not_before).is_err());
+    }
+
     #[test]
     fn retries_are_bounded_across_reload_and_original_evidence_never_changes() {
         let d = tempfile::tempdir().unwrap();

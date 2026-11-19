@@ -462,6 +462,9 @@ async fn audit_one(
             }
         }
     }
+    if let Some(ticket) = ticket {
+        retry::commit_ticket(cfg, object, ticket)?;
+    }
     // A terminated download is never promoted. Restart recovery deletes only
     // its journaled scratch inode and repeats this epoch from byte/slot zero.
     let result: Result<()> = async {
