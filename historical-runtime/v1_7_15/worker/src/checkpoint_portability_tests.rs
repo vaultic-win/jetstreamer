@@ -11,6 +11,13 @@ fn checkpoint_export_archive_restore_probe() {
     checkpoint_archive_restore_probe(true);
 }
 
+#[test]
+#[ignore]
+fn checkpoint_export_recorder_transcript_probe() {
+    assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT").is_some());
+    checkpoint_archive_restore_probe(true);
+}
+
 fn checkpoint_archive_restore_probe(use_export: bool) {
     use solana_runtime::{bank_forks::ArchiveFormat, snapshot_utils};
     const CHILD: &str = "JETSTREAMER_V1715_CHECKPOINT_PROBE_CHILD";
@@ -34,12 +41,20 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
         )
         .unwrap();
         let mut state = RuntimeState::from_test_bank(loaded.bank, false, directory);
+        let restored_bootstrap = state.freeze_checkpoint(1).unwrap();
         let processed = state.process_entry(entry).unwrap();
         let ticked = state.process_entry(tick).unwrap();
         let checkpoint = state.freeze_checkpoint(2).unwrap();
         std::fs::write(
             path.join("output.bin"),
-            bincode::serialize(&(std::process::id(), processed, ticked, checkpoint)).unwrap(),
+            bincode::serialize(&(
+                std::process::id(),
+                restored_bootstrap,
+                processed,
+                ticked,
+                checkpoint,
+            ))
+            .unwrap(),
         )
         .unwrap();
         return;
@@ -64,9 +79,10 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
     );
     bank0.register_tick(&Hash::new_unique());
     bank0.freeze();
-    let bank = Bank::new_from_parent(&Arc::new(bank0), &leader, 1);
-    bank.register_tick(&Hash::new_unique());
-    let mut uninterrupted = RuntimeState::from_test_bank(bank, false, source_dir);
+    let mut uninterrupted = RuntimeState::from_test_bank(bank0, false, source_dir);
+    let bootstrap = uninterrupted.freeze_checkpoint(0).unwrap();
+    let prefix_tick = request_for(&uninterrupted, 1, 0, 1, &[]);
+    let prefix_processed = uninterrupted.process_entry(prefix_tick.clone()).unwrap();
 
     // Bind the real worker checkpoint before serializer housekeeping. Preparing
     // hashes after housekeeping could conceal an export-induced consensus change.
@@ -79,6 +95,7 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
     assert_eq!(cursor, before.next_write_version);
     let staging = tempfile::tempdir().unwrap();
     let archives = tempfile::tempdir().unwrap();
+    let mut export_evidence = None;
     let archive = if use_export {
         use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody};
         use sha2::{Digest, Sha256};
@@ -114,6 +131,7 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
         );
         assert_eq!(exported.accounts_hash, before.accounts_hash);
         assert_eq!(exported.slot, before.slot);
+        export_evidence = Some(exported);
         assert!(uninterrupted
             .export_snapshot(
                 before.slot,
@@ -232,7 +250,13 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
     let fixture = tempfile::tempdir().unwrap();
     std::fs::write(
         fixture.path().join("input.bin"),
-        bincode::serialize(&(genesis.genesis_config, archive, entry, tick)).unwrap(),
+        bincode::serialize(&(
+            genesis.genesis_config.clone(),
+            archive.clone(),
+            entry.clone(),
+            tick.clone(),
+        ))
+        .unwrap(),
     )
     .unwrap();
     let child = std::process::Command::new(std::env::current_exe().unwrap())
@@ -255,12 +279,62 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
         String::from_utf8_lossy(&child.stdout),
         String::from_utf8_lossy(&child.stderr)
     );
-    let (pid, processed, ticked, checkpoint): (u32, EntryProcessed, EntryProcessed, Checkpoint) =
-        bincode::deserialize(&std::fs::read(fixture.path().join("output.bin")).unwrap()).unwrap();
+    let (pid, restored_bootstrap, processed, ticked, checkpoint): (
+        u32,
+        Checkpoint,
+        EntryProcessed,
+        EntryProcessed,
+        Checkpoint,
+    ) = bincode::deserialize(&std::fs::read(fixture.path().join("output.bin")).unwrap()).unwrap();
     assert_ne!(pid, std::process::id());
+    assert_eq!(restored_bootstrap, expected_after);
     assert_eq!(processed, expected);
     assert_eq!(ticked, expected_tick);
     assert_eq!(checkpoint, expected_checkpoint);
+    if let Some(root) = std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT") {
+        use std::io::Write;
+        use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+        let root = std::path::PathBuf::from(root);
+        assert!(root.is_absolute());
+        assert_eq!(std::fs::canonicalize(&root).unwrap(), root);
+        let metadata = std::fs::symlink_metadata(&root).unwrap();
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.uid(), unsafe { libc::geteuid() });
+        assert_eq!(metadata.mode() & 0o077, 0);
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+        let transcript = bincode::serialize(&(
+            "horizon-native-checkpoint-recorder-transcript-v1".to_string(),
+            genesis.genesis_config.hash().as_ref().to_vec(),
+            bootstrap,
+            prefix_tick,
+            prefix_processed,
+            before,
+            export_evidence.expect("transcript requires actual export"),
+            vec![entry, tick],
+            vec![expected, expected_tick],
+            expected_checkpoint,
+            restored_bootstrap,
+            vec![processed, ticked],
+            checkpoint,
+            std::process::id(),
+            pid,
+        ))
+        .unwrap();
+        for (name, bytes) in &[
+            ("native-transcript.bin", transcript),
+            ("native-snapshot.tar.bz2", std::fs::read(&archive).unwrap()),
+        ] {
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o400)
+                .open(root.join(name))
+                .unwrap();
+            file.write_all(bytes).unwrap();
+            file.sync_all().unwrap();
+        }
+        std::fs::File::open(root).unwrap().sync_all().unwrap();
+    }
 }
 
 #[test]
