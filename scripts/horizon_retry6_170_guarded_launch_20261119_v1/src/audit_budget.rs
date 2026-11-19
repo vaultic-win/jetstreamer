@@ -1,4 +1,4 @@
-//! Shared, read-only admission checks for the actual home-backed audit v8.
+//! Shared, read-only admission checks for the actual home-backed audit v9.
 //! Include this exact source in the stage, preparer and launcher build proofs.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -13,18 +13,18 @@ use std::{
 };
 
 const UNIT: &str = "horizon-r2-chronological-plugin-audit-20261118-v1.service";
-const IID: &str = "99c7ddc48af140efb131b784a6b064d2";
-const PID: u64 = 2_227_285;
+const IID: &str = "67725d9ba7aa4de994840564f44d963c";
+const PID: u64 = 2_285_828;
 const IMAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v8/audit";
-const IMAGE_SHA: &str = "60bd1919c887aebace36a64c6abbda51c8834dd4bc918e123f9d56835cfe341a";
+    "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v9/audit";
+const IMAGE_SHA: &str = "70d64c543ed79d8a05f3f2a9afd920ab5612133d4c6f89bfc9bffba1dcfe2ba2";
 const CONFIG: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v8/config.json";
+    "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v9/config.json";
 const CONFIG_SHA: &str = "5d7d09bfb1ffdb08ac5aa04b228e9cd3827a6ef3bbb700723d7b777d2261e177";
-const SEAL: &str = "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v8/deployment-seal-receipt.json";
-const SEAL_SHA: &str = "5f0d362095cfab09031a1430cf4b5370ffd6bd9afb66eab48bfaba475cf462e5";
-const START: &str = "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/migration-evidence/START_EVENT.json";
-const START_SHA: &str = "9ba3932a9fa110fcca509e6fc1b80cfc91731ce804b4a6027172d59585dc8906";
+const SEAL: &str = "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v9/deployment-seal-receipt.json";
+const SEAL_SHA: &str = "9848e46959219be23eba60280bffcc94d7121767951c8cc2691d372ab5ab8739";
+const START: &str = "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/range-v9-transition/START_EVENT.json";
+const START_SHA: &str = "c043d9d42a50bd2aac7b1ab0c865f3a0ee1759fe6adc6da657aed4d5b5ad2257";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const STATE: &str = "/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1";
 const READERS: &str = "/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1";
@@ -143,7 +143,7 @@ fn shape(v: &Value) -> Result<()> {
             && v["CPUQuotaPerSecUSec"] == "4s"
             && v["TasksMax"] == "512"
             && v["ControlGroup"] == format!("/system.slice/{UNIT}"),
-        "audit v8 identity or resource limits differ"
+        "audit v9 identity or resource limits differ"
     );
     Ok(())
 }
@@ -254,7 +254,7 @@ pub(super) fn fleet_obligation() -> Value {
         "archive_acceptance_ceiling_bytes":CEILING,"archive_cap_is_acceptance_ceiling_not_reservation":true,
         "per_epoch_capacity_reserves_exact_archive_bytes":true,"old166scratch_DATA_obligation_retained":OLD166,
         "original_promises_ended":false,"fresh_native_observation_claimed":false,
-        "admission_requirement":"Revalidate audit v8 identity, exact resident archive and remaining work; add concurrent replay growth above the audit floor."})
+        "admission_requirement":"Revalidate audit v9 identity, exact resident archive and remaining work; add concurrent replay growth above the audit floor."})
 }
 pub(super) fn validate_fleet_obligation(v: &Value) -> Result<()> {
     ensure!(

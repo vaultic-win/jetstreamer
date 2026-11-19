@@ -1,4 +1,4 @@
-//! Three-peer successor of the deployed home-backed audit v8 cycle.
+//! Three-peer successor of the deployed home-backed audit v9 cycle.
 //! Bind an accepted observation/status cycle and arm its one successor timer.
 //! No replay, archive, admission or reservation-ending authority.
 #[allow(dead_code)]
@@ -156,7 +156,7 @@ fn home_audit_snapshot(previous: &Value, recorded_at: u64) -> Result<Value> {
     let (progress, progress_sha) = audit_json(&state.join("progress.json"))?;
     ensure!(
         progress["schema"] == "horizon-r2-chronological-audit-progress-v1"
-            && progress["pid"] == 2_227_285u64
+            && progress["pid"] == 2_285_828u64
             && progress["remote_mutations"] == false
             && progress["external_scratch"].is_null()
             && progress["scratch_directory"] == format!("{AUDIT_STATE}/scratch")
