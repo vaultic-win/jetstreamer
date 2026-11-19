@@ -17,8 +17,8 @@ use std::{
 #[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
 mod singleton247_phase;
 
-const OBSERVER: &str = "/var/lib/jetstreamer/horizon-finalization247251-observer-20261119-v1/jetstreamer-horizon-observe";
-const OBSERVER_SHA: &str = "a9dd50adcaeb91b33d3e796557fd1f2aadbe9a55e002f416afa69b4d88685b7d";
+const OBSERVER: &str = "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/jetstreamer-horizon-observe";
+const OBSERVER_SHA: &str = "33172cb307668e2d6881c5c7869060e8c244ff26d261aa200bb78591c8a74185";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -38,6 +38,8 @@ struct Plan {
     handoff_plans: Vec<Bound>,
     #[serde(default)]
     native211_handoff: Option<Bound>,
+    #[serde(default)]
+    native265_handoff: Option<Bound>,
     state_directory: PathBuf,
     deployment: PathBuf,
 }
@@ -277,6 +279,103 @@ fn native211_pass_through(
     }
     Ok(())
 }
+fn native265_pass_through(
+    config: &Value,
+    reference: Option<&Bound>,
+    handoff: Option<&Value>,
+) -> Result<Value> {
+    let mut filtered = config.clone();
+    let rows = config
+        .get("native_input_diagnostics")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let rows = rows.as_array().context("native diagnostics array")?;
+    let selected = rows
+        .iter()
+        .filter(|r| r["epoch"] == 265)
+        .collect::<Vec<_>>();
+    ensure!(selected.len() <= 1, "duplicate native265 diagnostic");
+    let Some(row) = selected.first() else {
+        ensure!(
+            reference.is_none() && handoff.is_none(),
+            "unused native265 handoff"
+        );
+        return Ok(filtered);
+    };
+    let b = reference.context("native265 handoff required")?;
+    ensure!(
+        b.path.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
+            && b.path
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("horizon-native265-execution-"))
+            && b.path
+                .file_name()
+                .is_some_and(|n| n == "guarded-startup-handoff.json"),
+        "native265 handoff namespace"
+    );
+    let h = handoff.context("native265 handoff evidence required")?;
+    let unit = "horizon-265-native-input-20261119-v1.service";
+    let iid = string(h, "invocation_id")?;
+    let pid = h["main_pid"].as_u64().context("native265 PID")?;
+    ensure!(
+        iid.len() == 32
+            && iid
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+            && pid > 1
+            && pid <= i32::MAX as u64
+            && h["schema"] == "horizon-native265-guarded-startup-v1"
+            && h["unit"] == unit
+            && h["producer"]["Id"] == unit
+            && h["producer"]["InvocationID"] == iid
+            && h["producer"]["MainPID"] == pid.to_string().as_str(),
+        "native265 handoff identity"
+    );
+    let root = "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1";
+    let expected = json!({"epoch":265,"unit":unit,"expected_invocation_id":iid,"main_pid":pid,"scratch_path":root,
+        "executable":"/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "executable_sha256":"0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"});
+    ensure!(
+        **row == expected,
+        "native265 complete diagnostic tuple differs"
+    );
+    for k in [
+        "native_input_qualified",
+        "entry_replay",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "full_epoch_qualified",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(h[k] == false, "native265 unexpected authority {k}");
+    }
+    for field in ["replays", "diagnostic_replays"] {
+        if let Some(replays) = config[field].as_array() {
+            for r in replays {
+                ensure!(
+                    r["producer_unit"] != unit && r["controller_unit"] != unit,
+                    "native265 duplicate replay owner"
+                );
+                let scratch = Path::new(string(r, "scratch_path")?);
+                ensure!(
+                    !scratch.starts_with(root) && !Path::new(root).starts_with(scratch),
+                    "native265 overlapping scratch"
+                );
+            }
+        }
+    }
+    filtered["native_input_diagnostics"] = json!(
+        rows.iter()
+            .filter(|r| r["epoch"] != 265)
+            .collect::<Vec<_>>()
+    );
+    Ok(filtered)
+}
 fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
     ensure!(
         p.schema == "horizon-terminal-aware-observation-plan-v1"
@@ -366,8 +465,14 @@ fn run(args: &[String]) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
     validate(&p, &config, &handoffs)?;
     let native_handoff = p.native211_handoff.as_ref().map(bound).transpose()?;
-    native211_pass_through(
+    let native265_handoff = p.native265_handoff.as_ref().map(bound).transpose()?;
+    let other_native = native265_pass_through(
         &config,
+        p.native265_handoff.as_ref(),
+        native265_handoff.as_ref(),
+    )?;
+    native211_pass_through(
+        &other_native,
         p.native211_handoff.as_ref(),
         native_handoff.as_ref(),
     )?;
@@ -411,7 +516,7 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty() || !finalization.is_empty(),
@@ -428,7 +533,7 @@ fn run(args: &[String]) -> Result<()> {
     );
     ensure!(
         config.get("native_input_diagnostics") == original_native.as_ref(),
-        "native211 diagnostic altered during prescreen"
+        "native diagnostic altered during prescreen"
     );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
     let seal = save(
@@ -453,7 +558,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -471,6 +576,45 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn native265_prescreen_preserves_diagnostic_and_refuses_partial_owner() {
+        let unit = "horizon-265-native-input-20261119-v1.service";
+        let iid = "a".repeat(32);
+        let row = json!({"epoch":265,"unit":unit,"expected_invocation_id":iid,"main_pid":42,
+            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+            "executable":"/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+            "executable_sha256":"0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"});
+        let config = json!({"replays":[],"native_input_diagnostics":[row]});
+        let b = Bound {
+            path:
+                "/var/lib/jetstreamer/horizon-native265-execution-test/guarded-startup-handoff.json"
+                    .into(),
+            sha256: "b".repeat(64),
+        };
+        let mut h = json!({"schema":"horizon-native265-guarded-startup-v1","unit":unit,"invocation_id":iid,"main_pid":42,"producer":{"Id":unit,"InvocationID":iid,"MainPID":"42"}});
+        for k in [
+            "native_input_qualified",
+            "entry_replay",
+            "replay_launch_authorized",
+            "runtime_promotion_authorized",
+            "full_epoch_qualified",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            h[k] = json!(false);
+        }
+        let filtered = native265_pass_through(&config, Some(&b), Some(&h)).unwrap();
+        native211_pass_through(&filtered, None, None).unwrap();
+        assert_eq!(
+            config["native_input_diagnostics"].as_array().unwrap().len(),
+            1
+        );
+        assert!(native265_pass_through(&config, None, Some(&h)).is_err());
+        h["main_pid"] = json!(43);
+        assert!(native265_pass_through(&config, Some(&b), Some(&h)).is_err());
+    }
     #[test]
     #[ignore = "root native systemd owner transition, no campaign producer reads"]
     fn native_live_to_terminal_keeps_the_original_identity() {
