@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
     io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::Path,
     process::Command,
 };
@@ -82,6 +82,98 @@ fn phase(work: &Value) -> &'static str {
         "bootstrap"
     }
 }
+fn exact167_native(v: &Value) -> Result<()> {
+    ensure!(
+        v["Id"] == "horizon-qualify-167-replacement-local3retry7-20261110-v1.service"
+            && v["InvocationID"] == "a680103e76f546faaf469aa80c35fa3b"
+            && v["MainPID"] == "1871809"
+            && v["ControlPID"] == "0"
+            && v["ActiveState"] == "active"
+            && v["SubState"] == "running"
+            && v["NRestarts"] == "0"
+            && v["Job"] == "",
+        "actual167 identity changed"
+    );
+    Ok(())
+}
+fn joined167() -> Result<(Value, Value)> {
+    let unit = "horizon-qualify-167-replacement-local3retry7-20261110-v1.service";
+    let iid = "a680103e76f546faaf469aa80c35fa3b";
+    let admission_path = "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json";
+    let protection_path = "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_GUARD_PROTECTION.json";
+    let admission = read(admission_path)?;
+    let protection = read(protection_path)?;
+    ensure!(
+        admission["producer_invocation_id"] == iid
+            && admission["producer_pid"] == 1871809
+            && admission["fresh_admission_passed"] == true
+            && protection["admission"] == bind(admission_path)?
+            && protection["producer_invocation_id"] == iid,
+        "actual167 guarded admission differs"
+    );
+    let raw = run(Command::new("/usr/bin/systemctl").args(["show", unit,
+        "-pId,InvocationID,MainPID,ControlPID,ActiveState,SubState,NRestarts,Job,ExecMainStartTimestampMonotonic"]))?;
+    let mut map = serde_json::Map::new();
+    for line in raw.lines() {
+        let (key, value) = line.split_once('=').context("native property")?;
+        ensure!(
+            map.insert(key.into(), json!(value)).is_none(),
+            "duplicate native property"
+        );
+    }
+    let native = Value::Object(map);
+    exact167_native(&native)?;
+    let original_path = admission["actual_producer_native"]["path"]
+        .as_str()
+        .context("original producer")?;
+    ensure!(
+        bind(original_path)? == admission["actual_producer_native"]
+            && read(original_path)?["ExecMainStartTimestampMonotonic"]
+                == native["ExecMainStartTimestampMonotonic"]
+            && fs::read_link("/proc/1871809/exe")?
+                == Path::new(
+                    "/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/jetstreamer-node"
+                ),
+        "167 process changed"
+    );
+    let timer = protection["timer_unit"].as_str().context("167 timer")?;
+    let timer_raw = run(Command::new("/usr/bin/systemctl").args([
+        "show",
+        timer,
+        "-pActiveState,InvocationID",
+    ]))?;
+    let timer_iid = protection["timer_invocation_id"]
+        .as_str()
+        .context("167 timer IID")?;
+    ensure!(
+        timer_raw.lines().any(|s| s == "ActiveState=active")
+            && timer_raw
+                .lines()
+                .any(|s| s == format!("InvocationID={timer_iid}")),
+        "167 protection timer changed"
+    );
+    let log = "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/producer.log";
+    let scratch = "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/scratch";
+    let md = fs::symlink_metadata(log)?;
+    ensure!(
+        md.is_file()
+            && md.dev() == 64512
+            && md.uid() == 0
+            && md.nlink() == 1
+            && fs::symlink_metadata(scratch)?.is_dir(),
+        "actual167 log/scratch differs"
+    );
+    let observer = json!({"controller_unit":unit,"producer_unit":unit,
+        "expected_controller_invocation_id":iid,"expected_producer_invocation_id":iid,"range":"167",
+        "scratch_path":scratch,"worker_executable_basename":"historical-worker",
+        "append_log":{"path":log,"device":md.dev(),"inode":md.ino()}});
+    let owner = json!({"epoch":167,"unit":native,"in_current_observer":false,"observer":null,
+        "phase":"bootstrap","progress":null,"scratch_path":scratch,"admission":bind(admission_path)?,
+        "guard_protection":bind(protection_path)?,"native_identity_source":admission["actual_producer_native"],
+        "current_identity_from_same_observation":false,"event_driven_guarded_join":true,
+        "transaction_replay_claimed":false,"resource_credit_bytes":0});
+    Ok((owner, observer))
+}
 fn main() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "Root required");
     let a: Vec<_> = std::env::args().collect();
@@ -104,7 +196,7 @@ fn main() -> Result<()> {
     );
     let rows = sample["replays"].as_array().context("replays")?;
     ensure!(
-        rows.len() == 1
+        (rows.len() == 1 || rows.len() == 2)
             && rows[0]["range"] == "166"
             && rows[0]["invocation_binding_stable"] == true
             && rows[0]["producer_after"]["invocation_id"] == "4f09db5f45074244a45b06aeef932d1d"
@@ -112,6 +204,17 @@ fn main() -> Result<()> {
             && rows[0]["producer_after"]["restarts"] == 0,
         "exact healthy166 required"
     );
+    if rows.len() == 2 {
+        ensure!(
+            rows[1]["range"] == "167"
+                && rows[1]["invocation_binding_stable"] == true
+                && rows[1]["producer_after"]["invocation_id"] == "a680103e76f546faaf469aa80c35fa3b"
+                && rows[1]["producer_after"]["active_state"] == "active"
+                && rows[1]["producer_after"]["restarts"] == 0,
+            "exact healthy167 required"
+        );
+    }
+    let (joined167, observer167) = joined167()?;
     let stamp = sample["recorded_at_utc"].as_str().context("stamp")?;
     let next = sample["cadence"]["next_routine_observation_not_before_utc"]
         .as_str()
@@ -119,7 +222,8 @@ fn main() -> Result<()> {
     let (date, tag) = clock_labels(stamp)?;
     let (next_date, next_tag) = clock_labels(next)?;
     ensure!(next > stamp, "successor clock must advance");
-    let root = format!("/var/lib/jetstreamer/root{tag}-live166retry8-observation-{date}-v2");
+    let root =
+        format!("/var/lib/jetstreamer/root{tag}-live166retry8-167retry7-observation-{date}-v3");
     fs::create_dir(&root)?;
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
     let mut config = read(&a[3])?;
@@ -129,13 +233,36 @@ fn main() -> Result<()> {
     );
     config["previous_sample"] = json!(a[1]);
     config["not_before_utc"] = json!(next);
+    let diagnostics = config["diagnostic_replays"]
+        .as_array_mut()
+        .context("diagnostics")?;
+    for row in diagnostics.iter().filter(|r| r["range"] == "167") {
+        ensure!(
+            row["expected_producer_invocation_id"] == "fdfadeb7b76d4760a37983b402fd2771",
+            "unexpected old167 diagnostic"
+        );
+    }
+    diagnostics.retain(|r| r["range"] != "167");
+    let replays = config["replays"].as_array_mut().context("next replays")?;
+    if replays.len() == 1 {
+        replays.push(observer167.clone());
+    }
+    ensure!(
+        replays.len() == 2 && replays[0]["range"] == "166" && replays[1]["range"] == "167",
+        "exact next two lanes"
+    );
+    ensure!(
+        replays[1] == observer167,
+        "next167 observer identity differs"
+    );
     config["output"] = json!(format!(
-        "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root{next_tag}-live166retry8-{next_date}-v1.json"
+        "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root{next_tag}-live166retry8-167retry7-{next_date}-v1.json"
     ));
     let cpath = format!("{root}/next-observer.json");
     let cb = write(&cpath, &config)?;
-    let destination =
-        format!("/usr/local/lib/jetstreamer/horizon-live166retry8-observer-config-{tag}-{date}-v2");
+    let destination = format!(
+        "/usr/local/lib/jetstreamer/horizon-live166retry8-167retry7-observer-config-{tag}-{date}-v3"
+    );
     let ppath = format!("{root}/seal-plan.json");
     let p = write(
         &ppath,
@@ -151,7 +278,7 @@ fn main() -> Result<()> {
         SEALER_SHA,
     ]))?;
     let sealed = format!("{destination}/next-observer.json");
-    let unit = format!("horizon-observer-root{next_tag}-live166retry8-{next_date}-v1");
+    let unit = format!("horizon-observer-root{next_tag}-live166retry8-167retry7-{next_date}-v1");
     let calendar = format!("{} {} UTC", &next[..10], &next[11..19]);
     run(Command::new("/usr/bin/systemd-run").args(["--unit",&unit,"--on-calendar",&calendar,"--timer-property=AccuracySec=1s",
         "--property=Type=oneshot","--property=CPUQuota=200%","--property=MemoryMax=2G","--property=TasksMax=128",
@@ -173,10 +300,7 @@ fn main() -> Result<()> {
     );
     let mut fleet = read(&a[4])?;
     ensure!(
-        fleet["owner"] == "/root"
-            && fleet["live_replay_count"]
-                .as_u64()
-                .is_some_and(|v| v == 0 || v == 1),
+        fleet["owner"] == "/root" && fleet["live_replay_count"].as_u64().is_some_and(|v| v <= 2),
         "predecessor fleet differs"
     );
     fleet["previous_Root_operational_review"] = bind(&a[4])?;
@@ -194,15 +318,26 @@ fn main() -> Result<()> {
     let mut executing = Vec::new();
     let mut bootstraps = Vec::new();
     let mut owners = Vec::new();
-    for (epoch, prefix) in [(
-        166,
-        "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166",
-    )] {
+    for (epoch, prefix) in [
+        (
+            166,
+            "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166",
+        ),
+        (
+            167,
+            "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167",
+        ),
+    ] {
         let range = epoch.to_string();
         let observed = rows
             .iter()
-            .find(|r| r["range"].as_str() == Some(range.as_str()))
-            .context("peer sample")?;
+            .find(|r| r["range"].as_str() == Some(range.as_str()));
+        let Some(observed) = observed else {
+            ensure!(epoch == 167, "missing166 sample");
+            bootstraps.push(joined167.clone());
+            owners.push(joined167.clone());
+            continue;
+        };
         let admission_path = format!("{prefix}/ACTUAL_REPLACEMENT_ADMISSION.json");
         let protection_path = format!("{prefix}/ACTUAL_GUARD_PROTECTION.json");
         let admission = read(&admission_path)?;
@@ -254,7 +389,7 @@ fn main() -> Result<()> {
     }
     fleet["actual_executing_replays"] = json!(executing);
     fleet["actual_active_bootstraps"] = json!(bootstraps);
-    fleet["active_producer_count"] = json!(1);
+    fleet["active_producer_count"] = json!(2);
     fleet["guarded_bootstrap_owner_count"] = json!(bootstraps.len());
     fleet["live_replay_count"] = json!(executing.len());
     fleet["useful_replay_count"] = json!(executing.len());
@@ -438,6 +573,15 @@ fn main() -> Result<()> {
         "qualified_guard":bind("/usr/local/lib/jetstreamer/horizon-epoch167-retry7-live166retry8-guard-20261119-v1/artifact-proof.json")?,
         "next_action":"Use this accepted cycle and the actual latest preparation result to capture a fresh witness, complete native preparation and run the launcher native tests, sealed check and guarded launch. Keep all original promises and the audit allocation. Retired allocated bytes alone neither release a reservation nor prove simultaneous fit.",
         "resource_credit_bytes":0});
+    fleet["historical_prelaunch167_recovery"] = fleet["next_lane_recovery"].clone();
+    fleet["next_lane_recovery"] = json!({"epoch":170,"source_owner":"/root",
+        "next_action":"Finish qualified v3 launcher/stage deployment, then fresh measurement, witness, preparation and guarded admission alongside166/167, retaining the full audit allocation and every live growth obligation.167 is guarded bootstrap until a coordinated sample proves transaction replay.","resource_credit_bytes":0});
+    fleet["recovered167_admission"] = joined167["admission"].clone();
+    fleet["completed_historical_compiler_retirement"] =
+        bind("/var/lib/jetstreamer/historical-compiler-retire-20261119-v1/completion.json")?;
+    fleet["audit_observation0650"] =
+        bind("/var/lib/jetstreamer/audit-observation-0650-20261119-v1/status.json")?;
+    fleet["audit_transfer73_repair"] = json!({"result":bind("/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1/results/epoch-73.json")?,"failure_class":"incomplete network transfer before playback","remote_corruption_established":false,"next_action":"Qualify bounded transfer-only retry preserving the immutable failure and healthy74 playback; no R2 overwrite or deletion."});
     fleet["recovered166_admission"] = bind(
         "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
     )?;
@@ -456,7 +600,26 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clock_labels, phase};
+    use super::{clock_labels, exact167_native, phase};
+    #[test]
+    fn joined167_rejects_changed_owner_and_restart() {
+        let good = serde_json::json!({"Id":"horizon-qualify-167-replacement-local3retry7-20261110-v1.service",
+            "InvocationID":"a680103e76f546faaf469aa80c35fa3b","MainPID":"1871809","ControlPID":"0",
+            "ActiveState":"active","SubState":"running","NRestarts":"0","Job":""});
+        exact167_native(&good).unwrap();
+        for (key, value) in [
+            ("InvocationID", "foreign"),
+            ("MainPID", "1871810"),
+            ("ControlPID", "3"),
+            ("ActiveState", "failed"),
+            ("NRestarts", "1"),
+            ("Job", "queued"),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = serde_json::json!(value);
+            assert!(exact167_native(&bad).is_err());
+        }
+    }
     #[test]
     fn bootstrap_is_not_claimed_as_replay_without_progress() {
         assert_eq!(phase(&serde_json::json!({})), "bootstrap");
