@@ -13,7 +13,7 @@ fn closed_profile_rejects_other_target_and_schema() {
         schema: PROFILE.into(),
         source_commit: "a".repeat(40),
         cargo_lock_sha256: "b".repeat(64),
-        output: "/var/lib/jetstreamer/holding141-incremental-check-v1/check.json".into(),
+        output: "/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json".into(),
         prior_check: None,
     };
     validate_plan(&p).unwrap();
@@ -21,6 +21,18 @@ fn closed_profile_rejects_other_target_and_schema() {
     assert!(validate_plan(&p).is_err());
     p.schema = PROFILE.into();
     p.output = "/tmp/check.json".into();
+    assert!(validate_plan(&p).is_err());
+    p.output = "/var/lib/jetstreamer/holding141-incremental-check-v3-20261119/check.json".into();
+    assert!(validate_plan(&p).is_err());
+    p.output = "/var/lib/jetstreamer/holding141-incremental-retire-v4-20261119/check.json".into();
+    assert!(validate_plan(&p).is_err());
+    p.prior_check = Some(Bound {
+        path: "/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json".into(),
+        sha256: "c".repeat(64),
+    });
+    validate_plan(&p).unwrap();
+    p.prior_check.as_mut().unwrap().path =
+        "/var/lib/jetstreamer/holding141-incremental-check-v3-20261119/check.json".into();
     assert!(validate_plan(&p).is_err());
     assert!(serde_json::from_value::<Plan>(json!({"schema":PROFILE,"source_commit":"a".repeat(40),"cargo_lock_sha256":"b".repeat(64),"output":"/var/lib/jetstreamer/holding141-incremental-check/check.json","target":"/arbitrary"})).is_err());
 }
@@ -201,4 +213,144 @@ fn pre_lto_bitcode_rejects_replaced_identity() {
     fs::rename(&p, r.join("preserved.pre-lto.bc")).unwrap();
     fs::write(&p, b"BC\xc0\xde").unwrap();
     assert!(incremental::pre_lto_bitcode(&p, &before).is_err());
+}
+
+#[test]
+fn partial_cleanup_preserves_shared_aliases_and_all_directories() {
+    let (d, r, uid) = fixture();
+    fs::create_dir(r.join("sub")).unwrap();
+    fs::create_dir(r.join("empty")).unwrap();
+    fs::write(r.join("a.o"), b"disposable object").unwrap();
+    fs::write(r.join("sub/dep-graph.bin"), b"disposable graph").unwrap();
+    fs::write(r.join("b.o"), b"external shared object").unwrap();
+    fs::hard_link(r.join("b.o"), d.path().join("retained.o")).unwrap();
+    fs::write(r.join("c.o"), b"internal shared object").unwrap();
+    fs::hard_link(r.join("c.o"), r.join("sub/d.o")).unwrap();
+    let before = incremental::select_single_link_files(&r, uid).unwrap();
+    assert_eq!(before.selected_files.len(), 2);
+    assert_eq!(before.preserved_shared_files.len(), 3);
+    assert_eq!(before.directories.len(), 3);
+    assert_eq!(
+        before.selected_allocated_bytes,
+        (fs::metadata(r.join("a.o")).unwrap().blocks()
+            + fs::metadata(r.join("sub/dep-graph.bin")).unwrap().blocks())
+            * 512
+    );
+    assert!(
+        !before.cache["external_hardlinks_rejected"]
+            .as_bool()
+            .unwrap()
+    );
+    let after = incremental::retire_single_link_files(&r, uid, &before).unwrap();
+    assert!(after.selected_files.is_empty());
+    assert_eq!(after.preserved_shared_files, before.preserved_shared_files);
+    assert_eq!(
+        after.directories.keys().collect::<Vec<_>>(),
+        before.directories.keys().collect::<Vec<_>>()
+    );
+    assert!(!r.join("a.o").exists());
+    assert!(!r.join("sub/dep-graph.bin").exists());
+    assert!(r.join("empty").is_dir());
+    assert_eq!(
+        fs::metadata(d.path().join("retained.o")).unwrap().nlink(),
+        2
+    );
+    assert_eq!(fs::metadata(r.join("c.o")).unwrap().nlink(), 2);
+    assert_eq!(
+        fs::read(r.join("sub/d.o")).unwrap(),
+        b"internal shared object"
+    );
+}
+
+#[test]
+fn partial_cleanup_rejects_candidate_replacement_before_unlink() {
+    let (d, r, uid) = fixture();
+    fs::write(r.join("a.o"), b"selected").unwrap();
+    let selected = incremental::select_single_link_files(&r, uid).unwrap();
+    fs::rename(r.join("a.o"), d.path().join("original.o")).unwrap();
+    fs::write(r.join("a.o"), b"replacement").unwrap();
+    assert!(incremental::retire_single_link_files(&r, uid, &selected).is_err());
+    assert!(
+        incremental::unlink_selected_file(
+            &r,
+            Path::new("a.o"),
+            &selected.selected_files[Path::new("a.o")],
+            &selected.directories[Path::new("")],
+        )
+        .is_err()
+    );
+    assert_eq!(fs::read(r.join("a.o")).unwrap(), b"replacement");
+    assert_eq!(fs::read(d.path().join("original.o")).unwrap(), b"selected");
+}
+
+#[test]
+fn partial_cleanup_rejects_new_hardlink_before_unlink() {
+    let (d, r, uid) = fixture();
+    fs::write(r.join("a.o"), b"selected").unwrap();
+    fs::write(r.join("other.o"), b"must remain on failed full precheck").unwrap();
+    let selected = incremental::select_single_link_files(&r, uid).unwrap();
+    fs::hard_link(r.join("a.o"), d.path().join("retained.o")).unwrap();
+    assert!(incremental::retire_single_link_files(&r, uid, &selected).is_err());
+    assert!(
+        incremental::unlink_selected_file(
+            &r,
+            Path::new("a.o"),
+            &selected.selected_files[Path::new("a.o")],
+            &selected.directories[Path::new("")],
+        )
+        .is_err()
+    );
+    assert_eq!(fs::metadata(r.join("a.o")).unwrap().nlink(), 2);
+    assert!(r.join("other.o").is_file());
+}
+
+#[test]
+fn conservative_selection_keeps_member_rejections() {
+    let (d, r, uid) = fixture();
+    for name in ["failed-executable", "epoch-141.jet", "query-cache.bin.bak"] {
+        let p = r.join(name);
+        fs::write(&p, b"retained").unwrap();
+        assert!(incremental::select_single_link_files(&r, uid).is_err());
+        fs::remove_file(p).unwrap();
+    }
+    let p = r.join("a.o");
+    fs::write(&p, b"object").unwrap();
+    fs::set_permissions(&p, fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(incremental::select_single_link_files(&r, uid).is_err());
+    fs::remove_file(&p).unwrap();
+    std::os::unix::fs::symlink(d.path().join("outside.o"), &p).unwrap();
+    assert!(incremental::select_single_link_files(&r, uid).is_err());
+    fs::remove_file(&p).unwrap();
+    let _socket = std::os::unix::net::UnixListener::bind(&p).unwrap();
+    assert!(incremental::select_single_link_files(&r, uid).is_err());
+}
+
+#[test]
+fn partial_cleanup_verifier_rejects_replaced_directory() {
+    let (d, r, uid) = fixture();
+    fs::create_dir(r.join("sub")).unwrap();
+    fs::write(r.join("sub/a.o"), b"selected").unwrap();
+    let selected = incremental::select_single_link_files(&r, uid).unwrap();
+    incremental::retire_single_link_files(&r, uid, &selected).unwrap();
+    // The normal unlink changed directory timestamps/size, and was accepted.
+    // Replacing a directory with an empty same-name directory must still fail.
+    fs::rename(r.join("sub"), d.path().join("original-sub")).unwrap();
+    fs::create_dir(r.join("sub")).unwrap();
+    assert!(incremental::verify_partial_cleanup(&r, uid, &selected).is_err());
+}
+
+#[test]
+fn partial_cleanup_verifier_rejects_new_file_or_changed_shared_file() {
+    let (d, r, uid) = fixture();
+    fs::write(r.join("a.o"), b"selected").unwrap();
+    fs::write(r.join("b.o"), b"shared").unwrap();
+    fs::hard_link(r.join("b.o"), d.path().join("retained.o")).unwrap();
+    let selected = incremental::select_single_link_files(&r, uid).unwrap();
+    incremental::retire_single_link_files(&r, uid, &selected).unwrap();
+    fs::write(r.join("new.o"), b"unexpected").unwrap();
+    assert!(incremental::verify_partial_cleanup(&r, uid, &selected).is_err());
+    fs::remove_file(r.join("new.o")).unwrap();
+    incremental::verify_partial_cleanup(&r, uid, &selected).unwrap();
+    fs::write(r.join("b.o"), b"changed shared metadata and content").unwrap();
+    assert!(incremental::verify_partial_cleanup(&r, uid, &selected).is_err());
 }

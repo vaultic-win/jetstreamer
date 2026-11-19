@@ -1,4 +1,4 @@
-//! Retire only the closed holding141 incremental compiler cache, after a separate check.
+//! Partially retire single-link holding141 compiler-cache files after a separate check.
 mod evidence;
 mod incremental;
 mod process_references;
@@ -27,8 +27,11 @@ const ROOT: &str = "/tmp/holding141-target";
 const DEBUG: &str = "/tmp/holding141-target/debug";
 const TARGET: &str = "/tmp/holding141-target/debug/incremental";
 const LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock";
-const PROFILE: &str = "horizon-holding141-incremental-cleanup-plan-v1";
-const SCHEMA: &str = "horizon-holding141-incremental-cleanup-check-v1";
+const PROFILE: &str = "horizon-holding141-incremental-partial-cleanup-plan-v4";
+const SCHEMA: &str = "horizon-holding141-incremental-partial-cleanup-check-v4";
+// A full selection binds every selected/shared path and directory, not just a digest.
+// Keep ordinary plans at 1 MiB; only these immutable check receipts get a larger bound.
+const PARTIAL_CHECK_MAX_BYTES: u64 = 64 << 20;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -49,17 +52,16 @@ fn validate_plan(p: &Plan) -> Result<()> {
         p.schema == PROFILE && p.source_commit.len() == 40 && p.cargo_lock_sha256.len() == 64,
         "wrong fixed profile or reproduction binding"
     );
+    let check =
+        Path::new("/var/lib/jetstreamer/holding141-incremental-check-v4-20261119/check.json");
+    let retire =
+        Path::new("/var/lib/jetstreamer/holding141-incremental-retire-v4-20261119/check.json");
     ensure!(
-        p.output.file_name().is_some_and(|v| v == "check.json")
-            && p.output.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
-            && p.output
-                .parent()
-                .and_then(Path::file_name)
-                .and_then(|s| s.to_str())
-                .is_some_and(|s| s.starts_with("holding141-incremental-")
-                    && s.bytes()
-                        .all(|c| c.is_ascii_alphanumeric() || b"-_".contains(&c))),
-        "output is outside private evidence scope"
+        match &p.prior_check {
+            None => p.output == check,
+            Some(prior) => p.output == retire && prior.path == check,
+        },
+        "output/prior check is outside fixed v4 partial-cleanup evidence scope"
     );
     Ok(())
 }
@@ -178,8 +180,13 @@ fn persist(path: &Path, v: &Value) -> Result<()> {
     let mut t = tempfile::NamedTempFile::new_in(parent)?;
     t.as_file()
         .set_permissions(fs::Permissions::from_mode(0o400))?;
-    serde_json::to_writer_pretty(t.as_file_mut(), v)?;
-    t.write_all(b"\n")?;
+    let mut bytes = serde_json::to_vec_pretty(v)?;
+    bytes.push(b'\n');
+    ensure!(
+        bytes.len() as u64 <= PARTIAL_CHECK_MAX_BYTES,
+        "partial cleanup receipt exceeded bound"
+    );
+    t.write_all(&bytes)?;
     t.as_file().sync_all()?;
     t.persist_noclobber(path)
         .map_err(|e| anyhow::anyhow!("output already occupied: {e}"))?;
@@ -252,7 +259,7 @@ fn run() -> Result<()> {
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v3/cleanup"
+            "/usr/local/lib/jetstreamer/horizon-holding141-incremental-cleanup-20261119-v4/cleanup"
         ),
         "sealed image path required"
     );
@@ -313,7 +320,8 @@ fn run() -> Result<()> {
         "selected cache identity changed"
     );
     let mounts = incremental::incremental_mounts(target)?;
-    let tree = incremental::cache_tree_with_policy(target, 1001, true)?;
+    let selection = incremental::select_single_link_files(target, 1001)?;
+    let tree = serde_json::to_value(&selection)?;
     let preserved = retained()?;
     let refs = consumers()?;
     let result = json!({"schema":SCHEMA,"profile":PROFILE,"source_commit":plan.source_commit,"cargo_lock_sha256":plan.cargo_lock_sha256,"self_sha256":args[5],"plan":{"path":pb.path,"sha256":pb.sha256},"cache":tree,"group":group,"consumers":refs,"retained":preserved,"mount_census_sha256":mounts,"cache_unused_proven":unused(&refs),"archive_deletion_authorized":false,"DATA_credit_bytes":0,"r2_mutations":false});
@@ -325,7 +333,7 @@ fn run() -> Result<()> {
     lock_unchanged(&shared, Path::new(LOCK))?;
     lock_unchanged(&cargo, &Path::new(DEBUG).join(".cargo-lock"))?;
     ensure!(
-        incremental::cache_tree_with_policy(target, 1001, true)? == tree
+        incremental::select_single_link_files(target, 1001)? == selection
             && incremental::incremental_mounts(target)? == mounts
             && retained()? == preserved
             && private_group()? == group
@@ -333,13 +341,16 @@ fn run() -> Result<()> {
         "cache or consumers changed during check"
     );
     if let Some(prior) = &plan.prior_check {
-        let previous = bound_json(prior)?;
+        let previous = evidence::bound_partial_check(prior)?;
         ensure!(
             previous["schema"] == SCHEMA
                 && previous["profile"] == PROFILE
                 && previous["cache_unused_proven"] == true
                 && previous["cache"] == tree
                 && previous["retained"] == preserved
+                && previous["group"] == group
+                && previous["mount_census_sha256"] == mounts
+                && previous["self_sha256"] == args[5]
                 && previous["source_commit"] == plan.source_commit
                 && previous["cargo_lock_sha256"] == plan.cargo_lock_sha256,
             "prior positive proof differs"
@@ -350,28 +361,31 @@ fn run() -> Result<()> {
         let parent = plan.output.parent().unwrap();
         persist(
             &parent.join("intent.json"),
-            &json!({"schema":"horizon-holding141-incremental-retirement-intent-v1","cache":tree,"prior_check":{"path":prior.path,"sha256":prior.sha256},"current_check":{"path":plan.output,"sha256":hash_file(&plan.output,1<<20)?.0},"retained":preserved}),
+            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-intent-v4","partial_cleanup":true,"cache":tree,"prior_check":{"path":prior.path,"sha256":prior.sha256},"current_check":{"path":plan.output,"sha256":hash_file(&plan.output,PARTIAL_CHECK_MAX_BYTES)?.0},"retained":preserved}),
         )?;
         no_builders()?;
         lock_unchanged(&shared, Path::new(LOCK))?;
         lock_unchanged(&cargo, &Path::new(DEBUG).join(".cargo-lock"))?;
         ensure!(
             unused(&consumers()?)
-                && incremental::cache_tree_with_policy(target, 1001, true)? == tree
+                && incremental::select_single_link_files(target, 1001)? == selection
                 && incremental::incremental_mounts(target)? == mounts
                 && private_group()? == group
                 && retained()? == preserved,
             "pre-removal custody changed"
         );
-        fs::remove_dir_all(target)?;
-        File::open(DEBUG)?.sync_all()?;
+        let after = incremental::retire_single_link_files(target, 1001, &selection)?;
         ensure!(
-            !target.try_exists()? && retained()? == preserved,
-            "cache remains or retained artifacts changed"
+            retained()? == preserved
+                && incremental::incremental_mounts(target)? == mounts
+                && private_group()? == group,
+            "retained artifacts or custody changed"
         );
+        lock_unchanged(&shared, Path::new(LOCK))?;
+        lock_unchanged(&cargo, &Path::new(DEBUG).join(".cargo-lock"))?;
         persist(
             &parent.join("completion.json"),
-            &json!({"schema":"horizon-holding141-incremental-retirement-completion-v1","cache":tree,"cache_absent":true,"retained":preserved,"DATA_credit_bytes":0,"actual_free_delta_claimed":false,"r2_mutations":false}),
+            &json!({"schema":"horizon-holding141-incremental-partial-cleanup-completion-v4","partial_cleanup":true,"cache":tree,"selected_files_absent":true,"removed_files":selection.selected_files.len(),"preserved_shared_files":after.preserved_shared_files,"all_directories_preserved":true,"selected_allocated_bytes":selection.selected_allocated_bytes,"post_operation_allocated_bytes":after.cache["physical_bytes"],"post_operation_cache":after.cache,"retained":preserved,"DATA_credit_bytes":0,"actual_free_delta_claimed":false,"r2_mutations":false}),
         )?;
     }
     println!("{}", plan.output.display());

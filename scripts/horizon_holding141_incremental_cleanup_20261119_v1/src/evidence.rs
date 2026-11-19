@@ -55,13 +55,24 @@ pub(crate) fn hash_file(path: &Path, maximum: u64) -> Result<(String, fs::Metada
     Ok((format!("{:x}", hash.finalize()), before))
 }
 pub(crate) fn bound_json(bound: &Bound) -> Result<Value> {
+    bound_json_with_limit(bound, 1 << 20)
+}
+pub(crate) fn bound_partial_check(bound: &Bound) -> Result<Value> {
+    let value = bound_json_with_limit(bound, PARTIAL_CHECK_MAX_BYTES)?;
+    ensure!(
+        value["schema"] == SCHEMA && value["profile"] == PROFILE,
+        "not a v4 partial-cleanup check"
+    );
+    Ok(value)
+}
+fn bound_json_with_limit(bound: &Bound, maximum: u64) -> Result<Value> {
     ensure!(
         hex(&bound.sha256, 64)
             && bound.path.is_absolute()
             && bound.path.canonicalize()? == bound.path,
         "noncanonical evidence binding"
     );
-    let (sha, m) = hash_file(&bound.path, 1 << 20)?;
+    let (sha, m) = hash_file(&bound.path, maximum)?;
     ensure!(
         sha == bound.sha256 && m.uid() == 0 && m.mode() & 0o222 == 0,
         "mutable or mismatching evidence"
@@ -71,10 +82,10 @@ pub(crate) fn bound_json(bound: &Bound) -> Result<Value> {
         .read(true)
         .custom_flags(libc::O_NOFOLLOW)
         .open(&bound.path)?
-        .take((1 << 20) + 1)
+        .take(maximum + 1)
         .read_to_end(&mut bytes)?;
     ensure!(
-        bytes.len() <= 1 << 20
+        bytes.len() as u64 <= maximum
             && format!("{:x}", Sha256::digest(&bytes)) == bound.sha256
             && identity(&m) == identity(&fs::symlink_metadata(&bound.path)?),
         "evidence changed at decode"
