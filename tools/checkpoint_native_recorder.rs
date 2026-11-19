@@ -190,7 +190,9 @@ fn segment(
             runtime_toolchain: "rustc1.52.1-test-image".into(),
             genesis_hash: genesis,
             bootstrap_state_kind: if start.slot == 0 {
-                BootstrapStateKind::Genesis
+                // The fixture starts after the already-frozen bank at slot 0;
+                // it carries that bank into slot 1 rather than replaying genesis.
+                BootstrapStateKind::CarriedBank
             } else {
                 BootstrapStateKind::SnapshotArchive
             },
@@ -490,7 +492,7 @@ fn main() -> Result<()> {
         base: ArchiveProvenanceV3 {
             assembly_profile: "synthetic/native-recorder-restart-v1".into(),
             genesis_hash: hash(&genesis)?,
-            bootstrap_state_kind: BootstrapStateKind::Genesis,
+            bootstrap_state_kind: BootstrapStateKind::CarriedBank,
             bootstrap_state: StateCommitment {
                 slot: 0,
                 kind: StateCommitmentKind::LegacyAccountsHash,
