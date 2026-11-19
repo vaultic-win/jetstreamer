@@ -16,9 +16,9 @@ use std::{
 const UNIT: &str = "horizon265-prestart-control-v1.service";
 const OVERRIDE: &str = "horizon265-prestart-override-v1.service";
 const RETENTION: &str = "horizon265-prestart-control-retention-v1.target";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v1";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v2";
 const BINARY: &str =
-    "/var/lib/jetstreamer/horizon265-prestart-control-package-v1/horizon-prestart-controls";
+    "/var/lib/jetstreamer/horizon265-prestart-control-package-v2/horizon-prestart-controls";
 const STATE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1/tokens";
 const MARKERS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v1/markers";
@@ -75,6 +75,67 @@ fn bytes(b: &Bound, immutable: bool) -> Result<Vec<u8>> {
     let raw = fs::read(&b.path)?;
     ensure!(digest(&raw) == b.sha256, "input digest differs");
     Ok(raw)
+}
+// Ubuntu's installed coreutils use two root-owned symlinks to a shared,
+// hard-linked executable. This exception is only for the two system commands;
+// immutable campaign evidence continues through the strict reader above.
+fn system_binary(b: &Bound) -> Result<()> {
+    let name = match b.path.to_str() {
+        Some("/usr/bin/sleep") => "sleep",
+        Some("/usr/bin/test") => "test",
+        _ => bail!("unregistered system gate executable"),
+    };
+    let link = fs::symlink_metadata(&b.path)?;
+    ensure!(
+        link.is_symlink() && link.uid() == 0,
+        "system executable link custody"
+    );
+    let expected = PathBuf::from(format!("../lib/cargo/bin/coreutils/{name}"));
+    ensure!(
+        fs::read_link(&b.path)? == expected,
+        "system executable link changed"
+    );
+    let target = PathBuf::from(format!("/usr/lib/cargo/bin/coreutils/{name}"));
+    ensure!(
+        b.path.canonicalize()? == target,
+        "system executable resolution changed"
+    );
+    for p in b.path.ancestors().skip(1).chain(target.ancestors().skip(1)) {
+        let m = fs::symlink_metadata(p)?;
+        ensure!(
+            m.is_dir() && m.uid() == 0 && m.mode() & 0o022 == 0,
+            "system executable ancestor custody"
+        );
+    }
+    let before = fs::symlink_metadata(&target)?;
+    ensure!(
+        before.is_file()
+            && before.uid() == 0
+            && before.mode() & 0o022 == 0
+            && before.nlink() == 116
+            && before.len() <= 16 << 20,
+        "system executable target custody"
+    );
+    let raw = fs::read(&target)?;
+    let after = fs::symlink_metadata(&target)?;
+    ensure!(
+        before.dev() == after.dev()
+            && before.ino() == after.ino()
+            && before.len() == after.len()
+            && before.mode() == after.mode()
+            && before.uid() == after.uid()
+            && before.gid() == after.gid()
+            && before.nlink() == after.nlink()
+            && before.mtime() == after.mtime()
+            && before.mtime_nsec() == after.mtime_nsec()
+            && before.ctime() == after.ctime()
+            && before.ctime_nsec() == after.ctime_nsec()
+            && fs::read_link(&b.path)? == expected
+            && b.path.canonicalize()? == target
+            && digest(&raw) == b.sha256,
+        "system executable changed during read"
+    );
+    Ok(())
 }
 fn absent(p: &Path) -> Result<()> {
     match fs::symlink_metadata(p) {
@@ -574,8 +635,8 @@ fn run(plan: Bound, self_sha: &str) -> Result<()> {
         p.sleep.path == Path::new("/usr/bin/sleep") && p.test.path == Path::new("/usr/bin/test"),
         "native gate executables"
     );
-    bytes(&p.sleep, false)?;
-    bytes(&p.test, false)?;
+    system_binary(&p.sleep)?;
+    system_binary(&p.test)?;
     publication(&p.source_publication)?;
     let production = String::from_utf8(bytes(&p.production_template, true)?)?;
     gate_lines(&production, PROD_TOKENS)?;
@@ -706,8 +767,8 @@ fn run(plan: Bound, self_sha: &str) -> Result<()> {
     );
     drained(UNIT)?;
     drained(OVERRIDE)?;
-    bytes(&p.sleep, false)?;
-    bytes(&p.test, false)?;
+    system_binary(&p.sleep)?;
+    system_binary(&p.test)?;
     ensure!(
         digest(&fs::read("/proc/self/exe")?) == self_sha,
         "controller changed during controls"
@@ -751,6 +812,16 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn system_link_exception_cannot_read_campaign_evidence() {
+        assert!(
+            system_binary(&Bound {
+                path: "/var/lib/jetstreamer/proof.json".into(),
+                sha256: "0".repeat(64)
+            })
+            .is_err()
+        );
+    }
     #[test]
     fn exact_native_gate_preserves_three_ordered_fail_closed_commands() {
         let t = template(false);
