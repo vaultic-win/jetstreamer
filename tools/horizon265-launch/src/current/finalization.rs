@@ -293,16 +293,28 @@ pub(super) fn validate(
         fleet["diagnostics"] == json!([]) && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
-    let pipelines = fleet["pipelines"].as_array().context("pipeline census")?;
-    let diagnostics = observer["diagnostic_replays"]
+    // Admission independently authenticates both exact native terminal peers.
+    let pipelines: Vec<_> = fleet["pipelines"]
+        .as_array()
+        .context("pipeline census")?
+        .iter()
+        .filter(|e| !peers::selected(e))
+        .collect();
+    let observed_diagnostics = observer["diagnostic_replays"]
         .as_array()
         .context("diagnostic observation census")?;
+    let mut diagnostics = Vec::new();
+    for d in observed_diagnostics {
+        if !peers::terminal_diagnostic(d)? {
+            diagnostics.push(d);
+        }
+    }
     ensure!(
         pipelines.len() == diagnostics.len() && pipelines.len() <= 4,
         "missing/unregistered finalization owner"
     );
     let mut seen = BTreeSet::new();
-    for entry in pipelines {
+    for &entry in &pipelines {
         row(entry, fleet, rows, boot)?;
         let epoch = num(entry, "epoch")?;
         ensure!(seen.insert(epoch), "duplicate finalization owner");
@@ -321,7 +333,7 @@ pub(super) fn validate(
     for a in fleet["active"].as_array().context("active census")? {
         if a["phase"] == "producer-finalization" {
             ensure!(
-                pipelines.iter().filter(|p| *p == a).count() == 1,
+                pipelines.iter().filter(|p| **p == a).count() == 1,
                 "unbound active finalization"
             );
         } else {
@@ -339,6 +351,9 @@ pub(super) fn validate(
 }
 pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
+        if peers::selected(e) {
+            continue;
+        }
         let p = registered(num(e, "epoch")?)?;
         Bound::new(p.node, p.node_sha).artifact()?;
         Bound::new(p.manifest, p.manifest_sha).artifact()?;

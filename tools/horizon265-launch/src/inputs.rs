@@ -137,6 +137,7 @@ pub(super) fn check_static() -> Result<()> {
     );
     Ok(())
 }
+#[cfg(test)]
 fn accepted_terminal(v: &Value) -> Result<()> {
     ensure!(
         v["LoadState"] == "loaded"
@@ -183,26 +184,7 @@ pub(super) fn capabilities(v: &Value) -> Result<()> {
         bound(&v[k])?;
     }
     codec(&v["codec_regressions"])?;
-    let native = bound(&v["native_input"])?;
-    ensure!(
-        native["schema"] == "horizon265-exact-worker-cold-input-qualification-v1"
-            && native["worker"] == v["worker"]
-            && native["bootstrap_sha256"]
-                == "04eb59e2dbbc2b0d4f1535741fa9d56794c32ad18e14c98df4fa76a5ae397641"
-            && native["genesis_sha256"]
-                == "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
-            && native["bootstrap_slot"] == 114479281
-            && native["accounts_hash"] == "Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW"
-            && native["full_accounts_commitment_verified"] == true
-            && native["guard_trips"] == 0
-            && native["worker_shutdown_acknowledged"] == true
-            && native["worker_reaped"] == true
-            && native["entry_replay"] == false,
-        "native selected-worker cold-input gate missing"
-    );
-    accepted_terminal(&native["terminal"])?;
-    bound(&native["actual_command_and_journal"])?;
-    bound(&native["source_provenance"])?;
+    super::current::native_input(&v["native_input"])?;
     let probes = bound(&v["node_negative_probes"])?;
     ensure!(
         probes["schema"] == "horizon265-selected-node-negative-probes-v1"

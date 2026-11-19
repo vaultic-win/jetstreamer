@@ -313,6 +313,7 @@ pub(super) fn census(
     )?;
     let mut before = BTreeMap::new();
     let mut currents = BTreeMap::new();
+    let mut terminals = BTreeMap::new();
     for r in rows {
         ensure!(
             r.unit.ends_with(".service")
@@ -322,6 +323,17 @@ pub(super) fn census(
                 && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
+        if peers::is_retained(&r.unit) {
+            ensure!(
+                r.release.is_none(),
+                "native terminal release not authorized"
+            );
+            let v = n.show(&r.unit)?;
+            peers::terminal_owner(&r.unit, &v)?;
+            same_owner(&fleet["unit_census"][&r.unit], &v)?;
+            terminals.insert(r.unit.clone(), v);
+            continue;
+        }
         if r.release.is_some() {
             drain(n, r)?;
             continue;
@@ -471,6 +483,11 @@ pub(super) fn census(
             .maximum_memory_bytes;
         let current = finite_owner(&after, &unit, text(&old, "InvocationID")?, cap)?;
         currents.entry(unit).and_modify(|v| *v = (*v).min(current));
+    }
+    for (unit, old) in terminals {
+        let after = n.show(&unit)?;
+        same_terminal_census(&old, &after)?;
+        peers::terminal_owner(&unit, &after)?;
     }
     for c in periodic {
         periodic::observe(n, c)?;

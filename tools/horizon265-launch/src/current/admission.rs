@@ -300,6 +300,7 @@ pub(super) fn validate(
     );
     super::super::inputs::capabilities(&binding(&review["input_capability"])?.sealed()?)?;
     let (rows, auxiliary_overhead, periodic) = reservations(review)?;
+    peers::validate(&fleet, &rows)?;
     finalization::validate(&fleet, &observer, &rows, &boot)?;
     finalization::verify_inputs(&fleet)?;
     ensure!(

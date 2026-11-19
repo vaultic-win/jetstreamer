@@ -1,6 +1,23 @@
 # Closed epoch 265 replacement launcher
 
-Source candidate, not yet compiled, deployed or operationally qualified.
+Source candidate; guarded full replay has not yet been operationally qualified.
+
+The exact selected-worker native input completed successfully on November19.
+Its complete guarded terminal proof is
+`/var/lib/jetstreamer/horizon-native265-terminal-proof-2048-20261119-v1/proof.json`,
+SHA256 `62d7d71ee1a9c7215c4fffa7d5fec49ef449bb6be24de3e450432217a3efa519`.
+The proof preserves the original startup and all52 protective receipts; no
+retrospective running claim or repeated native initialization was used. The input
+capability now consumes this exact accepted proof directly.
+
+The retained-peer adapter carries native211 and native265 through full265
+admission with their full original memory, disk growth and floor obligations.
+It distinguishes the fleet's compact terminal census from the fresh full PID1
+manager properties, checking both without inventing missing fields. Native265's
+exact unavailable postterminal resource diagnostic is retained as history and
+never counted as executing or finalizing replay. Actual PID/cgroup drainage is
+checked twice; none of these changes authorizes resource release. The native
+initialization task described below is historical and must not be repeated.
 
 The ordinary-node startup sequence comes from `horizon251-launch5`: the same
 60-second `ExecStartPre` gate, original 50-second operator deadline, genuine

@@ -20,6 +20,8 @@ mod capacity;
 mod finalization;
 #[path = "current/live.rs"]
 mod live;
+#[path = "current/peers.rs"]
+mod peers;
 #[path = "current/periodic.rs"]
 mod periodic;
 #[path = "current/publication.rs"]
@@ -554,4 +556,9 @@ fn retained_guards(n: &mut Native, review: &Value) -> Result<()> {
     }
     ensure!(seen.len() == claims.len(), "foreign retained guard claim");
     Ok(())
+}
+
+/// Exact native265 result and completed guard history accepted by the Rust capture.
+pub(super) fn native_input(reference: &Value) -> Result<()> {
+    peers::input265(reference)
 }
