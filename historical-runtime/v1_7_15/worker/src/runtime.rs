@@ -1358,6 +1358,7 @@ mod tests {
     }
 
     include!("checkpoint_portability_tests.rs");
+    include!("checkpoint_ipc_tests.rs");
 
     fn test_state(ticks_per_slot: u64, hashes_per_tick: Option<u64>) -> (RuntimeState, Keypair) {
         let leader = Pubkey::new_from_array([7; 32]);
