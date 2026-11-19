@@ -323,3 +323,39 @@ the recorder consumes the retained transcript after the native run. It does
 not exercise a live parent checkpoint/stop/resume controller, a full epoch,
 mainnet state, canonical-mainnet terminal evidence, or full plugin playback
 of an R2 object. Those gates remain open, and no live deployment changed.
+
+The parent now has an explicit `--qualification-checkpoint-export=DIR` path
+(source `7b2d4338`). It is limited to standalone focused v1.7.15 qualification
+with exactly one explicit `--verify`, the exact canonical terminal checkpoint,
+a fresh segment output and an empty private canonical export directory. Cohort,
+carried-state, restart and registered runtime-handoff modes remain separate.
+After closing the segment, it exports the terminal snapshot and issues a fresh
+native freeze. Every checkpoint field, bootstrap field and emitted write cursor
+must remain identical, and that second freeze must emit no additional writes.
+Only after ordered worker shutdown and full segment-manifest readback does it
+publish and reread the snapshot manifest. Shutdown acknowledgment does not prove
+kernel reaping has completed or authorize scratch deletion.
+
+The bound snapshot-manifest writer compares the measured size and digest with
+the worker export before publishing the no-clobber manifest. A mismatch must
+leave no success sidecar; the prior measuring writer remains available for its
+existing callers. `tools/checkpoint_export_tests.rs` compiles the production
+policy, evidence types and snapshot-manifest modules directly. The sealed test
+image is
+`/var/lib/jetstreamer/horizon-checkpoint-focused-tests-20261119-v1/checkpoint_export_tests`,
+SHA-256 `52cf4ee385947bff07786c2e57096bee83d135b6ba0a153ae5d9e06b85cf6584`.
+Invocations `2614a18c360a4b769ea3845a10a3b7c8` and
+`801fa28e7ccc4aa0a4335713fd7d66ec` passed three policy tests and seven manifest
+tests respectively. Coverage includes every frozen evidence field and cursor,
+new writes, incompatible modes, private-directory and symlink rejection,
+changed export bytes, readback, and no-clobber publication. The initial build
+failed because the linker temporary directory was read-only; the retry gave
+that build an isolated writable temporary directory and succeeded under the
+same 2 GB cap, with a reported 277.9 MiB peak.
+
+These are policy and evidence-publication tests. The new full node build and
+actual CLI qualification are still pending, as are mainnet export/restore and
+the pressure-stop lifecycle. This source change does not authorize a sixth lane,
+arbitrary early-prefix completion, or use of the private epoch-203/213 restart
+routes for other epochs. Evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-focused-export-20261119-v1`.
