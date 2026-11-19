@@ -118,6 +118,8 @@ struct Config {
     retained_prefix205_ram: bool,
     #[serde(default)]
     singleton247_finalization: bool,
+    #[serde(default)]
+    singleton_finalization_epochs: Vec<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -332,7 +334,8 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
         !config.replays.is_empty()
             || !config.diagnostic_replays.is_empty()
             || !config.native_input_diagnostics.is_empty()
-            || config.singleton247_finalization,
+            || config.singleton247_finalization
+            || !config.singleton_finalization_epochs.is_empty(),
         "at least one replay is required"
     );
     ensure!(config.output.is_absolute(), "output path must be absolute");
@@ -372,6 +375,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "diagnostic_replay_count": config.diagnostic_replays.len(),
             "native_input_resource_diagnostic_count":config.native_input_diagnostics.len(),
             "singleton247_finalization_resource_only":config.singleton247_finalization,
+            "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
             "live_invocations_verified": false,
@@ -1939,8 +1943,8 @@ fn run(config: Config) -> Result<()> {
     diagnostic_observations.extend(native_input_diagnostic::sample(
         &config.native_input_diagnostics,
     ));
-    if config.singleton247_finalization {
-        diagnostic_observations.push(singleton247_finalization::sample(started_unix));
+    for epoch in singleton247_finalization::epochs(&config)? {
+        diagnostic_observations.push(singleton247_finalization::sample(epoch, started_unix)?);
     }
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
@@ -2460,6 +2464,7 @@ mod tests {
             host_global_pressure: false,
             retained_prefix205_ram: false,
             singleton247_finalization: false,
+            singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
                 supervisor_profile: "jetstreamer-private-epoch203-ram-bounded-runner-plan-v1"

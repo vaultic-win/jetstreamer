@@ -23,7 +23,17 @@ The November 19 bounded qualification passed nine tests, strict all-target
 Clippy and the locked/offline release build under a 2 GB memory limit. The
 evidence is retained in Foundation's private
 `horizon265-input-packet-build-20261119-v3` diagnostics directory. This qualifies
-the checker implementation; no production input packet has yet been verified.
+the checker implementation. A production input packet subsequently passed on
+November 19 at 15:52 UTC under a 512 MiB memory limit. It authenticates the
+retained bootstrap, node, worker, genesis, three codec sources and all three
+sealed indexes, including their CID metadata and nonoverlapping bucket bounds.
+The packet is retained at
+`/home/ubuntu/.codex/diagnostics/horizon265-input-cache-20261119-v1/input-packet.json`
+with SHA256 `f7dbb6eedd4f47c940c959639d399ea3af68343f18fc894c736170f6dc089153`.
+The original index files remain preserved; the new immutable cache is
+`/var/lib/jetstreamer/horizon265-index-20261119-v1`. This is input custody only:
+all eight authority flags remain false, and the remaining execution gates below
+are still required.
 Retain commands, source hashes, actual service completion and binary digest
 when rebuilding.
 Publish the source to `origin/account-updates` before any epoch admission. Seal
