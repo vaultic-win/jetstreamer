@@ -1,6 +1,7 @@
 //! A periodic oneshot may be firing while its last successful proof remains fresh.
 use super::native265::{self as c, num, text};
 use super::*;
+pub(super) const MAX_FIRING_MICROS: u64 = 60_000_000;
 const TIMER: &str = "horizon-native265-protective-v1.timer";
 const FIELDS: &str = "LoadState,ActiveState,SubState,InvocationID,Result,ExecMainStatus,ExecStart,DropInPaths,Restart,MemoryMax,MemorySwapMax,StartLimitIntervalUSec,Type,RemainAfterExit,TimeoutStartUSec,ExecMainStartTimestampMonotonic";
 fn manager_values(m: &Value, gb: &BoundFile, now: u64) -> Result<bool> {
@@ -15,7 +16,7 @@ fn manager_values(m: &Value, gb: &BoundFile, now: u64) -> Result<bool> {
         ("LoadState", "loaded"),
         ("Type", "oneshot"),
         ("RemainAfterExit", "no"),
-        ("TimeoutStartUSec", "15s"),
+        ("TimeoutStartUSec", "1min"),
         ("Restart", "no"),
         ("MemoryMax", "268435456"),
         ("MemorySwapMax", "0"),
@@ -34,7 +35,7 @@ fn manager_values(m: &Value, gb: &BoundFile, now: u64) -> Result<bool> {
     if firing {
         let start = text(m, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
         ensure!(
-            start > 0 && start <= now && now - start <= 15_000_000,
+            start > 0 && start <= now && now - start <= MAX_FIRING_MICROS,
             "265 guard firing exceeded its bound"
         );
     } else {
@@ -100,7 +101,7 @@ fn completed(
         .context("265 latest guard completion lacks start")?;
     ensure!(
         finished > start
-            && finished - start <= 15_000_000
+            && finished - start <= MAX_FIRING_MICROS
             && realtime <= wall
             && wall - realtime <= 120,
         "265 completed guard stale or over bound"
@@ -263,7 +264,7 @@ mod tests {
         };
         let gid = "b".repeat(32);
         let next = "c".repeat(32);
-        let mut manager = json!({"LoadState":"loaded","Type":"oneshot","RemainAfterExit":"no","TimeoutStartUSec":"15s","Restart":"no","MemoryMax":"268435456","MemorySwapMax":"0","StartLimitIntervalUSec":"0","DropInPaths":"","Result":"success","ExecStart":format!("{{ path={} ; argv[]={0} {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no }}",c::GUARD,gb.path.display(),gb.sha256,c::GUARD_SHA),"ActiveState":"inactive","SubState":"dead","ExecMainStatus":"0","InvocationID":gid,"ExecMainStartTimestampMonotonic":"100"});
+        let mut manager = json!({"LoadState":"loaded","Type":"oneshot","RemainAfterExit":"no","TimeoutStartUSec":"1min","Restart":"no","MemoryMax":"268435456","MemorySwapMax":"0","StartLimitIntervalUSec":"0","DropInPaths":"","Result":"success","ExecStart":format!("{{ path={} ; argv[]={0} {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no }}",c::GUARD,gb.path.display(),gb.sha256,c::GUARD_SHA),"ActiveState":"inactive","SubState":"dead","ExecMainStatus":"0","InvocationID":gid,"ExecMainStartTimestampMonotonic":"100"});
         let row = |iid: &str, message: String, mono: u64| json!({"_PID":"1","_UID":"0","_BOOT_ID":"boot","UNIT":c::GUARD_UNIT,"INVOCATION_ID":iid,"MESSAGE":message,"__MONOTONIC_TIMESTAMP":mono.to_string(),"__REALTIME_TIMESTAMP":"100000000"});
         let mut rows = vec![
             row(&gid, format!("Starting {} - guard", c::GUARD_UNIT), 100),
@@ -304,11 +305,86 @@ mod tests {
         );
         assert!(completed(&rows, &manager, "old-boot", true, 1000, 101).is_err());
         assert!(completed(&rows, &manager, "boot", true, 1000, 221).is_err());
-        assert!(manager_values(&manager, &gb, 15_001_000).is_err());
+        assert!(manager_values(&manager, &gb, 60_001_000).is_err());
         rows[2]["MESSAGE"] = json!("Failed guard");
         assert!(completed(&rows, &manager, "boot", true, 1000, 101).is_err());
         let timer = json!({"LoadState":"loaded","ActiveState":"active","SubState":"running","Unit":c::GUARD_UNIT,"DropInPaths":"","Job":"","NextElapseUSecMonotonic":"infinity"});
         timer_values(&timer, true).unwrap();
         assert!(timer_values(&timer, false).is_err());
+    }
+    fn retained_manager() -> (BoundFile, Value) {
+        let gb=BoundFile { path:"/var/lib/jetstreamer/horizon-native265-guard-binding-native-20261119-v1/guard-plan.json".into(), sha256:"d6aa8d26f07c17ce85705f4cb4cd554b4a64d56fcb3fd02726a87fe7b04983ea".into() };
+        // Derived manager fixture, NOT a captured PID1 manager snapshot. The
+        // retained service declares TimeoutStartSec=60; PID1 renders it as 1min.
+        let m = json!({"LoadState":"loaded","Type":"oneshot","RemainAfterExit":"no","TimeoutStartUSec":"1min","Restart":"no","MemoryMax":"268435456","MemorySwapMax":"0","StartLimitIntervalUSec":"0","DropInPaths":"","Result":"success","ExecStart":format!("{{ path={} ; argv[]={0} {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no }}",c::GUARD,gb.path.display(),gb.sha256,c::GUARD_SHA),"ActiveState":"inactive","SubState":"dead","ExecMainStatus":"0","InvocationID":"50fa014e70b54592a43a35606621b1eb","ExecMainStartTimestampMonotonic":"263167558159"});
+        (gb, m)
+    }
+    #[test]
+    fn retained_first_fire_accepts_actual_sixty_second_contract() {
+        let rows: Vec<Value> =
+            serde_json::from_str(include_str!("fixtures/native265-first-fire-20261119.json"))
+                .unwrap();
+        let (gb, m) = retained_manager();
+        assert!(!manager_values(&m, &gb, 263168374797).unwrap());
+        assert_eq!(
+            completed(
+                &rows,
+                &m,
+                "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+                false,
+                263168374797,
+                1795118095
+            )
+            .unwrap(),
+            "50fa014e70b54592a43a35606621b1eb"
+        );
+        for timeout in ["15s", "infinity", "0", "2min"] {
+            let mut bad = m.clone();
+            bad["TimeoutStartUSec"] = json!(timeout);
+            assert!(
+                manager_values(&bad, &gb, 263168374797).is_err(),
+                "{timeout}"
+            );
+        }
+    }
+    #[test]
+    fn actual_sixty_second_boundary_applies_to_firing_and_completed_proof() {
+        let (gb, mut m) = retained_manager();
+        m["ActiveState"] = json!("activating");
+        m["SubState"] = json!("start");
+        let start = 263167558159;
+        assert!(manager_values(&m, &gb, start + MAX_FIRING_MICROS).unwrap());
+        assert!(manager_values(&m, &gb, start + MAX_FIRING_MICROS + 1).is_err());
+        m["ActiveState"] = json!("inactive");
+        m["SubState"] = json!("dead");
+        let mut rows: Vec<Value> =
+            serde_json::from_str(include_str!("fixtures/native265-first-fire-20261119.json"))
+                .unwrap();
+        rows.truncate(2);
+        rows[1]["__MONOTONIC_TIMESTAMP"] = json!((start + MAX_FIRING_MICROS).to_string());
+        rows[1]["__REALTIME_TIMESTAMP"] = json!("1795118154435640");
+        assert!(
+            completed(
+                &rows,
+                &m,
+                "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+                false,
+                start + MAX_FIRING_MICROS + 1,
+                1795118155
+            )
+            .is_ok()
+        );
+        rows[1]["__MONOTONIC_TIMESTAMP"] = json!((start + MAX_FIRING_MICROS + 1).to_string());
+        assert!(
+            completed(
+                &rows,
+                &m,
+                "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+                false,
+                start + MAX_FIRING_MICROS + 1,
+                1795118155
+            )
+            .is_err()
+        );
     }
 }

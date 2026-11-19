@@ -1,0 +1,1213 @@
+{
+  "startup_handoff": {
+    "path": "/var/lib/jetstreamer/horizon-native265-execution-native-20261119-v1/guarded-startup-handoff.json",
+    "sha256": "896c9678b442fb31f0eb679d457c425423f24e0afd3fbc1ea3432fb318e8a208"
+  },
+  "values": {
+    "/var/lib/jetstreamer/horizon-native265-execution-native-20261119-v1/guarded-startup-handoff.json": {
+      "admission": {
+        "path": "/var/lib/jetstreamer/horizon-native265-admission-native-20261119-v1/admission.json",
+        "sha256": "a9d20936213c3eb0c875726d896aae24b18827210d7adedddfad0f67dbb5bb00"
+      },
+      "canonical_sidecar_authorized": false,
+      "entry_replay": false,
+      "first_guard_pid1_journal": {
+        "path": "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-PID1.json",
+        "sha256": "13730360e2bf3648237b5130314274bd5c043ff77db40ea1a55be574cc010d48"
+      },
+      "first_guard_sample": {
+        "path": "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-sample.json",
+        "sha256": "e2f670480ac6b8ddf71df25ebe212b55c0bcfd6bd811100fc025c2fdb00a1172"
+      },
+      "first_guard_token": {
+        "path": "/var/lib/jetstreamer/horizon-native265-startup-tokens/ce5f66a82fdd4c0e93ca99f27b925112/guard-admission.json",
+        "sha256": "38201691bbc6c63f036b536fd3604237afe2f4b630c6c9c9ff14348295f47e86"
+      },
+      "full_epoch_qualified": false,
+      "guard_plan": {
+        "path": "/var/lib/jetstreamer/horizon-native265-guard-binding-native-20261119-v1/guard-plan.json",
+        "sha256": "d6aa8d26f07c17ce85705f4cb4cd554b4a64d56fcb3fd02726a87fe7b04983ea"
+      },
+      "invocation_id": "ce5f66a82fdd4c0e93ca99f27b925112",
+      "main_pid": 1307638,
+      "native_input_qualified": false,
+      "producer": {
+        "ActiveState": "active",
+        "After": "-.mount system.slice basic.target systemd-journald.socket tmp.mount sysinit.target systemd-tmpfiles-setup.service",
+        "BindsTo": "",
+        "CPUAffinity": "48-55",
+        "CPUQuotaPerSecUSec": "8s",
+        "CapabilityBoundingSet": "",
+        "ControlGroup": "/system.slice/horizon-265-native-input-20261119-v1.service",
+        "ControlPID": "0",
+        "DefaultDependencies": "yes",
+        "Delegate": "no",
+        "DropInPaths": "",
+        "Environment": "RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH265_STARTUP_PLAN=/var/lib/jetstreamer/horizon-native265-startup-plan-native-20261119-v1/plan.json JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256=d4b85afe49e74d9a7f8e5c96393c8d5d023b1437b281ee0de186d59f6e4f23b7",
+        "ExecMainCode": "0",
+        "ExecMainStatus": "0",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; argv[]=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }",
+        "FragmentPath": "/etc/systemd/system/horizon-265-native-input-20261119-v1.service",
+        "Group": "ubuntu",
+        "Id": "horizon-265-native-input-20261119-v1.service",
+        "IgnoreOnIsolate": "no",
+        "InvocationID": "ce5f66a82fdd4c0e93ca99f27b925112",
+        "Job": "",
+        "KillMode": "control-group",
+        "LoadState": "loaded",
+        "MainPID": "1307638",
+        "MemoryHigh": "100000000000",
+        "MemoryMax": "128000000000",
+        "MemorySwapMax": "0",
+        "NRestarts": "0",
+        "NoNewPrivileges": "yes",
+        "PrivateNetwork": "yes",
+        "ProtectHome": "read-only",
+        "ProtectSystem": "strict",
+        "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+        "RemainAfterExit": "no",
+        "Requires": "sysinit.target system.slice",
+        "Restart": "no",
+        "Result": "success",
+        "RuntimeMaxUSec": "45min",
+        "StartLimitIntervalUSec": "10s",
+        "SubState": "running",
+        "TasksMax": "512",
+        "Transient": "no",
+        "TriggeredBy": "",
+        "Type": "exec",
+        "Upholds": "",
+        "User": "ubuntu",
+        "Wants": "tmp.mount -.mount"
+      },
+      "publication_authorized": false,
+      "r2_mutations": false,
+      "recorded_monotonic_us": 263168374797,
+      "recorded_unix_seconds": 1795118095,
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "retention": {
+        "ActiveState": "active",
+        "After": "horizon-265-native-input-20261119-v1.service",
+        "BindsTo": "",
+        "DefaultDependencies": "no",
+        "DropInPaths": "",
+        "FragmentPath": "/etc/systemd/system/horizon-native265-terminal-retention.target",
+        "Id": "horizon-native265-terminal-retention.target",
+        "IgnoreOnIsolate": "yes",
+        "InvocationID": "d237473241e747a38852fff69bb8c980",
+        "Job": "",
+        "LoadState": "loaded",
+        "Requires": "",
+        "StartLimitIntervalUSec": "10s",
+        "SubState": "active",
+        "Transient": "no",
+        "TriggeredBy": "",
+        "Upholds": "",
+        "Wants": ""
+      },
+      "runtime_promotion_authorized": false,
+      "schema": "horizon-native265-guarded-startup-v1",
+      "startup_plan": {
+        "path": "/var/lib/jetstreamer/horizon-native265-startup-plan-native-20261119-v1/plan.json",
+        "sha256": "d4b85afe49e74d9a7f8e5c96393c8d5d023b1437b281ee0de186d59f6e4f23b7"
+      },
+      "unit": "horizon-265-native-input-20261119-v1.service",
+      "unit_file": {
+        "path": "/var/lib/jetstreamer/horizon-native265-producer-native-20261119-v1/horizon-265-native-input-20261119-v1.service",
+        "sha256": "0ee13616e663b21764695ccb0c5ae31964b3e3351682f409089888d341612634"
+      }
+    },
+    "/var/lib/jetstreamer/horizon-native265-startup-plan-native-20261119-v1/plan.json": {
+      "admission": {
+        "path": "/var/lib/jetstreamer/horizon-native265-admission-native-20261119-v1/admission.json",
+        "sha256": "a9d20936213c3eb0c875726d896aae24b18827210d7adedddfad0f67dbb5bb00"
+      },
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "bootstrap_slot": 114479281,
+      "epoch": 265,
+      "expires_monotonic_us": 263224122519,
+      "genesis_sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945",
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "guard_unit": "horizon-native265-protective-v1.service",
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "input_packet": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-evidence-20261119-v1/input-packet.json",
+        "sha256": "f7dbb6eedd4f47c940c959639d399ea3af68343f18fc894c736170f6dc089153"
+      },
+      "issued_monotonic_us": 263164994489,
+      "maximum_memory_bytes": 128000000000,
+      "maximum_root_physical_bytes": 506191984640,
+      "minimum_free_bytes": 3216541534488,
+      "schema": "horizon-native265-startup-plan-v1",
+      "snapshot_sha256": "04eb59e2dbbc2b0d4f1535741fa9d56794c32ad18e14c98df4fa76a5ae397641",
+      "token_root": "/var/lib/jetstreamer/horizon-native265-startup-tokens",
+      "unit": "horizon-265-native-input-20261119-v1.service",
+      "worker": {
+        "path": "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15",
+        "sha256": "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4"
+      },
+      "worker_root": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1"
+    },
+    "/var/lib/jetstreamer/horizon-native265-admission-native-20261119-v1/admission.json": {
+      "actual_current_memory": {
+        "horizon-current-reader-205-audit-20261119-v4.service": 6999478272,
+        "horizon-qualify-250-reboot-20261117-v1.service": 162811727872,
+        "horizon-qualify-251-replacement-20261118-v1.service": 95567806464
+      },
+      "admitted": true,
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "candidate_incremental_peak_bytes": 506191984640,
+      "canonical_sidecar_authorized": false,
+      "capacity": {
+        "allocation_credit_taken_bytes": 0,
+        "available_memory_bytes": 1077021253632,
+        "century_floor_bytes": 280581611288,
+        "control_reserve_bytes": 1610612736,
+        "fixed_auxiliary_overhead_bytes": 2640509440,
+        "host_memory_total_bytes": 1212136964096,
+        "host_reserve_bytes": 68719476736,
+        "memory_obligation_after_bytes": 728746110976,
+        "observed_available_bytes": 4487108886528,
+        "periodic_control_envelope_bytes": 4294967296,
+        "protected_existing_floor_bytes": 3216541534488,
+        "remaining_hard_growth_bytes": 463367098368,
+        "required_initial_free_bytes": 3722733519128,
+        "retained_disk_growth_bytes": 2935959923200
+      },
+      "entry_replay": false,
+      "epoch": 265,
+      "expires_unix_seconds": 1795118151,
+      "fleet": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle1940-20261119-v1/fleet-v4.json",
+        "sha256": "e83a632fa95059dd4df249896fcc4acdc997c5809d38ce50477a509119f973e4"
+      },
+      "full_epoch_qualified": false,
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "input_packet": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-evidence-20261119-v1/input-packet.json",
+        "sha256": "f7dbb6eedd4f47c940c959639d399ea3af68343f18fc894c736170f6dc089153"
+      },
+      "issued_unix_seconds": 1795118091,
+      "maximum_memory_bytes": 128000000000,
+      "mode": "native-cold",
+      "observer": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-resume-observer-20261119-v106.json",
+        "sha256": "e2b143ad00073dd961b1be8d20a2edb8217e0dc8dfb6cd6fff027b742289eeb7"
+      },
+      "private_run_root": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+      "protected_existing_floor_bytes": 3216541534488,
+      "publication_authorized": false,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1795118091,
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "reservation_ledger": {
+        "path": "/var/lib/jetstreamer/horizon-native265-prestart-20261119-v2/ledger.json",
+        "sha256": "0e1104cbf1147a7f2a528148cdb5058af1cd38c8561e276459ca4a4956205f9b"
+      },
+      "review": {
+        "path": "/var/lib/jetstreamer/horizon-native265-normal-20261119-v1/review.json",
+        "sha256": "79493110d02b0730a0f3553564b3bd048189ba10bf92898416afe0e83bb54d0a"
+      },
+      "runtime_promotion_authorized": false,
+      "schema": "horizon-native265-current-fleet-admission-v1",
+      "source_publication": {
+        "path": "/var/lib/jetstreamer/horizon-native265-source-publication-20261119-v1/source-publication.json",
+        "sha256": "d6c667af1e9ab377b1a8dfb7f379c5584f2bd998cb2ccb1343c37542ad0c4410"
+      },
+      "unit": "horizon-265-native-input-20261119-v1.service",
+      "worker": {
+        "path": "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15",
+        "sha256": "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4"
+      }
+    },
+    "/var/lib/jetstreamer/horizon-native265-source-publication-20261119-v1/source-publication.json": {
+      "schema": "horizon-native265-source-publication-v1",
+      "remote_ref": "refs/heads/account-updates",
+      "remote_head": "accf4fa9204edb8354c68414e05f546cba2bfde1",
+      "fetched_unix_seconds": 1795116723,
+      "artifacts": [
+        {
+          "role": "harness",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+            "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+          },
+          "source_commit": "daa786c064d401a6c88d0ee54251794192e0e096",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-static-provenance-20261119-v1/harness-provenance.json",
+            "sha256": "d2ff0bd5c4b46fef5a24fc6265f9ed14a7e1448782e5ad9337371e9eb7fea9f2"
+          }
+        },
+        {
+          "role": "guard",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+            "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+          },
+          "source_commit": "00bdb61a17e66229dc61f16cfda6a573d0b05987",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-static-provenance-20261119-v1/guard-provenance.json",
+            "sha256": "20885b9f3d0871954ef4506a44a553c94727f6fcf473edf586bdb35192170e42"
+          }
+        },
+        {
+          "role": "launcher",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon-native265-controller-2bf0642f-20261119-v1/horizon-native265-launch",
+            "sha256": "b02b1f4c583f17d7278521613c2b126084d05cbfd2c4fccab33d284e2986d941"
+          },
+          "source_commit": "2bf0642fd02e752b79cc228f9c8895db942cf31b",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-static-provenance-20261119-v1/launcher-provenance.json",
+            "sha256": "26f4ee6184cbd56a0c11503146ef8ee5a4217d5af4cf547909cc9fcbd342742f"
+          }
+        },
+        {
+          "role": "sealer",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer",
+            "sha256": "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a"
+          },
+          "source_commit": "db7a9bea562a5f18ce42de394e064d4675e54fa9",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-static-provenance-20261119-v1/sealer-provenance.json",
+            "sha256": "deca165ce0f0a609a787a6380eba8728bde5f967dbab81cf21f31adbf4c55de7"
+          }
+        },
+        {
+          "role": "worker",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15",
+            "sha256": "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4"
+          },
+          "source_commit": "e3f15eb22a6da570eb142853eabc8b91871cb99f",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-static-provenance-20261119-v1/worker-provenance.json",
+            "sha256": "55c82912335460c73854261838ffe87f3f1bed9a01c4229c74d2f57d63ac484b"
+          }
+        },
+        {
+          "role": "fleet",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/jetstreamer-r2",
+            "sha256": "43c70fa88aa68f21a0bb09db716964fb18a00f82a924ce17a111c9962e8db3b0"
+          },
+          "source_commit": "57fbf5009d226c98ce76a0e3895a0206b6452eb9",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumer-provenance-20261119-v1/fleet-provenance.json",
+            "sha256": "6f5406ed0b4b70c8bd33fd7bcbb53e10ab6cae12edb7b694120dc74c2ab093ab"
+          }
+        },
+        {
+          "role": "observer",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/jetstreamer-horizon-observe",
+            "sha256": "33172cb307668e2d6881c5c7869060e8c244ff26d261aa200bb78591c8a74185"
+          },
+          "source_commit": "57fbf5009d226c98ce76a0e3895a0206b6452eb9",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumer-provenance-20261119-v1/observer-provenance.json",
+            "sha256": "4b09a0385122f66403520536f23cac0817556eebc0047fc1e54dfafc5d677c5a"
+          }
+        },
+        {
+          "role": "inactive-status",
+          "artifact": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/jetstreamer-r2",
+            "sha256": "43c70fa88aa68f21a0bb09db716964fb18a00f82a924ce17a111c9962e8db3b0"
+          },
+          "source_commit": "57fbf5009d226c98ce76a0e3895a0206b6452eb9",
+          "provenance": {
+            "path": "/var/lib/jetstreamer/horizon-native265-consumer-provenance-20261119-v1/inactive-status-provenance.json",
+            "sha256": "4d0f0d7a11f22e630a11851146bcd53994994d1ee9d9ee80cb4a43264d209272"
+          }
+        }
+      ],
+      "all_required_dependencies_in_remote": true,
+      "exact_deployed_source_provenance_reviewed": true,
+      "no_untracked_required_source": true,
+      "Main_accepted": true,
+      "pending_fields": []
+    },
+    "/var/lib/jetstreamer/horizon-native265-normal-20261119-v1/review.json": {
+      "schema": "horizon-native265-current-fleet-review-v1",
+      "epoch": 265,
+      "Main_accepted": true,
+      "single_campaign_controller_confirmed": true,
+      "main_controller_pid": 616614,
+      "main_controller_start_ticks": 11967297,
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "recorded_unix_seconds": 1795118039,
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "source_publication": {
+        "path": "/var/lib/jetstreamer/horizon-native265-source-publication-20261119-v1/source-publication.json",
+        "sha256": "d6c667af1e9ab377b1a8dfb7f379c5584f2bd998cb2ccb1343c37542ad0c4410"
+      },
+      "prestart_qualification": {
+        "path": "/var/lib/jetstreamer/horizon-native265-normal-20261119-v1/prestart.json",
+        "sha256": "36957a6a73436cb55310c32bcee14486371802de0130ca559136d7959624e411"
+      },
+      "fleet": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle1940-20261119-v1/fleet-v4.json",
+        "sha256": "e83a632fa95059dd4df249896fcc4acdc997c5809d38ce50477a509119f973e4"
+      },
+      "observer": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-resume-observer-20261119-v106.json",
+        "sha256": "e2b143ad00073dd961b1be8d20a2edb8217e0dc8dfb6cd6fff027b742289eeb7"
+      },
+      "reservation_ledger": {
+        "path": "/var/lib/jetstreamer/horizon-native265-prestart-20261119-v2/ledger.json",
+        "sha256": "0e1104cbf1147a7f2a528148cdb5058af1cd38c8561e276459ca4a4956205f9b"
+      },
+      "century": {
+        "path": "/var/lib/jetstreamer/horizon-native265-bookings-20261119-v1/century.json",
+        "sha256": "b2648ae45ad0f1933add84691b22881e3bbb1bc23e1e3cc50789c92c0f2b44b1"
+      },
+      "cpu_affinity": [
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55
+      ],
+      "attempt": "native-20261119-v1",
+      "operation": "launch",
+      "entry_replay": false,
+      "replay_launch_authorized": false,
+      "runtime_promotion_authorized": false,
+      "full_epoch_qualified": false,
+      "canonical_sidecar_authorized": false,
+      "publication_authorized": false,
+      "remote_mutations": false,
+      "r2_mutations": false,
+      "control_units": [
+        {
+          "unit": "horizon-native265-normal-control-20261119-v1.service",
+          "maximum_memory_bytes": 536870912,
+          "expected_exec_start": "{ path=/bin/bash ; argv[]=/bin/bash /var/lib/jetstreamer/horizon-native265-normal-control-20261119-v1/run.sh ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+        }
+      ]
+    },
+    "/var/lib/jetstreamer/horizon-native265-normal-20261119-v1/prestart.json": {
+      "schema": "horizon-native265-prestart-qualification-v1",
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "source_publication": {
+        "path": "/var/lib/jetstreamer/horizon-native265-source-publication-20261119-v1/source-publication.json",
+        "sha256": "d6c667af1e9ab377b1a8dfb7f379c5584f2bd998cb2ccb1343c37542ad0c4410"
+      },
+      "observer_complete_tuple_accepted": true,
+      "fleet_running_and_terminal_accepted": true,
+      "inactive_status_exact_owner_accepted": true,
+      "terminal_retention_accepted": true,
+      "pre_restore_gate_tests_accepted": true,
+      "actual_first_guard_required_before_snapshot": true,
+      "actual_native_startup_qualified": false,
+      "launcher_artifact_sha256": "b02b1f4c583f17d7278521613c2b126084d05cbfd2c4fccab33d284e2986d941",
+      "qualification_evidence": {
+        "path": "/var/lib/jetstreamer/horizon-native265-prestart-20261119-v1/qualification-evidence.json",
+        "sha256": "13a21e152f4da7b68729e82ae180f093db7e6d26a11b9bba23e773dde3939d63"
+      },
+      "entry_replay": false,
+      "replay_launch_authorized": false,
+      "runtime_promotion_authorized": false,
+      "full_epoch_qualified": false,
+      "canonical_sidecar_authorized": false,
+      "publication_authorized": false,
+      "remote_mutations": false,
+      "r2_mutations": false,
+      "protective_stop_qualification": {
+        "path": "/var/lib/jetstreamer/horizon-native265-stop-accepted-20261119-v1/qualification.json",
+        "sha256": "25d57d8ce7915d2793d528f3c655c8ea6139d17e096fe27de136d3558e8bb565"
+      }
+    },
+    "/var/lib/jetstreamer/horizon-native265-prestart-20261119-v1/qualification-evidence.json": {
+      "schema": "horizon-native265-main-static-consumer-review-v1",
+      "Main_accepted": true,
+      "qualifications": [
+        {
+          "path": "/var/lib/jetstreamer/horizon-native265-controller-2bf0642f-20261119-v1/qualification.json",
+          "sha256": "9065b592bcd00f9d54d40d163152eac54393eed91754cf98a3dd9cc7a38412ff"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/qualification.json",
+          "sha256": "3f7ba61665886b14fcb6c0393b901f2d025d2e4d273bb32cfb8af5eb8b7d12ed"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/qualification.json",
+          "sha256": "9de35138beefec4c17c6e30bbacd350fd92d279eb141e5fbccc2f684d592c886"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/observer-qualification.json",
+          "sha256": "62f45b2647062ddad2d5ae555088b04ea17bbe5ac36ed66ffe83a4951bb3404b"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-native265-observer-wrapper-accf4fa9-20261119-v1/qualification.json",
+          "sha256": "9ad3ab39d7769211006843f316821a671d7621d78ebaeeb0a1487c0a98ca8065"
+        },
+        {
+          "path": "/var/lib/jetstreamer/horizon-native265-consumers-57fbf500-20261119-v1/r2-qualification.json",
+          "sha256": "f1321f7799d3ed89f0f0df9c6827a87eb4013f0df79668eaf85d87ed78b8eaf1"
+        }
+      ],
+      "permissions": {
+        "path": "/home/ubuntu/.codex/diagnostics/horizon-native265-permissions-20261119-v1/native-open.json",
+        "sha256": "103feca743c7259ab7b6d8822bbf116e54bd14ceffb308dc5d366393d2555c0c"
+      },
+      "source_publication": {
+        "path": "/var/lib/jetstreamer/horizon-native265-source-publication-20261119-v1/source-publication.json",
+        "sha256": "d6c667af1e9ab377b1a8dfb7f379c5584f2bd998cb2ccb1343c37542ad0c4410"
+      },
+      "actual_protective_stop_pending": true,
+      "actual_native_startup_qualified": false,
+      "entry_replay": false,
+      "replay_launch_authorized": false,
+      "runtime_promotion_authorized": false,
+      "full_epoch_qualified": false,
+      "canonical_sidecar_authorized": false,
+      "publication_authorized": false,
+      "remote_mutations": false,
+      "r2_mutations": false
+    },
+    "/var/lib/jetstreamer/horizon-native265-stop-accepted-20261119-v1/qualification.json": {
+      "schema": "horizon-native265-protective-stop-qualification-v1",
+      "Main_accepted": true,
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "actual_pid1_stop_ordering_verified": true,
+      "sandbox_permissions_verified": true,
+      "original_attempt_retired_with_evidence": true,
+      "capture": {
+        "path": "/var/lib/jetstreamer/horizon-native265-stop-capture-20261119-v1/capture.json",
+        "sha256": "90b6f8162839249a116e64bf1d7b5c6af0c531cf599ffdb53f4496df6925aea7"
+      },
+      "retirement": {
+        "path": "/var/lib/jetstreamer/horizon-native265-stop-accepted-20261119-v1/retirement.json",
+        "sha256": "a18b62310be3069ad08caff79ee5374b63ac179e6ef9827c58e5ad5bfb23423a"
+      },
+      "recorded_unix_seconds": 1795118016,
+      "entry_replay": false,
+      "replay_launch_authorized": false,
+      "runtime_promotion_authorized": false,
+      "full_epoch_qualified": false,
+      "canonical_sidecar_authorized": false,
+      "publication_authorized": false,
+      "remote_mutations": false,
+      "r2_mutations": false
+    },
+    "/var/lib/jetstreamer/horizon-native265-stop-capture-20261119-v1/capture.json": {
+      "Main_acceptance_required": true,
+      "actual_stop_observed": true,
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "guard_invocation_id": "2322c2a463ef451f92d3450eb701b40b",
+      "guard_package": "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2",
+      "guard_pid1": {
+        "path": "/var/lib/jetstreamer/horizon-native265-execution-stop-20261119-v2/qualification-guard-PID1.jsonl",
+        "sha256": "591a8b1852d41b9fb991f619132c0604fb84a7f2d7fa684f08bd410a22828a5b"
+      },
+      "guard_plan": {
+        "path": "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/guard-plan.json",
+        "sha256": "dbd3ebc5372dadb29777850f0f9954aaa34ab9c649fee73d916035eed469a319"
+      },
+      "guard_terminal": {
+        "ActiveState": "failed",
+        "After": "basic.target systemd-journald.socket sysinit.target horizon-native265-protective-v1.timer system.slice",
+        "BindsTo": "",
+        "CPUAffinity": "",
+        "CPUQuotaPerSecUSec": "1s",
+        "CapabilityBoundingSet": "cap_dac_read_search cap_sys_ptrace",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "DefaultDependencies": "yes",
+        "Delegate": "no",
+        "DropInPaths": "",
+        "Environment": "",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard ; argv[]=/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard /var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/guard-plan.json --plan-sha256 dbd3ebc5372dadb29777850f0f9954aaa34ab9c649fee73d916035eed469a319 --self-sha256 75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842 ; ignore_errors=no ; start_time=[Thu 2026-11-19 19:52:22 UTC] ; stop_time=[Thu 2026-11-19 19:52:22 UTC] ; pid=1302880 ; code=exited ; status=1 }",
+        "FragmentPath": "/etc/systemd/system/horizon-native265-protective-v1.service",
+        "Group": "",
+        "Id": "horizon-native265-protective-v1.service",
+        "IgnoreOnIsolate": "no",
+        "InvocationID": "2322c2a463ef451f92d3450eb701b40b",
+        "Job": "",
+        "KillMode": "control-group",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "MemoryHigh": "infinity",
+        "MemoryMax": "268435456",
+        "MemorySwapMax": "0",
+        "NRestarts": "0",
+        "NoNewPrivileges": "yes",
+        "PrivateNetwork": "yes",
+        "ProtectHome": "read-only",
+        "ProtectSystem": "strict",
+        "ReadWritePaths": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf",
+        "RemainAfterExit": "no",
+        "Requires": "system.slice sysinit.target",
+        "Restart": "no",
+        "Result": "exit-code",
+        "RuntimeMaxUSec": "infinity",
+        "StartLimitIntervalUSec": "0",
+        "SubState": "failed",
+        "TasksMax": "64",
+        "Transient": "no",
+        "TriggeredBy": "horizon-native265-protective-v1.timer",
+        "Type": "oneshot",
+        "Upholds": "",
+        "User": "root",
+        "Wants": ""
+      },
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "kernel_drained": true,
+      "original_process_gone": true,
+      "producer_invocation_id": "06dbd9f9d1654c9fa76c7e1f376ee8bf",
+      "producer_main_pid": 1302753,
+      "producer_package": "/var/lib/jetstreamer/horizon-native265-producer-stop-20261119-v2",
+      "producer_pid1": {
+        "path": "/var/lib/jetstreamer/horizon-native265-execution-stop-20261119-v2/qualification-producer-PID1.jsonl",
+        "sha256": "c373698fe02dd864a37ed32bc53856740766ab29319bcbe8b0fbfcf90bec62fb"
+      },
+      "producer_terminal": {
+        "ActiveState": "inactive",
+        "After": "tmp.mount basic.target -.mount systemd-journald.socket system.slice systemd-tmpfiles-setup.service sysinit.target",
+        "BindsTo": "",
+        "CPUAffinity": "48-55",
+        "CPUQuotaPerSecUSec": "8s",
+        "CapabilityBoundingSet": "",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "DefaultDependencies": "yes",
+        "Delegate": "no",
+        "DropInPaths": "",
+        "Environment": "RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH265_STARTUP_PLAN=/var/lib/jetstreamer/horizon-native265-startup-plan-stop-20261119-v2/plan.json JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256=05bce62600222718ea849006b91ebe5d8219aa1d5e9a5efcfc225d32fe6b7c0f",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "15",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; argv[]=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; ignore_errors=no ; start_time=[Thu 2026-11-19 19:52:21 UTC] ; stop_time=[Thu 2026-11-19 19:52:22 UTC] ; pid=1302753 ; code=killed ; status=15/TERM }",
+        "FragmentPath": "/etc/systemd/system/horizon-265-native-input-20261119-v1.service",
+        "Group": "ubuntu",
+        "Id": "horizon-265-native-input-20261119-v1.service",
+        "IgnoreOnIsolate": "no",
+        "InvocationID": "06dbd9f9d1654c9fa76c7e1f376ee8bf",
+        "Job": "",
+        "KillMode": "control-group",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "MemoryHigh": "100000000000",
+        "MemoryMax": "128000000000",
+        "MemorySwapMax": "0",
+        "NRestarts": "0",
+        "NoNewPrivileges": "yes",
+        "PrivateNetwork": "yes",
+        "ProtectHome": "read-only",
+        "ProtectSystem": "strict",
+        "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+        "RemainAfterExit": "no",
+        "Requires": "system.slice sysinit.target",
+        "Restart": "no",
+        "Result": "success",
+        "RuntimeMaxUSec": "45min",
+        "StartLimitIntervalUSec": "10s",
+        "SubState": "dead",
+        "TasksMax": "512",
+        "Transient": "no",
+        "TriggeredBy": "",
+        "Type": "exec",
+        "Upholds": "",
+        "User": "ubuntu",
+        "Wants": "tmp.mount -.mount"
+      },
+      "publication_authorized": false,
+      "r2_mutations": false,
+      "receipts": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf",
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "sample": {
+        "path": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf/sample-2322c2a463ef451f92d3450eb701b40b.json",
+        "sha256": "927f4f6407229ed08e52d292b29d3f9a0c26d0951c8745454f8e8df4ff55b08e"
+      },
+      "schema": "horizon-native265-protective-stop-capture-v1",
+      "startup_plan": {
+        "path": "/var/lib/jetstreamer/horizon-native265-startup-plan-stop-20261119-v2/plan.json",
+        "sha256": "05bce62600222718ea849006b91ebe5d8219aa1d5e9a5efcfc225d32fe6b7c0f"
+      },
+      "stop_request": {
+        "path": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf/stop-request-2322c2a463ef451f92d3450eb701b40b.json",
+        "sha256": "b798c6a46c063031471d3ee4f5ed0f8dbc2235c4de8459ca6bd274b09c1fa021"
+      },
+      "token_absent": true,
+      "two_process_native_runtime_qualified": false,
+      "worker_root_empty": true
+    },
+    "/var/lib/jetstreamer/horizon-native265-stop-accepted-20261119-v1/retirement.json": {
+      "before": {
+        "path": "/var/lib/jetstreamer/horizon-native265-execution-retire-stop-20261119-v1/retirement-before.json",
+        "sha256": "0857c8e2d0c7accf028cb79841853cc3b6ae64a4eda1a843ead8180bc3abc9fd"
+      },
+      "producer_restarted": false,
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "schema": "horizon-native265-qualification-unit-retirement-v1",
+      "sealed_packages_and_diagnostics_preserved": true
+    },
+    "/var/lib/jetstreamer/horizon-native265-execution-retire-stop-20261119-v1/retirement-before.json": {
+      "capture": {
+        "Main_acceptance_required": true,
+        "actual_stop_observed": true,
+        "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+        "guard": {
+          "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+          "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+        },
+        "guard_invocation_id": "2322c2a463ef451f92d3450eb701b40b",
+        "guard_package": "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2",
+        "guard_pid1": {
+          "path": "/var/lib/jetstreamer/horizon-native265-execution-stop-20261119-v2/qualification-guard-PID1.jsonl",
+          "sha256": "591a8b1852d41b9fb991f619132c0604fb84a7f2d7fa684f08bd410a22828a5b"
+        },
+        "guard_plan": {
+          "path": "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/guard-plan.json",
+          "sha256": "dbd3ebc5372dadb29777850f0f9954aaa34ab9c649fee73d916035eed469a319"
+        },
+        "guard_terminal": {
+          "ActiveState": "failed",
+          "After": "basic.target systemd-journald.socket sysinit.target horizon-native265-protective-v1.timer system.slice",
+          "BindsTo": "",
+          "CPUAffinity": "",
+          "CPUQuotaPerSecUSec": "1s",
+          "CapabilityBoundingSet": "cap_dac_read_search cap_sys_ptrace",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "DefaultDependencies": "yes",
+          "Delegate": "no",
+          "DropInPaths": "",
+          "Environment": "",
+          "ExecMainCode": "1",
+          "ExecMainStatus": "1",
+          "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard ; argv[]=/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard /var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/guard-plan.json --plan-sha256 dbd3ebc5372dadb29777850f0f9954aaa34ab9c649fee73d916035eed469a319 --self-sha256 75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842 ; ignore_errors=no ; start_time=[Thu 2026-11-19 19:52:22 UTC] ; stop_time=[Thu 2026-11-19 19:52:22 UTC] ; pid=1302880 ; code=exited ; status=1 }",
+          "FragmentPath": "/etc/systemd/system/horizon-native265-protective-v1.service",
+          "Group": "",
+          "Id": "horizon-native265-protective-v1.service",
+          "IgnoreOnIsolate": "no",
+          "InvocationID": "2322c2a463ef451f92d3450eb701b40b",
+          "Job": "",
+          "KillMode": "control-group",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "MemoryHigh": "infinity",
+          "MemoryMax": "268435456",
+          "MemorySwapMax": "0",
+          "NRestarts": "0",
+          "NoNewPrivileges": "yes",
+          "PrivateNetwork": "yes",
+          "ProtectHome": "read-only",
+          "ProtectSystem": "strict",
+          "ReadWritePaths": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf",
+          "RemainAfterExit": "no",
+          "Requires": "system.slice sysinit.target",
+          "Restart": "no",
+          "Result": "exit-code",
+          "RuntimeMaxUSec": "infinity",
+          "StartLimitIntervalUSec": "0",
+          "SubState": "failed",
+          "TasksMax": "64",
+          "Transient": "no",
+          "TriggeredBy": "horizon-native265-protective-v1.timer",
+          "Type": "oneshot",
+          "Upholds": "",
+          "User": "root",
+          "Wants": ""
+        },
+        "harness": {
+          "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+          "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+        },
+        "kernel_drained": true,
+        "original_process_gone": true,
+        "producer_invocation_id": "06dbd9f9d1654c9fa76c7e1f376ee8bf",
+        "producer_main_pid": 1302753,
+        "producer_package": "/var/lib/jetstreamer/horizon-native265-producer-stop-20261119-v2",
+        "producer_pid1": {
+          "path": "/var/lib/jetstreamer/horizon-native265-execution-stop-20261119-v2/qualification-producer-PID1.jsonl",
+          "sha256": "c373698fe02dd864a37ed32bc53856740766ab29319bcbe8b0fbfcf90bec62fb"
+        },
+        "producer_terminal": {
+          "ActiveState": "inactive",
+          "After": "tmp.mount basic.target -.mount systemd-journald.socket system.slice systemd-tmpfiles-setup.service sysinit.target",
+          "BindsTo": "",
+          "CPUAffinity": "48-55",
+          "CPUQuotaPerSecUSec": "8s",
+          "CapabilityBoundingSet": "",
+          "ControlGroup": "",
+          "ControlPID": "0",
+          "DefaultDependencies": "yes",
+          "Delegate": "no",
+          "DropInPaths": "",
+          "Environment": "RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH265_STARTUP_PLAN=/var/lib/jetstreamer/horizon-native265-startup-plan-stop-20261119-v2/plan.json JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256=05bce62600222718ea849006b91ebe5d8219aa1d5e9a5efcfc225d32fe6b7c0f",
+          "ExecMainCode": "2",
+          "ExecMainStatus": "15",
+          "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; argv[]=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; ignore_errors=no ; start_time=[Thu 2026-11-19 19:52:21 UTC] ; stop_time=[Thu 2026-11-19 19:52:22 UTC] ; pid=1302753 ; code=killed ; status=15/TERM }",
+          "FragmentPath": "/etc/systemd/system/horizon-265-native-input-20261119-v1.service",
+          "Group": "ubuntu",
+          "Id": "horizon-265-native-input-20261119-v1.service",
+          "IgnoreOnIsolate": "no",
+          "InvocationID": "06dbd9f9d1654c9fa76c7e1f376ee8bf",
+          "Job": "",
+          "KillMode": "control-group",
+          "LoadState": "loaded",
+          "MainPID": "0",
+          "MemoryHigh": "100000000000",
+          "MemoryMax": "128000000000",
+          "MemorySwapMax": "0",
+          "NRestarts": "0",
+          "NoNewPrivileges": "yes",
+          "PrivateNetwork": "yes",
+          "ProtectHome": "read-only",
+          "ProtectSystem": "strict",
+          "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+          "RemainAfterExit": "no",
+          "Requires": "system.slice sysinit.target",
+          "Restart": "no",
+          "Result": "success",
+          "RuntimeMaxUSec": "45min",
+          "StartLimitIntervalUSec": "10s",
+          "SubState": "dead",
+          "TasksMax": "512",
+          "Transient": "no",
+          "TriggeredBy": "",
+          "Type": "exec",
+          "Upholds": "",
+          "User": "ubuntu",
+          "Wants": "tmp.mount -.mount"
+        },
+        "publication_authorized": false,
+        "r2_mutations": false,
+        "receipts": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf",
+        "remote_mutations": false,
+        "replay_launch_authorized": false,
+        "sample": {
+          "path": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf/sample-2322c2a463ef451f92d3450eb701b40b.json",
+          "sha256": "927f4f6407229ed08e52d292b29d3f9a0c26d0951c8745454f8e8df4ff55b08e"
+        },
+        "schema": "horizon-native265-protective-stop-capture-v1",
+        "startup_plan": {
+          "path": "/var/lib/jetstreamer/horizon-native265-startup-plan-stop-20261119-v2/plan.json",
+          "sha256": "05bce62600222718ea849006b91ebe5d8219aa1d5e9a5efcfc225d32fe6b7c0f"
+        },
+        "stop_request": {
+          "path": "/var/lib/jetstreamer/horizon-native265-guard-receipts-06dbd9f9d1654c9fa76c7e1f376ee8bf/stop-request-2322c2a463ef451f92d3450eb701b40b.json",
+          "sha256": "b798c6a46c063031471d3ee4f5ed0f8dbc2235c4de8459ca6bd274b09c1fa021"
+        },
+        "token_absent": true,
+        "two_process_native_runtime_qualified": false,
+        "worker_root_empty": true
+      },
+      "links": [
+        [
+          "horizon-265-native-input-20261119-v1.service",
+          "/var/lib/jetstreamer/horizon-native265-producer-stop-20261119-v2/horizon-265-native-input-20261119-v1.service"
+        ],
+        [
+          "horizon-native265-terminal-retention.target",
+          "/var/lib/jetstreamer/horizon-native265-producer-stop-20261119-v2/horizon-native265-terminal-retention.target"
+        ],
+        [
+          "horizon-native265-protective-v1.service",
+          "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/horizon-native265-protective-v1.service"
+        ],
+        [
+          "horizon-native265-protective-v1.timer",
+          "/var/lib/jetstreamer/horizon-native265-guard-binding-stop-20261119-v2/horizon-native265-protective-v1.timer"
+        ]
+      ],
+      "producer": {
+        "ActiveState": "inactive",
+        "After": "tmp.mount basic.target -.mount systemd-journald.socket system.slice systemd-tmpfiles-setup.service sysinit.target",
+        "BindsTo": "",
+        "CPUAffinity": "48-55",
+        "CPUQuotaPerSecUSec": "8s",
+        "CapabilityBoundingSet": "",
+        "ControlGroup": "",
+        "ControlPID": "0",
+        "DefaultDependencies": "yes",
+        "Delegate": "no",
+        "DropInPaths": "",
+        "Environment": "RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH265_STARTUP_PLAN=/var/lib/jetstreamer/horizon-native265-startup-plan-stop-20261119-v2/plan.json JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256=05bce62600222718ea849006b91ebe5d8219aa1d5e9a5efcfc225d32fe6b7c0f",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "15",
+        "ExecStart": "{ path=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; argv[]=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; ignore_errors=no ; start_time=[Thu 2026-11-19 19:52:21 UTC] ; stop_time=[Thu 2026-11-19 19:52:22 UTC] ; pid=1302753 ; code=killed ; status=15/TERM }",
+        "FragmentPath": "/etc/systemd/system/horizon-265-native-input-20261119-v1.service",
+        "Group": "ubuntu",
+        "Id": "horizon-265-native-input-20261119-v1.service",
+        "IgnoreOnIsolate": "no",
+        "InvocationID": "06dbd9f9d1654c9fa76c7e1f376ee8bf",
+        "Job": "",
+        "KillMode": "control-group",
+        "LoadState": "loaded",
+        "MainPID": "0",
+        "MemoryHigh": "100000000000",
+        "MemoryMax": "128000000000",
+        "MemorySwapMax": "0",
+        "NRestarts": "0",
+        "NoNewPrivileges": "yes",
+        "PrivateNetwork": "yes",
+        "ProtectHome": "read-only",
+        "ProtectSystem": "strict",
+        "ReadWritePaths": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+        "RemainAfterExit": "no",
+        "Requires": "system.slice sysinit.target",
+        "Restart": "no",
+        "Result": "success",
+        "RuntimeMaxUSec": "45min",
+        "StartLimitIntervalUSec": "10s",
+        "SubState": "dead",
+        "TasksMax": "512",
+        "Transient": "no",
+        "TriggeredBy": "",
+        "Type": "exec",
+        "Upholds": "",
+        "User": "ubuntu",
+        "Wants": "tmp.mount -.mount"
+      },
+      "remote_mutations": false,
+      "root_empty": true
+    },
+    "/var/lib/jetstreamer/horizon-native265-startup-tokens/ce5f66a82fdd4c0e93ca99f27b925112/guard-admission.json": {
+      "admission": {
+        "path": "/var/lib/jetstreamer/horizon-native265-admission-native-20261119-v1/admission.json",
+        "sha256": "a9d20936213c3eb0c875726d896aae24b18827210d7adedddfad0f67dbb5bb00"
+      },
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "canonical_sidecar_authorized": false,
+      "entry_replay": false,
+      "full_epoch_qualified": false,
+      "guard": {
+        "path": "/var/lib/jetstreamer/horizon265-native-guard-page-00bdb61a-20261119-v1/horizon265-native-guard",
+        "sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842"
+      },
+      "guard_invocation_id": "50fa014e70b54592a43a35606621b1eb",
+      "guard_pid1_journal": {
+        "path": "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-PID1.json",
+        "sha256": "13730360e2bf3648237b5130314274bd5c043ff77db40ea1a55be574cc010d48"
+      },
+      "guard_plan": {
+        "path": "/var/lib/jetstreamer/horizon-native265-guard-binding-native-20261119-v1/guard-plan.json",
+        "sha256": "d6aa8d26f07c17ce85705f4cb4cd554b4a64d56fcb3fd02726a87fe7b04983ea"
+      },
+      "guard_sample": {
+        "path": "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-sample.json",
+        "sha256": "e2f670480ac6b8ddf71df25ebe212b55c0bcfd6bd811100fc025c2fdb00a1172"
+      },
+      "harness": {
+        "path": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "invocation_id": "ce5f66a82fdd4c0e93ca99f27b925112",
+      "main_pid": 1307638,
+      "publication_authorized": false,
+      "r2_mutations": false,
+      "recorded_monotonic_us": 263167718976,
+      "remote_mutations": false,
+      "replay_launch_authorized": false,
+      "runtime_promotion_authorized": false,
+      "schema": "horizon-native265-first-guard-token-v1",
+      "startup_plan_sha256": "d4b85afe49e74d9a7f8e5c96393c8d5d023b1437b281ee0de186d59f6e4f23b7",
+      "unit": "horizon-265-native-input-20261119-v1.service"
+    },
+    "/var/lib/jetstreamer/horizon-native265-guard-binding-native-20261119-v1/guard-plan.json": {
+      "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+      "filesystem": "/",
+      "invocation_id": "ce5f66a82fdd4c0e93ca99f27b925112",
+      "main_start_ticks": 26316607,
+      "maximum_root_physical_bytes": 506191984640,
+      "maximum_worker_vmas": 3500000,
+      "minimum_free_bytes": 3216541534488,
+      "native_main": {
+        "executable": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "main_pid": 1307638,
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "receipt_directory": "/var/lib/jetstreamer/horizon-native265-guard-receipts-ce5f66a82fdd4c0e93ca99f27b925112",
+      "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+      "unit": "horizon-265-native-input-20261119-v1.service",
+      "worker_root": "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1"
+    },
+    "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-sample.json": {
+      "available_bytes": 4486431551488,
+      "bounded_canary": null,
+      "bounded_measurement": false,
+      "canary_target_error": null,
+      "filesystem_observation_error": null,
+      "guard_invocation_id": "50fa014e70b54592a43a35606621b1eb",
+      "guard_sha256": "75d4703d13ae7a72a359299da01002798e37ebdd4085dcb4291cdaaf29df7842",
+      "maximum_root_physical_bytes": 506191984640,
+      "maximum_worker_vmas": 3500000,
+      "memory_observation": {
+        "current_bytes": 897024,
+        "events": {
+          "high": 0,
+          "low": 0,
+          "max": 0,
+          "oom": 0,
+          "oom_group_kill": 0,
+          "oom_kill": 0,
+          "sock_throttled": 0
+        },
+        "high_bytes": 99999997952,
+        "maximum_bytes": 128000000000,
+        "swap_bytes": 0,
+        "tasks": 1
+      },
+      "memory_observation_error": null,
+      "minimum_free_bytes": 3216541534488,
+      "native_main": {
+        "executable": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+        "main_pid": 1307638,
+        "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9"
+      },
+      "plan": "/var/lib/jetstreamer/horizon-native265-guard-binding-native-20261119-v1/guard-plan.json",
+      "plan_sha256": "d6aa8d26f07c17ce85705f4cb4cd554b4a64d56fcb3fd02726a87fe7b04983ea",
+      "process_observation": {
+        "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+        "processes": [
+          {
+            "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+            "bytes": 1021472,
+            "ctime": 1795106958,
+            "ctime_nsec": 620077567,
+            "device": 66305,
+            "executable": "/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input",
+            "inode": 29354858,
+            "mode": 33133,
+            "mtime": 1795106958,
+            "mtime_nsec": 620077567,
+            "nlink": 1,
+            "parent_pid": 1,
+            "pid": 1307638,
+            "sha256": "0dbcd28e231f7158b88701666bff89cbdf36cc2033c0e5e826e54a8c87db76e9",
+            "start_ticks": 26316607,
+            "uid": 0
+          }
+        ],
+        "stable_census": true,
+        "token_present": false,
+        "workers": [
+          [
+            1307638,
+            31
+          ]
+        ]
+      },
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-265-native-input-20261119-v1.service",
+        "control_pid": 0,
+        "delegated": false,
+        "exec_main_code": 0,
+        "exec_main_status": 0,
+        "invocation_id": "ce5f66a82fdd4c0e93ca99f27b925112",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "memory_high": "100000000000",
+        "memory_max": "128000000000",
+        "memory_swap_max": "0",
+        "pid": 1307638,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running",
+        "tasks_max": "512"
+      },
+      "producer_invocation_id": "ce5f66a82fdd4c0e93ca99f27b925112",
+      "producer_stop_enabled": true,
+      "r2_mutations": false,
+      "recorded_unix_seconds": 1795118094,
+      "remote_mutations": false,
+      "root_physical_observation": {
+        "conservative_physical_bytes": 4096,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 1,
+          "entries": 1,
+          "physical_bytes": 4096,
+          "symlinks": 0,
+          "vanished_entries": 0
+        },
+        "maximum_physical_bytes": 506191984640,
+        "second": {
+          "directories": 1,
+          "entries": 1,
+          "physical_bytes": 4096,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "root_physical_observation_error": null,
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "scratch_deleted": false,
+      "target_handoff": null,
+      "target_handoff_error": null,
+      "trip_reason": null,
+      "worker_observation_error": null,
+      "workers": [
+        [
+          1307638,
+          31
+        ]
+      ]
+    },
+    "/var/lib/jetstreamer/horizon-native265-first-fire-native-20261119-v1/guard-PID1.json": [
+      {
+        "CODE_FILE": "src/core/job.c",
+        "CODE_FUNC": "job_emit_start_message",
+        "CODE_LINE": "622",
+        "INVOCATION_ID": "50fa014e70b54592a43a35606621b1eb",
+        "JOB_ID": "3612747",
+        "JOB_TYPE": "start",
+        "MESSAGE": "Starting horizon-native265-protective-v1.service - Epoch 265 native protective guard...",
+        "MESSAGE_ID": "7d4958e842da4a758f6c1cdc7b36dcc5",
+        "PRIORITY": "6",
+        "SYSLOG_FACILITY": "3",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "TID": "1",
+        "UNIT": "horizon-native265-protective-v1.service",
+        "_BOOT_ID": "3b17d0055c3a4a0e8841da097e0957b5",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_CMDLINE": "/usr/lib/systemd/systemd --switched-root --system --deserialize=56",
+        "_COMM": "systemd",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_GID": "0",
+        "_HOSTNAME": "horizon-vaultic",
+        "_MACHINE_ID": "662c3da6039944779789c3fe1c3d7401",
+        "_PID": "1",
+        "_RUNTIME_SCOPE": "system",
+        "_SOURCE_REALTIME_TIMESTAMP": "1795118094435633",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_TRANSPORT": "journal",
+        "_UID": "0",
+        "__CURSOR": "s=d048fb8ccd4e4326a91b8c5edb351816;i=954c3f;b=3b17d0055c3a4a0e8841da097e0957b5;m=3d4602420f;t=660a680594538;x=394a522254af301",
+        "__MONOTONIC_TIMESTAMP": "263167558159",
+        "__REALTIME_TIMESTAMP": "1795118094435640",
+        "__SEQNUM": "9784383",
+        "__SEQNUM_ID": "d048fb8ccd4e4326a91b8c5edb351816"
+      },
+      {
+        "CODE_FILE": "src/core/unit.c",
+        "CODE_FUNC": "unit_log_success",
+        "CODE_LINE": "6170",
+        "INVOCATION_ID": "50fa014e70b54592a43a35606621b1eb",
+        "MESSAGE": "horizon-native265-protective-v1.service: Deactivated successfully.",
+        "MESSAGE_ID": "7ad2d189f7e94e70a38c781354912448",
+        "PRIORITY": "6",
+        "SYSLOG_FACILITY": "3",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "TID": "1",
+        "UNIT": "horizon-native265-protective-v1.service",
+        "_BOOT_ID": "3b17d0055c3a4a0e8841da097e0957b5",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_CMDLINE": "/usr/lib/systemd/systemd --switched-root --system --deserialize=56",
+        "_COMM": "systemd",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_GID": "0",
+        "_HOSTNAME": "horizon-vaultic",
+        "_MACHINE_ID": "662c3da6039944779789c3fe1c3d7401",
+        "_PID": "1",
+        "_RUNTIME_SCOPE": "system",
+        "_SOURCE_REALTIME_TIMESTAMP": "1795118094533689",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_TRANSPORT": "journal",
+        "_UID": "0",
+        "__CURSOR": "s=d048fb8ccd4e4326a91b8c5edb351816;i=954c55;b=3b17d0055c3a4a0e8841da097e0957b5;m=3d4603c114;t=660a6805ac43d;x=8ef864711dc72864",
+        "__MONOTONIC_TIMESTAMP": "263167656212",
+        "__REALTIME_TIMESTAMP": "1795118094533693",
+        "__SEQNUM": "9784405",
+        "__SEQNUM_ID": "d048fb8ccd4e4326a91b8c5edb351816"
+      },
+      {
+        "CODE_FILE": "src/core/job.c",
+        "CODE_FUNC": "job_emit_done_message",
+        "CODE_LINE": "815",
+        "INVOCATION_ID": "50fa014e70b54592a43a35606621b1eb",
+        "JOB_ID": "3612747",
+        "JOB_RESULT": "done",
+        "JOB_TYPE": "start",
+        "MESSAGE": "Finished horizon-native265-protective-v1.service - Epoch 265 native protective guard.",
+        "MESSAGE_ID": "39f53479d3a045ac8e11786248231fbf",
+        "PRIORITY": "6",
+        "SYSLOG_FACILITY": "3",
+        "SYSLOG_IDENTIFIER": "systemd",
+        "TID": "1",
+        "UNIT": "horizon-native265-protective-v1.service",
+        "_BOOT_ID": "3b17d0055c3a4a0e8841da097e0957b5",
+        "_CAP_EFFECTIVE": "1ffffffffff",
+        "_CMDLINE": "/usr/lib/systemd/systemd --switched-root --system --deserialize=56",
+        "_COMM": "systemd",
+        "_EXE": "/usr/lib/systemd/systemd",
+        "_GID": "0",
+        "_HOSTNAME": "horizon-vaultic",
+        "_MACHINE_ID": "662c3da6039944779789c3fe1c3d7401",
+        "_PID": "1",
+        "_RUNTIME_SCOPE": "system",
+        "_SOURCE_REALTIME_TIMESTAMP": "1795118094533877",
+        "_SYSTEMD_CGROUP": "/init.scope",
+        "_SYSTEMD_SLICE": "-.slice",
+        "_SYSTEMD_UNIT": "init.scope",
+        "_TRANSPORT": "journal",
+        "_UID": "0",
+        "__CURSOR": "s=d048fb8ccd4e4326a91b8c5edb351816;i=954c56;b=3b17d0055c3a4a0e8841da097e0957b5;m=3d4603c1ce;t=660a6805ac4f7;x=58a6f3efbfcc9a1d",
+        "__MONOTONIC_TIMESTAMP": "263167656398",
+        "__REALTIME_TIMESTAMP": "1795118094533879",
+        "__SEQNUM": "9784406",
+        "__SEQNUM_ID": "d048fb8ccd4e4326a91b8c5edb351816"
+      }
+    ]
+  },
+  "raws": {
+    "/var/lib/jetstreamer/horizon-native265-producer-native-20261119-v1/horizon-265-native-input-20261119-v1.service": "[Unit]\nDescription=Epoch 265 gated native cold input qualification\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=100000000000\nMemoryMax=128000000000\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=800%\nCPUAffinity=48 49 50 51 52 53 54 55\nRuntimeMaxSec=2700\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=yes\nPrivateTmp=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths=/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1\nUMask=0077\nEnvironment=RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH265_STARTUP_PLAN=/var/lib/jetstreamer/horizon-native265-startup-plan-native-20261119-v1/plan.json JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256=d4b85afe49e74d9a7f8e5c96393c8d5d023b1437b281ee0de186d59f6e4f23b7\nExecStart=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input\n",
+    "/var/lib/jetstreamer/horizon-native265-startup-tokens/ce5f66a82fdd4c0e93ca99f27b925112/guard-admission.sha256": "38201691bbc6c63f036b536fd3604237afe2f4b630c6c9c9ff14348295f47e86\n"
+  }
+}
