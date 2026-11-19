@@ -1,0 +1,129 @@
+{
+  "schema": "horizon-original-slot-DATA-witness-set-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "complete_authority": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-current-authority-20261110-v1/authority.json",
+    "sha256": "2f88b7f91cc6df70804cd96027efbd0e18cb6452a48e76d813673b556d727caa"
+  },
+  "accepted_original154_ancestry": {
+    "path": "/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/original154-future-data-qa-v2/ACTUAL_ORIGINAL154_FUTURE_DATA_CHECK.json",
+    "sha256": "03a9fe761e5ce4aa4d694abc0cdbb59db9c29b898442334e9c2d3c556bfab399"
+  },
+  "lineage_manifest": {
+    "path": "/usr/local/lib/jetstreamer/horizon-original154-future-data-source-20261110-v2/lineage-manifest.json",
+    "sha256": "4906d22bdcc5656c2f28da7a9a28d45496c65ca57fc13cf898382b09a514b505"
+  },
+  "raw_minimum_free_bytes": 6264131239730,
+  "complete_DATA_bytes": 6229838610226,
+  "full_original_root_cap_bytes": 309237645312,
+  "margin_per_credited_slot_bytes": 1073741824,
+  "maximum_fulfillment_bytes": 241482399744,
+  "slots": [
+    {
+      "epoch": 166,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch166-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD166_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "9fe7e360d83f203cc6762dc2a68fdb8fb789e800015092eba49cc55db2380ff1"
+      },
+      "physical_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch166/local2/physical.json",
+        "sha256": "8b306602fc19f66bde2a50c46e0abd3e21e2cd0d270b25c341306e023d46ed20"
+      },
+      "members": [
+        "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/output/compact-indexes/166/epoch-166-bafyreibiiohrh4nfurrukccpyjdwu3c5a5ym4y5nqhkntxez734kdtlafe-mainnet-cid-to-offset-and-size.index",
+        "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/archives/epoch-166.jet",
+        "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/private/destination-dd3947fd4ee7fdd82612b5977aea040658746bdd51eab3e2bc25858329734ef8/work/root-cohort-166-166/run-4188448-1794243111198290622/inputs/snapshot-71711708-73JLv83cyRgHUNxtajhwXimfDSH4GUmu6R8LHKPbxu76.tar.zst"
+      ]
+    },
+    {
+      "epoch": 167,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch167-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD167_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "28c10a133d9773b33c5b47291e82ecd5da8e0b3b05d954be87e20734e1f8755f"
+      },
+      "physical_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch167/local2/physical.json",
+        "sha256": "bbf18c67dd2e6059987874d357cf2f123c03298a3fb4a53ef7bdc2ae27628f19"
+      },
+      "members": [
+        "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/output/compact-indexes/167/epoch-167-bafyreienhstqouv46ysqm2r5dqeixnhmil3qem77x76q5hicq4egi3uzhi-mainnet-cid-to-offset-and-size.index",
+        "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/archives/epoch-167.jet",
+        "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/private/destination-3b4f5569567cd789fd6de35befb8fb809d131b8a84c8a96ffb6060701e7e01f4/work/root-cohort-167-167/run-713-1794244398155881047/inputs/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst"
+      ]
+    },
+    {
+      "epoch": 168,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch168-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD168_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "8d733e8fd750052fb050726a0b930fe9d213ebf4edc174ba2eb7711878255913"
+      },
+      "physical_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v9/epoch168/local2/physical.json",
+        "sha256": "26fb109fc1009a7eb4dae70f4a8fab432b1d1ee39dce6ef73431a4912f67a502"
+      },
+      "members": [
+        "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/output/compact-indexes/168/epoch-168-bafyreigrdukjoi2647fzy7dbzbxcqygm54vogb6pbhhjhi6lowooruvnxa-mainnet-cid-to-offset-and-size.index",
+        "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/archives/epoch-168.jet",
+        "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/private/destination-38f108e9d00d485f8ed68d9e7caaeb0a1570f35891271acc1ddc6e75b942e5ad/work/root-cohort-168-168/run-14201-1794247152158421923/inputs/snapshot-72575704-Grdro3ninCQfmShQL6ypGv2y1gUzhPPB7xbj9M4UHJnx.tar.zst"
+      ]
+    },
+    {
+      "epoch": 169,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch169-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD169_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "48fd8018efb668cf164d4bb8a83b2f4ca087b2e8ad3e71e93606338378b59393"
+      },
+      "physical_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch169/local2/physical.json",
+        "sha256": "9f8739b0dd9b00e7ff87f8a1b82ec5cdadbb771484db8e2707fd91016bb5bfc6"
+      },
+      "members": [
+        "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/output/compact-indexes/169/epoch-169-bafyreibnyugrtsptq5qsj6tdweurgpzl55f75t7ku5r7wpxtia6e7gojbm-mainnet-cid-to-offset-and-size.index",
+        "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/archives/epoch-169.jet",
+        "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/inputs/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst"
+      ]
+    },
+    {
+      "epoch": 170,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch170-independent-singleton-20261109-v1/ROOT_FRESH_STANDARD170_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "3f053325eeb812fecf4f6444f9ed8e0b6d29e64dd7d1ff06ebfb87f99b5ac1ce"
+      },
+      "physical_ledger": {
+        "path": "/var/lib/jetstreamer/standard-replacement-recipes-20261110-v13/epoch170/local2/physical.json",
+        "sha256": "9d29acaf035c481319127316f19398cd5aab10fb620a814615c7903de570a5af"
+      },
+      "members": [
+        "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/output/compact-indexes/170/epoch-170-bafyreia7an3ku7nhc6mwpqygmsldmq25yli5urrrtf4j75u7k4zwx2psc4-mainnet-cid-to-offset-and-size.index",
+        "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/archives/epoch-170.jet",
+        "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/private/destination-24e279767bbd094f36e571aa8357667d7337eb6c90155883d927dbea39e6d2a9/work/root-cohort-170-170/run-86457-1794259534268950195/inputs/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst"
+      ]
+    },
+    {
+      "epoch": 171,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch171-standard-lane-20261110-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch171-independent-singleton-20261110-v1/ROOT_FRESH_STANDARD171_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "c781a0a2237546fc49bfc0fa30cd6472cc7437c1513a1416031333b6260fc594"
+      },
+      "physical_ledger": null,
+      "members": []
+    },
+    {
+      "epoch": 172,
+      "lane_root": "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1",
+      "original_booking": {
+        "path": "/home/sol/.jetstreamer-private/epoch172-independent-singleton-20261110-v1/ROOT_FRESH_STANDARD172_MANUAL_ADMISSION_AND_RESOURCE_BOOKING.json",
+        "sha256": "d0fa07c259fdb5dadc4ce564d3afc562b32180354db16788ba083fb670e96027"
+      },
+      "physical_ledger": null,
+      "members": []
+    }
+  ]
+}
