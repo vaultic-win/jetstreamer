@@ -1,5 +1,41 @@
 # Ubuntu debug dependency cache retirement
 
+## Fixed build-script output profiles
+
+Two additional profiles select only `target/debug/build` and
+`target/release/build` under `/home/ubuntu/workspace/jetstreamer`:
+`jetstreamer-horizon-ubuntu-debug-build-cache-plan-v1` and
+`jetstreamer-horizon-ubuntu-release-build-cache-plan-v1`. They use the existing
+identity-ledger, interrupted-subset and no-clobber receipt machinery, retain the
+parent profile's Cargo lock and every original directory, and require no builders
+or live/staged references across the **entire** corresponding profile. Preserved
+source and Cargo.lock must match a clean, published revision. Existing whole-profile
+checks remain read-only and cannot be used as retirement ledgers for these profiles.
+
+The protected checkpoint-name rule remains in force. Four observed RocksDB
+`checkpoint_impl.o` files are compiler objects; their exception requires their exact
+profile, relative path and complete SHA-256. Debug build generations
+`librocksdb-sys-37eeae80f930ac01` and `librocksdb-sys-718199d3bc47b9d1` have digest
+`f53c0f2b84b90ab5423f2923bf2da073bdb15661b24457e7c34cd4a4263a42e8`;
+release generations `librocksdb-sys-a545a441747427e1` and
+`librocksdb-sys-a53c016568a6018c` have digest
+`e6bf6a5539b644378595cd72bb03c103d485419bb753c44f8441448f58ac4d65`.
+All four are independently identified x86-64 ELF relocatable objects at
+`out/bfe5d317b023d6cf-checkpoint_impl.o`. A matching name with different bytes,
+another generation/profile, a link, or an archive/snapshot/lock remains rejected.
+The complete cache regression suite passed 32 tests, including wrong-content
+rejection and existing interrupted-retirement, link-target and lock preservation.
+
+The November 19 10:26 cleanup cycle found 37 stale linked build/test units from
+superseded epoch-205/234/238/240–244 work. All were inactive, non-restarting and
+without trigger, job or reverse dependency. Their `/etc/systemd/system` links were
+disabled; original sealed unit files and hashes were preserved. Fresh read-only
+checks of both complete workspace profiles then found no live/staged references.
+Evidence is under
+`/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle1026-20261119-v1`.
+Those checks do not themselves authorize deleting build outputs: run a fresh
+positive check and separate retirement using the exact new profile and helper.
+
 ## November 19 release dependency retirement
 
 The release dependency cache was retired through the current strict compiler
