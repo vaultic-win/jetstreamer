@@ -1,16 +1,15 @@
 # Epoch166 retry6 scratch retirement
 
-Source-only profile derived from `horizon_retry4_170_scratch_retire_20261118_v1`.
+Profile derived from `horizon_retry4_170_scratch_retire_20261118_v1`.
 The copied `stopped_tree.rs` and `process_references.rs` remain byte-identical to
-that reviewed predecessor. This package has not been built, tested, deployed or
-run by its source author. Main owns those operations, Git publication and all
-capacity accounting.
+that reviewed predecessor. Main owns qualification, deployment, Git publication
+and all capacity accounting. Qualification history is recorded below.
 
 The only removal target is the contents of the exact stopped retry6 run's
 `scratch` directory, device64512/inode103678021. The profile preserves that
 directory, run inode103678018 and every ancestor. It binds the original producer
 unit/invocation and the four supplied stop/admission/protection digests. It keeps
-`archives/epoch-166.jet` inode103678035 (56,173,984,550 bytes), every input, and
+`archives/epoch-166.jet` inode103678035 (56,173,984,550 bytes) in local mode, every input, and
 `cohort-state.json` inode103678019 (222 bytes). The exact run, destination,
 receipt paths and artifact hashes are constants in `src/main.rs`.
 
@@ -126,9 +125,9 @@ descriptor-relative `renameat2(RENAME_NOREPLACE)`.
 4. Publish the source to `origin/account-updates`, bind the exact production
    artifact to that source/build, and use the normal Rust sealer. The immutable
    runtime path must be
-   `/usr/local/lib/jetstreamer/horizon-retry6-166-scratch-retire-20261119-v1/retire`.
+   `/usr/local/lib/jetstreamer/horizon-retry6-166-scratch-retire-20261119-v2/retire`.
 5. Precreate root-owned0700
-   `/var/lib/jetstreamer/epoch166-retry6-scratch-retirement-20261119-v1` and admit
+   `/var/lib/jetstreamer/epoch166-retry6-scratch-retirement-20261119-v2` and admit
    ledger/log/hash I/O and execution resources without consuming promised
    replay growth. Keep all retained evidence readable by the final sandbox.
    A direct bind mount at/below scratch is intentionally rejected; qualify the
@@ -150,3 +149,32 @@ passed in `horizon-166-retry6-retire-clippy-20261119-v1.service` (invocation
 scratch retirement was performed. The original-build evidence gap remains open;
 closed partial-archive R2 holding is being qualified as an independent capacity
 recovery route that preserves the bytes.
+
+## Explicit held-partial mode in runtime v2
+
+The v1 plan and no-resume schemas keep the original local archive requirement.
+Both v2 schemas require the same `held_partial_completion: Bound`, pointing to
+the exact retry6 partial-retirement completion under the host holding state.
+Missing local output never selects held mode automatically.
+
+Held mode checks the immutable completion, intent, move and unlink records;
+the exact authenticated custody receipt; and genuine original park terminal
+evidence. Inspection and terminal proof copies must be hash-bound in a versioned
+retirement-evidence bundle. The completion must identify the original source,
+inode, length and digest. It must preserve the current input identities, state,
+run and ancestors. Every preservation check repeats these validations and binds
+the proof into the CHECK/completion evidence. No-follow parent descriptors must
+prove that both source and quarantine are absent and the preserved archives
+directory is empty. Missing parents, aliases, extra entries or changed evidence
+fail closed.
+
+The exact original production build/no-resume gate remains required and
+unresolved. Held-mode support grants no permission to remove the partial, delete
+scratch, release promises, restore a job or launch another lane. The separate
+partial-retirement workflow must complete first.
+
+Runtime-v2 source qualification on 2026-11-19: 28 tests passed, including seven
+held-mode regressions; strict all-target Clippy and the optimized build passed.
+The two JSON test fixtures are exact non-sensitive custody/terminal evidence;
+synthetic lifecycle fixtures are not operational receipts. No production scratch
+retirement was performed by this qualification.

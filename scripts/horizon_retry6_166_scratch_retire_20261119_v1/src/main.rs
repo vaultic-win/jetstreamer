@@ -2,6 +2,7 @@
 //! The old run, retained output, inputs, cursor, shared locks and all resource
 //! promises survive. This executable has no archive removal or R2 operation.
 mod custody;
+mod held_partial;
 mod process_references;
 mod references;
 mod stopped_tree;
@@ -29,8 +30,8 @@ use std::{
 };
 
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-retry6-166-scratch-retire-20261119-v1/retire";
-const BASE: &str = "/var/lib/jetstreamer/epoch166-retry6-scratch-retirement-20261119-v1";
+    "/usr/local/lib/jetstreamer/horizon-retry6-166-scratch-retire-20261119-v2/retire";
+const BASE: &str = "/var/lib/jetstreamer/epoch166-retry6-scratch-retirement-20261119-v2";
 const DESTINATION: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-d53ec84bc26887772d067cda9258daa995dc2541cb1e81e71b72376b619ffe51";
 const RUN: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-d53ec84bc26887772d067cda9258daa995dc2541cb1e81e71b72376b619ffe51/work/root-cohort-166-166/run-689067-1794918104133897328";
 const SCRATCH: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-d53ec84bc26887772d067cda9258daa995dc2541cb1e81e71b72376b619ffe51/work/root-cohort-166-166/run-689067-1794918104133897328/scratch";
@@ -112,6 +113,8 @@ struct Plan {
     guard_protection: Bound,
     no_resume_review: Bound,
     dependency_review: Bound,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    held_partial_completion: Option<Bound>,
     shared_locks: Vec<custody::LockBinding>,
     retire_scratch_contents: bool,
     preserve_archive_and_inputs: bool,
@@ -154,6 +157,8 @@ struct NoResumeReview {
     original_invocation_restarts_from_bootstrap: bool,
     snapshot_exports_and_indirect_readers_reviewed: bool,
     preserve_partial_archive_and_inputs: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    held_partial_completion: Option<Bound>,
 }
 
 fn sha(bytes: &[u8]) -> String {
@@ -263,8 +268,11 @@ impl Held {
 }
 fn validate_plan(p: &Plan) -> Result<()> {
     ensure!(
-        p.schema == "horizon-retry6-166-scratch-retirement-plan-v1"
-            && p.owner == "/root"
+        held_partial::schema_matches(
+            &p.schema,
+            "horizon-retry6-166-scratch-retirement-plan",
+            &p.held_partial_completion
+        ) && p.owner == "/root"
             && p.epoch == 166
             && p.run == Path::new(RUN)
             && p.scratch == Path::new(SCRATCH)
@@ -287,6 +295,9 @@ fn validate_plan(p: &Plan) -> Result<()> {
         "exact limited retry6 scratch authority required"
     );
     custody::validate_locks(&p.shared_locks)?;
+    if let Some(binding) = &p.held_partial_completion {
+        held_partial::validate_binding(binding)?;
+    }
     for b in [&p.no_resume_review, &p.dependency_review] {
         ensure!(
             b.path.is_absolute() && lower_sha(&b.sha256) && !b.path.starts_with(DESTINATION),
@@ -307,8 +318,11 @@ fn scope_sha(p: &Plan) -> Result<String> {
 }
 fn validate_no_resume(r: &NoResumeReview) -> Result<()> {
     ensure!(
-        r.schema == "horizon-retry6-166-no-resume-review-v1"
-            && r.owner == "/root"
+        held_partial::schema_matches(
+            &r.schema,
+            "horizon-retry6-166-no-resume-review",
+            &r.held_partial_completion
+        ) && r.owner == "/root"
             && r.epoch == 166
             && r.run == Path::new(RUN)
             && r.scratch == Path::new(SCRATCH)
@@ -372,6 +386,10 @@ fn validate_no_resume(r: &NoResumeReview) -> Result<()> {
 fn no_resume(p: &Plan) -> Result<NoResumeReview> {
     let r: NoResumeReview = serde_json::from_slice(&bound(&p.no_resume_review, MAX_JSON)?)?;
     validate_no_resume(&r)?;
+    ensure!(
+        r.held_partial_completion == p.held_partial_completion,
+        "plan and no-resume review disagree about partial custody"
+    );
     for b in [
         &r.original_native,
         &r.original_argv,
@@ -516,10 +534,11 @@ fn check(p: &Plan, plan_sha: &str, held: &Held) -> Result<()> {
         first == second && first.len() > 100_000,
         "scratch changed or is already empty"
     );
-    let retained = custody::preserved(true)?;
+    let retained = custody::preserved(true, p.held_partial_completion.as_ref())?;
     let final_gates = gates(p)?;
     ensure!(
-        custody::preserved(false)?.identities == retained.identities,
+        custody::preserved(false, p.held_partial_completion.as_ref())?.identities
+            == retained.identities,
         "retained files changed during check"
     );
     ensure!(
@@ -565,7 +584,8 @@ fn execute(p: &Plan, plan_sha: &str, held: &Held) -> Result<()> {
     );
     let retained: custody::Preserved = serde_json::from_value(check["preserved"].clone())?;
     ensure!(
-        custody::preserved(false)?.identities == retained.identities,
+        custody::preserved(false, p.held_partial_completion.as_ref())?.identities
+            == retained.identities,
         "protected sibling changed"
     );
     let ledger: Bound = serde_json::from_value(check["ledger"].clone())?;
@@ -609,12 +629,13 @@ fn execute(p: &Plan, plan_sha: &str, held: &Held) -> Result<()> {
     // No archive hash is repeated here; exact metadata remains pinned to CHECK.
     let pre_remove = gates(p)?;
     ensure!(
-        custody::preserved(false)?.identities == retained.identities,
+        custody::preserved(false, p.held_partial_completion.as_ref())?.identities
+            == retained.identities,
         "retained files changed before unlink"
     );
     held.recheck(p)?;
     let removed = stopped_tree::remove_contents(&root, &expected, DEVICE, UID, GID)?;
-    let after = custody::preserved(true)?;
+    let after = custody::preserved(true, p.held_partial_completion.as_ref())?;
     ensure!(
         after == retained,
         "protected content changed after retirement"

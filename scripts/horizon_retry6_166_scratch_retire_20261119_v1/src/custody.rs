@@ -258,7 +258,7 @@ fn retained_walk(
     );
     Ok(())
 }
-pub(super) fn preserved(hashes: bool) -> Result<Preserved> {
+pub(super) fn preserved(hashes: bool, held: Option<&Bound>) -> Result<Preserved> {
     let root = Path::new(RUN);
     let m = open_directory(root)?.metadata()?;
     ensure!(
@@ -283,22 +283,30 @@ pub(super) fn preserved(hashes: bool) -> Result<Preserved> {
             ]),
         "unexpected retained run member; review new continuation evidence"
     );
-    let archive = fs::symlink_metadata(root.join("archives/epoch-166.jet"))?;
     let state = fs::symlink_metadata(root.join("cohort-state.json"))?;
     ensure!(
-        archive.ino() == ARCHIVE_INODE
-            && archive.len() == ARCHIVE_BYTES
-            && state.ino() == STATE_INODE
-            && state.len() == STATE_BYTES,
-        "protected archive/state differs from exact run"
+        state.ino() == STATE_INODE && state.len() == STATE_BYTES,
+        "protected state differs from exact run"
     );
     let archive_names: Vec<_> = fs::read_dir(root.join("archives"))?
         .map(|entry| Ok(entry?.file_name()))
         .collect::<Result<_>>()?;
-    ensure!(
-        archive_names == [std::ffi::OsString::from("epoch-166.jet")],
-        "unreviewed extra archive or continuation artifact"
-    );
+    if held.is_some() {
+        ensure!(
+            archive_names.is_empty(),
+            "held partial mode requires empty preserved archives directory"
+        );
+    } else {
+        let archive = fs::symlink_metadata(root.join("archives/epoch-166.jet"))?;
+        ensure!(
+            archive.ino() == ARCHIVE_INODE && archive.len() == ARCHIVE_BYTES,
+            "protected archive differs from exact run"
+        );
+        ensure!(
+            archive_names == [std::ffi::OsString::from("epoch-166.jet")],
+            "unreviewed extra archive or continuation artifact"
+        );
+    }
     let scratch = fs::symlink_metadata(SCRATCH)?;
     ensure!(
         scratch.is_dir()
@@ -326,6 +334,10 @@ pub(super) fn preserved(hashes: bool) -> Result<Preserved> {
             (DEVICE, UID, GID),
             0,
         )?;
+    }
+    if let Some(binding) = held {
+        let proof = held_partial::verify(binding, &out.identities)?;
+        out.identities.insert("held_partial_custody".into(), proof);
     }
     Ok(out)
 }

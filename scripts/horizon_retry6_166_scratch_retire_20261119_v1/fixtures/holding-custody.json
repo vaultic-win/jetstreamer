@@ -1,0 +1,51 @@
+{
+  "bucket": "solana-archive-with-accounts-data",
+  "canonical_publication_authorized": false,
+  "eligibility": {
+    "path": "/usr/local/lib/jetstreamer/horizon-closed166-retry6-holding-plan-20261119-v1/eligibility.json",
+    "sha256": "6d7243eb5912b92d96367f57c94633be768937158d16a07923669ea972e79a97"
+  },
+  "host": "dev-samjohnson",
+  "job_resume_authorized": false,
+  "length": 56173984550,
+  "local_retirement_authorized": false,
+  "local_source_revalidated": true,
+  "manifest": {
+    "canonical_archive": false,
+    "canonical_publication_authorized": false,
+    "eligibility_sha256": "6d7243eb5912b92d96367f57c94633be768937158d16a07923669ea972e79a97",
+    "gid": 1003,
+    "host": "dev-samjohnson",
+    "length": 56173984550,
+    "mode": 384,
+    "name": "epoch-166.jet",
+    "object_key": "node_02/objects/c6edc4b47bb905fe8825f09155edcbc217d9ea44246a3a3b4d8deb4387384e85.blob",
+    "prefix": "node_02/",
+    "schema": "jetstreamer-horizon-holding-manifest-v2",
+    "sha256": "c6edc4b47bb905fe8825f09155edcbc217d9ea44246a3a3b4d8deb4387384e85",
+    "uid": 1001
+  },
+  "manifest_key": "node_02/manifests/1b3cfb30c50e1072e002c10bb8a2f036b808c76a0458db6a316f575aae671369.json",
+  "manifest_sha256": "1b3cfb30c50e1072e002c10bb8a2f036b808c76a0458db6a316f575aae671369",
+  "mapping": {
+    "path": "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json",
+    "sha256": "61f7601f78a7aa1f71394a020cbbb28aa9dbd85de858f139def1c989f2b2a89e"
+  },
+  "object_etag": "d98ea9e64f6adc65a51c5ae843e44656-838",
+  "object_key": "node_02/objects/c6edc4b47bb905fe8825f09155edcbc217d9ea44246a3a3b4d8deb4387384e85.blob",
+  "prefix": "node_02/",
+  "reference_census_after": {
+    "inspected_processes": 1034,
+    "references": []
+  },
+  "reference_census_before": {
+    "inspected_processes": 1032,
+    "references": []
+  },
+  "remote_sha256_readback": true,
+  "replay_launch_authorized": false,
+  "runtime_checkpoint_qualified": false,
+  "schema": "jetstreamer-horizon-holding-custody-v2",
+  "sha256": "c6edc4b47bb905fe8825f09155edcbc217d9ea44246a3a3b4d8deb4387384e85",
+  "source": "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-d53ec84bc26887772d067cda9258daa995dc2541cb1e81e71b72376b619ffe51/work/root-cohort-166-166/run-689067-1794918104133897328/archives/epoch-166.jet"
+}
