@@ -40,11 +40,11 @@ const GUARD_IMAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
 const PREPARER_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/prepare";
-const PREPARER_SHA: &str = "f33a100bd73c75cb1c1d5f000ab81abdc3fba71040cc72b2949ffd320cae9632";
-const PREPARER_BUILD_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/artifact-proof.json";
+    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
+const PREPARER_SHA: &str = "4b9c35f6983be37cf73a1422841735fca71754a94427536cb747866fd9c0b0f6";
+const PREPARER_BUILD_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/artifact-proof.json";
 const PREPARER_BUILD_PROOF_SHA: &str =
-    "b94097d4dca6ff4ef342b74bec99e9f3ddb479a2fa8194f543401623b53493d9";
+    "59aa310a6ca1543b6e1a1d68b100ccd913158a7e6566a7098cc6bbab80036c40";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 
@@ -1040,7 +1040,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     attempt
 }
 const LAUNCH_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch";
+    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v4/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),
@@ -1087,12 +1087,13 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn successor_v3_rejects_all_predecessor_destinations() {
+    fn successor_v4_rejects_all_predecessor_destinations() {
         require_launch_image(Path::new(LAUNCH_IMAGE)).unwrap();
         for path in [
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v1/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch",
+            "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch",
             "/tmp/launch",
         ] {
             assert!(require_launch_image(Path::new(path)).is_err());

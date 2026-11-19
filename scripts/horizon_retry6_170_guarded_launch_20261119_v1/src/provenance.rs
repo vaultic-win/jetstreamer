@@ -1,6 +1,6 @@
 //! Validate the exact sealed preparer, source closure and qualified guard.
 use super::*;
-const BUILD_COMMIT: &str = "60ef954d8c1665a0f259cde34ba9fc46a5683d1a";
+const BUILD_COMMIT: &str = "7bad5a088b916cee2c4efae6ca9509fc33345869";
 const PREPARE_PACKAGE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_20261118_v1/prepare-live166retry8-v1";
 pub(super) fn validate() -> Result<()> {
     fixed(PREPARER_IMAGE, PREPARER_SHA, 64 << 20)?;
@@ -17,7 +17,7 @@ pub(super) fn validate() -> Result<()> {
             && proof["production"]["sha256"] == PREPARER_SHA
             && proof["equivalent_build_source_commit"] == BUILD_COMMIT
             && proof["source_contained_in_origin_account_updates"] == true
-            && proof["tests_passed"] == 305
+            && proof["tests_passed"] == 306
             && proof["tests_failed"] == 0
             && proof["production_clippy_passed"] == true
             && proof["features"] == json!(["preparation"]),

@@ -16,6 +16,22 @@ const ALLOCATION_SHA: &str = "f99e0d79b062a86f13d808eafed4cb4d53c7325c154934b0c2
 const MEMORY: u64 = 24 << 30;
 const CPU: u64 = 4_000_000;
 
+const AUDIT_V7: &str =
+    "/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/audit";
+const AUDIT_V7_SHA: &str = "b3a1c8290cef4fe0e30e867b20698c6ebcb6a3a4f08d3997e403837db2d2df02";
+const AUDIT_V7_CONFIG: &str =
+    "/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/config.json";
+const AUDIT_V7_SEAL: &str = "/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/deployment-seal-receipt.json";
+const AUDIT_V7_SEAL_SHA: &str = "92d94aa9097ca2d95c2a798a178ba21e61c803f4c8877c24fdc16295fdc44ab9";
+fn selected_image(path: &Path) -> Result<(&'static str, &'static str, &'static str)> {
+    if path == Path::new(AUDIT_IMAGE) {
+        Ok((AUDIT_IMAGE, AUDIT_SHA, AUDIT_CONFIG))
+    } else if path == Path::new(AUDIT_V7) {
+        Ok((AUDIT_V7, AUDIT_V7_SHA, AUDIT_V7_CONFIG))
+    } else {
+        anyhow::bail!("unknown audit image")
+    }
+}
 fn config_shape(cfg: &Value, handoff: &Value) -> Result<()> {
     ensure!(
         cfg["state_directory"] == "/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1"
@@ -95,18 +111,42 @@ pub(super) fn observe() -> Result<Value> {
     shape(&row)?;
     let pid = string(&row, "MainPID")?.parse::<u64>()?;
     let start = process_start_ticks(pid)?;
-    ensure!(
-        fs::read_link(format!("/proc/{pid}/exe"))? == Path::new(AUDIT_IMAGE),
-        "audit PID executable differs"
-    );
-    let config_path = AUDIT_CONFIG;
+    let (image, image_sha, config_path) =
+        selected_image(&fs::read_link(format!("/proc/{pid}/exe"))?)?;
+    fixed(image, image_sha, 128 << 20)?;
+    fixed(config_path, AUDIT_CONFIG_SHA, 1 << 20)?;
+    if image == AUDIT_V7 {
+        fixed(AUDIT_V7_SEAL, AUDIT_V7_SEAL_SHA, 32 << 20)?;
+        let seal: Value =
+            serde_json::from_slice(&read_regular(Path::new(AUDIT_V7_SEAL), 32 << 20, true)?)?;
+        ensure!(
+            seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+                && seal["destination"] == Path::new(AUDIT_V7).parent().unwrap().to_str().unwrap()
+                && seal["sealer_sha256"] == SEALER_SHA
+                && seal["remote_mutations"] == false
+                && seal["replay_launch_authorized"] == false
+                && seal["members"].as_array().is_some_and(|m| m
+                    .iter()
+                    .any(|v| v["name"] == "audit"
+                        && v["sha256"] == AUDIT_V7_SHA
+                        && v["mode"] == "0555")
+                    && m.iter().any(|v| v["name"] == "config.json"
+                        && v["sha256"] == AUDIT_CONFIG_SHA
+                        && v["mode"] == "0444")),
+            "v7 normal seal differs"
+        );
+    }
     let config_bytes = read_regular(Path::new(config_path), 1 << 20, true)?;
     let cfg: Value = serde_json::from_slice(&config_bytes)?;
     let handoff: Value = serde_json::from_slice(&read_regular(Path::new(HANDOFF), 1 << 20, true)?)?;
     config_shape(&cfg, &handoff)?;
-    ensure!(process_start_ticks(pid)? == start, "audit PID reused");
+    ensure!(
+        process_start_ticks(pid)? == start
+            && fs::read_link(format!("/proc/{pid}/exe"))? == Path::new(image),
+        "audit PID or image changed"
+    );
     Ok(
-        json!({"native":row,"start_ticks":start,"image":{"path":AUDIT_IMAGE,"sha256":AUDIT_SHA},
+        json!({"native":row,"start_ticks":start,"image":{"path":image,"sha256":image_sha},"v7_seal":if image==AUDIT_V7{json!({"path":AUDIT_V7_SEAL,"sha256":AUDIT_V7_SEAL_SHA})}else{Value::Null},
         "config":{"path":config_path,"sha256":digest(&config_bytes)},
         "allocation":{"path":ALLOCATION,"sha256":ALLOCATION_SHA},
         "exact_archive_budget_handoff":{"path":HANDOFF,"sha256":HANDOFF_SHA}}),
@@ -146,6 +186,24 @@ pub(super) fn requirements(
 mod tests {
     use super::*;
     #[test]
+    fn audit_image_selection_rejects_unknown_generations() {
+        assert!(selected_image(Path::new(AUDIT_IMAGE)).is_ok());
+        assert_eq!(selected_image(Path::new(AUDIT_V7)).unwrap().1, AUDIT_V7_SHA);
+        assert!(selected_image(Path::new("/tmp/audit")).is_err());
+        assert!(
+            selected_image(Path::new(
+                "/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v6/audit"
+            ))
+            .is_err()
+        );
+        assert!(
+            selected_image(Path::new(
+                "/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v8/audit"
+            ))
+            .is_err()
+        );
+    }
+    #[test]
     fn exact_size_audit_handoff_keeps_root_only_storage_and_all_limits() {
         let cfg = json!({"state_directory":"/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1",
             "reserve_bytes":32u64<<30,"max_archive_bytes":385_290_386_716u64,
@@ -178,10 +236,10 @@ mod tests {
         }
     }
     #[test]
-    #[ignore = "requires the genuine sealed audit v5 service on this host"]
+    #[ignore = "requires the genuine sealed audit v5 or v7 service on this host"]
     fn actual_current_audit_preserves_additive_booking() {
         let result = observe().unwrap();
-        assert_eq!(result["image"]["sha256"], AUDIT_SHA);
+        assert!([json!(AUDIT_SHA), json!(AUDIT_V7_SHA)].contains(&result["image"]["sha256"]));
         assert_eq!(
             result["exact_archive_budget_handoff"]["sha256"],
             HANDOFF_SHA
