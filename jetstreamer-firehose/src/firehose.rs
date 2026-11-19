@@ -667,6 +667,9 @@ pub enum FirehoseError {
     RewardHandlerError(SharedError),
     /// Block handler returned an error.
     BlockHandlerError(SharedError),
+    /// Sequential input stopped at an acknowledged complete block. This is
+    /// deliberately distinct from successful exhaustion of the requested range.
+    SourceQuiesced(crate::source_quiescence::CompletedSourceBlock),
 }
 
 unsafe impl Send for FirehoseError {}
@@ -719,6 +722,9 @@ impl Display for FirehoseError {
             }
             FirehoseError::RangeComplete => {
                 write!(f, "slot range complete")
+            }
+            FirehoseError::SourceQuiesced(block) => {
+                write!(f, "source quiesced after complete block {}", block.slot)
             }
             FirehoseError::PrematureStreamEnd => {
                 write!(
@@ -796,6 +802,17 @@ pub trait SourcedTransactionNotifier: Send + Sync {
 pub trait BlockParentNotifier: Send + Sync {
     /// Reports that decoded block `slot` names `parent_slot` as its parent.
     fn notify_block_parent(&self, parent_slot: u64, slot: u64);
+
+    /// Runs in sequential mode only, after the complete block callback batch
+    /// returns successfully. Quiesce stops input with `SourceQuiesced`, without
+    /// retrying or claiming full-range completion. The caller must independently
+    /// drain execution, verify the selected boundary, and freeze native state.
+    fn source_block_completed(
+        &self,
+        _block: crate::source_quiescence::CompletedSourceBlock,
+    ) -> crate::source_quiescence::SourceBlockAction {
+        crate::source_quiescence::SourceBlockAction::Continue
+    }
 }
 
 impl From<reqwest::Error> for FirehoseError {
@@ -3635,7 +3652,7 @@ async fn firehose_geyser_thread(
                             .notify_block_parent(block.meta.parent_slot, block.slot);
                     }
 
-                    nodes.each(|node_with_cid| -> Result<(), SharedError> {
+                    let block_callbacks = nodes.each(|node_with_cid| -> Result<(), SharedError> {
                         item_index += 1;
                         // if item_index == 100000 && !triggered { log::info!("simulating
                         //     error"); triggered = true; return
@@ -3814,8 +3831,30 @@ async fn firehose_geyser_thread(
                             DataFrame(_data_frame) => (),
                         }
                         Ok(())
-                    })
-                .map_err(|e| FirehoseError::NodeDecodingError(item_index, e)).map_err(|e| (e, current_slot.unwrap_or(slot_range.start)))?;
+                    });
+                    let completed = crate::source_quiescence::CompletedSourceBlock {
+                        slot: block.slot,
+                        parent_slot: block.meta.parent_slot,
+                        blockhash: todo_latest_entry_blockhash.to_bytes(),
+                        entries: this_block_entry_count,
+                        transactions: this_block_executed_transaction_count,
+                    };
+                    let action = crate::source_quiescence::acknowledge(
+                        block_callbacks,
+                        completed,
+                        |completed| {
+                            if sequential_mode {
+                                if let Some(notifier) = block_parent_notifier_maybe.as_ref() {
+                                    return notifier.source_block_completed(completed);
+                                }
+                            }
+                            crate::source_quiescence::SourceBlockAction::Continue
+                        },
+                    ).map_err(|e| FirehoseError::NodeDecodingError(item_index, e))
+                        .map_err(|e| (e, current_slot.unwrap_or(slot_range.start)))?;
+                    if action == crate::source_quiescence::SourceBlockAction::Quiesce {
+                        return Err((FirehoseError::SourceQuiesced(completed), completed.slot));
+                    }
                     if block.slot == slot_range.end - 1 {
                         let finish_time = std::time::Instant::now();
                         let elapsed = finish_time.duration_since(start_time);
@@ -3862,7 +3901,7 @@ async fn firehose_geyser_thread(
             );
             return Ok(());
         }
-        if matches!(err, FirehoseError::OnLoadError(_)) {
+        if matches!(err, FirehoseError::OnLoadError(_) | FirehoseError::SourceQuiesced(_)) {
             return Err((err, slot));
         }
         log::error!(

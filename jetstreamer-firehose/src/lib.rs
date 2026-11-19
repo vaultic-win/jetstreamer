@@ -204,6 +204,7 @@ pub mod node_reader;
 pub mod pace;
 /// Reward decoding primitives and helpers.
 pub mod rewards;
+pub mod source_quiescence;
 /// Utilities for working with subset nodes.
 pub mod subset;
 /// System heuristics for sizing the firehose runtime.
