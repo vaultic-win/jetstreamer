@@ -109,6 +109,8 @@ mod runtime157;
 mod shrink_budget225;
 mod shrink_root203;
 mod singleton209;
+mod singleton211;
+mod full211_status;
 mod singleton209_admission;
 mod singleton209_capability;
 mod singleton209_capture;
@@ -183,6 +185,8 @@ pub(super) async fn publish_full227_status() -> Result<()> {
 pub(super) fn capture_full227_failure() -> Result<()> {
     full227_failure::capture()
 }
+pub(super) async fn publish_full211_status() -> Result<()> { full211_status::run().await }
+pub(super) fn full211_status_inactive_owner(receipt: &StatusPublicationReceipt) -> Result<Option<(String,String)>> { full211_status::inactive_owner(receipt) }
 pub(super) async fn publish_full209_status() -> Result<()> {
     full209_status::run().await
 }
@@ -1087,6 +1091,7 @@ fn validate_same_sample_admission(
     if prefix144::namespace(claim) {
         return prefix144::admission(previous, plan, claim, guard, guard_plan, now);
     }
+    if singleton211::namespace(claim) { return singleton211::transition(previous,plan,claim,guard,guard_plan,now); }
     // Only these separately pinned private measurement contracts may report
     // one same-sample admission; this never grants launch authority.
     let expected_guard = match claim.epoch {
@@ -1430,6 +1435,7 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if singleton211::namespace(claim) || receipt["schema"]==singleton211::SCHEMA { return singleton211::launch(claim,receipt); }
     if epoch136::namespace(claim) || receipt["schema"] == epoch136::SCHEMA {
         return epoch136::launch(receipt, claim);
     }
@@ -3483,6 +3489,7 @@ pub(super) async fn run() -> Result<()> {
                     "capped 227 live command changed"
                 );
             }
+            if singleton211::namespace(claim) { singleton211::live(claim,current)?; }
             if singleton209::namespace(claim) {
                 let launch = bound_json(&claim.launch_receipt)?;
                 ensure!(
@@ -3702,6 +3709,7 @@ pub(super) async fn run() -> Result<()> {
                         || super::repair141::matches(receipt, epoch, &before)
                         || full227_status::matches(receipt, epoch, &observer, &before)
                         || full209_status::matches(receipt, epoch, &observer, &before)
+                        || full211_status::matches(receipt, epoch, &observer, &before)
                         || prefix223_native20_status::matches(receipt, epoch, &observer, &before)
                         || native223_status::matches(receipt, epoch, &observer, &before)
                         || pipeline_status::native_input_matches_status(receipt, epoch, &before)
