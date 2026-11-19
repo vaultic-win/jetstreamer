@@ -216,3 +216,38 @@ sealed with the executable. Native child output and reports remain beside the
 result. The next recovery dependency is actual mainnet export/restore and
 parent-driven checkpoint/segment closure; synthetic V4 playback supplies no
 authority to oversubscribe the five running replay limits.
+
+The parent recorder now exposes exact-checkpoint segment closure. It requires
+a complete runtime checkpoint at the predeclared output end, rejects buffered
+data beyond that boundary, and compares the recorded final slot/blockhash
+before writing the index/footer. It cannot shorten an already-open full epoch.
+The node's ordinary historical close path invokes it when the terminal
+checkpoint reaches the declared end; existing independently proven skipped
+tails retain their normal close path. Actual checkpoint/export/restore
+consensus equality and pressure admission remain separate caller obligations.
+
+Recorder creation also refuses existing files and symlinks, validates the
+range arithmetic, and rejects a second active recorder before touching its
+output. Successful finalization fsyncs both the archive file and its parent
+directory. The slot-presence implementation was moved unchanged into a shared
+module so the bounded harness compiles the production recorder and presence
+map directly, without substitute scheduling logic.
+
+The final native harness at
+`/var/lib/jetstreamer/horizon-checkpoint-recorder-tests-20261119-v3/checkpoint_recorder_tests`
+has SHA-256 `6a81811322d923069bc28cab59cd0736bcb79d60d8e434eeb0d12be3a9ad2914`.
+It compiles with warnings denied against the retained reader/node dependency
+artifacts. Invocation `4208c92f25454870b30c57a09c9a6912` passed all 12 tests,
+including the new checkpoint and no-clobber cases plus existing full recorder,
+parent-chain and skipped-slot checks. The first test run is preserved: its
+empty-block fixture incorrectly expected a post-transaction orphan. Replacing
+that fixture with a real transaction exercises the intended freeze-write path;
+the production recorder classification was not changed to satisfy the test.
+Final native journal SHA-256 is
+`f3ab5810bec920c887aa647b0f8856b74ebc206c823aa190a4b265474a85e526`, under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-recorder-20261119-v1`.
+
+This is native recorder-module qualification, not a complete rebuilt node or
+an admitted pressure controller. No live worker, reader or guard was replaced.
+A full node build, predeclared segment replay/export/fresh restore, canonical
+root and resource-pressure qualification are still required before deployment.
