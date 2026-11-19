@@ -72,3 +72,37 @@ argument construction. Run native playback with the qualified
 `RUST_MIN_STACK=67108864` setting. These tests do not verify a canonical mainnet
 archive or authorize R2 publication. Rebuild and qualify the uploader and reader
 acceptance against the published source before using v2 for production delivery.
+
+### Foundation qualification, 2026-11-19
+
+Published source `db1c31fe4e6d462a8e45c18c61f6b331a9c1a1c6` passed
+25 verifier tests, nine ordinary reader-gate tests, the explicit native test of
+sealed epoch-251 evidence, Clippy with warnings denied, and the synthetic native
+playback cases above. The 131,073-update historical-capacity probe also passed.
+The verifier and fixture were rebuilt from a fresh archive of that exact Git
+commit and reproduced the tested binaries byte-for-byte. The accepted dependency
+manifest's 165 hashes were rechecked successfully. The plugin and reader library
+sources remain identical to the preceding `135657fe` acceptance; the only changed
+reader paths are the verifier and synthetic fixture examples.
+
+The rebuilt uploader and acceptance dossier are sealed on Foundation at
+`/var/lib/jetstreamer/horizon-skipped-tail-qualified-db1c31fe-20261119-v1`.
+Uploader SHA-256 is
+`02ae4dd1eafbb614b8ddf984817b3d544cbf68180e62613818fd49ff972c4ba4`;
+verifier SHA-256 is
+`f31ada10fd7e25247176c602f72fdaecff51d2fcb95bf40a6956f4db837f1e1f`.
+The dossier retains build commands, systemd test/build evidence, native results,
+dependency checks and the exact predecessor acceptance. Serial compilation and
+native qualification used a 2 GB memory cap, zero swap and four CPU cores' quota.
+An initial synthetic retry omitted the required worker-stack setting and failed;
+its evidence is retained. The corrected invocation passed with the 64 MiB
+thread-stack value bound into the acceptance.
+
+Fresh dormant reader plans for 247–251 are sealed at
+`/var/lib/jetstreamer/horizon-reader-delivery247-251-db1c31fe-20261119-v2`.
+They bind the new acceptance and independent boundaries, including the v2
+successor expectation for 251. These plans are preparation only: fresh terminal
+handoff, delivery resource admission, verification, upload and remote playback
+remain required. The running epoch-205 audit retains its original plan and
+cannot establish latest-branch compatibility after this verifier source change;
+preserve its work and requalify through the normal current-reader gates.
