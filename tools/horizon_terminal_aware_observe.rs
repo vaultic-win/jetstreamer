@@ -14,9 +14,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
+mod singleton247_phase;
+
 const OBSERVER: &str =
-    "/var/lib/jetstreamer/horizon-observer-hard-limits-20261119-v1/jetstreamer-horizon-observe";
-const OBSERVER_SHA: &str = "9da8d7f195c10635585511501dfea397af2dca7a2db5137a1a9fe80bd30cd6bc";
+    "/var/lib/jetstreamer/horizon-finalization247-observer-20261119-v1/jetstreamer-horizon-observe";
+const OBSERVER_SHA: &str = "10421a9728a797b4df98cfdb2160a6d136621779b25aed85f1d58cb4c9b7e02c";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -235,6 +238,12 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
             .is_none_or(|v| v == &json!([])),
         "diagnostic owners need their own unchanged route"
     );
+    ensure!(
+        config
+            .get("singleton247_finalization")
+            .is_none_or(|v| v == &json!(false)),
+        "finalization route is selected only by authenticated cadence prescreen"
+    );
     let m = fs::symlink_metadata(&p.state_directory)?;
     ensure!(
         m.is_dir()
@@ -290,24 +299,34 @@ fn run(args: &[String]) -> Result<()> {
     let mut live = Vec::new();
     let mut omitted = Vec::new();
     let mut census = Vec::new();
+    let mut finalization = Vec::new();
     for (row, handoff) in config["replays"].as_array().unwrap().iter().zip(&handoffs) {
         let unit = properties(string(row, "producer_unit")?)?;
         census.push(unit.clone());
         match classify(row, handoff, &unit)? {
-            State::Live => live.push(row.clone()),
+            State::Live => {
+                if unit["Id"] == singleton247_phase::UNIT
+                    && let Some(proof) = singleton247_phase::capture(&unit, now)?
+                {
+                    finalization.push(json!({"configuration":row,"unit":unit,"phase_evidence":proof,"reservations_retained":true,"resource_release_authorized":false}));
+                    continue;
+                }
+                live.push(row.clone());
+            },
             State::Terminal => omitted.push(json!({"configuration":row,"unit":unit,"terminal_handoff_required":true,"archive_completion_proven":false,"resource_release_authorized":false})),
         }
     }
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"omitted":omitted,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
-        !live.is_empty(),
+        !live.is_empty() || !finalization.is_empty(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     config["replays"] = json!(live);
+    config["singleton247_finalization"] = json!(!finalization.is_empty());
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
     let seal = save(
         &p.state_directory,
@@ -323,7 +342,7 @@ fn run(args: &[String]) -> Result<()> {
         .arg(p.deployment.join("config.json"))
         .status()?;
     let mut still_terminal = true;
-    for entry in &omitted {
+    for entry in omitted.iter().chain(&finalization) {
         let old = &entry["unit"];
         let current = properties(string(old, "Id")?)?;
         still_terminal &= current == *old;
@@ -331,7 +350,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,

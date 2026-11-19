@@ -3214,7 +3214,8 @@ pub(super) async fn run() -> Result<()> {
             for replay in replays {
                 ensure!(
                     !parse_observer_claim_range(observer_string(replay, &["range"])?)?
-                        .contains(&claim.epoch),
+                        .contains(&claim.epoch)
+                        || super::singleton247_finalization::matches_primary(&entry, replay),
                     "live pipeline overlaps an ordinary replay claim"
                 );
             }
@@ -3554,6 +3555,15 @@ pub(super) async fn run() -> Result<()> {
                 observer_string(replay, &["producer_after", "invocation_id"])?,
             )?;
             live = Some((controller, producer));
+            if pipelines
+                .iter()
+                .any(|entry| super::singleton247_finalization::matches_primary(entry, replay))
+            {
+                // The original coordinated row remains memory/status evidence,
+                // but EOF authenticated above has already ended replay. Its
+                // one active pipeline entry retains the complete reservation.
+                continue;
+            }
             if gate.state != "blocked-qualification" {
                 state = "live-replay";
                 next = "Complete replay and canonical checkpoint, then import and dispatch receipt-gated verification";

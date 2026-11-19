@@ -117,6 +117,35 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         private.len(),
         200,
     );
+    if report["valid"] == true {
+        // The generic calculator calls every diagnostic a private lane. Here
+        // comparable qualifications already live in `ordinary`; `private`
+        // contains only restore/delivery/finalization owners. Preserve their
+        // resident charge while removing their credit toward replay throughput.
+        let desired = report["desired_production_lanes"]
+            .as_u64()
+            .context("replay target")?;
+        let non_replay = report["aggregate_private_lane_rss_bytes"]
+            .as_u64()
+            .context("non-replay RSS")?;
+        let overhead = report["non_lane_resident_planning_bytes"]
+            .as_u64()
+            .context("host overhead")?;
+        report["desired_lanes"] = json!(desired);
+        report["executing_lanes"] = json!(ordinary.len());
+        report["executing_private_lanes"] = json!(0);
+        report["lane_gap"] = json!(i128::from(desired) - i128::try_from(ordinary.len())?);
+        report["non_replay_owner_count"] = json!(private.len());
+        report["non_replay_resident_bytes"] = json!(non_replay);
+        report["host_overhead_resident_bytes"] = json!(overhead);
+        report["non_lane_resident_planning_bytes"] = json!(
+            overhead
+                .checked_add(non_replay)
+                .context("non-lane RSS overflow")?
+        );
+        report["aggregate_lane_rss_bytes"] = report["aggregate_production_lane_rss_bytes"].clone();
+        report["aggregate_private_lane_rss_bytes"] = json!(0);
+    }
     report["sampled_at_utc"] = o["recorded_at_utc"].clone();
     report["owner_census"] = json!(owners.keys().collect::<Vec<_>>());
     report["qualification_replays_in_marginal_average"] = json!(true);
@@ -195,5 +224,41 @@ mod tests {
                 .unwrap()
                 .contains("missing from coordinated RSS")
         );
+    }
+    #[test]
+    fn finalization_owner_retains_rss_without_counting_as_replay() {
+        let (mut o, mut ledger) = fixture();
+        o["diagnostic_replays"][0]["post_replay_resource_only"] = json!(true);
+        o["diagnostic_replays"][0]["observation"]["useful_work"]["sufficient_for_rates"] =
+            json!(false);
+        let finalization = o["diagnostic_replays"][0].clone();
+        ledger["active"][0]["phase"] = json!("producer-finalization");
+        let report = report(&o, &ledger);
+        assert_eq!(report["valid"], true, "{report}");
+        assert_eq!(report["executing_lanes"], 2);
+        assert_eq!(report["non_replay_owner_count"], 1);
+        assert_eq!(report["non_replay_resident_bytes"], 142_216_388_608u64);
+        assert_eq!(report["desired_lanes"], report["desired_production_lanes"]);
+        assert_eq!(
+            report["aggregate_lane_rss_bytes"].as_u64().unwrap()
+                + report["non_lane_resident_planning_bytes"].as_u64().unwrap(),
+            report["host_resident_planning_bytes"].as_u64().unwrap()
+        );
+        assert_eq!(report["owner_census"].as_array().unwrap().len(), 3);
+        let mut bad = o.clone();
+        bad["diagnostic_replays"].as_array_mut().unwrap().remove(0);
+        assert_eq!(super::report(&bad, &ledger)["valid"], false);
+        let mut duplicate = o.clone();
+        duplicate["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(finalization);
+        assert_eq!(super::report(&duplicate, &ledger)["valid"], false);
+        let mut unavailable = o.clone();
+        unavailable["diagnostic_replays"][0]["status"] = json!("unavailable");
+        unavailable["diagnostic_replays"][0]["observation"] = Value::Null;
+        assert_eq!(super::report(&unavailable, &ledger)["valid"], false);
+        ledger["active"][0]["phase"] = json!("replay");
+        assert_eq!(super::report(&o, &ledger)["valid"], false);
     }
 }

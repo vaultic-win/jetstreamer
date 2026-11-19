@@ -86,6 +86,7 @@ mod reserve_stop;
 mod resource_audit;
 mod resource_verify;
 mod scan203_retention;
+mod singleton247_finalization;
 mod status_fallback_complete;
 mod status_fallback_inactive;
 mod status_fallback_ready;

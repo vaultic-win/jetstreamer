@@ -59,3 +59,27 @@ enforcement, invalid UTC dates, and a real bounded systemd live-to-terminal
 transition. The native test reads only its own disjoint fixture unit. Production
 deployment still requires published source, a sealed artifact and static plan
 validation; no production terminal event is claimed by these tests.
+
+## Epoch 247 post-replay verification
+
+The original epoch-247 producer can remain active after its historical worker
+has shut down while the parent validates the closed archive. The cadence
+prescreen recognizes only that exact producer, invocation, PID, command and
+mapped immutable node, together with its authenticated firehose completion
+event at or before the sample cutoff. It moves that owner into the observer's
+`singleton247_finalization` resource route. This route records stable parent
+cgroup/RSS telemetry without requiring a historical worker; an unavailable
+sample remains explicit and retains all reservations.
+
+Register the same owner as a `producer-finalization` fleet claim. The fleet
+keeps its memory charge but excludes it from advancing replay counts. The
+last ordinary sample may still contain its worker: only the exact authenticated
+247 finalization claim may consume that row as telemetry without creating a
+second replay claim. Later checkpoint and archive-close events must not be
+backdated to the earlier firehose-completion sample.
+
+Refresh the dashboard through pipeline status in `verification`, retaining an
+authenticated replay-phase publication receipt as the original execution clock.
+None of these observations proves successful producer exit, process drain,
+independent archive verification, upload readiness or releasable capacity.
+Those gates remain with the singleton delivery handoff and current reader.

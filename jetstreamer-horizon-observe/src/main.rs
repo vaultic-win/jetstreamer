@@ -33,6 +33,8 @@ mod prefix_output204205;
 mod private_archive223;
 mod retained_memory_parent;
 mod rss;
+mod singleton247_finalization;
+mod singleton247_phase;
 const OUTPUT_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-v2";
 const MAX_CONFIG_BYTES: u64 = 1024 * 1024;
 const MAX_PREVIOUS_SAMPLE_BYTES: u64 = 4 * 1024 * 1024;
@@ -114,6 +116,8 @@ struct Config {
     // Fixed retained parent telemetry only, never admission or replay credit.
     #[serde(default)]
     retained_prefix205_ram: bool,
+    #[serde(default)]
+    singleton247_finalization: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -327,7 +331,8 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     ensure!(
         !config.replays.is_empty()
             || !config.diagnostic_replays.is_empty()
-            || !config.native_input_diagnostics.is_empty(),
+            || !config.native_input_diagnostics.is_empty()
+            || config.singleton247_finalization,
         "at least one replay is required"
     );
     ensure!(config.output.is_absolute(), "output path must be absolute");
@@ -347,6 +352,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     );
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
+    singleton247_finalization::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     Ok((config, sha256(&bytes)))
@@ -365,6 +371,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "ordinary_replay_count": config.replays.len(),
             "diagnostic_replay_count": config.diagnostic_replays.len(),
             "native_input_resource_diagnostic_count":config.native_input_diagnostics.len(),
+            "singleton247_finalization_resource_only":config.singleton247_finalization,
             "configuration_validated": true,
             "resource_observation_performed": false,
             "live_invocations_verified": false,
@@ -1867,6 +1874,7 @@ fn observe_private(
 fn run(config: Config) -> Result<()> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
+    singleton247_finalization::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     let (previous_bytes, previous_value, previous_timestamp, previous_unix) =
@@ -1931,6 +1939,9 @@ fn run(config: Config) -> Result<()> {
     diagnostic_observations.extend(native_input_diagnostic::sample(
         &config.native_input_diagnostics,
     ));
+    if config.singleton247_finalization {
+        diagnostic_observations.push(singleton247_finalization::sample(started_unix));
+    }
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
             std::slice::from_ref(&auxiliary.replay),
@@ -1971,7 +1982,11 @@ fn run(config: Config) -> Result<()> {
     let observed_entries = observations.len()
         + diagnostic_observations
             .iter()
-            .filter(|r| r["status"] == "observed" && r["native_resource_only"] != true)
+            .filter(|r| {
+                r["status"] == "observed"
+                    && r["native_resource_only"] != true
+                    && r["post_replay_resource_only"] != true
+            })
             .count()
         + auxiliary_observations
             .iter()
@@ -2444,6 +2459,7 @@ mod tests {
             native_input_diagnostics: vec![],
             host_global_pressure: false,
             retained_prefix205_ram: false,
+            singleton247_finalization: false,
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
                 supervisor_profile: "jetstreamer-private-epoch203-ram-bounded-runner-plan-v1"

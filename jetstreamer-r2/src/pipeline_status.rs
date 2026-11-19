@@ -423,6 +423,9 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                         || (unit == super::cohort160_handoff::CONTROLLER
                             && invocation == super::cohort160_handoff::IID
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (unit == super::singleton247_finalization::UNIT
+                            && invocation == super::singleton247_finalization::IID
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (unit == super::repair141::UNIT
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (matches!(
@@ -1031,6 +1034,35 @@ mod tests {
             assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
         }
         assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+    }
+    #[test]
+    fn exact247_started_event_preserves_original_singleton_clock() {
+        let unit = super::super::singleton247_finalization::UNIT;
+        let invocation = super::super::singleton247_finalization::IID;
+        let event = json!({"UNIT":unit,"INVOCATION_ID":invocation,"_PID":"1","_UID":"0",
+            "MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started epoch247 singleton.",
+            "__REALTIME_TIMESTAMP":"1794882675000000"});
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
+            1794882675000
+        );
+        for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+            let mut bad = event.clone();
+            bad[key] = json!("foreign");
+            assert!(start_millis(&[bad], unit, invocation).is_err(), "{key}");
+        }
+        assert!(start_millis(&[event.clone(), event], unit, invocation).is_err());
+        let mut b = binding();
+        b.unit = unit.into();
+        b.origin_unit = unit.into();
+        b.invocation_id = invocation.into();
+        b.origin_invocation_id = invocation.into();
+        b.claim_phase = "producer-finalization".into();
+        b.validate(247, "verification").unwrap();
+        assert!(b.validate(248, "verification").is_err());
+        assert!(b.validate(247, "replay").is_err());
+        b.origin_invocation_id = "b".repeat(32);
+        assert!(b.validate(247, "verification").is_err());
     }
     use serde_json::json;
     pub(super) fn directory_plan() -> Plan {
