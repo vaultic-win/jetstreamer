@@ -63,3 +63,18 @@ commands and journals are retained in Foundation's private
 Production capture and delivery remain unqualified until the actual singleton
 finishes and the full operational gates pass. Static plan acceptance alone is
 not an epoch landing or permission to free its files.
+
+Foundation's source `7d809078` is deployed at
+`/var/lib/jetstreamer/horizon-singleton-delivery-handoff-7d809078-20261119-v1`.
+The executable SHA-256 is
+`b90e9ca43b438ee6eb26e066a4ea6838f03f14b0dada0951913473195c878e95`.
+The package includes the exact source, build/test commands, journals and five
+producer-specific plans. All five deployed `check-plan` invocations passed,
+including execution of the original-owner read preflight as UID/GID 1000.
+No production terminal capture has run while these producers remain active.
+
+For the integrated current-reader uploader, its observational `upload-readback`
+claim may initially report the dashboard phase `verification`: full local
+verification and plugin playback precede upload. Retain the same live uploader
+identity and original producer clock as the phase advances to `upload` and
+`readback`. This metadata allowance grants no archive publication authority.

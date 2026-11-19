@@ -102,7 +102,9 @@ impl Binding {
             | ("local-publication", "verification" | "publication")
             | ("producer-finalization", "verification" | "finalization")
             | ("controller-import-handoff", "verification" | "publication")
-            | ("upload-readback", "upload" | "readback") => (),
+            // The current-reader uploader verifies the complete local archive
+            // before its first upload. Keep that same live owner and clock.
+            | ("upload-readback", "verification" | "upload" | "readback") => (),
             ("upload-readback", "queued-upload") => ensure!(
                 epoch == 144 && self.unit == UPLOAD144 && self.origin_unit == PUB144,
                 "queued upload requires the exact 144 delivery owner"
@@ -1359,9 +1361,11 @@ mod tests {
     #[test]
     fn pipeline_binding_is_not_a_replay_or_another_epoch() {
         let b = binding();
+        b.validate(213, "verification").unwrap();
         b.validate(213, "upload").unwrap();
         b.validate(213, "readback").unwrap();
         assert!(b.validate(214, "upload").is_err());
+        assert!(b.validate(214, "verification").is_err());
         assert!(b.validate(213, "replay").is_err());
         assert!(b.validate(213, "publication").is_err());
         let current = json!({"Id":b.unit,"LoadState":"loaded","ActiveState":"active","SubState":"running",
