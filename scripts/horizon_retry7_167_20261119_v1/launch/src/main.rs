@@ -1160,9 +1160,23 @@ mod tests {
     fn actual_preparation_passes_complete_outer_preflight() {
         let bytes=read_regular(Path::new("/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/launch-plan.json"),1<<20,true).unwrap();
         let plan:Value=serde_json::from_slice(&bytes).unwrap();
-        let (_,capacity)=preflight(&plan,now().unwrap()).unwrap();
-        assert_eq!(capacity["required_DATA_bytes"],7_493_274_261_298u64);
-        assert!(capacity["available_DATA_bytes"].as_u64().unwrap()>=7_493_274_261_298);
+        let (prepared,capacity)=preflight(&plan,now().unwrap()).unwrap();
+        // Native retained allocations change between preparations. Verify the
+        // current complete budget instead of pinning an earlier observation.
+        let fit=&prepared["resource_checks"]["data_accounting"]["current_fit"];
+        assert_eq!(fit["candidate_root_cap_bytes"],CAP);
+        assert_eq!(fit["booked_root_cap_increment_inside_floor_bytes"],224u64<<30);
+        assert_eq!(fit["unrelated_growth_margin_bytes"],10u64<<30);
+        let floor=FLOOR-number(fit,"fulfilled_existing_DATA_bytes").unwrap();
+        assert_eq!(fit["immutable_effective_guard_floor_bytes"],floor);
+        let required=floor
+            +number(fit,"complete_concurrent_remaining_growth_bytes").unwrap()
+            -(224u64<<30)
+            +number(fit,"fresh_subtree_overlap_bytes").unwrap()
+            +(10u64<<30);
+        assert_eq!(fit["required_raw_available_bytes"],required);
+        assert_eq!(capacity["required_DATA_bytes"],required);
+        assert!(capacity["available_DATA_bytes"].as_u64().unwrap()>=required);
     }
     #[test]
     #[ignore = "requires actual retry7 preparation; run before launch"]
