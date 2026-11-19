@@ -1,6 +1,7 @@
 //! Native synthetic export/restore -> production recorder -> V4 -> full PoH.
 //! This partial fixture grants no mainnet, full-epoch or admission authority.
 #![allow(dead_code)]
+mod checkpoint_live_client;
 #[path = "../jetstreamer-node/src/slot_presence.rs"]
 mod slot_presence;
 use slot_presence::{SlotPresenceMap, SlotPresenceState};
@@ -415,7 +416,9 @@ fn main() -> Result<()> {
         "unexpected synthetic range",
     )?;
     let snapshot = input.join("native-snapshot.tar.bz2");
-    let snapshot_sha = digest(&snapshot)?;
+    let mut snapshot_sha = digest(&snapshot)?;
+    let baseline_snapshot_sha = snapshot_sha;
+    let mut exported_snapshot = snapshot.clone();
     require(
         export.archive_sha256 == snapshot_sha
             && export.archive_size == fs::metadata(&snapshot)?.len()
@@ -426,24 +429,44 @@ fn main() -> Result<()> {
     let image_sha = digest(image)?;
     let full_sha = digest(full)?;
     let paths = [output.join("prefix.jet"), output.join("suffix.jet")];
-    segment(
-        &paths[0],
-        hash(&genesis)?,
-        image_sha,
-        &bootstrap,
-        &boundary,
-        std::slice::from_ref(&prefix_entry),
-        std::slice::from_ref(&prefix_result),
-    )?;
-    segment(
-        &paths[1],
-        hash(&genesis)?,
-        image_sha,
-        &restored,
-        &actual_terminal,
-        &suffix_entries,
-        &actual_results,
-    )?;
+    let live_worker = std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER");
+    if let Some(launcher) = live_worker.as_ref() {
+        let live_export = checkpoint_live_client::run(
+            input,
+            output,
+            image,
+            Path::new(&launcher),
+            &genesis,
+            &bootstrap,
+            &prefix_entry,
+            &prefix_result,
+            &boundary,
+            &suffix_entries,
+            &expected_results,
+            &terminal,
+        )?;
+        snapshot_sha = live_export.archive_sha256.as_slice().try_into()?;
+        exported_snapshot = PathBuf::from(live_export.archive_path);
+    } else {
+        segment(
+            &paths[0],
+            hash(&genesis)?,
+            image_sha,
+            &bootstrap,
+            &boundary,
+            std::slice::from_ref(&prefix_entry),
+            std::slice::from_ref(&prefix_result),
+        )?;
+        segment(
+            &paths[1],
+            hash(&genesis)?,
+            image_sha,
+            &restored,
+            &actual_terminal,
+            &suffix_entries,
+            &actual_results,
+        )?;
+    }
     let writes = [
         prefix_result
             .writes
@@ -612,14 +635,16 @@ fn main() -> Result<()> {
     )?;
     require(
         digest(&transcript_path)? == transcript_sha
-            && digest(&snapshot)? == snapshot_sha
+            && digest(&snapshot)? == baseline_snapshot_sha
+            && digest(&exported_snapshot)? == snapshot_sha
             && digest(image)? == image_sha
             && digest(full)? == full_sha,
         "fixture or consumer changed",
     )?;
     let report = json!({"schema":"horizon-native-recorder-restart-result-v1","transcript_sha256":hex(&transcript_sha),
         "native_test_image_sha256":hex(&image_sha),"snapshot_sha256":hex(&snapshot_sha),"archive_sha256":hex(&digest(&archive)?),
-        "full_verifier_sha256":hex(&full_sha),"source_sha256":source_shas.map(|s|hex(&s)),"parent_pid":parent_pid,"restore_pid":child_pid,
+        "full_verifier_sha256":hex(&full_sha),"source_sha256":source_shas.map(|s|hex(&s)),
+        "baseline_parent_pid":parent_pid,"baseline_restore_pid":child_pid,"live_parent_ipc":live_worker.is_some(),"baseline_snapshot_sha256":hex(&baseline_snapshot_sha),
         "slot_start":1,"slot_count":2,"account_updates":observed.rows.len(),"transactions":observed.transactions.len(),
         "full_poh_passed":true,"changed_checkpoint_rejected":true,"full_epoch_verified":false,"mainnet_qualified":false,"admission_authorized":false});
     let mut file = create(&output.join("native-results.json"))?;
