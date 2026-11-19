@@ -137,3 +137,32 @@ The paired Clippy dep-info accepts exactly the two observed complete records:
 All source/output paths, blank lines, environment keys and remaining bytes must
 match. Unrecognized options or extra/missing records still reject; this does
 not parse or generally allow arbitrary Clippy argument strings.
+
+## November 19 incremental retirement
+
+The existing sealed `6f4a1600` checker (SHA-256
+`8116e74726102e97cc6bdfd9d67f748cea148c1e2a374e81731957edc33380d0`)
+completed a fresh positive check and separately authorized retirement of the
+fixed Ubuntu debug incremental cache. Both plans bound clean source
+`a567bfef80d2ca103a672499868625a325d99636` and Cargo.lock SHA-256
+`7ae1c48cfa7d127a40f993bdf892560a489aabc79ac5719af36f15bb7fe11f85`.
+The positive census inspected 1,276 processes, found no active builders,
+process references or staged unit references, and recorded 4,289 entries.
+
+The immutable positive ledger is
+`/var/lib/jetstreamer/horizon-dev-cache-check-incremental-20261119-v1/check.json`.
+The separately sealed retirement plan is
+`/var/lib/jetstreamer/horizon-incremental-retirement-plan-20261119-v1/plan.json`.
+The completed retirement's evidence directory is
+`/var/lib/jetstreamer/horizon-dev-cache-check-incremental-retirement-20261119-v1`;
+its `completion.json` SHA-256 is
+`cc8a1b8458f529dadc9eaaace386bbf81c6d169ae4a48873645cc1758cbf4667`.
+
+The cache's unique-inode allocation fell from 5,524,897,792 to 606,208 bytes.
+Every original directory and parent Cargo lock inode 12857456 was preserved.
+Filesystem availability recorded immediately before and after retirement rose
+from 4,046,490,783,744 to 4,052,439,687,168 bytes. This 5,948,903,424-byte
+filesystem delta includes concurrent activity; it is not a cache-only savings
+claim. No replay, archive, R2 object, reader dependency cache or sealed runtime
+was removed. Additional lane admission still requires the independent resource
+and recovery qualifications.
