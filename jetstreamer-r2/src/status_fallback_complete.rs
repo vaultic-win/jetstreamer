@@ -1056,7 +1056,8 @@ mod tests {
     #[test]
     fn independently_rebound_wrong_owner_flags_keys_bucket_and_schema_still_fail() {
         for epoch in [235, 237] {
-            let edits: Vec<Box<dyn Fn(&mut Documents)>> = vec![
+            type DocumentEdit = Box<dyn Fn(&mut Documents)>;
+            let edits: Vec<DocumentEdit> = vec![
                 Box::new(|d| d.completion["epoch"] = json!(999)),
                 Box::new(|d| d.completion["key"] = json!("epoch-235.jet")),
                 Box::new(|d| d.intent["key"] = json!("epoch-235.jet.sha256")),

@@ -9,6 +9,8 @@ mod epoch136;
 mod epoch141_retire;
 #[path = "holding_epoch166_retire.rs"]
 mod epoch166_retire;
+#[path = "holding_epoch166_retry6_retire.rs"]
+mod epoch166_retry6_retire;
 #[path = "holding_epoch169_retire.rs"]
 mod epoch169_retire;
 #[path = "holding_epoch185.rs"]
@@ -1234,6 +1236,9 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    if args[1] == "holding-census166-retry6-consumers" {
+        return epoch166_retry6_retire::inspect_consumers(&spec);
+    }
     if matches!(
         args[1].as_str(),
         "holding-check185-attempt-growth" | "holding-close185-attempt-growth"
@@ -1283,6 +1288,8 @@ pub(super) async fn run() -> Result<()> {
         "holding-retire169" => epoch169_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
+        "holding-check-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         _ => bail!("unsupported holding action"),
     }
 }

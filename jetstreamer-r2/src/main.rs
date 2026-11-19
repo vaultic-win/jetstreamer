@@ -3521,6 +3521,9 @@ async fn main() -> Result<()> {
                 | "holding-retire169"
                 | "holding-check-retire166"
                 | "holding-retire166"
+                | "holding-census166-retry6-consumers"
+                | "holding-check-retire166-retry6"
+                | "holding-retire166-retry6"
         )
     ) {
         return holding::run().await;
