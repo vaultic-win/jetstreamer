@@ -1,6 +1,11 @@
 # Chronological R2 audit deployment
 
-## Current home-storage deployment — 2026-11-19
+The current controller is the home-backed `runtime-v9` described in the
+November 19 22:50 section. The earlier deployment sections retain historical
+identities and resource settings; use the live service and state JSONs for
+current progress.
+
+## Home-storage migration — 2026-11-19
 
 At 19:51:42 UTC the same audit service started its explicit downloaded-epoch77
 recovery on the home filesystem. Invocation `99c7ddc48af140efb131b784a6b064d2`,
@@ -60,7 +65,7 @@ observations, matching structured report/log counters and a clean exit.
 Inspect it without a model or agent:
 
 ```sh
-sudo /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v3/audit status /usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261118-v3/config.json
+sudo /var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v9/audit status /var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1/runtime-v9/config.json
 sudo journalctl -u horizon-r2-chronological-plugin-audit-20261118-v1.service -n 30 --no-pager
 ```
 
@@ -549,6 +554,34 @@ strict Clippy and release builds, published in
 Use that directory's `cycle` for the current two-replay fleet. Its accepted
 fleet is `root2250-live166retry8-167retry7-homeaudit-observation-20261119-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json`
 under `/var/lib/jetstreamer/horizon_runtime_data`; its sole successor observation
-is scheduled for **23:25:52 UTC**. Epoch 170 is still unlaunched: its preparer,
-launcher and stage deployments must be requalified against the actual v9 audit
-identity before admission. Their older immutable images remain untouched.
+was scheduled for **23:25:52 UTC**. The same-clock epoch170 handoff below
+supersedes that pending two-peer timer. Earlier immutable images remain intact.
+
+## November 19 23:13 epoch170 admission and observer join
+
+Epoch80's ranged download completed and full plugin playback began at
+**23:09:09 UTC**. No pass is claimed until its terminal result is committed.
+The archive audit continues independently of replay admissions.
+
+The actual v9 audit identity was included in newly qualified epoch170
+`prepare-v5`, `launch-v8`, and `stage-v9` deployments under
+`/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1`.
+Qualification passed 314 preparer, 21 launcher and 12 staging tests, plus strict
+Clippy and release builds. Required source was published before admission.
+The retained bounded admission invocation
+`72029c086303444e871d150505fc5222` completed at **23:13:18 UTC**.
+Epoch170 producer PID **2295526**, invocation
+**ebd212d2045145259449d1d5c3d65353**, passed fresh admission and its first
+timer-driven guard. Its R2 status was conditionally updated and authenticated.
+This is guarded bootstrap until the coordinated observer establishes replay.
+
+The join exposed two observer assumptions that were corrected against the
+actual worker: its executable is beneath `scratch/.historical-runtime`, and
+scratch/cohort metadata belongs to the admitted `sol` producer. Root-owned
+admission and guard evidence still requires root ownership. The resulting
+observer suite passed 43 tests and strict Clippy; the normal sealer installed
+`observer170-v3` under the same epoch170 HOME base. Use its `cycle170` after
+the three-worker sample. The old two-peer timer was stopped and drained before
+arming `horizon-observer-root2325-live166retry8-167retry7-170retry6-20261119-v1.timer`
+for the unchanged **23:25:52 UTC** clock. Handoff evidence is under
+`/var/lib/jetstreamer/horizon_runtime_data/epoch170-join2325-20261119-v1`.
