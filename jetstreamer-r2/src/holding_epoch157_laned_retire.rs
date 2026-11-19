@@ -42,7 +42,7 @@ const EPOCH_LOCK: &str = "/home/sol/.jetstreamer-private/epochs150-173-20260923-
 const QUARANTINE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch157-laned-original.jet";
 const STATE_SHA: &str = "adf94e5dfdc9eeac826334a65f2e6026a140b04bc5fc34c8123f97513d2ada3d";
 const LIFECYCLE: &str =
-    "/usr/local/lib/jetstreamer/horizon-holding157-laned-retirement-20261119-v1";
+    "/usr/local/lib/jetstreamer/horizon-holding157-laned-retirement-20261119-v2";
 // Runtime sealing precedes census/review, and check receipts precede execution
 // plans. Keep their immutable versioned bundles separate from the runtime.
 const EVIDENCE_ROOT: &str = "/var/lib/jetstreamer/holding157-laned-retirement-evidence";
@@ -315,9 +315,108 @@ fn native(unit: &str) -> Result<Value> {
             "duplicate native field"
         );
     }
+    // systemctl omits empty Exec arrays even with --all. Only a positively
+    // typed empty D-Bus reply can fill an omitted property.
+    for property in [
+        "ExecCondition",
+        "ExecStartPre",
+        "ExecStart",
+        "ExecStartPost",
+        "ExecStop",
+        "ExecStopPost",
+    ] {
+        if !map.contains_key(property) {
+            let reply = std::process::Command::new("/usr/bin/busctl")
+                .args([
+                    "--system",
+                    "--json=short",
+                    "get-property",
+                    "org.freedesktop.systemd1",
+                    &unit_object_path(unit),
+                    "org.freedesktop.systemd1.Service",
+                    property,
+                ])
+                .output()?;
+            ensure!(
+                reply.status.success() && reply.stderr.is_empty() && reply.stdout.len() <= 4096,
+                "157laned typed native property unavailable: {property}"
+            );
+            typed_empty_exec(&reply.stdout)?;
+            map.insert(property.into(), json!(""));
+        }
+    }
     Ok(Value::Object(map))
 }
+fn unit_object_path(unit: &str) -> String {
+    let encoded: String = unit
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() {
+                char::from(b).to_string()
+            } else {
+                format!("_{b:02x}")
+            }
+        })
+        .collect();
+    format!("/org/freedesktop/systemd1/unit/{encoded}")
+}
+fn typed_empty_exec(bytes: &[u8]) -> Result<()> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    ensure!(
+        value == json!({"type":"a(sasbttttuii)","data":[]}),
+        "157laned command array is not positively typed empty"
+    );
+    Ok(())
+}
+fn exact_retained_terminal(row: &Value, unit: &str) -> Result<bool> {
+    // Preserve the original successful/failed bookkeeping evidence. These
+    // exact completed invocations have no executing process or activation;
+    // semantic closure independently reviews their actual archive scope.
+    let retained: Vec<Value> =
+        serde_json::from_str(include_str!("testdata/holding157-terminal-consumers.json"))?;
+    let Some(expected) = retained.iter().find(|entry| entry["Id"] == unit) else {
+        return Ok(false);
+    };
+    for (key, value) in expected.as_object().context("terminal fixture")? {
+        ensure!(
+            row[key] == *value,
+            "157laned retained terminal changed: {unit}/{key}"
+        );
+    }
+    for key in [
+        "ControlGroup",
+        "Job",
+        "TriggeredBy",
+        "Triggers",
+        "DropInPaths",
+        "ExecCondition",
+        "ExecStartPre",
+        "ExecStartPost",
+        "ExecStop",
+        "ExecStopPost",
+    ] {
+        ensure!(
+            row[key] == "",
+            "157laned retained terminal has dispatch: {unit}/{key}"
+        );
+    }
+    for (key, value) in [
+        ("MainPID", "0"),
+        ("ControlPID", "0"),
+        ("Restart", "no"),
+        ("NRestarts", "0"),
+    ] {
+        ensure!(
+            row[key] == value,
+            "157laned retained terminal not drained: {unit}/{key}"
+        );
+    }
+    Ok(true)
+}
 fn closed(row: &Value, unit: &str) -> Result<()> {
+    if exact_retained_terminal(row, unit)? {
+        return Ok(());
+    }
     ensure!(
         row["Id"] == unit
             && row["ActiveState"] == "inactive"
@@ -831,6 +930,17 @@ pub(super) async fn run(
         "laned requires its sealed runtime and separate versioned evidence bundles"
     );
     scope(p)?;
+    consumers::preflight(p)?;
+    // Fail cheaply on stale supplied evidence; retain descriptor and freshness
+    // validation after the full hash/closure below.
+    if !check {
+        let prior = bound(
+            p.prior_check
+                .as_ref()
+                .context("laned execution requires sealed successful check")?,
+        )?;
+        prior_check_freshness(&prior, clock()?)?;
+    }
     let creator_leases = creator_fence::acquire()?;
     let held = locks()?;
     let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
@@ -959,9 +1069,7 @@ pub(super) async fn run(
             && prior["descriptor"] == descriptor
             && prior["checked"] == true
             && prior["data_removed"] == false
-            && prior["recorded_unix_seconds"]
-                .as_u64()
-                .is_some_and(|t| t <= at && at - t <= 900),
+            && prior_check_freshness(&prior, at).is_ok(),
         "laned check stale or foreign"
     );
     // Refresh before each mutation and retain a hash-bound record of the actual
@@ -1034,6 +1142,20 @@ pub(super) async fn run(
     creator_fence::check(&creator_leases)?;
     persist(&completion_path, &expected_completion)?;
     println!("{}", completion_path.display());
+    Ok(())
+}
+
+fn prior_check_freshness(prior: &Value, now: u64) -> Result<()> {
+    ensure!(
+        prior["schema"] == "jetstreamer-holding-retire157-laned-check-v1"
+            && prior["checked"] == true
+            && prior["data_removed"] == false
+            && prior["recorded_unix_seconds"]
+                .as_u64()
+                .and_then(|at| now.checked_sub(at))
+                .is_some_and(|age| age <= 900),
+        "laned check stale or malformed"
+    );
     Ok(())
 }
 
@@ -1175,6 +1297,78 @@ mod tests {
             assert!(park_shape(&changed, iid).is_err());
         }
         assert!(park_shape(&good, &"a".repeat(32)).is_err());
+    }
+    #[test]
+    fn omitted_native_commands_require_actual_typed_empty_reply() {
+        typed_empty_exec(br#"{"type":"a(sasbttttuii)","data":[]}"#).unwrap();
+        for bad in [
+            br#"{}"#.as_slice(),
+            br#"{"type":"as","data":[]}"#,
+            br#"{"type":"a(sasbttttuii)","data":[[]]}"#,
+            br#"{"type":"a(sasbttttuii)"}"#,
+            b"",
+            b"null",
+        ] {
+            assert!(typed_empty_exec(bad).is_err());
+        }
+        assert_eq!(
+            unit_object_path("one-two_3.service"),
+            "/org/freedesktop/systemd1/unit/one_2dtwo_5f3_2eservice"
+        );
+    }
+    #[test]
+    fn historical_terminal_consumers_require_exact_identity_and_no_dispatch() {
+        let retained: Vec<Value> =
+            serde_json::from_str(include_str!("testdata/holding157-terminal-consumers.json"))
+                .unwrap();
+        assert_eq!(retained.len(), 4);
+        for mut row in retained {
+            for property in [
+                "ExecCondition",
+                "ExecStartPre",
+                "ExecStartPost",
+                "ExecStop",
+                "ExecStopPost",
+            ] {
+                assert!(row[property].is_null());
+                row[property] = json!(""); // fixture models the separately tested typed reply
+            }
+            let unit = row["Id"].as_str().unwrap().to_owned();
+            closed(&row, &unit).unwrap();
+            for (key, value) in [
+                ("InvocationID", "changed"),
+                ("MainPID", "1"),
+                ("ControlGroup", "/x"),
+                ("Job", "1/start"),
+                ("TriggeredBy", "x.timer"),
+                ("ExecStopPost", "/bin/true"),
+                ("NRestarts", "1"),
+                ("ExecStart", "changed"),
+                ("Result", "changed"),
+                ("FragmentPath", "/changed"),
+            ] {
+                let mut changed = row.clone();
+                changed[key] = json!(value);
+                assert!(closed(&changed, &unit).is_err(), "{unit}/{key}");
+            }
+            let mut foreign = row.clone();
+            foreign["Id"] = json!("foreign.service");
+            assert!(closed(&foreign, "foreign.service").is_err());
+            let mut original = row.clone();
+            original["Id"] = json!(PRODUCER);
+            assert!(closed(&original, PRODUCER).is_err());
+        }
+    }
+    #[test]
+    fn prior_check_uses_unchanged_nine_hundred_second_window() {
+        let good = json!({"schema":"jetstreamer-holding-retire157-laned-check-v1","checked":true,"data_removed":false,"recorded_unix_seconds":1000});
+        prior_check_freshness(&good, 1000).unwrap();
+        prior_check_freshness(&good, 1900).unwrap();
+        assert!(prior_check_freshness(&good, 1901).is_err());
+        assert!(prior_check_freshness(&good, 999).is_err());
+        let mut bad = good;
+        bad["data_removed"] = json!(true);
+        assert!(prior_check_freshness(&bad, 1000).is_err());
     }
     #[test]
     fn genuine157_start_and_terminal_receipts_bind_the_same_transfer() {

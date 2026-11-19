@@ -490,13 +490,37 @@ fn reverse_graph(
         PathBuf::from(RUN),
         PathBuf::from(DESTINATION),
     ]);
-    // Parse each text body once. Repeated full-corpus substring searches for
-    // every newly discovered node are prohibitively expensive on this host.
-    let mut all_edges = BTreeMap::new();
+    // Each invocation has one fixed corpus and alias map. Every file was
+    // independently stable-read and hashed above; only parsing may be reused.
+    // Digests select candidates, never establish equality: compare the actual
+    // bytes before borrowing a representative's edges. Retain references into
+    // the corpus, rather than another copy of the metadata bodies.
+    let mut representatives: BTreeMap<(&str, usize), Vec<&PathBuf>> = BTreeMap::new();
+    let mut all_edges: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
     let mut readers: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
     let mut edge_count = 0usize;
-    for (path, item) in corpus {
-        let edges = literal_edges(&item.bytes, corpus, &targets, aliases);
+    let started = std::time::Instant::now();
+    let mut last_report = started;
+    let mut processed_bytes = 0u64;
+    let mut parsed_bodies = 0usize;
+    let mut reused_bodies = 0usize;
+    for (index, (path, item)) in corpus.iter().enumerate() {
+        let candidates = representatives
+            .entry((item.sha256.as_str(), item.bytes.len()))
+            .or_default();
+        let matching = candidates
+            .iter()
+            .copied()
+            .find(|candidate| corpus[*candidate].bytes == item.bytes);
+        let edges = if let Some(representative) = matching {
+            reused_bodies += 1;
+            all_edges[representative].clone()
+        } else {
+            candidates.push(path);
+            parsed_bodies += 1;
+            literal_edges(&item.bytes, corpus, &targets, aliases)
+        };
+        // Count and insert every path, including byte-identical definitions.
         edge_count = edge_count
             .checked_add(edges.len())
             .context("reader edge overflow")?;
@@ -511,6 +535,21 @@ fn reverse_graph(
                 .insert(path.clone());
         }
         all_edges.insert(path.clone(), edges);
+        processed_bytes = processed_bytes
+            .checked_add(item.bytes.len() as u64)
+            .context("reader parsing byte overflow")?;
+        if last_report.elapsed() >= std::time::Duration::from_secs(60) {
+            let at = clock()?;
+            eprintln!(
+                "{}",
+                json!({"at":at,"epoch":157,"phase":"consumer-graph-progress",
+                "metadata_entries":index+1,"metadata_bytes":processed_bytes,
+                "parsed_bodies":parsed_bodies,"reused_bodies":reused_bodies,"literal_edges":edge_count,
+                "elapsed_seconds":started.elapsed().as_secs(),"last_substantive_progress_unix":at,
+                "complete_transitive_consumer_graph_qualified":false})
+            );
+            last_report = std::time::Instant::now();
+        }
     }
     let mut selected = BTreeSet::new();
     let mut queue: Vec<_> = targets.iter().cloned().collect();
@@ -540,7 +579,15 @@ fn reverse_graph(
     }
     Ok(graph)
 }
+fn review_freshness(recorded: u64, now: u64) -> Result<()> {
+    ensure!(
+        now.checked_sub(recorded).is_some_and(|age| age <= 1800),
+        "laned transitive consumer review is stale or future-dated"
+    );
+    Ok(())
+}
 fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
+    review_freshness(r.recorded_unix_seconds, now)?;
     ensure!(
         r.schema == "horizon-closed157-laned-transitive-consumer-closure-v1"
             && r.owner == "/root"
@@ -550,8 +597,6 @@ fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
             && same_bound(&r.inspection, &p.inspection)
             && same_bound(&r.park_plan, &p.park_plan)
             && same_bound(&r.park_terminal, &p.park_terminal)
-            && r.recorded_unix_seconds <= now
-            && now - r.recorded_unix_seconds <= 1800
             && r.sealed_metadata_root == Path::new(SEALED)
             && r.definition_roots
                 == ROOTS
@@ -795,6 +840,11 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
     println!("{}", path.display());
     Ok(())
 }
+pub(super) fn preflight(p: &Retire) -> Result<()> {
+    let value = evidence_with_limit(&p.consumer_closure, true, 16 << 20)?;
+    let r: Review = serde_json::from_value(value)?;
+    review_shape(&r, p, clock()?)
+}
 pub(super) fn verify(p: &Retire) -> Result<Value> {
     let value = evidence_with_limit(&p.consumer_closure, true, 16 << 20)?;
     let r: Review = serde_json::from_value(value)?;
@@ -870,6 +920,9 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
             read_artifact(&proof, 128 << 20, true)?;
         }
     }
+    // Collection and native/source verification can consume much of the
+    // review window. Freshness at entry must not authorize an expired result.
+    review_freshness(r.recorded_unix_seconds, clock()?)?;
     Ok(
         json!({"schema":"horizon-laned-transitive-consumer-gate-v1","review":p.consumer_closure,
         "sealed_metadata_census_sha256":sealed_sha,"definition_census_sha256":definitions_sha,
@@ -926,6 +979,163 @@ mod tests {
             }
         }
         edges
+    }
+    // Independent small-corpus oracle: parse every body and find the reverse
+    // closure by fixed-point expansion rather than the production cache/queue.
+    fn uncached_graph(
+        corpus: &BTreeMap<PathBuf, Artifact>,
+        aliases: &BTreeMap<PathBuf, PathBuf>,
+    ) -> BTreeMap<PathBuf, BTreeSet<PathBuf>> {
+        let targets = [SOURCE, RUN, DESTINATION]
+            .into_iter()
+            .map(PathBuf::from)
+            .collect();
+        let edges: BTreeMap<_, _> = corpus
+            .iter()
+            .map(|(path, item)| {
+                (
+                    path.clone(),
+                    value_tree_edges(&item.bytes, corpus, &targets, aliases),
+                )
+            })
+            .collect();
+        let mut selected = BTreeSet::new();
+        loop {
+            let before = selected.len();
+            for (path, outgoing) in &edges {
+                if outgoing
+                    .iter()
+                    .any(|target| targets.contains(target) || selected.contains(target))
+                {
+                    selected.insert(path.clone());
+                }
+            }
+            if before == selected.len() {
+                break;
+            }
+        }
+        selected
+            .iter()
+            .map(|path| {
+                (
+                    path.clone(),
+                    edges[path]
+                        .iter()
+                        .filter(|target| targets.contains(*target) || selected.contains(*target))
+                        .cloned()
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+    #[test]
+    fn identical_bodies_preserve_every_path_and_full_uncached_graph() {
+        let mut corpus = BTreeMap::from([
+            ("/sealed/plan.json".into(), artifact(SOURCE, false)),
+            ("/sealed/other.json".into(), artifact("{}", false)),
+            ("/sealed/é/🦀.json".into(), artifact(SOURCE, false)),
+        ]);
+        let bodies = [
+            "ExecStart=/sealed/plan.json",
+            r#"{"v":"\u002finput\u002fplan.json"}"#,
+            r#"{"\u002fsealed\u002f\u00e9\u002f\ud83e\udd80.json":null}"#,
+            r#"{"k":"\u002fsealed\u002fplan.json","k":null}"#,
+            r#"{"k":null,"k":"\u002fsealed\u002fplan.json"}"#,
+            r#"["\u002fsealed\u002fplan.json"] trailing"#,
+            r#"{"raw":"/sealed/plan.json","bad":"\q"}"#,
+            "reader /readers/0/0.json",
+        ];
+        for (index, body) in bodies.iter().enumerate() {
+            for copy in 0..3 {
+                corpus.insert(
+                    format!("/readers/{index}/{copy}.json").into(),
+                    artifact(body, copy == 1),
+                );
+            }
+        }
+        let aliases = BTreeMap::from([("/input".into(), "/sealed".into())]);
+        let observed = reverse_graph(&corpus, &aliases).unwrap();
+        assert_eq!(observed, uncached_graph(&corpus, &aliases));
+        for copy in 0..3 {
+            assert!(observed.contains_key(Path::new(&format!("/readers/0/{copy}.json"))));
+            assert!(observed.contains_key(Path::new(&format!("/readers/1/{copy}.json"))));
+            assert!(observed.contains_key(Path::new(&format!("/readers/7/{copy}.json"))));
+            assert!(!observed.contains_key(Path::new(&format!("/readers/3/{copy}.json"))));
+            assert!(!observed.contains_key(Path::new(&format!("/readers/5/{copy}.json"))));
+        }
+    }
+    #[test]
+    fn equal_digest_and_length_require_exact_bytes_before_edge_reuse() {
+        let mut corpus = BTreeMap::from([
+            ("/sealed/a.json".into(), artifact(SOURCE, false)),
+            ("/sealed/b.json".into(), artifact("{}", false)),
+        ]);
+        for (reader, target) in [("a", "a"), ("b", "b"), ("c", "b"), ("d", "a")] {
+            let mut item = artifact(&format!("/sealed/{target}.json"), false);
+            // An injected collision exercises the exact-byte guard without
+            // needing or pretending to possess a real SHA-256 collision.
+            item.sha256 = "0".repeat(64);
+            corpus.insert(format!("/readers/{reader}").into(), item);
+        }
+        let aliases = BTreeMap::new();
+        let graph = reverse_graph(&corpus, &aliases).unwrap();
+        assert_eq!(graph, uncached_graph(&corpus, &aliases));
+        assert!(graph.contains_key(Path::new("/readers/a")));
+        assert!(graph.contains_key(Path::new("/readers/d")));
+        assert!(!graph.contains_key(Path::new("/readers/b")));
+        assert!(!graph.contains_key(Path::new("/readers/c")));
+    }
+    #[test]
+    fn parsing_reuse_is_scoped_to_the_current_corpus_and_aliases() {
+        let mut corpus = BTreeMap::from([
+            ("/sealed/plan.json".into(), artifact(SOURCE, false)),
+            ("/reader-a".into(), artifact("/input/plan.json", true)),
+            ("/reader-b".into(), artifact("/input/plan.json", true)),
+            ("/future-reader".into(), artifact("/later/plan.json", true)),
+        ]);
+        let mut aliases = BTreeMap::from([("/input".into(), "/sealed".into())]);
+        let first = reverse_graph(&corpus, &aliases).unwrap();
+        assert!(first.contains_key(Path::new("/reader-a")));
+        assert!(first.contains_key(Path::new("/reader-b")));
+        assert!(!first.contains_key(Path::new("/future-reader")));
+
+        aliases.insert("/input".into(), "/unused".into());
+        let changed_alias = reverse_graph(&corpus, &aliases).unwrap();
+        assert_eq!(changed_alias, uncached_graph(&corpus, &aliases));
+        assert!(!changed_alias.contains_key(Path::new("/reader-a")));
+        assert!(!changed_alias.contains_key(Path::new("/reader-b")));
+
+        corpus.insert("/later/plan.json".into(), artifact(SOURCE, false));
+        let changed_corpus = reverse_graph(&corpus, &aliases).unwrap();
+        assert_eq!(changed_corpus, uncached_graph(&corpus, &aliases));
+        assert!(changed_corpus.contains_key(Path::new("/future-reader")));
+    }
+    #[test]
+    fn identical_reader_paths_still_count_toward_graph_limit() {
+        let corpus = (0..4097)
+            .map(|index| {
+                (
+                    PathBuf::from(format!("/readers/{index}")),
+                    artifact(SOURCE, true),
+                )
+            })
+            .collect();
+        let error = reverse_graph(&corpus, &BTreeMap::new()).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("transitive reader graph exceeds bound")
+        );
+    }
+    #[test]
+    fn review_expiring_during_verification_is_rejected_at_completion() {
+        let recorded = 100;
+        review_freshness(recorded, recorded).unwrap();
+        review_freshness(recorded, recorded + 1800).unwrap();
+        assert!(review_freshness(recorded, recorded + 1801).is_err());
+        assert!(review_freshness(recorded, recorded - 1).is_err());
+        assert!(review_freshness(u64::MAX, 0).is_err());
+        review_freshness(u64::MAX, u64::MAX).unwrap();
     }
     struct EdgeFixture {
         corpus: BTreeMap<PathBuf, Artifact>,
