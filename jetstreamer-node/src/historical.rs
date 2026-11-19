@@ -1316,6 +1316,22 @@ impl Drop for WorkerGuardian {
     }
 }
 
+/// Kernel cleanup outcome following an ordered shutdown acknowledgement.
+/// A pending or previously closed client is not evidence of resource release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum HistoricalShutdownOutcome {
+    AlreadyClosed,
+    Reaped { worker_pid: u32, forced: bool },
+    ReapPending { worker_pid: u32 },
+}
+
+impl HistoricalShutdownOutcome {
+    pub fn worker_reap_verified(self) -> bool {
+        matches!(self, Self::Reaped { .. })
+    }
+}
+
 /// Sequential client for one isolated historical runtime process.
 ///
 /// The protocol is deliberately lockstep.  At most one request is outstanding,
@@ -2105,8 +2121,16 @@ impl HistoricalRuntimeClient {
 
     /// Ask the worker to shut down, close its pipes, and reap it.
     pub fn shutdown(&mut self) -> Result<(), HistoricalRuntimeError> {
+        self.shutdown_with_outcome().map(|_| ())
+    }
+
+    /// Retain the actual synchronous reap result for checkpoint controllers.
+    /// Ordinary shutdown still permits acknowledged, deferred cleanup.
+    pub fn shutdown_with_outcome(
+        &mut self,
+    ) -> Result<HistoricalShutdownOutcome, HistoricalRuntimeError> {
         if self.closed {
-            return Ok(());
+            return Ok(HistoricalShutdownOutcome::AlreadyClosed);
         }
         match self.exchange(RequestBody::Shutdown)? {
             ResponseBody::ShuttingDown => {}
@@ -2121,6 +2145,7 @@ impl HistoricalRuntimeClient {
         // acknowledged Shutdown, so no further protocol traffic is valid.
         self.transport.take();
         let mut child = self.child.take().ok_or(HistoricalRuntimeError::Closed)?;
+        let worker_pid = child.id();
         let status = match wait_for_child(&mut child, self.timeouts.reap) {
             Ok(Some(status)) => status,
             Ok(None) => {
@@ -2149,7 +2174,10 @@ impl HistoricalRuntimeClient {
                         "historical worker acknowledged shutdown but required forced cleanup after {:?}",
                         self.timeouts.reap,
                     );
-                    return Ok(());
+                    return Ok(HistoricalShutdownOutcome::Reaped {
+                        worker_pid,
+                        forced: true,
+                    });
                 }
                 // SIGKILL can remain pending while a worker is in an
                 // uninterruptible kernel operation (for example, tearing
@@ -2165,7 +2193,7 @@ impl HistoricalRuntimeClient {
                     "historical worker acknowledged shutdown; forced cleanup remained pending after {:?} and was transferred to the detached reaper",
                     self.timeouts.reap,
                 );
-                return Ok(());
+                return Ok(HistoricalShutdownOutcome::ReapPending { worker_pid });
             }
             Err(error) => {
                 kill_and_reap(
@@ -2182,7 +2210,10 @@ impl HistoricalRuntimeClient {
         self.private_work_dir.take();
         self.guardian.take();
         if status.success() {
-            Ok(())
+            Ok(HistoricalShutdownOutcome::Reaped {
+                worker_pid,
+                forced: false,
+            })
         } else {
             Err(HistoricalRuntimeError::UnsuccessfulExit(status))
         }
@@ -4981,9 +5012,18 @@ mod tests {
         client.timeouts.reap = Duration::from_millis(50);
         assert!(process_is_running(child_id));
 
-        client.shutdown().unwrap();
+        assert_eq!(
+            client.shutdown_with_outcome().unwrap(),
+            HistoricalShutdownOutcome::Reaped {
+                worker_pid: child_id,
+                forced: true,
+            }
+        );
 
         assert_client_poisoned_and_worker_reaped(&mut client, child_id);
+        let repeated = client.shutdown_with_outcome().unwrap();
+        assert_eq!(repeated, HistoricalShutdownOutcome::AlreadyClosed);
+        assert!(!repeated.worker_reap_verified());
     }
 
     #[cfg(unix)]
@@ -4996,7 +5036,16 @@ mod tests {
         client.timeouts.reap = Duration::ZERO;
         assert!(process_is_running(child_id));
 
-        client.shutdown().unwrap();
+        let outcome = client.shutdown_with_outcome().unwrap();
+        assert!(matches!(
+            outcome,
+            HistoricalShutdownOutcome::ReapPending { worker_pid }
+                | HistoricalShutdownOutcome::Reaped { worker_pid, forced: true }
+                if worker_pid == child_id
+        ));
+        if matches!(outcome, HistoricalShutdownOutcome::ReapPending { .. }) {
+            assert!(!outcome.worker_reap_verified());
+        }
 
         assert!(client.closed);
         assert!(client.child.is_none());
@@ -5007,6 +5056,19 @@ mod tests {
             thread::sleep(Duration::from_millis(10));
         }
         assert!(!process_is_running(child_id));
+    }
+
+    #[test]
+    fn checkpoint_shutdown_never_promotes_pending_or_closed_cleanup() {
+        assert!(!HistoricalShutdownOutcome::AlreadyClosed.worker_reap_verified());
+        assert!(!HistoricalShutdownOutcome::ReapPending { worker_pid: 7 }.worker_reap_verified());
+        assert!(
+            HistoricalShutdownOutcome::Reaped {
+                worker_pid: 7,
+                forced: false
+            }
+            .worker_reap_verified()
+        );
     }
 
     #[cfg(unix)]

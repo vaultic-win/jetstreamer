@@ -938,6 +938,20 @@ impl HistoricalReplay {
         }
     }
 
+    pub(crate) fn shutdown_for_checkpoint(
+        &self,
+    ) -> Result<crate::historical::HistoricalShutdownOutcome, String> {
+        let mut state = self.state.lock().map_err(|_| {
+            "historical replay lock poisoned while shutting down checkpoint worker".to_string()
+        })?;
+        state
+            .client
+            .as_mut()
+            .ok_or("checkpoint worker was already carried into another epoch")?
+            .shutdown_with_outcome()
+            .map_err(|error| format!("checkpoint worker shutdown failed: {error}"))
+    }
+
     /// Transfers the live worker to the next epoch after terminal evidence is
     /// sealed. Calling this before a complete terminal checkpoint fails.
     pub(crate) fn take_client(&self) -> Result<HistoricalRuntimeClient, String> {

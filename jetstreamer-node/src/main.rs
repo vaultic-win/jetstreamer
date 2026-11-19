@@ -2511,6 +2511,9 @@ trait ReplayExecutor: Send + Sync {
     fn shutdown(&self) -> Result<(), String> {
         Ok(())
     }
+    fn shutdown_for_checkpoint(&self) -> Result<historical::HistoricalShutdownOutcome, String> {
+        Err("checkpoint shutdown requires an owned historical worker".into())
+    }
     fn take_historical_client(
         &self,
     ) -> Result<Option<historical::HistoricalRuntimeClient>, String> {
@@ -2570,6 +2573,10 @@ impl ReplayExecutor for historical_replay::HistoricalReplay {
 
     fn shutdown(&self) -> Result<(), String> {
         historical_replay::HistoricalReplay::shutdown(self)
+    }
+
+    fn shutdown_for_checkpoint(&self) -> Result<historical::HistoricalShutdownOutcome, String> {
+        historical_replay::HistoricalReplay::shutdown_for_checkpoint(self)
     }
 
     fn take_historical_client(
@@ -13823,6 +13830,7 @@ async fn run_geyser_replay(
     } else {
         None
     };
+    let mut checkpoint_shutdown = None;
     let carried_state = if retain_runtime_state {
         if let Some(replay) = agave_bank_replay {
             Some(CarriedRuntimeState::Agave {
@@ -13848,10 +13856,22 @@ async fn run_geyser_replay(
             })
         }
     } else {
-        replay_executor.shutdown()?;
+        if paused_at.is_some() {
+            checkpoint_shutdown = Some(replay_executor.shutdown_for_checkpoint()?);
+        } else {
+            replay_executor.shutdown()?;
+        }
         None
     };
     if let Some(boundary) = paused_at {
+        let worker_shutdown =
+            checkpoint_shutdown.ok_or("paused worker shutdown outcome missing")?;
+        if matches!(
+            worker_shutdown,
+            historical::HistoricalShutdownOutcome::AlreadyClosed
+        ) {
+            return Err("paused worker was closed before ordered checkpoint shutdown".into());
+        }
         let evidence = historical_evidence
             .as_ref()
             .ok_or("paused checkpoint evidence missing")?;
@@ -13938,7 +13958,7 @@ async fn run_geyser_replay(
                 &verified,
             )?;
         let report = serde_json::json!({
-            "schema": "horizon-pressure-checkpoint-paused-v2",
+            "schema": "horizon-pressure-checkpoint-paused-v3",
             "epoch": epoch,
             "intended_terminal_slot": end_inclusive,
             "selected_source_slot": boundary.slot,
@@ -13965,7 +13985,8 @@ async fn run_geyser_replay(
                 "length": snapshot.archive_size,
             },
             "worker_shutdown_acknowledged": true,
-            "worker_reap_verified": false,
+            "worker_reap_verified": worker_shutdown.worker_reap_verified(),
+            "worker_shutdown": worker_shutdown,
             "producer_pid": std::process::id(),
             "producer_invocation_id": env::var("INVOCATION_ID").ok(),
             "worker_executable_sha256": worker_executable_sha256,

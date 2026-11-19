@@ -829,3 +829,21 @@ execution; their evidence remains preserved. The full node and fixture/test
 build subsequently passed five focused bundle/custody tests under the 2 GB cap,
 invocation `92041f8185024e5eb674edf1fbfaea42`. This still does not qualify the
 full parent firehose or mainnet pressure controller, and no new lane was admitted.
+
+Checkpoint shutdown now returns the actual cleanup outcome: `Reaped` with the
+owned worker PID and whether cleanup required termination, `ReapPending` when
+the detached reaper still owns cleanup, or `AlreadyClosed` without fresh shutdown
+evidence. Ordinary replay keeps its existing acknowledged-shutdown behavior.
+The pressure path records this outcome in `horizon-pressure-checkpoint-paused-v3`
+and marks worker reaping verified only after synchronous kernel reaping. A
+previously closed worker cannot produce a new paused receipt. Parent/cgroup
+retirement, resource release, resume and canonical publication remain denied.
+
+Build invocation `e27b93f0bff74d398c0c62e894b12f01` compiled the node and native
+fixture under 2 GB, then passed nine focused shutdown, prefix and bundle tests.
+Native invocation `6a6cc947d45143469bdc7dd9b72d2b21` observed natural synchronous
+reaping of both actual synthetic workers (PIDs 1051511 and 1051533), exporter-parent
+exit, fresh-parent restoration and unchanged suffix output. Its evidence is under
+`/home/ubuntu/.jetstreamer-private/pressure-reap-20261119-v1/native-v1`.
+The full firehose pressure controller and mainnet restore path still require
+qualification before reservations can be released or another lane admitted.

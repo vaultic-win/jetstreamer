@@ -215,7 +215,15 @@ pub(super) fn run(
             ..before_evidence.clone()
         };
         checkpoint_export::validate_checkpoint_export_evidence(&before_evidence, &after_evidence)?;
-        client.shutdown()?;
+        let shutdown = client.shutdown_with_outcome()?;
+        require(
+            shutdown.worker_reap_verified(),
+            "source worker reap remains pending",
+        )?;
+        let mut shutdown_report = create(&output.join("source-shutdown.json"))?;
+        serde_json::to_writer_pretty(&mut shutdown_report, &shutdown)?;
+        shutdown_report.sync_all()?;
+        File::open(output)?.sync_all()?;
         drop(client);
         require(
             fs::read_dir(&scratch)?.next().is_none(),
@@ -262,7 +270,11 @@ pub(super) fn run(
         suffix,
         &results,
     )?;
-    resumed.shutdown()?;
+    let restored_shutdown = resumed.shutdown_with_outcome()?;
+    require(
+        restored_shutdown.worker_reap_verified(),
+        "restored worker reap remains pending",
+    )?;
     drop(resumed);
     require(
         fs::read_dir(&scratch)?.next().is_none(),
@@ -275,7 +287,7 @@ pub(super) fn run(
     let mut report = create(&output.join("live-client-results.json"))?;
     serde_json::to_writer_pretty(
         &mut report,
-        &json!({"schema":"horizon-synthetic-live-parent-checkpoint-v1","launcher_sha256":hex(&digest(launcher)?),"native_test_image_sha256":hex(&digest(image)?),"snapshot_sha256":hex(&export.archive_sha256),"source_scratch_reaped":true,"restored_scratch_reaped":true,"fresh_parent_resume":parent_phase.as_deref()==Some("resume"),"all_outputs_match_uninterrupted":true,"full_parent_firehose_qualified":false,"mainnet_qualified":false,"pressure_admission_authorized":false}),
+        &json!({"schema":"horizon-synthetic-live-parent-checkpoint-v2","launcher_sha256":hex(&digest(launcher)?),"native_test_image_sha256":hex(&digest(image)?),"snapshot_sha256":hex(&export.archive_sha256),"source_scratch_reaped":true,"restored_scratch_reaped":true,"restored_shutdown":restored_shutdown,"fresh_parent_resume":parent_phase.as_deref()==Some("resume"),"all_outputs_match_uninterrupted":true,"full_parent_firehose_qualified":false,"mainnet_qualified":false,"pressure_admission_authorized":false}),
     )?;
     report.sync_all()?;
     File::open(output)?.sync_all()?;
