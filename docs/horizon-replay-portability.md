@@ -353,9 +353,27 @@ failed because the linker temporary directory was read-only; the retry gave
 that build an isolated writable temporary directory and succeeded under the
 same 2 GB cap, with a reported 277.9 MiB peak.
 
-These are policy and evidence-publication tests. The new full node build and
-actual CLI qualification are still pending, as are mainnet export/restore and
-the pressure-stop lifecycle. This source change does not authorize a sixth lane,
+These are policy and evidence-publication tests. Mainnet export/restore and
+the pressure-stop lifecycle remain pending. This source change does not authorize a sixth lane,
 arbitrary early-prefix completion, or use of the private epoch-203/213 restart
 routes for other epochs. Evidence is retained under
 `/home/ubuntu/.codex/diagnostics/horizon-checkpoint-focused-export-20261119-v1`.
+
+The full node subsequently built from clean published `7b2d4338` in
+`horizon-checkpoint-focused-node-build-20261119-v1.service`, invocation
+`35bd887f239d4c2cbd1f53e39f21ddab`. It completed normally in 4m36.922s with
+a reported 1.3 GiB peak under the 2 GB cap, using the existing release/no-LTO,
+16-codegen-unit, single-job Rust 1.98 configuration. Actual Cargo evidence binds
+the default features and a newly built executable; the complete tracked source
+manifest was revalidated afterward. The Rust-sealed candidate is
+`/var/lib/jetstreamer/horizon-checkpoint-focused-node-7b2d4338-20261119-v1/jetstreamer-node`,
+SHA-256 `bae18fcfe0b345c58d35a9ce1b21d821d6b054b7ea48ebdbfbec9acdc9d78407`.
+
+Five isolated invocations of that exact node rejected empty and duplicate export
+paths, export without focused qualification, mixing focused export with the
+registered-handoff environment, and an absent export directory. Every case
+exited 2 with its expected diagnostic before runtime initialization, under
+256 MB caps and private networking; observed peaks were below 3.3 MB. Complete
+journals and effective settings are retained with the build evidence. These
+qualify the actual CLI rejection paths, not successful parent replay/export,
+mainnet restoration or a pressure-stop transition. No live worker was replaced.
