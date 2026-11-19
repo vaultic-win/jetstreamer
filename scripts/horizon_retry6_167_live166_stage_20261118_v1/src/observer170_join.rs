@@ -178,7 +178,9 @@ fn scratch_from_executable(exe: &Path, producer: u64) -> Result<PathBuf> {
                 .file_name()
                 .and_then(|v| v.to_str())
                 .is_some_and(|v| v.starts_with("jetstreamer-historical-parent-"))
-            && runtime.file_name().is_some_and(|v| v == ".historical-runtime")
+            && runtime
+                .file_name()
+                .is_some_and(|v| v == ".historical-runtime")
             && scratch.file_name().is_some_and(|v| v == "scratch")
             && run_name
                 .strip_prefix(&run_prefix)
