@@ -565,3 +565,47 @@ ordinary independent resume parent then executes the suffix and normal V4/full
 PoH checks. These targeted interruptions do not cover crashes during worker
 export, before the intent exists, during suffix execution or every filesystem
 operation, and do not qualify pressure admission or mainnet recovery.
+
+Published source `dc98355f` passed three focused production-module tests and
+all three native controller modes. The harness is Rust-sealed at
+`/var/lib/jetstreamer/horizon-checkpoint-publication-dc98355f-20261119-v1/checkpoint_native_recorder`,
+SHA-256 `a3c0cd6b4ba1ddede05c989295d709d5d2578b824eadf7fea9bbf71f228e51d9`.
+Seal-plan SHA-256:
+`7a5624726e636f905490cde3d5d9d001d88ffdc66bbb563983ef0f0a7ba41252`.
+The direct-source build used 422.7 MiB and 24.204s under a 2 GB cap; source
+hashes were revalidated afterward. All native runs retained the same cap.
+
+| Mode | Actual invocation | Wall time | Reported memory peak |
+| --- | --- | --- | --- |
+| Exit after durable intent | `404f3843cda541229adbbde3acdec614` | 2.503s | 500.6 MiB |
+| Exit after snapshot manifest | `81db31db1974442a902f6cefa5f12a36` | 2.476s | 499.3 MiB |
+| Normal parent restart | `f67a76a693e14f24879ae7b9090cb3d7` | 1.920s | 500.2 MiB |
+
+The two interrupted runs recovered publication and completed both slots,
+12 writes and the transaction through V4 assembly and strict full PoH.
+Wrong intent/receipt digests and duplicate suffix resume were rejected.
+Repeated publication recovery preserved the existing intent and manifest bytes.
+Results remain in the corresponding `native-intent-v1`, `native-snapshot-v1`
+and `native-normal-v1` directories beneath
+`/home/ubuntu/.jetstreamer-private/checkpoint-publication-20261119-v1`.
+Their `parent-controller-results.json` SHA-256 values, in that order, are:
+
+- `02f1ac9d076390f9b8d61bf7cc4fb18c7f53a61910cd224669d2a9529a8728a1`
+- `78e3e7e6a79054e52a62b7fbda2a150302895659d4bf56405a182302b4a834d9`
+- `ba1e6a752c0a24a1b6e3314b733c49f972cb23a7aa270b1c9c2205071599e028`
+
+Build, source, native journals and seal evidence are retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-publication-20261119-v1`.
+
+The full default-feature production node also built successfully from clean
+detached `dc98355f`, invocation `a2b42dc649964047bebed93cec986b8f`, in
+4m14.715s with a reported 1.2 GiB peak under the 2 GB cap. The complete tracked
+source manifest was revalidated. Its Rust-sealed candidate is
+`/var/lib/jetstreamer/horizon-checkpoint-publication-node-dc98355f-20261119-v1/jetstreamer-node`,
+SHA-256 `488bed397cc14d9a726cdb9c7fd289101fa93a89783fac93b7c67c6bbc562fcd`.
+The seal-plan digest is
+`fc87ae94c6d546853330e3e89f95f46b5f1639b6798c2e68b43c0d92c69c711a`.
+The package retains the actual node compiler commands, Cargo artifact, terminal
+unit evidence and source manifest; the complete build journal remains in the
+private diagnostics directory. Compilation does not qualify the full production
+controller, pressure-triggered checkpoint selection or mainnet replay.
