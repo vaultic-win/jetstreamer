@@ -300,6 +300,22 @@ fn main() -> Result<()> {
         "root_filesystem_archive_cap_bytes":17179869184u64,"DATA_reservation_bytes":0,
         "original_promises_ended":false,"fresh_native_observation_claimed":false,
         "admission_requirement":"Every next launcher must revalidate the current audit image, invocation and cgroup limits, and add this full allocation to the preserved campaign commitments."});
+    let holding_plan =
+        "/usr/local/lib/jetstreamer/horizon-closed169-local2-holding-plan-20261119-v1/plan.json";
+    let holding_binding = bind(holding_plan)?;
+    ensure!(
+        holding_binding["sha256"]
+            == "7130ea293ba07365c01599f9eef7640eb1d702ad3def97f32fec89272973b8d8",
+        "exact closed169 holding plan changed"
+    );
+    fleet["continuing_holding169_obligation"] = json!({"plan":holding_binding,
+        "unit":"horizon-closed169-local2-park-20261119-v1.service",
+        "invocation_id":"3bc22adcd63a4b3fa2bcddad22260e4c",
+        "additional_memory_bytes":2147483648u64,"additional_cpu_quota_micros":2000000u64,
+        "additional_DATA_staging_bytes":0,"parked_source_length":56565561764u64,
+        "potential_restore_overlap_bytes":56565561764u64,
+        "resource_credit_bytes":0,"promise_ending_bytes":0,"fresh_native_observation_claimed":false,
+        "admission_requirement":"Retain these additive resources until the exact transfer is proven terminal; require authenticated custody and separate local retirement before crediting any DATA, and separately admit any restoration."});
     fleet["completed_snapshot183_retirement"] = bind(
         "/var/lib/jetstreamer/snapshot183-private-retire-20261118-v1/target-0-completion.json",
     )?;

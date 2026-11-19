@@ -3517,6 +3517,8 @@ async fn main() -> Result<()> {
                 | "holding-retire136"
                 | "holding-check-retire141"
                 | "holding-retire141"
+                | "holding-check-retire169"
+                | "holding-retire169"
                 | "holding-check-retire166"
                 | "holding-retire166"
         )

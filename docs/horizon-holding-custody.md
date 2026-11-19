@@ -1,5 +1,27 @@
 # Closed-artifact holding custody
 
+The narrowly scoped `holding-check-retire169` and `holding-retire169` routes
+retire only the old epoch169 local2 partial pinned in
+`jetstreamer-r2/src/holding_epoch169_retire.rs`. They require the exact successful
+holding invocation, authenticated owner/manifest/blob custody, full local SHA256
+and multipart-ETag proofs, a fresh prior check and the shared local mutation lock.
+No canonical archive or R2 object is changed. The old169 owners must be closed;
+the whole169 lane must have no process references, and the selected file and run
+must have no staged references. Preserve the newer169 partial and all twelve
+original-slot witnesses before and after namespace changes. Reject a source or
+quarantine parent containing any witness, so no live witness ancestor is mutated.
+
+The native inspection is bound by its original digest and read from a normally
+sealed copy at
+`/usr/local/lib/jetstreamer/horizon-holding169-retirement-20261119-v1/inspection.json`.
+This copy must be byte-identical to the pinned original Root receipt. The new
+runtime remains unqualified for execution until its production artifact, source
+publication, native check and normal deployment are established. Four focused
+source tests passed on November19: produced-manifest compatibility, parallel
+digest equivalence, transition predecessor enforcement and witness-parent
+exclusion. The copied optional hash benchmark was not run. Source tests alone
+grant neither retirement authority nor reclaimed capacity.
+
 `jetstreamer-r2 holding-park SPEC --spec-sha256 HEX --self-sha256 HEX` and
 `holding-restore` implement a separate custody namespace for dev-samjohnson.
 They require a sealed root executable, hash-bound immutable root-owned JSON
