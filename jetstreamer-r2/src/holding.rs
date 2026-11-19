@@ -7,6 +7,8 @@ use std::os::unix::fs::PermissionsExt;
 mod epoch136;
 #[path = "holding_epoch141_retire.rs"]
 mod epoch141_retire;
+#[path = "holding_epoch157_laned_retire.rs"]
+mod epoch157_laned_retire;
 #[path = "holding_epoch166_retire.rs"]
 mod epoch166_retire;
 #[path = "holding_epoch166_retry6_retire.rs"]
@@ -1183,7 +1185,7 @@ pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-census157-laned-consumers|holding-check-retire157-laned|holding-retire157-laned|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1239,6 +1241,9 @@ pub(super) async fn run() -> Result<()> {
     if args[1] == "holding-census166-retry6-consumers" {
         return epoch166_retry6_retire::inspect_consumers(&spec);
     }
+    if args[1] == "holding-census157-laned-consumers" {
+        return epoch157_laned_retire::inspect_consumers(&spec);
+    }
     if matches!(
         args[1].as_str(),
         "holding-check185-attempt-growth" | "holding-close185-attempt-growth"
@@ -1284,6 +1289,8 @@ pub(super) async fn run() -> Result<()> {
         "holding-retire136" => epoch136::retire_local(&client, &m, v, &spec, false).await,
         "holding-check-retire141" => epoch141_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire141" => epoch141_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
+        "holding-check-retire157-laned" => epoch157_laned_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-retire157-laned" => epoch157_laned_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire169" => epoch169_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire169" => epoch169_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
