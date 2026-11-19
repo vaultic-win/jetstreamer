@@ -414,7 +414,9 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["INVOCATION_ID"] == invocation
                 && r["_PID"] == "1"
                 && r["_UID"] == "0" && r["MESSAGE"].as_str().is_some_and(|s| {
-                s.starts_with("Starting ")
+                (s.starts_with("Starting ")
+                    && !(unit == super::singleton247_finalization::UNIT
+                        && invocation == super::singleton247_finalization::IID))
                     || (((unit == super::cohort_finalization::CONTROLLER
                         && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
                         || (unit == super::cohort198_handoff::CONTROLLER
@@ -1046,6 +1048,17 @@ mod tests {
             start_millis(std::slice::from_ref(&event), unit, invocation).unwrap(),
             1794882675000
         );
+        // Type=exec emits Starting before its guarded ExecStartPre wait, then
+        // Started when the actual producer executes. Both records are normal.
+        let mut prestart = event.clone();
+        prestart["MESSAGE"] = json!("Starting epoch247 singleton...");
+        prestart["MESSAGE_ID"] = json!("7d4958e842da4a758f6c1cdc7b36dcc5");
+        prestart["__REALTIME_TIMESTAMP"] = json!("1794882615000000");
+        assert_eq!(
+            start_millis(&[prestart.clone(), event.clone()], unit, invocation).unwrap(),
+            1794882675000
+        );
+        assert!(start_millis(&[prestart], unit, invocation).is_err());
         for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
             let mut bad = event.clone();
             bad[key] = json!("foreign");
