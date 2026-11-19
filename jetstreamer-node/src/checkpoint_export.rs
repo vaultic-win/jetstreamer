@@ -3,6 +3,25 @@
 
 use std::{fs, ops::Range, os::unix::fs::MetadataExt, path::Path};
 
+/// A paused report preserves native stop evidence, but is not a verified prefix
+/// or a resource-release receipt. Publish it only after export and shutdown.
+pub(crate) fn write_paused_evidence(
+    directory: &Path,
+    report: &serde_json::Value,
+) -> Result<(), String> {
+    use std::io::Write;
+    let mut file = tempfile::NamedTempFile::new_in(directory).map_err(|e| e.to_string())?;
+    serde_json::to_writer_pretty(file.as_file_mut(), report).map_err(|e| e.to_string())?;
+    file.write_all(b"\n")
+        .and_then(|()| file.as_file().sync_all())
+        .map_err(|e| e.to_string())?;
+    file.persist_noclobber(directory.join("paused.json"))
+        .map_err(|e| e.to_string())?;
+    fs::File::open(directory)
+        .and_then(|f| f.sync_all())
+        .map_err(|e| e.to_string())
+}
+
 /// Checkpoint identity retained for replay provenance and runtime handoff.
 /// Account writes are deliberately excluded from this cloneable summary.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -86,6 +105,20 @@ pub(crate) fn validate_checkpoint_export_evidence(
 mod tests {
     use super::*;
     use std::os::unix::fs::{PermissionsExt, symlink};
+
+    #[test]
+    fn paused_evidence_is_private_and_never_replaces_an_earlier_attempt() {
+        let directory = tempfile::tempdir().unwrap();
+        let report =
+            serde_json::json!({"full_range_completed":false,"resource_release_authorized":false});
+        write_paused_evidence(directory.path(), &report).unwrap();
+        let path = directory.path().join("paused.json");
+        assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+        let original = fs::read(&path).unwrap();
+        assert!(write_paused_evidence(directory.path(), &serde_json::json!({})).is_err());
+        assert_eq!(fs::read(&path).unwrap(), original);
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
 
     fn evidence() -> HistoricalReplayEvidence {
         let checkpoint = HistoricalCheckpointSummary {

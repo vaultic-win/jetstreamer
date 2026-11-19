@@ -543,3 +543,31 @@ anomalies and no status diagnostics; target nine, executing five. The next
 single routine observer is armed for 06:24:30. The new audit consumes the
 released predecessor's 7 GB reservation, leaving the existing 2.64 GB auxiliary
 envelope; no sixth replay admission has occurred.
+
+The 06:24 cycle exposed an unsuitable verifier in the v2 audit: its unoptimized
+full stage advanced at roughly two slots per second and projected about 49 hours,
+exceeding the attempt's 18-hour bound. Both previous optimization failures had
+occurred in the pipeline before the full verifier was built. Building the full
+verifier separately with optimization level 3 succeeded under 2 GB. Its native
+qualification passed full synthetic playback and the partial, missing-metadata
+and invalid-PoH rejection fixtures; this is not canonical archive proof.
+
+The optimized full verifier is sealed at
+`/var/lib/jetstreamer/horizon-optimized-full-reader-135657fe-20261119-v1/verify_archive`,
+SHA-256 `0147e93b54d80786ddd5435d751738d1f1871fc6b478eabec8e6e366b8ea5de8`.
+The package retains the already-qualified unoptimized pipeline. Its separate
+acceptance records the different compiler settings and the required 64 MiB stack.
+The fetched branch `443a0bac` has exact reader-source equivalence with `135657fe`.
+
+After preserving v2's logs and confirming zero main/control PIDs and no remaining
+cgroup, a distinct v3 audit started with invocation
+`aedd60455bd248d6b2fb391112533cac`. It retains the same immutable restored input,
+7 GB cap, no swap, two verification threads and 18-hour bound, with fresh private
+receipts and playback directories. Its sealed plan is
+`/var/lib/jetstreamer/horizon-205-current-reader-plan-135657fe-20261119-v3/plan.json`,
+SHA-256 `ec75bd591e5e0dd1675e3ce61613cfecd4229467ab399cd078cc75599a7bc2a5`.
+Initial execution reached local hashing; actual optimized full-stage throughput,
+full local/remote plugin playback and the final branch check remain pending.
+No R2 archive or sidecar was replaced, and neither interrupted predecessor is a
+compatibility pass. Transition evidence is retained in
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-checkpoint-20261119-v1`.

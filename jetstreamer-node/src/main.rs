@@ -24,6 +24,7 @@ compile_error!("epoch163 first-output128 diagnostic requires an exclusive build"
 
 mod checkpoint_export;
 mod ready_entry_drain;
+mod source_checkpoint;
 use checkpoint_export::{
     validate_checkpoint_export_directory, validate_checkpoint_export_evidence,
     validate_checkpoint_export_mode,
@@ -4980,9 +4981,33 @@ struct BankBlockParentNotifier {
     failure: Arc<ReplayFailure>,
     ready_sender: crossbeam_channel::Sender<Vec<ReadyEntry>>,
     firehose_gate: Arc<Mutex<()>>,
+    checkpoint_boundary: Option<
+        Arc<
+            source_checkpoint::Boundary<
+                jetstreamer_firehose::source_quiescence::CompletedSourceBlock,
+            >,
+        >,
+    >,
 }
 
 impl BlockParentNotifier for BankBlockParentNotifier {
+    fn source_block_completed(
+        &self,
+        block: jetstreamer_firehose::source_quiescence::CompletedSourceBlock,
+    ) -> jetstreamer_firehose::source_quiescence::SourceBlockAction {
+        let Some(boundary) = &self.checkpoint_boundary else {
+            return jetstreamer_firehose::source_quiescence::SourceBlockAction::Continue;
+        };
+        match boundary.observe(block, block.slot, source_checkpoint::requested()) {
+            Ok(false) => jetstreamer_firehose::source_quiescence::SourceBlockAction::Continue,
+            Ok(true) => jetstreamer_firehose::source_quiescence::SourceBlockAction::Quiesce,
+            Err(error) => {
+                self.failure.record(error);
+                jetstreamer_firehose::source_quiescence::SourceBlockAction::Quiesce
+            }
+        }
+    }
+
     fn notify_block_parent(&self, parent_slot: u64, slot: u64) {
         let _firehose_guard = self
             .firehose_gate
@@ -5307,6 +5332,10 @@ fn usage(program: &str) -> String {
          directory. It requires exactly one explicit --verify and a fresh\n\
          segment output. Evidence commits after segment readback and worker\n\
          shutdown; restore, resume and pressure admission remain separate gates.\n\
+         --qualification-checkpoint-on-pressure also arms SIGUSR1 to stop input\n\
+         after a complete recorded block, drain execution and export a private\n\
+         checkpoint. A paused result requires separate prefix validation, worker\n\
+         reap and recovery qualification; it is never full replay completion.\n\
          --epoch-hashes=PATH, --snapshot-archive=PATH, --range-info=A-B, and\n\
          --replay-scratch=PATH are otherwise internal flags passed by the range\n\
          supervisor to its children. A root-checkpoint cohort may also use an\n\
@@ -5385,6 +5414,14 @@ struct QualificationPlan {
 enum SnapshotExportRequest<'a> {
     RegisteredHandoff(&'a Path),
     FocusedCheckpoint(&'a Path),
+    PressureCheckpoint(
+        &'a Path,
+        &'a Arc<
+            source_checkpoint::Boundary<
+                jetstreamer_firehose::source_quiescence::CompletedSourceBlock,
+            >,
+        >,
+    ),
 }
 
 /// Durable state used to initialize the first runtime in a replay process.
@@ -9691,6 +9728,7 @@ struct ReplayRunResult {
 enum ReplayRunOutcome {
     Completed(Box<ReplayRunResult>),
     PlanningPreflight(serde_json::Value),
+    Paused(serde_json::Value),
 }
 
 impl ReplayRunOutcome {
@@ -9700,6 +9738,7 @@ impl ReplayRunOutcome {
             Self::PlanningPreflight(_) => {
                 Err("planning-only outcome is not replay completion evidence".into())
             }
+            Self::Paused(_) => Err("pressure checkpoint is not replay completion evidence".into()),
         }
     }
 }
@@ -12028,7 +12067,11 @@ async fn run_geyser_replay(
     }
     let runtime_backend = execution.backend;
     let runtime_descriptor = execution.descriptor;
-    if let Some(SnapshotExportRequest::FocusedCheckpoint(directory)) = snapshot_export {
+    if let Some(
+        SnapshotExportRequest::FocusedCheckpoint(directory)
+        | SnapshotExportRequest::PressureCheckpoint(directory, _),
+    ) = snapshot_export
+    {
         if qualification.is_none()
             || snapshot_verifier.is_none()
             || runtime_backend != compatibility::RuntimeBackend::SolanaV1_7_15
@@ -12045,6 +12088,13 @@ async fn run_geyser_replay(
         }
         validate_checkpoint_export_directory(directory)?;
     }
+    let checkpoint_boundary = match snapshot_export {
+        Some(SnapshotExportRequest::PressureCheckpoint(_, boundary)) => {
+            boundary.validate_range(output_slot_start, end_inclusive)?;
+            Some(Arc::clone(boundary))
+        }
+        _ => None,
+    };
     if let Some(state) = carried_state.as_ref() {
         if state.completed_epoch().checked_add(1) != Some(epoch) {
             return Err(format!(
@@ -12698,8 +12748,7 @@ async fn run_geyser_replay(
                 |elapsed, backlog| {
                     // Separate blocking input wait from execution time. Queue
                     // depth distinguishes input starvation from slow replay.
-                    PHASE_RECV_WAIT_US
-                        .fetch_add(elapsed.as_micros() as u64, Ordering::Relaxed);
+                    PHASE_RECV_WAIT_US.fetch_add(elapsed.as_micros() as u64, Ordering::Relaxed);
                     PHASE_RECV_BACKLOG.fetch_add(backlog as u64, Ordering::Relaxed);
                     PHASE_RECV_COUNT.fetch_add(1, Ordering::Relaxed);
                 },
@@ -12740,6 +12789,7 @@ async fn run_geyser_replay(
             failure: failure.clone(),
             ready_sender: ready_sender.clone(),
             firehose_gate: firehose_gate.clone(),
+            checkpoint_boundary: checkpoint_boundary.clone(),
         }),
         block_metadata: Arc::new(BankBlockMetadataNotifier {
             scheduler: scheduler.clone(),
@@ -13314,6 +13364,7 @@ async fn run_geyser_replay(
     let mut firehose_start = slot_range.start;
     let mut incomplete_retries = 0usize;
     let mut firehose_error: Option<String> = None;
+    let mut paused_at: Option<jetstreamer_firehose::source_quiescence::CompletedSourceBlock> = None;
     let mut boundary_parent_edge: Option<(Slot, Slot)> = None;
     loop {
         if shutdown.load(Ordering::Relaxed) {
@@ -13402,9 +13453,27 @@ async fn run_geyser_replay(
 
         let stopped_by_backpressure = backpressure_stop_requested.load(Ordering::Relaxed);
 
-        if let Err((err, slot)) = firehose_result {
-            firehose_error = Some(format!("firehose error at slot {slot}: {err}"));
-            break;
+        match firehose_result {
+            Err((FirehoseError::SourceQuiesced(block), slot)) if checkpoint_boundary.is_some() => {
+                let selection = checkpoint_boundary.as_ref().unwrap().verify(block);
+                if slot != block.slot || selection.is_err() {
+                    firehose_error = Some(format!(
+                        "invalid checkpoint source boundary at {slot}: {selection:?}"
+                    ));
+                } else {
+                    paused_at = Some(block);
+                    match scheduler.drain_ready_entries() {
+                        Ok(entries) => send_ready_entries(&ready_sender, &failure, entries),
+                        Err(error) => failure.record(error),
+                    }
+                }
+                break;
+            }
+            Err((err, slot)) => {
+                firehose_error = Some(format!("firehose error at slot {slot}: {err}"));
+                break;
+            }
+            Ok(()) => {}
         }
 
         match scheduler.drain_ready_entries() {
@@ -13533,7 +13602,8 @@ async fn run_geyser_replay(
         ),
         Err(error) => failure.record(error),
     }
-    if let Err(err) = scheduler.verify_complete(end_inclusive) {
+    let completed_through = paused_at.map_or(end_inclusive, |block| block.slot);
+    if let Err(err) = scheduler.verify_complete(completed_through) {
         failure.record(err);
     }
 
@@ -13558,7 +13628,12 @@ async fn run_geyser_replay(
 
     if let Some(verifier) = snapshot_verifier.as_ref() {
         replay_executor.verify_latest_bank()?;
-        if verification_end_inclusive
+        if let Some(error) = verifier.error_summary() {
+            return Err(error);
+        }
+        if paused_at.is_some() {
+            info!("checkpoint pause retains canonical verification through slot {end_inclusive}");
+        } else if verification_end_inclusive
             .is_none_or(|verification_end| end_inclusive == verification_end)
         {
             verifier.finish()?;
@@ -13579,12 +13654,33 @@ async fn run_geyser_replay(
     }
 
     let historical_evidence = replay_executor.historical_evidence()?;
+    if let Some(boundary) = paused_at {
+        let evidence = historical_evidence
+            .as_ref()
+            .ok_or("paused replay has no native checkpoint")?;
+        if evidence.terminal.slot != boundary.slot
+            || !evidence.terminal.slot_complete
+            || evidence.terminal.last_blockhash != boundary.blockhash
+        {
+            return Err(
+                "drained native checkpoint differs from selected whole source block".into(),
+            );
+        }
+    }
     if recording {
         // Finalize and tear down this epoch's archive so the next epoch in a
         // range run can install its own. Exact terminal checkpoints also bind
         // the recorded final block; trailing skipped ranges keep their existing
         // independent skipped-slot proof path.
-        if let Some(evidence) = historical_evidence.as_ref()
+        if paused_at.is_some() {
+            let checkpoint = runtime_checkpoint_from_manifest(&segment_checkpoint_summary(
+                &historical_evidence
+                    .as_ref()
+                    .expect("paused evidence checked")
+                    .terminal,
+            ))?;
+            horizon::close_checkpoint_prefix_source(&checkpoint)?;
+        } else if let Some(evidence) = historical_evidence.as_ref()
             && evidence.terminal.slot == end_inclusive
         {
             let checkpoint =
@@ -13696,34 +13792,37 @@ async fn run_geyser_replay(
             jetstreamer_node::segment_manifest::sha256_hex_string(&exported.archive_sha256),
         );
     }
-    let checkpoint_snapshot =
-        if let Some(SnapshotExportRequest::FocusedCheckpoint(directory)) = snapshot_export {
-            let evidence = historical_evidence
-                .as_ref()
-                .ok_or("checkpoint export has no historical evidence")?;
-            if evidence.terminal.slot != end_inclusive || !evidence.terminal.slot_complete {
-                return Err("checkpoint export requires the exact complete terminal".into());
-            }
-            validate_checkpoint_export_directory(directory)?;
-            let exported = replay_executor
-                .export_historical_snapshot(
-                    end_inclusive,
-                    directory,
-                    evidence.terminal.accounts_hash,
-                    ".tar.bz2",
-                )?
-                .ok_or("selected runtime cannot export a checkpoint")?;
-            // export_snapshot consumed the one-use checkpoint seal. This forces a
-            // new native freeze and detects state or writes changed by serialization.
-            replay_executor.freeze_latest_bank()?;
-            let after = replay_executor
-                .historical_evidence()?
-                .ok_or("checkpoint export lost historical evidence")?;
-            validate_checkpoint_export_evidence(evidence, &after)?;
-            Some(exported)
-        } else {
-            None
-        };
+    let checkpoint_snapshot = if let Some(
+        SnapshotExportRequest::FocusedCheckpoint(directory)
+        | SnapshotExportRequest::PressureCheckpoint(directory, _),
+    ) = snapshot_export
+    {
+        let evidence = historical_evidence
+            .as_ref()
+            .ok_or("checkpoint export has no historical evidence")?;
+        if evidence.terminal.slot != completed_through || !evidence.terminal.slot_complete {
+            return Err("checkpoint export requires the exact complete terminal".into());
+        }
+        validate_checkpoint_export_directory(directory)?;
+        let exported = replay_executor
+            .export_historical_snapshot(
+                completed_through,
+                directory,
+                evidence.terminal.accounts_hash,
+                ".tar.bz2",
+            )?
+            .ok_or("selected runtime cannot export a checkpoint")?;
+        // export_snapshot consumed the one-use checkpoint seal. This forces a
+        // new native freeze and detects state or writes changed by serialization.
+        replay_executor.freeze_latest_bank()?;
+        let after = replay_executor
+            .historical_evidence()?
+            .ok_or("checkpoint export lost historical evidence")?;
+        validate_checkpoint_export_evidence(evidence, &after)?;
+        Some(exported)
+    } else {
+        None
+    };
     let carried_state = if retain_runtime_state {
         if let Some(replay) = agave_bank_replay {
             Some(CarriedRuntimeState::Agave {
@@ -13752,6 +13851,51 @@ async fn run_geyser_replay(
         replay_executor.shutdown()?;
         None
     };
+    if let Some(boundary) = paused_at {
+        let evidence = historical_evidence
+            .as_ref()
+            .ok_or("paused checkpoint evidence missing")?;
+        let snapshot = checkpoint_snapshot
+            .as_ref()
+            .ok_or("paused snapshot export missing")?;
+        fs::File::open(&horizon_output)
+            .and_then(|file| file.sync_all())
+            .map_err(|error| format!("sync paused source: {error}"))?;
+        let report = serde_json::json!({
+            "schema": "horizon-pressure-checkpoint-paused-v1",
+            "epoch": epoch,
+            "intended_terminal_slot": end_inclusive,
+            "selected_source_slot": boundary.slot,
+            "selected_source_parent_slot": boundary.parent_slot,
+            "selected_source_blockhash": boundary.blockhash,
+            "source_entries": boundary.entries,
+            "source_transactions": boundary.transactions,
+            "closed_source": horizon_output,
+            "bootstrap": segment_checkpoint_summary(&evidence.bootstrap),
+            "terminal": segment_checkpoint_summary(&evidence.terminal),
+            "snapshot": {
+                "path": snapshot.archive_path,
+                "sha256": snapshot.archive_sha256,
+                "length": snapshot.archive_size,
+            },
+            "worker_shutdown_acknowledged": true,
+            "worker_reap_verified": false,
+            "producer_pid": std::process::id(),
+            "producer_invocation_id": env::var("INVOCATION_ID").ok(),
+            "worker_executable_sha256": worker_executable_sha256,
+            "prefix_full_validation_required": true,
+            "full_range_completed": false,
+            "resume_authorized": false,
+            "resource_release_authorized": false,
+            "publication_authorized": false,
+        });
+        let directory = match snapshot_export {
+            Some(SnapshotExportRequest::PressureCheckpoint(directory, _)) => directory,
+            _ => return Err("paused result has no explicit export owner".into()),
+        };
+        checkpoint_export::write_paused_evidence(directory, &report)?;
+        return Ok(ReplayRunOutcome::Paused(report));
+    }
     Ok(ReplayRunOutcome::Completed(Box::new(ReplayRunResult {
         carried_state,
         historical_evidence,
@@ -19655,6 +19799,7 @@ async fn main() {
     let mut horizon_output: Option<PathBuf> = None;
     let mut qualification_end_slot: Option<Slot> = None;
     let mut checkpoint_export_directory: Option<PathBuf> = None;
+    let mut checkpoint_on_pressure = false;
     let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
@@ -19721,6 +19866,12 @@ async fn main() {
             verify_option_count = verify_option_count.saturating_add(1);
         } else if let Some(path) = arg.strip_prefix("--horizon-output=") {
             horizon_output = Some(PathBuf::from(path));
+        } else if arg == "--qualification-checkpoint-on-pressure" {
+            if checkpoint_on_pressure {
+                eprintln!("duplicate --qualification-checkpoint-on-pressure");
+                exit(2);
+            }
+            checkpoint_on_pressure = true;
         } else if let Some(path) = arg.strip_prefix("--qualification-checkpoint-export=") {
             if path.is_empty()
                 || checkpoint_export_directory
@@ -19878,6 +20029,7 @@ async fn main() {
     {
         let forbidden = horizon_output.is_some()
             || checkpoint_export_directory.is_some()
+            || checkpoint_on_pressure
             || qualification_end_slot.is_some()
             || epoch_hashes.is_some()
             || snapshot_archive_override.is_some()
@@ -20159,6 +20311,12 @@ async fn main() {
             exit(2);
         }
     };
+    if checkpoint_on_pressure && checkpoint_export_directory.is_none() {
+        eprintln!(
+            "--qualification-checkpoint-on-pressure requires --qualification-checkpoint-export"
+        );
+        exit(2);
+    }
     if let Some(directory) = checkpoint_export_directory.as_deref() {
         if let Err(error) = validate_checkpoint_export_mode(
             qualification.is_some(),
@@ -20187,6 +20345,29 @@ async fn main() {
             exit(2);
         }
     }
+    let _checkpoint_signal_guard = if checkpoint_on_pressure {
+        match source_checkpoint::SignalGuard::install() {
+            Ok(guard) => Some(guard),
+            Err(error) => {
+                eprintln!("{error}");
+                exit(2);
+            }
+        }
+    } else {
+        None
+    };
+    let pressure_boundary = if checkpoint_on_pressure {
+        let plan = qualification.expect("checkpoint mode requires focused qualification");
+        match source_checkpoint::Boundary::new(plan.output_slot_start, plan.end_inclusive) {
+            Ok(boundary) => Some(Arc::new(boundary)),
+            Err(error) => {
+                eprintln!("{error}");
+                exit(2);
+            }
+        }
+    } else {
+        None
+    };
     if epoch163_first_output128::enabled()
         && let Err(error) = epoch163_first_output128::admit_launch(
             start_epoch,
@@ -21876,7 +22057,12 @@ async fn main() {
             root_checkpoint_cohort.then(|| epoch_to_slot_range(end_epoch).1),
             checkpoint_export_directory
                 .as_deref()
-                .map(SnapshotExportRequest::FocusedCheckpoint)
+                .map(|directory| match pressure_boundary.as_ref() {
+                    Some(boundary) => {
+                        SnapshotExportRequest::PressureCheckpoint(directory, boundary)
+                    }
+                    None => SnapshotExportRequest::FocusedCheckpoint(directory),
+                })
                 .or(registered_handoff_directory
                     .as_deref()
                     .map(Path::new)
@@ -21895,6 +22081,11 @@ async fn main() {
         )
         .await;
         match result {
+            Ok(ReplayRunOutcome::Paused(report)) => {
+                // Never enter segment/cohort publication or ordinary completion.
+                println!("{report}");
+                return;
+            }
             Ok(ReplayRunOutcome::PlanningPreflight(report)) => {
                 println!("{report}");
                 return;
@@ -23759,6 +23950,73 @@ mod early_snapshot_tests {
         let error =
             validate_carried_archive_anchor(epoch, &evidence.bootstrap, wrong_parent).unwrap_err();
         assert!(error.contains("expected carried checkpoint"), "{error}");
+    }
+
+    #[test]
+    fn pressure_checkpoint_notifier_preserves_queued_execution_before_pause() {
+        let _serial = source_checkpoint::SIGNAL_TEST_LOCK.lock().unwrap();
+        let _signal = source_checkpoint::SignalGuard::install().unwrap();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let failure = Arc::new(ReplayFailure::new(shutdown.clone()));
+        let boundary = Arc::new(source_checkpoint::Boundary::new(10, 20).unwrap());
+        let (sender, receiver) = crossbeam_channel::bounded(1);
+        let notifier = BankBlockParentNotifier {
+            scheduler: Arc::new(test_scheduler(10, vec![SlotPresenceState::Present; 11])),
+            failure: failure.clone(),
+            ready_sender: sender.clone(),
+            firehose_gate: Arc::new(Mutex::new(())),
+            checkpoint_boundary: Some(boundary.clone()),
+        };
+        let block = jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
+            slot: 12,
+            parent_slot: 11,
+            blockhash: [2; 32],
+            entries: 1,
+            transactions: 0,
+        };
+        assert_eq!(
+            notifier.source_block_completed(block),
+            jetstreamer_firehose::source_quiescence::SourceBlockAction::Continue
+        );
+        sender
+            .send(vec![ReadyEntry {
+                slot: block.slot,
+                entry_index: 0,
+                start_index: 0,
+                txs: Vec::new(),
+                hash: Hash::new_from_array(block.blockhash),
+                num_hashes: 1,
+                tx_count: 0,
+            }])
+            .unwrap();
+        assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+        assert_eq!(
+            notifier.source_block_completed(block),
+            jetstreamer_firehose::source_quiescence::SourceBlockAction::Quiesce
+        );
+        boundary.verify(block).unwrap();
+        assert!(!shutdown.load(Ordering::SeqCst));
+        assert!(failure.error_message().is_none());
+        let consumer = std::thread::spawn(move || {
+            ready_entry_drain::consume(
+                receiver,
+                &shutdown,
+                |entries| {
+                    assert_eq!(entries.len(), 1);
+                    assert_eq!(entries[0].slot, block.slot);
+                    assert_eq!(entries[0].hash.to_bytes(), block.blockhash);
+                    Ok(())
+                },
+                |_, _| {},
+            )
+        });
+        let report = ready_entry_drain::close((), notifier, sender, consumer).unwrap();
+        assert_eq!(report.entries, 1);
+        assert!(
+            ReplayRunOutcome::Paused(serde_json::json!({}))
+                .completed()
+                .is_err()
+        );
     }
 
     #[test]

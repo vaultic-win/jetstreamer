@@ -775,3 +775,29 @@ drain and checkpoint/reap/restore still need integration before another lane
 can rely on memory oversubscription. Preserve reader-source equivalence during
 the new long-running epoch-205 audit; node-only integration can proceed without
 changing the conservative reader closure.
+
+The node now exposes an explicit `--qualification-checkpoint-on-pressure` mode,
+only alongside the existing standalone focused checkpoint-export route. SIGUSR1
+selects the next complete recorded source block before the intended terminal.
+The parent matches the typed source-quiescence identity, closes every ready-entry
+producer, drains execution, verifies scheduler completeness through that selected
+slot, and compares the frozen native slot and blockhash with the source boundary.
+It closes the prefix recorder, exports the snapshot, checks fresh post-export
+checkpoint equality, requests worker shutdown, and writes private no-clobber
+`paused.json` evidence. A separate `Paused` outcome returns before ordinary segment
+publication and cannot be converted into full replay completion. Normal replay
+does not install the signal handler.
+
+Build invocation `1f0a26e7f4ab4b4ba8f17e90ca6d5d16` compiled the full node and its
+test binary under a 2 GB hard limit, then passed 13 focused tests. These include
+the actual block-parent notifier receiving SIGUSR1 while an execution entry remains
+queued, source-boundary identity checks, cancellation/error rejection during drain,
+and private no-clobber paused evidence. Three exact-binary CLI rejection probes
+also passed without creating replay output. Evidence is retained in
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-checkpoint-20261119-v1`.
+This establishes source integration, not a qualified mainnet pressure lifecycle.
+The paused receipt explicitly denies full-range completion, verified worker reap,
+resource release, resume and publication. Dense-prefix conversion and full
+validation, actual worker reap, durable controller recovery, restore/suffix replay,
+canonical root verification and current-reader delivery remain required before
+another lane can rely on this mode. Existing replay workers are unchanged.
