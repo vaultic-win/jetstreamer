@@ -428,6 +428,9 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                         || (unit == super::singleton247_finalization::UNIT
                             && invocation == super::singleton247_finalization::IID
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (super::original_singleton_finalization::original_owner(
+                            unit, invocation,
+                        ) && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (unit == super::repair141::UNIT
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (matches!(
@@ -1076,6 +1079,56 @@ mod tests {
         assert!(b.validate(247, "replay").is_err());
         b.origin_invocation_id = "b".repeat(32);
         assert!(b.validate(247, "verification").is_err());
+    }
+    #[test]
+    fn original248_251_started_events_and_pipeline_bindings_keep_own_epoch_clock() {
+        for (epoch, unit, iid) in [
+            (
+                248,
+                "horizon-qualify-248-reboot-20261117-v1.service",
+                "16f84e36b65645a7be7d28d08e3d40cc",
+            ),
+            (
+                249,
+                "horizon-qualify-249-reboot-20261117-v1.service",
+                "dbf4a4d19de84f31b3897da87622156e",
+            ),
+            (
+                250,
+                "horizon-qualify-250-reboot-20261117-v1.service",
+                "a59fe93cc1d443abbb33317600227600",
+            ),
+            (
+                251,
+                "horizon-qualify-251-replacement-20261118-v1.service",
+                "cd2477bfec7f4e498545762c633e7bb0",
+            ),
+        ] {
+            let event = json!({"UNIT":unit,"INVOCATION_ID":iid,"_PID":"1","_UID":"0",
+                "MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":format!("Started epoch {epoch}."),
+                "__REALTIME_TIMESTAMP":"1794882675000000"});
+            assert_eq!(
+                start_millis(std::slice::from_ref(&event), unit, iid).unwrap(),
+                1794882675000
+            );
+            for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
+                let mut bad = event.clone();
+                bad[key] = json!("replacement");
+                assert!(start_millis(&[bad], unit, iid).is_err());
+            }
+            assert!(start_millis(&[event.clone(), event], unit, iid).is_err());
+            let mut b = binding();
+            b.unit = unit.into();
+            b.origin_unit = unit.into();
+            b.invocation_id = iid.into();
+            b.origin_invocation_id = iid.into();
+            b.claim_phase = "producer-finalization".into();
+            b.validate(epoch, "verification").unwrap();
+            assert!(b.validate(epoch + 1, "verification").is_err());
+            assert!(b.validate(epoch, "replay").is_err());
+            b.origin_invocation_id = "b".repeat(32);
+            assert!(b.validate(epoch, "verification").is_err());
+        }
     }
     use serde_json::json;
     pub(super) fn directory_plan() -> Plan {

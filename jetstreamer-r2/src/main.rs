@@ -76,6 +76,7 @@ mod holding;
 mod inactive_status;
 mod inventory_batch;
 mod native223_status;
+mod original_singleton_finalization;
 mod pipeline_status;
 mod qualification_status;
 mod readback_progress;

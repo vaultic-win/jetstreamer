@@ -147,6 +147,9 @@ pub(super) fn observe(current: &Value, sample: u64) -> Result<Value> {
 /// Permit one authenticated pre-transition primary row to remain as telemetry.
 /// This does not make unrelated overlapping replay/delivery claims acceptable.
 pub(super) fn matches_primary(entry: &Value, replay: &Value) -> bool {
+    if super::original_singleton_finalization::matches_primary(entry, replay) {
+        return true;
+    }
     entry["epoch"] == 247
         && entry["phase"] == "producer-finalization"
         && entry["live"] == true
