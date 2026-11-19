@@ -19,6 +19,7 @@ path = "src/bin/epoch185-offline-metadata/source/main.rs"
 required-features = ["epoch185-offline-metadata-plan"]
 
 [dependencies]
+horizon-singleton211-launch = { path = "../tools/singleton211-launch" }
 anyhow.workspace = true
 aws-credential-types.workspace = true
 aws-sdk-s3.workspace = true

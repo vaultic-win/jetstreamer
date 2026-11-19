@@ -3695,6 +3695,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("status-publish-full227") {
         return fleet::publish_full227_status().await;
     }
+    if env::args().nth(1).as_deref() == Some("status-publish-full211") {
+        return fleet::publish_full211_status().await;
+    }
     if env::args().nth(1).as_deref() == Some("status-publish-full209") {
         return fleet::publish_full209_status().await;
     }

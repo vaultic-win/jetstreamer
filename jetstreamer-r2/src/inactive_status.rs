@@ -262,6 +262,9 @@ fn owner_units(publication: &StatusPublicationReceipt) -> Result<Vec<(String, St
     if let Some(owner) = fleet::full227_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }
+    if let Some(owner) = fleet::full211_status_inactive_owner(publication)? {
+        return Ok(vec![owner]);
+    }
     if let Some(owner) = fleet::full209_status_inactive_owner(publication)? {
         return Ok(vec![owner]);
     }

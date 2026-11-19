@@ -40,6 +40,8 @@ struct Plan {
     native211_handoff: Option<Bound>,
     #[serde(default)]
     native265_handoff: Option<Bound>,
+    #[serde(default)]
+    singleton211_handoff: Option<Bound>,
     state_directory: PathBuf,
     deployment: PathBuf,
 }
@@ -376,6 +378,41 @@ fn native265_pass_through(
     );
     Ok(filtered)
 }
+fn singleton211_pass_through(p: &Plan, config: &Value) -> Result<()> {
+    let rows = config
+        .get("diagnostic_replays")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let Some(b) = &p.singleton211_handoff else {
+        ensure!(
+            rows == json!([]),
+            "full211 diagnostic needs its own startup handoff"
+        );
+        return Ok(());
+    };
+    let h = bound(b)?;
+    let sha = string(&h, "launcher_sha256")?;
+    horizon_singleton211_launch::validate_saved_handoff(&b.path, &b.sha256, sha)?;
+    let unit = "horizon-singleton-211-capped-4aeca563-v1.service";
+    let iid = string(&h, "invocation_id")?;
+    let expected = json!([{"range":"211-211","controller_unit":unit,"expected_controller_invocation_id":iid,
+        "producer_unit":unit,"expected_producer_invocation_id":iid,
+        "scratch_path":"/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1",
+        "worker_executable_basename":"historical-worker"}]);
+    ensure!(rows == expected, "full211 diagnostic tuple changed");
+    for key in ["replays", "native_input_diagnostics"] {
+        for row in config[key].as_array().into_iter().flatten() {
+            ensure!(
+                row["range"] != "211-211"
+                    && row["epoch"] != 211
+                    && row["unit"] != unit
+                    && row["producer_unit"] != unit,
+                "duplicate full211/native211 owner"
+            );
+        }
+    }
+    Ok(())
+}
 fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
     ensure!(
         p.schema == "horizon-terminal-aware-observation-plan-v1"
@@ -411,12 +448,7 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
             "handoff owner/range differs"
         );
     }
-    ensure!(
-        config
-            .get("diagnostic_replays")
-            .is_none_or(|v| v == &json!([])),
-        "diagnostic owners need their own unchanged route"
-    );
+    singleton211_pass_through(p, config)?;
     ensure!(
         config
             .get("singleton247_finalization")
@@ -519,7 +551,7 @@ fn run(args: &[String]) -> Result<()> {
         &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
-        !live.is_empty() || !finalization.is_empty(),
+        !live.is_empty() || !finalization.is_empty() || p.singleton211_handoff.is_some(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     let original_native = config.get("native_input_diagnostics").cloned();
