@@ -129,3 +129,34 @@ Register future delivery unit names in the next fleet plan before launch; this
 does not create live pipeline claims. Do not reuse the old legacy watchers or
 publish a pipeline claim with an anticipated invocation ID. A failed gate retains
 the complete local output and its evidence for diagnosis and an isolated retry.
+
+## Terminal process drain
+
+After actual terminal handoff, `capture-drain` records the separate process
+evidence needed by the next admission:
+
+```text
+horizon-singleton-delivery-handoff capture-drain PLAN --plan-sha256 HEX --self-sha256 HEX --terminal-sha256 HEX
+```
+
+The last digest binds that plan's existing `terminal-handoff.json`. The helper
+requires the original nondelegated, non-restarting, control-group-contained
+producer and repeats its clean PID1 history check. It rejects a control PID,
+queued job, activation trigger or changed cgroup. In PID1's cgroup namespace,
+it checks every remaining cgroup descendant for zero populated state, processes
+and threads, then scans `/proc` for any process still in that exact cgroup or a
+descendant. It repeats both census and manager checks before writing the
+no-clobber, fsynced `terminal-drain.json`.
+
+This is point-in-time evidence, not a capacity grant. The admission must recheck
+the exact terminal owner and drain, preserve the complete fleet history, and
+reserve delivery/readback and any replacement separately. Existing disk files
+and growth obligations are not removed by a process drain. No unit, archive,
+reservation ledger or R2 object is mutated by this command.
+
+Qualification passed 24 ordinary tests, three native tests and binary/test
+Clippy with warnings denied. The drain native test rejects a live disjoint
+systemd service, then accepts its normal exit and empty cgroup. A test-only
+target retains the completed unit's original properties. The initial fixture
+failure is retained in the private qualification journal; no production owner
+was stopped or used as a terminal fixture.

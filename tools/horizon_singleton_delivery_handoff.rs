@@ -294,6 +294,193 @@ fn terminal(p: &Plan) -> Result<Value> {
         .collect::<std::result::Result<Vec<_>, _>>()?;
     terminal_values(p, &u, &rows)
 }
+fn drain_properties(p: &Plan) -> Result<BTreeMap<String, String>> {
+    let out = Command::new("/usr/bin/systemctl")
+        .args([
+            "show",
+            &p.producer_unit,
+            "--property=ControlGroup,ControlPID,Job,Restart,KillMode,Delegate,TriggeredBy",
+        ])
+        .output()?;
+    ensure!(
+        out.status.success() && out.stdout.len() < 65536,
+        "drain manager query failed"
+    );
+    let values = String::from_utf8(out.stdout)?
+        .lines()
+        .map(|line| {
+            let (k, v) = line.split_once('=').context("drain manager row")?;
+            Ok((k.to_owned(), v.to_owned()))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    validate_drain_properties(&values, &format!("/system.slice/{}", p.producer_unit))?;
+    Ok(values)
+}
+fn validate_drain_properties(v: &BTreeMap<String, String>, group: &str) -> Result<()> {
+    let get = |key: &str| v.get(key).map(String::as_str);
+    ensure!(
+        get("ControlPID") == Some("0")
+            && get("Job") == Some("")
+            && get("Restart") == Some("no")
+            && get("KillMode") == Some("control-group")
+            && get("Delegate") == Some("no")
+            && get("TriggeredBy") == Some("")
+            && matches!(get("ControlGroup"), Some(s) if s.is_empty() || s == group),
+        "producer has control work, restart/delegation or a changed cgroup"
+    );
+    Ok(())
+}
+fn in_group(record: &str, group: &str) -> Result<bool> {
+    let rows: Vec<_> = record.lines().collect();
+    ensure!(rows.len() == 1, "unified cgroup record required");
+    let path = rows[0].strip_prefix("0::").context("not cgroup v2")?;
+    ensure!(path.starts_with('/'), "nonabsolute process cgroup");
+    Ok(path == group || path.strip_prefix(group).is_some_and(|s| s.starts_with('/')))
+}
+fn empty_cgroup(path: &Path, remaining: &mut usize) -> Result<()> {
+    ensure!(*remaining > 0, "too many cgroup descendants");
+    *remaining -= 1;
+    ensure!(
+        fs::symlink_metadata(path)?.is_dir() && path.canonicalize()? == path,
+        "unsafe cgroup directory"
+    );
+    let events = fs::read_to_string(path.join("cgroup.events"))?;
+    ensure!(
+        events.lines().filter(|s| *s == "populated 0").count() == 1
+            && !events
+                .lines()
+                .any(|s| s.starts_with("populated ") && s != "populated 0")
+            && fs::read_to_string(path.join("cgroup.procs"))?
+                .trim()
+                .is_empty()
+            && fs::read_to_string(path.join("cgroup.threads"))?
+                .trim()
+                .is_empty(),
+        "producer cgroup remains populated"
+    );
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            empty_cgroup(&entry.path(), remaining)?;
+        }
+    }
+    Ok(())
+}
+fn drained(p: &Plan) -> Result<Value> {
+    ensure!(
+        Path::new("/sys/fs/cgroup/cgroup.controllers").is_file(),
+        "host cgroup v2 required"
+    );
+    ensure!(
+        fs::read_link("/proc/self/ns/cgroup")? == fs::read_link("/proc/1/ns/cgroup")?,
+        "drain capture must share PID1 cgroup namespace"
+    );
+    let properties = drain_properties(p)?;
+    let group = format!("/system.slice/{}", p.producer_unit);
+    let path = Path::new("/sys/fs/cgroup").join(group.trim_start_matches('/'));
+    let present = match fs::symlink_metadata(&path) {
+        Ok(_) => {
+            empty_cgroup(&path, &mut 1024)?;
+            true
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => return Err(e.into()),
+    };
+    let mut inspected = 0u64;
+    for entry in fs::read_dir("/proc")? {
+        let entry = entry?;
+        if !entry
+            .file_name()
+            .as_encoded_bytes()
+            .iter()
+            .all(u8::is_ascii_digit)
+        {
+            continue;
+        }
+        match fs::read_to_string(entry.path().join("cgroup")) {
+            Ok(record) => {
+                ensure!(!in_group(&record, &group)?, "producer still owns a process");
+                inspected += 1;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
+    }
+    ensure!(
+        inspected > 1 && drain_properties(p)? == properties,
+        "drain census changed"
+    );
+    Ok(
+        json!({"properties":properties,"original_cgroup":group,"cgroup_present":present,
+        "process_cgroups_inspected":inspected,"descendant_processes":0}),
+    )
+}
+fn capture_drain(p: &Plan, binding: &Bound, terminal_sha: &str, self_sha: &str) -> Result<()> {
+    let handoff = Bound {
+        path: p.receipt_directory.join("terminal-handoff.json"),
+        sha256: terminal_sha.into(),
+    };
+    let prior = json_bound(&handoff)?;
+    ensure!(
+        prior["schema"] == "horizon-singleton-delivery-handoff-v1"
+            && prior["plan"] == serde_json::to_value(binding)?
+            && prior["epoch"] == p.epoch
+            && matches!(prior["self_sha256"].as_str(), Some(s) if s == self_sha || s ==
+            "b90e9ca43b438ee6eb26e066a4ea6838f03f14b0dada0951913473195c878e95"),
+        "terminal handoff origin differs"
+    );
+    let startup = json_bound(&p.startup_handoff)?;
+    ensure!(
+        startup["producer"]["ControlGroup"] == format!("/system.slice/{}", p.producer_unit)
+            && startup["producer"]["Delegate"] == "no"
+            && startup["producer"]["KillMode"] == "control-group"
+            && startup["producer"]["Restart"] == "no",
+        "startup containment differs"
+    );
+    let before = terminal(p)?;
+    ensure!(
+        before == prior["producer"],
+        "terminal owner changed since handoff"
+    );
+    let first = drained(p)?;
+    let second = drained(p)?;
+    ensure!(
+        before == terminal(p)?,
+        "terminal owner changed during drain capture"
+    );
+    let dir = fs::symlink_metadata(&p.receipt_directory)?;
+    ensure!(
+        p.receipt_directory.canonicalize()? == p.receipt_directory
+            && dir.is_dir()
+            && dir.uid() == 0
+            && dir.mode() & 0o077 == 0,
+        "unsafe drain receipt directory"
+    );
+    let receipt = p.receipt_directory.join("terminal-drain.json");
+    let value = json!({"schema":"horizon-singleton-terminal-drain-v1","plan":binding,
+        "terminal_handoff":handoff,"epoch":p.epoch,"self_sha256":self_sha,
+        "recorded_unix_seconds":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs(),
+        "producer":before,"first_census":first,"second_census":second,
+        "producer_cgroup_drained":true,"fresh_complete_fleet_admission_required":true,
+        "recheck_terminal_and_drain_at_admission_required":true,
+        "resource_release_authorized":false,"replay_launch_authorized":false,
+        "publication_authorized":false,"local_retirement_authorized":false,"remote_mutations":false});
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&receipt)?;
+    serde_json::to_writer_pretty(&mut f, &value)?;
+    f.write_all(b"\n")?;
+    f.sync_all()?;
+    File::open(&p.receipt_directory)?.sync_all()?;
+    println!(
+        "{}",
+        json!({"receipt":receipt,"producer_cgroup_drained":true,"resource_release_authorized":false})
+    );
+    Ok(())
+}
 fn source_directory(p: &Plan) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == p.source_uid,
@@ -407,13 +594,16 @@ fn source(p: &Plan, manifest: &Value) -> Result<Value> {
 }
 fn run(args: &[String]) -> Result<()> {
     ensure!(
-        args.len() == 6 && args[2] == "--plan-sha256" && args[4] == "--self-sha256",
+        (args.len() == 6
+            || (args.len() == 8 && args[0] == "capture-drain" && args[6] == "--terminal-sha256"))
+            && args[2] == "--plan-sha256"
+            && args[4] == "--self-sha256",
         "usage: horizon-singleton-delivery-handoff capture|check-plan|source PLAN --plan-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         matches!(
             args[0].as_str(),
-            "capture" | "check-plan" | "source" | "check-source-inputs"
+            "capture" | "capture-drain" | "check-plan" | "source" | "check-source-inputs"
         ),
         "unknown operation"
     );
@@ -450,6 +640,13 @@ fn run(args: &[String]) -> Result<()> {
     }
     validate_plan(&p)?;
     ensure!(unsafe { libc::geteuid() } == 0, "root capture required");
+    if args[0] == "capture-drain" {
+        ensure!(
+            args.len() == 8,
+            "capture-drain requires --terminal-sha256 HEX"
+        );
+        return capture_drain(&p, &binding, &args[7], &args[5]);
+    }
     if args[0] == "check-plan" {
         let child = Command::new(&exe)
             .arg("check-source-inputs")
@@ -523,6 +720,172 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn drain_rejects_control_work_restart_delegation_and_triggers() {
+        let group = "/system.slice/example.service";
+        let good = BTreeMap::from_iter(
+            [
+                ("ControlPID", "0"),
+                ("Job", ""),
+                ("Restart", "no"),
+                ("KillMode", "control-group"),
+                ("Delegate", "no"),
+                ("ControlGroup", group),
+                ("TriggeredBy", ""),
+            ]
+            .map(|(k, v)| (k.to_owned(), v.to_owned())),
+        );
+        validate_drain_properties(&good, group).unwrap();
+        for (key, value) in [
+            ("ControlPID", "1"),
+            ("Job", "123"),
+            ("Restart", "always"),
+            ("KillMode", "process"),
+            ("Delegate", "yes"),
+            ("ControlGroup", "/other"),
+            ("TriggeredBy", "example.timer"),
+        ] {
+            let mut bad = good.clone();
+            bad.insert(key.into(), value.into());
+            assert!(validate_drain_properties(&bad, group).is_err(), "{key}");
+        }
+        for key in good.keys() {
+            let mut bad = good.clone();
+            bad.remove(key);
+            assert!(
+                validate_drain_properties(&bad, group).is_err(),
+                "missing {key}"
+            );
+        }
+    }
+    #[test]
+    fn process_cgroup_matching_covers_descendants_but_not_similar_names() {
+        let group = "/system.slice/test.service";
+        for text in [
+            "0::/system.slice/test.service\n",
+            "0::/system.slice/test.service/child\n",
+        ] {
+            assert!(in_group(text, group).unwrap());
+        }
+        assert!(!in_group("0::/system.slice/test.service-other\n", group).unwrap());
+        assert!(!in_group("0::/\n", group).unwrap());
+        for text in [
+            "",
+            "1:memory:/system.slice/test.service",
+            "0::relative",
+            "0::/\n0::/other",
+        ] {
+            assert!(in_group(text, group).is_err());
+        }
+    }
+    #[test]
+    fn empty_cgroup_requires_all_descendants_and_threads_to_be_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let child = dir.path().join("child");
+        fs::create_dir(&child).unwrap();
+        for path in [dir.path(), child.as_path()] {
+            fs::write(path.join("cgroup.events"), "populated 0\nfrozen 0\n").unwrap();
+            fs::write(path.join("cgroup.procs"), "").unwrap();
+            fs::write(path.join("cgroup.threads"), "").unwrap();
+        }
+        empty_cgroup(dir.path(), &mut 8).unwrap();
+        for (leaf, value) in [
+            ("cgroup.procs", "12\n"),
+            ("cgroup.threads", "13\n"),
+            ("cgroup.events", "populated 1\n"),
+        ] {
+            let path = child.join(leaf);
+            let previous = fs::read(&path).unwrap();
+            fs::write(&path, value).unwrap();
+            assert!(empty_cgroup(dir.path(), &mut 8).is_err());
+            fs::write(path, previous).unwrap();
+        }
+        assert!(empty_cgroup(dir.path(), &mut 1).is_err());
+    }
+    #[test]
+    #[ignore = "root native persistent test unit; no production owner"]
+    fn native_drain_rejects_live_and_accepts_clean_terminal_owner() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let unit = format!(
+            "horizon-qualify-247-drain-native-{}.service",
+            std::process::id()
+        );
+        let file = Path::new("/run/systemd/system").join(&unit);
+        let target = unit.replace(".service", ".target");
+        let target_file = Path::new("/run/systemd/system").join(&target);
+        struct Cleanup(PathBuf, String, PathBuf, String);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = Command::new("/usr/bin/systemctl")
+                    .args(["stop", &self.3, &self.1])
+                    .status();
+                let _ = fs::remove_file(&self.0);
+                let _ = fs::remove_file(&self.2);
+                let _ = Command::new("/usr/bin/systemctl")
+                    .arg("daemon-reload")
+                    .status();
+            }
+        }
+        let mut f = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o644)
+            .open(&file)
+            .unwrap();
+        f.write_all(b"[Unit]\nDescription=Disjoint native terminal drain test\n[Service]\nType=exec\nExecStart=/usr/bin/sleep 3\nRestart=no\nKillMode=control-group\nMemoryMax=16777216\nMemorySwapMax=0\nTasksMax=8\nCPUQuota=100%\n").unwrap();
+        f.sync_all().unwrap();
+        let _cleanup = Cleanup(file, unit.clone(), target_file.clone(), target.clone());
+        let mut target_handle = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o644)
+            .open(&target_file)
+            .unwrap();
+        write!(
+            target_handle,
+            "[Unit]\nDescription=Retain disjoint native terminal evidence\nWants={unit}\n"
+        )
+        .unwrap();
+        target_handle.sync_all().unwrap();
+        assert!(
+            Command::new("/usr/bin/systemctl")
+                .arg("daemon-reload")
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            Command::new("/usr/bin/systemctl")
+                .args(["start", &target])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            Command::new("/usr/bin/systemctl")
+                .args(["start", &unit])
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (mut p, _, _) = fixture();
+        p.producer_unit = unit.clone();
+        let out = Command::new("/usr/bin/systemctl")
+            .args(["show", &unit, "--property=InvocationID", "--value"])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        p.producer_invocation_id = String::from_utf8(out.stdout).unwrap().trim().to_owned();
+        p.expected_exec_prefix = "{ path=/usr/bin/sleep ; argv[]=/usr/bin/sleep 3".into();
+        assert!(terminal(&p).is_err());
+        assert!(drained(&p).is_err());
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        terminal(&p).unwrap();
+        let proof = drained(&p).unwrap();
+        assert_eq!(proof["descendant_processes"], 0);
+        assert!(proof["process_cgroups_inspected"].as_u64().unwrap() > 1);
+        terminal(&p).unwrap();
+    }
     #[test]
     #[ignore = "root native PID1 terminal capture with a disjoint bounded service"]
     fn native_terminal_capture_uses_actual_manager_history() {
