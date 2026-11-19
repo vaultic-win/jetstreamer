@@ -38,6 +38,10 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
             .is_none_or(|value| value == "1")
     );
     let transaction_prefix = transaction_prefix.is_some();
+    let epoch_aligned = std::env::var("JETSTREAMER_PRESSURE_NATIVE_EPOCH").ok();
+    assert!(epoch_aligned.as_deref().is_none_or(|value| value == "1"));
+    let epoch_aligned = epoch_aligned.is_some();
+    assert!(!epoch_aligned || transaction_prefix);
     let bytes = fs::read(input.join(if transaction_prefix {
         "native-pressure-transcript.bin"
     } else {
@@ -108,14 +112,25 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     };
     assert_eq!(
         schema,
-        if transaction_prefix {
+        if epoch_aligned {
+            "horizon-native-pressure-recorder-transcript-v3"
+        } else if transaction_prefix {
             "horizon-native-pressure-recorder-transcript-v2"
         } else {
             "horizon-native-checkpoint-recorder-transcript-v1"
         }
     );
     assert_eq!(prefix_entries.len(), prefix_results.len());
-    assert_eq!(prefix_entries.len(), if transaction_prefix { 2 } else { 1 });
+    assert_eq!(
+        prefix_entries.len(),
+        if epoch_aligned {
+            65
+        } else if transaction_prefix {
+            2
+        } else {
+            1
+        }
+    );
     let source_transactions = prefix_entries
         .iter()
         .map(|entry| entry.transactions.len() as u64)
@@ -139,7 +154,11 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         genesis_hash,
         jetstreamer_historical_protocol::MAINNET_GENESIS_HASH
     );
-    assert_eq!((boundary.slot, terminal.slot), (1, 2));
+    let prefix_slot = if epoch_aligned { 432_000 } else { 1 };
+    assert_eq!(
+        (bootstrap.slot, boundary.slot, terminal.slot),
+        (prefix_slot - 1, prefix_slot, prefix_slot + 1)
+    );
     let mut saved = boundary.clone();
     saved.writes.clear();
     assert_eq!(saved, restored);
@@ -179,18 +198,21 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         required_genesis_hash: Box::leak(genesis_hash.into_boxed_str()),
         ..crate::historical::SOLANA_V1_7_15_CANDIDATE
     };
-    let export = if phase.as_deref() == Some("resume") {
-        read_exited_native_bundle(&directory)
+    let (export, resume_guard) = if phase.as_deref() == Some("resume") {
+        read_exited_native_bundle(&directory, &boundary, &terminal, epoch_aligned)
     } else {
-        export_from_pressure_notifiers(
-            &input,
-            &launcher,
-            profile,
-            &bootstrap,
-            &prefix_entries,
-            &boundary,
-            &terminal,
-            &directory,
+        (
+            export_from_pressure_notifiers(
+                &input,
+                &launcher,
+                profile,
+                &bootstrap,
+                &prefix_entries,
+                &boundary,
+                &terminal,
+                &directory,
+            ),
+            None,
         )
     };
     if phase.as_deref() == Some("export") {
@@ -200,6 +222,7 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         return;
     }
     let snapshot = export.archive_path.clone();
+    let worker_sha: [u8; 32] = Sha256::digest(fs::read(&launcher).unwrap()).into();
     let mut client = HistoricalRuntimeClient::spawn(
         profile,
         crate::historical::WorkerSpawn {
@@ -230,6 +253,21 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         actual.next_write_version,
         client.initialized().next_write_version
     );
+    let trust = if let Some(proof) = &resume_guard {
+        use crate::checkpoint_continuation::RestartProof;
+        assert!(proof.restored_verification().is_err());
+        proof
+            .verify_native_checkpoint(
+                &actual,
+                worker_sha,
+                client.initialized().next_write_version,
+                client.initialized().ticks_per_slot,
+            )
+            .unwrap();
+        proof.restored_verification().unwrap()
+    } else {
+        RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(terminal.slot)
+    };
     let verifier = Arc::new(SnapshotVerifier::new(
         BTreeMap::from([(
             terminal.slot,
@@ -240,6 +278,9 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         None,
     ));
     let shutdown = Arc::new(AtomicBool::new(false));
+    if let Some(proof) = &resume_guard {
+        proof.require_terminal(Some(&verifier)).unwrap();
+    }
     let failure = Arc::new(ReplayFailure::new(shutdown));
     let replay = HistoricalReplay::from_restored_checkpoint(
         client,
@@ -249,7 +290,7 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         Arc::new(ReplayCursor::new()),
         Arc::new(ReplayProgress::new(boundary.slot + 1)),
         boundary.slot + 1,
-        RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(terminal.slot),
+        trust,
     )
     .unwrap();
     assert!(verifier.finish().is_err());
@@ -336,12 +377,15 @@ fn export_from_pressure_notifiers(
         assert_eq!(entry.slot, prefix.slot);
         assert_eq!(entry.entry_index, index as u64);
     }
+    assert_eq!(bootstrap.slot + 1, prefix.slot);
     assert_eq!(
-        (bootstrap.slot, prefix.slot, boundary.slot, terminal.slot),
-        (0, 1, 1, 2)
+        (boundary.slot, terminal.slot),
+        (prefix.slot, prefix.slot + 1)
     );
+    let epoch = prefix.slot / 432_000;
     let initial = directory.join(format!(
-        "snapshot-0-{}.tar.bz2",
+        "snapshot-{}-{}.tar.bz2",
+        bootstrap.slot,
         Hash::new_from_array(bootstrap.accounts_hash.clone().try_into().unwrap())
     ));
     fs::copy(input.join("native-bootstrap.tar.bz2"), &initial).unwrap();
@@ -431,7 +475,7 @@ fn export_from_pressure_notifiers(
     let worker_sha = provenance.worker_executable_sha256;
     horizon::init(
         &source,
-        0,
+        epoch,
         prefix.slot,
         2,
         presence.clone(),
@@ -450,7 +494,7 @@ fn export_from_pressure_notifiers(
     ));
     let checkpoint_boundary =
         Arc::new(source_checkpoint::Boundary::new(prefix.slot, terminal.slot).unwrap());
-    let (sender, receiver) = crossbeam_channel::bounded(16);
+    let (sender, receiver) = crossbeam_channel::bounded(prefix_entries.len() + 1);
     let gate = Arc::new(Mutex::new(()));
     let active = Arc::new(Mutex::new(None));
     let backpressure = Arc::new(AtomicBool::new(false));
@@ -590,7 +634,7 @@ fn export_from_pressure_notifiers(
     let worker_shutdown = replay.shutdown_for_checkpoint().unwrap();
     assert!(worker_shutdown.worker_reap_verified());
     let request = || qualification_checkpoint_pause::PausedCheckpoint {
-        epoch: 0,
+        epoch,
         output_slot_start: prefix.slot,
         end_inclusive: terminal.slot,
         boundary: completed,
@@ -644,7 +688,13 @@ fn export_from_pressure_notifiers(
 /// resume CLI's epoch-wide scope for this synthetic slots-1/2 fixture.
 fn read_exited_native_bundle(
     directory: &std::path::Path,
-) -> crate::historical::HistoricalSnapshotExport {
+    boundary: &Checkpoint,
+    terminal: &Checkpoint,
+    epoch_aligned: bool,
+) -> (
+    crate::historical::HistoricalSnapshotExport,
+    Option<crate::qualification_checkpoint_resume::ValidatedResume>,
+) {
     use crate::checkpoint_continuation::{Evidence, sealed_bytes};
     let report_binding = Evidence {
         path: std::env::var_os("JETSTREAMER_PRESSURE_NATIVE_REPORT")
@@ -664,7 +714,9 @@ fn read_exited_native_bundle(
             .into(),
         sha256: std::env::var("JETSTREAMER_PRESSURE_NATIVE_EXIT_PROOF_SHA256").unwrap(),
     };
-    crate::qualification_checkpoint_exit::load(&proof, &report, &report_binding.sha256, 0).unwrap();
+    let epoch = boundary.slot / 432_000;
+    crate::qualification_checkpoint_exit::load(&proof, &report, &report_binding.sha256, epoch)
+        .unwrap();
     let pid = report["producer_pid"].as_u64().unwrap();
     assert_ne!(pid, u64::from(std::process::id()));
     assert!(
@@ -692,8 +744,8 @@ fn read_exited_native_bundle(
         manifest.archive_size,
         report["snapshot"]["length"].as_u64().unwrap()
     );
-    assert_eq!(segment.terminal.slot, 1);
-    assert_eq!(report["intended_terminal_slot"], 2);
+    assert_eq!(segment.terminal.slot, boundary.slot);
+    assert_eq!(report["intended_terminal_slot"], terminal.slot);
     for field in [
         "full_range_completed",
         "resource_release_authorized",
@@ -706,11 +758,62 @@ fn read_exited_native_bundle(
         "fresh native parent consumed authentic paused bundle and qualified producer/cgroup exit proof; producer_pid={pid} current_parent_pid={}",
         std::process::id()
     );
-    crate::historical::HistoricalSnapshotExport {
-        slot: manifest.snapshot_slot,
-        archive_path: snapshot,
-        accounts_hash: manifest.accounts_hash.parse::<Hash>().unwrap().to_bytes(),
-        archive_size: manifest.archive_size,
-        archive_sha256: manifest.archive_sha256,
-    }
+    let guard = if epoch_aligned {
+        let q = crate::QualificationPlan {
+            epoch,
+            bootstrap_slot: boundary.slot,
+            replay_start: boundary.slot + 1,
+            output_slot_start: boundary.slot + 1,
+            end_inclusive: terminal.slot,
+        };
+        let suffix = directory.join("suffix.jet");
+        assert!(
+            crate::qualification_checkpoint_resume::ValidatedResume::load(
+                &report_binding.path,
+                &report_binding.sha256,
+                proof.clone(),
+                crate::QualificationPlan {
+                    output_slot_start: q.output_slot_start + 1,
+                    ..q
+                },
+                &snapshot,
+                &suffix
+            )
+            .is_err()
+        );
+        let guard = crate::qualification_checkpoint_resume::ValidatedResume::load(
+            &report_binding.path,
+            &report_binding.sha256,
+            proof,
+            q,
+            &snapshot,
+            &suffix,
+        )
+        .unwrap();
+        guard
+            .validate_bootstrap_expectation(
+                q,
+                &snapshot,
+                crate::BankHashExpectation::LegacyAccountsHash(Hash::new_from_array(
+                    boundary.accounts_hash.clone().try_into().unwrap(),
+                )),
+            )
+            .unwrap();
+        eprintln!(
+            "actual ValidatedResume::load passed with native epoch-boundary prefix; wrong suffix scope rejected; synthetic roots only"
+        );
+        Some(guard)
+    } else {
+        None
+    };
+    (
+        crate::historical::HistoricalSnapshotExport {
+            slot: manifest.snapshot_slot,
+            archive_path: snapshot,
+            accounts_hash: manifest.accounts_hash.parse::<Hash>().unwrap().to_bytes(),
+            archive_size: manifest.archive_size,
+            archive_sha256: manifest.archive_sha256,
+        },
+        guard,
+    )
 }

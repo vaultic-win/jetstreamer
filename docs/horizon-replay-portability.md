@@ -1026,3 +1026,26 @@ Evidence is retained under
 `/home/ubuntu/.codex/diagnostics/horizon-pressure-car-transactions-20261119-v1`.
 These are test-only changes; controller interruption/recovery, epoch-scoped CLI,
 whole-epoch assembly/delivery and mainnet pressure admission still need qualification.
+
+An epoch-aligned synthetic fixture now exercises the actual `ValidatedResume::load`
+path and its native restart barrier without weakening either scope or clock checks.
+The native generator uses a fixed 432,000-slot schedule and 64 ticks per slot,
+advances the native bank to bootstrap slot 431999, and exports a transfer plus
+64-tick prefix at slot 432000. The paused report records epoch 1, 65 entries and
+one transaction; its native tick height advances from 27648000 to 27648064.
+An independent native suffix at slot 432001 supplies the test's expected terminal.
+These roots belong only to the synthetic fixture.
+
+Producer `cdb85e7647bf4399b3a4ddb88b888558` passed in 0.94 seconds. After its
+qualified exit proof, fresh parent `25bf7375c50d477785b1fe72ed55597f` rejected a
+wrong suffix scope, loaded the complete bundle through the production validator,
+required the actual worker's 64-tick native checkpoint before restored trust,
+and matched the independently generated suffix terminal in 727 ms. At an epoch's
+first slot, production CAR delivery starts at the header and does not need an
+index seek; the earlier interior-slot test still requires an index request.
+The v1/v2 native generators and interior transaction-bearing node fixture passed
+compatibility checks. Evidence, including the rejected warmup-schedule and
+index-expectation attempts, remains under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-epoch-scope-20261119-v1`.
+The real CLI, controller interruption/recovery, full-epoch assembly/delivery and
+exact production-worker mainnet pressure qualification remain outstanding.

@@ -42,7 +42,8 @@ fn frame(bytes: Vec<u8>) -> Value {
 
 fn car_and_index(bootstrap: &Checkpoint, prefix_entries: &[EntryRequest]) -> (Vec<u8>, Vec<u8>) {
     let prefix = prefix_entries.first().unwrap();
-    assert_eq!((bootstrap.slot, prefix.slot, prefix.entry_index), (0, 1, 0));
+    assert_eq!(bootstrap.slot + 1, prefix.slot);
+    assert_eq!(prefix.entry_index, 0);
     let mut payload = Vec::new();
     let mut entries = Vec::new();
     let mut transaction_index = 0;
@@ -100,8 +101,9 @@ fn car_and_index(bootstrap: &Checkpoint, prefix_entries: &[EntryRequest]) -> (Ve
     // A complete correctly sized index with only the synthetic slot present.
     // This is isolated under a loopback base URL, never a mainnet index override.
     let mut index = vec![0; 432_000 * 12];
-    index[12..20].copy_from_slice(&offset.to_le_bytes());
-    index[20..24].copy_from_slice(&length.to_le_bytes());
+    let row = (prefix.slot % 432_000) as usize * 12;
+    index[row..row + 8].copy_from_slice(&offset.to_le_bytes());
+    index[row + 8..row + 12].copy_from_slice(&length.to_le_bytes());
     (car, index)
 }
 
@@ -131,6 +133,7 @@ impl Mirror {
         let listener = TcpListener::bind(("127.0.0.1", base.port().unwrap())).unwrap();
         listener.set_nonblocking(true).unwrap();
         let (car, index) = car_and_index(bootstrap, prefix_entries);
+        let epoch = prefix_entries[0].slot / 432_000;
         eprintln!(
             "synthetic HTTP CAR sha256={:x} bytes={} slot_index_sha256={:x}",
             Sha256::digest(&car),
@@ -145,7 +148,7 @@ impl Mirror {
             move || {
                 while !stop.load(Ordering::SeqCst) {
                     match listener.accept() {
-                        Ok((stream, _)) => serve(stream, &car, &index, &requests),
+                        Ok((stream, _)) => serve(stream, &car, &index, &requests, epoch),
                         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                             std::thread::sleep(Duration::from_millis(10))
                         }
@@ -175,7 +178,13 @@ impl Drop for Mirror {
     }
 }
 
-fn serve(mut stream: TcpStream, car: &[u8], index: &[u8], requests: &Mutex<Vec<String>>) {
+fn serve(
+    mut stream: TcpStream,
+    car: &[u8],
+    index: &[u8],
+    requests: &Mutex<Vec<String>>,
+    epoch: u64,
+) {
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -198,8 +207,8 @@ fn serve(mut stream: TcpStream, car: &[u8], index: &[u8], requests: &Mutex<Vec<S
     let parts: Vec<_> = first.split_whitespace().collect();
     assert!(matches!(parts[0], "GET" | "HEAD"));
     let body = match parts[1] {
-        "/0/epoch-0.car" => car,
-        "/0/epoch-0-slot-ranges.raw" => index,
+        path if path == format!("/{epoch}/epoch-{epoch}.car") => car,
+        path if path == format!("/{epoch}/epoch-{epoch}-slot-ranges.raw") => index,
         other => panic!("unexpected fixture URL: {other}"),
     };
     let range = lines.find_map(|line| {
@@ -315,12 +324,21 @@ pub(super) fn deliver(
         other => panic!("expected real source quiescence, got {other:?}"),
     };
     let requests = mirror.requests.lock().unwrap();
-    assert!(requests.iter().any(|r| r.contains("/0/epoch-0.car")));
+    let epoch = prefix.slot / 432_000;
     assert!(
         requests
             .iter()
-            .any(|r| r.contains("/0/epoch-0-slot-ranges.raw"))
+            .any(|r| r.contains(&format!("/{epoch}/epoch-{epoch}.car")))
     );
+    // At the epoch's first slot the production reader can begin at the CAR
+    // header; it needs the slot index only when seeking into an epoch.
+    if prefix.slot % 432_000 != 0 {
+        assert!(
+            requests
+                .iter()
+                .any(|r| r.contains(&format!("/{epoch}/epoch-{epoch}-slot-ranges.raw")))
+        );
+    }
     eprintln!("real HTTP CAR source quiesced after complete decoded block: requests={requests:?}");
     drop(requests);
     block

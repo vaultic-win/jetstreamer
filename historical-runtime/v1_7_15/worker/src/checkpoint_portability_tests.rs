@@ -19,7 +19,7 @@ fn checkpoint_export_recorder_transcript_probe() {
 }
 
 fn checkpoint_archive_restore_probe(use_export: bool) {
-    checkpoint_archive_restore_probe_with_prefix(use_export, false);
+    checkpoint_archive_restore_probe_with_prefix(use_export, false, false);
 }
 
 #[test]
@@ -27,20 +27,28 @@ fn checkpoint_archive_restore_probe(use_export: bool) {
 fn checkpoint_export_pressure_transcript_probe() {
     assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT").is_some());
     assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_LIVE_FIXTURE").is_some());
-    checkpoint_archive_restore_probe_with_prefix(true, true);
+    checkpoint_archive_restore_probe_with_prefix(true, true, false);
 }
 
-fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_prefix: bool) {
+#[test]
+#[ignore]
+fn checkpoint_export_epoch_pressure_transcript_probe() {
+    assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT").is_some());
+    assert!(std::env::var_os("JETSTREAMER_CHECKPOINT_LIVE_FIXTURE").is_some());
+    checkpoint_archive_restore_probe_with_prefix(true, true, true);
+}
+
+fn checkpoint_archive_restore_probe_with_prefix(
+    use_export: bool,
+    transaction_prefix: bool,
+    epoch_aligned: bool,
+) {
     use solana_runtime::{bank_forks::ArchiveFormat, snapshot_utils};
     const CHILD: &str = "JETSTREAMER_V1715_CHECKPOINT_PROBE_CHILD";
     if let Some(path) = std::env::var_os(CHILD) {
         let path = std::path::PathBuf::from(path);
-        let (genesis, archive, entry, tick): (
-            GenesisConfig,
-            std::path::PathBuf,
-            EntryRequest,
-            EntryRequest,
-        ) = bincode::deserialize(&std::fs::read(path.join("input.bin")).unwrap()).unwrap();
+        let (genesis, archive, entries): (GenesisConfig, std::path::PathBuf, Vec<EntryRequest>) =
+            bincode::deserialize(&std::fs::read(path.join("input.bin")).unwrap()).unwrap();
         let directory = snapshot::private_state_dir(None).unwrap();
         let loaded = snapshot::load_archive(
             &archive,
@@ -53,17 +61,19 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         )
         .unwrap();
         let mut state = RuntimeState::from_test_bank(loaded.bank, false, directory);
-        let restored_bootstrap = state.freeze_checkpoint(1).unwrap();
-        let processed = state.process_entry(entry).unwrap();
-        let ticked = state.process_entry(tick).unwrap();
-        let checkpoint = state.freeze_checkpoint(2).unwrap();
+        let restored_bootstrap = state.freeze_checkpoint(state.bank.slot()).unwrap();
+        let terminal_slot = entries.last().unwrap().slot;
+        let processed = entries
+            .into_iter()
+            .map(|entry| state.process_entry(entry).unwrap())
+            .collect::<Vec<_>>();
+        let checkpoint = state.freeze_checkpoint(terminal_slot).unwrap();
         std::fs::write(
             path.join("output.bin"),
             bincode::serialize(&(
                 std::process::id(),
                 restored_bootstrap,
                 processed,
-                ticked,
                 checkpoint,
             ))
             .unwrap(),
@@ -74,8 +84,18 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
 
     let leader = Pubkey::new_from_array([7; 32]);
     let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
-    genesis.genesis_config.ticks_per_slot = 1;
+    let bootstrap_slot = if epoch_aligned { 431_999 } else { 0 };
+    let prefix_slot = bootstrap_slot + 1;
+    let terminal_slot = prefix_slot + 1;
+    let ticks = if epoch_aligned { 64 } else { 1 };
+    genesis.genesis_config.ticks_per_slot = ticks;
     genesis.genesis_config.poh_config.hashes_per_tick = None;
+    if epoch_aligned {
+        // The HTTP fixture uses fixed 432000-slot epochs. A warmup schedule
+        // would jump across uninitialized native epoch vote-account caches.
+        genesis.genesis_config.epoch_schedule =
+            solana_sdk::epoch_schedule::EpochSchedule::custom(432_000, 432_000, false);
+    }
     let source_dir = snapshot::private_state_dir(None).unwrap();
     let original_source_path = source_dir.path().to_path_buf();
     let bank0 = Bank::new_with_paths(
@@ -89,10 +109,24 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         AccountShrinkThreshold::default(),
         false,
     );
-    bank0.register_tick(&Hash::new_unique());
+    for _ in 0..ticks {
+        bank0.register_tick(&Hash::new_unique());
+    }
     bank0.freeze();
-    let mut uninterrupted = RuntimeState::from_test_bank(bank0, false, source_dir);
-    let bootstrap = uninterrupted.freeze_checkpoint(0).unwrap();
+    let initial = if epoch_aligned {
+        let bank = Bank::new_from_parent(&Arc::new(bank0), &leader, bootstrap_slot);
+        // Advance through the native clock; never edit serialized bank state or
+        // claim this synthetic bootstrap is a mainnet root.
+        while !bank.is_complete() {
+            bank.register_tick(&Hash::new_unique());
+        }
+        bank.freeze();
+        bank
+    } else {
+        bank0
+    };
+    let mut uninterrupted = RuntimeState::from_test_bank(initial, false, source_dir);
+    let bootstrap = uninterrupted.freeze_checkpoint(bootstrap_slot).unwrap();
     // Optional test-only initial snapshot for the live parent IPC fixture.
     // Keep it distinct from the exported slot-1 checkpoint being qualified.
     let bootstrap_archives = tempfile::tempdir().unwrap();
@@ -100,7 +134,7 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         Some(
             uninterrupted
                 .export_snapshot(
-                    0,
+                    bootstrap_slot,
                     bootstrap_archives.path().to_str().unwrap(),
                     &bootstrap.accounts_hash,
                 )
@@ -119,7 +153,7 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
             17,
             uninterrupted.bank.last_blockhash(),
         );
-        let entry = request_for(&uninterrupted, 1, 0, 1, &[transaction]);
+        let entry = request_for(&uninterrupted, prefix_slot, 0, 1, &[transaction]);
         let result = uninterrupted.process_entry(entry.clone()).unwrap();
         assert_eq!(result.outcomes.len(), 1);
         assert_eq!(result.outcomes[0].error, None);
@@ -127,14 +161,24 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         prefix_entries.push(entry);
         prefix_results.push(result);
     }
-    let prefix_tick = request_for(&uninterrupted, 1, prefix_entries.len() as u64, 1, &[]);
-    let prefix_processed = uninterrupted.process_entry(prefix_tick.clone()).unwrap();
-    prefix_entries.push(prefix_tick.clone());
-    prefix_results.push(prefix_processed.clone());
+    for _ in 0..ticks {
+        let tick = request_for(
+            &uninterrupted,
+            prefix_slot,
+            prefix_entries.len() as u64,
+            1,
+            &[],
+        );
+        let processed = uninterrupted.process_entry(tick.clone()).unwrap();
+        prefix_entries.push(tick);
+        prefix_results.push(processed);
+    }
+    let prefix_tick = prefix_entries.last().unwrap().clone();
+    let prefix_processed = prefix_results.last().unwrap().clone();
 
     // Bind the real worker checkpoint before serializer housekeeping. Preparing
     // hashes after housekeeping could conceal an export-induced consensus change.
-    let before = uninterrupted.freeze_checkpoint(1).unwrap();
+    let before = uninterrupted.freeze_checkpoint(prefix_slot).unwrap();
     assert_eq!(
         before.transaction_count - bootstrap.transaction_count,
         u64::from(transaction_prefix)
@@ -235,7 +279,7 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
             .next_write_version(),
         cursor
     );
-    let after = uninterrupted.freeze_checkpoint(1).unwrap();
+    let after = uninterrupted.freeze_checkpoint(prefix_slot).unwrap();
     assert!(
         after.writes.is_empty(),
         "export introduced undelivered writes"
@@ -282,15 +326,30 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         123,
         uninterrupted.bank.last_blockhash(),
     );
-    let entry = request_for(&uninterrupted, 2, 0, 1, &[transaction]);
+    let entry = request_for(&uninterrupted, terminal_slot, 0, 1, &[transaction]);
     let expected = uninterrupted.process_entry(entry.clone()).unwrap();
     assert_eq!(restored.process_entry(entry.clone()).unwrap(), expected);
     assert_eq!(expected.outcomes[0].error, None);
-    let tick = request_for(&uninterrupted, 2, 1, 1, &[]);
-    let expected_tick = uninterrupted.process_entry(tick.clone()).unwrap();
-    assert_eq!(restored.process_entry(tick.clone()).unwrap(), expected_tick);
-    let expected_checkpoint = uninterrupted.freeze_checkpoint(2).unwrap();
-    assert_eq!(restored.freeze_checkpoint(2).unwrap(), expected_checkpoint);
+    let mut suffix_entries = vec![entry];
+    let mut suffix_results = vec![expected];
+    for _ in 0..ticks {
+        let tick = request_for(
+            &uninterrupted,
+            terminal_slot,
+            suffix_entries.len() as u64,
+            1,
+            &[],
+        );
+        let expected_tick = uninterrupted.process_entry(tick.clone()).unwrap();
+        assert_eq!(restored.process_entry(tick.clone()).unwrap(), expected_tick);
+        suffix_entries.push(tick);
+        suffix_results.push(expected_tick);
+    }
+    let expected_checkpoint = uninterrupted.freeze_checkpoint(terminal_slot).unwrap();
+    assert_eq!(
+        restored.freeze_checkpoint(terminal_slot).unwrap(),
+        expected_checkpoint
+    );
     assert_eq!(restored.bank.get_balance(&recipient.pubkey()), 123);
     drop(uninterrupted);
     drop(restored);
@@ -305,8 +364,7 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         bincode::serialize(&(
             genesis.genesis_config.clone(),
             archive.clone(),
-            entry.clone(),
-            tick.clone(),
+            suffix_entries.clone(),
         ))
         .unwrap(),
     )
@@ -331,17 +389,15 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         String::from_utf8_lossy(&child.stdout),
         String::from_utf8_lossy(&child.stderr)
     );
-    let (pid, restored_bootstrap, processed, ticked, checkpoint): (
+    let (pid, restored_bootstrap, processed, checkpoint): (
         u32,
         Checkpoint,
-        EntryProcessed,
-        EntryProcessed,
+        Vec<EntryProcessed>,
         Checkpoint,
     ) = bincode::deserialize(&std::fs::read(fixture.path().join("output.bin")).unwrap()).unwrap();
     assert_ne!(pid, std::process::id());
     assert_eq!(restored_bootstrap, expected_after);
-    assert_eq!(processed, expected);
-    assert_eq!(ticked, expected_tick);
+    assert_eq!(processed, suffix_results);
     assert_eq!(checkpoint, expected_checkpoint);
     if let Some(root) = std::env::var_os("JETSTREAMER_CHECKPOINT_TRANSCRIPT_ROOT") {
         use std::io::Write;
@@ -356,18 +412,23 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
         assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
         let transcript = if transaction_prefix {
             bincode::serialize(&(
-                "horizon-native-pressure-recorder-transcript-v2".to_string(),
+                if epoch_aligned {
+                    "horizon-native-pressure-recorder-transcript-v3"
+                } else {
+                    "horizon-native-pressure-recorder-transcript-v2"
+                }
+                .to_string(),
                 genesis.genesis_config.hash().as_ref().to_vec(),
                 bootstrap,
                 prefix_entries,
                 prefix_results,
                 before,
                 export_evidence.expect("transcript requires actual export"),
-                vec![entry, tick],
-                vec![expected, expected_tick],
+                suffix_entries,
+                suffix_results,
                 expected_checkpoint,
                 restored_bootstrap,
-                vec![processed, ticked],
+                processed,
                 checkpoint,
                 std::process::id(),
                 pid,
@@ -382,11 +443,11 @@ fn checkpoint_archive_restore_probe_with_prefix(use_export: bool, transaction_pr
                 prefix_processed,
                 before,
                 export_evidence.expect("transcript requires actual export"),
-                vec![entry, tick],
-                vec![expected, expected_tick],
+                suffix_entries,
+                suffix_results,
                 expected_checkpoint,
                 restored_bootstrap,
-                vec![processed, ticked],
+                processed,
                 checkpoint,
                 std::process::id(),
                 pid,
