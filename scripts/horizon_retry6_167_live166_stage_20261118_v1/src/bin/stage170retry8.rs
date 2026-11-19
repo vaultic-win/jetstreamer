@@ -1111,7 +1111,7 @@ mod launch_plan {
             ),
             (
                 "scripts/horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs",
-                audit_budget::compiled_source_sha256(),
+                crate::audit_budget::compiled_source_sha256(),
             ),
         ] {
             ensure!(
