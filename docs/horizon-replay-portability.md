@@ -189,3 +189,30 @@ Preserve the five healthy replay producers and their hard limits while building
 that route. The retained inventory also has a one-epoch 265 cohort, in addition
 to 252–256, 257–260 and 261–264; prepare disjoint alternatives rather than
 depending on the five-epoch cohort alone. None has new admission authority.
+
+The standalone `tools/checkpoint_v4_playback.rs` fixture is published in
+`f15a1711` and merged through `d8369d49`. It compiles against the genuine
+`ed61722d` reader build's explicit rlib bindings without changing the reader
+closure or interrupting epoch 205's audit. Its bounded build completed in
+2.796 seconds at 238.6 MiB peak. The Rust-sealed artifact is
+`/var/lib/jetstreamer/horizon-checkpoint-v4-playback-f15a1711-20261119-v1/checkpoint_v4_playback`,
+SHA-256 `724986c9909c63c2b5dedadb75afa4586fd3b5d1b87d14b2d1544ce91e842696`.
+
+Native invocation `329690531efd426b91747eff5de75aae` completed normally in
+2.528 seconds at 714.8 MiB peak under a 2 GB hard cap with swap disabled.
+Two synthetic V2 pieces assemble into V4 over all 432,000 epoch slots. The
+qualified plugin and strict full verifier both exit zero; normalized writes
+are exactly 1000–1013, with one epoch notification and all source updates
+retained. A wrong terminal passed to the full verifier exits one. The merger
+rejects a wrong source digest, wrong prefix terminal, wrong suffix terminal
+and unequal restart checkpoint. None of these tests establishes mainnet
+restore, canonical epoch integrity, actual R2 readback or pressure recovery.
+
+Results are retained at
+`/home/ubuntu/.jetstreamer-private/checkpoint-v4-playback-20261119-v1/native/native-results.json`,
+SHA-256 `706bfd168f5233a558b530e6a43fe4145fef06c924c23aaeb84fd1ac43029e8f`.
+The build command, explicit dependency hashes and genuine build journal are
+sealed with the executable. Native child output and reports remain beside the
+result. The next recovery dependency is actual mainnet export/restore and
+parent-driven checkpoint/segment closure; synthetic V4 playback supplies no
+authority to oversubscribe the five running replay limits.
