@@ -80,6 +80,7 @@ mod original_singleton_finalization;
 mod pipeline_status;
 mod qualification_status;
 mod readback_progress;
+mod recover_reader205;
 mod repair141;
 mod repair141_model;
 mod reserve_scratch;
@@ -3494,6 +3495,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if env::args().nth(1).as_deref() == Some("recover-reader205-finalization") {
+        return recover_reader205::run().await;
+    }
     if matches!(
         env::args().nth(1).as_deref(),
         Some(

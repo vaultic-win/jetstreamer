@@ -17,6 +17,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[path = "current_reader/operator_equivalence205.rs"]
+mod operator_equivalence205;
+#[path = "current_reader/recovery205.rs"]
+pub mod recovery205;
+
 // Conservative closure: changes to any reader crate, workspace resolution,
 // vendored dependency, build input or compiler configuration require qualification.
 const READER_PATHS: &[&str] = &[
@@ -353,7 +358,7 @@ fn git(plan: &Plan, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8(output.stdout)?.trim().to_owned())
 }
 
-fn current_branch(plan: &Plan) -> Result<String> {
+fn current_branch(plan: &Plan) -> Result<(String, Value)> {
     ensure!(
         git(plan, &["remote", "get-url", "origin"])? == plan.origin_url,
         "reader repository origin changed"
@@ -375,12 +380,31 @@ fn current_branch(plan: &Plan) -> Result<String> {
         plan,
         &["merge-base", "--is-ancestor", &plan.reader_commit, &head],
     )?;
-    let mut args = vec!["diff", "--exit-code", &plan.reader_commit, &head, "--"];
+    let mut args = vec![
+        "diff",
+        "--name-only",
+        "--no-renames",
+        &plan.reader_commit,
+        &head,
+        "--",
+    ];
     args.extend_from_slice(READER_PATHS);
-    git(plan, &args).context(
-        "current account-updates reader changed; qualify new artifacts and repeat full playback",
-    )?;
-    Ok(head)
+    let changed = git(plan, &args)?;
+    if !changed.is_empty() {
+        // Only the individually reviewed exact operator-only blob transition is
+        // equivalent. Any additional/revised source, dependency, feature, mode or
+        // compiler/build input still requires qualification and full playback.
+        operator_equivalence205::validate(plan, &head, &changed).context(
+            "current account-updates reader changed; qualify new artifacts and repeat full playback",
+        )?;
+    }
+    let equivalence = if changed.is_empty() {
+        json!({"schema":"horizon-reader-byte-identical-source-v1",
+            "compared_paths":READER_PATHS})
+    } else {
+        operator_equivalence205::record(&changed)
+    };
+    Ok((head, equivalence))
 }
 
 fn validate_qualification(plan: &Plan, q: &Qualification) -> Result<()> {
@@ -531,7 +555,7 @@ impl Gate {
             bound_file(evidence)?;
         }
         private_directory(&plan.scratch_directory)?;
-        let current = current_branch(&plan)?;
+        let (current, source_equivalence) = current_branch(&plan)?;
         check_readback_capacity(&plan, length)?;
         let directory = plan.scratch_directory.join(format!(
             "epoch-{epoch}-{}-{}",
@@ -566,7 +590,7 @@ impl Gate {
             gate.playback(archive.parent().context("archive parent")?, "local")?;
         write_json(
             &gate.directory.join("local-acceptance.json"),
-            &json!({"schema":"horizon-current-reader-local-acceptance-v1","fetched_branch_commit":current,"reader_plan":gate.plan_binding,"local_playback":gate.local_playback,"full_verifier":gate.plan.full_verifier,"full_invocation":args,"full_exit_code":0,"minimum_thread_stack_bytes":gate.minimum_thread_stack_bytes}),
+            &json!({"schema":"horizon-current-reader-local-acceptance-v1","fetched_branch_commit":current,"source_equivalence":source_equivalence,"reader_plan":gate.plan_binding,"local_playback":gate.local_playback,"full_verifier":gate.plan.full_verifier,"full_invocation":args,"full_exit_code":0,"minimum_thread_stack_bytes":gate.minimum_thread_stack_bytes}),
         )?;
         Ok(gate)
     }
@@ -672,7 +696,7 @@ impl Gate {
             .remote_playback
             .as_ref()
             .context("full remote plugin playback is missing")?;
-        let current = current_branch(&self.plan)?;
+        let (current, source_equivalence) = current_branch(&self.plan)?;
         bound_file(&self.plan.pipeline)?;
         bound_file(&self.plan.full_verifier)?;
         write_json(
@@ -681,6 +705,7 @@ impl Gate {
                 "schema":"horizon-r2-current-reader-playback-acceptance-v1",
                 "epoch":self.epoch,"reader_commit":self.plan.reader_commit,
                 "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":READER_PATHS,
+                "source_equivalence":source_equivalence,
                 "reader_plan":self.plan_binding,"qualification":self.plan.qualification,
                 "local_playback":self.local_playback,"remote_playback":remote,
                 "minimum_thread_stack_bytes":self.minimum_thread_stack_bytes,
@@ -1039,12 +1064,12 @@ mod tests {
         p.origin_url = remote.to_str().unwrap().into();
         git(&p, &["remote", "add", "origin", &p.origin_url]).unwrap();
         git(&p, &["push", "origin", "account-updates"]).unwrap();
-        assert_eq!(current_branch(&p).unwrap(), p.reader_commit);
+        assert_eq!(current_branch(&p).unwrap().0, p.reader_commit);
         fs::write(repo.join("README.md"), "Documentation only").unwrap();
         git(&p, &["add", "."]).unwrap();
         git(&p, &["commit", "-m", "Unrelated documentation fixture"]).unwrap();
         git(&p, &["push", "origin", "account-updates"]).unwrap();
-        assert_ne!(current_branch(&p).unwrap(), p.reader_commit);
+        assert_ne!(current_branch(&p).unwrap().0, p.reader_commit);
         fs::write(repo.join("src/reader.rs"), "reader-v2").unwrap();
         git(&p, &["add", "."]).unwrap();
         git(&p, &["commit", "-m", "Changed reader fixture"]).unwrap();
