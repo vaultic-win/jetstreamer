@@ -2,7 +2,7 @@
   "schema": "horizon168-native-harness-source-inventory-v1",
   "source_only": true,
   "compiler_or_native_accepted": false,
-  "builds_run": false,
+  "builds_run": true,
   "tests_run": false,
   "native_controls_run": false,
   "resource_observations_run": false,
@@ -50,8 +50,8 @@
     },
     {
       "path": "src/fixture.rs",
-      "bytes": 21581,
-      "sha256": "c2c7bc197cc049f2bb08aa6828a96e8d530d942e1f386b8e843ebc9177906990"
+      "bytes": 21545,
+      "sha256": "bcaba16b6adc257c1a188029639acb3f4f84c37c9ca1081cc97947e2f66ed0da"
     },
     {
       "path": "src/isolation.rs",
@@ -60,8 +60,8 @@
     },
     {
       "path": "src/main.rs",
-      "bytes": 29270,
-      "sha256": "c1bfe7e487122db36dfdda82cc32e6664f90e4497119639cd880d7f4d714bb73"
+      "bytes": 29273,
+      "sha256": "b910a760fb736bd357867d027f3c341fbe8dc8b4d5eebecad75e53b71fd2ea4c"
     }
   ],
   "inspected_references": [
@@ -158,5 +158,13 @@
   "replay_launch_authorized": false,
   "archive_publication_authorized": false,
   "resource_credit_bytes": 0,
-  "parent_formatting_note": "Root ran rustfmt on the authored Rust modules and removed trailing blank TOML lines before publication. No build or native control has run."
+  "parent_formatting_note": "Root ran rustfmt on the authored Rust modules and removed trailing blank TOML lines before publication. No build or native control has run.",
+  "parent_first_compiler_result": {
+    "unit": "horizon-168-capture-fixture-build-20261119-v1.service",
+    "invocation_id": "3850c7a956294402b0a751fca9633ff9",
+    "exit": 101,
+    "reason": "strict Clippy rejected collapsible_if and chunks_exact_to_as_chunks",
+    "successor_change": "collapse condition and use fixed-size as_chunks; no suppression or control-policy change",
+    "native_controls_run": false
+  }
 }

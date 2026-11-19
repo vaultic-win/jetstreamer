@@ -577,10 +577,9 @@ impl Server {
                     Ok((stream, _)) => {
                         if let Err(error) =
                             serve(stream, &tls, &scenario, &thread_trace, &thread_stop)
+                            && let Ok(mut trace) = thread_trace.lock()
                         {
-                            if let Ok(mut trace) = thread_trace.lock() {
-                                trace.fixture_errors.push(error.to_string());
-                            }
+                            trace.fixture_errors.push(error.to_string());
                         }
                     }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => (),

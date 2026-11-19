@@ -162,7 +162,7 @@ fn arguments() -> Result<Args> {
         "usage: native-qualification --capture PATH --capture-sha256 HEX --funding PATH --funding-sha256 HEX --fault-image PATH --fault-sha256 HEX --output NEW_ABS_DIR",
     )?;
     let mut pairs = BTreeMap::new();
-    for pair in args.chunks_exact(2) {
+    for pair in args.as_chunks::<2>().0 {
         ensure(
             pairs.insert(pair[0].as_str(), pair[1].clone()).is_none(),
             "duplicate CLI key",
