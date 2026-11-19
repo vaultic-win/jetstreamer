@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    env,
+    env, fmt,
     io::Write,
     path::Path,
     time::{Duration, Instant},
@@ -42,6 +42,73 @@ pub struct Download {
     pub sidecar_sha256: Option<String>,
     pub sidecar_etag: Option<String>,
     pub metadata_sha256: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TransferIdentity {
+    pub bucket: String,
+    pub object: Object,
+    pub version_id: Option<String>,
+    pub metadata_sha256: Option<String>,
+    pub sidecar_sha256: Option<String>,
+    pub sidecar_etag: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TransferInterruptionKind {
+    BodyReadError,
+    BodyReadTimeout,
+}
+
+/// Constructed only at the authenticated response-body transport boundary.
+/// Digest, length, remote identity, disk, reader and plugin errors never acquire
+/// this marker merely because their text mentions an I/O failure.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TransferInterruption {
+    pub kind: TransferInterruptionKind,
+    pub identity: TransferIdentity,
+    pub downloaded_bytes: u64,
+    pub detail: String,
+}
+impl fmt::Display for TransferInterruption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "archive body transport interrupted after {} bytes: {}",
+            self.downloaded_bytes, self.detail
+        )
+    }
+}
+impl std::error::Error for TransferInterruption {}
+
+fn body_read_result<T, E: fmt::Display>(
+    result: std::result::Result<Option<T>, E>,
+    identity: &TransferIdentity,
+    downloaded_bytes: u64,
+) -> Result<Option<T>> {
+    result.map_err(|error| {
+        TransferInterruption {
+            kind: TransferInterruptionKind::BodyReadError,
+            identity: identity.clone(),
+            downloaded_bytes,
+            detail: error.to_string(),
+        }
+        .into()
+    })
+}
+
+fn require_same_transfer_identity(
+    current: &TransferIdentity,
+    prior: Option<&TransferIdentity>,
+) -> Result<()> {
+    ensure!(
+        prior.is_none_or(|prior| prior == current),
+        "remote archive or sidecar identity changed between transfer attempts"
+    );
+    Ok(())
 }
 impl Remote {
     pub fn from_env() -> Result<Self> {
@@ -211,12 +278,23 @@ impl Remote {
         cfg: &Config,
         object: &Object,
         attempt: &Path,
+        prior_identity: Option<&TransferIdentity>,
     ) -> Result<Download> {
         let (version_id, metadata_sha256) = self.check_identity(object).await?;
         let (sidecar_sha256, sidecar_etag) = self.sidecar(object).await?;
         if let (Some(a), Some(b)) = (&metadata_sha256, &sidecar_sha256) {
             ensure!(a == b, "sidecar and metadata digests disagree");
         }
+        let identity = TransferIdentity {
+            bucket: self.bucket.clone(),
+            object: object.clone(),
+            version_id: version_id.clone(),
+            metadata_sha256: metadata_sha256.clone(),
+            sidecar_sha256: sidecar_sha256.clone(),
+            sidecar_etag: sidecar_etag.clone(),
+        };
+        require_same_transfer_identity(&identity, prior_identity)?;
+        write_json(&attempt.join("download-identity.json"), &identity, false)?;
         cfg.require_download_capacity(object.bytes)?;
         let scratch = cfg.scratch_directory().join(&object.key);
         let mut output = create(&scratch)?;
@@ -249,13 +327,25 @@ impl Remote {
         let mut hash = Sha256::new();
         let mut last_progress = Instant::now();
         let began = Instant::now();
-        while let Some(chunk) = tokio::time::timeout(
-            Duration::from_secs(cfg.read_timeout_seconds),
-            body.body.try_next(),
-        )
-        .await
-        .context("archive stream stalled")??
-        {
+        loop {
+            let next = tokio::time::timeout(
+                Duration::from_secs(cfg.read_timeout_seconds),
+                body.body.try_next(),
+            )
+            .await;
+            let next = match next {
+                Ok(result) => body_read_result(result, &identity, count)?,
+                Err(error) => {
+                    return Err(TransferInterruption {
+                        kind: TransferInterruptionKind::BodyReadTimeout,
+                        identity: identity.clone(),
+                        downloaded_bytes: count,
+                        detail: error.to_string(),
+                    }
+                    .into());
+                }
+            };
+            let Some(chunk) = next else { break };
             count = count
                 .checked_add(chunk.len() as u64)
                 .context("download count overflow")?;
@@ -366,6 +456,64 @@ fn parse_sidecar(epoch: u64, bytes: &[u8]) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn identity() -> TransferIdentity {
+        TransferIdentity {
+            bucket: "solana-archive-with-accounts-data".into(),
+            object: Object {
+                epoch: 73,
+                key: "epoch-73.jet".into(),
+                etag: "pinned".into(),
+                bytes: 100,
+            },
+            version_id: Some("version".into()),
+            metadata_sha256: Some("a".repeat(64)),
+            sidecar_sha256: Some("a".repeat(64)),
+            sidecar_etag: Some("sidecar".into()),
+        }
+    }
+    #[test]
+    fn body_eof_error_is_typed_but_clean_short_read_and_digest_errors_are_not() {
+        let error = body_read_result::<Vec<u8>, _>(
+            Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection ended",
+            )),
+            &identity(),
+            50,
+        )
+        .unwrap_err();
+        let marker = error.downcast_ref::<TransferInterruption>().unwrap();
+        assert_eq!(marker.downloaded_bytes, 50);
+        assert_eq!(marker.identity, identity());
+        assert_eq!(marker.kind, TransferInterruptionKind::BodyReadError);
+        let clean = body_read_result::<Vec<u8>, std::io::Error>(Ok(None), &identity(), 50).unwrap();
+        assert!(clean.is_none());
+        for error in [
+            validate_download(50, 100, &"a".repeat(64), None, None).unwrap_err(),
+            validate_download(100, 100, &"a".repeat(64), Some(&"b".repeat(64)), None).unwrap_err(),
+        ] {
+            assert!(error.downcast_ref::<TransferInterruption>().is_none());
+        }
+    }
+    #[test]
+    fn retry_reobserves_every_pinned_remote_identity_field() {
+        let original = identity();
+        require_same_transfer_identity(&original, Some(&original)).unwrap();
+        for field in 0..7 {
+            let mut changed = original.clone();
+            match field {
+                0 => changed.object.etag.push('x'),
+                1 => changed.object.bytes += 1,
+                2 => changed.version_id = None,
+                3 => changed.metadata_sha256 = None,
+                4 => changed.sidecar_sha256 = None,
+                5 => changed.sidecar_etag = None,
+                _ => changed.bucket.push('x'),
+            }
+            let error = require_same_transfer_identity(&changed, Some(&original)).unwrap_err();
+            assert!(error.downcast_ref::<TransferInterruption>().is_none());
+        }
+    }
     #[test]
     fn download_rejects_truncation_and_corruption_but_includes_staged_archives() {
         let hash = "a".repeat(64);

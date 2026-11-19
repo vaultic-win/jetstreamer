@@ -2,6 +2,7 @@
 mod evidence;
 mod local;
 mod remote;
+mod retry;
 mod source;
 
 use anyhow::{Context, Result, ensure};
@@ -259,6 +260,10 @@ struct Outcome {
     playback: Option<evidence::PlaybackReport>,
     invocation: Vec<String>,
     error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    transfer_interruption: Option<remote::TransferInterruption>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry_of: Option<retry::RetryBinding>,
     remote_mutations: bool,
 }
 pub fn progress(
@@ -294,11 +299,9 @@ fn outcome_path(cfg: &Config, epoch: u64) -> PathBuf {
         .join(format!("epoch-{epoch}.json"))
 }
 fn finished(cfg: &Config, object: &Object) -> Result<bool> {
-    let path = outcome_path(cfg, object.epoch);
-    if !path.try_exists()? {
-        return Ok(false);
-    }
-    let result: Outcome = read_json(&path)?;
+    Ok(retry::view(cfg, object)?.is_some())
+}
+fn validate_outcome(result: &Outcome, object: &Object) -> Result<()> {
     ensure!(
         result.schema == "horizon-r2-chronological-plugin-audit-result-v1"
             && result.epoch == object.epoch
@@ -319,19 +322,43 @@ fn finished(cfg: &Config, object: &Object) -> Result<bool> {
         result.status != "failed" || result.error.is_some(),
         "failure receipt lacks its reason"
     );
-    Ok(true)
+    ensure!(
+        result.transfer_interruption.is_none()
+            || result.status == "failed"
+                && result.download.is_none()
+                && result.playback.is_none()
+                && result.invocation.is_empty(),
+        "transport failure marker outside download-only failure"
+    );
+    if let Some(transfer) = &result.transfer_interruption {
+        ensure!(
+            transfer.identity.object == *object
+                && transfer.identity.bucket == "solana-archive-with-accounts-data"
+                && transfer.downloaded_bytes <= object.bytes,
+            "transport interruption identity or byte count changed"
+        );
+    }
+    Ok(())
 }
 fn summary(cfg: &Config, inventory: &Inventory) -> Result<serde_json::Value> {
     let mut passed = 0;
     let mut failed = 0;
     let mut pending = 0;
+    let mut recovered = 0;
+    let mut retry_pending = 0;
     for object in &inventory.objects {
-        if finished(cfg, object)? {
-            let result: Outcome = read_json(&outcome_path(cfg, object.epoch))?;
+        if let Some(view) = retry::view(cfg, object)? {
+            let result = &view.latest;
             if result.status == "passed" {
                 passed += 1;
+                if result.retry_of.is_some() {
+                    recovered += 1;
+                }
             } else {
                 failed += 1;
+            }
+            if view.retry_available() {
+                retry_pending += 1;
             }
         } else {
             pending += 1;
@@ -339,16 +366,26 @@ fn summary(cfg: &Config, inventory: &Inventory) -> Result<serde_json::Value> {
     }
     Ok(
         json!({"archives":inventory.objects.len(), "passed":passed, "failed":failed, "pending":pending,
+        "recovered_transfer_failures":recovered,"transfer_retries_pending":retry_pending,
         "smallest":inventory.objects.iter().min_by_key(|o|o.bytes), "largest":inventory.objects.iter().max_by_key(|o|o.bytes),
         "total_bytes":inventory.objects.iter().map(|o|u128::from(o.bytes)).sum::<u128>(),
         "scope":"canonical archives present in the frozen authenticated bucket inventory", "inventory_observed_at":inventory.observed_at}),
     )
 }
-async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()> {
-    let attempt =
-        cfg.state_directory
-            .join("attempts")
-            .join(format!("epoch-{}-{}", object.epoch, nonce()));
+async fn audit_one(
+    cfg: &Config,
+    remote: &Remote,
+    object: &Object,
+    ticket: Option<&retry::RetryTicket>,
+) -> Result<()> {
+    let attempt = ticket.map_or_else(
+        || {
+            cfg.state_directory
+                .join("attempts")
+                .join(format!("epoch-{}-{}", object.epoch, nonce()))
+        },
+        |ticket| ticket.attempt.clone(),
+    );
     private_dir(&attempt)?;
     let mut outcome = Outcome {
         schema: "horizon-r2-chronological-plugin-audit-result-v1".into(),
@@ -363,6 +400,8 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
         playback: None,
         invocation: vec![],
         error: None,
+        transfer_interruption: None,
+        retry_of: ticket.map(|ticket| ticket.binding.clone()),
         remote_mutations: false,
     };
     write_json(&attempt.join("started.json"), &outcome, false)?;
@@ -427,7 +466,8 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
     // its journaled scratch inode and repeats this epoch from byte/slot zero.
     let result: Result<()> = async {
         progress(cfg,"downloading",Some(object.epoch),0,Some(object.bytes),None)?;
-        let download = remote.download(cfg, object, &attempt).await?;
+        let download = remote.download(cfg, object, &attempt,
+            ticket.and_then(|ticket| ticket.prior_identity.as_ref())).await?;
         outcome.download = Some(download.clone());
         let archive = cfg.scratch_directory().join(&object.key);
         // Re-fetch immediately before playback. If relevant reader changes land
@@ -478,12 +518,21 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
     }.await;
     match result {
         Ok(()) => outcome.status = "passed".into(),
-        Err(error) => outcome.error = Some(format!("{error:#}")),
+        Err(error) => {
+            outcome.transfer_interruption = error
+                .downcast_ref::<remote::TransferInterruption>()
+                .cloned();
+            outcome.error = Some(format!("{error:#}"));
+        }
     }
     outcome.finished_at = now();
     // The immutable terminal receipt is committed before the only archive
     // deletion this program performs (its own download).
-    write_json(&outcome_path(cfg, object.epoch), &outcome, false)?;
+    let result_path = ticket.map_or_else(
+        || outcome_path(cfg, object.epoch),
+        |ticket| retry::result_path(cfg, object.epoch, ticket.binding.ordinal),
+    );
+    write_json(&result_path, &outcome, false)?;
     cleanup_scratch(cfg)?;
     write_json(
         &attempt.join("cleanup.json"),
@@ -620,8 +669,9 @@ async fn main() -> Result<()> {
     cleanup_scratch(&cfg)?;
     for object in &inventory.objects {
         if !finished(&cfg, object)? {
-            audit_one(&cfg, &remote, object).await?;
+            audit_one(&cfg, &remote, object, None).await?;
         }
+        retry::run_pending(&cfg, &remote, object).await?;
         write_json(
             &cfg.state_directory.join("summary.json"),
             &summary(&cfg, &inventory)?,
@@ -803,6 +853,8 @@ mod tests {
             playback: None,
             invocation: vec![],
             error: None,
+            transfer_interruption: None,
+            retry_of: None,
             remote_mutations: false,
         };
         write_json(&outcome_path(&cfg, 1), &result, false).unwrap();

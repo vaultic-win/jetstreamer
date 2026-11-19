@@ -39,7 +39,8 @@ Production captured its own inventory when its state was created, under
 Once captured, inventory membership/ETags are frozen; restart does not silently
 add epochs or accept replaced remote objects. A later sweep uses another state
 directory. Existing success and failure receipts both mean "attempted"; a later
-repair sweep uses another state directory and preserves the first sweep.
+repair sweep uses another state directory and preserves the first sweep, except
+for the bounded append-only transfer recovery described below.
 
 ## Configuration and budgets
 
@@ -158,6 +159,11 @@ fresh entire-epoch playback; unrelated commits are recorded with equivalence pro
 - `summary.json`: attempted/passed/failed/pending counts after each epoch.
 - `results/epoch-N.json`: immutable terminal outcome, object/hash, reader source
   fingerprint, actual invocation, verification evidence or error.
+- `results/epoch-N.retry-I.intent.json` and `.retry-I.json`: at most two
+  append-only transfer-recovery slots, each binding original and predecessor
+  receipt hashes. The original result is never replaced. Summary counts use
+  the validated latest result and expose `recovered_transfer_failures` and
+  `transfer_retries_pending`.
 - `attempts/epoch-N-TIMESTAMP/`: start record, fetch/build/playback logs, capacity
   probe, remote download evidence, invocation and completion reports, cleanup record.
 - `scratch-owner.json`: exact owned download inode; it is not a success marker.
@@ -174,8 +180,16 @@ partial/download, and retries the unfinished epoch from byte zero and slot zero.
 It never treats an interrupted tail as full playback. If a receipt was already
 committed, it completes cleanup and proceeds. Reader/build/credential preparation
 problems wait persistently rather than declaring an archive corrupt. Download or
-playback failures produce an explicit failed result and continue to the next epoch;
-the result says what failed, not that the archive is necessarily corrupt. No remote
+playback failures produce an explicit failed result. A response-body transport
+error or body-read timeout may receive two additional attempts with 30/120-second
+backoff after the predecessor finishes. Each restarts download and playback from
+the beginning, rechecks the same remote identity, and uses the same controller.
+Checksum, clean truncation, identity, capacity, authentication and plugin failures
+are not retried by this policy. An interrupted recovery ticket consumes its slot
+and requires evidence review, preventing crash/restart from resetting the budget.
+See [`TRANSFER_RETRY_20261119.md`](TRANSFER_RETRY_20261119.md) for the exact
+legacy epoch73 receipt exception and pending qualification. The result says what
+failed, not that the archive is necessarily corrupt. No remote
 object is deleted, overwritten, or repaired by this tool.
 
 ## Build, deploy, inspect
