@@ -60,6 +60,9 @@ pub fn home(path: &Path) -> Result<()> {
     Ok(())
 }
 pub fn read(path: &str) -> Result<(Value, Value)> {
+    read_owned(path, 0)
+}
+fn read_owned(path: &str, owner: u32) -> Result<(Value, Value)> {
     let p = Path::new(path);
     ensure!(
         p.is_absolute() && p.canonicalize()? == p,
@@ -72,7 +75,7 @@ pub fn read(path: &str) -> Result<(Value, Value)> {
     let m = file.metadata()?;
     ensure!(
         m.is_file()
-            && m.uid() == 0
+            && m.uid() == owner
             && m.nlink() == 1
             && m.mode() & 0o022 == 0
             && m.len() <= 32 << 20,
@@ -217,7 +220,11 @@ fn discover_worker(producer: u64, group: &str) -> Result<(PathBuf, Value)> {
     let scratch = scratch_from_executable(&exe, producer)?;
     home(&scratch)?;
     let m = fs::symlink_metadata(&scratch)?;
-    ensure!(m.is_dir() && m.uid() == 0, "unsafe scratch directory");
+    let producer_uid = fs::metadata(format!("/proc/{producer}"))?.uid();
+    ensure!(
+        producer_uid == 1001 && m.is_dir() && m.uid() == producer_uid && m.mode() & 0o7777 == 0o700,
+        "unsafe scratch directory"
+    );
     let worker = fs::read(format!("/proc/{pid}/exe"))?;
     ensure!(
         sha(&worker) == WORKER_SHA
@@ -225,13 +232,14 @@ fn discover_worker(producer: u64, group: &str) -> Result<(PathBuf, Value)> {
             && process(pid)?.1 == start,
         "worker image or start changed"
     );
-    let (cohort, _) = read(
+    let (cohort, _) = read_owned(
         scratch
             .parent()
             .context("run")?
             .join("cohort-state.json")
             .to_str()
             .context("cohort path")?,
+        producer_uid,
     )?;
     ensure!(
         cohort["schema"] == "jetstreamer-root-cohort-run-v1"
@@ -516,6 +524,37 @@ pub fn preserve_fleet_obligations(before: &Value, after: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn worker_metadata_owner_does_not_relax_root_evidence() {
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "observer-owner-{}-{nonce}.json",
+            std::process::id()
+        ));
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .mode(0o600)
+            .open(&path)
+            .unwrap();
+        file.write_all(b"{\"worker\":true}").unwrap();
+        file.sync_all().unwrap();
+        let owner = file.metadata().unwrap().uid();
+        let name = path.to_str().unwrap();
+        assert_eq!(read_owned(name, owner).unwrap().0, json!({"worker":true}));
+        assert!(read_owned(name, owner + 1).is_err());
+        if owner != 0 {
+            assert!(read(name).is_err());
+        }
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o622)).unwrap();
+        assert!(read_owned(name, owner).is_err());
+        fs::remove_file(path).unwrap();
+    }
     #[test]
     fn scratch_requires_actual_producer_run_and_worker_layout() {
         let base = format!(
