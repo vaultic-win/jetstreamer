@@ -985,3 +985,23 @@ source, does not invoke the epoch-scoped private resume CLI, and does not run
 full-epoch assembly or delivery. Its slot-1 prefix must not bypass the CLI's
 epoch-start requirement. Controller interruption recovery, CAR/network input
 and mainnet pressure admission remain outstanding.
+
+The HTTP CAR extension uses a bounded loopback mirror with a complete slot-range
+index and the unchanged production firehose decoder and dispatcher. SIGUSR1 is
+requested after the decoder's parent callback, before entry delivery. The real
+source returns `SourceQuiesced` only after its complete block acknowledgement;
+queued native execution then drains into the production paused bundle. Separate
+export and fresh-parent resume invocations passed, including the qualified exit
+proof, full bundle reread and exact restored suffix terminal comparison.
+
+This source block contains one tick entry and **zero transactions**. It qualifies
+HTTP CAR/index delivery for that block, not transaction-bearing source delivery.
+The synthetic CAR is 302 bytes with SHA-256
+`d9be65153816ed53670ee54c887e9e6b6444d6a62ed7f7c2da3fbb646fccfad4`.
+Export invocation `566a3d6806b54b979e771d3568f8a34d` passed in 1.20 seconds;
+fresh-parent resume `08084aec057545d8bc893362e85758a7` passed in 411 ms.
+Both ran under a 2 GB hard cap. Commands, journals and sealed source bindings are
+retained in `/home/ubuntu/.codex/diagnostics/horizon-pressure-car-native-20261119-v1`.
+Production firehose and reader source did not change. Controller interruption
+recovery, epoch-scoped private resume CLI, complete epoch assembly/delivery and
+mainnet pressure admission remain unqualified; this test releases no reservation.

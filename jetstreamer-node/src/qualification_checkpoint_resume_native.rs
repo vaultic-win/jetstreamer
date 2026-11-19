@@ -5,6 +5,9 @@ use jetstreamer_historical_protocol::{Checkpoint, EntryProcessed, EntryRequest, 
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::atomic::AtomicBool};
 
+#[path = "qualification_checkpoint_car_native.rs"]
+mod source_car;
+
 type Transcript = (
     String,
     Vec<u8>,
@@ -234,13 +237,13 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     let outcome = replay.shutdown_for_checkpoint().unwrap();
     assert!(outcome.worker_reap_verified());
     eprintln!(
-        "native pressure integration: production notifiers selected a queued complete block; scheduler drained through native execution; prefix recorded/converted; snapshot exported and source worker reaped; fresh worker executed suffix and consumed exact future terminal; full firehose/controller/mainnet qualification=false"
+        "native pressure integration: production notifiers selected a queued complete block; scheduler drained through native execution; prefix recorded/converted; snapshot exported and source worker reaped; fresh worker executed suffix and consumed exact future terminal; HTTP CAR source=true; full controller/mainnet qualification=false"
     );
 }
 
-/// Drive the real node callbacks with the sealed synthetic source transcript.
+/// Drive the real HTTP CAR decoder and node callbacks from the sealed synthetic transcript.
 /// The consumer starts only after selection, proving queued native work survives
-/// pressure. This deliberately does not impersonate a CAR/network-source test.
+/// pressure. The mirror supplies a synthetic chain, never mainnet source authority.
 #[allow(clippy::too_many_arguments)]
 fn export_from_pressure_notifiers(
     input: &std::path::Path,
@@ -417,62 +420,16 @@ fn export_from_pressure_notifiers(
         }),
     };
     let notifiers = producers.geyser_notifiers();
-    producers
-        .block_parent
-        .notify_block_parent(bootstrap.slot, prefix.slot);
-    // Request while the source block is still being delivered. No callback is
-    // permitted to cancel shared execution or select a partial block.
-    assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
-    for (index, bytes) in prefix.transactions.iter().enumerate() {
-        let legacy: solana_transaction::Transaction = bincode::deserialize(bytes).unwrap();
-        let tx = solana_transaction::versioned::VersionedTransaction::from(legacy);
-        assert_eq!(encode_legacy_transaction(&tx).unwrap(), *bytes);
-        producers
-            .transaction
-            .notify_transaction(SourcedTransaction {
-                slot: prefix.slot,
-                transaction_slot_index: index,
-                signature: &tx.signatures[0],
-                message_hash: &tx.message.hash(),
-                is_vote: false,
-                status: SourcedTransactionStatus::Missing,
-                transaction: &tx,
-            });
-    }
-    producers.entry.notify_entry(
-        prefix.slot,
-        prefix.entry_index.try_into().unwrap(),
-        &solana_entry::entry::EntrySummary {
-            num_hashes: prefix.num_hashes,
-            hash: Hash::new_from_array(prefix.hash.clone().try_into().unwrap()),
-            num_transactions: prefix.transactions.len() as u64,
-        },
-        0,
-    );
-    producers.block_metadata.notify_block_metadata(
-        bootstrap.slot,
-        &Hash::new_from_array(bootstrap.last_blockhash.clone().try_into().unwrap()).to_string(),
-        prefix.slot,
-        &Hash::new_from_array(boundary.last_blockhash.clone().try_into().unwrap()).to_string(),
-        &solana_runtime::bank::KeyedRewardsAndNumPartitions {
-            keyed_rewards: vec![],
-            num_partitions: None,
-        },
-        None,
-        None,
-        prefix.transactions.len() as u64,
-        1,
-    );
-    let completed = jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
-        slot: prefix.slot,
-        parent_slot: bootstrap.slot,
-        blockhash: boundary.last_blockhash.clone().try_into().unwrap(),
-        entries: 1,
-        transactions: prefix.transactions.len() as u64,
-    };
+    let completed = source_car::deliver(bootstrap, prefix, &producers, shutdown.clone());
     assert_eq!(
-        producers.block_parent.source_block_completed(completed),
-        jetstreamer_firehose::source_quiescence::SourceBlockAction::Quiesce
+        completed,
+        jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
+            slot: prefix.slot,
+            parent_slot: bootstrap.slot,
+            blockhash: boundary.last_blockhash.clone().try_into().unwrap(),
+            entries: 1,
+            transactions: prefix.transactions.len() as u64,
+        }
     );
     checkpoint_boundary.verify(completed).unwrap();
     assert!(
