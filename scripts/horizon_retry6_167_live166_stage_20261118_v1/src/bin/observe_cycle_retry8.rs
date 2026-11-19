@@ -574,14 +574,41 @@ fn main() -> Result<()> {
         "next_action":"Use this accepted cycle and the actual latest preparation result to capture a fresh witness, complete native preparation and run the launcher native tests, sealed check and guarded launch. Keep all original promises and the audit allocation. Retired allocated bytes alone neither release a reservation nor prove simultaneous fit.",
         "resource_credit_bytes":0});
     fleet["historical_prelaunch167_recovery"] = fleet["next_lane_recovery"].clone();
+    let failed170_path = "/home/sol/.jetstreamer-private/r2-status-receipts/event-disk-fit-170-20261119-v1/RECEIPT.json";
+    let failed170 = read(failed170_path)?;
+    ensure!(
+        failed170["epoch"] == 170
+            && failed170["authenticated_readback"] == true
+            && failed170["preparation_failure"]["new_producer_launched"] == false
+            && failed170["preparation_failure"]["deficit_bytes"] == 38663067442u64,
+        "actual epoch170 disk-fit failure required"
+    );
     fleet["next_lane_recovery"] = json!({"epoch":170,"source_owner":"/root",
-        "next_action":"Finish qualified v3 launcher/stage deployment, then fresh measurement, witness, preparation and guarded admission alongside166/167, retaining the full audit allocation and every live growth obligation.167 is guarded bootstrap until a coordinated sample proves transaction replay.","resource_credit_bytes":0});
+        "last_attempt":bind(failed170_path)?,"last_result":"native preparation rejected complete disk fit",
+        "observed_deficit_bytes":38663067442u64,
+        "next_action":"Qualify additional cleanup or holding retirement, then use fresh measurement and a separately qualified new witness contract. The existing contract is consumed; qualify the preparer/stage/launcher successor including the actual audit v7 identity before guarded admission. Preserve both healthy peers, all retained growth and audit allocations; old reclamation is not new capacity.","resource_credit_bytes":0});
     fleet["recovered167_admission"] = joined167["admission"].clone();
     fleet["completed_historical_compiler_retirement"] =
         bind("/var/lib/jetstreamer/historical-compiler-retire-20261119-v1/completion.json")?;
     fleet["audit_observation0650"] =
         bind("/var/lib/jetstreamer/audit-observation-0650-20261119-v1/status.json")?;
-    fleet["audit_transfer73_repair"] = json!({"result":bind("/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1/results/epoch-73.json")?,"failure_class":"incomplete network transfer before playback","remote_corruption_established":false,"next_action":"Qualify bounded transfer-only retry preserving the immutable failure and healthy74 playback; no R2 overwrite or deletion."});
+    let audit_transition =
+        "/var/lib/jetstreamer/audit-retry-boundary-transition-20261119-v7/COMPLETED.json";
+    let audit_event = read(audit_transition)?;
+    ensure!(
+        audit_event["schema"] == "horizon-audit-idle-runtime-transition-completed-v1"
+            && audit_event["successor_invocation_id"] == "ed5d00ac282f4197b188a56974865102"
+            && audit_event["same_state_config_resources"] == true
+            && audit_event["archive_recovery_pass_claimed"] == false
+            && audit_event["remote_mutations"] == false,
+        "qualified audit v7 transition required"
+    );
+    fleet["audit_transfer73_repair"] = json!({"result":bind("/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1/results/epoch-73.json")?,"failure_class":"incomplete network transfer before playback","remote_corruption_established":false,
+        "qualified_idle_transition":bind(audit_transition)?,
+        "launch_phase":bind("/var/lib/jetstreamer/audit-retry-boundary-transition-20261119-v7/launch-phase.json")?,
+        "qualified_image":bind("/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/artifact-proof.json")?,
+        "fresh_audit_observation_claimed":false,"recovery_pass_claimed":false,
+        "next_action":"Preserve the v7 epoch73 retry begun at0751 and original immutable failure. Check its terminal result or next routine audit at0821; do not restart healthy download/playback. Qualify root cleanup for the separately observed epoch75 capacity deficit."});
     fleet["recovered166_admission"] = bind(
         "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
     )?;
