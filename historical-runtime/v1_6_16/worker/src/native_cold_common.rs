@@ -96,9 +96,11 @@ pub(super) fn integrity_regression(p:&Profile) {
     let link=directory.path().join("link");symlink(&input,&link).unwrap();assert!(checked_input(&link,18,&digest,uid).is_err());
     fs::set_permissions(&input,fs::Permissions::from_mode(0o644)).unwrap();assert!(checked_input(&input,18,&digest,uid).is_err());
     assert!(scratch_namespace(p,Path::new("/home/ubuntu/.jetstreamer-private").join(format!("{}v1/scratch",p.scratch_prefix)).as_path()));
-    for epoch in &[207,209,211,212,228] {
+    for epoch in &[207,209,210,211,212,228] {
+        if *epoch == p.epoch { continue; }
         assert!(!scratch_namespace(p,Path::new(&format!("/home/ubuntu/.jetstreamer-private/native-input{}-v1616-capped-v1/scratch",epoch))));
     }
-    assert!(!scratch_namespace(p,Path::new("/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1/nested/scratch")));
-    assert!(!scratch_namespace(p,Path::new("/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1/output")));
+    for suffix in &["nested/scratch", "output"] {
+        assert!(!scratch_namespace(p,Path::new(&format!("/home/ubuntu/.jetstreamer-private/{}v1/{}",p.scratch_prefix,suffix))));
+    }
 }
