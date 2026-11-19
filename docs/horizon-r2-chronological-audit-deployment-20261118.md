@@ -369,3 +369,67 @@ The helper is published as `023dc3ba`. Genuine admitted/protected epoch 167,
 fresh two-peer preparation, its own fresh DATA witness/contract and a qualified
 guarded epoch 170 launcher remain required. Parent owns the continuation;
 no repair sub-agent is running.
+
+## November 19 00:49 recovery and actual epoch 167 launch
+
+Epoch 141's holding retirement completed, removing **189,943,668,736 allocated
+bytes**. Its authenticated remote custody remains intact. Completion is
+`/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch141-completion.json`.
+The obsolete private epoch 160 bootstrap snapshot was also retired, removing
+**1,811,841,024 allocated bytes** while preserving its fully hashed immutable
+deployment copy. Its inactive restore definition was preserved and masked before
+the full bootstrap reference scan was accepted. Custody is under
+`/var/lib/jetstreamer/epoch160-obsolete-restore-custody-20261119-v1`; retirement
+completion is `/var/lib/jetstreamer/snapshot160-private-retire-20261119-v1/target-0-completion.json`.
+Neither retirement claims a net filesystem free-space delta or mutates R2.
+
+Epoch 167 preparation completed at 00:25:05 with the full 21,903,847-byte native
+census. The launcher now consumes its actual
+`current_fit.required_raw_available_bytes` field and accepts the census within
+a checked 32 MiB bound. The complete outer preflight initially failed its
+7,493,274,261,298-byte DATA requirement; cleanup opened that gate without
+changing the floor. All ten launcher tests, including the actual full outer
+preflight, and production Clippy passed. Required source was published before
+admission in `f6a26478064713bedc4ff96e9f4cd9eb15119852`.
+
+Sealed launcher:
+`/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261119-v3/launch`,
+SHA-256 `42b293d3481dd33f487452dd42238d01ce2abee386982e80781ba44acb90aef8`.
+The sealed check passed and the real launch completed at **00:45:18 UTC**.
+Producer PID **1718241**, invocation **fdfadeb7b76d4760a37983b402fd2771**,
+has genuine timer-driven first-guard proof. Admission and protection are under
+`/var/lib/jetstreamer/retry6-single167-guarded-launch-20261118-v1/epoch167/`.
+The admission digest is
+`99213a3ed3afecdde46a9b9b362fc6968c92755d6f85c5903872e7f466a04177`.
+This startup proves guarded bootstrap, not transaction replay.
+
+The sole 00:49 observer was replaced at the same clock to include actual epoch
+167. Its accepted sample is
+`/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root0049-live166167-20261119-v1.json`,
+SHA-256 `b3dc771d7a9b30c2f50353f75c6f9359290104ea2f9479ab695874f848756b03`.
+Epoch 166 was advancing at **2.3252 slots/sec**, **1,120.36 transactions/sec**,
+slot 71,758,744. Epoch 167 remained in bootstrap; both identities were stable
+with zero restarts. Counts: one executing replay, one active bootstrap, desired
+concurrency 13. The next routine observation is no earlier than **01:19:25 UTC**.
+All nineteen statuses were authenticated and refreshed from this sample:
+`/home/sol/.jetstreamer-private/r2-status-receipts/cycle0049-live166167-19-20261119-v1/COMPLETED.json`.
+That cycle is now every epoch's status predecessor. Earlier targeted epoch167
+corrections are retained under `event-disk-fit-167-20261119-v1` and
+`event-guarded-bootstrap-167-20261119-v1` in the same status root.
+
+Epoch 170's corrected launcher passed eleven tests, a production build and strict
+Clippy using units `horizon-single170-launch-corrected-{tests,production,clippy}-20261119-v1`.
+Its sealer now binds these executions and published source `f6a26478`. Actual
+two-peer staging, physical measurement, fresh own-image witness/contract and the
+complete operational preparation remain before guarded admission. Do not reuse
+the old one-peer stage helper or substitute forecast peer identities.
+
+The R2 audit's user-requested **00:33 UTC** check found **36 passed, zero failed**,
+with epoch36 downloading. Epochs26–35 completed in2,304 seconds: **15.625
+epochs/hour**, 230.4 seconds/epoch including download, playback, checks and cleanup.
+Epoch35 playback took30.730 seconds for432,000 slots and25,720,561 transactions.
+The unchanged audit service has zero restarts. Next routine audit check is no
+earlier than **01:03:38 UTC**. Its16GiB archive cap still needs a qualified scratch
+expansion before the first oversized archive at epoch74. No audit restart or
+DATA reservation change has occurred. An attempted delegation again received
+an encoded task payload and was interrupted; parent retains continuation.
