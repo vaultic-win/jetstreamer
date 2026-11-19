@@ -499,3 +499,56 @@ SHA-256 `22c9326872a8c793ab757e89a3b0e29529a639db57b965619cd52fb15a0d66e0`.
 Expected sample: `sample-root0119-live166167-20261119-v1.json` in the normal
 observer state directory. Use `observe_cycle_two` for this two-producer cadence;
 do not reuse the sole-166 helper. Its classification tests and strict Clippy pass.
+
+## November 19 22:50 ranged-transfer deployment
+
+The chronological audit passed epochs 0–78. Epoch 79 exhausted its original
+transfer plus two bounded retries, each with a response-body transport failure;
+it remains unverified. Epoch 80 also encountered two interrupted transfers.
+These failures are transport evidence, not proof of archive corruption.
+
+Source `63c030f8bc7802c1f31ef3c4825d64aea5ac4d19`, published to
+`account-updates`, replaces a whole-object response with sequential authenticated
+64 MiB ranges. The full standalone suite passed 64 tests with zero failures and
+one preexisting two-filesystem fixture ignored. Strict all-target Clippy and the
+release build passed. The new SDK-path tests cover conditional requests, exact
+HTTP 206/range/object identity, interruption, contiguous whole-file hashing, and
+the distinction between idle timeout and overall deadline. Full current-plugin
+playback, owned-copy cleanup and the original retry budget remain required.
+
+The normal Rust sealer installed `runtime-v9` beneath the HOME-backed root
+`/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1`.
+Its executable SHA-256 is
+`70d64c543ed79d8a05f3f2a9afd920ab5612133d4c6f89bfc9bffba1dcfe2ba2`;
+its seal receipt SHA-256 is
+`9848e46959219be23eba60280bffcc94d7121767951c8cc2691d372ab5ab8739`.
+The configuration bytes and resource limits are unchanged.
+
+The owner handoff occurred during epoch 80's empty-scratch retry wait, after
+the failed attempt's result and cleanup were durable and before retry 2 was
+consumed. `range-v9-transition/STOP_INTENT.json` and `STOPPED.json` bind that
+boundary and verify all previous result, inventory and recovery hashes remained
+unchanged. The old controller released the exclusive lock. The same service then
+started v9 at **22:50:13 UTC**, using ordinary `run` after its sandboxed
+metadata-only inventory preflight. Its PID is **2285828**, invocation
+**67725d9ba7aa4de994840564f44d963c**. No replay producer was restarted.
+`range-v9-transition/START_EVENT.json`, SHA-256
+`c043d9d42a50bd2aac7b1ab0c865f3a0ee1759fe6adc6da657aed4d5b5ad2257`,
+binds the unchanged reservations and the new owner.
+
+At the coordinated 22:50:52 observation, replay epochs 166 and 167 were both
+advancing with zero restarts. All 19 in-range status reports were refreshed and
+authenticated. The subsequent audit observation recorded **7,650,410,496 bytes**
+of epoch 80's 22,553,556,716-byte download at 22:55:28 UTC. This establishes
+transfer progress only. Epoch 79 still needs a separately qualified recovery;
+the deployment does not reset its exhausted retries or relabel it passed.
+
+The replacement observer consumers were qualified with 41 passing tests,
+strict Clippy and release builds, published in
+`2186cd7ee424be6d41019fbaaa54ddc89fbba2dc`, and sealed in `observer-v9`.
+Use that directory's `cycle` for the current two-replay fleet. Its accepted
+fleet is `root2250-live166retry8-167retry7-homeaudit-observation-20261119-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json`
+under `/var/lib/jetstreamer/horizon_runtime_data`; its sole successor observation
+is scheduled for **23:25:52 UTC**. Epoch 170 is still unlaunched: its preparer,
+launcher and stage deployments must be requalified against the actual v9 audit
+identity before admission. Their older immutable images remain untouched.
