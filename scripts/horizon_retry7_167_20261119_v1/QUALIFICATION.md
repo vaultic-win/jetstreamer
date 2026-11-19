@@ -1,7 +1,9 @@
 # Epoch167 retry7 recovery qualification
 
-The guard candidate is built and tested. Preparer, launcher, native witness,
-fleet admission and production launch are not yet qualified.
+The guard is built, tested and normally sealed. The preparer has passed its
+full test suite and production build; its source/runtime sealing remains pending.
+Launcher, native witness, fleet admission and production launch are not yet
+qualified.
 
 Guard release image SHA256:
 `e2821006426c497f25ecfdc8da26b63136d174a92c0ac15f78068bbc1078e581`.
@@ -23,9 +25,36 @@ custody fixtures. No producer or guard was launched or changed by qualification.
 The new guard scope retains epoch167's 512 GiB whole-lane cap and the
 6,829,053,656,882-byte raw floor. No reservation is released.
 
-Next steps: normally seal the guard and its real build/test/source proof;
-bind those exact hashes in the preparer; finish preparer/launcher fixtures and
-qualification. Before admission, publish all required sources to account-updates,
+The guard deployment is
+`/usr/local/lib/jetstreamer/horizon-epoch167-retry7-live166retry8-guard-20261119-v1`.
+Its artifact proof SHA256 is
+`6a334476cfefcd145163eaf3f4f3315969ba787bfc4a3d3652584a2155fcfa10`;
+its normal deployment receipt SHA256 is
+`0491b79a6c0982b876c51c62a56916cd2c52ff0dc9efd926f7a725a836e3b50a`.
+
+Preparer qualification, November 19:
+
+- `horizon-retry7-167-prepare-test-build-20261119-v2.service`: release
+  test image with locked dependencies and `preparation` feature, successful.
+- `horizon-retry7-167-prepare-test-root-20261119-v2.service`: exact executable
+  `prepare-bd5a1c2bb7e5518f`, **298 passed, zero failed/ignored**.
+- `horizon-retry7-167-prepare-build-20261119-v1.service`: production release,
+  successful; image SHA256
+  `44dcb706897b90da570f22637c20de661e591ba2cc14b82b41d1136f6b84128f`.
+
+These builds/tests used the same sequential 2 CPU / 2 GiB / no-swap envelope
+and existing DATA target. Their compile-time bindings use the exact guard,
+proof and deployment receipt above, and guard source commit
+`50f0a21c385ca38462b77bac770d6ed8cce594a2`.
+The first preparer test run is retained (297 passed, one failure). The corrected
+test fixture binds the current attempt instead of the historical booking's
+attempt, and explicitly rejects a missing attempt. No production reservation
+validation was weakened.
+
+Two launcher native tests require genuine fresh epoch167 preparation and remain
+explicitly pending; they have not passed. Next steps: seal the preparer source,
+runtime and actual qualification proof, bind those hashes in the launcher, and
+finish launcher qualification. Before admission, publish all required sources to account-updates,
 use the actual epoch166 retry8 identity and accepted current fleet, preserve
 all earlier retained promises plus the audit allocation, and requalify native
 DATA witness/preflight. Reuse the existing epoch167 retry7 root; no witness

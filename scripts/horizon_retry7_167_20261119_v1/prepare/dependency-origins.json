@@ -1,0 +1,211 @@
+{
+  "schema": "horizon-source-dependency-capture-v1",
+  "files": [
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/PINNED_INPUTS.json",
+      "original_sha256": "19beee2d90445830f4bff65a7b2bbb74d4f6f9ef467ae7963352e5c4faf18772",
+      "repository_file": "dep_19beee2d9044_PINNED_INPUTS.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/witness-set.json",
+      "original_sha256": "731806c5b1f4f35b6f9f9f52239cd60654454cd1e14f63640f7396b505bcd36c",
+      "repository_file": "dep_731806c5b1f4_witness-set.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/actual-three-owner-native.json",
+      "original_sha256": "05d3c4e05078c6f252fc7f712a5822bf680cd3156ec871a632987b45a854745e",
+      "repository_file": "dep_05d3c4e05078_actual-three-owner-native.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/allocation_window.rs",
+      "original_sha256": "c9c98847e9b91a1e385a8065c12cfb275b34a28fecb6805937046d5d75d4d1af",
+      "repository_file": "dep_c9c98847e9b9_allocation_window.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/completed_output_scope.rs",
+      "original_sha256": "b08f73821177f4ce5e36bee76b912662d961ffa40400bbcde8051d36b136131a",
+      "repository_file": "dep_b08f73821177_completed_output_scope.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/completed_output_report.rs",
+      "original_sha256": "bc5e37e91e4a274f7ce5f77fd77636f566fff172807d2d533252415ece02980e",
+      "repository_file": "dep_bc5e37e91e4a_completed_output_report.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_handoff.rs",
+      "original_sha256": "8398eca5b4edd6dc4c67ae5860ad1bcb0da28afe337865f2a64f9c64ba4a7027",
+      "repository_file": "dep_8398eca5b4ed_horizon_standalone_guard_handoff.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_native227.rs",
+      "original_sha256": "6dd43961e4d4327d500b9942917552ff76066fe934f26d401d3190700da242cf",
+      "repository_file": "dep_6dd43961e4d4_horizon_standalone_guard_native227.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/source-sealed/horizon_standalone_guard_root.rs",
+      "original_sha256": "ad7de942180bb4f0d62648186a52fc16e9e8a520c737167bc7d8c60850fe2a97",
+      "repository_file": "dep_ad7de942180b_horizon_standalone_guard_root.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/selection.rs",
+      "original_sha256": "44d21cd9870cad3647f748d9cdc4691922a6ba13e168df886ac61d375d62f0d3",
+      "repository_file": "dep_44d21cd9870c_selection.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json",
+      "original_sha256": "58bd338ae33eacb5d7f96b5d961aa118f5731c068c437e99ae000b221f456950",
+      "repository_file": "dep_58bd338ae33e_epoch166.RETRY4_PLAN.SOURCE_TEMPLATE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry4-lineage-fixture.json",
+      "original_sha256": "4b82a0e39e7e151ede60003bf56f73932439ea3f9f30b29f1aefe594dd10be13",
+      "repository_file": "dep_4b82a0e39e7e_retry4-lineage-fixture.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/terminal169_tests.rs",
+      "original_sha256": "91f960682d4b39d198d329bacb933f0b535d8490123f0a39dea1cee58880d05e",
+      "repository_file": "dep_91f960682d4b_terminal169_tests.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-prepare-build-v3/source-sealed/completed167_native_guard.rs",
+      "original_sha256": "b91d6447dc16de28e197d095079b14806660dc599e3d6a9527fc0f19f4952626",
+      "repository_file": "dep_b91d6447dc16_completed167_native_guard.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/host_fulfillment.rs",
+      "original_sha256": "27eebadac3853db91d3a5b166b4fcc479827433130a06f97527ac40593a8ad70",
+      "repository_file": "dep_27eebadac385_host_fulfillment.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/local.rs",
+      "original_sha256": "8319089e637ceb79bd1b3d7100633b75feeab066fee4f81d0d2abdfdadbd49e2",
+      "repository_file": "dep_8319089e637c_local.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v2/source-sealed/native_guard.rs",
+      "original_sha256": "411e1c18281dc40623c3b4ea0805ad2b61ab9db5303464603395064bab4d5cab",
+      "repository_file": "dep_411e1c18281d_native_guard.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/profile.rs",
+      "original_sha256": "ad904595bb77ccfddefc1c8f7cbcfc6cbae8b08c2fb43fa76a36e790b4b8a04b",
+      "repository_file": "dep_ad904595bb77_profile.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/resident_capture.rs",
+      "original_sha256": "64bfeee3982f366d5241cfe48dd984e7f4add7fc85576585d1df7387475adaab",
+      "repository_file": "dep_64bfeee3982f_resident_capture.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retirement_terminal.rs",
+      "original_sha256": "65577392d1efdb96e26a1e379290db1c11ce26caeba92c7bb01b6f49e04d624d",
+      "repository_file": "dep_65577392d1ef_retirement_terminal.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry_path.rs",
+      "original_sha256": "7b57870bebd45323f663c582f48441a2213ba459dd25196ecb86a7a680f372ad",
+      "repository_file": "dep_7b57870bebd4_retry_path.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/terminal166.rs",
+      "original_sha256": "e6501427d5b220c19a6137d9cc8dabe3837b1e782185b0f7d8465a7eaf98230f",
+      "repository_file": "dep_e6501427d5b2_terminal166.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/terminal167.rs",
+      "original_sha256": "64aa3fc725dc3fc3e6098fb3965dcaf5d050488bc1135e3dadfc5ac404d97293",
+      "repository_file": "dep_64aa3fc725dc_terminal167.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch166-RETRY1_PLAN.SOURCE_TEMPLATE.json",
+      "original_sha256": "38ee794434b7b8c931279ee4aa14e73983914e8b333834008a4bfc54531e6f8a",
+      "repository_file": "dep_38ee794434b7_epoch166-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch167-RETRY1_PLAN.SOURCE_TEMPLATE.json",
+      "original_sha256": "48cbea177c18ebcbb2c93a0c20e606acba8437be1fe3b1a6fe649031c683abcc",
+      "repository_file": "dep_48cbea177c18_epoch167-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch169-RETRY1_PLAN.SOURCE_TEMPLATE.json",
+      "original_sha256": "2a5c2c911638c16605ee2205f2d89eaae70a605f3fd84f2013245f89ccb18f4e",
+      "repository_file": "dep_2a5c2c911638_epoch169-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/epoch170-RETRY1_PLAN.SOURCE_TEMPLATE.json",
+      "original_sha256": "c6e982fa6ae4240556e3d73ce8797cf383d4ea8c25c0eae84abba5d674b27639",
+      "repository_file": "dep_c6e982fa6ae4_epoch170-RETRY1_PLAN.SOURCE_TEMPLATE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-completed167-guard-build-v2/native-guard-fixture.json",
+      "original_sha256": "72ef4a1dcbd2bf9d6d9e18351c2980c5322763d8e3af380a705c30c68db8a46b",
+      "repository_file": "dep_72ef4a1dcbd2_native-guard-fixture.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/admission_capture.rs",
+      "original_sha256": "2cf853d17a6ebae76505f7eec2cc6f04931cccdbcba3d8c6fd19496c25160c98",
+      "repository_file": "dep_2cf853d17a6e_admission_capture.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/epoch167-retry5-live166-20261117-v1/prepare-source-sealed-v3/resident_memory_tests.rs",
+      "original_sha256": "d0d7e21bba063107960a54674738f841c6da435fc17d8cea69ad2d7f5fe90e91",
+      "repository_file": "dep_d0d7e21bba06_resident_memory_tests.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry4-exact-peers.json",
+      "original_sha256": "97e29106102e63fae3ffa6f297846b0aabeae67b45ad9eda80b265554ee8fbc4",
+      "repository_file": "dep_97e29106102e_retry4-exact-peers.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/retry2-stopped-profiles.json",
+      "original_sha256": "b4d024aaefdc975cd16b474015aadedb3e802e4ae2fe0e824b7b9a35fd5dfea5",
+      "repository_file": "dep_b4d024aaefdc_retry2-stopped-profiles.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/completed167_tests.rs",
+      "original_sha256": "a241c8074b06c28f7cf0e41b798eb742e3e6894dab5d0dc27c86b98205c917b0",
+      "repository_file": "dep_a241c8074b06_completed167_tests.rs"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/actual-retirement-terminal-fixtures.json",
+      "original_sha256": "1af24b4120775898f5cf69a0c9373dc85ca8aa0c2c66bdffc67c70c7a8932731",
+      "repository_file": "dep_1af24b412077_actual-retirement-terminal-fixtures.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/terminal169-169-PID1.json",
+      "original_sha256": "943dea16ab6aa6d25cf6c00f1b167323f9ab09db456a7e8eee3cf36dd0a30256",
+      "repository_file": "dep_943dea16ab6a_terminal169-169-PID1.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/terminal169-169-NATIVE.json",
+      "original_sha256": "62a490385c3b9a86806282386e4fb84d65545e53075177285ed2fe64bb94c8dd",
+      "repository_file": "dep_62a490385c3b_terminal169-169-NATIVE.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v3/source-sealed/holding-DATA-booking.json",
+      "original_sha256": "94a54718ff7f906c51948eb1905b1f771e4b102cf3492b1b5875e30bb39ceef2",
+      "repository_file": "dep_94a54718ff7f_holding-DATA-booking.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v2/source-sealed/native-guard-fixture.json",
+      "original_sha256": "faea0f8651335abd56461dcfc18262b4e7cd4178b74174f27c3849a538ce7bc4",
+      "repository_file": "dep_faea0f865133_native-guard-fixture.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/private183-parent-custody-qualification-20261114-v1/holding-controls-v7/peer170-terminal169-build-v6/source-sealed/terminal167-fixture.json",
+      "original_sha256": "2e87c641674dc12d4af22b2fee5fa927ebf09377bf2b29f9d4ed389b9eaf3b14",
+      "repository_file": "dep_2e87c641674d_terminal167-fixture.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/terminal166-fixture.json",
+      "original_sha256": "3a65f9d0f158812751298a36f2caf7ac0951406e114acfe1f2a4de3e6581937c",
+      "repository_file": "dep_3a65f9d0f158_terminal166-fixture.json"
+    },
+    {
+      "original_path": "/var/lib/jetstreamer/peer170-completed167-native-operation-zero166-20261116-v1/parser-repair-v2/prepare-build-v2/source-sealed/NATIVE_EMPTY_JOB_LIST_DIAGNOSIS.json",
+      "original_sha256": "b2d77f8d3a7f8b9770edfe444f0338f27772f39c8bb2f7823fbf33afb6572c60",
+      "repository_file": "dep_b2d77f8d3a7f_NATIVE_EMPTY_JOB_LIST_DIAGNOSIS.json"
+    }
+  ],
+  "note": "Source attributes and compile-time include paths localized; all other dependency bytes preserved."
+}
