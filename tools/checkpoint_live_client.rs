@@ -234,7 +234,7 @@ pub(super) fn run(
         };
         if parent_phase.as_deref() == Some("export") {
             checkpoint_parent_handoff::publish(
-                input, output, launcher, image, genesis, boundary, &after, &export,
+                input, output, launcher, image, genesis, &initial, boundary, &after, &export,
             )?;
             return Ok(export);
         }

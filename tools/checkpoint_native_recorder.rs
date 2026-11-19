@@ -3,6 +3,8 @@
 #![allow(dead_code)]
 #[path = "../jetstreamer-node/src/archive_checksum.rs"]
 mod archive_checksum;
+#[path = "../jetstreamer-node/src/checkpoint_bundle.rs"]
+mod checkpoint_bundle;
 mod checkpoint_live_client;
 mod checkpoint_parent_handoff;
 #[path = "../jetstreamer-node/src/handoff_snapshot.rs"]

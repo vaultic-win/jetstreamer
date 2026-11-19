@@ -211,7 +211,7 @@ use jetstreamer_horizon::{block_metas::BlockNotification, entries::EntryRecord};
 use jetstreamer_node::handoff_snapshot::{
     HANDOFF_SNAPSHOT_MANIFEST_SCHEMA_VERSION, HistoricalHandoffSnapshotManifest,
     handoff_snapshot_manifest_path, read_and_validate_handoff_snapshot_manifest,
-    write_bound_handoff_snapshot_manifest, write_handoff_snapshot_manifest,
+    write_handoff_snapshot_manifest,
 };
 use jetstreamer_node::segment_manifest::{
     HistoricalSegmentManifest, SegmentCheckpointSummary, SegmentRuntimeAdmission,
@@ -11727,7 +11727,7 @@ fn publish_historical_segment_manifest(
     archive_path: &Path,
     result: &ReplayRunResult,
     allow_candidate_runtime: bool,
-) -> Result<(), String> {
+) -> Result<HistoricalSegmentManifest, String> {
     let evidence = result.historical_evidence.as_ref().ok_or_else(|| {
         "focused historical segment completed without checkpoint evidence".to_string()
     })?;
@@ -11781,7 +11781,7 @@ fn publish_historical_segment_manifest(
         .map_err(|err| format!("failed to publish segment evidence: {err}"))?;
     // Exercise the durable read path before telling a supervising parent that
     // this child succeeded.
-    read_and_validate_segment_manifest(archive_path).map_err(|err| {
+    let readback = read_and_validate_segment_manifest(archive_path).map_err(|err| {
         format!(
             "failed to re-read segment evidence {}: {err}",
             path.display()
@@ -11791,7 +11791,7 @@ fn publish_historical_segment_manifest(
         "published verified historical segment evidence {}",
         path.display()
     );
-    Ok(())
+    Ok(readback)
 }
 
 #[allow(clippy::too_many_arguments)] // top-level replay entry point: CLI params map 1:1
@@ -22022,16 +22022,19 @@ async fn main() {
                 } else if let Some(plan) = qualification
                     && result.historical_evidence.is_some()
                 {
-                    if let Err(err) = publish_historical_segment_manifest(
+                    let verified_segment = match publish_historical_segment_manifest(
                         epoch,
                         plan,
                         &horizon_output,
                         &result,
                         allow_candidate_runtime,
                     ) {
-                        eprintln!("error: {err}");
-                        exit(1);
-                    }
+                        Ok(segment) => segment,
+                        Err(err) => {
+                            eprintln!("error: {err}");
+                            exit(1);
+                        }
+                    };
                     if let Some(exported) = result.checkpoint_snapshot.as_ref() {
                         // Ordered worker shutdown has been acknowledged, and
                         // the segment passed its full manifest readback. Kernel
@@ -22078,14 +22081,9 @@ async fn main() {
                                 .expect("segment writer required worker identity"),
                             terminal: segment_checkpoint_summary(&evidence.terminal),
                         };
-                        let publication = write_bound_handoff_snapshot_manifest(&exported.archive_path, manifest)
-                            .and_then(|(path, published)| {
-                                let readback = read_and_validate_handoff_snapshot_manifest(&exported.archive_path)?;
-                                if readback != published || published.archive_size != exported.archive_size || published.archive_sha256 != exported.archive_sha256 {
-                                    return Err(jetstreamer_node::handoff_snapshot::HandoffSnapshotManifestError::Invalid("checkpoint snapshot changed during evidence publication".into()));
-                                }
-                                Ok(path)
-                            });
+                        let publication = jetstreamer_node::checkpoint_bundle::publish_bound_checkpoint_snapshot(
+                            &exported.archive_path, manifest, &verified_segment,
+                        ).map(|(path, _)| path);
                         match publication {
                             Ok(path) => info!(
                                 "focused checkpoint snapshot evidence {} committed after segment verification and worker shutdown; resume and pressure admission remain separate gates",

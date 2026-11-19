@@ -2,10 +2,12 @@
 use super::*;
 use crate::handoff_snapshot::{
     HistoricalHandoffSnapshotManifest, handoff_snapshot_manifest_path,
-    read_and_validate_handoff_snapshot_manifest, write_bound_handoff_snapshot_manifest,
+    read_and_validate_handoff_snapshot_manifest,
 };
 use crate::segment_manifest::{
-    SegmentCheckpointSummary, SegmentRuntimeAdmission, SegmentRuntimeIdentity,
+    HistoricalSegmentManifest, SegmentCheckpointSummary, SegmentRuntimeAdmission,
+    SegmentRuntimeIdentity, read_and_validate_segment_manifest, segment_manifest_path,
+    write_segment_manifest,
 };
 
 pub const PHASE: &str = "JETSTREAMER_NATIVE_PARENT_PHASE";
@@ -22,6 +24,7 @@ struct Receipt {
     native_image_sha256: String,
     transcript_sha256: String,
     prefix_sha256: String,
+    prefix_manifest_sha256: String,
     snapshot_manifest_sha256: String,
     export: SnapshotExport,
     checkpoint: Checkpoint,
@@ -48,6 +51,7 @@ pub fn publish(
     launcher: &Path,
     image: &Path,
     genesis: &[u8],
+    bootstrap: &Checkpoint,
     boundary: &Checkpoint,
     after: &Checkpoint,
     export: &SnapshotExport,
@@ -61,7 +65,7 @@ pub fn publish(
         archive_size: export.archive_size,
         archive_sha256: export.archive_sha256.as_slice().try_into()?,
         source_runtime: SegmentRuntimeIdentity {
-            generation_profile: "synthetic/native-parent-restart-v1".into(),
+            generation_profile: "synthetic/native-checkpoint-recorder-v1".into(),
             runtime_profile: "solana-v1.7.15".into(),
             runtime_admission: SegmentRuntimeAdmission::Candidate,
             runtime_revision: "4892eb4e1ad278d5249b6cda8983f88effb3e98b".into(),
@@ -72,20 +76,49 @@ pub fn publish(
         source_worker_executable_sha256: digest(image)?,
         terminal: summary(boundary)?,
     };
-    let (sidecar, published) =
-        write_bound_handoff_snapshot_manifest(&export.archive_path, manifest)?;
+    let prefix = output.join("prefix.jet");
+    let (prefix_sidecar, written_segment) = write_segment_manifest(
+        &prefix,
+        HistoricalSegmentManifest {
+            schema_version: 1,
+            epoch: 0,
+            output_slot_start: bootstrap.slot.checked_add(1).ok_or("slot overflow")?,
+            output_slot_count: boundary
+                .slot
+                .checked_sub(bootstrap.slot)
+                .ok_or("inverted prefix")?,
+            runtime: manifest.source_runtime.clone(),
+            worker_executable_sha256: digest(image)?,
+            archive_sha256: [0; 32],
+            bootstrap_archive_sha256: None,
+            bootstrap: summary(bootstrap)?,
+            terminal: summary(boundary)?,
+            emitted_raw_write_versions: bootstrap.next_write_version..boundary.next_write_version,
+        },
+    )?;
+    let verified_segment = read_and_validate_segment_manifest(&prefix)?;
+    require(
+        verified_segment == written_segment,
+        "prefix manifest readback differs",
+    )?;
+    let (sidecar, published) = checkpoint_bundle::publish_bound_checkpoint_snapshot(
+        Path::new(&export.archive_path),
+        manifest,
+        &verified_segment,
+    )?;
     require(
         read_and_validate_handoff_snapshot_manifest(&export.archive_path)? == published,
         "snapshot manifest readback differs",
     )?;
     let receipt = Receipt {
-        schema: "horizon-synthetic-parent-checkpoint-v1".into(),
+        schema: "horizon-synthetic-parent-checkpoint-v2".into(),
         parent_pid: std::process::id(),
         parent_sha256: hex(&digest(&std::env::current_exe()?)?),
         launcher_sha256: hex(&digest(launcher)?),
         native_image_sha256: hex(&digest(image)?),
         transcript_sha256: hex(&digest(&input.join("native-transcript.bin"))?),
         prefix_sha256: hex(&digest(&output.join("prefix.jet"))?),
+        prefix_manifest_sha256: hex(&digest(&prefix_sidecar)?),
         snapshot_manifest_sha256: hex(&digest(&sidecar)?),
         export: export.clone(),
         checkpoint: after.clone(),
@@ -131,7 +164,7 @@ pub fn read(
     )?;
     let r: Receipt = serde_json::from_slice(&bytes)?;
     require(
-        r.schema == "horizon-synthetic-parent-checkpoint-v1"
+        r.schema == "horizon-synthetic-parent-checkpoint-v2"
             && r.parent_pid != std::process::id()
             && r.parent_sha256 == hex(&digest(&std::env::current_exe()?)?)
             && r.launcher_sha256 == hex(&digest(launcher)?)
@@ -157,7 +190,12 @@ pub fn read(
         hex(&digest(&sidecar)?) == r.snapshot_manifest_sha256,
         "parent restart snapshot manifest changed",
     )?;
-    let m = read_and_validate_handoff_snapshot_manifest(archive)?;
+    let prefix = output.join("prefix.jet");
+    require(
+        hex(&digest(&segment_manifest_path(&prefix)?)?) == r.prefix_manifest_sha256,
+        "parent restart prefix manifest changed",
+    )?;
+    let (_, m) = checkpoint_bundle::read_and_validate_checkpoint_bundle(&prefix, archive)?;
     require(
         m.terminal == summary(boundary)?
             && m.source_runtime.genesis_hash == hash(genesis)?.to_string()
