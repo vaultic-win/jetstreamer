@@ -1308,6 +1308,8 @@ mod tests {
         ];
     }
 
+    include!("checkpoint_portability_tests.rs");
+
     fn test_state(ticks_per_slot: u64, hashes_per_tick: Option<u64>) -> (RuntimeState, Keypair) {
         let leader = Pubkey::new_from_array([7; 32]);
         let mut genesis = create_genesis_config_with_leader(1_000_000, &leader, 500_000);
