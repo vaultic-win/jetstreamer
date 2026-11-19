@@ -96,6 +96,40 @@ fn exact167_native(v: &Value) -> Result<()> {
     );
     Ok(())
 }
+fn preserve_holding166_recovery(fleet: &mut Value, previous: &Value, event: &Value) -> Result<()> {
+    ensure!(
+        event["schema"] == "horizon-exact-holding166-start-event-v1"
+            && event["native"]["Id"] == "horizon-closed166-retry6-park-20261119-v1.service"
+            && event["native"]["InvocationID"] == "afc04ba6096f4826836919c2020dcdc6"
+            && event["additional_memory_bytes"] == 2147483648u64
+            && event["additional_cpu_quota_micros"] == 2000000u64
+            && event["additional_DATA_staging_bytes"] == 0
+            && event["restore_overlap_bytes"] == 56173984550u64
+            && event["resource_credit_bytes"] == 0
+            && event["promise_ending_bytes"] == 0
+            && previous["continuing_holding166retry6_obligation"] == *event
+            && previous["next_lane_recovery"]["epoch"] == 170
+            && previous["next_lane_recovery"]["resource_credit_bytes"] == 0,
+        "exact holding166 event and unchanged additive budget required"
+    );
+    for key in [
+        "qualified_preparer",
+        "qualified_launcher",
+        "qualified_stage",
+    ] {
+        ensure!(
+            previous["next_lane_recovery"][key].is_object(),
+            "qualified170 successor missing"
+        );
+    }
+    fleet["next_lane_recovery"] = previous["next_lane_recovery"].clone();
+    fleet["continuing_holding166retry6_obligation"] = event.clone();
+    fleet["holding166_event_is_historical_not_fresh_native_observation"] = json!(true);
+    fleet["holding166_admission_requirement"] = json!(
+        "Revalidate the exact transfer before admission; retain its 2GiB/2CPU allocation until genuine terminal evidence. Custody and separate retirement are required before any local capacity credit."
+    );
+    Ok(())
+}
 fn joined167() -> Result<(Value, Value)> {
     let unit = "horizon-qualify-167-replacement-local3retry7-20261110-v1.service";
     let iid = "a680103e76f546faaf469aa80c35fa3b";
@@ -299,6 +333,7 @@ fn main() -> Result<()> {
         "successor timer not waiting"
     );
     let mut fleet = read(&a[4])?;
+    let previous_fleet = fleet.clone();
     ensure!(
         fleet["owner"] == "/root" && fleet["live_replay_count"].as_u64().is_some_and(|v| v <= 2),
         "predecessor fleet differs"
@@ -608,7 +643,32 @@ fn main() -> Result<()> {
         "launch_phase":bind("/var/lib/jetstreamer/audit-retry-boundary-transition-20261119-v7/launch-phase.json")?,
         "qualified_image":bind("/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/artifact-proof.json")?,
         "fresh_audit_observation_claimed":false,"recovery_pass_claimed":false,
-        "next_action":"Preserve the v7 epoch73 retry begun at0751 and original immutable failure. Check its terminal result or next routine audit at0821; do not restart healthy download/playback. Qualify root cleanup for the separately observed epoch75 capacity deficit."});
+        "next_action":"Preserve the v7 epoch73 retry and original immutable failure. Use its actual completion event or the next audit observation after the last audit's 1800-second interval; qualify root cleanup for epoch75. This cycle does not claim a fresh audit observation or a recovered pass."});
+    let holding_event_path =
+        "/var/lib/jetstreamer/root0832-holding166-event-20261119-v1/EVENT.json";
+    let event_binding = bind(holding_event_path)?;
+    ensure!(
+        event_binding["sha256"]
+            == "d5beb401ed0e015f371a7123fa34c6772f2d7f88b854d4cb1a01c4c8b2f0a0bb"
+            && previous_fleet["current_nonreplay_transition"] == event_binding,
+        "genuine holding166 event binding required"
+    );
+    for key in [
+        "qualified_preparer",
+        "qualified_launcher",
+        "qualified_stage",
+    ] {
+        let artifact = &previous_fleet["next_lane_recovery"][key];
+        ensure!(
+            bind(
+                artifact["path"]
+                    .as_str()
+                    .context("qualified170 proof path")?
+            )? == *artifact,
+            "qualified170 proof changed"
+        );
+    }
+    preserve_holding166_recovery(&mut fleet, &previous_fleet, &read(holding_event_path)?)?;
     fleet["recovered166_admission"] = bind(
         "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
     )?;
@@ -627,7 +687,38 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clock_labels, exact167_native, phase};
+    use super::{clock_labels, exact167_native, phase, preserve_holding166_recovery};
+    #[test]
+    fn holding_event_preserves_successor_and_budget_without_fresh_claim() {
+        let event = serde_json::json!({"schema":"horizon-exact-holding166-start-event-v1",
+            "native":{"Id":"horizon-closed166-retry6-park-20261119-v1.service","InvocationID":"afc04ba6096f4826836919c2020dcdc6"},
+            "additional_memory_bytes":2147483648u64,"additional_cpu_quota_micros":2000000u64,
+            "additional_DATA_staging_bytes":0,"restore_overlap_bytes":56173984550u64,
+            "resource_credit_bytes":0,"promise_ending_bytes":0});
+        let previous = serde_json::json!({"continuing_holding166retry6_obligation":event,
+            "next_lane_recovery":{"epoch":170,"resource_credit_bytes":0,"qualified_preparer":{},
+            "qualified_launcher":{},"qualified_stage":{},"next_action":"qualified retirement then launch"}});
+        let mut fleet = serde_json::json!({"next_lane_recovery":{"next_action":"stale"}});
+        preserve_holding166_recovery(&mut fleet, &previous, &event).unwrap();
+        assert_eq!(fleet["next_lane_recovery"], previous["next_lane_recovery"]);
+        assert_eq!(fleet["continuing_holding166retry6_obligation"], event);
+        assert_eq!(
+            fleet["holding166_event_is_historical_not_fresh_native_observation"],
+            true
+        );
+        for key in [
+            "additional_memory_bytes",
+            "additional_cpu_quota_micros",
+            "restore_overlap_bytes",
+        ] {
+            let mut bad = event.clone();
+            bad[key] = serde_json::json!(0);
+            assert!(preserve_holding166_recovery(&mut fleet, &previous, &bad).is_err());
+        }
+        let mut bad = previous.clone();
+        bad["continuing_holding166retry6_obligation"] = serde_json::Value::Null;
+        assert!(preserve_holding166_recovery(&mut fleet, &bad, &event).is_err());
+    }
     #[test]
     fn joined167_rejects_changed_owner_and_restart() {
         let good = serde_json::json!({"Id":"horizon-qualify-167-replacement-local3retry7-20261110-v1.service",
