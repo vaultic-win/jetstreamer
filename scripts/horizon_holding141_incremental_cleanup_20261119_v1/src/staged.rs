@@ -1,6 +1,74 @@
 use super::*;
 use evidence::properties;
 
+const NETWORK_ALIAS: &str =
+    "/run/systemd/generator/multi-user.target.wants/systemd-networkd.service";
+const NETWORK_FRAGMENT: &str = "/usr/lib/systemd/system/systemd-networkd.service";
+const NETWORK_FRAGMENT_SHA: &str =
+    "38ab8b44491353e11502b1eab3a8e67cd1845845397ae09db36e211a6d8bfce7";
+
+fn network_alias_shape(
+    path: &Path,
+    link: &Path,
+    p: &BTreeMap<String, String>,
+    target: &Path,
+) -> Result<()> {
+    ensure!(
+        path == Path::new(NETWORK_ALIAS) && link == Path::new("../systemd-networkd.service"),
+        "foreign generated alias"
+    );
+    for (key, value) in [
+        ("Id", "systemd-networkd.service"),
+        ("LoadState", "loaded"),
+        ("FragmentPath", NETWORK_FRAGMENT),
+        ("DropInPaths", ""),
+    ] {
+        ensure!(
+            p.get(key).map(String::as_str) == Some(value),
+            "generated network alias differs: {key}"
+        );
+    }
+    let start = p.get("ExecStart").context("network command")?;
+    ensure!(start.starts_with("{ path=/usr/lib/systemd/systemd-networkd ; argv[]=/usr/lib/systemd/systemd-networkd ; ignore_errors=no ;") && start.matches("{ path=").count() == 1, "foreign network command");
+    for key in [
+        "ExecStartPre",
+        "ExecStartPost",
+        "ExecCondition",
+        "ExecStop",
+        "ExecStopPost",
+        "ExecReload",
+    ] {
+        ensure!(
+            p.get(key).is_none_or(String::is_empty),
+            "network alias gained command: {key}"
+        );
+    }
+    let raw = serde_json::to_vec(p)?;
+    ensure!(
+        !process_references::encoded_reference(&raw, target.as_os_str().as_bytes(), true)
+            && !relative_cache_reference(&raw, target),
+        "resolved network alias references cache"
+    );
+    Ok(())
+}
+
+fn resolved_network_alias(
+    path: &Path,
+    link: &Path,
+    p: &BTreeMap<String, String>,
+    target: &Path,
+) -> Result<Value> {
+    network_alias_shape(path, link, p, target)?;
+    let (digest, md) = hash_file(Path::new(NETWORK_FRAGMENT), 1 << 20)?;
+    ensure!(
+        digest == NETWORK_FRAGMENT_SHA && md.uid() == 0 && md.gid() == 0 && md.mode() & 0o022 == 0,
+        "network fragment custody differs"
+    );
+    Ok(
+        json!({"path":NETWORK_FRAGMENT,"sha256":digest,"identity":evidence::identity(&md),"resolution":"exact generated alias resolved by PID1 to the installed distribution unit"}),
+    )
+}
+
 fn missing_unit_is_nonlaunchable(
     unit: &str,
     p: &std::collections::BTreeMap<String, String>,
@@ -83,9 +151,14 @@ pub(super) fn staged_references(
                             .all(|b| b.is_ascii_alphanumeric() || b"-_.@\\".contains(&b)),
                     "unsupported dangling alias"
                 );
-                let names = "Id,LoadState,ActiveState,SubState,MainPID,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,ExecStop,ExecStopPost,ExecReload,Triggers,TriggeredBy";
+                let names = "Id,LoadState,ActiveState,SubState,MainPID,ExecStart,ExecStartPre,ExecStartPost,ExecCondition,ExecStop,ExecStopPost,ExecReload,Triggers,TriggeredBy,FragmentPath,DropInPaths";
                 let before = properties(name, names)?;
-                missing_unit_is_nonlaunchable(name, &before)?;
+                let resolved = if path == Path::new(NETWORK_ALIAS) {
+                    resolved_network_alias(&path, &link, &before, target)?
+                } else {
+                    missing_unit_is_nonlaunchable(name, &before)?;
+                    Value::Null
+                };
                 let after = fs::symlink_metadata(&path)?;
                 ensure!(
                     fs::read_link(&path)? == link
@@ -96,7 +169,13 @@ pub(super) fn staged_references(
                         && properties(name, names)? == before,
                     "dangling alias/manager changed during check"
                 );
-                missing.push(json!({"alias":path,"missing_target":link,"manager_state":before,"before_after_stable":true}));
+                if !resolved.is_null() {
+                    ensure!(
+                        resolved_network_alias(&path, &link, &before, target)? == resolved,
+                        "resolved network fragment changed"
+                    );
+                }
+                missing.push(json!({"alias":path,"missing_target":link,"manager_state":before,"resolved_distribution_unit":resolved,"before_after_stable":true}));
                 continue;
             }
             Err(e) => {
@@ -127,4 +206,68 @@ pub(super) fn staged_references(
     }
     refs.sort();
     Ok(refs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn native() -> BTreeMap<String, String> {
+        [("Id", "systemd-networkd.service"), ("LoadState", "loaded"), ("FragmentPath", NETWORK_FRAGMENT), ("DropInPaths", ""), ("ExecStart", "{ path=/usr/lib/systemd/systemd-networkd ; argv[]=/usr/lib/systemd/systemd-networkd ; ignore_errors=no ; pid=0 }")].into_iter().map(|(k,v)|(k.into(),v.into())).collect()
+    }
+    #[test]
+    fn distribution_alias_requires_exact_resolution_and_commands() {
+        let p = native();
+        network_alias_shape(
+            Path::new(NETWORK_ALIAS),
+            Path::new("../systemd-networkd.service"),
+            &p,
+            Path::new(TARGET),
+        )
+        .unwrap();
+        for key in [
+            "Id",
+            "LoadState",
+            "FragmentPath",
+            "DropInPaths",
+            "ExecStart",
+            "ExecStartPre",
+            "ExecStopPost",
+        ] {
+            let mut bad = p.clone();
+            bad.insert(key.into(), "changed".into());
+            assert!(
+                network_alias_shape(
+                    Path::new(NETWORK_ALIAS),
+                    Path::new("../systemd-networkd.service"),
+                    &bad,
+                    Path::new(TARGET)
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            network_alias_shape(
+                Path::new("/run/foreign.service"),
+                Path::new("../systemd-networkd.service"),
+                &p,
+                Path::new(TARGET)
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn unknown_loaded_alias_remains_rejected() {
+        assert!(missing_unit_is_nonlaunchable("systemd-networkd.service", &native()).is_err());
+        let mut p = native();
+        p.insert("ExecStartPre".into(), format!("/bin/cat {TARGET}/a.o"));
+        assert!(
+            network_alias_shape(
+                Path::new(NETWORK_ALIAS),
+                Path::new("../systemd-networkd.service"),
+                &p,
+                Path::new(TARGET)
+            )
+            .is_err()
+        );
+    }
 }
