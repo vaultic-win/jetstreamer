@@ -270,7 +270,7 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         .context("DATA overflow")?;
     let required = number(
         &prepared["resource_checks"]["data_accounting"]["current_fit"],
-        "raw_initial_demand_bytes",
+        "required_raw_available_bytes",
     )?;
     ensure!(
         available >= required,
@@ -674,7 +674,7 @@ fn preflight(plan: &Value, at: u64) -> Result<(Value, Value)> {
         string(&plan["prepared"], "path")? == PREPARED,
         "wrong preparation path"
     );
-    let prepared = bound(&plan["prepared"], 8 << 20)?;
+    let prepared = bound(&plan["prepared"], 32 << 20)?;
     ensure!(
         prepared["schema"] == "horizon-standard-replacement-recipe-preparation-v1"
             && prepared["owner"] == "/root"
