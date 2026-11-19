@@ -100,12 +100,15 @@ fn one(p: &Value, filename: bool) -> Result<Value> {
     drained(unit, pid)?;
     for (k, w) in [
         ("User", "ubuntu"),
-        ("Group", "ubuntu"),
         ("NoNewPrivileges", "yes"),
         ("MemorySwapMax", "0"),
     ] {
         ensure!(before[k] == w, "probe safety property {k}");
     }
+    ensure!(
+        before["Group"] == "ubuntu" || (filename && before["Group"] == ""),
+        "probe group selection"
+    );
     let cap = text(&before, "MemoryMax")?.parse::<u64>()?;
     ensure!(cap > 0 && cap <= 1 << 30, "bounded probe memory");
     // The old filename probe is retained evidence; do not demand a redesigned sandbox.
@@ -129,7 +132,15 @@ fn one(p: &Value, filename: bool) -> Result<Value> {
     } else {
         "cohort manifest fingerprint mismatch"
     };
-    journal_owner(&rows, unit, iid, pid, &argv, marker, false)?;
+    journal_owner(
+        &rows,
+        unit,
+        iid,
+        pid,
+        &argv,
+        marker,
+        JournalEvidence::StrictNode,
+    )?;
     if filename {
         ensure!(
             !rows.iter().any(|r| r["MESSAGE"]

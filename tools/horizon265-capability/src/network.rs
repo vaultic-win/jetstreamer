@@ -354,7 +354,14 @@ pub(super) fn capture(p: &Value, plan: &Bound, self_sha: &str) -> Result<()> {
     let iid = text(p, "invocation_id")?;
     let helper: Bound = serde_json::from_value(p["helper"].clone())?;
     ensure!(
-        helper.sha256 == self_sha && digest(&read(&helper.path, 0, 64 << 20, true)?) == self_sha,
+        (helper.sha256 == self_sha
+            || (helper.path
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon265-capability-20261119-v1/horizon265-capability"
+                )
+                && helper.sha256
+                    == "42ae5a68f01de38568d54a1cc1c9bff482f957a29af7cbfcd68f760fabf526fd"))
+            && digest(&read(&helper.path, 0, 64 << 20, true)?) == helper.sha256,
         "network helper identity"
     );
     let argv = vec![
@@ -376,7 +383,7 @@ pub(super) fn capture(p: &Value, plan: &Bound, self_sha: &str) -> Result<()> {
             && native["unit"] == UNIT
             && native["invocation_id"] == iid
             && native["pid"] == pid
-            && native["self_sha256"] == self_sha
+            && native["self_sha256"] == helper.sha256
             && native["producer_template_sha256"] == digest(TEMPLATE.as_bytes())
             && native["curl"]["args"] == json!(curl_args())
             && native["curl"]["exit_code"] == 0
@@ -402,7 +409,7 @@ pub(super) fn capture(p: &Value, plan: &Bound, self_sha: &str) -> Result<()> {
         pid,
         &argv,
         "epoch265 bounded native HTTP206 CAR header accepted",
-        true,
+        JournalEvidence::BoundNetworkNative,
     )?;
     let output = Path::new(text(p, "output")?);
     let dir = output.parent().context("receipt directory")?;

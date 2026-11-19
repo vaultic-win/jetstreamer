@@ -248,6 +248,17 @@ fn journal(unit: &str, iid: &str) -> Result<Vec<Value>> {
     ensure!(!rows.is_empty(), "no original journal");
     Ok(rows)
 }
+#[derive(Clone, Copy)]
+enum JournalEvidence {
+    StrictNode,
+    BoundNetworkNative,
+}
+fn journal_image(row: &Value, argv: &[String], evidence: JournalEvidence) -> bool {
+    (row["_EXE"].as_str() == argv.first().map(String::as_str) && row["_CMDLINE"] == argv.join(" "))
+        || (matches!(evidence, JournalEvidence::BoundNetworkNative)
+            && row.get("_EXE").is_none()
+            && row.get("_CMDLINE").is_none())
+}
 fn journal_owner(
     rows: &[Value],
     unit: &str,
@@ -255,8 +266,12 @@ fn journal_owner(
     pid: u64,
     argv: &[String],
     marker: &str,
-    success: bool,
+    evidence: JournalEvidence,
 ) -> Result<()> {
+    // Only the network route has a separately authenticated native result with
+    // self digest, PID, IID and unchanged PID1 executable/argv. Journald may
+    // miss proc metadata when that short-lived process exits before enrichment.
+    let success = matches!(evidence, JournalEvidence::BoundNetworkNative);
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
@@ -287,8 +302,8 @@ fn journal_owner(
                     && r["_UID"] == "1000"
                     && r["_SYSTEMD_UNIT"] == unit
                     && r["_SYSTEMD_INVOCATION_ID"] == iid
-                    && r["_EXE"].as_str() == argv.first().map(String::as_str)
-                    && r["_CMDLINE"] == argv.join(" "),
+                    && r["_GID"] == "1000"
+                    && journal_image(r, argv, evidence),
                 "foreign marker"
             );
             ensure!(found.replace(i).is_none(), "duplicate marker");
@@ -338,5 +353,33 @@ fn main() -> Result<()> {
         "network" => network::capture(&p, &b, &a[4]),
         "probes" => probes::capture(&p, &b, &a[4]),
         _ => bail!("unknown command"),
+    }
+}
+#[cfg(test)]
+mod journal_tests {
+    use super::*;
+    #[test]
+    fn absent_proc_enrichment_is_network_only_and_never_hides_conflicts() {
+        let argv = vec!["/sealed/helper".into(), "network-run".into()];
+        let missing = json!({"_PID":"1352200","_UID":"1000","_GID":"1000"});
+        assert!(journal_image(
+            &missing,
+            &argv,
+            JournalEvidence::BoundNetworkNative
+        ));
+        assert!(!journal_image(&missing, &argv, JournalEvidence::StrictNode));
+        for bad in [
+            json!({"_EXE":"/wrong"}),
+            json!({"_CMDLINE":"wrong"}),
+            json!({"_EXE":null,"_CMDLINE":null}),
+        ] {
+            assert!(!journal_image(
+                &bad,
+                &argv,
+                JournalEvidence::BoundNetworkNative
+            ));
+        }
+        let exact = json!({"_EXE":"/sealed/helper","_CMDLINE":"/sealed/helper network-run"});
+        assert!(journal_image(&exact, &argv, JournalEvidence::StrictNode));
     }
 }
