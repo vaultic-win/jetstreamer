@@ -116,9 +116,17 @@ fn auxiliary_overhead(
             );
             Ok(0)
         }
-        Some("horizon-native211-retained-reservations-v2") => {
+        Some(
+            "horizon-native211-retained-reservations-v2"
+            | "horizon-native211-retained-reservations-v3",
+        ) => {
             ensure!(
-                previous["schema"] == "horizon-native211-prior-host-booking-v2"
+                previous["schema"]
+                    == if ledger["schema"] == "horizon-native211-retained-reservations-v3" {
+                        "horizon-native211-prior-host-booking-v3"
+                    } else {
+                        "horizon-native211-prior-host-booking-v2"
+                    }
                     && previous["auxiliary_overhead"] == ledger["auxiliary_overhead"],
                 "previous auxiliary booking changed or omitted"
             );
@@ -150,7 +158,9 @@ fn auxiliary_overhead(
         _ => bail!("unknown retained booking schema"),
     }
 }
-pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>, u64)> {
+pub(super) fn reservations(
+    review: &Value,
+) -> Result<(Vec<capacity::Reservation>, u64, Vec<periodic::Control>)> {
     let ledger = binding(&review["reservation_ledger"])?.sealed()?;
     ensure!(
         matches!(
@@ -158,6 +168,7 @@ pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>
             Some(
                 "horizon-native211-retained-reservations-v1"
                     | "horizon-native211-retained-reservations-v2"
+                    | "horizon-native211-retained-reservations-v3"
             )
         ) && ledger["Main_accepted"] == true
             && ledger["all_active_and_dormant_obligations_preserved"] == true
@@ -190,6 +201,7 @@ pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>
             Some(
                 "horizon-native211-prior-host-booking-v1"
                     | "horizon-native211-prior-host-booking-v2"
+                    | "horizon-native211-prior-host-booking-v3"
             )
         ) && previous["Main_accepted"] == true
             && previous["complete_host_booking"] == true,
@@ -214,7 +226,8 @@ pub(super) fn reservations(review: &Value) -> Result<(Vec<capacity::Reservation>
             "historical booking lowered without separate qualified transition"
         );
     }
-    Ok((rows, overhead))
+    let periodic = periodic::booking(&ledger, &previous, &rows)?;
+    Ok((rows, overhead, periodic))
 }
 pub(super) fn validate(
     n: &mut Native,
@@ -279,25 +292,29 @@ pub(super) fn validate(
     );
     fresh(num(&fleet, "recorded_unix_seconds")?, now()?, 300)?;
     ensure!(
-        fleet["pipelines"] == json!([])
-            && fleet["diagnostics"] == json!([])
-            && fleet["auxiliary_diagnostics"] == json!([]),
-        "unimplemented non-replay lifecycle owner; fail closed"
-    );
-    ensure!(
         observer["cadence"]["routine_minimum_interval_enforced"] == true
             && num(&observer["cadence"], "observed_interval_seconds")? >= 1800,
         "complete cadence observation required"
     );
-    let (rows, overhead) = reservations(review)?;
-    let currents = live::census(n, review, &fleet, &rows, candidate)?;
+    let (rows, overhead, periodic) = reservations(review)?;
+    finalization::validate(&fleet, &observer, &rows, &boot)?;
+    finalization::verify_inputs(&fleet)?;
+    let currents = live::census(n, review, &fleet, &rows, &periodic, candidate)?;
     let (total, available, disk) = live::resources()?;
     let obs_total = num(&observer["host_memory"], "total_kib")?
         .checked_mul(1024)
         .context("memory overflow")?;
     ensure!(total == obs_total, "host memory changed");
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
-    let cap = capacity::arithmetic(total, available, disk, century, &rows, &currents, overhead)?;
+    let cap = capacity::arithmetic(
+        total,
+        available,
+        disk,
+        century,
+        &rows,
+        &currents,
+        (overhead, periodic::total(&periodic)?),
+    )?;
     let mut admission = json!({"schema":"horizon-native211-current-fleet-admission-v1","epoch":211,"mode":"native-cold","unit":UNIT,
         "private_run_root":ROOT,"maximum_memory_bytes":MEMORY,"candidate_incremental_peak_bytes":SCRATCH,
         "protected_existing_floor_bytes":cap["protected_existing_floor_bytes"],"harness":Bound::new(HARNESS,HARNESS_SHA),

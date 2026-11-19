@@ -78,7 +78,7 @@ pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result
     ensure!(current <= cap, "kernel memory exceeds cap");
     Ok(current)
 }
-fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
+pub(super) fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
     ensure!(*budget > 0, "cgroup descendant bound");
     *budget -= 1;
     ensure!(
@@ -198,6 +198,7 @@ pub(super) fn census(
     review: &Value,
     fleet: &Value,
     rows: &[capacity::Reservation],
+    periodic: &[periodic::Control],
     candidate: bool,
 ) -> Result<BTreeMap<String, u64>> {
     let controls = review["control_units"]
@@ -215,6 +216,15 @@ pub(super) fn census(
         control_cap = capacity::add(control_cap, num(c, "maximum_memory_bytes")?)?;
     }
     ensure!(control_cap <= CONTROL, "controls exceed control reserve");
+    let periodic_names: BTreeSet<_> = periodic.iter().map(|c| c.unit.as_str()).collect();
+    ensure!(
+        periodic_names.len() == periodic.len()
+            && periodic_names.iter().all(|u| !control_names.contains(u)),
+        "duplicate periodic/ordinary control"
+    );
+    for c in periodic {
+        periodic::observe(n, c)?;
+    }
     let current_units = n.run(
         "/usr/bin/systemctl",
         &[
@@ -233,7 +243,8 @@ pub(super) fn census(
             r.unit.ends_with(".service")
                 && !r.unit.contains('/')
                 && r.unit != UNIT
-                && !control_names.contains(r.unit.as_str()),
+                && !control_names.contains(r.unit.as_str())
+                && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
         if r.release.is_some() {
@@ -263,6 +274,12 @@ pub(super) fn census(
         }
     }
     for a in fleet["active"].as_array().context("fleet active")? {
+        if a["phase"] == "producer-finalization" {
+            let unit = text(&a["unit"], "Id")?;
+            let v = before.get(unit).context("dropped finalization owner")?;
+            same_owner(&a["unit"], v)?;
+            continue;
+        }
         for role in ["producer", "controller"] {
             let unit = text(&a[role], "Id")?;
             let v = before.get(unit).context("dropped active fleet owner")?;
@@ -279,13 +296,17 @@ pub(super) fn census(
         if candidate && matches!(unit, UNIT | GUARD_UNIT) {
             continue;
         }
+        if periodic_names.contains(unit) {
+            continue;
+        }
         if control_names.contains(unit) {
             let c = controls.iter().find(|c| c["unit"] == unit).unwrap();
             let v = n.show(unit)?;
             ensure!(
                 scalar(&v, "MemoryMax")? == num(c, "maximum_memory_bytes")?
                     && v["MemorySwapMax"] == "0"
-                    && v["ExecStart"] == c["expected_exec_start"]
+                    && periodic::stable_command(text(&v, "ExecStart")?)?
+                        == periodic::stable_command(text(c, "expected_exec_start")?)?
                     && v["Restart"] == "no",
                 "control service changed"
             );
@@ -310,6 +331,7 @@ pub(super) fn census(
         if campaign(unit) {
             ensure!(
                 control_names.contains(unit)
+                    || periodic_names.contains(unit)
                     || (candidate && matches!(unit, UNIT | GUARD_UNIT | TIMER)),
                 "unadmitted campaign job {unit}"
             );
@@ -320,6 +342,7 @@ pub(super) fn census(
         .keys()
         .map(|u| cg(u))
         .chain(control_names.iter().map(|u| cg(u)))
+        .chain(periodic_names.iter().map(|u| cg(u)))
         .chain(candidate.then(|| cg(UNIT)))
         .chain(candidate.then(|| cg(GUARD_UNIT)))
         .collect();
@@ -374,6 +397,10 @@ pub(super) fn census(
         let current = finite_owner(&after, &unit, text(&old, "InvocationID")?, cap)?;
         currents.entry(unit).and_modify(|v| *v = (*v).min(current));
     }
+    for c in periodic {
+        periodic::observe(n, c)?;
+    }
+    finalization::verify_inputs(fleet)?;
     Ok(currents)
 }
 pub(super) fn resources() -> Result<(u64, u64, u64)> {

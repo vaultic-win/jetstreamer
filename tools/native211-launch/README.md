@@ -195,3 +195,64 @@ envelope. Tests cover hard-budget failure, drain credit, retained disk/floors,
 overflow/duplicate owners, direct internal-gate templates, template injection,
 and genuine first-guard sample/PID1 ordering. Running tests does not substitute
 for the exact runtime sandbox and first-fire qualification.
+
+## Original periodic guard accounting
+
+Foundation's four original recurring guards (248–251) each retain their full
+1,073,741,824-byte cap between timer firings. They must use matching
+`horizon-native211-retained-reservations-v3` and
+`horizon-native211-prior-host-booking-v3` documents. Both retain the v2 fixed
+`auxiliary_overhead` unchanged and include the identical `periodic_controls`
+object:
+
+```json
+{
+  "schema": "horizon-native211-original-periodic-controls-v1",
+  "controls": [
+    {
+      "unit": "horizon-248-reboot-20261117-protective-v1.service",
+      "timer": "horizon-248-reboot-20261117-protective-v1.timer",
+      "maximum_memory_bytes": 1073741824,
+      "service_source": {"path": "/var/lib/jetstreamer/horizon248-reboot-20261117-guard-v1/guard.service", "sha256": "c7cd20e232e84f8058de9101444a574e12a033d3a530e039a20274259fac9fe6"},
+      "timer_source": {"path": "/var/lib/jetstreamer/horizon248-reboot-20261117-guard-v1/guard.timer", "sha256": "90b637b95289135efe99f0ee6d757e104c9badbb4982e320b5e7a7521b141024"},
+      "guard_plan": {"path": "/var/lib/jetstreamer/horizon248-reboot-20261117-guard-v1/guard-plan.json", "sha256": "7f2209ef5e614df2b7d12b01070051c836e3c41d9040aca2db00e98fba9f16e3"},
+      "executable": {"path": "/var/lib/jetstreamer/horizon-native223-prefix-guard-044ccba7-v1/jetstreamer-horizon-standalone-guard", "sha256": "044ccba70304c6d5690d2628c1ca08586462efdcc2d9f278903ee8bab0da6b3f"}
+    }
+  ]
+}
+```
+
+The excerpt shows one member; `periodic-controls.example.json` supplies the complete
+four-member object. Acceptance requires all four exact registered
+members from `periodic.rs::pins`, with original service/timer/plan/artifact
+bindings. No omitted, duplicated, reduced or substituted member is accepted.
+The guard plan must still bind a retained original producer/IID and its full
+inherited floor. These units cannot also appear in `control_units` or producer
+reservations. Legacy ledgers cannot omit this envelope when retaining one of
+these original producers, even when every guard happens to be inactive.
+
+The complete 4,294,967,296 bytes are added to both physical hard obligations and
+remaining hard growth. No RSS credit is taken for these periodic controls.
+The ordinary 1.5 GiB control reserve (including the new native211 guard), fixed
+auxiliary overhead, original producer caps/disk growth and floors are unchanged.
+
+Every admitted periodic guard is checked twice independently of the active
+service list. Checks bind original unit bytes, exact stable command and
+`ignore_errors=no`, zero restarts, finite manager/kernel caps, original timer
+and guard plan, mapped main image/process membership and dormant drainage.
+Only PID1's execution-history trailer is ignored during command comparison;
+changed argv, ignore-errors policy or additional commands fail. A dormant guard
+requires an active waiting timer with a bounded typed future deadline; a firing
+guard may be activating/start under its oneshot service. Any race changing the
+owner during its census fails closed. Future guard replacements require a
+separate qualified source transition.
+
+The admission path also recognizes the registered original 248–251 singleton
+`producer-finalization` rows. Each must retain the original IID/PID, command,
+node/manifest, complete before/after resource tuple, full 251,041,591,296-byte
+memory cap, original remaining disk obligation and inherited floor. The fleet
+pipeline/active rows must match exactly once, with the same authenticated EOF
+and sample in the observer diagnostic row. EOF provides phase information only;
+terminal, release, archive verification and publication claims remain false.
+These owners still pass the same live manager/kernel census twice. Other
+pipeline/diagnostic shapes remain unsupported and fail closed.
