@@ -104,6 +104,20 @@ fn terminal(value: &Value, invocation: &str) -> bool {
 }
 
 fn validate_terminal_owner(current: &Value, historical: &Value, invocation: &str) -> Result<()> {
+    if historical["Id"] == jetstreamer_horizon_observe::full265::UNIT {
+        let owner = jetstreamer_horizon_observe::full265::check_manager(current)?;
+        ensure!(
+            owner.iid == invocation
+                && historical["InvocationID"] == invocation
+                && historical["MainPID"] == "0"
+                && historical["NRestarts"] == "0"
+                && !jetstreamer_horizon_observe::full265::owner(
+                    &owner,
+                    &jetstreamer_horizon_observe::full265::manager()?
+                )?,
+            "265 status owner still live/replaced"
+        );
+    }
     ensure!(
         terminal(historical, invocation),
         "missing exact durable terminal owner evidence"

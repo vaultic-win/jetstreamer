@@ -27,6 +27,7 @@ use {
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
 mod cgroup_limits;
+mod full265_telemetry;
 mod host_pressure;
 mod native_input_diagnostic;
 mod prefix_output204205;
@@ -356,6 +357,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
     singleton247_finalization::validate(&config)?;
+    full265_telemetry::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     Ok((config, sha256(&bytes)))
@@ -1715,6 +1717,18 @@ fn observe_replay_for_role(
     progress_since_unix: u64,
     role: ReplayRole,
 ) -> Result<ReplayObservation> {
+    let exact265 = if replay.producer_unit == jetstreamer_horizon_observe::full265::UNIT {
+        let manager = jetstreamer_horizon_observe::full265::manager()?;
+        let owner = jetstreamer_horizon_observe::full265::check_manager(&manager)?;
+        ensure!(
+            owner.iid == replay.expected_producer_invocation_id
+                && jetstreamer_horizon_observe::full265::owner(&owner, &manager)?,
+            "265 ordinary replay owner differs"
+        );
+        Some(manager)
+    } else {
+        None
+    };
     let controller_before = observe_unit_for_role(
         &replay.controller_unit,
         &replay.expected_controller_invocation_id,
@@ -1795,6 +1809,11 @@ fn observe_replay_for_role(
     );
     let within_sample_physical_delta_bytes =
         i128::from(scratch_pass_2.physical_bytes) - i128::from(scratch_pass_1.physical_bytes);
+    if let Some(initial) = exact265 {
+        let latest = jetstreamer_horizon_observe::full265::manager()?;
+        jetstreamer_horizon_observe::full265::same_snapshot(&initial, &latest)?;
+        jetstreamer_horizon_observe::full265::check_manager(&latest)?;
+    }
     Ok(ReplayObservation {
         range: replay.range.clone(),
         output_file,
@@ -1879,6 +1898,7 @@ fn run(config: Config) -> Result<()> {
     validate_replay_configs(&config.replays, &config.diagnostic_replays)?;
     native_input_diagnostic::validate(&config)?;
     singleton247_finalization::validate(&config)?;
+    full265_telemetry::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     let (previous_bytes, previous_value, previous_timestamp, previous_unix) =

@@ -47,6 +47,7 @@ pub(super) enum Phase {
 enum Scope {
     Production,
     #[cfg(test)]
+    #[allow(dead_code)] // Native controls are opt-in.
     Isolated,
     #[cfg(test)]
     Fixture,
@@ -70,6 +71,7 @@ impl Bindings {
         }
     }
     #[cfg(test)]
+    #[allow(dead_code)] // Used by separately gated native/fixture controls.
     pub(super) fn isolated(
         session: &str,
         image: &str,
@@ -91,6 +93,7 @@ impl Bindings {
         })
     }
     #[cfg(test)]
+    #[allow(dead_code)] // Used by separately gated native/fixture controls.
     fn fixture(session: &str, image: &str, policy: &str, acquisition: &str) -> Result<Self> {
         let mut b = Self::isolated(session, image, policy, acquisition)?;
         b.scope = Scope::Fixture;
@@ -153,28 +156,28 @@ impl Bindings {
     }
     fn encode(&self, mut value: Value) -> Value {
         #[cfg(test)]
-        if self.scope != Scope::Production {
-            if let Some(map) = value.as_object_mut() {
-                for key in [
-                    "plan_sha256",
-                    "consumer_review_sha256",
-                    "qualification_sha256",
-                    "historical_receipt",
-                    "historical_receipt_unchanged",
-                    "original_historical_receipt_preserved",
-                    "authenticated_generation_metadata",
-                    "authenticated_generation_metadata_sha256",
-                ] {
-                    if let Some(v) = map.remove(key) {
-                        map.insert(self.key(key), v);
-                    }
+        if self.scope != Scope::Production
+            && let Some(map) = value.as_object_mut()
+        {
+            for key in [
+                "plan_sha256",
+                "consumer_review_sha256",
+                "qualification_sha256",
+                "historical_receipt",
+                "historical_receipt_unchanged",
+                "original_historical_receipt_preserved",
+                "authenticated_generation_metadata",
+                "authenticated_generation_metadata_sha256",
+            ] {
+                if let Some(v) = map.remove(key) {
+                    map.insert(self.key(key), v);
                 }
-                if let Some(schema) = map.get("schema").and_then(Value::as_str) {
-                    if !schema.starts_with(&self.schema("jetstreamer-snapshot92447542-")) {
-                        let schema = self.schema(schema);
-                        map.insert("schema".into(), json!(schema));
-                    }
-                }
+            }
+            if let Some(schema) = map.get("schema").and_then(Value::as_str)
+                && !schema.starts_with(&self.schema("jetstreamer-snapshot92447542-"))
+            {
+                let schema = self.schema(schema);
+                map.insert("schema".into(), json!(schema));
             }
         }
         value
@@ -197,6 +200,7 @@ impl ObjectSpec {
         }
     }
     #[cfg(test)]
+    #[allow(dead_code)] // Used by separately gated native/fixture controls.
     pub(super) fn fixture(bytes: &[u8]) -> Result<Self> {
         let d = digest_reader(bytes, bytes.len() as u64, || Ok(()))?;
         Ok(Self {
@@ -206,6 +210,7 @@ impl ObjectSpec {
             fixed: false,
         })
     }
+    #[allow(dead_code)] // Used by separately gated native/fixture controls.
     pub(super) fn is_fixed_generation(&self) -> bool {
         self.fixed
     }
@@ -226,7 +231,7 @@ impl ObjectSpec {
                     && wanted.is_none_or(|s| s == d.sha256),
                 "isolated fixture integrity mismatch"
             );
-            return Ok(());
+            Ok(())
         }
         #[cfg(not(test))]
         bail!("non-generation production object refused")
@@ -272,12 +277,12 @@ pub(super) trait Environment {
 fn encoded<E: Environment>(e: &E, value: &Value) -> Value {
     let mut value = e.bindings().encode(value.clone());
     #[cfg(test)]
-    if !e.object().fixed {
-        if let Some(m) = value.as_object_mut() {
-            m.remove("uri");
-            m.remove("generation");
-            m.insert("fixture_object".into(), json!(true));
-        }
+    if !e.object().fixed
+        && let Some(m) = value.as_object_mut()
+    {
+        m.remove("uri");
+        m.remove("generation");
+        m.insert("fixture_object".into(), json!(true));
     }
     value
 }
@@ -519,7 +524,7 @@ pub(super) fn run_check<E: Environment>(e: &E) -> Result<()> {
         e.object().bytes()
     );
     let (identity, digests, physical) =
-        hash_object(e, cache, NAME, Some(&*e.source_identity()), None, || Ok(()))?;
+        hash_object(e, cache, NAME, Some(e.source_identity()), None, || Ok(()))?;
     let after = e.consumers()?;
     ensure!(
         before["consumers"] == after["consumers"],
@@ -575,7 +580,7 @@ pub(super) fn run_evict<E: Environment>(e: &E, check_sha: &str) -> Result<()> {
     let c = checked(e, state, check_sha, self_sha)?;
     ensure!(
         b.get(&c, "plan_sha256") == plan_sha
-            && c["source_identity"] == serde_json::to_value(&*e.source_identity())?
+            && c["source_identity"] == serde_json::to_value(e.source_identity())?
             && b.get(&c, "consumer_review_sha256") == b.consumer_sha256
             && b.get(&c, "qualification_sha256") == b.authority_sha256,
         "check/evidence/plan changed"
@@ -619,7 +624,7 @@ pub(super) fn run_evict<E: Environment>(e: &E, check_sha: &str) -> Result<()> {
             e,
             cache,
             NAME,
-            Some(&*e.source_identity()),
+            Some(e.source_identity()),
             Some(wanted),
             || Ok(()),
         )?;
@@ -636,7 +641,7 @@ pub(super) fn run_evict<E: Environment>(e: &E, check_sha: &str) -> Result<()> {
             e,
             cache,
             NAME,
-            Some(&*e.source_identity()),
+            Some(e.source_identity()),
             Some(wanted),
             || Ok(()),
         )?;
@@ -648,7 +653,7 @@ pub(super) fn run_evict<E: Environment>(e: &E, check_sha: &str) -> Result<()> {
         ensure!(cache.absent(NAME)?, "source reappeared after quarantine");
         let (i, d, physical) = hash_object(e, state, &q, None, Some(wanted), || Ok(()))?;
         ensure!(
-            i.renamed_from(&*e.source_identity()),
+            i.renamed_from(e.source_identity()),
             "substituted quarantine preserved; original identity differs"
         );
         let proof = encoded(

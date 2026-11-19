@@ -3,6 +3,9 @@
 #[allow(dead_code)]
 #[path = "../jetstreamer-node/src/cohort_publication.rs"]
 mod cohort;
+#[allow(dead_code)]
+#[path = "../jetstreamer-horizon-observe/src/full265.rs"]
+mod full265;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -133,7 +136,7 @@ fn validate_manifest(p: &Plan, manifest: &Value) -> Result<()> {
 fn validate_plan(p: &Plan) -> Result<Value> {
     ensure!(
         p.schema == "horizon-singleton-delivery-handoff-plan-v1"
-            && (247..=251).contains(&p.epoch)
+            && ((247..=251).contains(&p.epoch) || p.epoch == 265)
             && p.source_uid == 1000
             && p.source_gid == 1000
             && hex(&p.producer_invocation_id, 32)
@@ -156,6 +159,17 @@ fn validate_plan(p: &Plan) -> Result<Value> {
             && !p.receipt_directory.starts_with(&p.output_directory),
         "invalid handoff plan scope"
     );
+    if p.epoch == 265 {
+        full265::validate_delivery(
+            p.epoch,
+            &p.producer_unit,
+            &p.producer_invocation_id,
+            &p.expected_exec_prefix,
+            &p.output_directory,
+            &json!({"path":p.manifest.path,"sha256":p.manifest.sha256}),
+            &json!({"path":p.startup_handoff.path,"sha256":p.startup_handoff.sha256}),
+        )?;
+    }
     let startup = json_bound(&p.startup_handoff)?;
     ensure!(
         startup["producer"]["Id"] == p.producer_unit
@@ -211,7 +225,8 @@ fn terminal_values(p: &Plan, u: &BTreeMap<String, String>, rows: &[Value]) -> Re
             && val("Result") == "success"
             && val("ExecMainCode") == "1"
             && val("ExecMainStatus") == "0"
-            && (val("InvocationID") == p.producer_invocation_id || val("InvocationID").is_empty())
+            && (val("InvocationID") == p.producer_invocation_id
+                || (p.epoch != 265 && val("InvocationID").is_empty()))
             && val("ExecStart")
                 .split_once(" ; ignore_errors=")
                 .is_some_and(|(a, _)| a == p.expected_exec_prefix),
@@ -720,6 +735,42 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full265_terminal_delivery_keeps_original_identity_and_requires_clean_pid1_pair() {
+        let (mut p, mut u, mut rows) = fixture();
+        p.epoch = 265;
+        p.producer_unit = full265::UNIT.into();
+        p.expected_exec_prefix = full265::prefix();
+        u.insert("Id".into(), p.producer_unit.clone());
+        u.insert(
+            "ExecStart".into(),
+            format!(
+                "{} ; ignore_errors=no ; status=0/0 }}",
+                p.expected_exec_prefix
+            ),
+        );
+        rows[0]["UNIT"] = json!(p.producer_unit);
+        rows[0]["MESSAGE"] = json!(format!("Started {} - full265.", p.producer_unit));
+        rows[1]["UNIT"] = json!(p.producer_unit);
+        rows[1]["MESSAGE"] = json!(format!("{}: Deactivated successfully.", p.producer_unit));
+        terminal_values(&p, &u, &rows).unwrap();
+        for (key, value) in [
+            ("InvocationID", ""),
+            ("InvocationID", "replaced"),
+            ("MainPID", "42"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+        ] {
+            let mut bad = u.clone();
+            bad.insert(key.into(), value.into());
+            assert!(terminal_values(&p, &bad, &rows).is_err(), "{key}");
+        }
+        assert!(terminal_values(&p, &u, &rows[..1]).is_err());
+        let mut manifest = json!({"manifest_fingerprint":format!("sha256:{}","a".repeat(64)),"manifest":{"first_epoch":265,"last_epoch":265,"publication_boundary_epoch":265,"epoch_slots":432000,"epochs":[{"epoch":265}]}});
+        validate_manifest(&p, &manifest).unwrap();
+        manifest["manifest"]["epochs"][0]["epoch"] = json!(264);
+        assert!(validate_manifest(&p, &manifest).is_err());
+    }
     #[test]
     fn drain_rejects_control_work_restart_delegation_and_triggers() {
         let group = "/system.slice/example.service";

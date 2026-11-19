@@ -14,6 +14,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[allow(dead_code)]
+#[path = "../jetstreamer-horizon-observe/src/full265.rs"]
+mod full265;
 #[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
 mod singleton247_phase;
 
@@ -438,8 +441,27 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
     let mut seen = std::collections::BTreeSet::new();
     for (row, h) in rows.iter().zip(handoffs) {
         let epoch = h["epoch"].as_u64().context("missing epoch")?;
+        if epoch == 265 {
+            full265::validate_delivery(
+                epoch,
+                string(h, "producer_unit")?,
+                string(h, "producer_invocation_id")?,
+                string(h, "expected_exec_prefix")?,
+                Path::new(string(h, "output_directory")?),
+                &h["manifest"],
+                &h["startup_handoff"],
+            )?;
+            full265::telemetry_tuple(
+                string(row, "range")?,
+                string(row, "producer_unit")?,
+                string(row, "controller_unit")?,
+                string(row, "expected_producer_invocation_id")?,
+                string(row, "expected_controller_invocation_id")?,
+                Path::new(string(row, "scratch_path")?),
+            )?;
+        }
         ensure!(
-            (247..=251).contains(&epoch)
+            ((247..=251).contains(&epoch) || epoch == 265)
                 && seen.insert(epoch)
                 && h["schema"] == "horizon-singleton-delivery-handoff-plan-v1"
                 && row["range"] == format!("{epoch}-{epoch}")
@@ -534,9 +556,13 @@ fn run(args: &[String]) -> Result<()> {
         census.push(unit.clone());
         match classify(row, handoff, &unit)? {
             State::Live => {
-                let profile = singleton247_phase::profile(handoff["epoch"].as_u64().context("missing epoch")?)?;
-                if let Some(proof) = singleton247_phase::capture(profile, &unit, now)?
-                {
+                let epoch = handoff["epoch"].as_u64().context("missing epoch")?;
+                let phase = if epoch == 265 {
+                    full265::capture_phase(&unit, now)?
+                } else {
+                    singleton247_phase::capture(singleton247_phase::profile(epoch)?, &unit, now)?
+                };
+                if let Some(proof) = phase {
                     finalization.push(json!({"configuration":row,"unit":unit,"phase_evidence":proof,"reservations_retained":true,"resource_release_authorized":false}));
                     continue;
                 }

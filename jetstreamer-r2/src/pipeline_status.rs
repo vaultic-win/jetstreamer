@@ -417,9 +417,12 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 (s.starts_with("Starting ")
                     && !(unit == super::singleton247_finalization::UNIT
                         && invocation == super::singleton247_finalization::IID)
-                    && !super::original_singleton_finalization::original_owner(unit, invocation))
-                    || (((unit == super::cohort_finalization::CONTROLLER
-                        && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
+                    && !super::original_singleton_finalization::original_owner(unit, invocation)
+                    && unit != jetstreamer_horizon_observe::full265::UNIT)
+                    || (((unit == jetstreamer_horizon_observe::full265::UNIT
+                        && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (unit == super::cohort_finalization::CONTROLLER
+                            && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
                         || (unit == super::cohort198_handoff::CONTROLLER
                             && invocation == super::cohort198_handoff::CONTROLLER_INVOCATION
                             && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
@@ -962,6 +965,19 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full265_uses_actual_started_clock_after_first_guard_wait() {
+        let unit = jetstreamer_horizon_observe::full265::UNIT;
+        let iid = "a".repeat(32);
+        let start = json!({"UNIT":unit,"INVOCATION_ID":iid,"_PID":"1","_UID":"0","MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":format!("Started {unit} - full replay."),"__REALTIME_TIMESTAMP":"2000000"});
+        let wait = json!({"UNIT":unit,"INVOCATION_ID":iid,"_PID":"1","_UID":"0","MESSAGE_ID":"7d4958e842da4a758f6c1cdc7b36dcc5","MESSAGE":format!("Starting {unit} - full replay..."),"__REALTIME_TIMESTAMP":"1000000"});
+        assert_eq!(
+            start_millis(&[wait.clone(), start.clone()], unit, &iid).unwrap(),
+            2000
+        );
+        assert!(start_millis(&[wait], unit, &iid).is_err());
+        assert!(start_millis(&[start.clone(), start], unit, &iid).is_err());
+    }
     #[test]
     fn exact141_repair_uses_only_its_actual_pid1_started_clock() {
         let unit = super::super::repair141::UNIT;

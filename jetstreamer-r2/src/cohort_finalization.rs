@@ -24,6 +24,9 @@ const BATCH_SHA: &str = "84edb7b4c90f8a78d218d3992b28831ea8279b51f1cfe3af9acbaea
 const COMMIT: &str = "root-checkpoint cohort 216-219 published 4 archive(s) with checksums in transaction 2958b2841e8e4c0307c2478e81ffe63254355da59ed0e782d09b48eb4d744d54; receipt ";
 
 pub(super) fn scope(unit: &str) -> Result<std::ops::RangeInclusive<u64>> {
+    if unit == jetstreamer_horizon_observe::full265::UNIT {
+        return Ok(265..=265);
+    }
     if let Some(epoch) = super::original_singleton_finalization::scope(unit) {
         return Ok(epoch..=epoch);
     }
@@ -242,6 +245,10 @@ fn terminal_events(records: &[Value], sampled_seconds: u64) -> Result<Value> {
 }
 
 pub(super) fn observe(current: &Value, sampled_seconds: u64) -> Result<Value> {
+    if current["Id"] == jetstreamer_horizon_observe::full265::UNIT {
+        return jetstreamer_horizon_observe::full265::capture_phase(current, sampled_seconds)?
+            .context("265 terminal slot/EOF absent");
+    }
     if current["Id"]
         .as_str()
         .and_then(super::original_singleton_finalization::scope)

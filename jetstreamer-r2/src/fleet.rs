@@ -2967,6 +2967,13 @@ pub(super) async fn run() -> Result<()> {
         );
     }
     let before = census(&names, plan.first_epoch, plan.last_epoch)?;
+    if let Some(current) = before.get(jetstreamer_horizon_observe::full265::UNIT)
+        && current["LoadState"] == "loaded"
+        && (current["InvocationID"].as_str().is_some_and(|s| !s.is_empty())
+            || current["ActiveState"] == "active")
+    {
+        jetstreamer_horizon_observe::full265::check_manager(current)?;
+    }
     if before
         .get(native211::UNIT)
         .is_some_and(diagnostic_stage_running)
@@ -3769,6 +3776,13 @@ pub(super) async fn run() -> Result<()> {
         auxiliary_diagnostics.push(entry);
     }
     let after = census(&names, plan.first_epoch, plan.last_epoch)?;
+    if let Some(current) = after.get(jetstreamer_horizon_observe::full265::UNIT)
+        && current["LoadState"] == "loaded"
+        && (current["InvocationID"].as_str().is_some_and(|s| !s.is_empty())
+            || current["ActiveState"] == "active")
+    {
+        jetstreamer_horizon_observe::full265::check_manager(current)?;
+    }
     ensure!(
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() - sample_seconds <= 1800,
         "observer became stale during fleet reconciliation"

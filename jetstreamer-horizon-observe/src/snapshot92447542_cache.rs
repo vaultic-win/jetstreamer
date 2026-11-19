@@ -38,7 +38,6 @@ use {
     },
 };
 
-const SLOT: u64 = 92_447_542;
 const NAME: &str = "snapshot-92447542-4gX8J8Y3c36L6W4D38ax2RYShfKmYxHWuDHAkQKeNzqd.tar.zst";
 const CACHE_ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-later-snapshots";
 const STATE: &str = "/home/ubuntu/.jetstreamer-private/cache-retirements";
@@ -541,6 +540,7 @@ fn digest_at(
         m.blocks().checked_mul(512).context("blocks overflow")?,
     ))
 }
+#[cfg(all(test, feature = "snapshot92447542-native-sdk-tests"))]
 fn hash_at(
     dir: &Directory,
     name: &str,

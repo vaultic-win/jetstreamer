@@ -25,13 +25,31 @@ pub(super) fn epochs(config: &Config) -> Result<Vec<u64>> {
     }
     let mut seen = std::collections::BTreeSet::new();
     for &epoch in &epochs {
-        singleton247_phase::profile(epoch)?;
+        if epoch != 265 {
+            singleton247_phase::profile(epoch)?;
+        }
         ensure!(seen.insert(epoch), "duplicate singleton finalization owner");
     }
     Ok(epochs)
 }
 pub(super) fn validate(config: &Config) -> Result<()> {
     for epoch in epochs(config)? {
+        if epoch == 265 {
+            ensure!(
+                config.epoch203_ram_auxiliary.is_none(),
+                "265 finalization auxiliary overlap"
+            );
+            for r in config.replays.iter().chain(&config.diagnostic_replays) {
+                let (first, last) = r.range.split_once('-').unwrap_or((&r.range, &r.range));
+                ensure!(
+                    !(first.parse::<u64>()?..=last.parse::<u64>()?).contains(&265)
+                        && r.producer_unit != jetstreamer_horizon_observe::full265::UNIT
+                        && r.controller_unit != jetstreamer_horizon_observe::full265::UNIT,
+                    "265 finalization replay overlap"
+                );
+            }
+            continue;
+        }
         let p = singleton247_phase::profile(epoch)?;
         ensure!(
             config.epoch203_ram_auxiliary.is_none(),
@@ -114,6 +132,9 @@ fn row(p: singleton247_phase::Profile, result: Result<Value>) -> Value {
         "ordinary_replay_claim":false,"entry_replay":false,"terminal_completion_proven":false,"resource_release_authorized":false,"publication_authorized":false,"r2_mutations":false})
 }
 pub(super) fn sample(epoch: u64, sample: u64) -> Result<Value> {
+    if epoch == 265 {
+        return full265_telemetry::sample(sample);
+    }
     let p = singleton247_phase::profile(epoch)?;
     Ok(row(p, observe(p, sample)))
 }

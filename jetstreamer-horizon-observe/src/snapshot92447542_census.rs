@@ -178,7 +178,8 @@ fn capture(roots: &[&Path], destination: &Path) -> Result<Value> {
                 );
                 queue.extend(children.into_iter().map(|p| (p, depth + 1)));
             }
-        } else if !files.contains_key(&canonical) {
+        } else if let std::collections::btree_map::Entry::Vacant(e) = files.entry(canonical.clone())
+        {
             let (bytes, id) = read_input(&canonical)?;
             total = total
                 .checked_add(bytes.len() as u64)
@@ -198,8 +199,7 @@ fn capture(roots: &[&Path], destination: &Path) -> Result<Value> {
             } else {
                 ensure!(read_input(&saved)?.0 == bytes, "capture digest collision");
             }
-            files.insert(
-                canonical,
+            e.insert(
                 json!({"sha256":sha,"bytes":bytes.len(),"identity":id,"captured_source":saved}),
             );
         }
@@ -328,7 +328,7 @@ pub(crate) fn native_owner(
         "invalid owner binding"
     );
     let p = evidence::properties(
-        &unit,
+        unit,
         "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,ControlGroup,ExecStart,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,TasksMax,RuntimeMaxUSec,NoNewPrivileges,ProtectSystem,ProtectHome,ReadWritePaths",
     )?;
     for (k, v) in [
