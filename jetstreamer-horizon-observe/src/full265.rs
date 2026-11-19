@@ -24,8 +24,8 @@ pub const FINGERPRINT: &str =
 pub const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst";
 pub const HANDOFF: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v1/launch-v1/guarded-startup-handoff.json";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon-full265-controller-e8ce7e9a-20261119-v1/horizon265-launch";
-const LAUNCHER_SHA: &str = "185b4f0c3d5bb8716516fd1c34f2a131bd671b5dd94b34f0dcdc6f86691c8be4";
+    "/var/lib/jetstreamer/horizon-full265-fast-controller-20261119-v1/horizon265-launch";
+const LAUNCHER_SHA: &str = "95e3034b85440e737434be10d9cc273339f98950ed4e14ad90abb19a13f10632";
 const GUARD_SHA: &str = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d";
 const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v1.service";
 const NATIVE: &str =
