@@ -1,9 +1,9 @@
 //! Bind the second real peer; absent or forecast identities never qualify.
 use super::*;
-const UNIT167: &str = "horizon-qualify-167-replacement-local3retry6-20261110-v1.service";
-const GUARD167: &str = "horizon-guard-replacement-167-local3retry6-20261110-v1";
-pub(super) const ADMISSION: &str = "/var/lib/jetstreamer/retry6-single167-guarded-launch-20261118-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json";
-pub(super) const PROTECTION: &str = "/var/lib/jetstreamer/retry6-single167-guarded-launch-20261118-v1/epoch167/ACTUAL_GUARD_PROTECTION.json";
+const UNIT167: &str = "horizon-qualify-167-replacement-local3retry7-20261110-v1.service";
+const GUARD167: &str = "horizon-guard-replacement-167-local3retry7-20261110-v1";
+pub(super) const ADMISSION: &str = "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json";
+pub(super) const PROTECTION: &str = "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_GUARD_PROTECTION.json";
 
 fn shape(
     a: &Value,
@@ -151,6 +151,10 @@ mod tests {
         let r = json!({"InvocationID":iid,"MainPID":"123","MainStartTicks":456});
         let t = json!({"Id":format!("{GUARD167}.timer"),"ActiveState":"active","Job":"","InvocationID":"c".repeat(32)});
         shape(&a, &g, &n, &r, &t, 456, &sha).unwrap();
+        let mut old = a.clone();
+        old["producer_unit"] =
+            json!("horizon-qualify-167-replacement-local3retry6-20261110-v1.service");
+        assert!(shape(&old, &g, &n, &r, &t, 456, &sha).is_err());
         assert!(shape(&Value::Null, &g, &n, &r, &t, 456, &sha).is_err());
         assert!(shape(&a, &g, &n, &r, &t, 457, &sha).is_err());
         let mut bad = a.clone();
