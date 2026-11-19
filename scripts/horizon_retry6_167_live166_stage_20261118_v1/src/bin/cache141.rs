@@ -166,7 +166,8 @@ fn deploy(image_sha: &str) -> Result<()> {
         ("clippy", ""),
         ("build", ""),
     ] {
-        let u = format!("horizon-holding141-incremental-{phase}-20261119-v4.service");
+        let version = if phase == "tests" { "v4-retry2" } else { "v4" };
+        let u = format!("horizon-holding141-incremental-{phase}-20261119-{version}.service");
         let n = native(&u)?;
         let s = std::str::from_utf8(&n)?;
         for (k, v) in [

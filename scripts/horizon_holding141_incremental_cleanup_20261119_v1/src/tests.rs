@@ -321,7 +321,10 @@ fn conservative_selection_keeps_member_rejections() {
     std::os::unix::fs::symlink(d.path().join("outside.o"), &p).unwrap();
     assert!(incremental::select_single_link_files(&r, uid).is_err());
     fs::remove_file(&p).unwrap();
-    let _socket = std::os::unix::net::UnixListener::bind(&p).unwrap();
+    // A FIFO exercises the same special-entry rejection without Unix-domain
+    // socket path-length limits in the admitted long DATA test directory.
+    let name = std::ffi::CString::new(p.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
     assert!(incremental::select_single_link_files(&r, uid).is_err());
 }
 
