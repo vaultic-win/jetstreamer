@@ -15,6 +15,19 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+// Ordinary controller/native report JSONs share the existing reader limit.
+// Cargo metadata is a subprocess log and has its separate 32 MiB bound.
+pub const MAX_JSON_BYTES: u64 = 16 * 1024 * 1024;
+pub const MAX_SOURCE_METADATA_LOG_BYTES: u64 = 32 * 1024 * 1024;
+
+pub fn operation_metadata_growth(max_log_bytes: u64) -> Result<u64> {
+    // One bounded subprocess log, one native report, and one atomic controller
+    // JSON publication. Existing records are already reflected in free bytes.
+    max_log_bytes
+        .checked_add(2 * MAX_JSON_BYTES)
+        .context("operation metadata reservation overflow")
+}
+
 pub fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -113,16 +126,21 @@ pub fn validate_absolute(path: &Path) -> Result<()> {
 pub fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T> {
     let file = open_read(path)?;
     ensure!(
-        file.metadata()?.len() <= 16 * 1024 * 1024,
+        file.metadata()?.len() <= MAX_JSON_BYTES,
         "JSON exceeds bound"
     );
     Ok(serde_json::from_reader(file)?)
 }
 pub fn write_json(path: &Path, value: &impl Serialize, replace: bool) -> Result<()> {
+    let mut bytes = serde_json::to_vec_pretty(value)?;
+    bytes.push(b'\n');
+    ensure!(
+        bytes.len() as u64 <= MAX_JSON_BYTES,
+        "JSON exceeds publication bound"
+    );
     let temp = path.with_extension(format!("tmp-{}", nonce()));
     let mut file = create(&temp)?;
-    serde_json::to_writer_pretty(&mut file, value)?;
-    file.write_all(b"\n")?;
+    file.write_all(&bytes)?;
     file.sync_all()?;
     if replace {
         fs::rename(&temp, path)?;
@@ -171,10 +189,12 @@ pub fn free_bytes(path: &Path) -> Result<u64> {
         .context("free byte overflow")
 }
 pub fn require_space(path: &Path, floor: u64, additional: u64) -> Result<()> {
+    require_available(free_bytes(path)?, floor, additional)
+}
+pub fn require_available(free: u64, floor: u64, additional: u64) -> Result<()> {
     let needed = floor
         .checked_add(additional)
         .context("space calculation overflow")?;
-    let free = free_bytes(path)?;
     ensure!(
         free >= needed,
         "disk reserve blocks audit: free={free}, required={needed}"
@@ -464,11 +484,7 @@ pub fn run_logged(
 ) -> Result<bool> {
     let state = &cfg.state_directory;
     // Establish both filesystem floors before the child can do useful work.
-    cfg.require_runtime_space(0)?;
-    ensure!(
-        working_bytes(state)? <= cfg.build_reserve_bytes,
-        "audit source/build/log allocation exceeds budget"
-    );
+    cfg.require_operation_capacity(max_log)?;
     let file = create(log)?;
     command.stdout(file.try_clone()?).stderr(file.try_clone()?);
     use std::os::unix::process::CommandExt;
@@ -567,8 +583,19 @@ mod tests {
         let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
         cfg.state_directory = state.to_owned();
         cfg.reserve_bytes = 0;
-        cfg.build_reserve_bytes = 1024 * 1024;
+        cfg.max_log_bytes = 1024;
+        cfg.build_reserve_bytes = 128 * 1024 * 1024;
         cfg
+    }
+    #[test]
+    fn oversized_json_never_creates_or_replaces_evidence() {
+        let d = tempfile::tempdir().unwrap();
+        let path = d.path().join("receipt.json");
+        write_json(&path, &"retained", false).unwrap();
+        let oversized = "x".repeat(MAX_JSON_BYTES as usize);
+        assert!(write_json(&path, &oversized, true).is_err());
+        assert_eq!(read_json::<String>(&path).unwrap(), "retained");
+        assert_eq!(fs::read_dir(d.path()).unwrap().count(), 1);
     }
     #[test]
     fn allocation_walk_tolerates_cargo_removal_after_enumeration() {

@@ -318,12 +318,18 @@ fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, Strin
     ]);
     let metadata_path = attempt.join(format!("cargo-metadata-{}.json", nonce()));
     ensure!(
-        run_logged(command, &metadata_path, 600, 32 * 1024 * 1024, cfg)?,
+        run_logged(
+            command,
+            &metadata_path,
+            600,
+            MAX_SOURCE_METADATA_LOG_BYTES,
+            cfg
+        )?,
         "Cargo metadata failed; inspect bounded metadata log"
     );
     let file = open_read(&metadata_path)?;
     ensure!(
-        file.metadata()?.len() <= 32 * 1024 * 1024,
+        file.metadata()?.len() <= MAX_SOURCE_METADATA_LOG_BYTES,
         "Cargo metadata exceeds bound"
     );
     let metadata: Value = serde_json::from_reader(file)?;
@@ -425,22 +431,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
             return Ok(reader);
         }
     }
-    require_space(
-        &cfg.state_directory,
-        cfg.reserve_bytes,
-        remaining_working_budget(&cfg.state_directory, cfg.build_reserve_bytes)?,
-    )?;
-    let mut command = cargo(cfg, &source)?;
-    command.args([
-        "build",
-        "--release",
-        "--locked",
-        "--package",
-        "jetstreamer",
-        "--bin",
-        "horizon_pipeline",
-        "--no-default-features",
-    ]);
+    let command = required_reader_build(cfg, &source)?;
     ensure!(
         run_logged(
             command,
@@ -571,9 +562,43 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
     Ok(reader)
 }
 
+fn required_reader_build(cfg: &Config, source: &Path) -> Result<Command> {
+    // Called only after current source/feature/toolchain equivalence failed.
+    // A resident archive is already absent from statvfs's available space.
+    cfg.require_rebuild_capacity()?;
+    let mut command = cargo(cfg, source)?;
+    command.args([
+        "build",
+        "--release",
+        "--locked",
+        "--package",
+        "jetstreamer",
+        "--bin",
+        "horizon_pipeline",
+        "--no-default-features",
+    ]);
+    Ok(command)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn changed_reader_cannot_create_build_scratch_without_rebuild_capacity() {
+        let state = tempfile::tempdir().unwrap();
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.state_directory = state.path().to_owned();
+        cfg.reserve_bytes = 1;
+        cfg.max_archive_bytes = 1;
+        // Valid arithmetic but impossible on a real filesystem. This exercises
+        // the production rebuild entry point before cargo() creates build-tmp.
+        cfg.build_reserve_bytes = u64::MAX - 2;
+        cfg.validate().unwrap();
+        let error = required_reader_build(&cfg, state.path()).unwrap_err();
+        assert!(error.to_string().contains("disk reserve blocks audit"));
+        assert!(!state.path().join("build-tmp").exists());
+        assert!(!state.path().join("build").exists());
+    }
     #[test]
     fn native_build_temporary_files_stay_in_accounted_state() {
         let state = tempfile::tempdir().unwrap();

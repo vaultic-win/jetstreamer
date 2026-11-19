@@ -44,17 +44,26 @@ repair sweep uses another state directory and preserves the first sweep.
 ## Configuration and budgets
 
 `config.example.json` is an initial **root-filesystem** example, not permission to
-start work: preserve 32 GiB free, cap an individual archive at 20 GiB, and reserve
-16 GiB for the private source checkout/build/artifact/logs. Before each download,
-free space must cover `reserve_bytes + actual_object_bytes + remaining_work_budget`.
-The remaining working reservation subtracts the audit's already allocated
-source/build/log bytes from `build_reserve_bytes`, so resident audit files are
-charged once rather than twice.
+start work: preserve 32 GiB free, cap an individual archive at 20 GiB, and limit
+the private source checkout/build/artifact/logs to 16 GiB. The exact-epoch successor
+requires `reserve_bytes + actual_object_bytes + bounded_operation_metadata`
+before download. With the current 128 MiB log bound, operation metadata is
+160 MiB: one bounded log and two 16 MiB JSON publication slots. Existing files
+already reduce observed free space. `max_archive_bytes` is an acceptance ceiling,
+not a reservation for every epoch. An equivalent sealed reader is reused without
+reserving unused compiler capacity. Only a necessary reader rebuild requires
+the full remaining source/build budget, against actual free bytes that already
+exclude a resident archive. See [`EXACT_EPOCH_BUDGET_20261119.md`](EXACT_EPOCH_BUDGET_20261119.md)
+for the pending qualification and deployment handoff; the live v3 retains its
+old policy until that handoff.
 During transfer and child execution, the free-space floor remains enforced; source,
 build and logs are also measured against the working budget. Only one archive can
 exist in scratch. Logs are bounded individually. Build jobs and playback threads
 are fixed at two and four in the example; parent-approved systemd CPU/memory/task
 limits remain mandatory.
+Playback streams compressed buckets from that same `.jet` into memory; it does
+not extract a ledger, AccountsDb or another disk working copy. The verification
+plugin writes only its small structured report and process log.
 
 A deployment on `/home/sol` must instead preserve the current campaign's admitted
 growth reservation. The parent specified 7,493,617,796,914 bytes as the pending

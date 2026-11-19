@@ -146,15 +146,48 @@ impl Config {
         }
     }
 
-    fn require_download_capacity(&self, archive_bytes: u64) -> Result<()> {
-        ensure!(
-            archive_bytes <= self.max_archive_bytes,
-            "archive {archive_bytes} exceeds max_archive_bytes {}; operator must increase admitted config budget",
-            self.max_archive_bytes
-        );
+    fn playback_growth_bytes(&self) -> Result<u64> {
+        operation_metadata_growth(self.max_log_bytes.max(MAX_SOURCE_METADATA_LOG_BYTES))
+    }
+
+    fn require_operation_capacity(&self, max_log: u64) -> Result<()> {
+        let growth = operation_metadata_growth(max_log)?;
+        require_working_growth(
+            working_bytes(&self.state_directory)?,
+            self.build_reserve_bytes,
+            growth,
+        )?;
+        self.require_runtime_space(0)?;
+        require_space(&self.state_directory, self.reserve_bytes, growth)
+    }
+
+    fn require_download_write_capacity(&self, chunk_bytes: u64) -> Result<()> {
+        // Downloads have no compiler or playback child. Retain space only for
+        // the bounded controller/download records while writing this chunk.
+        let (state_growth, scratch_growth) = download_reservations(
+            chunk_bytes,
+            2 * MAX_JSON_BYTES,
+            self.external_scratch.is_some(),
+        )?;
+        if let Some(scratch) = &self.external_scratch {
+            validate_external_scratch(scratch, &self.state_directory)?;
+            require_space(&scratch.directory, scratch.reserve_bytes, scratch_growth)?;
+        }
+        require_space(&self.state_directory, self.reserve_bytes, state_growth)
+    }
+
+    fn require_rebuild_capacity(&self) -> Result<()> {
         let remaining = remaining_working_budget(&self.state_directory, self.build_reserve_bytes)?;
-        let (state_additional, scratch_additional) =
-            download_reservations(archive_bytes, remaining, self.external_scratch.is_some())?;
+        self.require_runtime_space(0)?;
+        // statvfs already excludes any resident archive. Do not add its size
+        // again or credit it back: a branch change must fit the real free space
+        // before rebuilding while that exact authenticated copy stays resident.
+        require_space(&self.state_directory, self.reserve_bytes, remaining)
+    }
+
+    fn require_download_capacity(&self, archive_bytes: u64) -> Result<()> {
+        let (state_additional, scratch_additional) = self
+            .download_capacity_requirements(archive_bytes, working_bytes(&self.state_directory)?)?;
         if let Some(scratch) = &self.external_scratch {
             validate_external_scratch(scratch, &self.state_directory)?;
             require_space(&self.state_directory, self.reserve_bytes, state_additional)?;
@@ -167,15 +200,40 @@ impl Config {
             require_space(&self.state_directory, self.reserve_bytes, state_additional)
         }
     }
+
+    fn download_capacity_requirements(
+        &self,
+        archive_bytes: u64,
+        working_allocated: u64,
+    ) -> Result<(u64, u64)> {
+        ensure!(
+            archive_bytes <= self.max_archive_bytes,
+            "archive {archive_bytes} exceeds max_archive_bytes {}; operator must increase admitted config budget",
+            self.max_archive_bytes
+        );
+        let growth = self.playback_growth_bytes()?;
+        require_working_growth(working_allocated, self.build_reserve_bytes, growth)?;
+        download_reservations(archive_bytes, growth, self.external_scratch.is_some())
+    }
 }
 
-fn download_reservations(archive: u64, remaining_work: u64, separate: bool) -> Result<(u64, u64)> {
+fn require_working_growth(used: u64, budget: u64, growth: u64) -> Result<()> {
+    ensure!(
+        used.checked_add(growth)
+            .context("working allocation overflow")?
+            <= budget,
+        "bounded audit metadata exceeds remaining source/build/log budget"
+    );
+    Ok(())
+}
+
+fn download_reservations(archive: u64, metadata_growth: u64, separate: bool) -> Result<(u64, u64)> {
     if separate {
-        Ok((remaining_work, archive))
+        Ok((metadata_growth, archive))
     } else {
         Ok((
             archive
-                .checked_add(remaining_work)
+                .checked_add(metadata_growth)
                 .context("capacity overflow")?,
             0,
         ))
@@ -335,6 +393,18 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
         match source::qualify(cfg, &attempt, sequence) {
             Ok(reader) => {
                 outcome.reader = Some(reader);
+                // Fetch/build may have consumed space since the earlier gate.
+                // Capacity remains an infrastructure wait, not an archive failure.
+                if let Err(error) = cfg.require_download_capacity(object.bytes) {
+                    wait(
+                        cfg,
+                        "waiting_for_capacity",
+                        object.epoch,
+                        &error.to_string(),
+                    )
+                    .await?;
+                    continue;
+                }
                 break;
             }
             Err(error) => {
@@ -576,18 +646,89 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn split_scratch_preserves_root_work_and_charges_archive_once() {
+    fn split_scratch_reserves_only_metadata_on_root_and_exact_archive_on_data() {
         let archive = 385_290_386_716;
-        let remaining_work = 9_000_000_000;
+        let metadata_growth = 160 * 1024 * 1024;
         assert_eq!(
-            download_reservations(archive, remaining_work, true).unwrap(),
-            (remaining_work, archive)
+            download_reservations(archive, metadata_growth, true).unwrap(),
+            (metadata_growth, archive)
         );
         assert_eq!(
-            download_reservations(archive, remaining_work, false).unwrap(),
-            (archive + remaining_work, 0)
+            download_reservations(archive, metadata_growth, false).unwrap(),
+            (archive + metadata_growth, 0)
         );
         assert!(download_reservations(u64::MAX, 1, false).is_err());
+    }
+    #[test]
+    fn observed_epoch73_fits_without_unused_build_or_maximum_archive_charge() {
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.max_archive_bytes = 360 * 1024 * 1024 * 1024;
+        let archive = 13_978_437_633;
+        let working_allocated = 6_139_572_224;
+        let free = 53_100_396_544;
+        let before = cfg
+            .download_capacity_requirements(archive, working_allocated)
+            .unwrap();
+        assert_eq!(before, (archive + 167_772_160, 0));
+        require_available(free, cfg.reserve_bytes, before.0).unwrap();
+        assert!(
+            require_available(
+                free,
+                cfg.reserve_bytes,
+                archive + cfg.build_reserve_bytes - working_allocated
+            )
+            .is_err()
+        );
+        assert!(require_available(free, cfg.reserve_bytes, cfg.max_archive_bytes).is_err());
+        cfg.max_archive_bytes *= 2;
+        cfg.build_reserve_bytes *= 2;
+        assert_eq!(
+            before,
+            cfg.download_capacity_requirements(archive, working_allocated)
+                .unwrap()
+        );
+        assert!(
+            require_available(
+                cfg.reserve_bytes + before.0 - 1,
+                cfg.reserve_bytes,
+                before.0
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn metadata_budget_and_archive_cap_remain_hard_limits() {
+        let cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        let growth = cfg.playback_growth_bytes().unwrap();
+        assert!(
+            cfg.download_capacity_requirements(1, cfg.build_reserve_bytes - growth)
+                .is_ok()
+        );
+        assert!(
+            cfg.download_capacity_requirements(1, cfg.build_reserve_bytes - growth + 1)
+                .is_err()
+        );
+        assert!(
+            cfg.download_capacity_requirements(cfg.max_archive_bytes + 1, 0)
+                .is_err()
+        );
+    }
+    #[test]
+    fn changed_reader_growth_uses_free_space_after_resident_archive_once() {
+        let floor = 32 * 1024 * 1024 * 1024;
+        let archive = 14 * 1024 * 1024 * 1024;
+        let rebuild_remaining = 11 * 1024 * 1024 * 1024;
+        let before_download = floor + archive + rebuild_remaining - 1;
+        let free_after_download = before_download - archive;
+        assert!(require_available(free_after_download, floor, rebuild_remaining).is_err());
+        require_available(free_after_download + 1, floor, rebuild_remaining).unwrap();
+        // Metadata-only playback remains possible at the same actual free space.
+        require_available(
+            free_after_download,
+            floor,
+            operation_metadata_growth(128 << 20).unwrap(),
+        )
+        .unwrap();
     }
     #[test]
     fn legacy_config_defaults_to_original_scratch() {

@@ -267,7 +267,7 @@ impl Remote {
                 began.elapsed().as_secs() <= cfg.download_timeout_seconds,
                 "archive download deadline exceeded"
             );
-            cfg.require_runtime_space(chunk.len() as u64)?;
+            cfg.require_download_write_capacity(chunk.len() as u64)?;
             output.write_all(&chunk)?;
             hash.update(&chunk);
             if last_progress.elapsed() >= Duration::from_secs(30) {
