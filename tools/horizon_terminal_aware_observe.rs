@@ -17,8 +17,7 @@ use std::{
 #[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
 mod singleton247_phase;
 
-const OBSERVER: &str =
-    "/var/lib/jetstreamer/horizon-finalization247251-observer-20261119-v1/jetstreamer-horizon-observe";
+const OBSERVER: &str = "/var/lib/jetstreamer/horizon-finalization247251-observer-20261119-v1/jetstreamer-horizon-observe";
 const OBSERVER_SHA: &str = "a9dd50adcaeb91b33d3e796557fd1f2aadbe9a55e002f416afa69b4d88685b7d";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
@@ -37,6 +36,8 @@ struct Plan {
     schema: String,
     config: Bound,
     handoff_plans: Vec<Bound>,
+    #[serde(default)]
+    native211_handoff: Option<Bound>,
     state_directory: PathBuf,
     deployment: PathBuf,
 }
@@ -197,6 +198,85 @@ fn classify(row: &Value, handoff: &Value, unit: &Value) -> Result<State> {
     }
     Ok(State::Terminal)
 }
+const NATIVE211_UNIT: &str = "archive-211-v1616-native-input-actual-v1.service";
+const NATIVE211_IID: &str = "9267f2c2c64949c29b9da7c27a46df94";
+const NATIVE211_PID: u64 = 1264515;
+const NATIVE211_HANDOFF: &str =
+    "/var/lib/jetstreamer/horizon-native211-execution-launch1810-v3/guarded-startup-handoff.json";
+const NATIVE211_HANDOFF_SHA: &str =
+    "409b5692303d4e6b59d463806ad447dfe84cd0e4e01733fd739f843d2622ce07";
+fn native211_row() -> Value {
+    json!({"epoch":211,"unit":NATIVE211_UNIT,"expected_invocation_id":NATIVE211_IID,"main_pid":NATIVE211_PID,
+        "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1/scratch",
+        "executable":"/var/lib/jetstreamer/horizon-211-native-input-gated-20261119-v1/native-input-test",
+        "executable_sha256":"2b1c0dd8b8cfcf0bbb80e52864c4b78a8348b1bc96dc97cbdfc4fee1094b8773"})
+}
+fn native211_pass_through(
+    config: &Value,
+    reference: Option<&Bound>,
+    handoff: Option<&Value>,
+) -> Result<()> {
+    // Native cold-input observation has its own closed consumer. Never put this
+    // owner into diagnostic_replays, which has different replay tuple semantics.
+    let native = config
+        .get("native_input_diagnostics")
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    if native == json!([]) {
+        ensure!(
+            reference.is_none() && handoff.is_none(),
+            "unused native211 handoff"
+        );
+        return Ok(());
+    }
+    ensure!(
+        native == json!([native211_row()]),
+        "only the exact admitted native211 diagnostic is supported"
+    );
+    let b = reference.context("native211 handoff binding required")?;
+    ensure!(
+        b.path == Path::new(NATIVE211_HANDOFF) && b.sha256 == NATIVE211_HANDOFF_SHA,
+        "native211 handoff substitution"
+    );
+    let h = handoff.context("native211 handoff evidence required")?;
+    ensure!(
+        h["schema"] == "horizon-native211-guarded-startup-v1"
+            && h["unit"] == NATIVE211_UNIT
+            && h["invocation_id"] == NATIVE211_IID
+            && h["main_pid"] == NATIVE211_PID
+            && h["producer"]["Id"] == NATIVE211_UNIT
+            && h["producer"]["InvocationID"] == NATIVE211_IID
+            && h["producer"]["MainPID"].as_str() == Some("1264515"),
+        "native211 handoff owner differs"
+    );
+    for k in [
+        "native_input_qualified",
+        "entry_replay",
+        "replay_launch_authorized",
+        "runtime_promotion_authorized",
+        "full_epoch_qualified",
+        "canonical_sidecar_authorized",
+        "publication_authorized",
+        "remote_mutations",
+        "r2_mutations",
+    ] {
+        ensure!(h[k] == false, "native211 handoff grants unexpected {k}");
+    }
+    for row in config["replays"].as_array().context("replay census")? {
+        ensure!(
+            row["producer_unit"] != NATIVE211_UNIT && row["controller_unit"] != NATIVE211_UNIT,
+            "native211 duplicated as ordinary replay"
+        );
+        let scratch = Path::new(string(row, "scratch_path")?);
+        let native_scratch =
+            Path::new("/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1/scratch");
+        ensure!(
+            !scratch.starts_with(native_scratch) && !native_scratch.starts_with(scratch),
+            "native211 scratch overlaps replay"
+        );
+    }
+    Ok(())
+}
 fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
     ensure!(
         p.schema == "horizon-terminal-aware-observation-plan-v1"
@@ -285,6 +365,12 @@ fn run(args: &[String]) -> Result<()> {
         .map(bound)
         .collect::<Result<Vec<_>>>()?;
     validate(&p, &config, &handoffs)?;
+    let native_handoff = p.native211_handoff.as_ref().map(bound).transpose()?;
+    native211_pass_through(
+        &config,
+        p.native211_handoff.as_ref(),
+        native_handoff.as_ref(),
+    )?;
     ensure!(
         sha(&raw(Path::new(OBSERVER), 64 << 20)?) == OBSERVER_SHA
             && sha(&raw(Path::new(SEALER), 64 << 20)?) == SEALER_SHA,
@@ -325,12 +411,13 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty() || !finalization.is_empty(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
+    let original_native = config.get("native_input_diagnostics").cloned();
     config["replays"] = json!(live);
     config["singleton247_finalization"] = json!(false);
     config["singleton_finalization_epochs"] = json!(
@@ -338,6 +425,10 @@ fn run(args: &[String]) -> Result<()> {
             .iter()
             .map(|e| e["phase_evidence"]["epoch"].clone())
             .collect::<Vec<_>>()
+    );
+    ensure!(
+        config.get("native_input_diagnostics") == original_native.as_ref(),
+        "native211 diagnostic altered during prescreen"
     );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
     let seal = save(
@@ -362,7 +453,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -530,5 +621,91 @@ mod tests {
         ] {
             assert!(timestamp(bad).is_err(), "{bad}");
         }
+    }
+    fn native_fixture() -> (Value, Bound, Value) {
+        let config = json!({"replays":[{"range":"249-249","producer_unit":"original249.service","controller_unit":"original249.service","scratch_path":"/home/ubuntu/.jetstreamer-private/qualification-249-reboot-20261117-v1"}],"native_input_diagnostics":[native211_row()]});
+        let reference = Bound {
+            path: NATIVE211_HANDOFF.into(),
+            sha256: NATIVE211_HANDOFF_SHA.into(),
+        };
+        let handoff = json!({"schema":"horizon-native211-guarded-startup-v1","unit":NATIVE211_UNIT,"invocation_id":NATIVE211_IID,"main_pid":NATIVE211_PID,"producer":{"Id":NATIVE211_UNIT,"InvocationID":NATIVE211_IID,"MainPID":NATIVE211_PID.to_string()},"native_input_qualified":false,"entry_replay":false,"replay_launch_authorized":false,"runtime_promotion_authorized":false,"full_epoch_qualified":false,"canonical_sidecar_authorized":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false});
+        (config, reference, handoff)
+    }
+    #[test]
+    fn native211_diagnostic_passes_unchanged_without_replay_claim() {
+        let (mut config, b, h) = native_fixture();
+        let original = config["native_input_diagnostics"].clone();
+        native211_pass_through(&config, Some(&b), Some(&h)).unwrap();
+        config["replays"] = json!([]);
+        config["singleton_finalization_epochs"] = json!([249]);
+        native211_pass_through(&config, Some(&b), Some(&h)).unwrap();
+        assert_eq!(config["native_input_diagnostics"], original);
+        assert!(config.get("diagnostic_replays").is_none());
+        let empty = json!({"replays":[]});
+        native211_pass_through(&empty, None, None).unwrap();
+        assert!(native211_pass_through(&empty, Some(&b), Some(&h)).is_err());
+    }
+    #[test]
+    fn native211_pass_through_rejects_other_owners_duplicate_or_authorizing_shapes() {
+        let (config, b, h) = native_fixture();
+        assert!(native211_pass_through(&config, None, Some(&h)).is_err());
+        assert!(native211_pass_through(&config, Some(&b), None).is_err());
+        for key in [
+            "epoch",
+            "unit",
+            "expected_invocation_id",
+            "main_pid",
+            "scratch_path",
+            "executable",
+            "executable_sha256",
+        ] {
+            let mut bad = config.clone();
+            bad["native_input_diagnostics"][0][key] = Value::Null;
+            assert!(
+                native211_pass_through(&bad, Some(&b), Some(&h)).is_err(),
+                "{key}"
+            );
+        }
+        let mut bad = config.clone();
+        bad["native_input_diagnostics"][0]["entry_replay"] = json!(true);
+        assert!(native211_pass_through(&bad, Some(&b), Some(&h)).is_err());
+        bad = config.clone();
+        bad["native_input_diagnostics"]
+            .as_array_mut()
+            .unwrap()
+            .push(native211_row());
+        assert!(native211_pass_through(&bad, Some(&b), Some(&h)).is_err());
+        bad = config.clone();
+        bad["replays"][0]["producer_unit"] = json!(NATIVE211_UNIT);
+        assert!(native211_pass_through(&bad, Some(&b), Some(&h)).is_err());
+        bad = config.clone();
+        bad["replays"][0]["scratch_path"] = json!("/home/ubuntu/.jetstreamer-private");
+        assert!(native211_pass_through(&bad, Some(&b), Some(&h)).is_err());
+        let wrong = Bound {
+            path: b.path.clone(),
+            sha256: "0".repeat(64),
+        };
+        assert!(native211_pass_through(&config, Some(&wrong), Some(&h)).is_err());
+        for key in [
+            "native_input_qualified",
+            "entry_replay",
+            "replay_launch_authorized",
+            "runtime_promotion_authorized",
+            "full_epoch_qualified",
+            "canonical_sidecar_authorized",
+            "publication_authorized",
+            "remote_mutations",
+            "r2_mutations",
+        ] {
+            let mut bad = h.clone();
+            bad[key] = json!(true);
+            assert!(
+                native211_pass_through(&config, Some(&b), Some(&bad)).is_err(),
+                "{key}"
+            );
+        }
+        let mut bad = h;
+        bad["producer"]["MainPID"] = json!("1");
+        assert!(native211_pass_through(&config, Some(&b), Some(&bad)).is_err());
     }
 }
