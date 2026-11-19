@@ -247,7 +247,29 @@ Final native journal SHA-256 is
 `f3ab5810bec920c887aa647b0f8856b74ebc206c823aa190a4b265474a85e526`, under
 `/home/ubuntu/.codex/diagnostics/horizon-checkpoint-recorder-20261119-v1`.
 
-This is native recorder-module qualification, not a complete rebuilt node or
-an admitted pressure controller. No live worker, reader or guard was replaced.
-A full node build, predeclared segment replay/export/fresh restore, canonical
-root and resource-pressure qualification are still required before deployment.
+The complete node subsequently built from the clean detached source at
+`490eaa3c7a3f79a8d7af8cb5a4347f34969536c8`, with its tracked-file manifest
+revalidated after compilation. Invocation `2886b299ba6441a6b8241e88053c1138`
+finished in 10 minutes 22 seconds with a reported 1.8 GiB peak beneath the
+2,000,000,000-byte cap. Rust 1.98 used offline locked dependencies, one build
+job, default features, release LTO disabled, 16 codegen units and GCC 15's
+BFD linker. This bounded configuration is distinct from the prior default-LTO
+build's 14.3 GB peak; it does not establish a general build-memory bound.
+
+The candidate is sealed at
+`/var/lib/jetstreamer/horizon-checkpoint-node-490eaa3c-20261119-v1/jetstreamer-node`,
+SHA-256 `170fc2934cc8a3a2f66713bb6245497486695a2dc667b74056827b8c0852fcfb`.
+Its package retains the source manifest, actual Cargo artifact/features,
+compiler commands, effective build settings and complete journals.
+An initial bounded probe preserved the expected candidate-runtime opt-in
+rejection. With that existing opt-in and the qualified worker binding restored,
+invocation `6f877efaf54b4d95a3920a2278a98418` accepted the sealed epoch-265
+singleton manifest and rejected the deliberately wrong snapshot filename
+before initialization. It exited 1 as expected, using 113,496,064 bytes under
+a 256,000,000-byte cap with private networking. Its journal SHA-256 is
+`4447e368af98e2205088a4e6990fc500b35a27b639dea0fb2247a8a23f994508`.
+
+These checks qualify the build and that bounded input-gate path. No live
+worker, reader or guard was replaced. Predeclared segment replay/export/fresh
+restore, canonical root equality and resource-pressure qualification remain
+required before replay deployment; no additional lane was admitted.
