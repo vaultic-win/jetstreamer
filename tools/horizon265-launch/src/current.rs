@@ -292,7 +292,12 @@ impl Native {
                 let _ = child.wait();
                 bail!("command deadline {exe}");
             }
-            std::thread::sleep(Duration::from_millis(10));
+            // Publication checks execute thousands of short Git reads. A 10ms
+            // polling floor per completed child can outlive the retained guard
+            // invocation and the admission lease even though useful work is done.
+            // Preserve both deadlines and every output/exit check; reduce only
+            // the latency before observing child completion.
+            std::thread::sleep(Duration::from_millis(1));
         }
         self.check()?;
         ensure!(
