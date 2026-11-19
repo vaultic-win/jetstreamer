@@ -897,3 +897,24 @@ baseline and synchronously reaped the worker. Evidence is retained in
 `/home/ubuntu/.codex/diagnostics/horizon-pressure-resume-20261119-v1`.
 This is native adapter qualification, not full firehose/controller or mainnet
 pressure qualification. No live reservation was released or new lane admitted.
+
+`tools/pressure_checkpoint_exit.rs` adds the read-only controller exit check.
+Its root-sealed, hash-bound plan names one service invocation, producer PID,
+epoch and private paused-v3 report. The tool verifies its own executable digest,
+the report's hash and custody, clean terminal systemd state, zero restarts,
+nondelegated control-group ownership, absent producer and reaped-worker PIDs,
+and an absent or recursively unpopulated cgroup. It repeats the identity and
+absence checks before writing a private, fsynced, no-clobber exit receipt.
+It does not signal a process, scan archive bodies or authorize resource release,
+resume or publication. Bundle validation and fresh admission remain mandatory.
+
+The initial sealed helper passed three rejection tests and two real systemd
+controls: a clean exited fixture produced a receipt; an otherwise exited fixture
+with a surviving descendant was rejected and produced no receipt. Both fixture
+units were then stopped. These controls use explicitly synthetic report metadata
+and establish the controller's process/cgroup checks only. They do not establish
+a full parent firehose pressure lifecycle or a usable mainnet checkpoint.
+Evidence: `/home/ubuntu/.codex/diagnostics/horizon-pressure-exit-20261119-v1`,
+deployment `/var/lib/jetstreamer/horizon-pressure-exit-20261119-v1`.
+The next integration must bind this exit receipt into resume/controller recovery
+and qualify the whole source-pressure, export, exit, restore and assembly path.
