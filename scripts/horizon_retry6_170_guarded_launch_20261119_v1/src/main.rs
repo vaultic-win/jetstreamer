@@ -1,5 +1,6 @@
 //! Exact epoch 170 retry 6 launch. The prepare receipt is an input, never launch authority.
 mod audit_budget;
+mod holding_budget;
 mod peers;
 mod provenance;
 use anyhow::{Context, Result, bail, ensure};
@@ -23,10 +24,10 @@ const UNIT: &str = "horizon-qualify-170-replacement-local3retry6-20261110-v1.ser
 const GUARD: &str = "horizon-guard-replacement-170-local3retry6-20261110-v1";
 const GUARD_STATE: &str =
     "/var/lib/jetstreamer/retry6-170-preparation-20261118-v1/epoch170/local3retry6/guard-state";
-const PEER_UNIT: &str = "horizon-qualify-166-replacement-local3retry7-20261110-v1.service";
-const PEER_GUARD: &str = "horizon-guard-replacement-166-local3retry7-20261110-v1";
-const PEER_ADMISSION: &str = "/var/lib/jetstreamer/retry7-single166-guarded-launch-20261118-v2/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json";
-const PEER_PROTECTION: &str = "/var/lib/jetstreamer/retry7-single166-guarded-launch-20261118-v2/epoch166/ACTUAL_GUARD_PROTECTION.json";
+const PEER_UNIT: &str = "horizon-qualify-166-replacement-local3retry8-20261110-v1.service";
+const PEER_GUARD: &str = "horizon-guard-replacement-166-local3retry8-20261110-v1";
+const PEER_ADMISSION: &str = "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json";
+const PEER_PROTECTION: &str = "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_GUARD_PROTECTION.json";
 const FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 288 << 30;
 const PREPARED: &str =
@@ -39,11 +40,11 @@ const GUARD_IMAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
 const PREPARER_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-prepare-20261118-v1/prepare";
-const PREPARER_SHA: &str = "095d99efd0b0c6d657fb806943ecad86b0a19ea3528d273ca5d48d577e9bfaff";
-const PREPARER_BUILD_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-prepare-20261118-v1/artifact-proof.json";
+    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/prepare";
+const PREPARER_SHA: &str = "f33a100bd73c75cb1c1d5f000ab81abdc3fba71040cc72b2949ffd320cae9632";
+const PREPARER_BUILD_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/artifact-proof.json";
 const PREPARER_BUILD_PROOF_SHA: &str =
-    "c106402b757c68f260fe79f5d7744ff85c3c214c93d6c79346bd3f12d0f52b4e";
+    "b94097d4dca6ff4ef342b74bec99e9f3ddb479a2fa8194f543401623b53493d9";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 
@@ -323,11 +324,22 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         memory,
         cores,
     )?;
+    let holding_native = holding_budget::observe()?;
+    let combined_resources = holding_budget::requirements(
+        &audit_resources,
+        &holding_native,
+        total_kib
+            .checked_mul(1024)
+            .context("total memory overflow")?,
+        memory,
+        cores,
+    )?;
     Ok(
         json!({"available_DATA_bytes":available,"required_DATA_bytes":required,
         "available_memory_bytes":memory,"historical_required_memory_bytes":memory_required,
-        "required_memory_bytes":audit_resources["required_available_memory_bytes"],
-        "audit_additive_resources":audit_resources,"audit_native":audit_native}),
+        "required_memory_bytes":combined_resources["required_available_memory_bytes"],
+        "audit_additive_resources":audit_resources,"audit_native":audit_native,
+        "holding_native":holding_native,"combined_additive_resources":combined_resources}),
     )
 }
 fn exact_producer(argv: &[String]) -> Result<()> {
@@ -915,6 +927,10 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     ensure!(
         audit_budget::observe()? == capacity["audit_native"],
         "audit changed since additive admission"
+    );
+    ensure!(
+        holding_budget::observe()? == capacity["holding_native"],
+        "holding changed since additive admission"
     );
     let mut guard_timer_start_confirmed = false;
     let attempt = (|| -> Result<Value> {
