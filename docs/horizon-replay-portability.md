@@ -728,8 +728,17 @@ acceptance receipts. An explicit value overrides the inherited environment;
 old qualifications without it preserve their existing behavior. Eight focused
 current-reader tests passed, including a real child receiving the qualified
 value despite a conflicting inherited setting; the preexisting root-only Git
-ownership test remained ignored in this unprivileged run. The new uploader
-still requires a full build and deployment qualification. Do not launch the
+ownership test remained ignored in this unprivileged run. Published uploader
+source `4eae70f0` subsequently built in full, using `opt-level=0` and
+`codegen-units=256` after the optimized attempt exceeded the unchanged 2 GB
+cap. Invocation `62462f7cf1364fb6907c45ed797ad357` completed in 22.597 seconds
+with a reported 1.5 GiB peak; its source manifest was revalidated. The candidate
+is sealed at
+`/var/lib/jetstreamer/horizon-reader-stack-uploader-4eae70f0-20261119-v1`.
+Exact reader feature names are recorded in the corrected acceptance at
+`/var/lib/jetstreamer/horizon-current-reader-acceptance-97e87154-20261119-v2/main-acceptance.json`;
+the earlier descriptive feature label remains preserved and unused.
+Actual epoch playback through this uploader remains pending. Do not launch the
 unoptimized reader through an older uploader that cannot bind its required
 stack setting. The ongoing epoch-205 audit remains untouched; final acceptance
 still requires complete remote playback and the latest-branch check.
