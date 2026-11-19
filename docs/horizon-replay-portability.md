@@ -36,3 +36,37 @@ directory. It must therefore run only in an isolated private staging directory;
 it cannot be pointed directly at campaign archives or a holding namespace.
 Successful synthetic serialization does not authorize those mutations on a live
 producer, replace a checkpoint's evidence, or justify deleting its scratch.
+
+The v1.7.15 worker also rejects `ExportSnapshot`. Its isolated probe is now
+published in `worker/src/checkpoint_portability_tests.rs`, included only in the
+worker's test module. Select
+`runtime::tests::isolated_native_checkpoint_archive_restore_probe` explicitly
+with `--ignored --exact --nocapture` on a qualified v1.7.15 test executable.
+It freezes the real worker checkpoint before invoking serializer housekeeping,
+then requires unchanged bank/accounts hashes, the complete checkpoint tuple,
+and write cursor. It compares complete transaction outputs and account writes
+after both same-process and fresh-process restoration, deleting the original
+fixture state before the latter. This deliberately cannot pass merely because
+the serializer and loader agree on a checkpoint changed during export.
+
+Native v1.7.15 execution remains pending as of 2026-11-19 00:14 UTC. Build
+evidence is retained at
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-portability-v1715-20261119-v1`.
+The exact historical Rust 1.52.1 build is isolated from the running workers and
+the epoch-205 reader audit. A target-selection error, an intentionally stopped
+LTO-inconsistent attempt, a missing shared protocol source, and a compiler
+cgroup OOM are retained separately. The source copy now includes and rehashes
+both the v1.7.15 subtree and shared protocol schema against published `2e7224fd`.
+The current build uses the normal binary test target, one Cargo job, a 2 GB
+hard memory limit, no swap, optimization level 3, 16 codegen units and no LTO.
+Its invocation is `1074721553ba4d3592d0801573c8ba05` in
+`horizon-v1715-checkpoint-probe-build-20261119-v5.service`.
+
+Even a successful synthetic probe leaves protocol export, actual mainnet
+checkpoint/restore, partial `.jet` continuation and idempotent pressure recovery
+unqualified. Before oversubscribed admission, select a genuinely resumable
+victim and bind the tested checkpoint, pressure trigger and recovery path.
+Preserve the five healthy replay producers and their hard limits while building
+that route. The retained inventory also has a one-epoch 265 cohort, in addition
+to 252–256, 257–260 and 261–264; prepare disjoint alternatives rather than
+depending on the five-epoch cohort alone. None has new admission authority.
