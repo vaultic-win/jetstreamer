@@ -432,3 +432,51 @@ older baseline snapshot digest. That failure and its outputs are preserved.
 The corrected v2 reran the complete path and independently revalidated both
 snapshot identities; no live fleet deployment or epoch-205 reader binding
 changed.
+
+Source `a7f15626` extends this fixture across independent parent processes.
+Set `JETSTREAMER_NATIVE_PARENT_PHASE=controller` alongside the live worker
+settings. The controller runs an export parent to clean exit, waits for it,
+then starts a separate resume parent. The export parent uses the production
+snapshot-manifest writer and readback, and fsyncs a private no-clobber receipt
+binding its own image, launcher, native worker, baseline transcript, closed
+prefix, complete frozen checkpoint and snapshot sidecar. The resume parent
+requires the independently supplied receipt digest, revalidates those inputs,
+and restores solely from durable files. This is a synthetic qualification
+controller, not the fleet's production pressure controller.
+
+The direct-source build completed in 7.499s with a reported 393.1 MiB peak
+under a 2 GB cap. Its Rust-sealed harness is
+`/var/lib/jetstreamer/horizon-checkpoint-parent-restart-a7f15626-20261119-v1/checkpoint_native_recorder`,
+SHA-256 `89b0db9314f8888d4b658efec05ea4ed14a69b26d7ad7c7fc7b23e793a2d82b5`.
+The seal plan is bound by
+`68879cee3d901174a02e4606bb2891b86d8e1cb769c2c8249efc81a3a3f631af`.
+Source publication and remote containment preceded the native invocation.
+
+Unit `horizon-checkpoint-parent-restart-native-20261119-v1.service`, invocation
+`88ef690b2bfc4e9ab926a588d2972ae6`, succeeded in 1.427s with a reported
+477.9 MiB peak under the same cap. The fresh parent reproduced both slots,
+all 12 writes and the transaction, assembled V4 and passed strict full PoH.
+An incorrect receipt digest failed before worker restoration; a duplicate
+resume failed without changing the successful result or checkpoint receipt.
+The existing same-parent path also passed after the refactor, invocation
+`b34a2605cfa4497bbe15ea3a03999bd5`, in 1.312s with a reported 482.1 MiB peak.
+
+Private results are in
+`/home/ubuntu/.jetstreamer-private/checkpoint-parent-restart-20261119-v1/native-v1/`:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `parent-controller-results.json` | `95af34c474a46d912be403c068167b852b07722876032ef4ee5f33513eb57a93` |
+| `parent-checkpoint.json` | `49e8470acffcb157d3884b154a31f20617e4584ff22e60f9697891bd53080fbd` |
+| `native-results.json` | `e10bf37d08809935ebd8d5731d7bea28860fdd2dc121d152a43f9aa9137a1456` |
+| `live-client-results.json` | `b158132f10b8541dccd467e971c248e7758e42de38c28a49801c3e4469363f7e` |
+
+Build, source, seal and invocation evidence is in
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-parent-restart-20261119-v1`.
+The comparison result in `same-parent-v1/native-results.json` has SHA-256
+`972ada5e5667a385205999a8f97b5896093a1b4ccf2f070256acfac63b89be68`.
+This proves clean parent exit and file-backed restart in the synthetic path;
+it does not establish crash recovery at intermediate publication steps,
+pressure-triggered stopping, the complete firehose parent, mainnet recovery,
+holding upload/restore, full-epoch or R2 playback qualification. Those gates
+remain required before controlled oversubscription or another lane admission.
