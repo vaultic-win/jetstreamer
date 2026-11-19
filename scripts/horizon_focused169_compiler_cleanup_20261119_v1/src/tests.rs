@@ -262,7 +262,7 @@ fn source_and_receipt_reader_bounds_reject_alias_and_oversize() {
 }
 #[test]
 fn indirect_closure_requires_all_classes_and_actual_inputs() {
-    let good = json!({"schema":"horizon-focused169-compiler-consumer-closure-v1","owner":"/root","targets":TARGETS.iter().map(|t|t.0).collect::<Vec<_>>(),"no_current_or_staged_consumer":true,"no_reopen_until_completion_reconciled":true,"classes":CLASSES.iter().map(|c|json!({"class":c,"no_local_outputs_required":true,"reason":"actual retired input inspection","inspected_inputs":[{"path":"/sealed/input","sha256":"a".repeat(64)}]})).collect::<Vec<_>>()});
+    let good = json!({"schema":"horizon-focused169-compiler-consumer-closure-v1","owner":"/root","targets":TARGETS.iter().map(|t|t.0).collect::<Vec<_>>(),"no_current_or_staged_consumer":true,"no_reopen_until_completion_reconciled":true,"indirect_dependencies":[],"classes":CLASSES.iter().map(|c|json!({"class":c,"no_local_outputs_required":true,"reason":"actual retired input inspection","inspected_inputs":[{"path":"/sealed/input","sha256":"a".repeat(64)}]})).collect::<Vec<_>>()});
     validate_review(&good).unwrap();
     let mut bad = good.clone();
     bad["classes"].as_array_mut().unwrap().pop();
@@ -270,6 +270,15 @@ fn indirect_closure_requires_all_classes_and_actual_inputs() {
     let mut bad = good;
     bad["classes"][0]["inspected_inputs"] = json!([]);
     assert!(validate_review(&bad).is_err());
+}
+#[test]
+fn review_requires_explicit_dependency_census_separate_from_evidence() {
+    let mut review = json!({"schema":"horizon-focused169-compiler-consumer-closure-v1","owner":"/root","targets":TARGETS.iter().map(|t|t.0).collect::<Vec<_>>(),"no_current_or_staged_consumer":true,"no_reopen_until_completion_reconciled":true,"classes":CLASSES.iter().map(|c|json!({"class":c,"no_local_outputs_required":true,"reason":"current input is independent of compiler cache","inspected_inputs":[{"path":"/sealed/current-plan","sha256":"a".repeat(64)}]})).collect::<Vec<_>>()});
+    assert!(validate_review(&review).is_err());
+    review["indirect_dependencies"] = json!([]);
+    validate_review(&review).unwrap();
+    review["indirect_dependencies"] = Value::Null;
+    assert!(validate_review(&review).is_err());
 }
 #[test]
 fn nested_mount_or_bind_alias_is_rejected() {

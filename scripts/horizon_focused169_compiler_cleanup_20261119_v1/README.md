@@ -1,6 +1,6 @@
 # Focused169 compiler output cleanup
 
-The isolated build passes **25 tests** (17 policy/filesystem, 6 process-reference
+The isolated build passes **26 tests** (18 policy/filesystem, 6 process-reference
 and 2 staged-alias tests), strict Clippy on all targets, and rustfmt. The special
 inode test uses a FIFO so the long isolated TMPDIR does not exceed the Unix socket
 pathname limit. Native consumer review, check, deployment and retirement remain
@@ -73,10 +73,10 @@ between the positive check and retirement.
 Commit/push the package and verify remote containment before operational use.
 Normally seal the new executable to:
 
-`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v1/cleanup`
+`/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v2/cleanup`
 
 The same package must contain root-owned immutable `artifact-proof.json` with
-`source_commit`, `production_sha256`, `tests_passed: 25`,
+`source_commit`, `production_sha256`, `tests_passed: 26`,
 `clippy_all_targets_passed: true`, and `sources` mapping **every tracked file in
 this package** to its SHA256. Preserve the actual test/build/native evidence in
 that proof. The runtime validates the ordinary deployment seal's cleanup and
@@ -126,10 +126,14 @@ recovery
 
 Each row needs `class`, `no_local_outputs_required: true`, a specific evidence-
 based `reason`, and a nonempty `inspected_inputs` list of exact `{path,sha256}`
-bindings to root-owned immutable inputs outside selected caches. These input
-paths are themselves checked for live/staged consumers. Historical documents
-can describe old target references without authorizing a live reader. Do not
-fill the review with generic assertions or synthetic terminal evidence.
+bindings to root-owned immutable evidence outside selected caches. A separate,
+mandatory `indirect_dependencies` array binds actual cache-dependent input files;
+use an explicit empty array only when the reviewed evidence proves none exist.
+These dependencies are checked for live/staged consumers. Reading an independent
+plan as evidence does not itself make that plan cache-dependent. Exact cache
+command, environment, map, descriptor and staged references remain fatal.
+Historical documents can describe old references without authorizing a live
+reader. Do not fill the review with generic assertions or synthetic evidence.
 
 Before check, preserve original producer and guard terminal evidence and close
 the known failed guard through the parent's qualified path. The runtime requires

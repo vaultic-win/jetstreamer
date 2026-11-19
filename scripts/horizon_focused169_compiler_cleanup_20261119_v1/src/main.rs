@@ -29,7 +29,7 @@ const REPO: &str = "/home/sol/workspace/jetstreamer";
 const FIXTURE: &str = "/home/sol/.jetstreamer-private/epoch169-focused-route-20261117-v1/source";
 const PACKAGE: &str = "scripts/horizon_focused169_compiler_cleanup_20261119_v1";
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v1/cleanup";
+    "/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v2/cleanup";
 const PROFILE: &str = "horizon-focused169-compiler-partial-cleanup-plan-v1";
 const SCHEMA: &str = "horizon-focused169-compiler-partial-cleanup-check-v1";
 const PARTIAL_CHECK_MAX_BYTES: u64 = 64 << 20;
@@ -285,7 +285,8 @@ fn validate_review(v: &Value) -> Result<()> {
             && v["owner"] == "/root"
             && v["targets"] == json!(TARGETS.iter().map(|x| x.0).collect::<Vec<_>>())
             && v["no_current_or_staged_consumer"] == true
-            && v["no_reopen_until_completion_reconciled"] == true,
+            && v["no_reopen_until_completion_reconciled"] == true
+            && v["indirect_dependencies"].is_array(),
         "exact controller closure required"
     );
     let rows = v["classes"].as_array().context("indirect classes")?;
@@ -309,7 +310,7 @@ fn validate_review(v: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn consumer_inputs(p: &Plan) -> Result<(Value, Vec<PathBuf>)> {
+fn consumer_inputs(p: &Plan) -> Result<(Value, Vec<PathBuf>, Vec<PathBuf>)> {
     let review = bound_json(&p.indirect_review)?;
     validate_review(&review)?;
     let mut inputs = BTreeSet::new();
@@ -334,10 +335,34 @@ fn consumer_inputs(p: &Plan) -> Result<(Value, Vec<PathBuf>)> {
             inputs.insert(b.path);
         }
     }
-    Ok((review, inputs.into_iter().collect()))
+    // Inspected plans are retained review evidence. Only actual cache-dependent
+    // inputs propagate a live/staged reference to the selected compiler cache.
+    // Require an explicit (possibly empty) dependency census, never infer it
+    // from the set of files the operator read to establish independence.
+    let mut dependencies = BTreeSet::new();
+    for item in review["indirect_dependencies"].as_array().unwrap() {
+        count += 1;
+        ensure!(count <= 4096, "indirect input bound");
+        let b: Bound = serde_json::from_value(item.clone())?;
+        ensure!(
+            b.path.is_absolute() && b.path.canonicalize()? == b.path && hex(&b.sha256, 64),
+            "unsafe indirect dependency"
+        );
+        let (digest, md) = hash_file(&b.path, 16 << 20)?;
+        ensure!(
+            digest == b.sha256 && md.uid() == 0 && md.mode() & 0o222 == 0,
+            "indirect dependency changed"
+        );
+        dependencies.insert(b.path);
+    }
+    Ok((
+        review,
+        inputs.into_iter().collect(),
+        dependencies.into_iter().collect(),
+    ))
 }
 fn consumers(p: &Plan) -> Result<Value> {
-    let (review, inputs) = consumer_inputs(p)?;
+    let (review, inputs, dependencies) = consumer_inputs(p)?;
     let roots = [
         "/etc/systemd/system",
         "/usr/lib/systemd/system",
@@ -369,13 +394,13 @@ fn consumers(p: &Plan) -> Result<Value> {
             Path::new("/proc"),
             target,
             target.parent().context("cache profile parent")?,
-            &inputs,
+            &dependencies,
         )?;
         refs.extend(process.references.iter().cloned());
         processes.push(process);
         refs.extend(staged::staged_references(&roots, target, &mut missing)?);
     }
-    for input in &inputs {
+    for input in &dependencies {
         refs.extend(staged::staged_references(&roots, input, &mut missing)?);
     }
     // PID1 can retain a failed transient command after its fragment disappears.
@@ -420,7 +445,7 @@ fn consumers(p: &Plan) -> Result<Value> {
         "review changed during consumer census"
     );
     Ok(
-        json!({"references":refs,"processes":processes,"missing_aliases":missing,"indirect_review":p.indirect_review,"inspected_inputs":inputs}),
+        json!({"references":refs,"processes":processes,"missing_aliases":missing,"indirect_review":p.indirect_review,"inspected_inputs":inputs,"indirect_dependencies":dependencies}),
     )
 }
 fn unused(v: &Value) -> bool {
