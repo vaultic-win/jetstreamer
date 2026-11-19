@@ -367,16 +367,106 @@ mod tests {
 
 }
 
-fn contract_path(path:&Path)->bool {
- if path.file_name().and_then(|s|s.to_str())!=Some("contract.json"){return false;}
- let Some(parent)=path.parent() else{return false;};
- if parent.parent()!=Some(Path::new("/usr/local/lib/jetstreamer")){return false;}
- parent.file_name().and_then(|s|s.to_str()).and_then(|s|s.strip_prefix("horizon-epoch170-retry6-live166retry8-data-contract-")).is_some_and(|s| (1..=32).contains(&s.len())&&s.bytes().all(|b|b.is_ascii_lowercase()||b.is_ascii_digit()||b==b'-'))
+fn contract_path(path: &Path) -> bool {
+    if path.file_name().and_then(|name| name.to_str()) != Some("contract.json") {
+        return false;
+    }
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    // Retain the qualified legacy contracts used for measurement. Fresh HOME
+    // contracts have their own exact parent and the stage tool's generation tag.
+    // This path selector grants no seal, witness, freshness or resource credit.
+    let prefix = match parent.parent() {
+        Some(root) if root == Path::new("/usr/local/lib/jetstreamer") => {
+            "horizon-epoch170-retry6-live166retry8-data-contract-"
+        }
+        Some(root)
+            if root
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1",
+                ) =>
+        {
+            "data-contract-"
+        }
+        _ => return false,
+    };
+    parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix(prefix))
+        .is_some_and(|tag| {
+            (1..=32).contains(&tag.len())
+                && tag
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        })
 }
-#[cfg(test)] mod contract_generation_tests {
- use super::*;
- #[test] fn contract_generations_never_escape_exact_namespace(){
-  for tag in ["20261119-v1","retry2"]{assert!(contract_path(Path::new(&format!("/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}/contract.json"))));}
-  for p in ["/tmp/contract.json","/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-/contract.json","/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2/other.json","/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry8-data-contract-v2/contract.json"]{assert!(!contract_path(Path::new(p)));}
- }
+#[cfg(test)]
+mod contract_generation_tests {
+    use super::*;
+    const HOME: &str =
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1";
+
+    #[test]
+    fn contract_generations_never_escape_exact_namespace() {
+        for tag in ["20261119-v1", "retry2"] {
+            assert!(contract_path(Path::new(&format!(
+                "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}/contract.json"
+            ))));
+        }
+        for path in [
+            "/tmp/contract.json",
+            "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-/contract.json",
+            "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2/other.json",
+            "/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry8-data-contract-v2/contract.json",
+            "/usr/local/lib/jetstreamer/data-contract-v2/contract.json",
+        ] {
+            assert!(!contract_path(Path::new(path)), "{path}");
+        }
+    }
+
+    #[test]
+    fn home_contracts_accept_exact_stage_generations_and_preserve_legacy_measurements() {
+        let longest = "a".repeat(32);
+        for tag in ["v1", "v2", "20261119-v1", "retry2", longest.as_str()] {
+            let home = format!("{HOME}/data-contract-{tag}/contract.json");
+            let legacy = format!(
+                "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}/contract.json"
+            );
+            assert!(contract_path(Path::new(&home)), "{home}");
+            assert!(contract_path(Path::new(&legacy)), "{legacy}");
+        }
+        let too_long = "a".repeat(33);
+        for tag in [
+            "",
+            "V2",
+            "v_2",
+            "v.2",
+            "v2/child",
+            "../v2",
+            too_long.as_str(),
+        ] {
+            let path = format!("{HOME}/data-contract-{tag}/contract.json");
+            assert!(!contract_path(Path::new(&path)), "{path}");
+        }
+        for path in [
+            format!("{HOME}/data-contract-v2/other.json"),
+            format!("{HOME}/data-contract-v2/child/contract.json"),
+            format!("{HOME}/data-contract-v2/../contract.json"),
+            format!("{HOME}/../data-contract-v2/contract.json"),
+            format!("{HOME}-other/data-contract-v2/contract.json"),
+            format!("{HOME}/horizon-epoch170-retry6-live166retry8-data-contract-v2/contract.json"),
+            format!(
+                "{}/data-contract-v2/contract.json",
+                HOME.replace("epoch170", "epoch169")
+            ),
+            format!(
+                "{}/data-contract-v2/contract.json",
+                HOME.replace("audit-v8", "audit-v9")
+            ),
+        ] {
+            assert!(!contract_path(Path::new(&path)), "{path}");
+        }
+    }
 }
