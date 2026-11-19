@@ -1007,6 +1007,13 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   guard's `ReadWritePaths=` and verify its sealed owner and mode before launch; systemd resolves
   those paths while constructing the mount namespace, so a missing receipt directory fails with
   status 226 before the guard can sample or create it.
+  Native DATA witnesses may bind ancestor directory modification/change times. Create the
+  next lanes' required sibling roots and qualification directories before capturing those
+  witnesses. While a protected producer is live, do not create, rename or remove siblings
+  beneath its pinned ancestors: even an empty new directory can invalidate its guard. Reuse
+  precreated roots or a separately qualified namespace outside that ancestry. If a witness
+  has changed, preserve the stop evidence and qualify fresh preparation; never restore
+  timestamps or weaken the witness checks to reuse it.
 - Before using scratch growth for admission or cross-host comparisons, resolve the exact live
   `--replay-scratch` argument from the service/process rather than measuring a lane, qualification,
   or retry parent. Record physical bytes, apparent bytes, file count, and a bounded-depth directory

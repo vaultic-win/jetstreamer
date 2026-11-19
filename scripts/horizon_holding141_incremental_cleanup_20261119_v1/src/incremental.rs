@@ -1,5 +1,29 @@
 use super::*;
 
+pub(super) fn pre_lto_bitcode(path: &Path, expected: &fs::Metadata) -> Result<()> {
+    ensure!(
+        expected.len() >= 4 && expected.mode() & 0o111 == 0,
+        "LLVM bitcode member is truncated or executable"
+    );
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
+        .open(path)?;
+    ensure!(
+        evidence::identity(expected) == evidence::identity(&file.metadata()?),
+        "LLVM bitcode member changed before read"
+    );
+    let mut magic = [0u8; 4];
+    file.read_exact(&mut magic)?;
+    ensure!(magic == *b"BC\xc0\xde", "invalid raw LLVM bitcode magic");
+    ensure!(
+        evidence::identity(expected) == evidence::identity(&file.metadata()?)
+            && evidence::identity(expected) == evidence::identity(&fs::symlink_metadata(path)?),
+        "LLVM bitcode member changed during read"
+    );
+    Ok(())
+}
+
 fn incremental_member(path: &Path, m: &fs::Metadata) -> Result<()> {
     ensure!(
         !m.file_type().is_symlink(),
@@ -24,14 +48,26 @@ fn incremental_member(path: &Path, m: &fs::Metadata) -> Result<()> {
     let object = name
         .strip_suffix(".o")
         .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric()));
+    let bitcode = name
+        .strip_suffix(".pre-lto.bc")
+        .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric()));
+    if bitcode {
+        pre_lto_bitcode(path, m)?;
+    }
     ensure!(
         m.mode() & 0o111 == 0
             && (object
+                || bitcode
                 || matches!(
                     name,
-                    "dep-graph.bin" | "query-cache.bin" | "work-products.bin" | "metadata.rmeta"
+                    "dep-graph.bin"
+                        | "query-cache.bin"
+                        | "work-products.bin"
+                        | "metadata.rmeta"
+                        | "thin-lto-past-keys.bin"
                 )),
-        "incremental cache contains executable, failed-test artifact or unknown member"
+        "incremental cache contains executable, failed-test artifact or unknown member: {}",
+        path.display()
     );
     Ok(())
 }
