@@ -300,6 +300,14 @@ fn active(u: &Unit) -> bool {
 fn cgroup() -> PathBuf {
     Path::new(CGROUPS).join("system.slice").join(UNIT)
 }
+fn kernel_memory_cap(configured: u64, page_size: i64) -> Result<u64> {
+    let page = u64::try_from(page_size).context("invalid native page size")?;
+    ensure!(
+        page.is_power_of_two() && configured >= page,
+        "invalid memory page/cap"
+    );
+    Ok(configured / page * page)
+}
 fn memory(u: &Unit) -> Result<Value> {
     ensure!(
         u.memory_max == MEMORY.to_string()
@@ -317,8 +325,8 @@ fn memory(u: &Unit) -> Result<Value> {
     let swap = read("memory.swap.current")?;
     let tasks = read("pids.current")?;
     ensure!(
-        max == MEMORY
-            && high == HIGH
+        max == kernel_memory_cap(MEMORY, unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?
+            && high == kernel_memory_cap(HIGH, unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?
             && swapmax == 0
             && read("pids.max")? == 512
             && current <= MEMORY
@@ -613,6 +621,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn kernel_high_threshold_retains_pid1_decimal_limit_and_accounts_for_page_rounding() {
+        assert_eq!(
+            kernel_memory_cap(100_000_000_000, 4096).unwrap(),
+            99_999_997_952
+        );
+        assert_eq!(
+            kernel_memory_cap(128_000_000_000, 4096).unwrap(),
+            128_000_000_000
+        );
+        assert!(kernel_memory_cap(HIGH, -1).is_err());
+        assert!(kernel_memory_cap(HIGH, 3000).is_err());
+    }
     fn plan() -> Plan {
         serde_json::from_value(json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,
             "invocation_id":"a".repeat(32),"filesystem":"/","minimum_free_bytes":1,

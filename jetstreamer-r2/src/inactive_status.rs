@@ -14,6 +14,7 @@ mod native223;
 mod native227;
 mod native227_v1625;
 mod native228;
+mod native265;
 mod natural144;
 mod preserved144;
 mod publication144;
@@ -427,6 +428,10 @@ fn fresh_census(
     if native211 {
         native211::validate(&current, terminal_fleet, owners)?;
     }
+    let native265 = plan.epoch == 265 && native265::recognized(terminal_fleet, owners);
+    if native265 {
+        native265::validate(&current, terminal_fleet, owners)?;
+    }
     let native210 = plan.epoch == 210 && native210::recognized(terminal_fleet, owners);
     let native227_v1625 = plan.epoch == 227 && native227_v1625::recognized(terminal_fleet, owners);
     if native227_v1625 {
@@ -474,6 +479,7 @@ fn fresh_census(
             && !native209
             && !native210
             && !native211
+            && !native265
             && !native227_v1625
             && !native228
             && !warmup223
