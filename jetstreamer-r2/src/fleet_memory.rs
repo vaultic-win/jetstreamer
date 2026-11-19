@@ -46,6 +46,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
     let mut ordinary = Vec::new();
     let mut private = Vec::new();
     let mut seen = BTreeMap::new();
+    let mut historical = Vec::new();
     let mut rows = o["replays"]
         .as_array()
         .context("ordinary memory census")?
@@ -62,6 +63,15 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
+        if !owners.contains_key(name) && super::fleet::terminal247::historical_row(ledger, row)? {
+            ensure!(
+                seen.insert(name.to_string(), ()).is_none(),
+                "duplicate historical memory owner"
+            );
+            historical.push(name.to_string());
+            private.push(row.clone());
+            continue;
+        }
         let Some((iid, comparable)) = owners.get(name) else {
             // No silently unaccounted observed owner, including a terminal race.
             anyhow::bail!("observed owner absent from current fleet: {name}");
@@ -105,7 +115,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         }
     }
     ensure!(
-        seen.len() == owners.len(),
+        seen.len() == owners.len() + historical.len(),
         "active fleet owner missing from coordinated RSS telemetry"
     );
     let mut normalized = o.clone();
@@ -148,6 +158,8 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
     }
     report["sampled_at_utc"] = o["recorded_at_utc"].clone();
     report["owner_census"] = json!(owners.keys().collect::<Vec<_>>());
+    report["historical_non_replay_owner_census"] = json!(historical);
+    report["historical_rss_released"] = json!(false);
     report["qualification_replays_in_marginal_average"] = json!(true);
     Ok(report)
 }
@@ -161,6 +173,55 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn proven_terminal_transition_retains_historical_rss_and_raw_sample() {
+        let (mut o, mut ledger) = fixture();
+        let unit = super::super::fleet::terminal247::UNIT;
+        let iid = super::super::fleet::terminal247::IID;
+        super::super::fleet::terminal247::test_historical_ledger(&mut ledger);
+        o["recorded_at_utc"] = ledger["sampled_at_utc"].clone();
+        for role in [
+            "controller_before",
+            "controller_after",
+            "producer_before",
+            "producer_after",
+        ] {
+            o["diagnostic_replays"][0]["observation"][role]["unit"] = json!(unit);
+            o["diagnostic_replays"][0]["observation"][role]["invocation_id"] = json!(iid);
+        }
+        o["diagnostic_replays"][0]["observation"]["range"] = json!("247-247");
+        o["diagnostic_replays"][0]["observation"]["post_replay_finalization"] = json!(true);
+        o["diagnostic_replays"][0]["observation"]["resource_only"] = json!(true);
+        ledger["active"].as_array_mut().unwrap().remove(0);
+        let original = o.clone();
+        let r = report(&o, &ledger);
+        assert_eq!(r["valid"], true, "{r}");
+        assert_eq!(r["executing_lanes"], 2);
+        assert_eq!(r["non_replay_resident_bytes"], 142_216_388_608_u64);
+        assert_eq!(r["historical_non_replay_owner_census"], json!([unit]));
+        assert_eq!(r["owner_census"].as_array().unwrap().len(), 2);
+        assert_eq!(r["admission_authorized"], false);
+        assert_eq!(o, original);
+        for key in [
+            "observer_sha256",
+            "sampled_at_utc",
+            "terminal247_conservative_rss",
+        ] {
+            let mut bad = ledger.clone();
+            bad[key] = Value::Null;
+            assert_eq!(report(&o, &bad)["valid"], false);
+        }
+        let mut bad = ledger.clone();
+        bad["unit_census"][unit]["InvocationID"] = json!("replacement");
+        assert_eq!(report(&o, &bad)["valid"], false);
+        let mut duplicate = o.clone();
+        let row = duplicate["diagnostic_replays"][0].clone();
+        duplicate["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(row);
+        assert_eq!(report(&duplicate, &ledger)["valid"], false);
+    }
     fn fixture() -> (Value, Value) {
         let mut observations = Vec::new();
         let mut active = Vec::new();

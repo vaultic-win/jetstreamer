@@ -114,6 +114,7 @@ mod singleton227_terminal;
 mod snapshot144;
 mod tail223;
 mod tail223_scan;
+pub(super) mod terminal247;
 mod warmup223;
 mod warmup223_input_capture;
 mod warmup223_retire;
@@ -2344,7 +2345,17 @@ fn operator_status_owner_matches(
     status: &EpochStatus,
     object: &MutableRemoteObject,
     observer: &BoundFile,
+    current: Option<&Value>,
 ) -> Result<bool> {
+    if epoch == 247 {
+        return terminal247::status_matches(
+            evidence,
+            status,
+            object,
+            current.context("247 operator handoff current owner missing")?,
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        );
+    }
     if epoch != 251 {
         return Ok(false);
     }
@@ -2528,8 +2539,9 @@ pub(super) async fn run() -> Result<()> {
     for (epoch, gate) in &plan.gates {
         ensure!(
             gate.operator_status.is_none()
-                || (*epoch == 251 && gate.state == "blocked-qualification"),
-            "operator status evidence is scoped to epoch 251 input qualification"
+                || (*epoch == 251 && gate.state == "blocked-qualification")
+                || (*epoch == 247 && gate.state == "post-replay-pipeline"),
+            "operator status evidence is outside qualified 251/247 profiles"
         );
         ensure!(
             matches!(
@@ -3618,17 +3630,17 @@ pub(super) async fn run() -> Result<()> {
                     })
                 }
             });
-            let operator_matches = gate
-                .operator_status
-                .as_ref()
-                .is_some_and(|_| epoch == 251 && state == "blocked-qualification")
-                && operator_status_owner_matches(
-                    gate.operator_status.as_ref().expect("checked"),
-                    epoch,
-                    &status,
-                    &object,
-                    &plan.observer,
-                )?;
+            let operator_matches = gate.operator_status.as_ref().is_some_and(|_| {
+                (epoch == 251 && state == "blocked-qualification")
+                    || (epoch == 247 && state == "post-replay-pipeline")
+            }) && operator_status_owner_matches(
+                gate.operator_status.as_ref().expect("checked"),
+                epoch,
+                &status,
+                &object,
+                &plan.observer,
+                before.get(terminal247::UNIT),
+            )?;
             let production_matches = production_status_binding_matches(matches, state)
                 || (matches && private_qualification_binding);
             json!({"key":key,"etag":object.etag,"payload":status,"sha256":hex_lower(&Sha256::digest(&object.bytes)),"classification":if production_matches {"bound-live-status"} else if operator_matches {"bound-operator-status"} else {"stale-or-orphaned"},"owner_binding_matches":matches || operator_matches,"production_claim_eligible":matches!(state,"live-replay"|"post-replay-pipeline"),"sample_matches_observer":status.sampled_at_utc == sample,"current_eta_valid":(production_matches && status.sampled_at_utc == sample) || operator_matches})
@@ -3673,6 +3685,18 @@ pub(super) async fn run() -> Result<()> {
     receipt["terminal_replays"] = json!(terminal_replays);
     receipt["auxiliary_diagnostics"] = json!(auxiliary_diagnostics);
     if plan.first_epoch == 201 && plan.last_epoch == 300 {
+        if observer["recorded_at_utc"] == "2026-11-19T16:04:00Z"
+            && receipt["unit_census"][terminal247::UNIT]["ActiveState"] == "inactive"
+        {
+            receipt["terminal247_conservative_rss"] = terminal247::capture(
+                &receipt["unit_census"][terminal247::UNIT],
+                &observer,
+                &plan.observer.sha256,
+                receipt["recorded_unix_seconds"]
+                    .as_u64()
+                    .context("fleet clock missing")?,
+            )?;
+        }
         receipt["memory_target"] = fleet_memory::report(&observer, &receipt);
     }
     if let Some(entry) = runtime157 {
