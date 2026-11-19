@@ -93,7 +93,13 @@ fn link(path: &Path, process: &Path, optional: bool) -> Result<Option<PathBuf>> 
         Err(e) => Err(e).context("incomplete process link"),
     }
 }
-fn process_identity(root: &Path) -> Result<Option<(u64, bool)>> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ProcessIdentity {
+    start: u64,
+    optional_links: bool,
+    kernel_thread: bool,
+}
+fn process_identity(root: &Path) -> Result<Option<ProcessIdentity>> {
     let Some(raw) = read_process(&root.join("stat"), root)? else {
         return Ok(None);
     };
@@ -103,10 +109,38 @@ fn process_identity(root: &Path) -> Result<Option<(u64, bool)>> {
     ensure!(fields.len() >= 20, "incomplete process stat");
     let flags = fields[6].parse::<u64>()?;
     let start = fields[19].parse::<u64>()?;
-    Ok(Some((
+    Ok(Some(ProcessIdentity {
         start,
-        flags & 0x00200000 != 0 || matches!(fields[0], "Z" | "X"),
-    )))
+        optional_links: flags & 0x00200000 != 0 || matches!(fields[0], "Z" | "X"),
+        kernel_thread: flags & 0x00200000 != 0,
+    }))
+}
+fn environment(root: &Path, before: ProcessIdentity) -> Result<Option<Vec<u8>>> {
+    environment_result(read_process(&root.join("environ"), root), root, before)
+}
+fn environment_result(
+    result: Result<Option<Vec<u8>>>,
+    root: &Path,
+    before: ProcessIdentity,
+) -> Result<Option<Vec<u8>>> {
+    match result {
+        Ok(bytes) => Ok(bytes),
+        Err(error)
+            if error
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|e| e.raw_os_error() == Some(libc::ESRCH))
+                && before.kernel_thread =>
+        {
+            // Kernel threads have no userspace mm/environment. Still inspect
+            // their links, maps and descriptors, and require the same identity.
+            ensure!(
+                process_identity(root)? == Some(before),
+                "kernel task changed while reading environment"
+            );
+            Ok(Some(Vec::new()))
+        }
+        Err(error) => Err(error),
+    }
 }
 fn relation(path: &Path, target: &Path, scope: &Path) -> bool {
     path == target
@@ -183,9 +217,10 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
         }
         let root = e.path();
         result.inspected_processes += 1;
-        let Some((start, optional)) = process_identity(&root)? else {
+        let Some(identity) = process_identity(&root)? else {
             continue;
         };
+        let optional = identity.optional_links;
         let Some(cmd) = read_process(&root.join("cmdline"), &root)? else {
             continue;
         };
@@ -195,7 +230,7 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
                 .references
                 .push(format!("pid {pid} command/relative/indirect"));
         }
-        let Some(environment) = read_process(&root.join("environ"), &root)? else {
+        let Some(environment) = environment(&root, identity)? else {
             continue;
         };
         if command_reference(&environment, &cwd, target, scope, indirect) {
@@ -241,8 +276,11 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
             Err(e) if disappearing(&e, &root) => (),
             Err(e) => return Err(e).context("incomplete descriptor census"),
         }
-        if let Some((after, _)) = process_identity(&root)? {
-            ensure!(after == start, "PID reused during reference census");
+        if let Some(after) = process_identity(&root)? {
+            ensure!(
+                after.start == identity.start,
+                "PID reused during reference census"
+            );
         }
     }
     result.references.sort();
@@ -252,6 +290,30 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    #[test]
+    fn only_identity_stable_kernel_esrch_proves_absent_environment() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let stat = |flags: u64, start: u64| {
+            format!("2 (kthreadd) S 0 0 0 0 -1 {flags} 0 0 0 0 0 0 0 0 20 0 1 0 {start} 0\n")
+        };
+        fs::write(root.join("stat"), stat(0x00200000, 134)).unwrap();
+        let before = process_identity(root).unwrap().unwrap();
+        let error = |errno| Err(std::io::Error::from_raw_os_error(errno).into());
+        assert_eq!(
+            environment_result(error(libc::ESRCH), root, before).unwrap(),
+            Some(vec![])
+        );
+        for errno in [libc::EACCES, libc::EPERM, libc::EIO, libc::ENOENT] {
+            assert!(environment_result(error(errno), root, before).is_err());
+        }
+        fs::write(root.join("stat"), stat(0x00200000, 135)).unwrap();
+        assert!(environment_result(error(libc::ESRCH), root, before).is_err());
+        fs::write(root.join("stat"), stat(0, 134)).unwrap();
+        let user = process_identity(root).unwrap().unwrap();
+        assert!(environment_result(error(libc::ESRCH), root, user).is_err());
+        assert!(environment_result(error(libc::ESRCH), root, before).is_err());
+    }
     #[test]
     fn exact_reference_has_both_boundaries() {
         assert!(encoded_reference(b"--input=/x/body\0", b"/x/body", true));

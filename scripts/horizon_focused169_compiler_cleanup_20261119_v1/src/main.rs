@@ -29,7 +29,7 @@ const REPO: &str = "/home/sol/workspace/jetstreamer";
 const FIXTURE: &str = "/home/sol/.jetstreamer-private/epoch169-focused-route-20261117-v1/source";
 const PACKAGE: &str = "scripts/horizon_focused169_compiler_cleanup_20261119_v1";
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v5/cleanup";
+    "/usr/local/lib/jetstreamer/horizon-focused169-compiler-cleanup-20261119-v6/cleanup";
 const PROFILE: &str = "horizon-focused169-compiler-partial-cleanup-plan-v1";
 const SCHEMA: &str = "horizon-focused169-compiler-partial-cleanup-check-v1";
 const PARTIAL_CHECK_MAX_BYTES: u64 = 64 << 20;
