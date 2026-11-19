@@ -23,6 +23,7 @@
 compile_error!("epoch163 first-output128 diagnostic requires an exclusive build");
 
 mod checkpoint_export;
+mod ready_entry_drain;
 use checkpoint_export::{
     validate_checkpoint_export_directory, validate_checkpoint_export_evidence,
     validate_checkpoint_export_mode,
@@ -5037,18 +5038,6 @@ impl ReplayReadyEntryProducers {
             block_metadata_notifier: Some(self.block_metadata.clone()),
         }
     }
-}
-
-fn close_ready_entry_channel<N, P, T>(
-    notifiers: N,
-    producers: P,
-    sender: crossbeam_channel::Sender<T>,
-    consumer: std::thread::JoinHandle<()>,
-) -> std::thread::Result<()> {
-    drop(notifiers);
-    drop(producers);
-    drop(sender);
-    consumer.join()
 }
 
 impl BlockMetadataNotifier for BankBlockMetadataNotifier {
@@ -12686,6 +12675,7 @@ async fn run_geyser_replay(
     let (ready_sender, ready_receiver) = bounded::<Vec<ReadyEntry>>(ready_queue_capacity);
     let ready_shutdown = shutdown.clone();
     let ready_replay_executor = replay_executor.clone();
+    let ready_failure = failure.clone();
     let ready_handle = std::thread::Builder::new()
         .name("readyEntries".to_string())
         .stack_size(64 * 1024 * 1024)
@@ -12695,33 +12685,25 @@ async fn run_geyser_replay(
             // entries. Coalesce everything already queued before replaying
             // so slot groups span whole stretches of the slot — that is
             // what gives the wave scheduler real parallelism to exploit.
-            const COALESCE_CAP: usize = 4096;
-            loop {
-                // Time the blocking wait separately: if this dominates wall
-                // time, replay is starved by firehose input (download/decode),
-                // not bound by execution. The backlog depth right after the
-                // wait is the corroborating signal — a deep queue means
-                // compute-bound, a near-empty one means input-bound.
-                let recv_start = Instant::now();
-                let mut entries = match ready_receiver.recv() {
-                    Ok(entries) => entries,
-                    Err(_) => break,
-                };
-                PHASE_RECV_WAIT_US
-                    .fetch_add(recv_start.elapsed().as_micros() as u64, Ordering::Relaxed);
-                PHASE_RECV_BACKLOG.fetch_add(ready_receiver.len() as u64, Ordering::Relaxed);
-                PHASE_RECV_COUNT.fetch_add(1, Ordering::Relaxed);
-                if ready_shutdown.load(Ordering::Relaxed) {
-                    break;
-                }
-                while entries.len() < COALESCE_CAP {
-                    match ready_receiver.try_recv() {
-                        Ok(more) => entries.extend(more),
-                        Err(_) => break,
+            ready_entry_drain::consume(
+                ready_receiver,
+                &ready_shutdown,
+                |entries| {
+                    ready_replay_executor.process_ready_entries(entries);
+                    match ready_failure.error_message() {
+                        Some(error) => Err(error),
+                        None => Ok(()),
                     }
-                }
-                ready_replay_executor.process_ready_entries(entries);
-            }
+                },
+                |elapsed, backlog| {
+                    // Separate blocking input wait from execution time. Queue
+                    // depth distinguishes input starvation from slow replay.
+                    PHASE_RECV_WAIT_US
+                        .fetch_add(elapsed.as_micros() as u64, Ordering::Relaxed);
+                    PHASE_RECV_BACKLOG.fetch_add(backlog as u64, Ordering::Relaxed);
+                    PHASE_RECV_COUNT.fetch_add(1, Ordering::Relaxed);
+                },
+            )
         })
         .expect("failed to spawn ready entry thread");
     let slot_range = replay_start..(end_inclusive + 1);
@@ -13544,7 +13526,13 @@ async fn run_geyser_replay(
     // Drop every producer before joining the channel consumer. The explicit
     // owner also covers the block-parent notifier, which is not part of
     // `GeyserNotifiers`.
-    let _ = close_ready_entry_channel(notifiers, ready_producers, ready_sender, ready_handle);
+    match ready_entry_drain::close(notifiers, ready_producers, ready_sender, ready_handle) {
+        Ok(report) => info!(
+            "ready-entry drainage complete: batches={} entries={}",
+            report.batches, report.entries
+        ),
+        Err(error) => failure.record(error),
+    }
     if let Err(err) = scheduler.verify_complete(end_inclusive) {
         failure.record(err);
     }
@@ -23775,7 +23763,7 @@ mod early_snapshot_tests {
 
     #[test]
     fn ready_entry_teardown_unblocks_and_joins_consumer() {
-        let (sender, receiver) = crossbeam_channel::bounded::<()>(1);
+        let (sender, receiver) = crossbeam_channel::bounded::<Vec<()>>(1);
         let producers = ReadyEntryProducers {
             transaction: sender.clone(),
             entry: sender.clone(),
@@ -23785,10 +23773,11 @@ mod early_snapshot_tests {
         let notifier_sender = sender.clone();
         let consumer = std::thread::spawn(move || {
             assert_eq!(receiver.recv(), Err(crossbeam_channel::RecvError));
+            Ok(ready_entry_drain::DrainReport::default())
         });
         let (done_sender, done_receiver) = crossbeam_channel::bounded(1);
         std::thread::spawn(move || {
-            close_ready_entry_channel(notifier_sender, producers, sender, consumer)
+            ready_entry_drain::close(notifier_sender, producers, sender, consumer)
                 .expect("consumer exits cleanly");
             done_sender.send(()).expect("test remains alive");
         });
