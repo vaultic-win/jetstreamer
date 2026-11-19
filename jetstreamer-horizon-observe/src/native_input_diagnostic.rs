@@ -38,6 +38,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
                 "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
             ),
+            211 => (
+                "archive-211-v1616-native-input-actual-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1/scratch",
+                "/var/lib/jetstreamer/horizon-211-native-input-gated-20261119-v1/native-input-test",
+                "2b1c0dd8b8cfcf0bbb80e52864c4b78a8348b1bc96dc97cbdfc4fee1094b8773",
+            ),
             227 if self.unit == "horizon-native-input-227-v1625-small-v2.service" => (
                 "horizon-native-input-227-v1625-small-v2.service",
                 "/home/ubuntu/.jetstreamer-private/native-input227-v1625-full-small-v2/scratch",
@@ -241,6 +247,60 @@ mod tests {
     use std::os::unix::fs::{PermissionsExt, symlink};
     fn config() -> NativeConfig {
         serde_json::from_value(serde_json::json!({"epoch":227,"unit":"horizon-native-input-227-capped-710f6523-v1.service","expected_invocation_id":"a".repeat(32),"main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch","executable":"/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test","executable_sha256":"1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"})).unwrap()
+    }
+    #[test]
+    fn native211_requires_gated_harness_and_its_own_complete_owner() {
+        let good = json!({"epoch":211,"unit":"archive-211-v1616-native-input-actual-v1.service",
+            "expected_invocation_id":"a".repeat(32),"main_pid":42,
+            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1/scratch",
+            "executable":"/var/lib/jetstreamer/horizon-211-native-input-gated-20261119-v1/native-input-test",
+            "executable_sha256":"2b1c0dd8b8cfcf0bbb80e52864c4b78a8348b1bc96dc97cbdfc4fee1094b8773"});
+        let native: NativeConfig = serde_json::from_value(good.clone()).unwrap();
+        native.validate().unwrap();
+        for (key, value) in [
+            ("epoch", json!(210)),
+            (
+                "unit",
+                json!("archive-210-v1616-native-input-actual-v1.service"),
+            ),
+            (
+                "scratch_path",
+                json!("/home/ubuntu/.jetstreamer-private/native-input210-v1616-capped-v1/scratch"),
+            ),
+            (
+                "executable",
+                json!(
+                    "/var/lib/jetstreamer/horizon-211-native-input-9b29f0ac-20261119-v1/native-input-test"
+                ),
+            ),
+            (
+                "executable_sha256",
+                json!("b0b1185584680eae2b644c38a0c7d3f4240e0f4af392caa8e419300f2ac17df5"),
+            ),
+            ("main_pid", json!(1)),
+            ("expected_invocation_id", json!("invalid")),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = value;
+            assert!(
+                serde_json::from_value::<NativeConfig>(bad)
+                    .unwrap()
+                    .validate()
+                    .is_err(),
+                "{key}"
+            );
+        }
+        let unavailable = row(&native, Err(anyhow!("native211 owner terminated")));
+        assert_eq!(unavailable["status"], "unavailable");
+        assert_eq!(unavailable["observation"], Value::Null);
+        for field in [
+            "ordinary_replay_claim",
+            "entry_replay",
+            "publication_authorized",
+            "r2_mutations",
+        ] {
+            assert_eq!(unavailable[field], false);
+        }
     }
     #[test]
     fn epoch227_v1625_full_runner_never_borrows_v1620_or_diagnostic_telemetry() {
