@@ -8,6 +8,9 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+#[allow(dead_code)]
+#[path = "../../../horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs"]
+mod audit_budget;
 
 const THREAD: &str = "01a1af2a-9ce8-76a2-8939-b2112bd38f53";
 const PROPERTIES: &str = "Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Job,Triggers,TriggeredBy,ExecStart,CPUQuotaPerSecUSec,MemoryMax";
@@ -233,8 +236,8 @@ const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
 const PREPARER: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
-const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V2_SHA256");
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
+const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V3_SHA256");
 const GUARD: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
@@ -766,6 +769,7 @@ fn main() -> Result<()> {
         sha(&fs::read("/proc/self/exe")?) == a[5],
         "wrapper self hash"
     );
+    launch_plan::published_sources()?;
     let cfg = read_bound(Path::new(&a[1]), &a[3])?;
     for k in [
         "fleet",
@@ -790,12 +794,8 @@ fn main() -> Result<()> {
             && fleet["sole_next_observer"] == cfg["next_observer"],
         "mixed cycle evidence"
     );
-    ensure!(
-        fleet["continuing_audit_obligation"]["additional_memory_bytes"] == 25769803776u64
-            && fleet["continuing_audit_obligation"]["additional_cpu_quota_micros"] == 4000000u64
-            && fleet["continuing_audit_obligation"]["DATA_reservation_bytes"] == 0,
-        "audit reservation omitted"
-    );
+    audit_budget::validate_fleet_obligation(&fleet["continuing_audit_obligation"])?;
+    audit_budget::observe()?;
     let admission = bound(&cfg["peer167_admission"])?;
     let protection = bound(&cfg["peer167_protection"])?;
     let prefix = "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167";
@@ -873,7 +873,7 @@ fn main() -> Result<()> {
             && sha(&fs::read(format!(
                 "{}/artifact-proof.json",
                 Path::new(PREPARER).parent().unwrap().display()
-            ))?) == env!("HORIZON_170_PREPARER_V2_PROOF_SHA256"),
+            ))?) == env!("HORIZON_170_PREPARER_V3_PROOF_SHA256"),
         "qualified preparer/proof changed"
     );
     let m = fs::symlink_metadata(FRESH)?;
@@ -1091,6 +1091,37 @@ mod launch_plan {
         );
         Ok(String::from_utf8(result.stdout)?)
     }
+    pub(super) fn published_sources() -> Result<String> {
+        let commit = git(&["rev-parse", "HEAD"])?;
+        git(&[
+            "merge-base", "--is-ancestor", commit.trim(), "origin/account-updates",
+        ])?;
+        for (path, compiled_sha) in [
+            (
+                "scripts/horizon_retry6_167_live166_stage_20261118_v1/src/bin/stage170retry8.rs",
+                sha(include_bytes!("stage170retry8.rs")),
+            ),
+            (
+                "scripts/horizon_retry6_167_live166_stage_20261118_v1/Cargo.toml",
+                sha(include_bytes!("../../Cargo.toml")),
+            ),
+            (
+                "scripts/horizon_retry6_167_live166_stage_20261118_v1/Cargo.lock",
+                sha(include_bytes!("../../Cargo.lock")),
+            ),
+            (
+                "scripts/horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs",
+                audit_budget::compiled_source_sha256(),
+            ),
+        ] {
+            ensure!(
+                git(&["status", "--porcelain", "--untracked-files=all", "--", path])?.is_empty()
+                    && sha(git(&["show", &format!("HEAD:{path}")])?.as_bytes()) == compiled_sha,
+                "staging compiled source is not the published source: {path}"
+            );
+        }
+        Ok(commit.trim().to_owned())
+    }
     fn private(path: &Path) -> Result<()> {
         match fs::DirBuilder::new().mode(0o700).create(path) {
             Ok(()) => File::open(path.parent().context("directory parent")?)?.sync_all()?,
@@ -1112,29 +1143,12 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v4/launch";
+        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v5/launch";
         ensure!(
-            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V4_SHA256"),
+            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V5_SHA256"),
             "sealed launcher differs"
         );
-        let commit = git(&["rev-parse", "HEAD"])?;
-        git(&[
-            "merge-base",
-            "--is-ancestor",
-            commit.trim(),
-            "origin/account-updates",
-        ])?;
-        ensure!(
-            git(&[
-                "status",
-                "--porcelain",
-                "--untracked-files=all",
-                "--",
-                "scripts/horizon_retry6_167_live166_stage_20261118_v1/src/bin/stage170retry8.rs"
-            ])?
-            .is_empty(),
-            "tracked source changed"
-        );
+        let commit = published_sources()?;
         let mut file = OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW)

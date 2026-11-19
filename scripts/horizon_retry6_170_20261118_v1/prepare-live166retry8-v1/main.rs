@@ -23,6 +23,9 @@ use std::{
 };
 #[path = "dep_500da6c03730_allocation_window.rs"]
 mod allocation_window;
+#[allow(dead_code)]
+#[path = "../../horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs"]
+mod audit_budget;
 mod completed167;
 #[path = "dep_185809ed60c6_completed167_native_guard.rs"]
 mod completed167_native_guard;
@@ -63,7 +66,7 @@ mod terminal170;
 use local::LocalInputs;
 use profile::{Profile, profile};
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
 const RETIRED170_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
 const RETIRED170_COMPLETION_SHA: &str = "0a6792c6fe26ebda05764a10c6f8e070c4340cc28f9b7a184056d013c334dde3";
 const RETIRED170_INTENT: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-intent-20261118T1213Z.json";
@@ -970,9 +973,19 @@ fn resource_check(r: &Review, p: &Plan, fleet: &Value) -> Result<Value> {
                     .context("CPU overflow")?,
         "complete CPU fit failed"
     );
-    Ok(
-        json!({"retry3_working_set":retry3_working_set,"host_memory":mem,"complete_memory_plus_reserve_bytes":if current_budget::selected(p){current_budget::CURRENT_MEMORY+RESERVE}else{need},"data_accounting":data_accounting,"memory_accounting":memory_accounting,"actual_available_data_bytes":available,"actual_available_inodes":stat.f_favail,"actual_online_cpus":cores,"booked_cpu_quota_micros":r.complete_booked_cpu_quota_micros,"minimum_initial_available_data_bytes":r.minimum_initial_available_data_bytes}),
-    )
+    audit_budget::validate_fleet_obligation(&fleet["continuing_audit_obligation"])?;
+    let audit_native = audit_budget::observe()?;
+    let audit_data = audit_budget::data_requirements(&data_accounting["current_fit"], available)?;
+    let mut result=json!({"retry3_working_set":retry3_working_set,"host_memory":mem,"complete_memory_plus_reserve_bytes":if current_budget::selected(p){current_budget::CURRENT_MEMORY+RESERVE}else{need},"data_accounting":data_accounting,"memory_accounting":memory_accounting,"actual_available_data_bytes":available,"actual_available_inodes":stat.f_favail,"actual_online_cpus":cores,"booked_cpu_quota_micros":r.complete_booked_cpu_quota_micros,"minimum_initial_available_data_bytes":r.minimum_initial_available_data_bytes});
+    result["audit_additive_resources"]=audit_budget::requirements(
+        &json!({"resource_checks":result.clone()}),
+        *mem.get("MemTotal").context("MemTotal")?,
+        *mem.get("MemAvailable").context("MemAvailable")?,
+        u64::try_from(cores)?,
+    )?;
+    result["audit_native"]=audit_native;
+    result["audit_home_DATA"]=audit_data;
+    Ok(result)
 }
 fn claims_epoch(value: &Value, epoch: u64) -> bool {
     match value {

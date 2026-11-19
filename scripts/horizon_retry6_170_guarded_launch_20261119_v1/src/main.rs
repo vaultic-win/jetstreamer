@@ -1,4 +1,5 @@
 //! Exact epoch 170 retry 6 launch. The prepare receipt is an input, never launch authority.
+#[allow(dead_code)]
 mod audit_budget;
 mod holding_budget;
 mod peers;
@@ -40,11 +41,11 @@ const GUARD_IMAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
 const PREPARER_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
-const PREPARER_SHA: &str = "4b9c35f6983be37cf73a1422841735fca71754a94427536cb747866fd9c0b0f6";
-const PREPARER_BUILD_PROOF: &str = "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/artifact-proof.json";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
+const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V3_SHA256");
+const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/artifact-proof.json";
 const PREPARER_BUILD_PROOF_SHA: &str =
-    "59aa310a6ca1543b6e1a1d68b100ccd913158a7e6566a7098cc6bbab80036c40";
+    env!("HORIZON_170_PREPARER_V3_PROOF_SHA256");
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 
@@ -315,6 +316,10 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         "current memory below admitted demand"
     );
     let audit_native = audit_budget::observe()?;
+    let audit_data = audit_budget::data_requirements(
+        &prepared["resource_checks"]["data_accounting"]["current_fit"],
+        available,
+    )?;
     let cores = u64::try_from(unsafe { libc::sysconf(libc::_SC_NPROCESSORS_ONLN) })?;
     let audit_resources = audit_budget::requirements(
         prepared,
@@ -335,7 +340,8 @@ fn local_capacity(prepared: &Value) -> Result<Value> {
         cores,
     )?;
     Ok(
-        json!({"available_DATA_bytes":available,"required_DATA_bytes":required,
+        json!({"available_DATA_bytes":available,"historical_required_DATA_bytes":required,
+        "required_DATA_bytes":audit_data["required_DATA_bytes"],"audit_home_DATA":audit_data,
         "available_memory_bytes":memory,"historical_required_memory_bytes":memory_required,
         "required_memory_bytes":combined_resources["required_available_memory_bytes"],
         "audit_additive_resources":audit_resources,"audit_native":audit_native,
@@ -633,6 +639,7 @@ fn live_peer166(prepared: &Value) -> Result<Value> {
         peer_start,
     )?;
     let fleet = bound(&prepared["fleet"], 16 << 20)?;
+    audit_budget::validate_fleet_obligation(&fleet["continuing_audit_obligation"])?;
     let peers = fleet["actual_executing_replays"]
         .as_array()
         .context("fleet replay rows")?;
@@ -928,6 +935,13 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
         audit_budget::observe()? == capacity["audit_native"],
         "audit changed since additive admission"
     );
+    // The identity stays constant across epoch transitions; storage does not.
+    // Re-sample the exact archive, working allocation and DATA immediately before launch.
+    let mut final_capacity = local_capacity(prepared)?;
+    ensure!(final_capacity["audit_native"] == capacity["audit_native"],
+        "audit owner changed during final home capacity check");
+    final_capacity["revalidated_unix_seconds"] = json!(now()?);
+    let final_capacity_bound = write_json(output_root, "FINAL_PRELAUNCH_HOME_CAPACITY.json", &final_capacity)?;
     ensure!(
         holding_budget::observe()? == capacity["holding_native"],
         "holding changed since additive admission"
@@ -991,6 +1005,8 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
             "fresh_native_Rust_preparation":plan["prepared"],
             "historical_preparation_recorded_unix_seconds":number(prepared,"recorded_unix_seconds")?,
             "current_closed_unit_revalidation":capacity,
+            "final_prelaunch_capacity":final_capacity_bound,
+            "final_prelaunch_capacity_evaluated_unix_seconds":final_capacity["revalidated_unix_seconds"],
             "actual_producer_native":producer_bound,"first_guard":first_bound,
             "recorded_unix_seconds":now()?,"remote_mutations":false,"r2_mutations":false});
         let admission_bound =
@@ -1040,7 +1056,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     attempt
 }
 const LAUNCH_IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v4/launch";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v5/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),

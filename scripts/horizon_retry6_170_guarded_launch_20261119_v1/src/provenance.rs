@@ -1,8 +1,16 @@
 //! Validate the exact sealed preparer, source closure and qualified guard.
 use super::*;
-const BUILD_COMMIT: &str = "7bad5a088b916cee2c4efae6ca9509fc33345869";
+const BUILD_COMMIT: &str = env!("HORIZON_170_PREPARER_V3_SOURCE_COMMIT");
 const PREPARE_PACKAGE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_20261118_v1/prepare-live166retry8-v1";
+const AUDIT_SOURCE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs";
 pub(super) fn validate() -> Result<()> {
+    let passed = env!("HORIZON_170_PREPARER_V3_TESTS_PASSED").parse::<u64>()?;
+    ensure!(
+        passed >= 306
+            && BUILD_COMMIT.len() == 40
+            && BUILD_COMMIT.bytes().all(|b| b.is_ascii_hexdigit()),
+        "exact published successor build/test pins required"
+    );
     fixed(PREPARER_IMAGE, PREPARER_SHA, 64 << 20)?;
     fixed(PREPARER_BUILD_PROOF, PREPARER_BUILD_PROOF_SHA, 1 << 20)?;
     let proof: Value = serde_json::from_slice(&read_regular(
@@ -17,7 +25,7 @@ pub(super) fn validate() -> Result<()> {
             && proof["production"]["sha256"] == PREPARER_SHA
             && proof["equivalent_build_source_commit"] == BUILD_COMMIT
             && proof["source_contained_in_origin_account_updates"] == true
-            && proof["tests_passed"] == 306
+            && proof["tests_passed"] == passed
             && proof["tests_failed"] == 0
             && proof["production_clippy_passed"] == true
             && proof["features"] == json!(["preparation"]),
@@ -59,7 +67,8 @@ pub(super) fn validate() -> Result<()> {
     for binding in sources {
         let source = Path::new(string(binding, "path")?);
         ensure!(
-            source.parent() == Some(Path::new(PREPARE_PACKAGE)),
+            source.parent() == Some(Path::new(PREPARE_PACKAGE))
+                || source == Path::new(AUDIT_SOURCE),
             "foreign source member"
         );
         let leaf = source
@@ -69,6 +78,12 @@ pub(super) fn validate() -> Result<()> {
         ensure!(names.insert(leaf), "duplicate source member");
         let name = format!("source-{leaf}");
         let sha = string(binding, "sha256")?;
+        if leaf == "audit_budget.rs" {
+            ensure!(
+                source == Path::new(AUDIT_SOURCE) && sha == audit_budget::compiled_source_sha256(),
+                "preparer and launcher audit budget source differs"
+            );
+        }
         ensure!(
             members
                 .iter()
@@ -88,6 +103,7 @@ pub(super) fn validate() -> Result<()> {
         "retry170.rs",
         "resident_memory.rs",
         "data_fulfillment.rs",
+        "audit_budget.rs",
         "Cargo.toml",
         "Cargo.lock",
     ] {
