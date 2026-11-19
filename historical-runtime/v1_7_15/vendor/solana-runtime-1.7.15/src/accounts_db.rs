@@ -738,6 +738,11 @@ impl AccountStorageEntry {
     pub fn get_path(&self) -> PathBuf {
         self.accounts.get_path()
     }
+
+    /// Written prefix and logical mmap length for lossless sparse snapshot export.
+    pub fn snapshot_file_layout(&self) -> (usize, u64) {
+        (self.accounts.len(), self.accounts.capacity())
+    }
 }
 
 pub fn get_temp_accounts_paths(count: u32) -> IoResult<(Vec<TempDir>, Vec<PathBuf>)> {

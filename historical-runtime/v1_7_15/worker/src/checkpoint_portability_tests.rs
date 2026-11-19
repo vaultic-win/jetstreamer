@@ -1,7 +1,17 @@
-// Included only in runtime::tests. This probe does not enable protocol export.
+// Included only in runtime::tests. Synthetic evidence is not mainnet qualification.
 #[test]
 #[ignore]
 fn isolated_native_checkpoint_archive_restore_probe() {
+    checkpoint_archive_restore_probe(false);
+}
+
+#[test]
+#[ignore]
+fn checkpoint_export_archive_restore_probe() {
+    checkpoint_archive_restore_probe(true);
+}
+
+fn checkpoint_archive_restore_probe(use_export: bool) {
     use solana_runtime::{bank_forks::ArchiveFormat, snapshot_utils};
     const CHILD: &str = "JETSTREAMER_V1715_CHECKPOINT_PROBE_CHILD";
     if let Some(path) = std::env::var_os(CHILD) {
@@ -69,16 +79,76 @@ fn isolated_native_checkpoint_archive_restore_probe() {
     assert_eq!(cursor, before.next_write_version);
     let staging = tempfile::tempdir().unwrap();
     let archives = tempfile::tempdir().unwrap();
-    let archive = snapshot_utils::bank_to_snapshot_archive(
-        staging.path(),
-        &uninterrupted.bank,
-        None,
-        archives.path(),
-        ArchiveFormat::TarBzip2,
-        None,
-        1,
-    )
-    .unwrap();
+    let archive = if use_export {
+        use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody};
+        use sha2::{Digest, Sha256};
+        use std::os::unix::fs::PermissionsExt;
+        let sentinel = archives.path().join("snapshot-unrelated.tar.bz2");
+        std::fs::write(&sentinel, b"retain existing archives").unwrap();
+        let mut worker = crate::Worker {
+            hello_complete: true,
+            state: Some(uninterrupted),
+        };
+        let (response, shutdown) = worker.handle(Request {
+            id: 20,
+            body: RequestBody::ExportSnapshot {
+                slot: before.slot,
+                output_directory: archives.path().to_str().unwrap().into(),
+                expected_accounts_hash: before.accounts_hash.clone(),
+            },
+        });
+        assert!(!shutdown, "export failed: {:?}", response);
+        assert_eq!(response.request_id, 20);
+        let exported = match response.body {
+            ResponseBody::SnapshotExported(exported) => exported,
+            other => panic!("unexpected export response: {:?}", other),
+        };
+        uninterrupted = worker.state.take().unwrap();
+        let path = std::path::PathBuf::from(&exported.archive_path);
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(exported.archive_size, bytes.len() as u64);
+        assert_eq!(exported.archive_sha256, Sha256::digest(&bytes).as_slice());
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o400
+        );
+        assert_eq!(exported.accounts_hash, before.accounts_hash);
+        assert_eq!(exported.slot, before.slot);
+        assert!(uninterrupted
+            .export_snapshot(
+                before.slot,
+                archives.path().to_str().unwrap(),
+                &before.accounts_hash,
+            )
+            .unwrap_err()
+            .contains("immediately preceding"));
+        uninterrupted.freeze_checkpoint(before.slot).unwrap();
+        assert!(uninterrupted
+            .export_snapshot(
+                before.slot,
+                archives.path().to_str().unwrap(),
+                &before.accounts_hash,
+            )
+            .unwrap_err()
+            .contains("refusing to replace"));
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            std::fs::read(sentinel).unwrap(),
+            b"retain existing archives"
+        );
+        path
+    } else {
+        snapshot_utils::bank_to_snapshot_archive(
+            staging.path(),
+            &uninterrupted.bank,
+            None,
+            archives.path(),
+            ArchiveFormat::TarBzip2,
+            None,
+            1,
+        )
+        .unwrap()
+    };
     assert_eq!(
         uninterrupted.bank.hash().as_ref(),
         before.bank_hash.as_slice()
@@ -169,7 +239,11 @@ fn isolated_native_checkpoint_archive_restore_probe() {
         .args(&[
             "--ignored",
             "--exact",
-            "runtime::tests::isolated_native_checkpoint_archive_restore_probe",
+            if use_export {
+                "runtime::tests::checkpoint_export_archive_restore_probe"
+            } else {
+                "runtime::tests::isolated_native_checkpoint_archive_restore_probe"
+            },
             "--nocapture",
         ])
         .env(CHILD, fixture.path())
@@ -187,4 +261,152 @@ fn isolated_native_checkpoint_archive_restore_probe() {
     assert_eq!(processed, expected);
     assert_eq!(ticked, expected_tick);
     assert_eq!(checkpoint, expected_checkpoint);
+}
+
+#[test]
+fn checkpoint_export_seal_rejects_wrong_requests_and_is_consumed() {
+    let (mut state, _) = test_state(1, None);
+    let output = tempfile::tempdir().unwrap();
+    let directory = output.path().to_str().unwrap();
+    assert!(state
+        .export_snapshot(0, directory, &[0; 32])
+        .unwrap_err()
+        .contains("immediately preceding"));
+    state.bank.register_tick(&Hash::new_unique());
+    for (slot, hash) in &[(1, vec![0; 32]), (0, vec![0; 31]), (0, vec![0; 32])] {
+        state.freeze_checkpoint(0).unwrap();
+        assert!(state
+            .export_snapshot(*slot, directory, hash)
+            .unwrap_err()
+            .contains("differs from checkpoint"));
+        assert!(state.snapshot_export_seal.is_none());
+    }
+    let checkpoint = state.freeze_checkpoint(0).unwrap();
+    state.next_entry_index += 1;
+    assert!(state
+        .export_snapshot(0, directory, &checkpoint.accounts_hash)
+        .is_err());
+    state.freeze_checkpoint(0).unwrap();
+    assert!(state.freeze_checkpoint(1).is_err());
+    assert!(state.snapshot_export_seal.is_none());
+    state.freeze_checkpoint(0).unwrap();
+    assert!(state.process_entries(Vec::new()).is_err());
+    assert!(state.snapshot_export_seal.is_none());
+    assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn checkpoint_export_rejects_changed_bank_and_unsafe_output_without_publication() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let (mut state, _) = test_state(1, None);
+    state.bank.register_tick(&Hash::new_unique());
+    let checkpoint = state.freeze_checkpoint(0).unwrap();
+    let mut bad = checkpoint.clone();
+    bad.next_write_version += 1;
+    assert!(snapshot_export::check_bank(&state.bank, &bad).is_err());
+    bad = checkpoint.clone();
+    bad.bank_hash[0] ^= 1;
+    assert!(snapshot_export::check_bank(&state.bank, &bad).is_err());
+    let output = tempfile::tempdir().unwrap();
+    let alias = output.path().join("alias");
+    symlink(output.path(), &alias).unwrap();
+    assert!(state
+        .export_snapshot(0, alias.to_str().unwrap(), &checkpoint.accounts_hash)
+        .unwrap_err()
+        .contains("canonical, owned private"));
+    std::fs::remove_file(alias).unwrap();
+    state.freeze_checkpoint(0).unwrap();
+    std::fs::set_permissions(output.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(state
+        .export_snapshot(
+            0,
+            output.path().to_str().unwrap(),
+            &checkpoint.accounts_hash
+        )
+        .unwrap_err()
+        .contains("canonical, owned private"));
+    std::fs::set_permissions(output.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let final_path = output.path().join(format!(
+        "snapshot-0-{}.tar.bz2",
+        Hash::new(&checkpoint.accounts_hash)
+    ));
+    symlink(output.path().join("missing"), &final_path).unwrap();
+    state.freeze_checkpoint(0).unwrap();
+    assert!(state
+        .export_snapshot(
+            0,
+            output.path().to_str().unwrap(),
+            &checkpoint.accounts_hash
+        )
+        .unwrap_err()
+        .contains("refusing to replace"));
+    assert!(std::fs::symlink_metadata(final_path)
+        .unwrap()
+        .file_type()
+        .is_symlink());
+    assert_eq!(std::fs::read_dir(output.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn checkpoint_export_protocol_intervening_requests_invalidate_and_fail_closed() {
+    use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody, PROTOCOL_VERSION};
+    let (mut state, _) = test_state(1, None);
+    state.bank.register_tick(&Hash::new_unique());
+    let mut worker = crate::Worker {
+        hello_complete: true,
+        state: Some(state),
+    };
+    for body in &[
+        RequestBody::Ping,
+        RequestBody::Hello {
+            protocol_version: PROTOCOL_VERSION,
+        },
+    ] {
+        let (response, stopped) = worker.handle(Request {
+            id: 1,
+            body: RequestBody::FreezeCheckpoint { slot: 0 },
+        });
+        assert!(!stopped);
+        assert!(matches!(response.body, ResponseBody::Checkpoint(_)));
+        assert!(worker
+            .state
+            .as_ref()
+            .unwrap()
+            .snapshot_export_seal
+            .is_some());
+        worker.handle(Request {
+            id: 2,
+            body: body.clone(),
+        });
+        assert!(worker
+            .state
+            .as_ref()
+            .unwrap()
+            .snapshot_export_seal
+            .is_none());
+    }
+    let (response, stopped) = worker.handle(Request {
+        id: 3,
+        body: RequestBody::ExportSnapshot {
+            slot: 0,
+            output_directory: "/tmp".into(),
+            expected_accounts_hash: vec![0; 32],
+        },
+    });
+    assert!(stopped);
+    assert!(matches!(response.body, ResponseBody::Error(_)));
+    // The batch IPC path bypasses handle_body; it must still consume the seal.
+    worker.handle(Request {
+        id: 4,
+        body: RequestBody::FreezeCheckpoint { slot: 0 },
+    });
+    assert!(worker
+        .process_entry_batch(5, Vec::new(), &mut Vec::new())
+        .unwrap());
+    assert!(worker
+        .state
+        .as_ref()
+        .unwrap()
+        .snapshot_export_seal
+        .is_none());
 }

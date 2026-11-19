@@ -2,6 +2,7 @@ mod leader_schedule;
 mod poh_backend;
 mod runtime;
 mod snapshot;
+mod snapshot_export;
 
 use jetstreamer_historical_protocol::{
     read_frame, write_frame, AccountWrite, BackendQualification, EntryProcessed,
@@ -36,7 +37,9 @@ impl Worker {
         let request_id = request.id;
         let fatal_on_error = matches!(
             &request.body,
-            RequestBody::ProcessEntry(_) | RequestBody::ProcessEntries(_)
+            RequestBody::ProcessEntry(_)
+                | RequestBody::ProcessEntries(_)
+                | RequestBody::ExportSnapshot { .. }
         );
         let result = self.handle_body(request.body);
         match result {
@@ -52,6 +55,11 @@ impl Worker {
     }
 
     fn handle_body(&mut self, body: RequestBody) -> Result<(ResponseBody, bool), WorkerError> {
+        if !matches!(&body, RequestBody::ExportSnapshot { .. }) {
+            if let Some(state) = self.state.as_mut() {
+                state.invalidate_snapshot_export();
+            }
+        }
         match body {
             RequestBody::Hello { protocol_version } => {
                 if protocol_version != PROTOCOL_VERSION {
@@ -117,12 +125,22 @@ impl Worker {
                     .map_err(|message| worker_error(WorkerErrorCode::Runtime, message))?;
                 Ok((ResponseBody::Checkpoint(checkpoint), false))
             }
-            RequestBody::ExportSnapshot { .. } => {
+            RequestBody::ExportSnapshot {
+                slot,
+                output_directory,
+                expected_accounts_hash,
+            } => {
                 self.require_hello()?;
-                Err(worker_error(
-                    WorkerErrorCode::UnsupportedOperation,
-                    "snapshot export is supported only by the Solana v1.0.7 worker".to_string(),
-                ))
+                let state = self.state.as_mut().ok_or_else(|| {
+                    worker_error(
+                        WorkerErrorCode::NotInitialized,
+                        "initialize before export".into(),
+                    )
+                })?;
+                let exported = state
+                    .export_snapshot(slot, &output_directory, &expected_accounts_hash)
+                    .map_err(|message| worker_error(WorkerErrorCode::Runtime, message))?;
+                Ok((ResponseBody::SnapshotExported(exported), false))
             }
             RequestBody::Ping => Ok((ResponseBody::Pong, false)),
             RequestBody::Shutdown => Ok((ResponseBody::ShuttingDown, true)),
@@ -564,7 +582,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_export_fails_closed_as_unsupported() {
+    fn snapshot_export_requires_initialization_and_errors_end_the_session() {
         let mut worker = Worker::new();
         worker.handle(Request {
             id: 1,
@@ -580,10 +598,10 @@ mod tests {
                 expected_accounts_hash: vec![0; 32],
             },
         });
-        assert!(!shutdown);
+        assert!(shutdown);
         match response.body {
             ResponseBody::Error(error) => {
-                assert_eq!(error.code, WorkerErrorCode::UnsupportedOperation)
+                assert_eq!(error.code, WorkerErrorCode::NotInitialized)
             }
             other => panic!("unexpected response: {:?}", other),
         }

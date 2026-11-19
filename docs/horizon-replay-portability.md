@@ -77,8 +77,27 @@ one passed, zero failed, with normal completion in 0.62s. That parent test
 requires a clean child-process exit and matching complete restored outcomes.
 Its journal is retained as `native-v1.jsonl` in the evidence directory above,
 SHA-256 `50479df35a3dca11c230cd5c754b0b5f7d9449f00e9da112c0096e99e394db87`.
-The production worker still rejects `ExportSnapshot`; this pass establishes
-synthetic native feasibility only.
+The deployed production worker still rejects `ExportSnapshot`; this pass
+establishes synthetic native feasibility only.
+
+The next candidate source implements one-use, checkpoint-bound v1.7.15 export.
+It binds the complete frozen checkpoint and entry/write cursors, consumes the
+seal on every attempt and invalidates it on intervening protocol requests or
+batch processing. Export errors terminate the IPC session because storage
+housekeeping may already have begun. The packager uses the native v1.7.15 bank
+serializer with an in-process sparse tar writer. It checks checkpoint equality
+before and after housekeeping, hashes and fsyncs the staged archive, then uses
+no-clobber publication into an existing canonical private directory. It does
+not invoke system tar or remove older archives. An additive storage accessor
+exposes the written prefix and logical mmap capacity for lossless sparse export.
+
+The new ignored `checkpoint_export_archive_restore_probe` exercises the actual
+worker export response, archive digest and permissions, duplicate rejection,
+unchanged checkpoint, full same-process continuation and fresh-process restore.
+Negative tests cover malformed/stale requests, changed checkpoint fields,
+intervening Ping/Hello/batch requests, unsafe output directories and existing
+symlinks. These source changes await bounded compilation and native execution;
+no new runtime or pressure-recovery deployment is qualified by this description.
 
 Even a successful synthetic probe leaves protocol export, actual mainnet
 checkpoint/restore, partial `.jet` continuation and idempotent pressure recovery

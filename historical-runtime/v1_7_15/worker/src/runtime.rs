@@ -1,8 +1,8 @@
-use crate::{leader_schedule, poh_backend, snapshot};
+use crate::{leader_schedule, poh_backend, snapshot, snapshot_export};
 use jetstreamer_historical_protocol::{
     AccountWrite, Checkpoint, EntryProcessed, EntryRequest, Initialized, InitializedSource,
-    InstructionError as WireInstructionError, TransactionError as WireTransactionError,
-    TransactionOutcome, MAX_ENTRIES_PER_BATCH,
+    InstructionError as WireInstructionError, SnapshotExport,
+    TransactionError as WireTransactionError, TransactionOutcome, MAX_ENTRIES_PER_BATCH,
 };
 use rayon::{prelude::*, ThreadPool, ThreadPoolBuilder};
 use solana_merkle_tree::MerkleTree;
@@ -66,6 +66,14 @@ pub struct RuntimeState {
     last_accounts_clean_block_height: u64,
     accounts_shrink_consumed_budget: usize,
     execution_wave_metrics: ExecutionWaveMetrics,
+    snapshot_export_seal: Option<SnapshotExportSeal>,
+}
+
+struct SnapshotExportSeal {
+    checkpoint: Checkpoint,
+    next_entry_index: u64,
+    last_entry_hash: Hash,
+    tick_hash_count: u64,
 }
 
 #[derive(Default)]
@@ -217,6 +225,7 @@ impl RuntimeState {
                 execution_wave_metrics: ExecutionWaveMetrics::new(
                     env::var_os(WAVE_METRICS_ENV).is_some(),
                 ),
+                snapshot_export_seal: None,
             },
             initialized,
         ))
@@ -256,6 +265,7 @@ impl RuntimeState {
     where
         F: FnMut(EntryProcessed) -> Result<(), E>,
     {
+        self.invalidate_snapshot_export();
         if requests.is_empty() {
             return Err(ProcessEntriesError::Runtime(
                 "entry batch must contain at least one entry".to_string(),
@@ -603,6 +613,7 @@ impl RuntimeState {
     }
 
     pub fn freeze_checkpoint(&mut self, expected_slot: u64) -> Result<Checkpoint, String> {
+        self.invalidate_snapshot_export();
         if expected_slot != self.bank.slot() {
             return Err(format!(
                 "checkpoint requested for slot {}, current bank is {}",
@@ -628,7 +639,7 @@ impl RuntimeState {
         let writes = self.freeze_root_and_drain()?;
         let accounts_hash = self.bank.update_accounts_hash();
         self.execution_wave_metrics.report("checkpoint");
-        Ok(Checkpoint {
+        let mut checkpoint = Checkpoint {
             slot: self.bank.slot(),
             bank_hash: self.bank.hash().as_ref().to_vec(),
             accounts_hash: accounts_hash.as_ref().to_vec(),
@@ -637,9 +648,46 @@ impl RuntimeState {
             transaction_count: self.bank.transaction_count(),
             tick_height: self.bank.tick_height(),
             slot_complete: self.bank.is_complete(),
-            writes,
+            writes: Vec::new(),
             next_write_version: self.write_cursor,
-        })
+        };
+        self.snapshot_export_seal = Some(SnapshotExportSeal {
+            checkpoint: checkpoint.clone(),
+            next_entry_index: self.next_entry_index,
+            last_entry_hash: self.last_entry_hash,
+            tick_hash_count: self.tick_hash_count,
+        });
+        checkpoint.writes = writes;
+        Ok(checkpoint)
+    }
+
+    pub fn invalidate_snapshot_export(&mut self) {
+        self.snapshot_export_seal = None;
+    }
+
+    pub fn export_snapshot(
+        &mut self,
+        slot: u64,
+        output_directory: &str,
+        expected_accounts_hash: &[u8],
+    ) -> Result<SnapshotExport, String> {
+        // Every attempt consumes the seal, including malformed requests. A
+        // serializer failure may follow storage mutations; the IPC owner ends
+        // the session on export errors rather than continuing unknown state.
+        let seal = self.snapshot_export_seal.take().ok_or_else(|| {
+            "snapshot export requires the immediately preceding successful checkpoint".to_string()
+        })?;
+        if seal.checkpoint.slot != slot
+            || expected_accounts_hash.len() != 32
+            || seal.checkpoint.accounts_hash.as_slice() != expected_accounts_hash
+            || self.write_cursor != seal.checkpoint.next_write_version
+            || self.next_entry_index != seal.next_entry_index
+            || self.last_entry_hash != seal.last_entry_hash
+            || self.tick_hash_count != seal.tick_hash_count
+        {
+            return Err("snapshot export request or cursor differs from checkpoint".into());
+        }
+        snapshot_export::export_archive(&self.bank, &seal.checkpoint, Path::new(output_directory))
     }
 
     fn advance_to(&mut self, slot: u64) -> Result<Vec<AccountWrite>, String> {
@@ -776,6 +824,7 @@ impl RuntimeState {
             last_accounts_clean_block_height: 0,
             accounts_shrink_consumed_budget: 0,
             execution_wave_metrics: ExecutionWaveMetrics::new(false),
+            snapshot_export_seal: None,
         }
     }
 }
