@@ -2357,7 +2357,7 @@ fn operator_status_owner_matches(
     observer: &BoundFile,
     current: Option<&Value>,
 ) -> Result<bool> {
-    if epoch == 265 || (epoch == 247 && !evidence.predecessors.is_empty()) {
+    if matches!(epoch, 211 | 265) || (epoch == 247 && !evidence.predecessors.is_empty()) {
         return operator_successors::matches(
             evidence,
             epoch,
@@ -2565,6 +2565,7 @@ pub(super) async fn run() -> Result<()> {
             gate.operator_status.is_none()
                 || (*epoch == 251 && gate.state == "blocked-qualification")
                 || (*epoch == 265 && gate.state == "blocked-qualification")
+                || (*epoch == 211 && gate.state == "blocked-qualification")
                 || (*epoch == 247 && gate.state == "post-replay-pipeline"),
             "operator status evidence is outside qualified profiles"
         );
@@ -3658,6 +3659,7 @@ pub(super) async fn run() -> Result<()> {
             let operator_matches = gate.operator_status.as_ref().is_some_and(|_| {
                 (epoch == 251 && state == "blocked-qualification")
                     || (epoch == 265 && state == "blocked-qualification")
+                    || (epoch == 211 && state == "blocked-qualification")
                     || (epoch == 247 && state == "post-replay-pipeline")
             }) && operator_status_owner_matches(
                 gate.operator_status.as_ref().expect("checked"),

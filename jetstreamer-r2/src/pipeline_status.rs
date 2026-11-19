@@ -416,7 +416,8 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["_UID"] == "0" && r["MESSAGE"].as_str().is_some_and(|s| {
                 (s.starts_with("Starting ")
                     && !(unit == super::singleton247_finalization::UNIT
-                        && invocation == super::singleton247_finalization::IID))
+                        && invocation == super::singleton247_finalization::IID)
+                    && !super::original_singleton_finalization::original_owner(unit, invocation))
                     || (((unit == super::cohort_finalization::CONTROLLER
                         && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
                         || (unit == super::cohort198_handoff::CONTROLLER
@@ -1111,6 +1112,16 @@ mod tests {
                 start_millis(std::slice::from_ref(&event), unit, iid).unwrap(),
                 1794882675000
             );
+            // These Type=exec producers have both native manager events. The
+            // pre-start interval is not part of their original replay clock.
+            let starting = json!({"UNIT":unit,"INVOCATION_ID":iid,"_PID":"1","_UID":"0",
+                "MESSAGE_ID":"7d4958e842da4a758f6c1cdc7b36dcc5","MESSAGE":format!("Starting epoch {epoch}..."),
+                "__REALTIME_TIMESTAMP":"1794882615000000"});
+            assert_eq!(
+                start_millis(&[starting.clone(), event.clone()], unit, iid).unwrap(),
+                1794882675000
+            );
+            assert!(start_millis(&[starting], unit, iid).is_err());
             for key in ["UNIT", "INVOCATION_ID", "_PID", "_UID", "MESSAGE_ID"] {
                 let mut bad = event.clone();
                 bad[key] = json!("replacement");

@@ -1,0 +1,42 @@
+{
+  "archive_or_sidecar_mutation": false,
+  "authenticated_status_absent_before": true,
+  "basis": "Source provenance accepted; complete recurring guard accounting and sandbox permissions remain. 6h repairs plus2h native/replay qualification,65h conservative same-century replay planning,20h full/local-plugin/upload/readback/remote-plugin/sidecar. No actual211 replay is claimed.",
+  "control_blocker": {
+    "path": "/home/ubuntu/.codex/diagnostics/horizon-native211-admission-prep-20261119-v1/control-census-blocker.json",
+    "sha256": "2bf449b9c6117cf3455df8fa161711a09371f841ca413f8b11b76a90679585e6"
+  },
+  "epoch": 211,
+  "estimate_components": {
+    "delivery_allowance_millis": 72000000,
+    "native_input_and_replay_qualification_millis": 7200000,
+    "remaining_control_and_permission_qualification_millis": 21600000,
+    "replay_planning_millis": 234000000
+  },
+  "estimate_high_uncertainty": true,
+  "handoff": {
+    "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle1639-20261119-v1/continuation-handoff.txt",
+    "sha256": "f0104b4e29699484d35a4acd5eb3be730cf700ac00756355166461670ab401d0"
+  },
+  "key": "epoch-211.epoch-status.json",
+  "original_start_utc": "2026-11-19T17:00:57Z",
+  "owner": "/root",
+  "replacement_sha256": "2290716b2c6b793d0fa42a327d1c7db3655883f5577c3641af32c82dae053990",
+  "replay_launch_authorized": false,
+  "schema": "horizon211-native-operator-status-v1",
+  "source_publication": {
+    "path": "/var/lib/jetstreamer/horizon-native211-source-publication-20261119-v1/source-publication.json",
+    "sha256": "cf0050ab59b5d855de9596f66fc391a58a4ba148c242ac91e252140513db17c8"
+  },
+  "stage": "native-admission-control-and-permission-qualification",
+  "start_basis": "Resumed Main admission task documented in continuation handoff; this is an operator task clock, not a producer start.",
+  "status": {
+    "elapsed_execution_millis": 530000,
+    "epoch": 211,
+    "estimated_remaining_millis": 334800000,
+    "jet_size_bytes": 0,
+    "phase": "verification",
+    "sampled_at_utc": "2026-11-19T17:09:47Z"
+  },
+  "thread_id": "01a1b2db-33e3-7163-a8b3-480390e3aaf3"
+}

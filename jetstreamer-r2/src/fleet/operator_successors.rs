@@ -1,4 +1,4 @@
-//! Closed operator metadata chains for original 247 delivery and 265 input work.
+//! Closed operator metadata chains for original 211/265 input and 247 delivery work.
 //! A chain authenticates status continuity, never replay, admission or capacity.
 use super::*;
 const ROOT: &str = "/home/ubuntu/.codex/diagnostics";
@@ -6,6 +6,24 @@ const THREAD: &str = "01a1b2db-33e3-7163-a8b3-480390e3aaf3";
 const PACKET: &str =
     "/home/ubuntu/.codex/diagnostics/horizon265-input-cache-20261119-v1/input-packet.json";
 const PACKET_SHA: &str = "f7dbb6eedd4f47c940c959639d399ea3af68343f18fc894c736170f6dc089153";
+const NATIVE211_START: &str = "2026-11-19T17:00:57Z";
+const NATIVE211_EVIDENCE: [(&str, &str, &str); 3] = [
+    (
+        "source_publication",
+        "/var/lib/jetstreamer/horizon-native211-source-publication-20261119-v1/source-publication.json",
+        "cf0050ab59b5d855de9596f66fc391a58a4ba148c242ac91e252140513db17c8",
+    ),
+    (
+        "control_blocker",
+        "/home/ubuntu/.codex/diagnostics/horizon-native211-admission-prep-20261119-v1/control-census-blocker.json",
+        "2bf449b9c6117cf3455df8fa161711a09371f841ca413f8b11b76a90679585e6",
+    ),
+    (
+        "handoff",
+        "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle1639-20261119-v1/continuation-handoff.txt",
+        "f0104b4e29699484d35a4acd5eb3be730cf700ac00756355166461670ab401d0",
+    ),
+];
 struct Record {
     basis: Value,
     completion: Value,
@@ -15,6 +33,7 @@ struct Record {
 }
 fn prefix(epoch: u64) -> Result<&'static str> {
     match epoch {
+        211 => Ok("horizon211-native-status-20261119-v"),
         247 => Ok("horizon247-terminal-status-20261119-v"),
         265 => Ok("horizon265-input-status-20261119-v"),
         _ => bail!("unsupported operator status epoch"),
@@ -22,6 +41,11 @@ fn prefix(epoch: u64) -> Result<&'static str> {
 }
 fn anchors(epoch: u64) -> Result<[&'static str; 3]> {
     match epoch {
+        211 => Ok([
+            "cca8869c41e05ba7a133f4a72be7f1573449761c0198cd5ed8b4defa34522ab2",
+            "f8dbb2a1852b4293f52ea2b1fb42d40786b10ee1a904046501d2dcf976f17282",
+            "2290716b2c6b793d0fa42a327d1c7db3655883f5577c3641af32c82dae053990",
+        ]),
         247 => Ok([
             "ec66051f6e599502ec3c8674da27c2caa855a5b0893bbbf6ef4c6eb5d2430e2b",
             "a1570028aa826db237a8d3e16de08438fdf63e6516b7fe1b6b59113819095c7b",
@@ -173,6 +197,47 @@ fn input265(record: &Record) -> Result<()> {
     );
     Ok(())
 }
+fn native211(record: &Record) -> Result<()> {
+    let b = &record.basis;
+    let parts = b["estimate_components"]
+        .as_object()
+        .context("211 estimate components missing")?;
+    let fields = [
+        "delivery_allowance_millis",
+        "native_input_and_replay_qualification_millis",
+        "remaining_control_and_permission_qualification_millis",
+        "replay_planning_millis",
+    ];
+    let total = fields.iter().try_fold(0_u64, |sum, k| {
+        parts
+            .get(*k)
+            .and_then(Value::as_u64)
+            .and_then(|n| sum.checked_add(n))
+    });
+    ensure!(
+        parts.len() == fields.len()
+            && total == Some(record.status.estimated_remaining_millis)
+            && b["schema"] == "horizon211-native-operator-status-v1"
+            && b["stage"] == "native-admission-control-and-permission-qualification"
+            && b["original_start_utc"] == NATIVE211_START
+            && b["start_basis"]
+                == "Resumed Main admission task documented in continuation handoff; this is an operator task clock, not a producer start."
+            && b.get("original_start_unit").is_none()
+            && b.get("original_start_invocation_id").is_none()
+            && record.status.phase == "verification"
+            && record.status.jet_size_bytes == 0
+            && sample_ms(record)?.checked_sub(utc_seconds(NATIVE211_START)? * 1000)
+                == Some(record.status.elapsed_execution_millis),
+        "211 operator task clock/estimate differs"
+    );
+    for (field, path, digest) in NATIVE211_EVIDENCE {
+        ensure!(
+            b[field] == json!({"path":path,"sha256":digest}),
+            "211 original repair evidence differs: {field}"
+        );
+    }
+    Ok(())
+}
 fn chain(records: &[Record], epoch: u64, now: u64) -> Result<()> {
     ensure!(
         !records.is_empty() && records.len() <= 2048,
@@ -205,6 +270,8 @@ fn chain(records: &[Record], epoch: u64, now: u64) -> Result<()> {
                     && r.basis["original_producer"] == records[0].basis["original_producer"],
                 "247 original archive/owner changed"
             );
+        } else if epoch == 211 {
+            native211(r)?;
         } else {
             input265(r)?;
         }
@@ -218,18 +285,18 @@ fn chain(records: &[Record], epoch: u64, now: u64) -> Result<()> {
                     && r.completion["before_etag"] == r.basis["before_etag"],
                 "operator conditional successor chain broken"
             );
-            if epoch == 265 {
+            if matches!(epoch, 211 | 265) {
                 ensure!(
                     r.basis["authenticated_status_absent_before"] == false
                         && r.completion["authenticated_status_absent_before"] == false,
-                    "265 successor cannot recreate absent object"
+                    "operator successor cannot recreate absent object"
                 );
             }
-        } else if epoch == 265 {
+        } else if matches!(epoch, 211 | 265) {
             ensure!(
                 r.basis["authenticated_status_absent_before"] == true
                     && r.completion["authenticated_status_absent_before"] == true,
-                "265 initial absence anchor differs"
+                "operator initial absence anchor differs"
             );
         }
     }
@@ -249,7 +316,7 @@ pub(super) fn matches(
     now: u64,
 ) -> Result<bool> {
     ensure!(
-        matches!(epoch, 247 | 265) && evidence.predecessors.len() < 2048,
+        matches!(epoch, 211 | 247 | 265) && evidence.predecessors.len() < 2048,
         "operator successor scope/count differs"
     );
     let mut records = Vec::new();
@@ -268,6 +335,13 @@ pub(super) fn matches(
     chain(&records, epoch, now)?;
     if epoch == 247 {
         terminal247::validate_current(current.context("247 terminal owner missing")?, now)?;
+    } else if epoch == 211 {
+        for (_, path, digest) in NATIVE211_EVIDENCE {
+            bytes(&BoundFile {
+                path: path.into(),
+                sha256: digest.into(),
+            })?;
+        }
     } else {
         let packet = bytes(&BoundFile {
             path: PACKET.into(),
@@ -296,6 +370,118 @@ pub(super) fn matches(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn actual211() -> Record {
+        let parts = [
+            include_bytes!("operator_successors_fixtures/epoch211-v1-intent.json").as_slice(),
+            include_bytes!("operator_successors_fixtures/epoch211-v1-completion.json").as_slice(),
+            include_bytes!("operator_successors_fixtures/epoch211-v1-readback.json").as_slice(),
+        ];
+        for (part, digest) in parts.iter().zip(anchors(211).unwrap()) {
+            assert_eq!(hex_lower(&Sha256::digest(part)), digest);
+        }
+        let raw: Value = serde_json::from_slice(parts[2]).unwrap();
+        Record {
+            basis: serde_json::from_slice(parts[0]).unwrap(),
+            completion: serde_json::from_slice(parts[1]).unwrap(),
+            status: serde_json::from_value(raw.clone()).unwrap(),
+            raw,
+            bytes: parts[2].to_vec(),
+        }
+    }
+    fn next211(prior: &Record) -> Record {
+        let mut r = actual211();
+        r.status.sampled_at_utc = "2026-11-19T17:40:00Z".into();
+        r.status.elapsed_execution_millis = (utc_seconds(&r.status.sampled_at_utc).unwrap()
+            - utc_seconds(NATIVE211_START).unwrap())
+            * 1000;
+        r.raw = serde_json::to_value(&r.status).unwrap();
+        r.bytes = serde_json::to_vec(&r.raw).unwrap();
+        let digest = hex_lower(&Sha256::digest(&r.bytes));
+        r.basis["status"] = r.raw.clone();
+        r.basis["replacement_sha256"] = json!(digest);
+        r.completion["new_sha256"] = json!(digest);
+        r.completion["new_etag"] = json!("\"qualified-successor\"");
+        r.completion["sampled_at_utc"] = json!(r.status.sampled_at_utc);
+        for v in [&mut r.basis, &mut r.completion] {
+            v["authenticated_status_absent_before"] = json!(false);
+            v["before_sha256"] = prior.completion["new_sha256"].clone();
+            v["before_etag"] = prior.completion["new_etag"].clone();
+        }
+        r
+    }
+    #[test]
+    fn actual211_anchor_and_conditional_successor_preserve_operator_clock() {
+        let a = actual211();
+        assert_eq!(a.status.elapsed_execution_millis, 530000);
+        let first = utc_seconds(&a.status.sampled_at_utc).unwrap();
+        chain(std::slice::from_ref(&a), 211, first).unwrap();
+        let b = next211(&a);
+        let now = utc_seconds(&b.status.sampled_at_utc).unwrap();
+        let records = [a, b];
+        chain(&records, 211, now).unwrap();
+        assert!(chain(&records, 211, now - 1).is_err());
+        assert!(chain(&records, 211, now + 1801).is_err());
+        assert_eq!(prefix(211).unwrap(), "horizon211-native-status-20261119-v");
+    }
+    #[test]
+    fn actual211_rejects_changed_task_source_blocker_owner_or_estimate() {
+        let now = utc_seconds("2026-11-19T17:09:47Z").unwrap();
+        for key in [
+            "owner",
+            "thread_id",
+            "stage",
+            "schema",
+            "source_publication",
+            "control_blocker",
+            "handoff",
+            "original_start_utc",
+            "start_basis",
+        ] {
+            let mut a = actual211();
+            a.basis[key] = json!("changed");
+            assert!(chain(&[a], 211, now).is_err(), "{key}");
+        }
+        for key in ["original_start_unit", "original_start_invocation_id"] {
+            let mut a = actual211();
+            a.basis[key] = json!("invented-producer");
+            assert!(chain(&[a], 211, now).is_err());
+        }
+        let mut a = actual211();
+        a.basis["estimate_components"]["replay_planning_millis"] = json!(1);
+        assert!(chain(&[a], 211, now).is_err());
+        let mut a = actual211();
+        a.basis["estimate_components"]["extra"] = json!(0);
+        assert!(chain(&[a], 211, now).is_err());
+        let mut a = actual211();
+        a.completion["authenticated_exact_byte_readback"] = json!(false);
+        assert!(chain(&[a], 211, now).is_err());
+        let mut a = actual211();
+        a.status.elapsed_execution_millis += 1;
+        assert!(chain(&[a], 211, now).is_err());
+    }
+    #[test]
+    fn actual211_successor_cannot_drop_compare_and_swap_or_restart_elapsed_clock() {
+        for field in ["before_etag", "before_sha256"] {
+            let a = actual211();
+            let mut b = next211(&a);
+            b.basis[field] = json!("foreign");
+            assert!(chain(&[a, b], 211, utc_seconds("2026-11-19T17:40:00Z").unwrap()).is_err());
+        }
+        let a = actual211();
+        let mut b = next211(&a);
+        b.basis["authenticated_status_absent_before"] = json!(true);
+        assert!(chain(&[a, b], 211, utc_seconds("2026-11-19T17:40:00Z").unwrap()).is_err());
+        let a = actual211();
+        let mut b = next211(&a);
+        b.status.elapsed_execution_millis = 0;
+        b.raw = serde_json::to_value(&b.status).unwrap();
+        b.bytes = serde_json::to_vec(&b.raw).unwrap();
+        let digest = hex_lower(&Sha256::digest(&b.bytes));
+        b.basis["status"] = b.raw.clone();
+        b.basis["replacement_sha256"] = json!(digest);
+        b.completion["new_sha256"] = json!(digest);
+        assert!(chain(&[a, b], 211, utc_seconds("2026-11-19T17:40:00Z").unwrap()).is_err());
+    }
     fn record(epoch: u64, sample: &str, previous: Option<&Record>) -> Record {
         let sample_seconds = utc_seconds(sample).unwrap();
         let start = if epoch == 265 {
