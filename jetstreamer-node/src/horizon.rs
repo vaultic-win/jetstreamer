@@ -38,7 +38,7 @@
 //! the node's replay machinery already treats divergence as fatal.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::BufWriter;
 use std::path::Path;
 use std::str::FromStr;
@@ -47,7 +47,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use jetstreamer_horizon::account_updates::AccountUpdateView;
 use jetstreamer_horizon::archive::{
     ArchiveProvenance, ArchiveStats, ArchiveWriter, ArchiveWriterConfig, BlockMeta, EntryRecord,
-    EpochMeta,
+    EpochMeta, RuntimeStateCheckpoint,
 };
 use jetstreamer_horizon::convert;
 use jetstreamer_horizon::transactions::Transaction;
@@ -116,6 +116,14 @@ pub fn init(
     provenance: &ArchiveProvenance,
     expected_initial_parent: Option<(Slot, Hash)>,
 ) -> Result<(), String> {
+    // Refuse a second recorder before touching its output path. A failed init
+    // must not truncate or create an archive beside the still-active recorder.
+    let mut slot = RECORDER
+        .write()
+        .map_err(|_| "horizon recorder lock poisoned".to_string())?;
+    if slot.is_some() {
+        return Err("horizon recorder already initialized".to_string());
+    }
     let recorder = HorizonRecorder::create(
         path,
         epoch,
@@ -125,12 +133,6 @@ pub fn init(
         Some(provenance),
         expected_initial_parent,
     )?;
-    let mut slot = RECORDER
-        .write()
-        .map_err(|_| "horizon recorder lock poisoned".to_string())?;
-    if slot.is_some() {
-        return Err("horizon recorder already initialized".to_string());
-    }
     *slot = Some(Arc::new(recorder));
     Ok(())
 }
@@ -140,13 +142,30 @@ pub fn init(
 /// disabled. Clears the slot so the next epoch's [`init`] can install a fresh
 /// archive.
 pub fn finish() -> Result<Option<ArchiveStats>, String> {
+    finish_recorder(None)
+}
+
+/// Finalize an exact checkpoint segment and release its active recorder.
+/// This requires the same producer-drain and freeze ordering as [`finish`].
+pub fn finish_checkpoint_segment(
+    checkpoint: &RuntimeStateCheckpoint,
+) -> Result<Option<ArchiveStats>, String> {
+    finish_recorder(Some(checkpoint))
+}
+
+fn finish_recorder(
+    checkpoint: Option<&RuntimeStateCheckpoint>,
+) -> Result<Option<ArchiveStats>, String> {
     let recorder = RECORDER
         .write()
         .map_err(|_| "horizon recorder lock poisoned".to_string())?
         .take();
-    match recorder {
-        Some(recorder) => recorder.finish().map(Some),
-        None => Ok(None),
+    match (recorder, checkpoint) {
+        (Some(recorder), Some(checkpoint)) => {
+            recorder.finish_checkpoint_segment(checkpoint).map(Some)
+        }
+        (Some(recorder), None) => recorder.finish().map(Some),
+        (None, _) => Ok(None),
     }
 }
 
@@ -354,6 +373,7 @@ struct BufferedBlockMeta {
 
 struct RecorderState {
     writer: ArchiveWriter<BufWriter<File>>,
+    archive_parent: File,
     epoch: u64,
     slot_start: Slot,
     slot_end_inclusive: Slot,
@@ -391,7 +411,20 @@ impl HorizonRecorder {
         provenance: Option<&ArchiveProvenance>,
         expected_initial_parent: Option<(Slot, Hash)>,
     ) -> Result<Self, String> {
-        let file = File::create(path)
+        let slot_end_inclusive = slot_count
+            .checked_sub(1)
+            .and_then(|count| slot_start.checked_add(count))
+            .ok_or_else(|| "horizon archive range is empty or overflows".to_string())?;
+        let parent = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let archive_parent = File::open(parent)
+            .map_err(|err| format!("failed to open horizon archive directory: {err}"))?;
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
             .map_err(|err| format!("failed to create horizon archive {}: {err}", path.display()))?;
         let sink = BufWriter::with_capacity(8 << 20, file);
         let config = ArchiveWriterConfig::default();
@@ -405,9 +438,10 @@ impl HorizonRecorder {
         Ok(HorizonRecorder {
             state: Mutex::new(RecorderState {
                 writer,
+                archive_parent,
                 epoch,
                 slot_start,
-                slot_end_inclusive: slot_start + slot_count - 1,
+                slot_end_inclusive,
                 assemblies: BTreeMap::new(),
                 block_metas: BTreeMap::new(),
                 #[cfg(feature = "epoch141-original-entry-qualification")]
@@ -685,11 +719,46 @@ impl HorizonRecorder {
     /// The caller must freeze the final replayed bank first so the last
     /// slot's post-transaction orphan updates have been recorded.
     pub fn finish(&self) -> Result<ArchiveStats, String> {
+        self.finish_inner(None)
+    }
+
+    /// Close a predeclared segment only at its exact complete runtime
+    /// checkpoint. The caller must drain producers and record freeze writes
+    /// first. This cannot shorten a full-epoch writer or authorize a restart;
+    /// native restore, checkpoint equality and admission remain separate gates.
+    pub fn finish_checkpoint_segment(
+        &self,
+        checkpoint: &RuntimeStateCheckpoint,
+    ) -> Result<ArchiveStats, String> {
+        self.finish_inner(Some(checkpoint))
+    }
+
+    fn finish_inner(
+        &self,
+        checkpoint: Option<&RuntimeStateCheckpoint>,
+    ) -> Result<ArchiveStats, String> {
         let mut state = self.lock();
         if state.finished {
             return Err("horizon recorder already finished".to_string());
         }
+        if let Some(checkpoint) = checkpoint {
+            if !checkpoint.slot_complete || checkpoint.slot != state.slot_end_inclusive {
+                return Err("checkpoint must complete the predeclared segment boundary".into());
+            }
+            if state.assemblies.keys().any(|slot| *slot > checkpoint.slot)
+                || state.block_metas.keys().any(|slot| *slot > checkpoint.slot)
+            {
+                return Err("checkpoint segment contains buffered data beyond its boundary".into());
+            }
+        }
         state.emit_complete_below(Slot::MAX);
+        if let Some(checkpoint) = checkpoint {
+            if state.last_emitted != Some(checkpoint.slot)
+                || state.last_emitted_blockhash != Some(checkpoint.last_blockhash)
+            {
+                return Err("recorded terminal block does not match the runtime checkpoint".into());
+            }
+        }
         if state.last_emitted.is_none() {
             return Err(format!(
                 "horizon archive {}..={} contains no block from which to prove its initial PoH anchor",
@@ -733,8 +802,15 @@ impl HorizonRecorder {
         let (sink, stats) = writer
             .finish()
             .map_err(|err| format!("horizon: failed to finalize archive: {err}"))?;
-        sink.into_inner()
+        let file = sink
+            .into_inner()
             .map_err(|err| format!("horizon: failed to flush archive: {err}"))?;
+        file.sync_all()
+            .map_err(|err| format!("horizon: failed to sync archive: {err}"))?;
+        state
+            .archive_parent
+            .sync_all()
+            .map_err(|err| format!("horizon: failed to sync archive directory: {err}"))?;
         info!(
             "horizon archive complete: slots={} blocks={} txs={} tx_updates={} orphan_updates={} \
              epochs={} buckets={} bytes={} (payload {} uncompressed)",
@@ -1408,6 +1484,110 @@ mod tests {
         assert_eq!(reader.read_slots(100, 1, &mut collected).expect("read"), 1);
         assert_eq!(collected.blocks.len(), 1);
         assert_eq!(collected.blocks[0].0, 100);
+    }
+
+    #[test]
+    fn checkpoint_segment_requires_exact_frozen_terminal_and_keeps_declared_extent() {
+        use jetstreamer_horizon::archive::AccountsHashKind;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("segment.jet");
+        let recorder = HorizonRecorder::create(
+            &path,
+            1,
+            100,
+            1,
+            presence_map(100, &[SlotPresenceState::Present]),
+            None,
+            None,
+        )
+        .unwrap();
+        let anchor = Hash::new_unique();
+        let (tx, tx_meta) = legacy_tx(0x37, 1);
+        let terminal = solana_entry::entry::next_hash(&anchor, 1, std::slice::from_ref(&tx));
+        recorder.record_block_meta(
+            100,
+            99,
+            &anchor.to_string(),
+            &terminal.to_string(),
+            &KeyedRewardsAndNumPartitions {
+                keyed_rewards: vec![],
+                num_partitions: None,
+            },
+            None,
+            None,
+            1,
+            1,
+        );
+        recorder.record_committed_entry(100, 0, 1, vec![(tx, tx_meta)]);
+        // A genuine post-freeze orphan must survive checkpoint closure.
+        recorder.record_account_update(100, &pk(1), &account(5, b"freeze", 2), None, 10);
+        let checkpoint = RuntimeStateCheckpoint {
+            slot: 100,
+            bank_hash: Hash::new_unique(),
+            accounts_hash_kind: AccountsHashKind::LegacyAccountsHash,
+            accounts_hash: Hash::new_unique(),
+            last_blockhash: terminal,
+            capitalization: 5,
+            transaction_count: 1,
+            tick_height: 1,
+            slot_complete: true,
+            next_write_version: 11,
+        };
+        for invalid in [
+            RuntimeStateCheckpoint {
+                slot: 99,
+                ..checkpoint
+            },
+            RuntimeStateCheckpoint {
+                slot: 101,
+                ..checkpoint
+            },
+            RuntimeStateCheckpoint {
+                slot_complete: false,
+                ..checkpoint
+            },
+            RuntimeStateCheckpoint {
+                last_blockhash: Hash::new_unique(),
+                ..checkpoint
+            },
+        ] {
+            assert!(recorder.finish_checkpoint_segment(&invalid).is_err());
+        }
+        let stats = recorder.finish_checkpoint_segment(&checkpoint).unwrap();
+        assert_eq!(stats.slots, 1);
+        assert!(recorder.finish_checkpoint_segment(&checkpoint).is_err());
+        let mut reader = ArchiveReader::open(File::open(path).unwrap()).unwrap();
+        assert_eq!(
+            (reader.header().slot_start, reader.header().slot_count),
+            (100, 1)
+        );
+        assert!(reader.has_complete_slot_coverage().unwrap());
+        reader.verify_chain = true;
+        let mut collected = Collected::default();
+        assert_eq!(reader.read_slots(100, 1, &mut collected).unwrap(), 1);
+        assert_eq!(collected.blocks[0].1, terminal);
+        assert_eq!(collected.blocks[0].4, vec![10]);
+    }
+
+    #[test]
+    fn recorder_create_preserves_existing_files_and_rejects_invalid_ranges() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("retained.jet");
+        std::fs::write(&path, b"retained archive sentinel").unwrap();
+        let presence = presence_map(100, &[SlotPresenceState::Present]);
+        assert!(HorizonRecorder::create(&path, 1, 100, 1, presence.clone(), None, None).is_err());
+        let link = dir.path().join("symlink.jet");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(HorizonRecorder::create(&link, 1, 100, 1, presence.clone(), None, None).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"retained archive sentinel");
+        let absent = dir.path().join("invalid.jet");
+        for (start, count) in [(100, 0), (u64::MAX, 2)] {
+            assert!(
+                HorizonRecorder::create(&absent, 1, start, count, presence.clone(), None, None)
+                    .is_err()
+            );
+            assert!(!absent.exists());
+        }
     }
 
     #[test]

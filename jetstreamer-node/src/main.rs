@@ -3056,37 +3056,8 @@ impl ReplayFailure {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SlotPresenceState {
-    Present,
-    Missing,
-}
-
-#[derive(Debug)]
-struct SlotPresenceMap {
-    start: Slot,
-    end_inclusive: Slot,
-    states: Vec<SlotPresenceState>,
-    next_present_after: Vec<Option<Slot>>,
-}
-
-impl SlotPresenceMap {
-    fn state(&self, slot: Slot) -> Option<SlotPresenceState> {
-        if slot < self.start || slot > self.end_inclusive {
-            return None;
-        }
-        let idx = (slot - self.start) as usize;
-        self.states.get(idx).copied()
-    }
-
-    fn next_present_after(&self, slot: Slot) -> Option<Slot> {
-        if slot < self.start || slot > self.end_inclusive {
-            return None;
-        }
-        let idx = (slot - self.start) as usize;
-        self.next_present_after.get(idx).copied().flatten()
-    }
-}
+mod slot_presence;
+use slot_presence::{SlotPresenceMap, SlotPresenceState};
 
 struct RipgetProgress {
     label: String,
@@ -13576,16 +13547,30 @@ async fn run_geyser_replay(
         }
     }
 
-    if horizon::recorder().is_some() {
+    let recording = horizon::recorder().is_some();
+    if recording {
         // Freeze the final bank so its end-of-slot account updates are
         // recorded before the archive closes.
         replay_executor.freeze_latest_bank()?;
-        // Finalize and tear down this epoch's archive so the next epoch in a
-        // range run can install its own.
-        horizon::finish()?;
     }
 
     let historical_evidence = replay_executor.historical_evidence()?;
+    if recording {
+        // Finalize and tear down this epoch's archive so the next epoch in a
+        // range run can install its own. Exact terminal checkpoints also bind
+        // the recorded final block; trailing skipped ranges keep their existing
+        // independent skipped-slot proof path.
+        if let Some(evidence) = historical_evidence.as_ref()
+            && evidence.terminal.slot == end_inclusive
+        {
+            let checkpoint = runtime_checkpoint_from_manifest(
+                &segment_checkpoint_summary(&evidence.terminal),
+            )?;
+            horizon::finish_checkpoint_segment(&checkpoint)?;
+        } else {
+            horizon::finish()?;
+        }
+    }
     if let Some(output_directory) = handoff_export_directory {
         let plan = qualification.ok_or_else(|| {
             "handoff snapshot export is allowed only for a focused qualification run".to_string()
