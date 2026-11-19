@@ -1,0 +1,65 @@
+{
+  "schema": "horizon168-native-harness-source-resolution-v1",
+  "command": [
+    "/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/cargo",
+    "metadata",
+    "--offline",
+    "--format-version=1",
+    "--filter-platform",
+    "x86_64-unknown-linux-gnu",
+    "--manifest-path",
+    "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/native_qualification/Cargo.toml"
+  ],
+  "metadata_only": true,
+  "builds_run": false,
+  "tests_run": false,
+  "native_controls_run": false,
+  "resolved_packages": 36,
+  "workspace_members": [
+    {
+      "name": "horizon-epoch168-native-fault-shim",
+      "version": "0.1.0",
+      "manifest_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/native_qualification/fault-shim/Cargo.toml",
+      "targets": [
+        {
+          "kind": [
+            "cdylib"
+          ],
+          "crate_types": [
+            "cdylib"
+          ],
+          "name": "horizon_epoch168_native_fault_shim",
+          "src_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/native_qualification/fault-shim/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "horizon-epoch168-native-qualification",
+      "version": "0.1.0",
+      "manifest_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/native_qualification/Cargo.toml",
+      "targets": [
+        {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "horizon-epoch168-native-qualification",
+          "src_path": "/home/sol/workspace/jetstreamer/scripts/horizon_epoch168_source_diagnostic_20261119_v1/native_qualification/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        }
+      ]
+    }
+  ],
+  "lock_sha256": "626ca5f97e7885f3c3ff5f81cfef9e6f68bf19c84ed7ca1fafbf30213f502607",
+  "new_registry_versions_vs_parent": [],
+  "stderr": ""
+}
