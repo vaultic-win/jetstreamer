@@ -425,11 +425,33 @@ complete operational preparation remain before guarded admission. Do not reuse
 the old one-peer stage helper or substitute forecast peer identities.
 
 The R2 audit's user-requested **00:33 UTC** check found **36 passed, zero failed**,
-with epoch36 downloading. Epochs26–35 completed in2,304 seconds: **15.625
+with epoch 36 downloading. Epochs 26–35 completed in 2,304 seconds: **15.625
 epochs/hour**, 230.4 seconds/epoch including download, playback, checks and cleanup.
-Epoch35 playback took30.730 seconds for432,000 slots and25,720,561 transactions.
+Epoch 35 playback took 30.730 seconds for 432,000 slots and 25,720,561 transactions.
 The unchanged audit service has zero restarts. Next routine audit check is no
-earlier than **01:03:38 UTC**. Its16GiB archive cap still needs a qualified scratch
-expansion before the first oversized archive at epoch74. No audit restart or
+earlier than **01:03:38 UTC**. Its 16 GiB archive cap still needs a qualified scratch
+expansion before the first oversized archive at epoch 74. No audit restart or
 DATA reservation change has occurred. An attempted delegation again received
 an encoded task payload and was interrupted; parent retains continuation.
+
+At 00:54 the corrected epoch 170 launcher was sealed at
+`/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch`,
+SHA-256 `91d99b494420cdf63680ced191c7bbbb53a83046ca4af60b511ee2771b411cca`.
+Its adjacent artifact proof SHA-256 is
+`fb2f647dec28eef1d3111ada991681364e776ce7302bc10910faaa6e57dc9d56`.
+This is qualification evidence only; no epoch 170 preparation or launch occurred.
+
+The reconciled fleet now updates every nested status and binds both actual
+producer admissions, classifying epoch 167 as bootstrap. It is
+`/var/lib/jetstreamer/root0049-live166167-observation-20261119-v2/ROOT_COMPLETE_OPERATIONAL_FLEET.json`,
+SHA-256 `62ef665dd8c42a27bb3b9e0edaf4c51bfe20315cfd877d6eb1a4712d3a91c6b0`.
+The v1 attempt encountered the existing join configuration and stopped before
+arming a timer; its evidence remains. The v2 route uses a distinct immutable
+configuration. Exactly one successor timer is armed:
+`horizon-observer-root0119-live166167-20261119-v1.timer`, for **01:19:25 UTC**.
+Its config is
+`/usr/local/lib/jetstreamer/horizon-live166167-observer-config-0049-20261119-v2/next-observer.json`,
+SHA-256 `22c9326872a8c793ab757e89a3b0e29529a639db57b965619cd52fb15a0d66e0`.
+Expected sample: `sample-root0119-live166167-20261119-v1.json` in the normal
+observer state directory. Use `observe_cycle_two` for this two-producer cadence;
+do not reuse the sole-166 helper. Its classification tests and strict Clippy pass.
