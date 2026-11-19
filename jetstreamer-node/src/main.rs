@@ -40,6 +40,7 @@ mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
 mod failed_prefix220;
+mod qualification_checkpoint_resume;
 mod singletons209_212;
 mod singletons209_212_profile;
 
@@ -5343,6 +5344,13 @@ fn usage(program: &str) -> String {
          after a complete recorded block, drain execution and export a private\n\
          checkpoint. A paused result requires separate prefix validation, worker\n\
          reap and recovery qualification; it is never full replay completion.\n\
+         --qualification-checkpoint-resume=SEALED-PAUSED-REPORT and\n\
+         --qualification-checkpoint-resume-sha256=HEX resume privately from a\n\
+         reaped v3 pressure checkpoint. Existing focused flags must name the\n\
+         exported snapshot, original canonical terminal and a fresh private\n\
+         suffix output. A complete prefix reread and native restored-state\n\
+         check precede entries. The suffix and private .restart-v4.jet assembly\n\
+         retain full verification and publication gates; no sidecar is created.\n\
          --epoch-hashes=PATH, --snapshot-archive=PATH, --range-info=A-B, and\n\
          --replay-scratch=PATH are otherwise internal flags passed by the range\n\
          supervisor to its children. A root-checkpoint cohort may also use an\n\
@@ -19903,6 +19911,8 @@ async fn main() {
     let mut qualification_end_slot: Option<Slot> = None;
     let mut checkpoint_export_directory: Option<PathBuf> = None;
     let mut checkpoint_on_pressure = false;
+    let mut checkpoint_resume_report: Option<PathBuf> = None;
+    let mut checkpoint_resume_sha: Option<String> = None;
     let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
@@ -19969,6 +19979,20 @@ async fn main() {
             verify_option_count = verify_option_count.saturating_add(1);
         } else if let Some(path) = arg.strip_prefix("--horizon-output=") {
             horizon_output = Some(PathBuf::from(path));
+        } else if let Some(path) = arg.strip_prefix("--qualification-checkpoint-resume=") {
+            if path.is_empty()
+                || checkpoint_resume_report
+                    .replace(PathBuf::from(path))
+                    .is_some()
+            {
+                eprintln!("checkpoint resume requires one nonempty sealed paused-report path");
+                exit(2);
+            }
+        } else if let Some(hash) = arg.strip_prefix("--qualification-checkpoint-resume-sha256=") {
+            if checkpoint_resume_sha.replace(hash.into()).is_some() {
+                eprintln!("duplicate checkpoint resume report SHA-256");
+                exit(2);
+            }
         } else if arg == "--qualification-checkpoint-on-pressure" {
             if checkpoint_on_pressure {
                 eprintln!("duplicate --qualification-checkpoint-on-pressure");
@@ -20131,6 +20155,8 @@ async fn main() {
         || continuation_plan_sha256.is_some()
     {
         let forbidden = horizon_output.is_some()
+            || checkpoint_resume_report.is_some()
+            || checkpoint_resume_sha.is_some()
             || checkpoint_export_directory.is_some()
             || checkpoint_on_pressure
             || qualification_end_slot.is_some()
@@ -20420,6 +20446,49 @@ async fn main() {
         );
         exit(2);
     }
+    let checkpoint_resume = if checkpoint_resume_report.is_some() || checkpoint_resume_sha.is_some()
+    {
+        let result = (|| {
+            qualification_checkpoint_resume::validate_mode(
+                qualification.is_some() && explicit_verify == Some(true),
+                verify_option_count,
+                checkpoint_export_directory.is_some()
+                    || checkpoint_on_pressure
+                    || inherited_epoch_lease
+                    || root_checkpoint_cohort
+                    || range_info.is_some()
+                    || recover_staged_only
+                    || recover_staged_cohort_only
+                    || recover_unreceipted_root_cohort_only
+                    || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+                    || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+            )?;
+            qualification_checkpoint_resume::ValidatedResume::load(
+                checkpoint_resume_report
+                    .as_deref()
+                    .ok_or("checkpoint resume report is required")?,
+                checkpoint_resume_sha
+                    .as_deref()
+                    .ok_or("checkpoint resume report SHA-256 is required")?,
+                qualification.ok_or("checkpoint resume qualification missing")?,
+                snapshot_archive_override
+                    .as_deref()
+                    .ok_or("checkpoint resume snapshot missing")?,
+                horizon_output
+                    .as_deref()
+                    .ok_or("checkpoint resume suffix output missing")?,
+            )
+        })();
+        match result {
+            Ok(proof) => Some(proof),
+            Err(error) => {
+                eprintln!("checkpoint resume rejected: {error}");
+                exit(2);
+            }
+        }
+    } else {
+        None
+    };
     if let Some(directory) = checkpoint_export_directory.as_deref() {
         if let Err(error) = validate_checkpoint_export_mode(
             qualification.is_some(),
@@ -22137,6 +22206,12 @@ async fn main() {
         }
 
         let registered_handoff_directory = env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR");
+        if let Some(resume) = checkpoint_resume.as_ref()
+            && let Err(error) = resume.require_terminal(snapshot_verifier.as_deref())
+        {
+            eprintln!("checkpoint resume rejected: {error}");
+            exit(2);
+        }
         let result = run_geyser_replay(
             epoch,
             allow_candidate_runtime,
@@ -22171,7 +22246,9 @@ async fn main() {
                     .map(Path::new)
                     .map(SnapshotExportRequest::RegisteredHandoff)),
             epoch < end_epoch,
-            None,
+            checkpoint_resume
+                .as_ref()
+                .map(|proof| proof as &dyn checkpoint_continuation::RestartProof),
             if epoch223_prefix_preflight {
                 epoch223_qualification::TailMode::PrefixPlanningPreflight
             } else if epoch223_tail_preflight {
@@ -22317,6 +22394,12 @@ async fn main() {
                             exit(1);
                         }
                     };
+                    if let Some(resume) = checkpoint_resume.as_ref()
+                        && let Err(error) = resume.assemble(&horizon_output, &verified_segment)
+                    {
+                        eprintln!("private checkpoint assembly failed: {error}");
+                        exit(1);
+                    }
                     if let Some(exported) = result.checkpoint_snapshot.as_ref() {
                         // Ordered worker shutdown has been acknowledged, and
                         // the segment passed its full manifest readback. Kernel

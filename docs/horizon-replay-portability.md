@@ -847,3 +847,30 @@ exit, fresh-parent restoration and unchanged suffix output. Its evidence is unde
 `/home/ubuntu/.jetstreamer-private/pressure-reap-20261119-v1/native-v1`.
 The full firehose pressure controller and mainnet restore path still require
 qualification before reservations can be released or another lane admitted.
+
+The node now has an explicit private resume entry point using
+`--qualification-checkpoint-resume=SEALED-PAUSED-REPORT` and
+`--qualification-checkpoint-resume-sha256=HEX` alongside the existing standalone
+focused qualification flags. It requires an immutable, root-owned paused-v3
+report, a synchronously reaped worker and an absent recorded producer PID.
+This PID check does not replace controller/cgroup exit proof or fresh resource
+admission. The original prefix must cover the epoch from its first slot through
+the selected complete block, and the requested suffix must end at the original
+intended terminal. Export, cohort, carry and other recovery modes cannot be mixed.
+
+Before replay, the route independently rereads the complete prefix/snapshot
+bundle, binds its measured identities to the report and pins them through the
+operation. It requires the exact canonical terminal in the verification set;
+the prefix never exempts that obligation. The actual suffix worker must match
+the saved consensus tuple, unchanged executable and zero bootstrap writes before
+receiving entries. Its initialized write cursor remains an independent namespace.
+After normal focused verification and segment readback, the route merges the
+unchanged prefix and suffix into a fresh private `.restart-v4.jet` using explicit
+write-version mappings. It does not create a canonical sidecar or grant archive
+publication, resource release or automated pressure-controller authority.
+
+Initial full-node tests cover CLI mode isolation, exact prefix/suffix coverage,
+preservation of the canonical terminal obligation, native consensus and worker
+binding, independent cursors and rejection of a repeated native barrier. Actual
+full-firehose pressure/restore qualification remains pending; this entry point
+alone does not qualify mainnet recovery or admit another lane.
