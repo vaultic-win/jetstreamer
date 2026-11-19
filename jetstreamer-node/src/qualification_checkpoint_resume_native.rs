@@ -67,10 +67,34 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     let mut saved = boundary.clone();
     saved.writes.clear();
     assert_eq!(saved, restored);
-    let directory = tempfile::tempdir().unwrap();
+    let phase = std::env::var("JETSTREAMER_PRESSURE_NATIVE_PHASE").ok();
+    assert!(
+        phase
+            .as_deref()
+            .is_none_or(|p| matches!(p, "export" | "resume"))
+    );
+    let temporary = phase.is_none().then(|| tempfile::tempdir().unwrap());
+    let directory = match &temporary {
+        Some(directory) => directory.path().to_owned(),
+        None => PathBuf::from(std::env::var_os("JETSTREAMER_PRESSURE_NATIVE_DIRECTORY").unwrap()),
+    };
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+        if phase.as_deref() == Some("export") {
+            fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&directory)
+                .unwrap();
+        } else if temporary.is_some() {
+            fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        assert_eq!(directory.canonicalize().unwrap(), directory);
+        let metadata = fs::symlink_metadata(&directory).unwrap();
+        assert!(
+            metadata.is_dir()
+                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.mode() & 0o077 == 0
+        );
     }
     let accounts_hash: [u8; 32] = boundary.accounts_hash.clone().try_into().unwrap();
     assert_eq!(baseline_export.slot, boundary.slot);
@@ -79,16 +103,26 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
         required_genesis_hash: Box::leak(genesis_hash.into_boxed_str()),
         ..crate::historical::SOLANA_V1_7_15_CANDIDATE
     };
-    let export = export_from_pressure_notifiers(
-        &input,
-        &launcher,
-        profile,
-        &bootstrap,
-        &prefix_entry,
-        &boundary,
-        &terminal,
-        directory.path(),
-    );
+    let export = if phase.as_deref() == Some("resume") {
+        read_exited_native_bundle(&directory)
+    } else {
+        export_from_pressure_notifiers(
+            &input,
+            &launcher,
+            profile,
+            &bootstrap,
+            &prefix_entry,
+            &boundary,
+            &terminal,
+            &directory,
+        )
+    };
+    if phase.as_deref() == Some("export") {
+        eprintln!(
+            "native producer published authentic paused-v3 bundle; source worker reaped; exiting before resume"
+        );
+        return;
+    }
     let snapshot = export.archive_path.clone();
     let mut client = HistoricalRuntimeClient::spawn(
         profile,
@@ -102,7 +136,7 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
                     expected_accounts_hash: accounts_hash,
                     expected_archive_sha256: Some(export.archive_sha256),
                     expected_archive_size: Some(export.archive_size),
-                    scratch_parent: Some(directory.path().into()),
+                    scratch_parent: Some(directory.clone()),
                 },
             ),
         },
@@ -304,6 +338,16 @@ fn export_from_pressure_notifiers(
         },
         worker_executable_sha256: Sha256::digest(fs::read(launcher).unwrap()).into(),
     };
+    let runtime = jetstreamer_node::segment_manifest::SegmentRuntimeIdentity {
+        generation_profile: provenance.base.generation_profile.clone(),
+        runtime_profile: provenance.base.runtime_profile.clone(),
+        runtime_admission: jetstreamer_node::segment_manifest::SegmentRuntimeAdmission::Candidate,
+        runtime_revision: provenance.base.runtime_revision.clone(),
+        runtime_toolchain: provenance.base.runtime_toolchain.clone(),
+        runtime_target: profile.target.into(),
+        genesis_hash: provenance.base.genesis_hash.to_string(),
+    };
+    let worker_sha = provenance.worker_executable_sha256;
     horizon::init(
         &source,
         0,
@@ -501,25 +545,130 @@ fn export_from_pressure_notifiers(
     replay.freeze_latest_bank().unwrap();
     checkpoint_export::validate_checkpoint_export_evidence(&before, &replay.evidence().unwrap())
         .unwrap();
+    let worker_shutdown = replay.shutdown_for_checkpoint().unwrap();
+    assert!(worker_shutdown.worker_reap_verified());
+    let request = || qualification_checkpoint_pause::PausedCheckpoint {
+        epoch: 0,
+        output_slot_start: prefix.slot,
+        end_inclusive: terminal.slot,
+        boundary: completed,
+        horizon_output: &source,
+        directory: &export_directory,
+        evidence: &before,
+        snapshot: &exported,
+        worker_shutdown,
+        runtime: runtime.clone(),
+        worker_sha,
+        bootstrap_archive_sha256: Some(Sha256::digest(fs::read(&initial).unwrap()).into()),
+    };
+    // Bad tuple and previously closed clients fail before creating any bundle.
+    let mut invalid = request();
+    invalid.boundary.blockhash[0] ^= 1;
     assert!(
-        replay
-            .shutdown_for_checkpoint()
-            .unwrap()
-            .worker_reap_verified()
+        qualification_checkpoint_pause::publish(invalid)
+            .unwrap_err()
+            .contains("differ from source")
     );
-    let converted = jetstreamer_node::checkpoint_prefix::convert_closed_prefix(
-        &source,
-        &directory.join("prefix.jet"),
-        &jetstreamer_node::checkpoint_prefix::ClosedPrefixRange {
-            epoch: 0,
-            first_slot: prefix.slot,
-            intended_terminal: terminal.slot,
-            selected_terminal: boundary.slot,
-            terminal_blockhash: Hash::new_from_array(completed.blockhash),
-        },
-    )
-    .unwrap();
-    assert_eq!(converted.slot_count, 1);
+    let mut invalid = request();
+    invalid.worker_shutdown = historical::HistoricalShutdownOutcome::AlreadyClosed;
+    assert!(
+        qualification_checkpoint_pause::publish(invalid)
+            .unwrap_err()
+            .contains("before ordered")
+    );
+    assert!(!export_directory.join("validated-prefix").exists());
+    let report = qualification_checkpoint_pause::publish(request()).unwrap();
+    assert_eq!(report["verified_prefix"]["segment"]["output_slot_count"], 1);
+    assert_eq!(report["producer_pid"], std::process::id());
+    assert_eq!(report["worker_reap_verified"], true);
+    let report_path = export_directory.join("paused.json");
+    let bytes = fs::read(&report_path).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),
+        report
+    );
+    assert!(qualification_checkpoint_pause::publish(request()).is_err());
+    assert_eq!(
+        fs::read(&report_path).unwrap(),
+        bytes,
+        "duplicate finalization must not overwrite evidence"
+    );
     assert!(failure.error_message().is_none());
     exported
+}
+
+/// Fresh-parent fixture consumes actual process/cgroup proof and deeply rereads
+/// the authentic production bundle. It intentionally does not waive the private
+/// resume CLI's epoch-wide scope for this synthetic slots-1/2 fixture.
+fn read_exited_native_bundle(
+    directory: &std::path::Path,
+) -> crate::historical::HistoricalSnapshotExport {
+    use crate::checkpoint_continuation::{Evidence, sealed_bytes};
+    let report_binding = Evidence {
+        path: std::env::var_os("JETSTREAMER_PRESSURE_NATIVE_REPORT")
+            .unwrap()
+            .into(),
+        sha256: std::env::var("JETSTREAMER_PRESSURE_NATIVE_REPORT_SHA256").unwrap(),
+    };
+    let bytes = sealed_bytes(&report_binding, 4 << 20).unwrap();
+    assert_eq!(
+        bytes,
+        fs::read(directory.join("export/paused.json")).unwrap()
+    );
+    let report: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let proof = Evidence {
+        path: std::env::var_os("JETSTREAMER_PRESSURE_NATIVE_EXIT_PROOF")
+            .unwrap()
+            .into(),
+        sha256: std::env::var("JETSTREAMER_PRESSURE_NATIVE_EXIT_PROOF_SHA256").unwrap(),
+    };
+    crate::qualification_checkpoint_exit::load(&proof, &report, &report_binding.sha256, 0).unwrap();
+    let pid = report["producer_pid"].as_u64().unwrap();
+    assert_ne!(pid, u64::from(std::process::id()));
+    assert!(
+        unsafe { libc::kill(i32::try_from(pid).unwrap(), 0) } == -1
+            && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+    );
+    let prefix = PathBuf::from(report["verified_prefix"]["path"].as_str().unwrap());
+    let snapshot = PathBuf::from(report["snapshot"]["path"].as_str().unwrap());
+    assert_eq!(prefix, directory.join("export/validated-prefix/prefix.jet"));
+    assert_eq!(snapshot.parent().unwrap(), directory.join("export"));
+    let (segment, manifest) =
+        jetstreamer_node::checkpoint_bundle::read_and_validate_checkpoint_bundle(
+            &prefix, &snapshot,
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(&segment).unwrap(),
+        report["verified_prefix"]["segment"]
+    );
+    assert_eq!(
+        serde_json::to_value(manifest.archive_sha256).unwrap(),
+        report["snapshot"]["sha256"]
+    );
+    assert_eq!(
+        manifest.archive_size,
+        report["snapshot"]["length"].as_u64().unwrap()
+    );
+    assert_eq!(segment.terminal.slot, 1);
+    assert_eq!(report["intended_terminal_slot"], 2);
+    for field in [
+        "full_range_completed",
+        "resource_release_authorized",
+        "resume_authorized",
+        "publication_authorized",
+    ] {
+        assert_eq!(report[field], false);
+    }
+    eprintln!(
+        "fresh native parent consumed authentic paused bundle and qualified producer/cgroup exit proof; producer_pid={pid} current_parent_pid={}",
+        std::process::id()
+    );
+    crate::historical::HistoricalSnapshotExport {
+        slot: manifest.snapshot_slot,
+        archive_path: snapshot,
+        accounts_hash: manifest.accounts_hash.parse::<Hash>().unwrap().to_bytes(),
+        archive_size: manifest.archive_size,
+        archive_sha256: manifest.archive_sha256,
+    }
 }

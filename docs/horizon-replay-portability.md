@@ -958,3 +958,30 @@ This joins real node callbacks, native execution, recording, export and restore.
 It still injects a synthetic decoded transcript and keeps the parent alive;
 CAR/network delivery, durable controller/parent restart, assembled full-epoch
 verification and mainnet pressure admission remain separate outstanding gates.
+
+The next native fixture uses the production paused finalizer itself, now shared
+in `qualification_checkpoint_pause.rs`. The helper retains full prefix/manifest
+rereads, snapshot publication intent and binding, no-clobber paused-v3 output,
+and denied resource-release/resume/publication fields. It also checks the
+snapshot's slot and accounts hash against the selected native/source boundary
+before creating bundle files. Already-closed workers and changed source tuples
+are rejected, and duplicate finalization leaves the original report intact.
+
+Separate systemd export and resume invocations passed using that authentic
+bundle. Producer PID 1073826, invocation `a2b86d0100a6448fa37d16eeba8da0f9`,
+completed after synchronous worker reaping. The qualified exit helper verified
+the retained clean systemd invocation, absent producer/worker PIDs and empty
+cgroup. Fresh parent PID 1073968, invocation
+`9926fe6848e24062af43f021d0a87bd8`, consumed the sealed proof/report, deeply
+reread the bundle and executed the restored suffix to the exact terminal.
+Both native stages stayed within 2 GB; the resume stage took 426 ms with a
+reported 237.3 MiB peak. Thirteen focused tests also passed. Evidence and exact
+commands are retained in
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-parent-native-20261119-v1`.
+
+This proves a clean producer-parent handoff with the actual production bundle,
+not the whole pressure controller. The fixture still injects decoded synthetic
+source, does not invoke the epoch-scoped private resume CLI, and does not run
+full-epoch assembly or delivery. Its slot-1 prefix must not bypass the CLI's
+epoch-start requirement. Controller interruption recovery, CAR/network input
+and mainnet pressure admission remain outstanding.
