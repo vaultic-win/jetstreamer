@@ -2,6 +2,7 @@
 mod evidence;
 mod local;
 mod remote;
+mod resume;
 mod retry;
 mod source;
 
@@ -372,6 +373,184 @@ fn summary(cfg: &Config, inventory: &Inventory) -> Result<serde_json::Value> {
         "scope":"canonical archives present in the frozen authenticated bucket inventory", "inventory_observed_at":inventory.observed_at}),
     )
 }
+fn playback_args(cfg: &Config, epoch: u64, native_report: &Path) -> Vec<String> {
+    vec![
+        format!("{epoch}:{epoch}"),
+        cfg.scratch_directory().to_string_lossy().into_owned(),
+        "--threads".into(),
+        cfg.threads.to_string(),
+        "--verify-only".into(),
+        "--verification-report".into(),
+        native_report.to_string_lossy().into_owned(),
+    ]
+}
+
+/// The sole full-playback/acceptance route for a fresh download or a qualified
+/// copied download. A recovery never substitutes an old playback report.
+async fn playback_downloaded(
+    cfg: &Config,
+    remote: &Remote,
+    object: &Object,
+    logs: &Path,
+    sequence: &mut u64,
+    download: &remote::Download,
+    outcome: &mut Outcome,
+) -> Result<()> {
+    let archive = cfg.scratch_directory().join(&object.key);
+    // Re-fetch immediately before playback. If relevant reader changes land
+    // during playback, repeat the whole epoch with that current build.
+    loop {
+        *sequence += 1;
+        let reader = loop {
+            match source::qualify(cfg, logs, *sequence) {
+                Ok(reader) => break reader,
+                Err(error) => {
+                    write_json(
+                        &logs.join(format!("reader-error-{sequence}.json")),
+                        &json!({"at":now(),"error":format!("{error:#}")}),
+                        false,
+                    )?;
+                    wait(
+                        cfg,
+                        "waiting_for_reader",
+                        object.epoch,
+                        &format!("{error:#}"),
+                    )
+                    .await?;
+                    *sequence += 1;
+                }
+            }
+        };
+        let native_report = logs.join(format!("native-playback-{sequence}.json"));
+        let args = playback_args(cfg, object.epoch, &native_report);
+        let mut invocation = vec![reader.artifact.to_string_lossy().into_owned()];
+        invocation.extend(args.clone());
+        write_json(
+            &logs.join(format!("playback-{sequence}-invocation.json")),
+            &json!({"argv":invocation,"reader":reader,"download":download,
+                "environment":{"PATH":"/usr/bin:/bin","LC_ALL":"C","RUST_LOG":"info","RUST_MIN_STACK":"67108864"},"other_environment_removed":true}),
+            false,
+        )?;
+        progress(
+            cfg,
+            "playing_entire_epoch",
+            Some(object.epoch),
+            object.bytes,
+            Some(object.bytes),
+            None,
+        )?;
+        let mut command = clean_command(&reader.artifact);
+        command.args(&args);
+        command.current_dir(cfg.scratch_directory());
+        let log = logs.join(format!("playback-{sequence}.log"));
+        outcome.reader = Some(reader.clone());
+        outcome.invocation = invocation;
+        ensure!(
+            run_logged(
+                command,
+                &log,
+                cfg.playback_timeout_seconds,
+                cfg.max_log_bytes,
+                cfg
+            )?,
+            "plugin playback exited unsuccessfully"
+        );
+        let mut report =
+            evidence::validate_playback(&log, object.epoch, cfg.threads, cfg.max_log_bytes)?;
+        evidence::validate_native_report(
+            &native_report,
+            &mut report,
+            &outcome.invocation,
+            &cfg.scratch_directory(),
+        )?;
+        let owned: OwnedScratch = read_json(&cfg.state_directory.join("scratch-owner.json"))?;
+        owned.identity.check(&archive)?;
+        ensure!(
+            hash_file(&archive)? == download.sha256,
+            "audit archive changed during playback"
+        );
+        ensure!(
+            hash_file(&reader.artifact)? == reader.artifact_sha256,
+            "reader image changed during playback"
+        );
+        ensure!(
+            remote.identity(object).await? == download.identity(&remote.bucket),
+            "remote archive changed during playback"
+        );
+        write_json(
+            &logs.join(format!("playback-{sequence}-report.json")),
+            &report,
+            false,
+        )?;
+        *sequence += 1;
+        let current = loop {
+            match source::qualify(cfg, logs, *sequence) {
+                Ok(reader) => break reader,
+                Err(error) => {
+                    wait(
+                        cfg,
+                        "waiting_for_reader",
+                        object.epoch,
+                        &format!("{error:#}"),
+                    )
+                    .await?;
+                    *sequence += 1;
+                }
+            }
+        };
+        if current.source_fingerprint == reader.source_fingerprint {
+            outcome.reader = Some(current);
+            outcome.playback = Some(report);
+            break;
+        }
+        progress(
+            cfg,
+            "replaying_after_reader_change",
+            Some(object.epoch),
+            object.bytes,
+            Some(object.bytes),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn finish_attempt(
+    cfg: &Config,
+    object: &Object,
+    ticket: Option<&retry::RetryTicket>,
+    logs: &Path,
+    outcome: &mut Outcome,
+    result: Result<()>,
+) -> Result<bool> {
+    match result {
+        Ok(()) => outcome.status = "passed".into(),
+        Err(error) => {
+            outcome.transfer_interruption = error
+                .downcast_ref::<remote::TransferInterruption>()
+                .cloned();
+            outcome.error = Some(format!("{error:#}"));
+        }
+    }
+    outcome.finished_at = now();
+    validate_outcome(outcome, object)?;
+    // The immutable terminal receipt is committed before the only archive
+    // deletion this program performs (its own download).
+    let result_path = ticket.map_or_else(
+        || outcome_path(cfg, object.epoch),
+        |ticket| retry::result_path(cfg, object.epoch, ticket.binding.ordinal),
+    );
+    write_json(&result_path, outcome, false)?;
+    cleanup_scratch(cfg)?;
+    write_json(
+        &logs.join("cleanup.json"),
+        &json!({"at":now(),"removed_only_owned_audit_copy":true,"epoch":object.epoch}),
+        false,
+    )?;
+    eprintln!("epoch {}: {}", object.epoch, outcome.status);
+    Ok(outcome.status == "passed")
+}
+
 async fn audit_one(
     cfg: &Config,
     remote: &Remote,
@@ -468,81 +647,37 @@ async fn audit_one(
     // A terminated download is never promoted. Restart recovery deletes only
     // its journaled scratch inode and repeats this epoch from byte/slot zero.
     let result: Result<()> = async {
-        progress(cfg,"downloading",Some(object.epoch),0,Some(object.bytes),None)?;
-        let download = remote.download(cfg, object, &attempt,
-            ticket.and_then(|ticket| ticket.prior_identity.as_ref())).await?;
+        progress(
+            cfg,
+            "downloading",
+            Some(object.epoch),
+            0,
+            Some(object.bytes),
+            None,
+        )?;
+        let download = remote
+            .download(
+                cfg,
+                object,
+                &attempt,
+                ticket.and_then(|ticket| ticket.prior_identity.as_ref()),
+            )
+            .await?;
         outcome.download = Some(download.clone());
-        let archive = cfg.scratch_directory().join(&object.key);
-        // Re-fetch immediately before playback. If relevant reader changes land
-        // during playback, repeat the whole epoch with that current build.
-        loop {
-            sequence+=1;
-            let reader = loop {
-                match source::qualify(cfg, &attempt, sequence) {
-                    Ok(reader) => break reader,
-                    Err(error) => { write_json(&attempt.join(format!("reader-error-{sequence}.json")), &json!({"at":now(),"error":format!("{error:#}")}), false)?;
-                        wait(cfg,"waiting_for_reader",object.epoch,&format!("{error:#}")).await?; sequence+=1; },
-                }
-            };
-            let native_report = attempt.join(format!("native-playback-{sequence}.json"));
-            let args = vec![format!("{}:{}",object.epoch,object.epoch), cfg.scratch_directory().to_string_lossy().into_owned(),
-                "--threads".into(), cfg.threads.to_string(), "--verify-only".into(),
-                "--verification-report".into(), native_report.to_string_lossy().into_owned()];
-            let mut invocation = vec![reader.artifact.to_string_lossy().into_owned()]; invocation.extend(args.clone());
-            write_json(&attempt.join(format!("playback-{sequence}-invocation.json")), &json!({"argv":invocation,"reader":reader,"download":download,
-                "environment":{"PATH":"/usr/bin:/bin","LC_ALL":"C","RUST_LOG":"info","RUST_MIN_STACK":"67108864"},"other_environment_removed":true}), false)?;
-            progress(cfg,"playing_entire_epoch",Some(object.epoch),object.bytes,Some(object.bytes),None)?;
-            let mut command = clean_command(&reader.artifact); command.args(&args);
-            command.current_dir(cfg.scratch_directory());
-            let log = attempt.join(format!("playback-{sequence}.log"));
-            outcome.reader = Some(reader.clone()); outcome.invocation = invocation;
-            ensure!(run_logged(command,&log,cfg.playback_timeout_seconds,cfg.max_log_bytes,cfg)?, "plugin playback exited unsuccessfully");
-            let mut report = evidence::validate_playback(&log,object.epoch,cfg.threads,cfg.max_log_bytes)?;
-            evidence::validate_native_report(&native_report, &mut report, &outcome.invocation, &cfg.scratch_directory())?;
-            let owned: OwnedScratch = read_json(&cfg.state_directory.join("scratch-owner.json"))?;
-            owned.identity.check(&archive)?;
-            ensure!(hash_file(&archive)? == download.sha256, "audit archive changed during playback");
-            ensure!(hash_file(&reader.artifact)? == reader.artifact_sha256, "reader image changed during playback");
-            ensure!(remote.check_identity(object).await? == (download.version_id.clone(),download.metadata_sha256.clone()), "remote archive changed during playback");
-            write_json(&attempt.join(format!("playback-{sequence}-report.json")), &report, false)?;
-            sequence+=1;
-            let current = loop {
-                match source::qualify(cfg,&attempt,sequence) {
-                    Ok(reader) => break reader,
-                    Err(error) => { wait(cfg,"waiting_for_reader",object.epoch,&format!("{error:#}")).await?; sequence+=1; },
-                }
-            };
-            if current.source_fingerprint == reader.source_fingerprint {
-                outcome.reader = Some(current); outcome.playback=Some(report); break;
-            }
-            progress(cfg,"replaying_after_reader_change",Some(object.epoch),object.bytes,Some(object.bytes),None)?;
-        }
+        playback_downloaded(
+            cfg,
+            remote,
+            object,
+            &attempt,
+            &mut sequence,
+            &download,
+            &mut outcome,
+        )
+        .await?;
         Ok(())
-    }.await;
-    match result {
-        Ok(()) => outcome.status = "passed".into(),
-        Err(error) => {
-            outcome.transfer_interruption = error
-                .downcast_ref::<remote::TransferInterruption>()
-                .cloned();
-            outcome.error = Some(format!("{error:#}"));
-        }
     }
-    outcome.finished_at = now();
-    // The immutable terminal receipt is committed before the only archive
-    // deletion this program performs (its own download).
-    let result_path = ticket.map_or_else(
-        || outcome_path(cfg, object.epoch),
-        |ticket| retry::result_path(cfg, object.epoch, ticket.binding.ordinal),
-    );
-    write_json(&result_path, &outcome, false)?;
-    cleanup_scratch(cfg)?;
-    write_json(
-        &attempt.join("cleanup.json"),
-        &json!({"at":now(),"removed_only_owned_audit_copy":true,"epoch":object.epoch}),
-        false,
-    )?;
-    eprintln!("epoch {}: {}", object.epoch, outcome.status);
+    .await;
+    finish_attempt(cfg, object, ticket, &attempt, &mut outcome, result)?;
     Ok(())
 }
 #[tokio::main(flavor = "multi_thread", worker_threads = 2)]
@@ -550,11 +685,14 @@ async fn main() -> Result<()> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     ensure!(
         args.len() == 2,
-        "usage: horizon-r2-chronological-plugin-audit <inventory|run|status|reconfigure> CONFIG.json"
+        "usage: horizon-r2-chronological-plugin-audit <inventory|run|resume-downloaded|status|reconfigure> CONFIG.json"
     );
     let mode = args[0].to_str().context("invalid mode")?;
     ensure!(
-        matches!(mode, "inventory" | "run" | "status" | "reconfigure"),
+        matches!(
+            mode,
+            "inventory" | "run" | "resume-downloaded" | "status" | "reconfigure"
+        ),
         "invalid mode"
     );
     let cfg: Config = read_json(Path::new(&args[1]))?;
@@ -611,6 +749,12 @@ async fn main() -> Result<()> {
         write_json(&config_path, &cfg, true)?;
         return Ok(());
     }
+    if mode == "resume-downloaded" {
+        ensure!(
+            config_path.try_exists()? && cfg.state_directory.join("inventory.json").try_exists()?,
+            "download recovery requires the original accepted configuration and frozen inventory"
+        );
+    }
     if config_path.try_exists()? {
         ensure!(
             read_json::<Config>(&config_path)? == cfg,
@@ -652,6 +796,14 @@ async fn main() -> Result<()> {
             serde_json::to_string_pretty(&summary(&cfg, &inventory)?)?
         );
         return Ok(());
+    }
+    // A crashed explicit recovery cannot fall through ordinary startup cleanup
+    // or consume another retry slot. Only a fully committed recovery can resume
+    // ordinary chronological scheduling.
+    if mode == "resume-downloaded" {
+        resume::run(&cfg, &remote, &inventory).await?;
+    } else {
+        resume::ordinary_start(&cfg)?;
     }
     // Preserve an interruption receipt before cleaning the old partial. A
     // terminal result, if present, remains authoritative; otherwise retry it.

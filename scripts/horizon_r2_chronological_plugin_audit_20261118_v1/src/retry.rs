@@ -58,6 +58,10 @@ impl View {
     }
 }
 
+pub fn has_incomplete(view: &View) -> bool {
+    view.incomplete.is_some()
+}
+
 fn retryable(result: &Outcome, sha256: &str) -> bool {
     if result.status != "failed"
         || result.download.is_some()
@@ -86,7 +90,7 @@ pub fn result_path(cfg: &Config, epoch: u64, ordinal: u32) -> PathBuf {
         .join("results")
         .join(format!("epoch-{epoch}.retry-{ordinal}.json"))
 }
-fn ticket_path(cfg: &Config, epoch: u64, ordinal: u32) -> PathBuf {
+pub fn ticket_path(cfg: &Config, epoch: u64, ordinal: u32) -> PathBuf {
     cfg.state_directory
         .join("results")
         .join(format!("epoch-{epoch}.retry-{ordinal}.intent.json"))
@@ -219,6 +223,16 @@ pub fn view(cfg: &Config, object: &Object) -> Result<Option<View>> {
         view.completed_recoveries = ordinal;
     }
     Ok(Some(view))
+}
+
+/// Validated existing ticket only: this never spends or resets a retry budget.
+/// The normal path still terminally records an interrupted ticket; only the
+/// explicitly selected downloaded-recovery route may request this binding.
+pub fn incomplete_ticket(cfg: &Config, object: &Object) -> Result<RetryTicket> {
+    view(cfg, object)?
+        .context("download recovery requires original retry history")?
+        .incomplete
+        .context("download recovery requires an incomplete retry intent with no terminal result")
 }
 
 fn prepare_ticket(cfg: &Config, object: &Object) -> Result<RetryTicket> {

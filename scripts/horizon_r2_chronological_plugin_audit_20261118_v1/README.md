@@ -44,6 +44,17 @@ for the bounded append-only transfer recovery described below.
 
 ## Configuration and budgets
 
+On `dev-samjohnson`, all audit state, downloads, builds and reader generations
+now have home-filesystem backing. Persistent bind mounts retain the established
+state and reader paths, so historical receipts and sealed reader destinations
+remain valid. The backing directories are `state` and `readers` beneath
+`/home/sol/.jetstreamer-private/horizon-root-runtime-data/r2-audit-storage-20261119-v1`.
+Use the admitted DATA reserve, not the old root-filesystem floor. The archive
+cap is an acceptance ceiling: each download reserves its exact object length
+and bounded metadata; a reader rebuild reserves only remaining working growth.
+The original ROOT configuration below is historical and must not be selected
+for new work on this host.
+
 `config.example.json` is an initial **root-filesystem** example, not permission to
 start work: preserve 32 GiB free, cap an individual archive at 20 GiB, and limit
 the private source checkout/build/artifact/logs to 16 GiB. The exact-epoch successor
@@ -151,6 +162,19 @@ rechecked. Another branch fetch follows playback: relevant code changes cause a
 fresh entire-epoch playback; unrelated commits are recorded with equivalence proof.
 
 ## State, failures, and restart
+
+The explicit `resume-downloaded CONFIG.json` recovery command handles the
+epoch77 retry whose complete authenticated download was copied during the
+home-storage migration. It requires the stopped original controller, pinned
+original inventory/retry/download evidence, both persistent DATA mounts, the
+whole copied archive's digest and fresh authenticated remote identity. It
+records the old ownership before rebinding the copied inode, qualifies the
+current reader and repeats the entire plugin playback. It preserves retry1's
+identity and writes its normal result before removing the copied archive, then
+continues chronologically. It does not reset retry budgets or substitute the
+earlier playback receipt. Use `Restart=no` for this single-use recovery entry;
+an interrupted intent requires inspection. After its durable completion,
+future restarts use `run`; the running controller needs no restart to continue.
 
 - `inventory.json`: immutable ordered scope and pinned remote identities.
 - `progress.json`: current phase, epoch, transfer bytes, timestamp, wait reason.

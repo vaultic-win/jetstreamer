@@ -7,6 +7,22 @@ description: Generate, verify, upload, and safely retire Horizon epoch archives 
 
 ## Campaign operating priority
 
+On `dev-samjohnson`, place all Horizon epoch work on the `/home/sol` filesystem:
+archives, replay ledgers, snapshots, audit downloads and state, source/build caches,
+temporary files, logs and runtime artifacts. The small root filesystem must not
+limit work while admitted home capacity is available. Check `findmnt -T` and
+`statvfs` for the actual backing filesystem, not just the pathname. Root-owned
+bind mounts from home-backed storage may preserve established `/var/lib` or
+`/usr/local/lib` paths, receipt bindings and service sandbox access. Keep only
+small system service/mount definitions on root. Migrate existing storage at a
+safe owner boundary, preserving receipts, hashes, locks and recovery state;
+do not restart healthy replay just to change a path. Charge copied bytes and
+remaining growth to the home filesystem's existing complete fleet commitments.
+For the serial R2 audit, reserve the exact next object's bytes plus its bounded
+working growth; the largest accepted archive is a ceiling, not a reservation
+for every small epoch. When storage blocks the audit, fixing placement takes
+priority over adding unrelated cleanup tooling.
+
 Keep one controlling conversation per host and assigned campaign. Before booking resources or
 starting shared builds, admissions, launches or status writers, check the recorded owner and any
 known live controller. Resolve overlapping ownership through an explicit handoff before those

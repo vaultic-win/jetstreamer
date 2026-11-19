@@ -44,6 +44,19 @@ pub struct Download {
     pub metadata_sha256: Option<String>,
 }
 
+impl Download {
+    pub fn identity(&self, bucket: &str) -> TransferIdentity {
+        TransferIdentity {
+            bucket: bucket.into(),
+            object: self.object.clone(),
+            version_id: self.version_id.clone(),
+            metadata_sha256: self.metadata_sha256.clone(),
+            sidecar_sha256: self.sidecar_sha256.clone(),
+            sidecar_etag: self.sidecar_etag.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TransferIdentity {
@@ -273,6 +286,23 @@ impl Remote {
         ensure!(data.len() == usize::try_from(length)?, "short sidecar read");
         Ok((Some(parse_sidecar(object.epoch, &data)?), Some(etag)))
     }
+    /// Reobserve the complete authenticated identity, including the canonical
+    /// sidecar. Reused by copied-download recovery and the final playback check.
+    pub async fn identity(&self, object: &Object) -> Result<TransferIdentity> {
+        let (version_id, metadata_sha256) = self.check_identity(object).await?;
+        let (sidecar_sha256, sidecar_etag) = self.sidecar(object).await?;
+        if let (Some(a), Some(b)) = (&metadata_sha256, &sidecar_sha256) {
+            ensure!(a == b, "sidecar and metadata digests disagree");
+        }
+        Ok(TransferIdentity {
+            bucket: self.bucket.clone(),
+            object: object.clone(),
+            version_id,
+            metadata_sha256,
+            sidecar_sha256,
+            sidecar_etag,
+        })
+    }
     pub async fn download(
         &self,
         cfg: &Config,
@@ -280,19 +310,11 @@ impl Remote {
         attempt: &Path,
         prior_identity: Option<&TransferIdentity>,
     ) -> Result<Download> {
-        let (version_id, metadata_sha256) = self.check_identity(object).await?;
-        let (sidecar_sha256, sidecar_etag) = self.sidecar(object).await?;
-        if let (Some(a), Some(b)) = (&metadata_sha256, &sidecar_sha256) {
-            ensure!(a == b, "sidecar and metadata digests disagree");
-        }
-        let identity = TransferIdentity {
-            bucket: self.bucket.clone(),
-            object: object.clone(),
-            version_id: version_id.clone(),
-            metadata_sha256: metadata_sha256.clone(),
-            sidecar_sha256: sidecar_sha256.clone(),
-            sidecar_etag: sidecar_etag.clone(),
-        };
+        let identity = self.identity(object).await?;
+        let version_id = identity.version_id.clone();
+        let metadata_sha256 = identity.metadata_sha256.clone();
+        let sidecar_sha256 = identity.sidecar_sha256.clone();
+        let sidecar_etag = identity.sidecar_etag.clone();
         require_same_transfer_identity(&identity, prior_identity)?;
         write_json(&attempt.join("download-identity.json"), &identity, false)?;
         cfg.require_download_capacity(object.bytes)?;
