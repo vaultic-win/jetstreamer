@@ -295,11 +295,54 @@ fn main() -> Result<()> {
             == "f99e0d79b062a86f13d808eafed4cb4d53c7325c154934b0c2b59f4f78fa8a46",
         "audit allocation changed"
     );
+    let audit_handoff =
+        "/usr/local/lib/jetstreamer/horizon-audit-exact-budget-handoff-20261119-v1/handoff.json";
+    let audit_handoff_binding = bind(audit_handoff)?;
+    ensure!(
+        audit_handoff_binding["sha256"]
+            == "8e9df42acb7784416775361be5b2f2ca7304ff76aeb61cc6ebb1e971ca6cc0f6",
+        "current audit handoff changed"
+    );
+    let audit = read(audit_handoff)?;
+    ensure!(
+        audit["DATA_reservation_bytes"] == 0
+            && audit["ceiling_is_not_a_capacity_reservation"] == true
+            && audit["actual_capacity_rechecked_per_archive"] == true,
+        "exact per-object audit allocation required"
+    );
     fleet["continuing_audit_obligation"] = json!({"allocation":audit_binding,
+        "exact_archive_budget_handoff":audit_handoff_binding,
         "additional_memory_bytes":25769803776u64,"additional_cpu_quota_micros":4000000u64,
-        "root_filesystem_archive_cap_bytes":17179869184u64,"DATA_reservation_bytes":0,
+        "root_filesystem_archive_cap_bytes":audit["archive_acceptance_ceiling_bytes"],
+        "archive_cap_is_acceptance_ceiling_not_reservation":true,
+        "root_filesystem_floor_bytes":audit["root_floor_bytes"],
+        "bounded_operation_metadata_bytes":audit["metadata_growth_limit_bytes"],
+        "per_epoch_capacity_reserves_exact_archive_bytes":true,
+        "DATA_reservation_bytes":0,
         "original_promises_ended":false,"fresh_native_observation_claimed":false,
         "admission_requirement":"Every next launcher must revalidate the current audit image, invocation and cgroup limits, and add this full allocation to the preserved campaign commitments."});
+    let current167 = status["receipts"]["167"]["path"]
+        .as_str()
+        .context("current167 status receipt")?;
+    ensure!(
+        bind(current167)? == status["receipts"]["167"],
+        "current167 status binding differs"
+    );
+    let event167 = read(current167)?;
+    if event167["preparation_failure"].is_object() {
+        fleet["next_lane_recovery"]["latest_preparation_failure"] =
+            event167["preparation_failure"].clone();
+        fleet["next_lane_recovery"]["current_status_evidence"] = bind(current167)?;
+    }
+    let compiler_retirement =
+        "/var/lib/jetstreamer/focused169-compiler-retire-20261119-v1/completion.json";
+    let compiler_retirement_binding = bind(compiler_retirement)?;
+    ensure!(
+        compiler_retirement_binding["sha256"]
+            == "ea7eed460e5e29d1d1ee1fbc56f8f5ea459edc95ed0879837b484518dab2d390",
+        "completed compiler retirement changed"
+    );
+    fleet["completed_focused169_compiler_retirement"] = compiler_retirement_binding;
     let holding_plan =
         "/usr/local/lib/jetstreamer/horizon-closed169-local2-holding-plan-20261119-v1/plan.json";
     let holding_binding = bind(holding_plan)?;
@@ -384,7 +427,8 @@ fn main() -> Result<()> {
                 && completion["retired_censused_physical_bytes"] == 56565645312u64
                 && completion["actual_free_delta_claimed"] == false
                 && completion["r2_mutations"] == false
-                && completion["intent"]["sha256"] == "33f3b6d1622bb516ce90cc6a5b535038b2403b6056ddb15c49feaa0c70fb742f",
+                && completion["intent"]["sha256"]
+                    == "33f3b6d1622bb516ce90cc6a5b535038b2403b6056ddb15c49feaa0c70fb742f",
             "epoch169 retirement incomplete"
         );
         fleet["completed_holding169_retirement"] = bind(retirement169)?;
