@@ -373,7 +373,27 @@ fn main() -> Result<()> {
     fleet["completed_snapshot160_retirement"] = bind(
         "/var/lib/jetstreamer/snapshot160-private-retire-20261119-v1/target-0-completion.json",
     )?;
-    fleet["next_lane_recovery"] = json!({"epoch":167,"attempt":"local3retry7","source_owner":"/root/epoch170_next_lane","last_result":"Epoch166 retry8 admitted and running;167 source prepared against its actual identity; guard/preparer/launcher qualification pending.","next_action":"Qualify167 successor, publish required sources, measure retained physical bytes and run fresh preparation and guarded launch with all prior promises and the current audit allocation retained.","resource_credit_bytes":0});
+    let retirement169 = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch169-completion.json";
+    if Path::new(retirement169).try_exists()? {
+        let completion = read(retirement169)?;
+        ensure!(
+            completion["schema"] == "jetstreamer-holding-retire169-completion-v1"
+                && completion["source_absent"] == true
+                && completion["quarantine_absent"] == true
+                && completion["authenticated_custody_revalidated"] == true
+                && completion["retired_censused_physical_bytes"] == 56565645312u64
+                && completion["actual_free_delta_claimed"] == false
+                && completion["r2_mutations"] == false
+                && completion["intent"]["sha256"] == "33f3b6d1622bb516ce90cc6a5b535038b2403b6056ddb15c49feaa0c70fb742f",
+            "epoch169 retirement incomplete"
+        );
+        fleet["completed_holding169_retirement"] = bind(retirement169)?;
+    }
+    fleet["next_lane_recovery"] = json!({"epoch":167,"attempt":"local3retry7","source_owner":"/root",
+        "qualified_preparer":bind("/usr/local/lib/jetstreamer/horizon-epoch167-retry7-live166retry8-prepare-20261119-v1/artifact-proof.json")?,
+        "qualified_guard":bind("/usr/local/lib/jetstreamer/horizon-epoch167-retry7-live166retry8-guard-20261119-v1/artifact-proof.json")?,
+        "next_action":"Use this accepted cycle and the actual latest preparation result to capture a fresh witness, complete native preparation and run the launcher native tests, sealed check and guarded launch. Keep all original promises and the audit allocation. Retired allocated bytes alone neither release a reservation nor prove simultaneous fit.",
+        "resource_credit_bytes":0});
     fleet["recovered166_admission"] = bind(
         "/var/lib/jetstreamer/retry8-single166-guarded-launch-20261119-v1/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json",
     )?;
