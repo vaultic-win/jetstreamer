@@ -1,7 +1,8 @@
 //! Bounded reverse reference graph plus separately evidenced native/dynamic
 //! reader review. A direct empty source census does not satisfy this gate.
 use super::*;
-use std::collections::BTreeSet;
+use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use std::{borrow::Cow, collections::BTreeSet};
 
 const SEALED: &str = "/usr/local/lib/jetstreamer";
 // The native host inventory contains 104,491 metadata files / 15,425,505,635
@@ -130,26 +131,133 @@ fn literal_edges(
     aliases: &BTreeMap<PathBuf, PathBuf>,
 ) -> BTreeSet<PathBuf> {
     let mut edges = literal_edges_raw(bytes, corpus, targets, aliases);
-    // Decode bounded valid JSON too: escaped separators must not hide paths.
-    if let Ok(value) = serde_json::from_slice::<Value>(bytes) {
-        let mut pending = vec![value];
-        while let Some(value) = pending.pop() {
-            match value {
-                Value::String(text) => {
-                    edges.extend(literal_edges_raw(text.as_bytes(), corpus, targets, aliases))
-                }
-                Value::Array(values) => pending.extend(values),
-                Value::Object(values) => {
-                    for (key, value) in values {
-                        edges.extend(literal_edges_raw(key.as_bytes(), corpus, targets, aliases));
-                        pending.push(value);
-                    }
-                }
-                _ => (),
-            }
+    // Unescaped JSON strings have already been scanned byte-for-byte above.
+    // A valid JSON document without backslashes cannot contribute new paths.
+    if bytes.contains(&b'\\') {
+        let mut decoder = serde_json::Deserializer::from_slice(bytes);
+        let strings = JsonEdges {
+            corpus,
+            targets,
+            aliases,
+        };
+        // Retain the previous all-or-nothing JSON rule: neither a valid prefix
+        // nor strings visited before an invalid escape/trailing token count.
+        if let Ok(decoded) = strings.deserialize(&mut decoder)
+            && decoder.end().is_ok()
+        {
+            edges.extend(decoded);
         }
     }
     edges
+}
+
+// Visit JSON without constructing a Value tree or copying ordinary strings.
+// serde_json still owns syntax, UTF-8, escape/surrogate and depth validation.
+// Only strings decoded into its scratch buffer need another raw-path scan.
+#[derive(Clone, Copy)]
+struct JsonEdges<'a> {
+    corpus: &'a BTreeMap<PathBuf, Artifact>,
+    targets: &'a BTreeSet<PathBuf>,
+    aliases: &'a BTreeMap<PathBuf, PathBuf>,
+}
+impl<'de> DeserializeSeed<'de> for JsonEdges<'_> {
+    type Value = BTreeSet<PathBuf>;
+    fn deserialize<D: serde::Deserializer<'de>>(self, decoder: D) -> Result<Self::Value, D::Error> {
+        decoder.deserialize_any(self)
+    }
+}
+impl<'de> Visitor<'de> for JsonEdges<'_> {
+    type Value = BTreeSet<PathBuf>;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("a JSON value")
+    }
+    fn visit_borrowed_str<E: serde::de::Error>(self, _: &'de str) -> Result<Self::Value, E> {
+        // With Deserializer::from_slice, borrowed strings contain no escapes.
+        Ok(BTreeSet::new())
+    }
+    fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+        Ok(literal_edges_raw(
+            text.as_bytes(),
+            self.corpus,
+            self.targets,
+            self.aliases,
+        ))
+    }
+    fn visit_string<E: serde::de::Error>(self, text: String) -> Result<Self::Value, E> {
+        self.visit_str(&text)
+    }
+    fn visit_bool<E: serde::de::Error>(self, _: bool) -> Result<Self::Value, E> {
+        Ok(BTreeSet::new())
+    }
+    fn visit_i64<E: serde::de::Error>(self, _: i64) -> Result<Self::Value, E> {
+        Ok(BTreeSet::new())
+    }
+    fn visit_u64<E: serde::de::Error>(self, _: u64) -> Result<Self::Value, E> {
+        Ok(BTreeSet::new())
+    }
+    fn visit_f64<E: serde::de::Error>(self, _: f64) -> Result<Self::Value, E> {
+        Ok(BTreeSet::new())
+    }
+    fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+        Ok(BTreeSet::new())
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut array: A) -> Result<Self::Value, A::Error> {
+        let mut edges = BTreeSet::new();
+        while let Some(value) = array.next_element_seed(self)? {
+            edges.extend(value);
+        }
+        Ok(edges)
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut object: A) -> Result<Self::Value, A::Error> {
+        let mut edges = BTreeSet::new();
+        // Value keeps the last value of duplicate decoded keys. Retain only
+        // values with decoded edges, but let a later empty value remove them.
+        // This preserves that rule without storing unrelated JSON data/keys.
+        let mut values: BTreeMap<Cow<'de, str>, BTreeSet<PathBuf>> = BTreeMap::new();
+        while let Some(key) = object.next_key_seed(JsonKey)? {
+            if let Cow::Owned(text) = &key {
+                edges.extend(literal_edges_raw(
+                    text.as_bytes(),
+                    self.corpus,
+                    self.targets,
+                    self.aliases,
+                ));
+            }
+            let value = object.next_value_seed(self)?;
+            if value.is_empty() {
+                values.remove(key.as_ref());
+            } else {
+                values.insert(key, value);
+            }
+        }
+        for value in values.into_values() {
+            edges.extend(value);
+        }
+        Ok(edges)
+    }
+}
+
+struct JsonKey;
+impl<'de> DeserializeSeed<'de> for JsonKey {
+    type Value = Cow<'de, str>;
+    fn deserialize<D: serde::Deserializer<'de>>(self, decoder: D) -> Result<Self::Value, D::Error> {
+        decoder.deserialize_str(self)
+    }
+}
+impl<'de> Visitor<'de> for JsonKey {
+    type Value = Cow<'de, str>;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("a JSON object key")
+    }
+    fn visit_borrowed_str<E: serde::de::Error>(self, text: &'de str) -> Result<Self::Value, E> {
+        Ok(Cow::Borrowed(text))
+    }
+    fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+        Ok(Cow::Owned(text.to_owned()))
+    }
+    fn visit_string<E: serde::de::Error>(self, text: String) -> Result<Self::Value, E> {
+        Ok(Cow::Owned(text))
+    }
 }
 fn read_artifact(b: &Bound, max: u64, immutable: bool) -> Result<Vec<u8>> {
     ensure!(
@@ -738,6 +846,282 @@ mod tests {
             bytes: bytes.as_bytes().to_vec(),
             definition,
         }
+    }
+    // Independent decoder oracle: retain the former Value-tree implementation
+    // in tests so string streaming must preserve its actual edge semantics.
+    fn value_tree_edges(
+        bytes: &[u8],
+        corpus: &BTreeMap<PathBuf, Artifact>,
+        targets: &BTreeSet<PathBuf>,
+        aliases: &BTreeMap<PathBuf, PathBuf>,
+    ) -> BTreeSet<PathBuf> {
+        let mut edges = literal_edges_raw(bytes, corpus, targets, aliases);
+        if let Ok(value) = serde_json::from_slice::<Value>(bytes) {
+            let mut pending = vec![value];
+            while let Some(value) = pending.pop() {
+                match value {
+                    Value::String(text) => {
+                        edges.extend(literal_edges_raw(text.as_bytes(), corpus, targets, aliases));
+                    }
+                    Value::Array(values) => pending.extend(values),
+                    Value::Object(values) => {
+                        for (key, value) in values {
+                            edges.extend(literal_edges_raw(
+                                key.as_bytes(),
+                                corpus,
+                                targets,
+                                aliases,
+                            ));
+                            pending.push(value);
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+        edges
+    }
+    struct EdgeFixture {
+        corpus: BTreeMap<PathBuf, Artifact>,
+        targets: BTreeSet<PathBuf>,
+        aliases: BTreeMap<PathBuf, PathBuf>,
+    }
+    impl EdgeFixture {
+        fn new() -> Self {
+            Self {
+                corpus: [
+                    "/sealed/plan.json",
+                    "/sealed/wrapper.sh",
+                    "/sealed/é/🦀.json",
+                ]
+                .into_iter()
+                .map(|path| (path.into(), artifact("", false)))
+                .collect(),
+                targets: [SOURCE, RUN, DESTINATION]
+                    .into_iter()
+                    .map(PathBuf::from)
+                    .collect(),
+                aliases: BTreeMap::from([
+                    ("/input-alias".into(), "/sealed".into()),
+                    ("/unicode-alias".into(), "/sealed/é".into()),
+                ]),
+            }
+        }
+        fn compare(&self, bytes: &[u8]) -> BTreeSet<PathBuf> {
+            let observed = literal_edges(bytes, &self.corpus, &self.targets, &self.aliases);
+            let expected = value_tree_edges(bytes, &self.corpus, &self.targets, &self.aliases);
+            assert_eq!(
+                observed,
+                expected,
+                "input={}",
+                String::from_utf8_lossy(bytes)
+            );
+            observed
+        }
+    }
+    #[test]
+    fn streaming_json_preserves_keys_unicode_surrogates_aliases_and_nested_paths() {
+        let fixture = EdgeFixture::new();
+        let cases: &[(&str, &[&str])] = &[
+            (r#"{"v":"\/sealed\/plan.json"}"#, &["/sealed/plan.json"]),
+            (
+                r#"{"v":"\u002Fsealed\u002fpl\u0061n.json"}"#,
+                &["/sealed/plan.json"],
+            ),
+            (
+                r#"{"\u002fsealed\u002fplan.json":null}"#,
+                &["/sealed/plan.json"],
+            ),
+            (
+                r#""\u002fsealed\u002f\u00e9\u002f\ud83e\udd80.json""#,
+                &["/sealed/é/🦀.json"],
+            ),
+            (
+                r#"{"\u002funicode-alias\u002f\ud83e\udd80.json":false}"#,
+                &["/sealed/é/🦀.json"],
+            ),
+            (
+                r#"["\u002finput-alias\u002fplan.json",{"v":["\/sealed\/wrapper.sh"]}]"#,
+                &["/sealed/plan.json", "/sealed/wrapper.sh"],
+            ),
+            (
+                r#"["no\\path",null,true,false,0,-1,-9223372036854775808,18446744073709551615,1.25,1e-300]"#,
+                &[],
+            ),
+        ];
+        for (body, expected) in cases {
+            assert!(serde_json::from_str::<Value>(body).is_ok());
+            assert_eq!(
+                fixture.compare(body.as_bytes()),
+                expected.iter().map(PathBuf::from).collect()
+            );
+        }
+    }
+    #[test]
+    fn streaming_json_preserves_every_raw_separator_after_decoding() {
+        let fixture = EdgeFixture::new();
+        for separator in "\0\n\r\t '\";|&()<>[]{},:\\".chars() {
+            let text = format!("/input-alias/plan.json{separator}/sealed/wrapper.sh");
+            let encoded = serde_json::to_string(&text)
+                .unwrap()
+                .replace('/', "\\u002f");
+            assert!(serde_json::from_str::<Value>(&encoded).is_ok());
+            let expected = ["/sealed/plan.json", "/sealed/wrapper.sh"]
+                .into_iter()
+                .map(PathBuf::from)
+                .collect();
+            assert_eq!(
+                fixture.compare(encoded.as_bytes()),
+                expected,
+                "separator={separator:?}"
+            );
+        }
+    }
+    #[test]
+    fn streaming_json_keeps_the_last_value_of_duplicate_decoded_keys() {
+        let fixture = EdgeFixture::new();
+        let cases: &[(&str, &[&str])] = &[
+            (r#"{"k":"\u002fsealed\u002fplan.json","k":null}"#, &[]),
+            (
+                r#"{"k":null,"\u006b":"\/sealed\/plan.json"}"#,
+                &["/sealed/plan.json"],
+            ),
+            (
+                r#"{"\u006b":"\/sealed\/plan.json","k":"\/sealed\/wrapper.sh"}"#,
+                &["/sealed/wrapper.sh"],
+            ),
+            (r#"{"k":{"\u002fsealed\u002fplan.json":true},"k":[]}"#, &[]),
+            (
+                r#"{"a":{"k":"\/sealed\/plan.json"},"b":{"k":"\/sealed\/wrapper.sh"}}"#,
+                &["/sealed/plan.json", "/sealed/wrapper.sh"],
+            ),
+            (
+                r#"{"\/sealed\/plan.json":"\/sealed\/wrapper.sh","\u002fsealed\u002fplan.json":null}"#,
+                &["/sealed/plan.json"],
+            ),
+        ];
+        for (body, expected) in cases {
+            assert!(serde_json::from_str::<Value>(body).is_ok());
+            assert_eq!(
+                fixture.compare(body.as_bytes()),
+                expected.iter().map(PathBuf::from).collect()
+            );
+        }
+    }
+    #[test]
+    fn streaming_json_discards_decoded_edges_for_invalid_documents_without_losing_raw_edges() {
+        let fixture = EdgeFixture::new();
+        let mut cases: Vec<Vec<u8>> = [
+            r#""\u002fsealed\u002fplan.json" trailing"#,
+            r#"["\u002fsealed\u002fplan.json"] null"#,
+            r#"{"v":"\u002fsealed\u002fplan.json""#,
+            r#"["\u002fsealed\u002fplan.json","\q"]"#,
+            r#"["\u002fsealed\u002fplan.json","\uD800"]"#,
+            r#"["\u002fsealed\u002fplan.json","\uDC00"]"#,
+            r#"["\u002fsealed\u002fplan.json","\uD800\u0041"]"#,
+            r#"{"v":"\u002fsealed\u002fplan.json","n":01}"#,
+            r#"{"v":"\u002fsealed\u002fplan.json","n":1e9999}"#,
+            r#"{"raw":"/sealed/wrapper.sh","v":"\u002fsealed\u002fplan.json","bad":true,}"#,
+        ]
+        .into_iter()
+        .map(|text| text.as_bytes().to_vec())
+        .collect();
+        let mut invalid_utf8 = br#"["\u002fsealed\u002fplan.json",""#.to_vec();
+        invalid_utf8.extend_from_slice(&[0xff, b'"', b']']);
+        cases.push(invalid_utf8);
+        cases.push(
+            format!(
+                "{}\"\\u002fsealed\\u002fplan.json\"{}",
+                "[".repeat(130),
+                "]".repeat(130)
+            )
+            .into_bytes(),
+        );
+        for bytes in cases {
+            assert!(serde_json::from_slice::<Value>(&bytes).is_err());
+            let raw =
+                literal_edges_raw(&bytes, &fixture.corpus, &fixture.targets, &fixture.aliases);
+            let observed = fixture.compare(&bytes);
+            assert_eq!(observed, raw);
+            assert!(!observed.contains(Path::new("/sealed/plan.json")));
+        }
+    }
+    #[test]
+    fn streaming_json_matches_value_tree_across_encodings_and_path_length_gates() {
+        use std::fmt::Write as _;
+        let fixture = EdgeFixture::new();
+        let mut texts = vec![
+            SOURCE.to_owned(),
+            format!("{RUN}/scratch/item"),
+            "/sealed/plan.json".into(),
+            "/sealed/plan.json-extra".into(),
+            "/sealed/é/🦀.json".into(),
+            "bind=/input-alias/plan.json:/sealed/wrapper.sh".into(),
+            "quoted=\"/sealed/plan.json\";other=\\/sealed/wrapper.sh".into(),
+        ];
+        for length in [4095, 4096, 4097] {
+            let prefix = "/sealed/plan.json/";
+            texts.push(format!("{prefix}{}", "x".repeat(length - prefix.len())));
+        }
+        for text in texts {
+            let ordinary = serde_json::to_string(&text).unwrap();
+            let mut utf16 = String::new();
+            for unit in text.encode_utf16() {
+                write!(utf16, "\\u{unit:04x}").unwrap();
+            }
+            for encoded in [
+                ordinary.clone(),
+                ordinary.replace('/', "\\/"),
+                format!("\"{utf16}\""),
+            ] {
+                for document in [
+                    encoded.clone(),
+                    format!("{{{encoded}:[{{\"v\":{encoded}}},null,true,23,-0.5]}}"),
+                    format!("[{{\"k\":{encoded},\"k\":null}},{encoded}]"),
+                ] {
+                    assert!(serde_json::from_str::<Value>(&document).is_ok());
+                    fixture.compare(document.as_bytes());
+                }
+            }
+        }
+        for body in [
+            "/sealed/plan.json:/sealed/wrapper.sh",
+            "invalid \\q /sealed/plan.json",
+            "{\"v\":\"/sealed/é/🦀.json\"}",
+        ] {
+            fixture.compare(body.as_bytes());
+        }
+    }
+    #[test]
+    #[ignore = "bounded in-memory comparison; run only in the admitted test envelope"]
+    fn streaming_json_value_tree_benchmark() {
+        let fixture = EdgeFixture::new();
+        let ordinary = br#"{"path":"/unrelated/metadata.json","phase":"complete","epoch":166,"ready":true,"notes":["retained",null,0]}"#;
+        let escaped = br#"{"ref":"\u002finput-alias\u002fplan.json","unicode":"\u002fsealed\u002f\u00e9\u002f\ud83e\udd80.json"}"#;
+        let mut bytes = vec![b'['];
+        for index in 0..50_000 {
+            if index != 0 {
+                bytes.push(b',');
+            }
+            bytes.extend_from_slice(if index % 1024 == 0 { escaped } else { ordinary });
+        }
+        bytes.push(b']');
+        let start = std::time::Instant::now();
+        let before = value_tree_edges(&bytes, &fixture.corpus, &fixture.targets, &fixture.aliases);
+        let value_tree_seconds = start.elapsed().as_secs_f64();
+        let start = std::time::Instant::now();
+        let after = literal_edges(&bytes, &fixture.corpus, &fixture.targets, &fixture.aliases);
+        let streaming_seconds = start.elapsed().as_secs_f64();
+        assert_eq!(after, before);
+        assert_eq!(after.len(), 2);
+        eprintln!(
+            "{}",
+            json!({
+                "fixture_bytes":bytes.len(),"value_tree_seconds":value_tree_seconds,
+                "streaming_seconds":streaming_seconds,"edges_equal":true,
+                "native_host_census_qualified":false
+            })
+        );
     }
     #[test]
     fn reverse_graph_follows_definition_wrapper_and_plan_instead_of_only_direct_source_hits() {

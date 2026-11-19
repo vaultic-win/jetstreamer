@@ -38,7 +38,7 @@ const EPOCH_LOCK: &str = "/home/sol/.jetstreamer-private/epoch166-standard-lane-
 const QUARANTINE: &str = "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/retirements/epoch166-retry6-c6edc4b47bb905fe8825f09155edcbc217d9ea44246a3a3b4d8deb4387384e85.jet";
 const STATE_SHA: &str = "ef63e2a2e443375f84b1c851c8d0ffc51454d3ef0f5bea03124f8ce3cd73e47a";
 const LIFECYCLE: &str =
-    "/usr/local/lib/jetstreamer/horizon-holding166-retry6-retirement-20261119-v1";
+    "/usr/local/lib/jetstreamer/horizon-holding166-retry6-retirement-20261119-v2";
 // Runtime sealing precedes census/review, and check receipts precede execution
 // plans. Keep their immutable versioned bundles separate from the runtime.
 const EVIDENCE_ROOT: &str = "/var/lib/jetstreamer/holding166-retry6-retirement-evidence";

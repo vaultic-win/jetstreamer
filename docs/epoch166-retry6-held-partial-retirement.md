@@ -24,7 +24,7 @@ gate requires a separate, fresh, fully evidenced closure.
 ## Routes and plans
 
 Seal the helper and its build/source proof in
-`/usr/local/lib/jetstreamer/horizon-holding166-retry6-retirement-20261119-v1`.
+`/usr/local/lib/jetstreamer/horizon-holding166-retry6-retirement-20261119-v2`.
 The helper's actual executable parent must be this directory. Then run its
 census and seal the copied inspection, actual terminal proof, reviewed closure
 and check plan in a new versioned bundle under
@@ -179,3 +179,18 @@ partial during its preservation/hash check. If partial retirement happens first,
 that future scratch operation needs a separately qualified holding-aware
 preservation path or an admitted restore. Do not silently treat that dependency
 as resolved by this partial-only route.
+
+## Census parser successor
+
+The v2 runtime replaces full `serde_json::Value` construction with a streaming
+Serde visitor. It retains raw path scanning and only rescans decoded strings
+when JSON escapes can introduce additional paths. Decoded edges are committed
+only after the complete JSON document validates; duplicate object keys retain
+the predecessor's last-value behavior. Escaped keys, Unicode surrogate pairs,
+aliases, malformed/trailing JSON and raw delimiters have equivalence coverage.
+The installed corpus is still retained in memory, so the 32 GiB census envelope
+and all graph limits remain unchanged. Real census timing must still demonstrate
+that check and retirement fit the original freshness clocks. Build this successor
+in the admitted DATA target: the old ROOT compiler cache has been retired to
+make room for chronological audit readback. Preserve the immutable v1 runtime;
+the new census includes any relevant old runtime metadata in its reviewed graph.
