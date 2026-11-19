@@ -59,7 +59,14 @@ fn main() -> Result<()> {
         "origin/account-updates",
     ])?;
     ensure!(
-        git(&["status", "--porcelain", "--untracked-files=no", "--", "scripts/horizon_retry6_167_live166_stage_20261118_v1/src/bin/plan_launch170.rs"])?.is_empty(),
+        git(&[
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            "scripts/horizon_retry6_167_live166_stage_20261118_v1/src/bin/plan_launch170.rs"
+        ])?
+        .is_empty(),
         "tracked source changed"
     );
     let mut file = OpenOptions::new()
