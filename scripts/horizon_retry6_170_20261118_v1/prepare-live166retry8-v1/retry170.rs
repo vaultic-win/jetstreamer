@@ -249,10 +249,7 @@ pub(super) fn shape(p: &Plan) -> Result<()> {
         .context("fresh guard contract")?;
     ensure!(
         data.runtime.path == Path::new(GUARD_RUNTIME)
-            && data.contract.contract.path
-                == Path::new(
-                    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-20261119-v1/contract.json"
-                )
+            && contract_path(&data.contract.contract.path)
             && data.contract.deployment_seal.path
                 == data
                     .contract
@@ -368,4 +365,18 @@ mod tests {
         assert!(peer_rows_shape(&json!([rows[0],rows[0]]),&a,&g).is_err());
     }
 
+}
+
+fn contract_path(path:&Path)->bool {
+ if path.file_name().and_then(|s|s.to_str())!=Some("contract.json"){return false;}
+ let Some(parent)=path.parent() else{return false;};
+ if parent.parent()!=Some(Path::new("/usr/local/lib/jetstreamer")){return false;}
+ parent.file_name().and_then(|s|s.to_str()).and_then(|s|s.strip_prefix("horizon-epoch170-retry6-live166retry8-data-contract-")).is_some_and(|s| (1..=32).contains(&s.len())&&s.bytes().all(|b|b.is_ascii_lowercase()||b.is_ascii_digit()||b==b'-'))
+}
+#[cfg(test)] mod contract_generation_tests {
+ use super::*;
+ #[test] fn contract_generations_never_escape_exact_namespace(){
+  for tag in ["20261119-v1","retry2"]{assert!(contract_path(Path::new(&format!("/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-{tag}/contract.json"))));}
+  for p in ["/tmp/contract.json","/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-/contract.json","/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-data-contract-v2/other.json","/usr/local/lib/jetstreamer/horizon-epoch167-retry6-live166retry8-data-contract-v2/contract.json"]{assert!(!contract_path(Path::new(p)));}
+ }
 }

@@ -63,7 +63,7 @@ mod terminal170;
 use local::LocalInputs;
 use profile::{Profile, profile};
 const IMAGE: &str =
-    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v1/prepare";
+    "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry8-prepare-20261119-v2/prepare";
 const RETIRED170_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
 const RETIRED170_COMPLETION_SHA: &str = "0a6792c6fe26ebda05764a10c6f8e070c4340cc28f9b7a184056d013c334dde3";
 const RETIRED170_INTENT: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-intent-20261118T1213Z.json";
