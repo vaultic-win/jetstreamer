@@ -1,5 +1,56 @@
 # Ubuntu debug dependency cache retirement
 
+## November 19 release dependency retirement
+
+The release dependency cache was retired through the current strict compiler
+classifier, with source equivalent to published `b42f0488`. The original sealed
+`6f4a1600` checker rejected the checkpoint-named executable
+`jetstreamer_checkpoint_restore_probe-1fa5f8bd66f575cc` before deletion. Published
+changes `8f5f4d5f` and `aa438812` already supplied exact dep-info/ELF proof for
+that compiler output; no filename-only exception was added for this operation.
+
+The current full observer library, checker binary and tests were built against
+the retained dependency cache outside the selected tree. All 31 focused cache
+tests passed, including the complete manifest classifier, interrupted subsets,
+symlink targets and parent-lock preservation. The build invocation was
+`13af38fd5820433aa500e40ba31f321e`, 7.656 seconds with a reported 446 MiB peak
+under a 2 GB cap. The source manifest and dependency digests were rechecked.
+The Rust-sealed checker is
+`/var/lib/jetstreamer/horizon-cache-checker-b42f0488-20261119-v1/jetstreamer-horizon-dev-cache-check`,
+SHA-256 `3e1e2b03b4493d2f5d45208ef9839aa933c2e885d79422fc41210a1fcd082a40`.
+
+The positive native check, invocation `61393fddfbd8441791e8be5051dbead3`,
+inspected 1,267 processes, found no active builders or process/staged references,
+and bound 3,933 entries totaling 10,231,230,464 unique-inode physical bytes.
+Its immutable ledger is
+`/var/lib/jetstreamer/horizon-dev-cache-check-release-20261119-v3/check.json`,
+SHA-256 `96c232eee8400b1a245e347744203beb377b89cb9198825757a3dccf5f93de3b`.
+
+An initial retirement plan used a receipt-directory name outside the required
+`horizon-dev-cache-check-` prefix. It failed before writing an intent or deleting
+anything; its plan and journal are retained. The corrected, separately sealed
+plan is
+`/var/lib/jetstreamer/horizon-release-cache-retire-plan-20261119-v2/plan.json`,
+SHA-256 `3e4925aebde297144a8369de78eeee81fd72d1af6ed21779ad85bb92dc9ea751`.
+Actual retirement invocation `e7a447511ece4e69b89d64a737799fb5` completed in
+30.548 seconds with a reported 35.8 MiB peak under a 256 MB cap.
+
+The completion receipt is
+`/var/lib/jetstreamer/horizon-dev-cache-check-release-retirement-20261119-v1/completion.json`,
+SHA-256 `4b34dc132b88304f23e89e10a34921eeab5d8b991004fe94e3f21f600e70be71`.
+Only the original empty directories remain, occupying 753,664 bytes. The
+parent Cargo lock inode `13798479` was preserved. Available filesystem bytes
+rose from 3,989,218,996,224 at durable intent to 3,996,304,044,032 at completion,
+a 7,085,047,808-byte net increase while live replay continued allocating.
+That event delta is distinct from the cache's 10.23 GB physical footprint;
+external hardlinks and concurrent growth can affect reclaimed space.
+
+The active epoch-205 reader dependency cache, all replay scratch, archive
+inputs and sealed deployments remain outside this retirement. No replay or R2
+mutation was authorized by it. Native build/check/retirement journals and plans
+are retained in
+`/home/ubuntu/.codex/diagnostics/horizon-cache-checker-current-20261119-v1`.
+
 The Rust `jetstreamer-horizon-dev-cache-check` profile
 `jetstreamer-horizon-ubuntu-debug-deps-cache-check-plan-v1` selects only
 `/home/ubuntu/workspace/jetstreamer/target/debug/deps`. It cannot select another
