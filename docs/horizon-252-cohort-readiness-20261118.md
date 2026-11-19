@@ -59,8 +59,15 @@ Its retained 16,483,458,670-byte bootstrap already exists at
 `/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/`
 `snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst`.
 Recorded GCS generation is `1641500477962489`, CRC32C `+0CPhA==` and MD5
-`Q0FEYKFkXAJiwZNXZtq6rQ==`. Fresh local custody/hash qualification remains
-pending. The canonical final root is slot 114910768, hash
+`Q0FEYKFkXAJiwZNXZtq6rQ==`. On November 19, the 256 MB bounded hash service
+`horizon-265-retained-bootstrap-hash-20261119-v1.service`, invocation
+`006af45b3f9847748103fdf6da73218e`, completed normally. The root-owned 0444
+file's fresh SHA-256 matches sealed custody:
+`04eb59e2dbbc2b0d4f1535741fa9d56794c32ad18e14c98df4fa76a5ae397641`.
+The journal is `bootstrap-hash.jsonl` in the source evidence directory,
+SHA-256 `d11bc8125e5d41d2fd33e37959a872f15bde05cd786bbd27958fccedf6098e59`.
+This is local integrity evidence, not a new authenticated GCS metadata read.
+The canonical final root is slot 114910768, hash
 `HnePfSpTtWaPDFx9RrPeuamDZREhoUXa7xpK6fbtPGyK`, generation
 `1641767242524970`. No duplicate download or epoch-265 replay was launched.
 This shorter candidate remains subject to the same recovery and admission gates.

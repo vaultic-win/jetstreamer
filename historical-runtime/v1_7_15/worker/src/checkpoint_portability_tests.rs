@@ -350,7 +350,7 @@ fn checkpoint_export_rejects_changed_bank_and_unsafe_output_without_publication(
 #[test]
 fn checkpoint_export_protocol_intervening_requests_invalidate_and_fail_closed() {
     use jetstreamer_historical_protocol::{Request, RequestBody, ResponseBody, PROTOCOL_VERSION};
-    let (mut state, _) = test_state(1, None);
+    let (state, _) = test_state(1, None);
     state.bank.register_tick(&Hash::new_unique());
     let mut worker = crate::Worker {
         hello_complete: true,

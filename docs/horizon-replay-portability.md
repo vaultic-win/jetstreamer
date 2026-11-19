@@ -96,8 +96,43 @@ worker export response, archive digest and permissions, duplicate rejection,
 unchanged checkpoint, full same-process continuation and fresh-process restore.
 Negative tests cover malformed/stale requests, changed checkpoint fields,
 intervening Ping/Hello/batch requests, unsafe output directories and existing
-symlinks. These source changes await bounded compilation and native execution;
-no new runtime or pressure-recovery deployment is qualified by this description.
+symlinks.
+
+Published candidate `335af895` built normally in 2m53s at a reported 1.2 GiB
+peak under the same 2 GB cap. Both production worker and test artifacts use
+empty package features and optimization 3; the production worker retains the
+workspace's LTO/codegen settings. The Rust-sealed deployment is
+`/var/lib/jetstreamer/horizon-v1715-checkpoint-export-335af895-20261119-v1`.
+Worker SHA-256 is
+`8275e240f40a8ce6cbba95bf16266df4e2cd2c8fb398c4ae3a20b02e707966c3`;
+test SHA-256 is
+`5b177530199ced75930bf5631761b21e65bc862b5b581a075ad2dec71b2081e7`.
+The source manifest remained unchanged after compilation. Use the complete
+build journal captured with `journalctl --all`: JSON output without that flag
+omits long compiler commands. The initial incomplete journal is retained, but
+the sealed package contains the complete journal and both genuine rustc commands.
+
+Native unit `horizon-v1715-checkpoint-export-tests-20261119-v1.service`, invocation
+`a0c42c32f20f4a0087a36dfa249e3b55`, passed 51 tests with zero failures and seven
+explicitly ignored tests. The separate export/restore unit, invocation
+`f9cf77e6aa7b4ed9a7ddb5fa7e360e2e`, ran exactly the selected ignored
+`runtime::tests::checkpoint_export_archive_restore_probe`: one passed, zero
+failed, normal completion in 0.62s. Journals are retained under
+`/home/ubuntu/.codex/diagnostics/horizon-checkpoint-export-v1715-20261119-v1`.
+This qualifies synthetic export/restore behavior, not live worker replacement,
+mainnet initialization, archive continuation or pressure admission.
+
+The next opt-in integration probe is
+`worker/tests/checkpoint_export_mainnet.rs::epoch265_actual_worker_export_and_fresh_restore`.
+It pins the actual sealed worker above and the independently retained epoch-265
+bootstrap SHA/size. It uses framed IPC to initialize mainnet, checkpoint and
+export; after clean source-worker shutdown and removal of its scratch, it
+starts a second actual worker, restores the exported snapshot with the normal
+mainnet builtins, and compares the complete checkpoint and cursor. It independently
+hashes the export before and after restore and writes a no-clobber fsynced native
+evidence tuple. It sends no replay entries and grants no canonical-root or
+archive-continuation authority. A bounded synthetic pass does not authorize
+its large mainnet restore: prepare a separate full-resource admission first.
 
 Even a successful synthetic probe leaves protocol export, actual mainnet
 checkpoint/restore, partial `.jet` continuation and idempotent pressure recovery
