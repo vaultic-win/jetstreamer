@@ -9,8 +9,8 @@ use std::{
     path::Path,
     process::Command,
 };
-const ROOT: &str = "/var/lib/jetstreamer/observe166-retry8-20261119-v1";
-const DEST: &str = "/usr/local/lib/jetstreamer/horizon-live166retry8-observer-20261119-v1";
+const ROOT: &str = "/var/lib/jetstreamer/observe166-retry8-20261119-v2";
+const DEST: &str = "/usr/local/lib/jetstreamer/horizon-live166retry8-observer-20261119-v2";
 const CONFIG: &str =
     "/usr/local/lib/jetstreamer/horizon-stopped166167-observer-0151-20261119-v1/observer.json";
 const UNIT: &str = "horizon-qualify-166-replacement-local3retry8-20261110-v1.service";
@@ -116,12 +116,25 @@ fn main() -> Result<()> {
                 == 13,
         "foreign prior configuration"
     );
+    // The observer rejects overlapping epoch ranges, including terminal diagnostics.
+    // Preserve the superseded identity in this durable handoff, rather than pretending
+    // that it is a second current observation for epoch166.
+    let diagnostics = cfg["diagnostic_replays"].as_array_mut().unwrap();
+    let index = diagnostics
+        .iter()
+        .position(|r| r["range"] == "166")
+        .context("old166 diagnostic")?;
+    let superseded166 = diagnostics.remove(index);
+    ensure!(
+        superseded166["expected_producer_invocation_id"] == "03fa3ce80d8c4769a1e9dec548cdbeca",
+        "foreign predecessor"
+    );
     cfg["replays"] = json!([{"range":"166", "controller_unit":UNIT, "producer_unit":UNIT,
         "expected_controller_invocation_id":IID, "expected_producer_invocation_id":IID,
         "scratch_path":scratch, "worker_executable_basename":"historical-worker",
         "append_log":{"path":log,"device":md.dev(),"inode":md.ino()}}]);
     cfg["output"] = json!(
-        "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root-live166retry8-first-20261119-v1.json"
+        "/var/lib/jetstreamer-horizon-observe-eleven-focus-20261017-v1/sample-root-live166retry8-first-20261119-v2.json"
     );
     fs::DirBuilder::new().mode(0o700).create(ROOT)?;
     let cb = save("observer.json", &cfg)?;
@@ -143,13 +156,13 @@ fn main() -> Result<()> {
         "handoff.json",
         &json!({"previous_config":bind(CONFIG)?,"new_config":bind(&format!("{DEST}/observer.json"))?,
         "admission":bind(ADMISSION)?,"protection":bind(PROTECTION)?,"producer_native":producer,
-        "diagnostic_rows_preserved":13,"same_minimum_cadence_seconds":1800,"replay_mutations":false,"remote_mutations":false}),
+            "superseded166_diagnostic":superseded166,"current_diagnostic_rows":12,"historical_diagnostic_rows_preserved":13,"same_minimum_cadence_seconds":1800,"replay_mutations":false,"remote_mutations":false}),
     )?;
     println!(
         "{}",
         run(&[
             "systemd-run",
-            "--unit=horizon-observer-live166retry8-first-20261119-v1",
+            "--unit=horizon-observer-live166retry8-first-20261119-v2",
             "--on-active=2s",
             "--timer-property=AccuracySec=1s",
             "--property=Type=oneshot",
