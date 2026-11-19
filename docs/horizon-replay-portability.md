@@ -742,3 +742,36 @@ Actual epoch playback through this uploader remains pending. Do not launch the
 unoptimized reader through an older uploader that cannot bind its required
 stack setting. The ongoing epoch-205 audit remains untouched; final acceptance
 still requires complete remote playback and the latest-branch check.
+
+On 2026-11-19, published `4cfa8848` adds an input-side complete-block
+acknowledgement to the sequential firehose. `SourceBlockAction::Quiesce`
+returns the distinct `FirehoseError::SourceQuiesced` outcome; ordinary callers
+still reject it as incomplete execution. It does not prove executor drainage,
+a frozen checkpoint, or full-range completion, and no production pressure
+controller opts into it yet.
+
+Published `135657fe` fixes the associated retry watermark: the source commits
+its last-counted slot and parent hash only after the entire decoded callback
+batch succeeds, including when there is no metadata subscriber. Previously a
+metadata callback could advance that cursor before a later node failed, causing
+the retry to skip the incomplete block. Five focused tests pass, including
+failure after metadata followed by successful full-block redelivery.
+
+The full node and current reader built under a 2 GB hard limit, invocation
+`9213181863b1453e8b373021d624e8c8`, in 70.824 seconds. The tracked source
+manifest was rechecked after completion. The sealed package is
+`/var/lib/jetstreamer/horizon-source-retry-reader-135657fe-20261119-v1`.
+Its reader passed full synthetic epoch playback and the incomplete,
+missing-metadata and invalid-PoH rejection fixtures with the required 64 MiB
+thread stack. These are capability tests, not canonical epoch verification.
+Build commands, dependency hashes, tests and native invocation evidence are in
+`/home/ubuntu/.codex/diagnostics/horizon-source-retry-commit-20261119-v1`.
+
+Two subsequent optimized pipeline builds, at optimization levels 3 and 1,
+exceeded their 7 GB hard caps. Their separate failed invocations are preserved;
+neither artifact was promoted. The accepted unoptimized reader remains selected.
+Production pressure requests, source-boundary selection, complete execution
+drain and checkpoint/reap/restore still need integration before another lane
+can rely on memory oversubscription. Preserve reader-source equivalence during
+the new long-running epoch-205 audit; node-only integration can proceed without
+changing the conservative reader closure.

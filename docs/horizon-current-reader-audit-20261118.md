@@ -509,3 +509,37 @@ Preserve its audit and the five healthy replay limits. The next observer's v71
 configuration is sealed and statically checked for no earlier than 01:25:21 UTC;
 no timer was installed. The mainnet checkpoint-export probe remains dormant
 because its 128 GB restore does not fit the existing hard reservations.
+
+At 2026-11-19 05:44:27 UTC the original epoch-205 audit, invocation
+`a5678a9273d74b4da89805b156c7a3d2`, reached its six-hour runtime limit.
+The authenticated 104,772,252,720-byte remote readback hash had passed, but
+remote plugin playback had not finished. Systemd reports `Result=timeout`,
+zero main/control PIDs and no remaining service cgroup. This is incomplete
+compatibility evidence, not evidence of archive corruption. Its local input,
+readback, logs and historical receipts remain preserved.
+
+After the published source retry fix and native reader qualification described
+in `horizon-replay-portability.md`, a distinct successor audit was started:
+`horizon-current-reader-205-audit-20261119-v2.service`, invocation
+`5e1ef53e07c74cae8ba763c7fb7fc826`. It uses the stack-aware uploader from
+`4eae70f0`, the qualified `135657fe` reader, a 7 GB hard limit, no swap, two
+verification threads and an 18-hour runtime bound. It reuses the immutable
+restored local input but writes only to new private playback and receipt
+directories. The initial live invocation reached local archive hashing.
+Full local verification, local plugin playback, new authenticated readback,
+full remote plugin playback and final branch equivalence remain required.
+
+The reader plan is
+`/var/lib/jetstreamer/horizon-205-current-reader-plan-135657fe-20261119-v2/plan.json`,
+SHA-256 `64e7cd2d62180616c09287192b4be6ebad0af65ff8dba54c0a8f9fee913fc797`.
+The sealed acceptance binds the exact artifacts, native fixtures, source and
+compiler evidence, and 64 MiB minimum thread stack. Preserve all original R2
+objects and do not claim this running audit as a compatibility pass.
+
+The 05:54:30 coordinated sample proved all five replay owners 247–251 advancing.
+All five status objects were conditionally refreshed and authenticated-readback
+verified. The complete 201–300 census remains 34 ready pairs, 66 missing, zero
+anomalies and no status diagnostics; target nine, executing five. The next
+single routine observer is armed for 06:24:30. The new audit consumes the
+released predecessor's 7 GB reservation, leaving the existing 2.64 GB auxiliary
+envelope; no sixth replay admission has occurred.

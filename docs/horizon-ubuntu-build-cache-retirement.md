@@ -217,3 +217,26 @@ filesystem delta includes concurrent activity; it is not a cache-only savings
 claim. No replay, archive, R2 object, reader dependency cache or sealed runtime
 was removed. Additional lane admission still requires the independent resource
 and recovery qualifications.
+
+The November 19 05:54 control cycle also qualified and retired the fixed
+`target/debug/deps` cache using the sealed `b42f0488` checker. Both plans bound
+clean source `135657fed5f64532889ed6a48ea2b275597f1475` and the unchanged
+Cargo.lock. The first check correctly refused a compiler still exiting after
+an OOM; its failure was retained. A distinct check passed after that process
+exited, finding no live or staged references. The separate retirement repeated
+the guarded checks and completed under invocation
+`69d9217cdfe74f2eb6a001e097d3d6d4`. The dependency directory is absent; the
+parent Cargo lock inode `12857456` is unchanged.
+
+The prior `du` measurement counted 18,046,844,928 unique-inode allocated bytes;
+the checker's pathname-based census counted 20,690,976,768 bytes. Neither is
+the filesystem delta. Available space increased by 12,953,042,944 bytes,
+from 3,984,316,628,992 to 3,997,269,671,936 bytes, while replay and the new
+epoch-205 audit continued allocating. Completion evidence is
+`/var/lib/jetstreamer/horizon-dev-cache-check-debug-deps-retirement-20261119-v1/completion.json`,
+SHA-256 `3b95437869e6f0049ed09a17a0708ff41e18d9aaccf12a788f59962f57227120`.
+The compact space record and all failed/successful journals are under
+`/home/ubuntu/.codex/diagnostics/horizon-source-retry-commit-20261119-v1`.
+The original private reader dependency closure remains required by prepared
+node builds. Mixed `.codex/tmp-readiness` trees still need exact consumer and
+lineage review; this retirement does not authorize their bulk removal.
