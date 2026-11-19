@@ -18,8 +18,8 @@ use std::{
 mod singleton247_phase;
 
 const OBSERVER: &str =
-    "/var/lib/jetstreamer/horizon-finalization247-observer-20261119-v1/jetstreamer-horizon-observe";
-const OBSERVER_SHA: &str = "10421a9728a797b4df98cfdb2160a6d136621779b25aed85f1d58cb4c9b7e02c";
+    "/var/lib/jetstreamer/horizon-finalization247251-observer-20261119-v1/jetstreamer-horizon-observe";
+const OBSERVER_SHA: &str = "a9dd50adcaeb91b33d3e796557fd1f2aadbe9a55e002f416afa69b4d88685b7d";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -244,6 +244,12 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
             .is_none_or(|v| v == &json!(false)),
         "finalization route is selected only by authenticated cadence prescreen"
     );
+    ensure!(
+        config
+            .get("singleton_finalization_epochs")
+            .is_none_or(|v| v == &json!([])),
+        "finalization epochs are selected only by authenticated cadence prescreen"
+    );
     let m = fs::symlink_metadata(&p.state_directory)?;
     ensure!(
         m.is_dir()
@@ -305,8 +311,8 @@ fn run(args: &[String]) -> Result<()> {
         census.push(unit.clone());
         match classify(row, handoff, &unit)? {
             State::Live => {
-                if unit["Id"] == singleton247_phase::UNIT
-                    && let Some(proof) = singleton247_phase::capture(&unit, now)?
+                let profile = singleton247_phase::profile(handoff["epoch"].as_u64().context("missing epoch")?)?;
+                if let Some(proof) = singleton247_phase::capture(profile, &unit, now)?
                 {
                     finalization.push(json!({"configuration":row,"unit":unit,"phase_evidence":proof,"reservations_retained":true,"resource_release_authorized":false}));
                     continue;
@@ -326,7 +332,13 @@ fn run(args: &[String]) -> Result<()> {
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     config["replays"] = json!(live);
-    config["singleton247_finalization"] = json!(!finalization.is_empty());
+    config["singleton247_finalization"] = json!(false);
+    config["singleton_finalization_epochs"] = json!(
+        finalization
+            .iter()
+            .map(|e| e["phase_evidence"]["epoch"].clone())
+            .collect::<Vec<_>>()
+    );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
     let seal = save(
         &p.state_directory,
