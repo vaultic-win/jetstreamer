@@ -61,7 +61,12 @@ fn terminal_owner(current: &Value, terminal: &Value, drain: &Value, now: u64) ->
     }
     ensure!(
         current["ControlGroup"] == ""
-            && current["ExecStart"] == terminal["producer"]["unit"]["ExecStart"],
+            && current["ExecStart"]
+                .as_str()
+                .zip(terminal["producer"]["unit"]["ExecStart"].as_str())
+                .is_some_and(|(current, original)| {
+                    pipeline_status::same_exec_start(original, current)
+                }),
         "247 terminal command/cgroup changed"
     );
     for census in ["first_census", "second_census"] {
@@ -322,6 +327,25 @@ mod tests {
             "resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false,
             "remote_mutations":false,"local_retirement_authorized":false});
         terminal_owner(current, &terminal, &drain, 100).unwrap();
+        // PID1 can clear execution-history fields after reload without changing
+        // the retained invocation, configured command, or terminal outcome.
+        let original = "{ path=/sealed/node ; argv[]=/sealed/node 247 ; ignore_errors=no ; start_time=[Tue 2026-11-17 02:31:12 UTC] ; stop_time=[Thu 2026-11-19 16:06:18 UTC] ; pid=50887 ; code=exited ; status=0 }";
+        let cleared = "{ path=/sealed/node ; argv[]=/sealed/node 247 ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+        let mut retained = terminal.clone();
+        retained["producer"]["unit"]["ExecStart"] = json!(original);
+        let mut retained_drain = drain.clone();
+        retained_drain["producer"] = retained["producer"].clone();
+        let mut observed = current.clone();
+        observed["ExecStart"] = json!(cleared);
+        terminal_owner(&observed, &retained, &retained_drain, 100).unwrap();
+        for changed in [
+            cleared.replace("node 247", "node 248"),
+            cleared.replace("ignore_errors=no", "ignore_errors=yes"),
+            format!("{cleared} ; {cleared}"),
+        ] {
+            observed["ExecStart"] = json!(changed);
+            assert!(terminal_owner(&observed, &retained, &retained_drain, 100).is_err());
+        }
         assert!(terminal_owner(current, &terminal, &drain, 99).is_err());
         for key in [
             "InvocationID",
