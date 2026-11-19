@@ -672,3 +672,64 @@ library change also requires qualification against the latest reader branch
 before closing epoch 205's final audit. An isolated current-reader and full
 node build is in progress from the published revision, preserving the active
 audit's original dependency closure; no running replay has been changed.
+
+### Ready-entry drainage and bounded current-reader builds
+
+Source `97e87154` makes the production consumer report successful channel
+exhaustion explicitly. Cancellation, callback failure and consumer panic now
+fail finalization. Teardown drops all notifier and producer owners, closes the
+sender, joins the consumer and checks its result before the scheduler/freeze
+gates. Five focused tests passed, including retained producers, queued ordering,
+closed-channel cancellation, execution failure and panic. This is a drainage
+prerequisite; dynamic firehose quiescence and pressure-selected boundaries are
+still unimplemented and no live lane has been checkpointed or restarted.
+
+The full node built from that exact source with the original accepted node
+dependency graph, invocation `f14aa90cc6014dd1891ea2e040ab2ca2`. PID 1 recorded
+successful completion in 65.302 seconds with a reported 1.7 GiB peak under a
+2 GB hard cap. SHA-256:
+`522d88a96a172a07ac12b6b44140553a59e93e2cfb6d53dd5bf34b468f85f9ba`.
+An earlier attempt mixed the reader's and node's distinct Cargo dependency
+graphs and failed with twelve type/trait errors. Rebuilding the workspace
+libraries against the genuine node graph resolved those errors without a
+production source workaround. The two declared `ripget` versions remain distinct.
+
+The reader's optimized pipeline compilation exceeded the same 2 GB cap. A
+separate build retained the accepted dependency artifacts and features while
+compiling the pipeline and verifier examples with `opt-level=0` and
+`codegen-units=256`. Invocation `5e695828fb9d4afcae28c3549ce70841` succeeded in
+8.695 seconds with a reported 1.1 GiB peak. The first native test then exposed
+a Tokio-worker stack overflow; a subsequent `opt-level=1` pipeline build also
+exceeded the cap. Those failed attempts are preserved.
+
+With `RUST_MIN_STACK=67108864`, native invocation
+`85bfac18f2984e67baad7437c8a9e918` passed all full-verifier/plugin fixtures in
+2.633 seconds with a reported 495.2 MiB peak under the unchanged 2 GB cap.
+The valid synthetic full epoch preserved all expected callbacks and account
+bytes; partial coverage and missing epoch metadata failed without a success
+report, and strict full verification rejected incorrect PoH. This is synthetic
+reader qualification, not verification of an R2 epoch or a throughput benchmark.
+
+The Rust-sealed candidate package is
+`/var/lib/jetstreamer/horizon-ready-drain-reader-97e87154-20261119-v1`.
+It contains the node, pipeline, full verifier, fixture driver, source manifest,
+exact compiler commands, 165 explicit dependency bindings and PID 1 journals.
+The pipeline and full-verifier SHA-256 values are respectively
+`c8cade2958a0e84a420dafbe1d9345bfd8c65f50c3d845e4d3c8e8d8656c0515` and
+`a16530e93bc10c313566a2756c34993d35d8d503856a74b1e6a6338cc7a24e15`.
+Source/artifact and native evidence is retained in
+`/home/ubuntu/.codex/diagnostics/horizon-ready-drain-20261119-v1` and
+`/home/ubuntu/.jetstreamer-private/ready-drain-20261119-v1/native-reader-v2`.
+
+Current-reader acceptance now supports an optional, hash-bound
+`minimum_thread_stack_bytes` between 2 and 64 MiB. The uploader applies it to
+both the full verifier and every local/remote plugin child and records it in
+acceptance receipts. An explicit value overrides the inherited environment;
+old qualifications without it preserve their existing behavior. Eight focused
+current-reader tests passed, including a real child receiving the qualified
+value despite a conflicting inherited setting; the preexisting root-only Git
+ownership test remained ignored in this unprivileged run. The new uploader
+still requires a full build and deployment qualification. Do not launch the
+unoptimized reader through an older uploader that cannot bind its required
+stack setting. The ongoing epoch-205 audit remains untouched; final acceptance
+still requires complete remote playback and the latest-branch check.

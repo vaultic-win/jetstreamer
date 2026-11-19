@@ -123,6 +123,10 @@ struct Qualification {
     full_verifier: Bound,
     cargo_features: Vec<String>,
     rustc_flags: Vec<String>,
+    // Some qualified builds need larger native worker stacks. Bind the value
+    // into immutable acceptance instead of relying on the operator's shell.
+    #[serde(default)]
+    minimum_thread_stack_bytes: Option<u64>,
     source_build_evidence: Vec<Bound>,
     source_artifact_correspondence_accepted: bool,
     full_and_plugin_capabilities_accepted: bool,
@@ -148,6 +152,7 @@ pub struct Gate {
     readback: PathBuf,
     local_playback: Value,
     remote_playback: Option<Value>,
+    minimum_thread_stack_bytes: Option<u64>,
 }
 
 fn hex(value: &str, len: usize) -> bool {
@@ -311,6 +316,7 @@ fn current_branch(plan: &Plan) -> Result<String> {
 }
 
 fn validate_qualification(plan: &Plan, q: &Qualification) -> Result<()> {
+    validate_thread_stack(q.minimum_thread_stack_bytes)?;
     ensure!(
         q.schema == "horizon-current-reader-main-acceptance-v1"
             && q.reader_commit == plan.reader_commit
@@ -330,6 +336,22 @@ fn validate_qualification(plan: &Plan, q: &Qualification) -> Result<()> {
             .all(|s| !s.is_empty()),
         "invalid compiler configuration evidence"
     );
+    Ok(())
+}
+
+fn validate_thread_stack(bytes: Option<u64>) -> Result<()> {
+    ensure!(
+        bytes.is_none_or(|bytes| (2 * 1024 * 1024..=64 * 1024 * 1024).contains(&bytes)),
+        "qualified reader thread stack must be between 2 and 64 MiB"
+    );
+    Ok(())
+}
+
+fn configure_thread_stack(command: &mut Command, bytes: Option<u64>) -> Result<()> {
+    validate_thread_stack(bytes)?;
+    if let Some(bytes) = bytes {
+        command.env("RUST_MIN_STACK", bytes.to_string());
+    }
     Ok(())
 }
 
@@ -464,6 +486,7 @@ impl Gate {
             readback,
             local_playback: Value::Null,
             remote_playback: None,
+            minimum_thread_stack_bytes: qualification.minimum_thread_stack_bytes,
         };
         ensure!(
             archive.file_name() == gate.readback.file_name(),
@@ -475,17 +498,17 @@ impl Gate {
             gate.playback(archive.parent().context("archive parent")?, "local")?;
         write_json(
             &gate.directory.join("local-acceptance.json"),
-            &json!({"schema":"horizon-current-reader-local-acceptance-v1","fetched_branch_commit":current,"reader_plan":gate.plan_binding,"local_playback":gate.local_playback,"full_verifier":gate.plan.full_verifier,"full_invocation":args,"full_exit_code":0}),
+            &json!({"schema":"horizon-current-reader-local-acceptance-v1","fetched_branch_commit":current,"reader_plan":gate.plan_binding,"local_playback":gate.local_playback,"full_verifier":gate.plan.full_verifier,"full_invocation":args,"full_exit_code":0,"minimum_thread_stack_bytes":gate.minimum_thread_stack_bytes}),
         )?;
         Ok(gate)
     }
 
     fn command(&self, executable: &Bound, args: &[String]) -> Result<()> {
         bound_file(executable)?;
-        let status = Command::new(&executable.path)
-            .args(args)
-            .stdin(Stdio::null())
-            .status()?;
+        let mut command = Command::new(&executable.path);
+        command.args(args).stdin(Stdio::null());
+        configure_thread_stack(&mut command, self.minimum_thread_stack_bytes)?;
+        let status = command.status()?;
         ensure!(
             status.success(),
             "reader {} failed with {status}; no readiness publication permitted",
@@ -592,6 +615,7 @@ impl Gate {
                 "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":READER_PATHS,
                 "reader_plan":self.plan_binding,"qualification":self.plan.qualification,
                 "local_playback":self.local_playback,"remote_playback":remote,
+                "minimum_thread_stack_bytes":self.minimum_thread_stack_bytes,
                 "verified_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
                 "readiness_sidecar_committed":false
             }),
@@ -724,11 +748,17 @@ mod tests {
             full_verifier: p.full_verifier.clone(),
             cargo_features: vec![],
             rustc_flags: vec![],
+            minimum_thread_stack_bytes: None,
             source_build_evidence: vec![p.pipeline.clone()],
             source_artifact_correspondence_accepted: true,
             full_and_plugin_capabilities_accepted: true,
         };
         validate_qualification(&p, &q).unwrap();
+        q.minimum_thread_stack_bytes = Some(64 * 1024 * 1024);
+        validate_qualification(&p, &q).unwrap();
+        q.minimum_thread_stack_bytes = Some(64 * 1024 * 1024 + 1);
+        assert!(validate_qualification(&p, &q).is_err());
+        q.minimum_thread_stack_bytes = None;
         q.reader_commit = "c".repeat(40);
         assert!(validate_qualification(&p, &q).is_err());
         q.reader_commit = p.reader_commit.clone();
@@ -740,6 +770,22 @@ mod tests {
         q.full_and_plugin_capabilities_accepted = true;
         q.source_build_evidence.clear();
         assert!(validate_qualification(&p, &q).is_err());
+    }
+
+    #[test]
+    fn qualified_stack_overrides_inherited_setting_in_real_child() {
+        let mut command = Command::new("/bin/sh");
+        command
+            .args(["-c", "test \"$RUST_MIN_STACK\" = 67108864"])
+            .env("RUST_MIN_STACK", "1");
+        configure_thread_stack(&mut command, Some(64 * 1024 * 1024)).unwrap();
+        assert!(command.status().unwrap().success());
+        for invalid in [0, 2 * 1024 * 1024 - 1, 64 * 1024 * 1024 + 1, u64::MAX] {
+            assert!(configure_thread_stack(&mut command, Some(invalid)).is_err());
+        }
+        let mut legacy = Command::new("/bin/sh");
+        configure_thread_stack(&mut legacy, None).unwrap();
+        assert_eq!(legacy.get_envs().count(), 0);
     }
 
     #[test]
@@ -770,6 +816,7 @@ mod tests {
             readback: dir.path().join("readback"),
             local_playback: json!({}),
             remote_playback: None,
+            minimum_thread_stack_bytes: None,
         };
         assert!(
             gate.publication_receipt()
