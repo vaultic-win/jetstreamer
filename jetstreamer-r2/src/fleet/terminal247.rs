@@ -218,7 +218,7 @@ pub(super) fn status_matches(
         now,
     )
 }
-fn status_values(
+pub(super) fn status_values(
     basis: &Value,
     completion: &Value,
     raw: &Value,
@@ -281,6 +281,15 @@ fn status_values(
             && completion["archive_or_sidecar_mutation"] == false
             && sampled <= now
             && now - sampled <= 1800,
+    )
+}
+
+pub(super) fn validate_current(current: &Value, now: u64) -> Result<()> {
+    terminal_owner(
+        current,
+        &pinned(TERMINAL_PATH, TERMINAL_SHA)?,
+        &pinned(DRAIN_PATH, DRAIN_SHA)?,
+        now,
     )
 }
 

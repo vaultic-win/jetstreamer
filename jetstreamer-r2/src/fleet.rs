@@ -68,6 +68,7 @@ mod native228_event;
 mod native228_full209;
 mod native228_peer209;
 mod native228_terminal;
+mod operator_successors;
 mod original141;
 mod original141_capped;
 mod original141_freeze;
@@ -472,6 +473,15 @@ struct Gate {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct OperatorStatusEvidence {
+    basis: BoundFile,
+    completion: BoundFile,
+    raw_status: BoundFile,
+    #[serde(default)]
+    predecessors: Vec<OperatorStatusRecord>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OperatorStatusRecord {
     basis: BoundFile,
     completion: BoundFile,
     raw_status: BoundFile,
@@ -2347,6 +2357,16 @@ fn operator_status_owner_matches(
     observer: &BoundFile,
     current: Option<&Value>,
 ) -> Result<bool> {
+    if epoch == 265 || (epoch == 247 && !evidence.predecessors.is_empty()) {
+        return operator_successors::matches(
+            evidence,
+            epoch,
+            status,
+            object,
+            current,
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+        );
+    }
     if epoch == 247 {
         return terminal247::status_matches(
             evidence,
@@ -2359,6 +2379,10 @@ fn operator_status_owner_matches(
     if epoch != 251 {
         return Ok(false);
     }
+    ensure!(
+        evidence.predecessors.is_empty(),
+        "251 operator status does not admit successor chains"
+    );
     for bound in [&evidence.basis, &evidence.completion, &evidence.raw_status] {
         let metadata = fs::symlink_metadata(&bound.path)?;
         ensure!(
@@ -2540,8 +2564,9 @@ pub(super) async fn run() -> Result<()> {
         ensure!(
             gate.operator_status.is_none()
                 || (*epoch == 251 && gate.state == "blocked-qualification")
+                || (*epoch == 265 && gate.state == "blocked-qualification")
                 || (*epoch == 247 && gate.state == "post-replay-pipeline"),
-            "operator status evidence is outside qualified 251/247 profiles"
+            "operator status evidence is outside qualified profiles"
         );
         ensure!(
             matches!(
@@ -3632,6 +3657,7 @@ pub(super) async fn run() -> Result<()> {
             });
             let operator_matches = gate.operator_status.as_ref().is_some_and(|_| {
                 (epoch == 251 && state == "blocked-qualification")
+                    || (epoch == 265 && state == "blocked-qualification")
                     || (epoch == 247 && state == "post-replay-pipeline")
             }) && operator_status_owner_matches(
                 gate.operator_status.as_ref().expect("checked"),
