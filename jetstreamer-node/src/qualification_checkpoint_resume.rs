@@ -189,6 +189,32 @@ impl ValidatedResume {
         Ok(())
     }
 
+    /// The exported accounts hash is a local restart commitment, not an external
+    /// canonical root. Validate it without inserting it into the trusted list.
+    /// The actual restored worker still has to pass `verify_native_checkpoint`.
+    pub(crate) fn validate_bootstrap_expectation(
+        &self,
+        q: QualificationPlan,
+        snapshot: &Path,
+        expectation: BankHashExpectation,
+    ) -> Result<(), String> {
+        self.revalidate()?;
+        scope(q, &self.manifest, self.end)?;
+        let hash = self
+            .manifest
+            .terminal
+            .accounts_hash
+            .parse::<Hash>()
+            .map_err(|e| e.to_string())?;
+        require(
+            snapshot == self.snapshot
+                && self.snapshot_manifest.snapshot_slot == q.bootstrap_slot
+                && self.snapshot_manifest.accounts_hash == hash.to_string()
+                && expectation == BankHashExpectation::LegacyAccountsHash(hash),
+            "checkpoint resume bootstrap differs from the validated local bundle",
+        )
+    }
+
     pub(crate) fn require_terminal(
         &self,
         verifier: Option<&SnapshotVerifier>,
@@ -314,6 +340,18 @@ impl RestartProof for ValidatedResume {
     fn snapshot_size(&self) -> u64 {
         self.snapshot_manifest.archive_size
     }
+    fn restored_verification(&self) -> Result<historical_replay::RestoredCheckpointTrust, String> {
+        self.revalidate()?;
+        require(
+            self.native_checked.load(Ordering::SeqCst),
+            "pressure restart requires the actual native barrier before verifier construction",
+        )?;
+        Ok(
+            historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(
+                self.end,
+            ),
+        )
+    }
     fn covers_trusted_root(&self, _: u64, _: u64, _: u64, _: u64) -> bool {
         false
     }
@@ -417,7 +455,7 @@ mod tests {
             terminal: terminal.clone(),
             emitted_raw_write_versions: 1..1000,
         };
-        let snapshot = PathBuf::from("/private/snapshot.tar.bz2");
+        let snapshot = PathBuf::from(format!("/private/snapshot-{}-{hash}.tar.bz2", start + 9));
         let snapshot_manifest = HistoricalHandoffSnapshotManifest {
             schema_version: 1,
             boundary_slot: start + 10,
@@ -463,6 +501,123 @@ mod tests {
             q,
             actual,
         )
+    }
+
+    #[test]
+    fn resume_accepts_local_bootstrap_without_inventing_a_canonical_root() {
+        let (proof, q, actual) = fixture();
+        let hash = Hash::new_from_array([1; 32]);
+        let terminal_hash = Hash::new_from_array([8; 32]);
+        let expected = BTreeMap::from([
+            (
+                q.bootstrap_slot - 1,
+                BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+            (
+                q.replay_start,
+                BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+            (
+                q.end_inclusive,
+                BankHashExpectation::LegacyAccountsHash(terminal_hash),
+            ),
+            (
+                q.end_inclusive + 1,
+                BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+        ]);
+        let bootstrap = compatibility::SOLANA_V1_7_15_RUNTIME.bootstrap;
+        assert!(
+            qualification_expectations(expected.clone(), q, &proof.snapshot, bootstrap, None)
+                .unwrap_err()
+                .contains("absent")
+        );
+        let scoped =
+            qualification_expectations(expected, q, &proof.snapshot, bootstrap, Some(&proof))
+                .unwrap();
+        assert_eq!(scoped.len(), 2);
+        assert!(!scoped.contains_key(&q.bootstrap_slot));
+        assert!(!proof.native_checked.load(Ordering::SeqCst));
+        assert!(proof.restored_verification().is_err());
+        let verifier = SnapshotVerifier::new(scoped, None);
+        proof.require_terminal(Some(&verifier)).unwrap();
+        proof
+            .verify_native_checkpoint(&actual, [2; 32], 7, 64)
+            .unwrap();
+        assert!(matches!(proof.restored_verification().unwrap(),
+            historical_replay::RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(end) if end == q.end_inclusive));
+        verifier.verify_legacy_accounts_hash(q.replay_start, hash);
+        assert!(verifier.finish().is_err());
+        verifier.verify_legacy_accounts_hash(q.end_inclusive, terminal_hash);
+        assert!(verifier.finish().is_ok());
+    }
+
+    #[test]
+    fn resume_expectations_reject_conflicts_missing_terminal_and_changed_bundle() {
+        let (mut proof, q, _) = fixture();
+        let hash = Hash::new_from_array([1; 32]);
+        let bootstrap = compatibility::SOLANA_V1_7_15_RUNTIME.bootstrap;
+        let mut expected = BTreeMap::from([
+            (
+                q.bootstrap_slot,
+                BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+            (
+                q.end_inclusive,
+                BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+        ]);
+        let scoped = qualification_expectations(
+            expected.clone(),
+            q,
+            &proof.snapshot,
+            bootstrap,
+            Some(&proof),
+        )
+        .unwrap();
+        assert_eq!(scoped, expected);
+        expected.insert(
+            q.bootstrap_slot,
+            BankHashExpectation::LegacyAccountsHash(Hash::new_unique()),
+        );
+        assert!(
+            qualification_expectations(
+                expected.clone(),
+                q,
+                &proof.snapshot,
+                bootstrap,
+                Some(&proof)
+            )
+            .unwrap_err()
+            .contains("does not match the canonical")
+        );
+        expected.remove(&q.bootstrap_slot);
+        expected.remove(&q.end_inclusive);
+        expected.insert(
+            q.end_inclusive - 1,
+            BankHashExpectation::LegacyAccountsHash(hash),
+        );
+        assert!(
+            qualification_expectations(
+                expected.clone(),
+                q,
+                &proof.snapshot,
+                bootstrap,
+                Some(&proof)
+            )
+            .unwrap_err()
+            .contains("exact canonical terminal")
+        );
+        expected.insert(
+            q.end_inclusive,
+            BankHashExpectation::LegacyAccountsHash(hash),
+        );
+        proof.snapshot_manifest.accounts_hash = Hash::new_unique().to_string();
+        assert!(
+            qualification_expectations(expected, q, &proof.snapshot, bootstrap, Some(&proof))
+                .unwrap_err()
+                .contains("validated local bundle")
+        );
     }
 
     #[test]

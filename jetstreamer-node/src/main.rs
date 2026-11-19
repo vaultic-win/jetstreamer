@@ -12714,6 +12714,9 @@ async fn run_geyser_replay(
                     cursor.clone(),
                     progress.clone(),
                     output_slot_start,
+                    checkpoint_restart
+                        .expect("matched restart proof")
+                        .restored_verification()?,
                 )?
             }
             Some(checkpoint) => historical_replay::HistoricalReplay::from_carried(
@@ -14985,13 +14988,16 @@ fn add_runtime_handoff_expectations(
 }
 
 /// Restricts a canonical epoch checkpoint list to one focused qualification
-/// span. The bootstrap filename must itself be present in the trusted list,
-/// and at least one independently generated checkpoint must follow it.
+/// span. Ordinary bootstrap snapshots must be in the trusted list. A validated
+/// pressure restart instead binds its bootstrap through the saved bundle and
+/// the actual native restore barrier; it never creates a canonical expectation.
+/// Both paths require the exact independently trusted terminal checkpoint.
 fn qualification_expectations(
     mut expected: BTreeMap<Slot, BankHashExpectation>,
     plan: QualificationPlan,
     snapshot_archive: &Path,
     bootstrap: compatibility::BootstrapState,
+    resume: Option<&qualification_checkpoint_resume::ValidatedResume>,
 ) -> Result<BTreeMap<Slot, BankHashExpectation>, String> {
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
@@ -15001,6 +15007,9 @@ fn qualification_expectations(
             plan.bootstrap_slot
         ));
     }
+    if let Some(resume) = resume {
+        resume.validate_bootstrap_expectation(plan, snapshot_archive, snapshot_expectation)?;
+    }
     match expected.get(&snapshot_slot) {
         Some(expected_hash) if *expected_hash == snapshot_expectation => {}
         Some(expected_hash) => {
@@ -15009,6 +15018,7 @@ fn qualification_expectations(
                 snapshot_archive.display()
             ));
         }
+        None if resume.is_some() => {}
         None => {
             return Err(format!(
                 "qualification snapshot slot {snapshot_slot} is absent from the supplied checkpoint file"
@@ -21726,6 +21736,7 @@ async fn main() {
                                 plan,
                                 snapshot_path,
                                 effective_runtime.descriptor.bootstrap,
+                                checkpoint_resume.as_ref(),
                             )
                         };
                         match expectations {
@@ -25774,7 +25785,8 @@ mod early_snapshot_tests {
         ]);
 
         let bootstrap = compatibility::SOLANA_V1_0_13_RUNTIME.bootstrap;
-        let filtered = qualification_expectations(expected, plan, &snapshot, bootstrap).unwrap();
+        let filtered =
+            qualification_expectations(expected, plan, &snapshot, bootstrap, None).unwrap();
         assert_eq!(filtered.len(), 2);
         assert!(filtered.contains_key(&515_912));
         assert!(filtered.contains_key(&534_248));
@@ -25785,7 +25797,7 @@ mod early_snapshot_tests {
             BankHashExpectation::LegacyAccountsHash(bootstrap_hash),
         )]);
         assert!(
-            qualification_expectations(bootstrap_only, plan, &snapshot, bootstrap)
+            qualification_expectations(bootstrap_only, plan, &snapshot, bootstrap, None)
                 .unwrap_err()
                 .contains("exact canonical terminal checkpoint")
         );
@@ -25801,7 +25813,7 @@ mod early_snapshot_tests {
             ),
         ]);
         assert!(
-            qualification_expectations(non_terminal_checkpoint, plan, &snapshot, bootstrap)
+            qualification_expectations(non_terminal_checkpoint, plan, &snapshot, bootstrap, None)
                 .unwrap_err()
                 .contains("exact canonical terminal checkpoint")
         );
@@ -25814,7 +25826,7 @@ mod early_snapshot_tests {
             (534_248, BankHashExpectation::LegacyAccountsHash(post_hash)),
         ]);
         assert!(
-            qualification_expectations(wrong_bootstrap, plan, &snapshot, bootstrap)
+            qualification_expectations(wrong_bootstrap, plan, &snapshot, bootstrap, None)
                 .unwrap_err()
                 .contains("does not match the canonical checkpoint")
         );

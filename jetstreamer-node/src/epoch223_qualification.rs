@@ -720,21 +720,24 @@ mod tests {
             output_slot_start: 96_336_000,
             end_inclusive: OUTPUT_END,
         };
-        let error = crate::qualification_expectations(expected.clone(), plan, snapshot, bootstrap)
-            .unwrap_err();
+        let error =
+            crate::qualification_expectations(expected.clone(), plan, snapshot, bootstrap, None)
+                .unwrap_err();
         assert!(error.contains("exact canonical terminal checkpoint at slot 96767999"));
         assert!(tail_expectations(expected.clone(), plan, snapshot, bootstrap).is_err());
 
         // The prefix uses the existing exact terminal rules, not the tail's
         // bootstrap-only exception. Restart/assembly and admission stay separate.
         plan.end_inclusive = TAIL_BOOTSTRAP;
-        let bound = crate::qualification_expectations(expected, plan, snapshot, bootstrap).unwrap();
+        let bound =
+            crate::qualification_expectations(expected, plan, snapshot, bootstrap, None).unwrap();
         validate_prefix_expectations(&bound, plan).unwrap();
         if cfg!(feature = "epoch223-v1-6-25-qualification") {
             let mut invented = bound.clone();
             invented.insert(TAIL_BOOTSTRAP, cold_hash);
             assert!(
-                crate::qualification_expectations(invented, plan, snapshot, bootstrap).is_err()
+                crate::qualification_expectations(invented, plan, snapshot, bootstrap, None)
+                    .is_err()
             );
         }
         assert_eq!(bound.len(), 2);
@@ -845,9 +848,15 @@ mod tests {
         let (_, known) = snapshot_path_expectation(snapshot, bootstrap).unwrap();
         let expected = BTreeMap::from([(TAIL_BOOTSTRAP, known)]);
         assert!(
-            crate::qualification_expectations(expected.clone(), tail_plan(), snapshot, bootstrap)
-                .unwrap_err()
-                .contains("exact canonical terminal checkpoint")
+            crate::qualification_expectations(
+                expected.clone(),
+                tail_plan(),
+                snapshot,
+                bootstrap,
+                None
+            )
+            .unwrap_err()
+            .contains("exact canonical terminal checkpoint")
         );
         assert_eq!(
             tail_expectations(expected, tail_plan(), snapshot, bootstrap)

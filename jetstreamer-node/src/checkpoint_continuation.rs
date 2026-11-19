@@ -78,6 +78,9 @@ pub(crate) struct ValidatedPrefix {
 pub(crate) trait RestartProof: Sync {
     fn snapshot_sha256(&self) -> [u8; 32];
     fn snapshot_size(&self) -> u64;
+    fn restored_verification(&self) -> Result<historical_replay::RestoredCheckpointTrust, String> {
+        Ok(historical_replay::RestoredCheckpointTrust::CanonicalBootstrap)
+    }
     fn covers_trusted_root(&self, epoch: u64, bootstrap: u64, start: u64, end: u64) -> bool;
     fn validate_invocation(
         &self,
@@ -1012,7 +1015,8 @@ mod tests {
                 expected,
                 q,
                 snapshot,
-                compatibility::SOLANA_V1_6_16_RUNTIME.bootstrap
+                compatibility::SOLANA_V1_6_16_RUNTIME.bootstrap,
+                None,
             )
             .is_err()
         );

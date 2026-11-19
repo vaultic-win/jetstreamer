@@ -874,3 +874,26 @@ preservation of the canonical terminal obligation, native consensus and worker
 binding, independent cursors and rejection of a repeated native barrier. Actual
 full-firehose pressure/restore qualification remains pending; this entry point
 alone does not qualify mainnet recovery or admit another lane.
+
+The pressure resume bootstrap now has a separate trust scope from an externally
+canonical checkpoint. Its filename commitment must match the independently
+validated local bundle; if the canonical file also names that slot, the two must
+agree. The route never inserts the exported snapshot into the canonical list.
+Ordinary focused qualification still requires its canonical bootstrap. The
+pressure route retains every supplied suffix checkpoint and the exact original
+terminal, and the replay adapter does not prematurely call `finish()` at restore.
+Only the validated resume proof, after its actual native barrier, selects this
+future-terminal scope. The existing canonical-bootstrap continuation stays strict.
+
+Qualification on 2026-11-19 passed 45 focused tests, including unchanged ordinary
+qualification and existing checkpoint-continuation cases. An opt-in full-node
+test additionally used the sealed synthetic v1.7.15 native worker and hash-bound
+transcript with the production `HistoricalReplay` adapter. It restored the
+snapshot, compared the consensus state, rejected premature verification
+completion, executed the suffix entries through the adapter, consumed the exact
+future terminal, compared its full consensus tuple with the uninterrupted
+baseline and synchronously reaped the worker. Evidence is retained in
+`horizon-pressure-resume-native-adapter-20261119-v2.service` and
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-resume-20261119-v1`.
+This is native adapter qualification, not full firehose/controller or mainnet
+pressure qualification. No live reservation was released or new lane admitted.

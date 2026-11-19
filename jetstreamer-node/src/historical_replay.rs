@@ -36,6 +36,15 @@ const HISTORICAL_BATCH_MAX_SLOTS: usize = 4;
 // unusually large transactions from turning one response into a huge burst.
 const HISTORICAL_BATCH_TRANSACTION_BYTES: usize = 32 * 1024 * 1024;
 
+#[cfg(test)]
+#[path = "qualification_checkpoint_resume_native.rs"]
+mod resume_native;
+
+pub(crate) enum RestoredCheckpointTrust {
+    CanonicalBootstrap,
+    LocalBootstrapWithCanonicalTerminal(Slot),
+}
+
 #[cfg(feature = "epoch224-account-delta-diagnostic")]
 const EPOCH224_ACCOUNT_DELTA_DIAGNOSTIC_SLOT: Slot = 96_767_525;
 
@@ -349,8 +358,9 @@ impl HistoricalReplay {
 
     /// Starts from an independently frozen snapshot checkpoint. The caller
     /// must already have compared the complete native tuple with its retained
-    /// prefix; this constructor additionally consumes the exact canonical
-    /// root expectation before accepting an entry. Archive bootstrap provenance
+    /// prefix; this constructor either consumes the exact canonical bootstrap
+    /// root or retains the pressure suffix's future canonical obligations.
+    /// Archive bootstrap provenance
     /// remains SnapshotArchive, never CarriedBank.
     pub(crate) fn from_restored_checkpoint(
         client: HistoricalRuntimeClient,
@@ -360,18 +370,15 @@ impl HistoricalReplay {
         cursor: Arc<ReplayCursor>,
         progress: Arc<ReplayProgress>,
         live_start_slot: Slot,
+        trust: RestoredCheckpointTrust,
     ) -> Result<Self, String> {
-        validate_restored_bootstrap(
+        verify_restored_bootstrap(
             client.initialized(),
             &checkpoint,
             live_start_slot,
-            verifier.checkpoint_count_in_range(checkpoint.slot, checkpoint.slot) == 1,
+            &verifier,
+            trust,
         )?;
-        verifier.verify_legacy_accounts_hash(
-            checkpoint.slot,
-            Hash::new_from_array(checkpoint.accounts_hash),
-        );
-        verifier.finish()?;
         Self::from_carried(
             client,
             checkpoint,
@@ -1304,6 +1311,18 @@ fn validate_restored_bootstrap(
     live_start_slot: Slot,
     exact_root_present: bool,
 ) -> Result<(), String> {
+    validate_restored_snapshot(initialized, checkpoint, live_start_slot)?;
+    if !exact_root_present {
+        return Err("restored checkpoint requires its exact canonical root".into());
+    }
+    Ok(())
+}
+
+fn validate_restored_snapshot(
+    initialized: &crate::historical::HistoricalInitialized,
+    checkpoint: &HistoricalCheckpointSummary,
+    live_start_slot: Slot,
+) -> Result<(), String> {
     if initialized.source != HistoricalInitializedSource::SnapshotArchive
         || initialized.slot != checkpoint.slot
         || initialized.last_blockhash != checkpoint.last_blockhash
@@ -1315,11 +1334,58 @@ fn validate_restored_bootstrap(
                 .slot
                 .checked_add(1)
                 .ok_or("checkpoint slot overflow")?
-        || !exact_root_present
     {
-        return Err("restored checkpoint must be an untouched complete snapshot with its exact canonical root".into());
+        return Err("restored checkpoint must be an untouched complete snapshot".into());
     }
     Ok(())
+}
+
+fn verify_restored_bootstrap(
+    initialized: &crate::historical::HistoricalInitialized,
+    checkpoint: &HistoricalCheckpointSummary,
+    live_start_slot: Slot,
+    verifier: &SnapshotVerifier,
+    trust: RestoredCheckpointTrust,
+) -> Result<(), String> {
+    match trust {
+        RestoredCheckpointTrust::CanonicalBootstrap => {
+            validate_restored_bootstrap(
+                initialized,
+                checkpoint,
+                live_start_slot,
+                verifier.checkpoint_count_in_range(checkpoint.slot, checkpoint.slot) == 1,
+            )?;
+            verifier.verify_legacy_accounts_hash(
+                checkpoint.slot,
+                Hash::new_from_array(checkpoint.accounts_hash),
+            );
+            verifier.finish()
+        }
+        RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(end) => {
+            validate_restored_snapshot(initialized, checkpoint, live_start_slot)?;
+            if end < live_start_slot
+                || !verifier.expected.get(&end).is_some_and(|v| {
+                    matches!(*v, super::BankHashExpectation::LegacyAccountsHash(_))
+                })
+                || verifier
+                    .expected
+                    .iter()
+                    .any(|v| *v.key() < checkpoint.slot || *v.key() > end)
+            {
+                return Err("pressure restore requires its exact future canonical terminal and scoped expectations".into());
+            }
+            // Compare a canonical bootstrap if supplied, but never insert one
+            // from the local snapshot. Future roots remain pending until replay.
+            verifier.verify_legacy_accounts_hash(
+                checkpoint.slot,
+                Hash::new_from_array(checkpoint.accounts_hash),
+            );
+            if let Some(error) = verifier.error_summary() {
+                return Err(error);
+            }
+            Ok(())
+        }
+    }
 }
 
 fn consume_checkpoint_export_seal(last_checkpoint_slot: &mut Option<Slot>) {
@@ -1718,6 +1784,98 @@ mod tests {
             write_count: 0,
             next_write_version,
         }
+    }
+
+    #[test]
+    fn pressure_restored_bootstrap_keeps_future_roots_pending() {
+        let checkpoint = checkpoint_summary(108_864_009, 7);
+        let initialized = crate::historical::HistoricalInitialized {
+            genesis_hash: jetstreamer_historical_protocol::MAINNET_GENESIS_HASH.into(),
+            source: HistoricalInitializedSource::SnapshotArchive,
+            slot: checkpoint.slot,
+            last_blockhash: checkpoint.last_blockhash,
+            ticks_per_slot: 64,
+            next_write_version: checkpoint.next_write_version,
+        };
+        let start = checkpoint.slot + 1;
+        let end = checkpoint.slot + 10;
+        let hash = Hash::new_from_array([9; 32]);
+        let expectations = std::collections::BTreeMap::from([
+            (
+                start,
+                super::super::BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+            (
+                end,
+                super::super::BankHashExpectation::LegacyAccountsHash(hash),
+            ),
+        ]);
+        let verifier = SnapshotVerifier::new(expectations.clone(), None);
+        verify_restored_bootstrap(
+            &initialized,
+            &checkpoint,
+            start,
+            &verifier,
+            RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(end),
+        )
+        .unwrap();
+        assert_eq!(verifier.legacy_checkpoint_slots(), vec![start, end]);
+        verifier.verify_legacy_accounts_hash(start, hash);
+        assert!(verifier.finish().is_err());
+        verifier.verify_legacy_accounts_hash(end, hash);
+        verifier.finish().unwrap();
+
+        let verifier = SnapshotVerifier::new(expectations.clone(), None);
+        assert!(
+            verify_restored_bootstrap(
+                &initialized,
+                &checkpoint,
+                start,
+                &verifier,
+                RestoredCheckpointTrust::CanonicalBootstrap
+            )
+            .is_err()
+        );
+        for terminal in [checkpoint.slot, end - 1, end + 1] {
+            assert!(
+                verify_restored_bootstrap(
+                    &initialized,
+                    &checkpoint,
+                    start,
+                    &verifier,
+                    RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(terminal)
+                )
+                .is_err()
+            );
+        }
+        let mut changed = checkpoint.clone();
+        changed.write_count = 1;
+        assert!(
+            verify_restored_bootstrap(
+                &initialized,
+                &changed,
+                start,
+                &verifier,
+                RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(end)
+            )
+            .is_err()
+        );
+        let mut conflict = expectations;
+        conflict.insert(
+            checkpoint.slot,
+            super::super::BankHashExpectation::LegacyAccountsHash(hash),
+        );
+        let verifier = SnapshotVerifier::new(conflict, None);
+        assert!(
+            verify_restored_bootstrap(
+                &initialized,
+                &checkpoint,
+                start,
+                &verifier,
+                RestoredCheckpointTrust::LocalBootstrapWithCanonicalTerminal(end)
+            )
+            .is_err()
+        );
     }
 
     #[test]
