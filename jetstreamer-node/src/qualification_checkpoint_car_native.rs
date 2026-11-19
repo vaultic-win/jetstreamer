@@ -265,17 +265,24 @@ fn serve(
 /// Request pressure after the real decoder emits the parent edge, before its
 /// transaction/entry/metadata callbacks. Completion remains the real firehose's
 /// successful whole-batch acknowledgement.
-struct PressureParent(Arc<crate::BankBlockParentNotifier>);
+struct PressureParent {
+    inner: Arc<crate::BankBlockParentNotifier>,
+    pressure: bool,
+    completed: Arc<Mutex<Option<jetstreamer_firehose::source_quiescence::CompletedSourceBlock>>>,
+}
 impl jetstreamer_firehose::firehose::BlockParentNotifier for PressureParent {
     fn notify_block_parent(&self, parent: u64, slot: u64) {
-        self.0.notify_block_parent(parent, slot);
-        assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+        self.inner.notify_block_parent(parent, slot);
+        if self.pressure {
+            assert_eq!(unsafe { libc::raise(libc::SIGUSR1) }, 0);
+        }
     }
     fn source_block_completed(
         &self,
         block: jetstreamer_firehose::source_quiescence::CompletedSourceBlock,
     ) -> jetstreamer_firehose::source_quiescence::SourceBlockAction {
-        self.0.source_block_completed(block)
+        assert!(self.completed.lock().unwrap().replace(block).is_none());
+        self.inner.source_block_completed(block)
     }
 }
 
@@ -285,12 +292,32 @@ pub(super) fn deliver(
     producers: &crate::ReplayReadyEntryProducers,
     shutdown: Arc<AtomicBool>,
 ) -> jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
+    deliver_mode(bootstrap, prefix_entries, producers, shutdown, true)
+}
+
+pub(super) fn deliver_complete(
+    bootstrap: &Checkpoint,
+    entries: &[EntryRequest],
+    producers: &crate::ReplayReadyEntryProducers,
+    shutdown: Arc<AtomicBool>,
+) -> jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
+    deliver_mode(bootstrap, entries, producers, shutdown, false)
+}
+
+fn deliver_mode(
+    bootstrap: &Checkpoint,
+    prefix_entries: &[EntryRequest],
+    producers: &crate::ReplayReadyEntryProducers,
+    shutdown: Arc<AtomicBool>,
+    pressure: bool,
+) -> jetstreamer_firehose::source_quiescence::CompletedSourceBlock {
     use jetstreamer_firehose::firehose::{
         FirehoseError, firehose_geyser_with_notifiers_and_block_parent,
     };
     let prefix = prefix_entries.first().unwrap();
     let mirror = Mirror::start(bootstrap, prefix_entries);
     let (confirmed_sender, _confirmed_receiver) = crossbeam_channel::unbounded();
+    let completed = Arc::new(Mutex::new(None));
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -300,9 +327,13 @@ pub(super) fn deliver(
     );
     let result = firehose_geyser_with_notifiers_and_block_parent(
         rt,
-        prefix.slot..prefix.slot + 2,
+        prefix.slot..prefix.slot + if pressure { 2 } else { 1 },
         producers.geyser_notifiers(),
-        Some(Arc::new(PressureParent(producers.block_parent.clone()))),
+        Some(Arc::new(PressureParent {
+            inner: producers.block_parent.clone(),
+            pressure,
+            completed: completed.clone(),
+        })),
         Some((
             bootstrap.slot,
             Hash::new_from_array(bootstrap.last_blockhash.clone().try_into().unwrap()),
@@ -316,12 +347,17 @@ pub(super) fn deliver(
         true,
         Some(1 << 20),
     );
-    let block = match result {
-        Err((FirehoseError::SourceQuiesced(block), slot)) => {
+    let block = completed
+        .lock()
+        .unwrap()
+        .expect("complete decoded source block");
+    match result {
+        Err((FirehoseError::SourceQuiesced(selected), slot)) if pressure => {
             assert_eq!(slot, block.slot);
-            block
+            assert_eq!(selected, block);
         }
-        other => panic!("expected real source quiescence, got {other:?}"),
+        Ok(()) if !pressure => {}
+        other => panic!("unexpected real source result, pressure={pressure}: {other:?}"),
     };
     let requests = mirror.requests.lock().unwrap();
     let epoch = prefix.slot / 432_000;
@@ -339,7 +375,9 @@ pub(super) fn deliver(
                 .any(|r| r.contains(&format!("/{epoch}/epoch-{epoch}-slot-ranges.raw")))
         );
     }
-    eprintln!("real HTTP CAR source quiesced after complete decoded block: requests={requests:?}");
+    eprintln!(
+        "real HTTP CAR source completed decoded block: pressure={pressure} requests={requests:?}"
+    );
     drop(requests);
     block
 }
