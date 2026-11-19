@@ -110,12 +110,16 @@ pub(crate) fn publish(input: PausedCheckpoint<'_>) -> Result<serde_json::Value, 
         snapshot_manifest.clone(),
         &verified,
     )?;
+    #[cfg(test)]
+    publication_fault("after-publication-intent");
     let (snapshot_sidecar, _) =
         jetstreamer_node::checkpoint_bundle::publish_bound_checkpoint_snapshot(
             &snapshot.archive_path,
             snapshot_manifest,
             &verified,
         )?;
+    #[cfg(test)]
+    publication_fault("after-snapshot-manifest");
     let report = serde_json::json!({
         "schema": "horizon-pressure-checkpoint-paused-v3",
         "epoch": epoch,
@@ -156,5 +160,28 @@ pub(crate) fn publish(input: PausedCheckpoint<'_>) -> Result<serde_json::Value, 
         "publication_authorized": false,
     });
     checkpoint_export::write_paused_evidence(directory, &report)?;
+    #[cfg(test)]
+    publication_fault("after-paused-report");
     Ok(report)
+}
+
+/// Native fault qualification only. A failed producer must never acquire a
+/// clean exit proof, even when its artifact publication happened to finish.
+/// This hook and its environment access are absent from production builds.
+#[cfg(test)]
+fn publication_fault(stage: &str) {
+    if env::var("JETSTREAMER_PRESSURE_NATIVE_EXPORT_CRASH").as_deref() != Ok(stage) {
+        return;
+    }
+    assert_eq!(
+        env::var("JETSTREAMER_PRESSURE_NATIVE_PHASE").as_deref(),
+        Ok("export")
+    );
+    assert_eq!(
+        env::var("JETSTREAMER_NETWORK").as_deref(),
+        Ok("synthetic-pressure")
+    );
+    eprintln!("native checkpoint export crash at {stage}; no clean producer exit");
+    // Do not run destructors or let the test harness turn this into success.
+    unsafe { libc::_exit(87) }
 }

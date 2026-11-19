@@ -1098,3 +1098,32 @@ Evidence is under
 This closes the post-proof-publication controller interruption window only;
 it does not qualify interrupted producer export, automatic launch orchestration,
 full-epoch playback, mainnet recovery or reservation release.
+
+Native producer-interruption qualification now injects real process exits after
+publication intent, snapshot-manifest publication, and paused-report publication.
+These hooks compile only in the test binary and require the synthetic export
+environment. Each producer exits with status 87, without destructor cleanup or
+test-harness success. The first two leave no paused report; the third leaves the
+complete report and bundle but still fails the unchanged clean-exit proof gate.
+No exit receipt is issued for the failed producer. Snapshot publication recovery
+alone cannot make that invocation a trustworthy resume parent.
+
+The qualified fallback is a fresh replay from the original trusted input into
+a new private directory, not adoption of the interrupted producer's files.
+Replacement invocation `204b54eca0004e598c345ccf90a35b98` completed native prefix
+execution/export and synchronous worker reap, then exited cleanly. Its own
+separately sealed report and exit proof passed the production resume consumer;
+a fresh native worker executed and recorded the suffix and assembled V4 output.
+Full decode plus independent full PoH and exact terminal verification passed:
+two slots, two transactions, sixteen normalized updates, with archive SHA-256
+`d3eefed977e829a795602786bccf021291c1d127b8c85c690f3b9bd3d60b08d1`.
+All test workers are terminal; the clean replacement unit was retired only after
+its proof had been consumed. The failed artifacts remain qualification evidence.
+
+Build, fault-stage journals, rejection, replacement proof and verification evidence
+are in `/home/ubuntu/.codex/diagnostics/horizon-pressure-producer-replacement-20261119-v1`.
+This establishes interrupted-export rejection and replacement replay for the
+epoch-aligned synthetic scope. It does not salvage a failed producer's checkpoint,
+automatically select/admit/launch replacements, prove complete-epoch plugin
+playback, or qualify the production mainnet worker. Those remaining gates still
+block pressure-based reservation release and increased replay concurrency.

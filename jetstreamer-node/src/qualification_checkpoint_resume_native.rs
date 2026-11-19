@@ -165,6 +165,13 @@ fn pressure_notifiers_drain_native_prefix_export_and_resume_to_terminal() {
     saved.writes.clear();
     assert_eq!(saved, restored);
     let phase = std::env::var("JETSTREAMER_PRESSURE_NATIVE_PHASE").ok();
+    if let Ok(stage) = std::env::var("JETSTREAMER_PRESSURE_NATIVE_EXPORT_CRASH") {
+        assert_eq!(phase.as_deref(), Some("export"));
+        assert!(matches!(
+            stage.as_str(),
+            "after-publication-intent" | "after-snapshot-manifest" | "after-paused-report"
+        ));
+    }
     assert!(
         phase
             .as_deref()
