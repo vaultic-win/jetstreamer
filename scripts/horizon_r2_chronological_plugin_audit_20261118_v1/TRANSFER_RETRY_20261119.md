@@ -1,9 +1,8 @@
 # Bounded transfer recovery
 
-Source-only successor to the current v5 audit; no builds, Git, sealing, services,
-storage cleanup, R2 writes or live audit/resource observations were performed.
-Do not restart the healthy audit merely to deploy this patch. Parent owns the
-shared build slot and a handoff at a genuine idle boundary.
+The qualified v7 audit retries bounded response-body interruptions while preserving
+the original failure and complete playback requirements. Deploy through a genuine
+idle boundary; preserve healthy playback and the existing state/configuration.
 
 ## Exact historical failure
 
@@ -65,13 +64,14 @@ absence of a new marker never reclassifies an already-spent slot.
 
 ## Qualification and deployment handoff
 
-Rustfmt and `git diff --check` pass. No compiled test result is claimed.
-Eight new ordinary tests cover body-EOF classification versus clean truncation
+Qualification passed 44 ordinary tests, strict all-target Clippy and the release
+build. The existing native two-filesystem test was not rerun and remains ignored.
+The retry regressions cover body-EOF classification versus clean truncation
 and checksum errors; all remote identity fields; two-slot persistence and
 original preservation; exact historical receipt eligibility; interrupted-ticket
 consumption; orphan/substituted/gapped chains; scratch cleanup prerequisites; and
-success summary reconciliation. Expected ordinary total: **42**, plus the
-existing ignored native two-filesystem test. Report actual compiler/test results.
+success summary reconciliation, repeated interruption before the transfer boundary,
+and predecessor/backoff/scratch revalidation at that boundary.
 
 Use the parent's admitted serial build envelope and existing target; do not start
 compilers while its cache retirement is unreconciled:
@@ -89,7 +89,7 @@ next safe operational handoff and require a real retry pass/cleanup receipt befo
 claiming recovery. A successful mock/fixture cannot prove archive compatibility.
 
 Parent must publish exact source on `account-updates`, seal a distinct runtime
-such as `/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v6`,
+`/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7`,
 retain the current config bytes, state lock, service sandbox and resource envelope,
 preserve predecessor native evidence, then switch only the idle controller.
 Current playback must finish first. No `reconfigure` is needed for this fixed
