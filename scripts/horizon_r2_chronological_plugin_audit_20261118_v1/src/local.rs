@@ -1,3 +1,4 @@
+use crate::{Config, ExternalScratch};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
@@ -281,25 +282,126 @@ pub struct OwnedScratch {
     pub key: String,
     pub identity: Identity,
     pub created_at: u64,
+    /// Old same-filesystem journals omit this. External scratch must bind the
+    /// full accepted directory identity so recovery cannot unlink elsewhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_scratch: Option<ExternalScratch>,
 }
 
-pub fn scratch_path(state: &Path, owned: &OwnedScratch) -> Result<PathBuf> {
+pub fn validate_external_scratch(scratch: &ExternalScratch, state: &Path) -> Result<()> {
+    validate_absolute(&scratch.directory)?;
+    ensure!(
+        unsafe { libc::geteuid() } == 0,
+        "external scratch requires root custody"
+    );
+    for ancestor in scratch.directory.ancestors() {
+        let meta = fs::symlink_metadata(ancestor)?;
+        ensure!(
+            meta.is_dir() && meta.uid() == 0 && meta.mode() & 0o022 == 0,
+            "external scratch ancestry is writable or foreign-owned: {}",
+            ancestor.display()
+        );
+    }
+    let meta = fs::symlink_metadata(&scratch.directory)?;
+    ensure!(
+        meta.mode() & 0o077 == 0
+            && meta.dev() == scratch.device
+            && meta.ino() == scratch.inode
+            && meta.dev() != fs::symlink_metadata(state)?.dev(),
+        "external scratch identity or separate filesystem changed"
+    );
+    Ok(())
+}
+
+fn lock_directory(path: &Path) -> Result<File> {
+    let directory = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)?;
+    ensure!(
+        unsafe {
+            libc::flock(
+                std::os::fd::AsRawFd::as_raw_fd(&directory),
+                libc::LOCK_EX | libc::LOCK_NB,
+            )
+        } == 0,
+        "another audit owns the external scratch directory"
+    );
+    Ok(directory)
+}
+
+pub fn lock_external_scratch(cfg: &Config) -> Result<Option<File>> {
+    let Some(scratch) = &cfg.external_scratch else {
+        return Ok(None);
+    };
+    validate_external_scratch(scratch, &cfg.state_directory)?;
+    let directory = lock_directory(&scratch.directory)?;
+    let meta = directory.metadata()?;
+    ensure!(
+        meta.dev() == scratch.device && meta.ino() == scratch.inode,
+        "external scratch changed during lock acquisition"
+    );
+    Ok(Some(directory))
+}
+
+/// A relocation is allowed only while this state's exclusive lock is held and
+/// neither configuration owns a download. No archive or evidence is migrated.
+pub fn require_idle_scratch_change(old: &Config, new: &Config) -> Result<()> {
+    if old.external_scratch == new.external_scratch {
+        return Ok(());
+    }
+    ensure!(
+        !old.state_directory
+            .join("scratch-owner.json")
+            .try_exists()?,
+        "scratch relocation requires no owned in-flight download"
+    );
+    for cfg in [old, new] {
+        if let Some(scratch) = &cfg.external_scratch {
+            validate_external_scratch(scratch, &cfg.state_directory)?;
+        }
+        let directory = cfg.scratch_directory();
+        let meta = fs::symlink_metadata(&directory)?;
+        ensure!(
+            meta.is_dir() && meta.uid() == unsafe { libc::geteuid() } && meta.mode() & 0o077 == 0,
+            "scratch relocation requires private directories"
+        );
+        ensure!(
+            fs::read_dir(&directory)?.next().is_none(),
+            "scratch relocation requires empty old and new directories"
+        );
+    }
+    Ok(())
+}
+
+pub fn scratch_path(cfg: &Config, owned: &OwnedScratch) -> Result<PathBuf> {
     ensure!(
         crate::canonical_epoch(&owned.key).is_some(),
         "unsafe scratch key"
     );
-    Ok(state.join("scratch").join(&owned.key))
+    ensure!(
+        owned.external_scratch == cfg.external_scratch,
+        "owned scratch journal belongs to another directory or allocation"
+    );
+    if let Some(scratch) = &cfg.external_scratch {
+        validate_external_scratch(scratch, &cfg.state_directory)?;
+    }
+    Ok(cfg.scratch_directory().join(&owned.key))
 }
-pub fn cleanup_scratch(state: &Path) -> Result<()> {
+pub fn cleanup_scratch(cfg: &Config) -> Result<()> {
+    let state = &cfg.state_directory;
+    if let Some(scratch) = &cfg.external_scratch {
+        validate_external_scratch(scratch, state)?;
+    }
     let journal = state.join("scratch-owner.json");
     if journal.try_exists()? {
         let owned: OwnedScratch = read_json(&journal)?;
-        let path = scratch_path(state, &owned)?;
+        let path = scratch_path(cfg, &owned)?;
         match fs::symlink_metadata(&path) {
             Ok(_) => {
                 owned.identity.check(&path)?;
                 fs::remove_file(path)?;
-                sync_dir(&state.join("scratch"))?;
+                sync_dir(&cfg.scratch_directory())?;
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
@@ -309,7 +411,7 @@ pub fn cleanup_scratch(state: &Path) -> Result<()> {
     }
     // Unknown or unjournaled files are NEVER guessed to be disposable.
     ensure!(
-        fs::read_dir(state.join("scratch"))?.next().is_none(),
+        fs::read_dir(cfg.scratch_directory())?.next().is_none(),
         "unowned scratch file; inspect manually"
     );
     Ok(())
@@ -358,10 +460,15 @@ pub fn run_logged(
     log: &Path,
     timeout: u64,
     max_log: u64,
-    state: &Path,
-    floor: u64,
-    working_budget: u64,
+    cfg: &Config,
 ) -> Result<bool> {
+    let state = &cfg.state_directory;
+    // Establish both filesystem floors before the child can do useful work.
+    cfg.require_runtime_space(0)?;
+    ensure!(
+        working_bytes(state)? <= cfg.build_reserve_bytes,
+        "audit source/build/log allocation exceeds budget"
+    );
     let file = create(log)?;
     command.stdout(file.try_clone()?).stderr(file.try_clone()?);
     use std::os::unix::process::CommandExt;
@@ -403,7 +510,7 @@ pub fn run_logged(
                 "subprocess log exceeds bound"
             );
             ensure!(
-                working_bytes(state)? <= working_budget,
+                working_bytes(state)? <= cfg.build_reserve_bytes,
                 "audit source/build/log allocation exceeds budget"
             );
             return Ok(exit.success());
@@ -419,7 +526,7 @@ pub fn run_logged(
             );
             if last_allocation_check.elapsed() >= Duration::from_secs(30) {
                 ensure!(
-                    working_bytes(state)? <= working_budget,
+                    working_bytes(state)? <= cfg.build_reserve_bytes,
                     "audit source/build/log allocation exceeds budget"
                 );
                 last_allocation_check = Instant::now();
@@ -430,7 +537,7 @@ pub fn run_logged(
                     true,
                 )?;
             }
-            require_space(state, floor, 0)
+            cfg.require_runtime_space(0)
         })();
         if let Err(error) = guard {
             owned.stop();
@@ -456,6 +563,13 @@ pub fn set_readonly(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn config(state: &Path) -> Config {
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.state_directory = state.to_owned();
+        cfg.reserve_bytes = 0;
+        cfg.build_reserve_bytes = 1024 * 1024;
+        cfg
+    }
     #[test]
     fn allocation_walk_tolerates_cargo_removal_after_enumeration() {
         let d = tempfile::tempdir().unwrap();
@@ -554,17 +668,18 @@ mod tests {
             key: "epoch-3.jet".into(),
             identity: Identity::from_file(&f).unwrap(),
             created_at: now(),
+            external_scratch: None,
         };
         write_json(&state.join("scratch-owner.json"), &owned, false).unwrap();
         fs::rename(&path, state.join("original")).unwrap();
         create(&path).unwrap();
-        assert!(cleanup_scratch(state).is_err());
+        assert!(cleanup_scratch(&config(state)).is_err());
         assert!(path.exists());
         let bad = OwnedScratch {
             key: "../epoch-3.jet".into(),
             ..owned
         };
-        assert!(scratch_path(state, &bad).is_err());
+        assert!(scratch_path(&config(state), &bad).is_err());
     }
     #[test]
     fn cleanup_recovers_partial_and_is_idempotent() {
@@ -577,12 +692,13 @@ mod tests {
             key: "epoch-0.jet".into(),
             identity: Identity::from_file(&f).unwrap(),
             created_at: now(),
+            external_scratch: None,
         };
         write_json(&state.join("scratch-owner.json"), &owned, false).unwrap();
         f.write_all(b"partial").unwrap();
         f.sync_all().unwrap();
-        cleanup_scratch(state).unwrap();
-        cleanup_scratch(state).unwrap();
+        cleanup_scratch(&config(state)).unwrap();
+        cleanup_scratch(&config(state)).unwrap();
         assert!(!path.exists());
     }
     #[test]
@@ -596,6 +712,155 @@ mod tests {
         assert!(lock(&d.path().join("lock")).is_err());
     }
     #[test]
+    fn legacy_scratch_journal_cannot_delete_from_relocated_directory() {
+        let d = tempfile::tempdir().unwrap();
+        private_dir(&d.path().join("scratch")).unwrap();
+        let file = create(&d.path().join("scratch/epoch-74.jet")).unwrap();
+        let owned = OwnedScratch {
+            key: "epoch-74.jet".into(),
+            identity: Identity::from_file(&file).unwrap(),
+            created_at: now(),
+            external_scratch: None,
+        };
+        let mut cfg = config(d.path());
+        cfg.external_scratch = Some(ExternalScratch {
+            directory: PathBuf::from("/var/lib/jetstreamer/horizon_runtime_data/audit"),
+            device: 64512,
+            inode: 123,
+            reserve_bytes: 100,
+        });
+        let error = scratch_path(&cfg, &owned).unwrap_err();
+        assert!(error.to_string().contains("another directory"));
+        assert!(d.path().join("scratch/epoch-74.jet").exists());
+    }
+    #[test]
+    fn scratch_relocation_rejects_inflight_owner_without_touching_journal() {
+        let d = tempfile::tempdir().unwrap();
+        private_dir(&d.path().join("scratch")).unwrap();
+        let old = config(d.path());
+        let mut new = old.clone();
+        new.external_scratch = Some(ExternalScratch {
+            directory: PathBuf::from("/unprovisioned-scratch"),
+            device: 64512,
+            inode: 123,
+            reserve_bytes: 100,
+        });
+        let journal = d.path().join("scratch-owner.json");
+        fs::write(&journal, b"preserve even malformed ownership evidence").unwrap();
+        assert!(
+            require_idle_scratch_change(&old, &new)
+                .unwrap_err()
+                .to_string()
+                .contains("in-flight")
+        );
+        assert_eq!(
+            fs::read(journal).unwrap(),
+            b"preserve even malformed ownership evidence"
+        );
+    }
+    #[test]
+    fn directory_lock_excludes_other_state_owners_without_creating_archive_files() {
+        let d = tempfile::tempdir().unwrap();
+        let first = lock_directory(d.path()).unwrap();
+        assert!(lock_directory(d.path()).is_err());
+        assert!(fs::read_dir(d.path()).unwrap().next().is_none());
+        drop(first);
+        assert!(lock_directory(d.path()).is_ok());
+    }
+    #[test]
+    fn old_journal_deserializes_without_external_scratch_authority() {
+        let legacy = serde_json::json!({"key":"epoch-1.jet", "identity":{"device":1,"inode":2,"uid":0},"created_at":3});
+        let owned: OwnedScratch = serde_json::from_value(legacy).unwrap();
+        assert!(owned.external_scratch.is_none());
+    }
+    #[test]
+    fn external_scratch_failure_stops_child_before_spawn() {
+        let d = tempfile::tempdir().unwrap();
+        let mut cfg = config(d.path());
+        cfg.external_scratch = Some(ExternalScratch {
+            directory: d.path().join("unprovisioned"),
+            device: 64512,
+            inode: 123,
+            reserve_bytes: 1,
+        });
+        let marker = d.path().join("child-started");
+        let mut command = clean_command(Path::new("/usr/bin/touch"));
+        command.arg(&marker);
+        assert!(run_logged(command, &d.path().join("child.log"), 5, 1024, &cfg).is_err());
+        assert!(!marker.exists());
+        assert!(!d.path().join("child.log").exists());
+    }
+    #[test]
+    #[ignore = "requires parent-admitted root-owned private parents on two filesystems"]
+    fn external_scratch_full_roundtrip_on_two_admitted_filesystems() {
+        ensure_root_test();
+        let state_parent =
+            std::env::var_os("AUDIT_STORAGE_TEST_STATE_PARENT").expect("state test parent");
+        let scratch_parent =
+            std::env::var_os("AUDIT_STORAGE_TEST_SCRATCH_PARENT").expect("scratch test parent");
+        let state = tempfile::tempdir_in(state_parent).unwrap();
+        let scratch = tempfile::tempdir_in(scratch_parent).unwrap();
+        // tempfile follows the invoking umask; qualify the same explicit private
+        // directory custody required by the production external-scratch route.
+        fs::set_permissions(state.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        fs::set_permissions(scratch.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        private_dir(&state.path().join("scratch")).unwrap();
+        let mut cfg = config(state.path());
+        cfg.reserve_bytes = 1;
+        cfg.max_archive_bytes = 8192;
+        let meta = fs::symlink_metadata(scratch.path()).unwrap();
+        cfg.external_scratch = Some(ExternalScratch {
+            directory: scratch.path().to_owned(),
+            device: meta.dev(),
+            inode: meta.ino(),
+            reserve_bytes: 1,
+        });
+        let legacy = config(state.path());
+        validate_external_scratch(cfg.external_scratch.as_ref().unwrap(), state.path()).unwrap();
+        require_idle_scratch_change(&legacy, &cfg).unwrap();
+        let owner = lock_external_scratch(&cfg).unwrap();
+        assert!(lock_external_scratch(&cfg).is_err());
+        cfg.require_download_capacity(8192).unwrap();
+        assert!(cfg.require_download_capacity(8193).is_err());
+        let path = scratch.path().join("epoch-74.jet");
+        let mut file = create(&path).unwrap();
+        let journal = OwnedScratch {
+            key: "epoch-74.jet".into(),
+            identity: Identity::from_file(&file).unwrap(),
+            created_at: now(),
+            external_scratch: cfg.external_scratch.clone(),
+        };
+        write_json(&state.path().join("scratch-owner.json"), &journal, false).unwrap();
+        file.write_all(b"interrupted authenticated download fixture")
+            .unwrap();
+        file.sync_all().unwrap();
+        assert!(require_idle_scratch_change(&cfg, &legacy).is_err());
+        let mut changed = cfg.clone();
+        changed.external_scratch.as_mut().unwrap().inode += 1;
+        assert!(cleanup_scratch(&changed).is_err());
+        assert!(path.exists());
+        drop(file);
+        cleanup_scratch(&cfg).unwrap();
+        cleanup_scratch(&cfg).unwrap();
+        assert!(!path.exists());
+        assert!(!state.path().join("scratch-owner.json").exists());
+        let unknown = scratch.path().join("unknown-evidence");
+        fs::write(&unknown, b"must remain").unwrap();
+        assert!(cleanup_scratch(&cfg).is_err());
+        assert!(require_idle_scratch_change(&cfg, &legacy).is_err());
+        assert_eq!(fs::read(&unknown).unwrap(), b"must remain");
+        fs::remove_file(&unknown).unwrap();
+        require_idle_scratch_change(&cfg, &legacy).unwrap();
+        drop(owner);
+    }
+    fn ensure_root_test() {
+        assert_eq!(
+            unsafe { libc::geteuid() },
+            0,
+            "this ignored integration test requires root"
+        );
+    }
+    #[test]
     fn unknown_and_symlink_scratch_survive_cleanup() {
         let d = tempfile::tempdir().unwrap();
         let state = d.path();
@@ -604,7 +869,7 @@ mod tests {
         fs::write(&outside, b"archive").unwrap();
         let path = state.join("scratch/epoch-4.jet");
         std::os::unix::fs::symlink(&outside, &path).unwrap();
-        assert!(cleanup_scratch(state).is_err());
+        assert!(cleanup_scratch(&config(state)).is_err());
         assert!(outside.exists());
         assert!(path.symlink_metadata().is_ok());
     }
@@ -620,9 +885,7 @@ mod tests {
                 &d.path().join("child.log"),
                 5,
                 1024,
-                d.path(),
-                0,
-                1024 * 1024
+                &config(d.path())
             )
             .unwrap()
         );
@@ -645,9 +908,7 @@ mod tests {
             &d.path().join("group.log"),
             1,
             1024,
-            d.path(),
-            0,
-            1024 * 1024,
+            &config(d.path()),
         )
         .unwrap_err();
         assert!(error.to_string().contains("timeout"));

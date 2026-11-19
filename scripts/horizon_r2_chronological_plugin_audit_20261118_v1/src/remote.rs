@@ -217,12 +217,14 @@ impl Remote {
         if let (Some(a), Some(b)) = (&metadata_sha256, &sidecar_sha256) {
             ensure!(a == b, "sidecar and metadata digests disagree");
         }
-        let scratch = cfg.state_directory.join("scratch").join(&object.key);
+        cfg.require_download_capacity(object.bytes)?;
+        let scratch = cfg.scratch_directory().join(&object.key);
         let mut output = create(&scratch)?;
         let owned = OwnedScratch {
             key: object.key.clone(),
             identity: Identity::from_file(&output)?,
             created_at: now(),
+            external_scratch: cfg.external_scratch.clone(),
         };
         write_json(
             &cfg.state_directory.join("scratch-owner.json"),
@@ -265,7 +267,7 @@ impl Remote {
                 began.elapsed().as_secs() <= cfg.download_timeout_seconds,
                 "archive download deadline exceeded"
             );
-            require_space(&cfg.state_directory, cfg.reserve_bytes, chunk.len() as u64)?;
+            cfg.require_runtime_space(chunk.len() as u64)?;
             output.write_all(&chunk)?;
             hash.update(&chunk);
             if last_progress.elapsed() >= Duration::from_secs(30) {

@@ -59,24 +59,25 @@ limits remain mandatory.
 A deployment on `/home/sol` must instead preserve the current campaign's admitted
 growth reservation. The parent specified 7,493,617,796,914 bytes as the pending
 whole-fleet baseline, which must not be replaced by the smaller root-filesystem
-floor. No other filesystem is implicitly authorized. This implementation keeps
+floor. No other filesystem is implicitly authorized. The deployed v3 keeps
 scratch, source/build, evidence, and sealed reader generations on the same
 filesystem. Reader generations are held separately under the root-owned
 `/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1` and are charged
 to the same working budget. The current deployment therefore requires state on
-the root filesystem; a later larger-volume migration needs qualified destination
-ancestry and accounting, not merely a path edit.
+the root filesystem. The optional external-scratch successor described in
+[`SPLIT_SCRATCH_20261119.md`](SPLIT_SCRATCH_20261119.md) keeps that state and all
+reader generations in place while separating only the disposable archive copy.
+That successor is source preparation, not an admitted or deployed allocation.
 
 If the next archive exceeds the admitted archive cap or free space is insufficient,
 the service writes `waiting_for_capacity` and stays alive, rechecking after 1800
 seconds. It never skips that epoch to fit a later one. Therefore the root example
-can process early small epochs, then waits until the parent moves the audit state
-under a separately qualified allocation or increases the budget. Keep the entire
-state together when moving it; paths in receipts preserve their historical meaning,
-and source/artifact/config custody must be requalified. In ordinary operation,
-prefer provisioning enough space for the largest archive from the start.
+can process early small epochs, then waits for separately qualified capacity.
+The optional scratch successor requires a private root-owned directory on a
+different filesystem, pins its device/inode, and preserves both filesystem
+reserves. It does not migrate the state or rewrite historical receipt paths.
 
-To alter only the three byte budgets, stop the service and finish qualified capacity
+To alter resource budgets, stop the service and finish qualified capacity
 planning, prepare a newly sealed config with the same other fields, then run:
 
 ```text
@@ -86,6 +87,10 @@ SEALED_BINARY reconfigure NEW_CONFIG.json
 This command acquires the same exclusive lock and saves old/new configuration
 evidence before replacing the accepted config. Update the service to use that
 sealed config and restart it. It does not itself authorize the new allocation.
+The successor additionally permits changing `external_scratch` only when both
+old and new scratch directories are empty and no ownership journal exists. It
+locks both external directory identities during the transition. A journal from
+another scratch configuration is never used to delete a file.
 
 ## Reader provenance and playback
 
