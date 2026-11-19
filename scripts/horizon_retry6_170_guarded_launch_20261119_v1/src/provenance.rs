@@ -1,10 +1,10 @@
 //! Validate the exact sealed preparer, source closure and qualified guard.
 use super::*;
-const BUILD_COMMIT: &str = env!("HORIZON_170_PREPARER_V4_SOURCE_COMMIT");
+const BUILD_COMMIT: &str = env!("HORIZON_170_PREPARER_V5_SOURCE_COMMIT");
 const PREPARE_PACKAGE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_20261118_v1/prepare-live166retry8-v1";
 const AUDIT_SOURCE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_guarded_launch_20261119_v1/src/audit_budget.rs";
 pub(super) fn validate() -> Result<()> {
-    let passed = env!("HORIZON_170_PREPARER_V4_TESTS_PASSED").parse::<u64>()?;
+    let passed = env!("HORIZON_170_PREPARER_V5_TESTS_PASSED").parse::<u64>()?;
     ensure!(
         passed >= 306
             && BUILD_COMMIT.len() == 40

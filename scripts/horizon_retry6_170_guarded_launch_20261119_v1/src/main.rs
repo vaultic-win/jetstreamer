@@ -40,10 +40,10 @@ const NODE_SHA: &str = "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b
 const GUARD_IMAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
-const PREPARER_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v4/prepare";
-const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V4_SHA256");
-const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v4/artifact-proof.json";
-const PREPARER_BUILD_PROOF_SHA: &str = env!("HORIZON_170_PREPARER_V4_PROOF_SHA256");
+const PREPARER_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v5/prepare";
+const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V5_SHA256");
+const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v5/artifact-proof.json";
+const PREPARER_BUILD_PROOF_SHA: &str = env!("HORIZON_170_PREPARER_V5_PROOF_SHA256");
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const GUARD_PLAN_PARENT: &str =
@@ -1125,7 +1125,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     attempt
 }
 const LAUNCH_IMAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v7/launch";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v8/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),

@@ -235,8 +235,8 @@ fn process_claims() -> Result<Vec<Value>> {
 const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
-const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v4/prepare";
-const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V4_SHA256");
+const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v5/prepare";
+const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V5_SHA256");
 const GUARD: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
@@ -884,7 +884,7 @@ fn main() -> Result<()> {
             && sha(&fs::read(format!(
                 "{}/artifact-proof.json",
                 Path::new(PREPARER).parent().unwrap().display()
-            ))?) == env!("HORIZON_170_PREPARER_V4_PROOF_SHA256"),
+            ))?) == env!("HORIZON_170_PREPARER_V5_PROOF_SHA256"),
         "qualified preparer/proof changed"
     );
     let m = fs::symlink_metadata(FRESH)?;
@@ -1162,9 +1162,9 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v7/launch";
+        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v8/launch";
         ensure!(
-            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V7_SHA256"),
+            sha(&fs::read(launcher)?) == env!("HORIZON_170_RETRY8_LAUNCH_V8_SHA256"),
             "sealed launcher differs"
         );
         let commit = published_sources()?;
