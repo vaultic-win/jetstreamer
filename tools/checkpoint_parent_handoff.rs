@@ -13,6 +13,16 @@ use crate::segment_manifest::{
 pub const PHASE: &str = "JETSTREAMER_NATIVE_PARENT_PHASE";
 const RECEIPT: &str = "parent-checkpoint.json";
 const RECEIPT_SHA: &str = "JETSTREAMER_NATIVE_PARENT_RECEIPT_SHA256";
+const INTERRUPT: &str = "JETSTREAMER_NATIVE_PUBLICATION_INTERRUPT";
+const INTENT_SHA: &str = "JETSTREAMER_NATIVE_PUBLICATION_INTENT_SHA256";
+
+fn interrupt_after(stage: &str) {
+    if std::env::var(INTERRUPT).ok().as_deref() == Some(stage) {
+        eprintln!("synthetic publication interruption after {stage}");
+        // Deliberately skip destructors after the named durable boundary.
+        unsafe { libc::_exit(86) }
+    }
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -101,6 +111,13 @@ pub fn publish(
         verified_segment == written_segment,
         "prefix manifest readback differs",
     )?;
+    checkpoint_bundle::prepare_checkpoint_publication(
+        &prefix,
+        Path::new(&export.archive_path),
+        manifest.clone(),
+        &verified_segment,
+    )?;
+    interrupt_after("intent");
     let (sidecar, published) = checkpoint_bundle::publish_bound_checkpoint_snapshot(
         Path::new(&export.archive_path),
         manifest,
@@ -110,6 +127,29 @@ pub fn publish(
         read_and_validate_handoff_snapshot_manifest(&export.archive_path)? == published,
         "snapshot manifest readback differs",
     )?;
+    interrupt_after("snapshot");
+    publish_receipt(
+        input,
+        output,
+        launcher,
+        image,
+        after,
+        export,
+        &prefix_sidecar,
+        &sidecar,
+    )
+}
+
+fn publish_receipt(
+    input: &Path,
+    output: &Path,
+    launcher: &Path,
+    image: &Path,
+    after: &Checkpoint,
+    export: &SnapshotExport,
+    prefix_sidecar: &Path,
+    sidecar: &Path,
+) -> Result<()> {
     let receipt = Receipt {
         schema: "horizon-synthetic-parent-checkpoint-v2".into(),
         parent_pid: std::process::id(),
@@ -118,16 +158,83 @@ pub fn publish(
         native_image_sha256: hex(&digest(image)?),
         transcript_sha256: hex(&digest(&input.join("native-transcript.bin"))?),
         prefix_sha256: hex(&digest(&output.join("prefix.jet"))?),
-        prefix_manifest_sha256: hex(&digest(&prefix_sidecar)?),
-        snapshot_manifest_sha256: hex(&digest(&sidecar)?),
+        prefix_manifest_sha256: hex(&digest(prefix_sidecar)?),
+        snapshot_manifest_sha256: hex(&digest(sidecar)?),
         export: export.clone(),
         checkpoint: after.clone(),
     };
-    let mut file = create(&output.join(RECEIPT))?;
+    let mut file = tempfile::Builder::new()
+        .prefix(".parent-checkpoint-")
+        .tempfile_in(output)?;
     serde_json::to_writer_pretty(&mut file, &receipt)?;
-    file.sync_all()?;
+    file.as_file().sync_all()?;
+    file.persist_noclobber(output.join(RECEIPT))?;
     File::open(output)?.sync_all()?;
     Ok(())
+}
+
+pub fn recover(
+    input: &Path,
+    output: &Path,
+    launcher: &Path,
+    image: &Path,
+    genesis: &[u8],
+    boundary: &Checkpoint,
+) -> Result<()> {
+    let expected = std::env::var(INTENT_SHA)?;
+    require(
+        expected.len() == 64
+            && expected
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+        "invalid publication intent digest",
+    )?;
+    let expected: [u8; 32] = (0..32)
+        .map(|i| u8::from_str_radix(&expected[i * 2..i * 2 + 2], 16))
+        .collect::<std::result::Result<Vec<_>, _>>()?
+        .try_into()
+        .map_err(|_| "invalid digest length")?;
+    let prefix = output.join("prefix.jet");
+    let intent = checkpoint_bundle::checkpoint_publication_intent_path(&prefix)?;
+    let (segment, snapshot) = checkpoint_bundle::recover_checkpoint_publication(&intent, expected)?;
+    require(
+        snapshot.terminal == summary(boundary)?
+            && snapshot.source_runtime.genesis_hash == hash(genesis)?.to_string()
+            && snapshot.source_worker_executable_sha256 == digest(image)?
+            && Path::new(&snapshot.archive_path).parent()
+                == Some(output.join("live-export").as_path()),
+        "recovered publication differs from native fixture",
+    )?;
+    let sidecar = handoff_snapshot_manifest_path(&snapshot.archive_path)?;
+    let before = (digest(&intent)?, digest(&sidecar)?);
+    require(
+        checkpoint_bundle::recover_checkpoint_publication(&intent, expected)?
+            == (segment, snapshot.clone()),
+        "repeated publication recovery differs",
+    )?;
+    require(
+        before == (digest(&intent)?, digest(&sidecar)?),
+        "repeated recovery rewrote evidence",
+    )?;
+    let export = SnapshotExport {
+        slot: snapshot.snapshot_slot,
+        archive_path: snapshot.archive_path,
+        archive_size: snapshot.archive_size,
+        archive_sha256: snapshot.archive_sha256.to_vec(),
+        accounts_hash: boundary.accounts_hash.clone(),
+    };
+    let mut after = boundary.clone();
+    after.writes.clear();
+    publish_receipt(
+        input,
+        output,
+        launcher,
+        image,
+        &after,
+        &export,
+        &segment_manifest_path(&prefix)?,
+        &sidecar,
+    )
 }
 
 pub fn read(
@@ -221,22 +328,56 @@ pub fn controller(args: &[PathBuf]) -> Result<()> {
         "controller output must be empty",
     )?;
     let executable = std::env::current_exe()?;
+    let interruption = std::env::var(INTERRUPT).ok();
+    require(
+        matches!(interruption.as_deref(), None | Some("intent" | "snapshot")),
+        "unknown publication interruption",
+    )?;
     let child = |phase: &str, receipt_sha: Option<&str>| -> Result<std::process::Output> {
         let mut command = Command::new(&executable);
         command.args(args).env(PHASE, phase).stdin(Stdio::null());
         if let Some(sha) = receipt_sha {
             command.env(RECEIPT_SHA, sha);
+            command.env(INTENT_SHA, sha);
         }
         Ok(command.output()?)
     };
     let exported = child("export", None)?;
-    require(
-        exported.status.success(),
-        &format!(
-            "export parent failed: {}",
-            String::from_utf8_lossy(&exported.stderr)
-        ),
-    )?;
+    let mut stages = Vec::new();
+    if interruption.is_some() {
+        require(
+            exported.status.code() == Some(86) && !output.join(RECEIPT).try_exists()?,
+            "publication interruption did not stop before checkpoint receipt",
+        )?;
+        let intent =
+            checkpoint_bundle::checkpoint_publication_intent_path(&output.join("prefix.jet"))?;
+        let intent_sha = hex(&digest(&intent)?);
+        let rejected = child("recover-publication", Some(&"0".repeat(64)))?;
+        require(
+            !rejected.status.success()
+                && String::from_utf8_lossy(&rejected.stderr)
+                    .contains("checkpoint publication intent digest mismatch"),
+            "wrong publication intent digest accepted",
+        )?;
+        let recovered = child("recover-publication", Some(&intent_sha))?;
+        require(
+            recovered.status.success(),
+            &format!(
+                "publication recovery failed: {}",
+                String::from_utf8_lossy(&recovered.stderr)
+            ),
+        )?;
+        stages.push(("wrong-intent", rejected));
+        stages.push(("recover-publication", recovered));
+    } else {
+        require(
+            exported.status.success(),
+            &format!(
+                "export parent failed: {}",
+                String::from_utf8_lossy(&exported.stderr)
+            ),
+        )?;
+    }
     // The exporting parent has exited and been reaped. Only durable files cross
     // into the independent resume parent; no live Client or recorder is retained.
     let receipt_sha = hex(&digest(&output.join(RECEIPT))?);
@@ -268,12 +409,13 @@ pub fn controller(args: &[PathBuf]) -> Result<()> {
             && hex(&digest(&output.join(RECEIPT))?) == receipt_sha,
         "rejected retry changed successful evidence",
     )?;
-    for (name, result) in [
+    stages.extend([
         ("export", exported),
         ("wrong-digest", rejected),
         ("resume", resumed),
         ("duplicate", replayed),
-    ] {
+    ]);
+    for (name, result) in stages {
         let mut file = create(&output.join(format!("parent-{name}.stderr")))?;
         file.write_all(&result.stderr)?;
         file.sync_all()?;
@@ -286,6 +428,8 @@ pub fn controller(args: &[PathBuf]) -> Result<()> {
             "receipt_sha256":receipt_sha,"native_results_sha256":hex(&results_before),
             "export_parent_reaped":true,"fresh_parent_resume":true,
             "changed_receipt_binding_rejected":true,"duplicate_resume_rejected":true,
+            "publication_interruption":interruption,
+            "publication_recovered":interruption.is_some(),
             "full_parent_firehose_qualified":false,"mainnet_qualified":false,
             "pressure_admission_authorized":false
         }),

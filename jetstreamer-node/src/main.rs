@@ -22081,9 +22081,14 @@ async fn main() {
                                 .expect("segment writer required worker identity"),
                             terminal: segment_checkpoint_summary(&evidence.terminal),
                         };
-                        let publication = jetstreamer_node::checkpoint_bundle::publish_bound_checkpoint_snapshot(
+                        let publication = jetstreamer_node::checkpoint_bundle::prepare_checkpoint_publication(
+                            &horizon_output, &exported.archive_path, manifest.clone(), &verified_segment,
+                        ).and_then(|(intent, digest)| {
+                            info!("checkpoint publication intent {} SHA256 {} durable", intent.display(), jetstreamer_node::segment_manifest::sha256_hex_string(&digest));
+                            jetstreamer_node::checkpoint_bundle::publish_bound_checkpoint_snapshot(
                             &exported.archive_path, manifest, &verified_segment,
-                        ).map(|(path, _)| path);
+                        ).map(|(path, _)| path)
+                        });
                         match publication {
                             Ok(path) => info!(
                                 "focused checkpoint snapshot evidence {} committed after segment verification and worker shutdown; resume and pressure admission remain separate gates",

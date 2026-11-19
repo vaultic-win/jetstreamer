@@ -389,7 +389,7 @@ fn main() -> Result<()> {
     require(
         matches!(
             parent_phase.as_deref(),
-            None | Some("controller" | "export" | "resume")
+            None | Some("controller" | "export" | "resume" | "recover-publication")
         ),
         "unknown synthetic parent phase",
     )?;
@@ -402,7 +402,10 @@ fn main() -> Result<()> {
     if parent_phase.as_deref() == Some("controller") {
         return checkpoint_parent_handoff::controller(&args);
     }
-    if parent_phase.as_deref() != Some("resume") {
+    if !matches!(
+        parent_phase.as_deref(),
+        Some("resume" | "recover-publication")
+    ) {
         require(
             fs::read_dir(output)?.next().is_none(),
             "output must be empty",
@@ -460,6 +463,16 @@ fn main() -> Result<()> {
     let full_sha = digest(full)?;
     let paths = [output.join("prefix.jet"), output.join("suffix.jet")];
     let live_worker = std::env::var_os("JETSTREAMER_NATIVE_LIVE_WORKER");
+    if parent_phase.as_deref() == Some("recover-publication") {
+        return checkpoint_parent_handoff::recover(
+            input,
+            output,
+            Path::new(live_worker.as_ref().ok_or("missing live launcher")?),
+            image,
+            &genesis,
+            &boundary,
+        );
+    }
     if let Some(launcher) = live_worker.as_ref() {
         let live_export = checkpoint_live_client::run(
             input,

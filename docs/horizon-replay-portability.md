@@ -537,3 +537,31 @@ The node seal-plan SHA-256 is
 `682fd4c6bba65c1bad1679731e6520bbff5765e57d93df43dedf8027e703f0c1`.
 This verifies the production integration builds; it does not claim a successful
 full firehose/mainnet checkpoint run or authorize replacing a healthy worker.
+
+The next recovery component records an atomic, no-clobber checkpoint-publication
+intent after prefix validation and ordered shutdown, before publishing the
+snapshot manifest. It binds canonical prefix/snapshot paths, the fully verified
+segment and the worker's exact snapshot digest, size, runtime and terminal state.
+The focused production completion path logs the durable intent path and digest.
+The normal publisher still rejects duplicate publication.
+
+Explicit `recover_checkpoint_publication` requires the independently retained
+intent digest and owner-only custody. It holds the destination writer lock,
+deeply rereads the prefix, creates a missing snapshot manifest from the exact
+bound export, and fully validates the resulting bundle. A surviving manifest
+must match exactly; it is never overwritten. Open-file identities are retained
+and rechecked through recovery, including the intent and both source archives.
+Recovery fsyncs the matching manifest and its directory even when an earlier
+parent may have exited between rename and directory fsync. The caller must
+authenticate the controller plan, exclude a live producer and preserve custody;
+this component alone proves neither process reaping nor permission to resume.
+
+The synthetic controller supports `JETSTREAMER_NATIVE_PUBLICATION_INTERRUPT`
+values `intent` and `snapshot`. Its export parent exits abruptly at the selected
+durable boundary without a final parent receipt. A distinct recovery parent
+rejects an incorrect intent digest, recovers publication, repeats recovery
+without rewriting evidence, and atomically publishes the parent receipt. The
+ordinary independent resume parent then executes the suffix and normal V4/full
+PoH checks. These targeted interruptions do not cover crashes during worker
+export, before the intent exists, during suffix execution or every filesystem
+operation, and do not qualify pressure admission or mainnet recovery.

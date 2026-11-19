@@ -13,7 +13,185 @@ use crate::{
         HistoricalSegmentManifest, read_and_validate_segment_manifest, segment_manifest_path,
     },
 };
-use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::{
+    fs::{self, File},
+    io::{Read, Write},
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+};
+
+/// Durable publication input, not proof that a worker has exited or that a
+/// checkpoint is admitted for replay. Recovery callers authenticate its digest
+/// independently and keep exclusive custody of all selected files.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PublicationIntent {
+    schema_version: u32,
+    prefix: PathBuf,
+    segment: HistoricalSegmentManifest,
+    snapshot: HistoricalHandoffSnapshotManifest,
+}
+
+pub fn checkpoint_publication_intent_path(prefix: &Path) -> Result<PathBuf, String> {
+    let mut name = prefix
+        .file_name()
+        .ok_or("prefix has no filename")?
+        .to_os_string();
+    name.push(".checkpoint-publication.json");
+    Ok(prefix.with_file_name(name))
+}
+
+/// Called after the prefix's complete validation and ordered worker shutdown,
+/// before snapshot-manifest publication. Leaves an atomic, no-clobber recovery
+/// intent even when the parent exits before finishing publication. No snapshot
+/// or prefix data is replaced, and ordinary duplicate publication still fails.
+pub fn prepare_checkpoint_publication(
+    prefix: &Path,
+    archive: &Path,
+    mut snapshot: HistoricalHandoffSnapshotManifest,
+    verified_segment: &HistoricalSegmentManifest,
+) -> Result<(PathBuf, [u8; 32]), String> {
+    if !prefix.is_absolute()
+        || prefix.canonicalize().map_err(|e| e.to_string())? != prefix
+        || !archive.is_absolute()
+        || archive.canonicalize().map_err(|e| e.to_string())? != archive
+    {
+        return Err("checkpoint publication requires canonical absolute paths".into());
+    }
+    snapshot.archive_path = archive.to_str().ok_or("non-UTF8 snapshot path")?.into();
+    snapshot.validate().map_err(|e| e.to_string())?;
+    validate_checkpoint_relation(verified_segment, &snapshot)?;
+    let path = checkpoint_publication_intent_path(prefix)?;
+    let parent = path.parent().ok_or("intent has no parent")?;
+    let intent = PublicationIntent {
+        schema_version: 1,
+        prefix: prefix.to_path_buf(),
+        segment: verified_segment.clone(),
+        snapshot,
+    };
+    let bytes = serde_json::to_vec_pretty(&intent).map_err(|e| e.to_string())?;
+    if bytes.len() > 1 << 20 {
+        return Err("checkpoint publication intent exceeds bound".into());
+    }
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".checkpoint-publication-")
+        .tempfile_in(parent)
+        .map_err(|e| e.to_string())?;
+    temporary.write_all(&bytes).map_err(|e| e.to_string())?;
+    temporary.as_file().sync_all().map_err(|e| e.to_string())?;
+    temporary
+        .persist_noclobber(&path)
+        .map_err(|e| e.to_string())?;
+    File::open(parent)
+        .and_then(|d| d.sync_all())
+        .map_err(|e| e.to_string())?;
+    Ok((path, Sha256::digest(&bytes).into()))
+}
+
+/// Explicit recovery of only the snapshot evidence publication. A missing
+/// manifest may be created from this authenticated intent; an existing one must
+/// match exactly and is never replaced. The complete prefix and snapshot are
+/// independently reread. This does not start/stop workers or release resources.
+pub fn recover_checkpoint_publication(
+    intent_path: &Path,
+    expected_sha256: [u8; 32],
+) -> Result<(HistoricalSegmentManifest, HistoricalHandoffSnapshotManifest), String> {
+    let mut intent_file = open_regular_nofollow(intent_path).map_err(|e| e.to_string())?;
+    let identity = archive_file_identity(&intent_file).map_err(|e| e.to_string())?;
+    let metadata = intent_file.metadata().map_err(|e| e.to_string())?;
+    if metadata.len() > 1 << 20
+        || metadata.nlink() != 1
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.mode() & 0o077 != 0
+    {
+        return Err("checkpoint publication intent custody or size invalid".into());
+    }
+    let mut bytes = Vec::new();
+    (&mut intent_file)
+        .take((1 << 20) + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > 1 << 20 || <[u8; 32]>::from(Sha256::digest(&bytes)) != expected_sha256 {
+        return Err("checkpoint publication intent digest mismatch".into());
+    }
+    let intent: PublicationIntent = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    let snapshot_path = Path::new(&intent.snapshot.archive_path);
+    if intent.schema_version != 1
+        || !intent.prefix.is_absolute()
+        || intent.prefix.canonicalize().map_err(|e| e.to_string())? != intent.prefix
+        || !snapshot_path.is_absolute()
+        || snapshot_path.canonicalize().map_err(|e| e.to_string())? != snapshot_path
+        || checkpoint_publication_intent_path(&intent.prefix)? != intent_path
+    {
+        return Err("checkpoint publication intent path or schema mismatch".into());
+    }
+    intent.snapshot.validate().map_err(|e| e.to_string())?;
+    validate_checkpoint_relation(&intent.segment, &intent.snapshot)?;
+    // The existing writer lock serializes cooperative publication/recovery.
+    // The controller still owns custody and must exclude a live producer.
+    let _lock = crate::archive_checksum::acquire_archive_destination_writer_lock(
+        intent.prefix.parent().ok_or("prefix has no parent")?,
+    )
+    .map_err(|e| e.to_string())?;
+    let pinned_paths = [
+        intent.prefix.clone(),
+        segment_manifest_path(&intent.prefix).map_err(|e| e.to_string())?,
+        snapshot_path.to_path_buf(),
+    ];
+    let pinned_files = pinned_paths
+        .iter()
+        .map(|path| {
+            let file = open_regular_nofollow(path).map_err(|e| e.to_string())?;
+            let identity = archive_file_identity(&file).map_err(|e| e.to_string())?;
+            Ok((file, identity))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let segment = read_and_validate_segment_manifest(&intent.prefix).map_err(|e| e.to_string())?;
+    if segment != intent.segment {
+        return Err("checkpoint publication prefix differs from intent".into());
+    }
+    if archive_file_identity(&intent_file).map_err(|e| e.to_string())? != identity
+        || !path_matches_archive_identity(intent_path, identity).map_err(|e| e.to_string())?
+    {
+        return Err("checkpoint publication intent changed before recovery".into());
+    }
+    let sidecar = handoff_snapshot_manifest_path(snapshot_path).map_err(|e| e.to_string())?;
+    match fs::symlink_metadata(&sidecar) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            publish_bound_checkpoint_snapshot(snapshot_path, intent.snapshot.clone(), &segment)?;
+        }
+        Err(e) => return Err(e.to_string()),
+        Ok(_) => {}
+    }
+    let sidecar_file = open_regular_nofollow(&sidecar).map_err(|e| e.to_string())?;
+    let sidecar_identity = archive_file_identity(&sidecar_file).map_err(|e| e.to_string())?;
+    let result = read_and_validate_checkpoint_bundle(&intent.prefix, snapshot_path)?;
+    if result.0 != intent.segment || result.1 != intent.snapshot {
+        return Err("checkpoint publication existing evidence differs from intent".into());
+    }
+    // Complete durability even if the previous parent died after rename but
+    // before directory fsync. Never rewrite a surviving evidence file.
+    sidecar_file.sync_all().map_err(|e| e.to_string())?;
+    File::open(sidecar.parent().ok_or("sidecar has no parent")?)
+        .and_then(|d| d.sync_all())
+        .map_err(|e| e.to_string())?;
+    if archive_file_identity(&intent_file).map_err(|e| e.to_string())? != identity
+        || !path_matches_archive_identity(intent_path, identity).map_err(|e| e.to_string())?
+        || !path_matches_archive_identity(&sidecar, sidecar_identity).map_err(|e| e.to_string())?
+    {
+        return Err("checkpoint publication evidence changed during recovery".into());
+    }
+    for (path, (file, identity)) in pinned_paths.iter().zip(&pinned_files) {
+        if archive_file_identity(file).map_err(|e| e.to_string())? != *identity
+            || !path_matches_archive_identity(path, *identity).map_err(|e| e.to_string())?
+        {
+            return Err("checkpoint publication source changed during recovery".into());
+        }
+    }
+    Ok(result)
+}
 
 /// The caller must supply a segment returned by a complete source validation.
 /// Structural checks here cannot turn an unverified manifest into evidence.
@@ -209,5 +387,33 @@ mod tests {
             }
             assert!(validate_checkpoint_relation(&wrong, &snapshot).is_err());
         }
+    }
+
+    #[test]
+    fn publication_intent_is_atomic_bound_and_cannot_authorize_an_invalid_prefix() {
+        let dir = tempfile::tempdir().unwrap();
+        let prefix = dir.path().join("prefix.jet");
+        fs::write(&prefix, b"invalid archive").unwrap();
+        let (segment, mut snapshot) = pair();
+        let archive = dir
+            .path()
+            .join(format!("snapshot-7-{}.tar.bz2", snapshot.accounts_hash));
+        fs::write(&archive, b"snapshot bytes").unwrap();
+        snapshot.archive_size = 14;
+        snapshot.archive_sha256 = Sha256::digest(b"snapshot bytes").into();
+        let (intent, digest) =
+            prepare_checkpoint_publication(&prefix, &archive, snapshot.clone(), &segment).unwrap();
+        let original = fs::read(&intent).unwrap();
+        assert_eq!(<[u8; 32]>::from(Sha256::digest(&original)), digest);
+        assert!(prepare_checkpoint_publication(&prefix, &archive, snapshot, &segment).is_err());
+        assert_eq!(fs::read(&intent).unwrap(), original);
+        assert!(
+            recover_checkpoint_publication(&intent, [0; 32])
+                .unwrap_err()
+                .contains("digest mismatch")
+        );
+        assert!(recover_checkpoint_publication(&intent, digest).is_err());
+        assert!(!handoff_snapshot_manifest_path(&archive).unwrap().exists());
+        assert_eq!(fs::read(&intent).unwrap(), original);
     }
 }
