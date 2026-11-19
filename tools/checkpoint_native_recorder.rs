@@ -7,6 +7,8 @@ mod archive_checksum;
 mod checkpoint_bundle;
 mod checkpoint_live_client;
 mod checkpoint_parent_handoff;
+#[path = "../jetstreamer-node/src/checkpoint_prefix.rs"]
+mod checkpoint_prefix;
 #[path = "../jetstreamer-node/src/handoff_snapshot.rs"]
 mod handoff_snapshot;
 #[path = "../jetstreamer-node/src/segment_manifest.rs"]
@@ -30,7 +32,6 @@ use jetstreamer_horizon::{
         RuntimeHandoffProvenance, RuntimeSegmentProvenance, RuntimeSegmentSource,
         RuntimeStateCheckpoint, SemanticDigest, SlotVisitor, StateCommitment, StateCommitmentKind,
         TransactionMetadataPolicy, WriteVersionNormalization, merge_checkpoint_restart_segments,
-        reencode_closed_checkpoint_prefix,
     },
     transactions::Transaction,
 };
@@ -319,15 +320,42 @@ fn segment(
             !source.has_complete_slot_coverage()?,
             "early source falsely complete",
         )?;
-        let (output, transformed) = reencode_closed_checkpoint_prefix(
-            File::open(&source_path)?,
-            create(path)?,
-            ArchiveWriterConfig::default(),
-            1,
-            hash(&end.last_blockhash)?,
+        let mut range = checkpoint_prefix::ClosedPrefixRange {
+            epoch: 0,
+            first_slot: slot,
+            intended_terminal: slot + declared_count - 1,
+            selected_terminal: slot,
+            terminal_blockhash: hash(&end.last_blockhash)?,
+        };
+        let rejected = path.with_extension("wrong-range.jet");
+        range.intended_terminal += 1;
+        require(
+            checkpoint_prefix::convert_closed_prefix(&source_path, &rejected, &range).is_err(),
+            "wrong original range accepted",
         )?;
-        output.sync_all()?;
-        File::open(path.parent().ok_or("missing output parent")?)?.sync_all()?;
+        require(!rejected.exists(), "rejected range published an output")?;
+        range.intended_terminal -= 1;
+        let rejected = path.with_extension("wrong-terminal.jet");
+        range.terminal_blockhash = Hash::new_from_array([0xee; 32]);
+        require(
+            checkpoint_prefix::convert_closed_prefix(&source_path, &rejected, &range).is_err(),
+            "wrong terminal accepted",
+        )?;
+        require(!rejected.exists(), "rejected terminal published an output")?;
+        range.terminal_blockhash = hash(&end.last_blockhash)?;
+        let transformed = checkpoint_prefix::convert_closed_prefix(&source_path, path, &range)?;
+        require(
+            transformed.source_sha256 == source_digest,
+            "conversion source hash differs",
+        )?;
+        require(
+            transformed.prefix_sha256 == digest(path)?,
+            "conversion output hash differs",
+        )?;
+        require(
+            checkpoint_prefix::convert_closed_prefix(&source_path, path, &range).is_err(),
+            "duplicate prefix replaced an output",
+        )?;
         let mut reader = ArchiveReader::open(File::open(path)?)?;
         require(
             reader.has_complete_slot_coverage()?,
@@ -339,7 +367,7 @@ fn segment(
             "prefix reread length",
         )?;
         require(
-            semantic.finish()? == transformed.output_semantic_sha256,
+            semantic.finish()? == transformed.semantic_sha256,
             "prefix semantic reread differs",
         )?;
         require(

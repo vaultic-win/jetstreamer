@@ -571,3 +571,14 @@ full local/remote plugin playback and the final branch check remain pending.
 No R2 archive or sidecar was replaced, and neither interrupted predecessor is a
 compatibility pass. Transition evidence is retained in
 `/home/ubuntu/.codex/diagnostics/horizon-pressure-checkpoint-20261119-v1`.
+
+At the 2026-11-19 06:54:30 coordinated cycle the optimized full stage was
+advancing at approximately 66 slots per second, around 36,557 of 432,000 slots,
+with approximately 1 hour 40 minutes remaining for that stage. The v3 invocation
+remained unchanged and active with zero restarts under its 7 GB cap. This is
+progress evidence only; local plugin, remote readback/plugin and final branch
+checks still remain. All five replay lanes advanced, and all five status JSONs
+were conditionally published and authenticated-readback verified. The complete
+fleet remains 34 ready pairs, 66 missing and zero anomalies/status diagnostics.
+The memory-selected target remains nine against five executing lanes. The next
+single observer is armed for 07:24:30 UTC.

@@ -801,3 +801,31 @@ resource release, resume and publication. Dense-prefix conversion and full
 validation, actual worker reap, durable controller recovery, restore/suffix replay,
 canonical root verification and current-reader delivery remain required before
 another lane can rely on this mode. Existing replay workers are unchanged.
+
+The paused path now converts its closed source into a new private dense prefix
+before reporting a successful pause. `checkpoint_prefix::convert_closed_prefix`
+binds the original epoch/start/intended range, requires a proper incomplete V2
+prefix with the selected terminal hash, preserves and remeasures the original
+source, and completely rereads the converted semantic stream before no-clobber
+publication. Source aliases, existing destinations and nonprivate output
+directories are rejected. Phase logs and minute heartbeats distinguish elapsed
+work from actual progress without additional resource observations.
+
+The parent then writes and fully rereads the prefix's native segment manifest,
+publishes a durable checkpoint intent, and binds the exported snapshot to the
+exact verified prefix. `horizon-pressure-checkpoint-paused-v2` records these
+artifacts and their digests. It still denies full-range completion, verified reap,
+resource release, resume and canonical publication. The original longer-range
+source remains intact; no suffix is fabricated and no canonical root obligation
+is removed.
+
+The shared conversion helper passed a real synthetic worker export-parent
+exit/reap and fresh-parent restore/suffix/V4/full-PoH experiment, including
+changed original-range, terminal-hash and duplicate-output rejection. The result
+is retained at
+`/home/ubuntu/.jetstreamer-private/pressure-prefix-20261119-v1/native-parent-v3/parent-controller-results.json`.
+Two earlier fixture launches rejected missing environment bindings before native
+execution; their evidence remains preserved. The full node and fixture/test
+build subsequently passed five focused bundle/custody tests under the 2 GB cap,
+invocation `92041f8185024e5eb674edf1fbfaea42`. This still does not qualify the
+full parent firehose or mainnet pressure controller, and no new lane was admitted.

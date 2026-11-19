@@ -3,6 +3,7 @@
 pub mod archive_checksum;
 pub mod archive_publish;
 pub mod checkpoint_bundle;
+pub mod checkpoint_prefix;
 pub mod epoch145_extract;
 pub mod epoch145_stage_policy;
 pub mod epoch228_extract;
