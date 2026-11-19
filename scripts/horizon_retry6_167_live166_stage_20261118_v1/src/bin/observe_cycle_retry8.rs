@@ -82,6 +82,45 @@ fn phase(work: &Value) -> &'static str {
         "bootstrap"
     }
 }
+fn preserve_audit_recovery(fleet: &mut Value, previous: &Value) -> Result<()> {
+    let recovered = &previous["audit_transfer73_repair"];
+    if recovered["recovery_pass_claimed"] != true {
+        return Ok(());
+    }
+    let result_path = recovered["result"]["path"]
+        .as_str()
+        .context("audit result path")?;
+    let cleanup_path = recovered["cleanup"]["path"]
+        .as_str()
+        .context("audit cleanup path")?;
+    ensure!(
+        bind(result_path)? == recovered["result"]
+            && recovered["result"]["sha256"]
+                == "fe81955c789dc385a569ea78d726366837f258fb0faded2d287627cdbf7dae9f"
+            && bind(cleanup_path)? == recovered["cleanup"]
+            && recovered["cleanup"]["sha256"]
+                == "dfc7720c62b98b8fb8a8051819da121943eceb95372549e20b17636d6ef9a2f3",
+        "audit recovery evidence changed"
+    );
+    let result = read(result_path)?;
+    let cleanup = read(cleanup_path)?;
+    ensure!(
+        result["epoch"] == 73
+            && result["status"] == "passed"
+            && result["playback"]["clean_process_exit"] == true
+            && result["playback"]["first_slot"] == 31536000
+            && result["playback"]["last_slot"] == 31967999
+            && result["playback"]["counters"]["slots"] == 432000
+            && cleanup["epoch"] == 73
+            && cleanup["removed_only_owned_audit_copy"] == true,
+        "full audit recovery required"
+    );
+    fleet["historical_audit_transfer73_repair"] = fleet["audit_transfer73_repair"].clone();
+    fleet["audit_transfer73_repair"] = recovered.clone();
+    fleet["audit_transfer73_repair"]["fresh_audit_observation_claimed"] = json!(false);
+    fleet["audit_milestone_gent_submission"] = previous["audit_milestone_gent_submission"].clone();
+    Ok(())
+}
 fn exact167_native(v: &Value) -> Result<()> {
     ensure!(
         v["Id"] == "horizon-qualify-167-replacement-local3retry7-20261110-v1.service"
@@ -644,6 +683,7 @@ fn main() -> Result<()> {
         "qualified_image":bind("/usr/local/lib/jetstreamer/horizon-r2-chronological-plugin-audit-20261119-v7/artifact-proof.json")?,
         "fresh_audit_observation_claimed":false,"recovery_pass_claimed":false,
         "next_action":"Preserve the v7 epoch73 retry and original immutable failure. Use its actual completion event or the next audit observation after the last audit's 1800-second interval; qualify root cleanup for epoch75. This cycle does not claim a fresh audit observation or a recovered pass."});
+    preserve_audit_recovery(&mut fleet, &previous_fleet)?;
     let holding_event_path =
         "/var/lib/jetstreamer/root0832-holding166-event-20261119-v1/EVENT.json";
     let event_binding = bind(holding_event_path)?;
