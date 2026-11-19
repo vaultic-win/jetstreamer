@@ -168,6 +168,13 @@ impl Rpc {
         save(&path, &body)?;
         self.evidence
             .push(json!({"path":path,"sha256":digest(&body)}));
+        let request_path = self.root.join(format!("{label}-request.json"));
+        let request_bytes = serde_json::to_vec_pretty(
+            &json!({"endpoint":ENDPOINT,"request":request,"started_unix_seconds":started,"received_unix_seconds":received,"response_sha256":digest(&body)}),
+        )?;
+        save(&request_path, &request_bytes)?;
+        self.evidence
+            .push(json!({"path":request_path,"sha256":digest(&request_bytes)}));
         let v: Value = serde_json::from_slice(&body)?;
         ensure!(
             v["jsonrpc"] == "2.0"
@@ -176,13 +183,6 @@ impl Rpc {
                 && !v["result"].is_null(),
             "RPC returned missing/error/foreign result: {label}"
         );
-        let request_path = self.root.join(format!("{label}-request.json"));
-        let request_bytes = serde_json::to_vec_pretty(
-            &json!({"endpoint":ENDPOINT,"request":request,"started_unix_seconds":started,"received_unix_seconds":received,"response_sha256":digest(&body)}),
-        )?;
-        save(&request_path, &request_bytes)?;
-        self.evidence
-            .push(json!({"path":request_path,"sha256":digest(&request_bytes)}));
         eprintln!("finalized boundary source: {label} complete at {received}");
         Ok(v["result"].clone())
     }
@@ -243,7 +243,45 @@ async fn run(args: Vec<String>) -> Result<()> {
         "first block does not establish epoch parent"
     );
     let parent = rpc.block("parent-block", parent_slot).await?;
-    let terminal = rpc.block("terminal-block", start + 431999).await?;
+    let terminal = match rpc.block("terminal-block", start + 431999).await {
+        Ok(v) => v,
+        Err(original) => {
+            // A failed exact-terminal lookup is not proof of a skipped tail.
+            // Collect the ordered tail and successor, but do not emit a v1
+            // expectation: that consumer cannot yet validate a skipped tail.
+            let tail = rpc
+                .call(
+                    "tail-block-census",
+                    "getBlocks",
+                    json!([start+430976,start+431999,{"commitment":"finalized"}]),
+                )
+                .await?;
+            first_slot(&tail, start + 430976)?;
+            let last = tail.as_array().unwrap().last().unwrap().as_u64().unwrap();
+            ensure!(
+                last < start + 431999,
+                "terminal exists in census; investigate RPC inconsistency"
+            );
+            let next = rpc
+                .call(
+                    "successor-block-census",
+                    "getBlocks",
+                    json!([start+432000,start+433023,{"commitment":"finalized"}]),
+                )
+                .await?;
+            let next_slot = first_slot(&next, start + 432000)?;
+            let last_block = rpc.block("last-produced-block", last).await?;
+            let successor = rpc.block("successor-block", next_slot).await?;
+            validate_tail_link(start + 431999, last, &last_block, next_slot, &successor)?;
+            save(
+                &p.output_directory.join("skipped-tail-evidence.json"),
+                &serde_json::to_vec_pretty(
+                    &json!({"schema":"horizon-independent-skipped-tail-evidence-v1","epoch":p.epoch,"epoch_end_slot":start+431999,"last_produced_slot":last,"last_produced_blockhash":hash_text(&last_block,"blockhash")?,"successor_slot":next_slot,"successor_parent_slot":successor["parentSlot"],"successor_previous_blockhash":hash_text(&successor,"previousBlockhash")?,"independent_evidence":rpc.evidence,"completed_unix_seconds":now()?,"current_reader_skipped_tail_support_required":true,"archive_verified":false,"publication_authorized":false}),
+                )?,
+            )?;
+            return Err(original.context("independent successor proves skipped tail; current reader v1 expectation cannot represent it"));
+        }
+    };
     let v = expectation(p.epoch, first, &a, &parent, &terminal, json!(rpc.evidence))?;
     private_directory(&p.output_directory)?;
     ensure!(plan_bytes(Path::new(&args[0]))? == raw, "plan changed");
@@ -254,6 +292,24 @@ async fn run(args: Vec<String>) -> Result<()> {
         "{}",
         json!({"expectation":path,"sha256":digest(&bytes),"completed_unix_seconds":now()?,"archive_verified":false,"publication_authorized":false,"remote_mutations":false})
     );
+    Ok(())
+}
+fn validate_tail_link(
+    end: u64,
+    last: u64,
+    block: &Value,
+    next: u64,
+    successor: &Value,
+) -> Result<()> {
+    ensure!(
+        last < end && next > end && successor["parentSlot"].as_u64() == Some(last),
+        "successor does not directly bridge skipped tail"
+    );
+    ensure!(
+        hash_text(block, "blockhash")? == hash_text(successor, "previousBlockhash")?,
+        "successor hash does not bridge skipped tail"
+    );
+    hash_text(successor, "blockhash")?;
     Ok(())
 }
 fn main() {
@@ -270,6 +326,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn skipped_tail_requires_exact_successor_parent_and_hash() {
+        let h = bs58::encode([1u8; 32]).into_string();
+        let other = bs58::encode([2u8; 32]).into_string();
+        let b = json!({"blockhash":h});
+        let s = json!({"parentSlot":98,"previousBlockhash":h,"blockhash":other});
+        validate_tail_link(99, 98, &b, 101, &s).unwrap();
+        assert!(validate_tail_link(99, 98, &b, 99, &s).is_err());
+        let mut wrong = s.clone();
+        wrong["parentSlot"] = json!(97);
+        assert!(validate_tail_link(99, 98, &b, 101, &wrong).is_err());
+        wrong = s;
+        wrong["previousBlockhash"] = json!(other);
+        assert!(validate_tail_link(99, 98, &b, 101, &wrong).is_err());
+    }
     #[test]
     fn ordered_first_block_census() {
         assert_eq!(first_slot(&json!([1001, 1004]), 1000).unwrap(), 1001);

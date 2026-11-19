@@ -15,7 +15,13 @@ The collector obtains the ordered block census for the first 1,024 epoch slots,
 then reads the first block, its parent and the exact terminal slot. The first
 block must point before the epoch boundary, its previous blockhash must match
 the independently fetched parent, and the terminal parent must lie inside the
-epoch. A skipped or unavailable terminal slot fails closed for investigation.
+epoch. A skipped or unavailable terminal slot triggers a bounded tail and next-epoch
+block census. The collector fetches the last produced block and first successor,
+and requires that successor to name the exact last block as its parent with a
+matching previous blockhash. It retains this independent skipped-tail evidence,
+then still fails closed without emitting a v1 expectation: the current reader's
+strict terminal gate does not yet support this case. A missing RPC block alone
+never proves that a slot was skipped.
 Every blockhash must decode to 32 bytes. TLS validation remains enabled, redirects
 are disabled, each request has a 30-second timeout, and each response is limited
 to 1 MiB. The containing qualification service also needs a bounded runtime.
