@@ -2,7 +2,7 @@
 use super::*;
 // Preserve epoch265's actual 1GiB guard; native211's 256MiB guard is not its cap.
 const CANDIDATE_GUARD_CAP: u64 = 1_073_741_824;
-pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainStatus,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
+pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
 fn scalar(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
 }
@@ -26,14 +26,10 @@ pub(super) fn same_owner(a: &Value, b: &Value) -> Result<()> {
     ] {
         ensure!(a[k] == b[k] && !a[k].is_null(), "owner changed {k}");
     }
-    let command = |v: &Value| -> Result<String> {
-        Ok(text(v, "ExecStart")?
-            .split(" ; ignore_errors=")
-            .next()
-            .context("ExecStart")?
-            .into())
-    };
-    ensure!(command(a)? == command(b)?, "owner command changed");
+    ensure!(
+        command_identity(text(a, "ExecStart")?)? == command_identity(text(b, "ExecStart")?)?,
+        "owner command changed"
+    );
     Ok(())
 }
 pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result<u64> {
@@ -106,6 +102,80 @@ pub(super) fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
     }
     Ok(())
 }
+// Preserve path/argv/ignore_errors byte identity; only PID1's display history
+// may clear on daemon-reload. This follows pipeline_status::same_exec_start,
+// without its equal-string shortcut for malformed command framing.
+fn command_identity(value: &str) -> Result<&str> {
+    let identity = periodic::stable_command(value)?;
+    ensure!(
+        value.matches(" ; start_time=").count() == 1 && identity.matches(" ; argv[]=").count() == 1,
+        "ambiguous ExecStart framing"
+    );
+    let history = value
+        .split_once(" ; start_time=")
+        .context("command history")?
+        .1;
+    let fields: Vec<_> = history
+        .strip_suffix(" }")
+        .context("command history end")?
+        .split(" ; ")
+        .collect();
+    ensure!(
+        fields.len() == 5
+            && fields[0].starts_with('[')
+            && fields[0].ends_with(']')
+            && fields[1].starts_with("stop_time=[")
+            && fields[1].ends_with(']')
+            && fields[2]
+                .strip_prefix("pid=")
+                .context("command PID")?
+                .parse::<u32>()
+                .is_ok(),
+        "malformed ExecStart display history"
+    );
+    Ok(identity)
+}
+fn terminal_identity(current: &Value, receipt: &Value) -> Result<()> {
+    let retained = &receipt["producer"]["unit"];
+    ensure!(
+        retained.is_object(),
+        "drain receipt lacks nested producer unit"
+    );
+    for k in [
+        "Id",
+        "LoadState",
+        "InvocationID",
+        "ExecMainCode",
+        "ExecMainStatus",
+        "NRestarts",
+        "Result",
+        "ActiveState",
+        "SubState",
+        "MainPID",
+    ] {
+        ensure!(
+            !retained[k].is_null() && current[k] == retained[k],
+            "terminal identity changed {k}"
+        );
+    }
+    ensure!(
+        command_identity(text(current, "ExecStart")?)?
+            == command_identity(text(retained, "ExecStart")?)?,
+        "terminal command changed"
+    );
+    Ok(())
+}
+fn same_terminal_census(before: &Value, after: &Value) -> Result<()> {
+    ensure!(
+        command_identity(text(before, "ExecStart")?)?
+            == command_identity(text(after, "ExecStart")?)?,
+        "terminal command changed during census"
+    );
+    let mut normalized = after.clone();
+    normalized["ExecStart"] = before["ExecStart"].clone();
+    ensure!(*before == normalized, "terminal changed during census");
+    Ok(())
+}
 pub(super) fn drain(n: &mut Native, r: &capacity::Reservation) -> Result<()> {
     let receipt = r.release.as_ref().context("release evidence")?.json()?;
     ensure!(
@@ -129,23 +199,11 @@ pub(super) fn drain(n: &mut Native, r: &capacity::Reservation) -> Result<()> {
         "drain owner changed"
     );
     let before = n.show(&r.unit)?;
-    for k in [
-        "Id",
-        "InvocationID",
-        "ExecMainStatus",
-        "NRestarts",
-        "Result",
-        "ActiveState",
-        "SubState",
-        "MainPID",
-    ] {
-        ensure!(
-            before[k] == receipt["producer"][k],
-            "terminal identity changed {k}"
-        );
-    }
+    terminal_identity(&before, &receipt)?;
     ensure!(
         before["Id"] == r.unit
+            && before["LoadState"] == "loaded"
+            && before["ExecMainCode"] == "1"
             && before["InvocationID"] == r.invocation_id
             && before["MainPID"] == "0"
             && before["ControlPID"] == "0"
@@ -189,7 +247,7 @@ pub(super) fn drain(n: &mut Native, r: &capacity::Reservation) -> Result<()> {
             Err(e) => return Err(e.into()),
         }
     }
-    ensure!(n.show(&r.unit)? == before, "terminal changed during census");
+    same_terminal_census(&before, &n.show(&r.unit)?)?;
     Ok(())
 }
 fn campaign(unit: &str) -> bool {
@@ -451,5 +509,120 @@ mod tests {
         );
         assert_eq!(CANDIDATE_GUARD_CAP, 1_073_741_824);
         assert_eq!(CONTROL - CANDIDATE_GUARD_CAP, 536_870_912);
+    }
+}
+
+#[cfg(test)]
+mod drain_tests {
+    use super::*;
+    // Actual epoch247 terminal-drain v1 producer.unit, retained 2026-11-19.
+    // Events and unrelated proof fields are omitted: this tests the identity reader,
+    // not a substitute drain/admission receipt.
+    fn fixture() -> Value {
+        serde_json::from_str(r###"{
+  "schema": "horizon-singleton-terminal-drain-v1",
+  "producer": {
+    "unit": {
+      "ActiveState": "inactive",
+      "ExecMainCode": "1",
+      "ExecMainStatus": "0",
+      "ExecStart": "{ path=/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-node ; argv[]=/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-node 247 /home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon247-controls0345-v1/preflight-247-target1.json --cohort-manifest-fingerprint=sha256:12070bfb11a9153cd41b0d1179397947fd718e9891849d2e9a793d02dba098f3 --snapshot-archive=/var/lib/jetstreamer/horizon247-bootstrap-copy0347-work-v2/projection/bootstrap/snapshot-106703614-AtkJcCAEp3EfF4ymeeN9t3YvHuAq3aykuQ6vogtDYcf9.tar.zst ; ignore_errors=no ; start_time=[Tue 2026-11-17 02:31:12 UTC] ; stop_time=[Thu 2026-11-19 16:06:18 UTC] ; pid=50887 ; code=exited ; status=0 }",
+      "Id": "horizon-qualify-247-reboot-20261117-v2.service",
+      "InvocationID": "d091bb68ff2648159c76f690b3b7fee3",
+      "LoadState": "loaded",
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Result": "success",
+      "SubState": "dead"
+    }
+  }
+}"###).unwrap()
+    }
+    fn cleared_history(unit: &Value) -> Value {
+        let mut v = unit.clone();
+        v["ExecStart"] = json!(format!(
+            "{} ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",
+            command_identity(text(unit, "ExecStart").unwrap()).unwrap()
+        ));
+        v
+    }
+    #[test]
+    fn actual_nested_terminal_receipt_survives_only_pid1_command_history_reset() {
+        let receipt = fixture();
+        let unit = &receipt["producer"]["unit"];
+        terminal_identity(unit, &receipt).unwrap();
+        let current = cleared_history(unit);
+        terminal_identity(&current, &receipt).unwrap();
+        same_terminal_census(unit, &current).unwrap();
+        let mut owner = unit.clone();
+        owner["ControlGroup"] = json!("");
+        let reset = cleared_history(&owner);
+        same_owner(&owner, &reset).unwrap();
+        let mut unsafe_owner = reset;
+        unsafe_owner["ExecStart"] = json!(
+            text(&unsafe_owner, "ExecStart")
+                .unwrap()
+                .replace("ignore_errors=no", "ignore_errors=yes")
+        );
+        assert!(same_owner(&owner, &unsafe_owner).is_err());
+        let flat = json!({"producer":unit});
+        assert!(terminal_identity(unit, &flat).is_err());
+        let absent = json!({"producer":{"unit":{}}});
+        assert!(terminal_identity(&json!({}), &absent).is_err());
+    }
+    #[test]
+    fn terminal_identity_rejects_changed_native_fields_and_missing_evidence() {
+        let receipt = fixture();
+        let original = &receipt["producer"]["unit"];
+        for key in [
+            "Id",
+            "LoadState",
+            "InvocationID",
+            "ExecMainCode",
+            "ExecMainStatus",
+            "NRestarts",
+            "Result",
+            "ActiveState",
+            "SubState",
+            "MainPID",
+        ] {
+            let mut current = original.clone();
+            current[key] = json!("changed");
+            assert!(terminal_identity(&current, &receipt).is_err(), "{key}");
+            assert!(same_terminal_census(original, &current).is_err(), "{key}");
+            let mut missing = receipt.clone();
+            missing["producer"]["unit"]
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
+            assert!(
+                terminal_identity(original, &missing).is_err(),
+                "missing {key}"
+            );
+        }
+        let mut extra = original.clone();
+        extra["ControlPID"] = json!("42");
+        assert!(same_terminal_census(original, &extra).is_err());
+    }
+    #[test]
+    fn command_identity_keeps_argv_ignore_errors_and_single_command_strict() {
+        let receipt = fixture();
+        let original = &receipt["producer"]["unit"];
+        let current = cleared_history(original);
+        let command = text(&current, "ExecStart").unwrap();
+        for changed in [
+            command.replace(" 247 ", " 248 "),
+            command.replace("ignore_errors=no", "ignore_errors=yes"),
+            command.replace("path=/var/lib/jetstreamer/", "path=/other/"),
+            command.replace(" ; pid=0", " ; pid=invalid"),
+            format!("{command} {command}"),
+            command.replace("start_time=[n/a]", "start_time=n/a"),
+        ] {
+            let mut bad = current.clone();
+            bad["ExecStart"] = json!(changed);
+            assert!(terminal_identity(&bad, &receipt).is_err());
+            assert!(same_terminal_census(original, &bad).is_err());
+        }
+        assert!(command_identity("opaque same string").is_err());
     }
 }
