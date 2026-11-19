@@ -1,4 +1,4 @@
-use crate::{Config, canonical_epoch, local::*};
+use crate::{Config, canonical_epoch, local::*, range};
 use anyhow::{Context, Result, ensure};
 use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
 use aws_sdk_s3::{
@@ -6,7 +6,6 @@ use aws_sdk_s3::{
     config::{BehaviorVersion, Region},
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
     env, fmt,
@@ -97,6 +96,7 @@ impl fmt::Display for TransferInterruption {
 }
 impl std::error::Error for TransferInterruption {}
 
+#[cfg(test)]
 fn body_read_result<T, E: fmt::Display>(
     result: std::result::Result<Option<T>, E>,
     identity: &TransferIdentity,
@@ -310,13 +310,23 @@ impl Remote {
         attempt: &Path,
         prior_identity: Option<&TransferIdentity>,
     ) -> Result<Download> {
-        let identity = self.identity(object).await?;
+        let deadline = tokio::time::Instant::now()
+            .checked_add(Duration::from_secs(cfg.download_timeout_seconds))
+            .context("download deadline overflow")?;
+        let identity = tokio::time::timeout_at(deadline, self.identity(object))
+            .await
+            .context("archive download deadline exceeded while pinning identity")??;
         let version_id = identity.version_id.clone();
         let metadata_sha256 = identity.metadata_sha256.clone();
         let sidecar_sha256 = identity.sidecar_sha256.clone();
         let sidecar_etag = identity.sidecar_etag.clone();
         require_same_transfer_identity(&identity, prior_identity)?;
         write_json(&attempt.join("download-identity.json"), &identity, false)?;
+        write_json(
+            &attempt.join("range-transfer-plan.json"),
+            &range::plan(&identity)?,
+            false,
+        )?;
         cfg.require_download_capacity(object.bytes)?;
         let scratch = cfg.scratch_directory().join(&object.key);
         let mut output = create(&scratch)?;
@@ -331,71 +341,39 @@ impl Remote {
             &owned,
             false,
         )?;
-        let mut body = self
-            .client
-            .get_object()
-            .bucket(&self.bucket)
-            .key(&object.key)
-            .if_match(&object.etag)
-            .send()
-            .await
-            .context("GET pinned archive")?;
-        check_response(object, body.e_tag(), body.content_length())?;
-        ensure!(
-            body.version_id().map(str::to_owned) == version_id,
-            "archive version changed"
-        );
-        let mut count = 0_u64;
-        let mut hash = Sha256::new();
         let mut last_progress = Instant::now();
-        let began = Instant::now();
-        loop {
-            let next = tokio::time::timeout(
-                Duration::from_secs(cfg.read_timeout_seconds),
-                body.body.try_next(),
-            )
-            .await;
-            let next = match next {
-                Ok(result) => body_read_result(result, &identity, count)?,
-                Err(error) => {
-                    return Err(TransferInterruption {
-                        kind: TransferInterruptionKind::BodyReadTimeout,
-                        identity: identity.clone(),
-                        downloaded_bytes: count,
-                        detail: error.to_string(),
-                    }
-                    .into());
+        let (count, sha256) = range::transfer(
+            &self.client,
+            &identity,
+            deadline,
+            Duration::from_secs(cfg.read_timeout_seconds),
+            |start, bytes| {
+                let count = start
+                    .checked_add(u64::try_from(bytes.len())?)
+                    .context("download count overflow")?;
+                ensure!(
+                    count <= object.bytes && count <= cfg.max_archive_bytes,
+                    "archive exceeds pinned length or budget"
+                );
+                owned.identity.check(&scratch)?;
+                cfg.require_download_write_capacity(u64::try_from(bytes.len())?)?;
+                output.write_all(bytes)?;
+                if last_progress.elapsed() >= Duration::from_secs(30) {
+                    crate::progress(
+                        cfg,
+                        "downloading",
+                        Some(object.epoch),
+                        count,
+                        Some(object.bytes),
+                        None,
+                    )?;
+                    last_progress = Instant::now();
                 }
-            };
-            let Some(chunk) = next else { break };
-            count = count
-                .checked_add(chunk.len() as u64)
-                .context("download count overflow")?;
-            ensure!(
-                count <= object.bytes && count <= cfg.max_archive_bytes,
-                "archive exceeds pinned length or budget"
-            );
-            ensure!(
-                began.elapsed().as_secs() <= cfg.download_timeout_seconds,
-                "archive download deadline exceeded"
-            );
-            cfg.require_download_write_capacity(chunk.len() as u64)?;
-            output.write_all(&chunk)?;
-            hash.update(&chunk);
-            if last_progress.elapsed() >= Duration::from_secs(30) {
-                crate::progress(
-                    cfg,
-                    "downloading",
-                    Some(object.epoch),
-                    count,
-                    Some(object.bytes),
-                    None,
-                )?;
-                last_progress = Instant::now();
-            }
-        }
+                Ok(())
+            },
+        )
+        .await?;
         output.sync_all()?;
-        let sha256 = hex(&hash.finalize());
         validate_download(
             count,
             object.bytes,
@@ -410,8 +388,15 @@ impl Remote {
             "local readback differs from authenticated stream"
         );
         ensure!(
-            self.check_identity(object).await? == (version_id.clone(), metadata_sha256.clone()),
-            "archive changed after download"
+            tokio::time::Instant::now() < deadline,
+            "archive download deadline exceeded during local readback"
+        );
+        ensure!(
+            tokio::time::timeout_at(deadline, self.identity(object))
+                .await
+                .context("archive download deadline exceeded during final identity check")??
+                == identity,
+            "archive or sidecar changed after download"
         );
         let result = Download {
             object: object.clone(),

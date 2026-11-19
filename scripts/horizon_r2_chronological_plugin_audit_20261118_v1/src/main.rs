@@ -1,6 +1,7 @@
 //! Serial, read-only historical R2 audit. See README.md for deployment gates.
 mod evidence;
 mod local;
+mod range;
 mod remote;
 mod resume;
 mod retry;

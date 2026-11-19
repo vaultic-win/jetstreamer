@@ -161,6 +161,22 @@ playback, then rehashed afterward. The remote identity and executable hash are
 rechecked. Another branch fetch follows playback: relevant code changes cause a
 fresh entire-epoch playback; unrelated commits are recorded with equivalence proof.
 
+The range-transfer successor reads one conditional 64 MiB range at a time. It
+requires HTTP 206, exact range boundaries, total length, ETag, version and hash
+metadata, and clean end-of-body before appending that range to the single owned
+scratch file. It rejects ignored ranges and changed or ambiguous response headers.
+Only one range is buffered in memory; no second archive or extracted ledger is
+created. The immutable transfer plan records the range size and count.
+
+This successor retains the existing whole-attempt retry limit and starts an
+interrupted attempt from byte zero. It does not retry ranges, resume a persisted
+prefix, erase earlier failures or grant another attempt after exhausted retries.
+After transfer it still checks the complete SHA-256, independently rereads the
+file, rechecks archive and sidecar identity, and plays the entire epoch through
+the current plugin. A range transfer is not a plugin verification result.
+Deployment requires a separately qualified controller and an owner handoff;
+editing this source does not change the running v8 service.
+
 ## State, failures, and restart
 
 The explicit `resume-downloaded CONFIG.json` recovery command handles the
