@@ -225,21 +225,7 @@ fn apply_runtime_reconstructed_metadata(
     }
 }
 
-/// Checkpoint identity retained for replay provenance and runtime handoff.
-/// Account writes are deliberately excluded from this cloneable summary.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct HistoricalCheckpointSummary {
-    pub(crate) slot: Slot,
-    pub(crate) bank_hash: [u8; 32],
-    pub(crate) accounts_hash: [u8; 32],
-    pub(crate) last_blockhash: [u8; 32],
-    pub(crate) capitalization: u64,
-    pub(crate) transaction_count: u64,
-    pub(crate) tick_height: u64,
-    pub(crate) slot_complete: bool,
-    pub(crate) write_count: u64,
-    pub(crate) next_write_version: u64,
-}
+pub(crate) use crate::checkpoint_export::{HistoricalCheckpointSummary, HistoricalReplayEvidence};
 
 impl TryFrom<&HistoricalCheckpoint> for HistoricalCheckpointSummary {
     type Error = String;
@@ -265,17 +251,6 @@ impl TryFrom<&HistoricalCheckpoint> for HistoricalCheckpointSummary {
             next_write_version: checkpoint.next_write_version,
         })
     }
-}
-
-/// Minimal evidence produced by one uninterrupted historical runtime segment.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct HistoricalReplayEvidence {
-    pub(crate) bootstrap: HistoricalCheckpointSummary,
-    pub(crate) terminal: HistoricalCheckpointSummary,
-    /// Raw worker write versions emitted for slots at or after the segment's
-    /// live start. The range is empty at the terminal cursor when no such
-    /// writes were emitted.
-    pub(crate) emitted_write_versions: Range<u64>,
 }
 
 /// Adapts the version-neutral worker protocol to Jetstreamer's ordered entry

@@ -22,6 +22,11 @@
 ))]
 compile_error!("epoch163 first-output128 diagnostic requires an exclusive build");
 
+mod checkpoint_export;
+use checkpoint_export::{
+    validate_checkpoint_export_directory, validate_checkpoint_export_evidence,
+    validate_checkpoint_export_mode,
+};
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
@@ -206,7 +211,7 @@ use jetstreamer_horizon::{block_metas::BlockNotification, entries::EntryRecord};
 use jetstreamer_node::handoff_snapshot::{
     HANDOFF_SNAPSHOT_MANIFEST_SCHEMA_VERSION, HistoricalHandoffSnapshotManifest,
     handoff_snapshot_manifest_path, read_and_validate_handoff_snapshot_manifest,
-    write_handoff_snapshot_manifest,
+    write_bound_handoff_snapshot_manifest, write_handoff_snapshot_manifest,
 };
 use jetstreamer_node::segment_manifest::{
     HistoricalSegmentManifest, SegmentCheckpointSummary, SegmentRuntimeAdmission,
@@ -5308,6 +5313,11 @@ fn usage(program: &str) -> String {
          at the later of the target epoch boundary and the snapshot successor. It\n\
          requires a single epoch, --verify,\n\
          --snapshot-archive, --epoch-hashes, and --horizon-output.\n\
+         --qualification-checkpoint-export=DIR exports the verified terminal\n\
+         snapshot of a standalone focused v1.7.15 replay into an empty private\n\
+         directory. It requires exactly one explicit --verify and a fresh\n\
+         segment output. Evidence commits after segment readback and worker\n\
+         shutdown; restore, resume and pressure admission remain separate gates.\n\
          --epoch-hashes=PATH, --snapshot-archive=PATH, --range-info=A-B, and\n\
          --replay-scratch=PATH are otherwise internal flags passed by the range\n\
          supervisor to its children. A root-checkpoint cohort may also use an\n\
@@ -5378,6 +5388,14 @@ struct QualificationPlan {
     replay_start: Slot,
     output_slot_start: Slot,
     end_inclusive: Slot,
+}
+
+/// Checkpoint exports retain the ordinary focused canonical-checkpoint gates.
+/// They do not acquire registry-handoff, arbitrary-prefix or resume authority.
+#[derive(Clone, Copy)]
+enum SnapshotExportRequest<'a> {
+    RegisteredHandoff(&'a Path),
+    FocusedCheckpoint(&'a Path),
 }
 
 /// Durable state used to initialize the first runtime in a replay process.
@@ -9677,6 +9695,8 @@ struct ReplayRunResult {
     /// Exact registered handoff archive admitted and privately copied before
     /// this segment's historical worker initialized.
     bootstrap_handoff_archive_sha256: Option<[u8; 32]>,
+    /// Present only after focused export and acknowledged worker shutdown.
+    checkpoint_snapshot: Option<historical::HistoricalSnapshotExport>,
 }
 
 enum ReplayRunOutcome {
@@ -11809,10 +11829,9 @@ async fn run_geyser_replay(
     // terminal slot is used for candidate admission; only the final member
     // consumes the verifier with `finish`.
     verification_end_inclusive: Option<Slot>,
-    // Registry-owned directory for a source runtime's one-use handoff
-    // snapshot export. Normal replay passes `None`; the self-supervised
-    // qualification child obtains this from its sealed environment.
-    handoff_export_directory: Option<&Path>,
+    // Optional registered handoff or explicit standalone checkpoint export.
+    // Each route retains its independent qualification and identity gates.
+    snapshot_export: Option<SnapshotExportRequest<'_>>,
     retain_runtime_state: bool,
     // Only exact independently validated private epoch 144/213 runners construct these proofs.
     checkpoint_restart: Option<&dyn checkpoint_continuation::RestartProof>,
@@ -11830,7 +11849,7 @@ async fn run_geyser_replay(
             || carried_state.is_some()
             || audited_cohort_bootstrap.is_some()
             || verification_end_inclusive.is_some()
-            || handoff_export_directory.is_some()
+            || snapshot_export.is_some()
             || retain_runtime_state
             || checkpoint_restart.is_some()
         {
@@ -11866,7 +11885,7 @@ async fn run_geyser_replay(
         carried_state.is_some()
             || checkpoint_restart.is_some()
             || retain_runtime_state
-            || handoff_export_directory.is_some(),
+            || snapshot_export.is_some(),
     )?;
     if let Some(prefix) = checkpoint_restart {
         prefix.validate_invocation(
@@ -12020,6 +12039,23 @@ async fn run_geyser_replay(
     }
     let runtime_backend = execution.backend;
     let runtime_descriptor = execution.descriptor;
+    if let Some(SnapshotExportRequest::FocusedCheckpoint(directory)) = snapshot_export {
+        if qualification.is_none()
+            || snapshot_verifier.is_none()
+            || runtime_backend != compatibility::RuntimeBackend::SolanaV1_7_15
+            || carried_state.is_some()
+            || retain_runtime_state
+            || audited_cohort_bootstrap.is_some()
+            || verification_end_inclusive.is_some()
+            || checkpoint_restart.is_some()
+            || !snapshot_verifier
+                .as_ref()
+                .is_some_and(|v| v.expected.contains_key(&end_inclusive))
+        {
+            return Err("checkpoint export requires a standalone v1.7.15 focused replay with its exact canonical terminal; cohort, carry and restart modes are excluded".into());
+        }
+        validate_checkpoint_export_directory(directory)?;
+    }
     if let Some(state) = carried_state.as_ref() {
         if state.completed_epoch().checked_add(1) != Some(epoch) {
             return Err(format!(
@@ -13563,15 +13599,14 @@ async fn run_geyser_replay(
         if let Some(evidence) = historical_evidence.as_ref()
             && evidence.terminal.slot == end_inclusive
         {
-            let checkpoint = runtime_checkpoint_from_manifest(
-                &segment_checkpoint_summary(&evidence.terminal),
-            )?;
+            let checkpoint =
+                runtime_checkpoint_from_manifest(&segment_checkpoint_summary(&evidence.terminal))?;
             horizon::finish_checkpoint_segment(&checkpoint)?;
         } else {
             horizon::finish()?;
         }
     }
-    if let Some(output_directory) = handoff_export_directory {
+    if let Some(SnapshotExportRequest::RegisteredHandoff(output_directory)) = snapshot_export {
         let plan = qualification.ok_or_else(|| {
             "handoff snapshot export is allowed only for a focused qualification run".to_string()
         })?;
@@ -13673,6 +13708,34 @@ async fn run_geyser_replay(
             jetstreamer_node::segment_manifest::sha256_hex_string(&exported.archive_sha256),
         );
     }
+    let checkpoint_snapshot =
+        if let Some(SnapshotExportRequest::FocusedCheckpoint(directory)) = snapshot_export {
+            let evidence = historical_evidence
+                .as_ref()
+                .ok_or("checkpoint export has no historical evidence")?;
+            if evidence.terminal.slot != end_inclusive || !evidence.terminal.slot_complete {
+                return Err("checkpoint export requires the exact complete terminal".into());
+            }
+            validate_checkpoint_export_directory(directory)?;
+            let exported = replay_executor
+                .export_historical_snapshot(
+                    end_inclusive,
+                    directory,
+                    evidence.terminal.accounts_hash,
+                    ".tar.bz2",
+                )?
+                .ok_or("selected runtime cannot export a checkpoint")?;
+            // export_snapshot consumed the one-use checkpoint seal. This forces a
+            // new native freeze and detects state or writes changed by serialization.
+            replay_executor.freeze_latest_bank()?;
+            let after = replay_executor
+                .historical_evidence()?
+                .ok_or("checkpoint export lost historical evidence")?;
+            validate_checkpoint_export_evidence(evidence, &after)?;
+            Some(exported)
+        } else {
+            None
+        };
     let carried_state = if retain_runtime_state {
         if let Some(replay) = agave_bank_replay {
             Some(CarriedRuntimeState::Agave {
@@ -13708,6 +13771,7 @@ async fn run_geyser_replay(
         bootstrap_handoff_archive_sha256: bootstrap_handoff_manifest
             .map(|manifest| manifest.archive_sha256)
             .or_else(|| checkpoint_restart.map(|prefix| prefix.snapshot_sha256())),
+        checkpoint_snapshot,
     })))
 }
 
@@ -16519,7 +16583,9 @@ async fn run_mixed_runtime_root_cohort_first_epoch(
             } else {
                 plan.end_inclusive
             }),
-            (!is_terminal).then_some(handoff_dir.as_path()),
+            (!is_terminal).then_some(SnapshotExportRequest::RegisteredHandoff(
+                handoff_dir.as_path(),
+            )),
             is_terminal,
             None,
             epoch223_qualification::TailMode::Disabled,
@@ -19600,6 +19666,7 @@ async fn main() {
     let mut verify_option_count = 0usize;
     let mut horizon_output: Option<PathBuf> = None;
     let mut qualification_end_slot: Option<Slot> = None;
+    let mut checkpoint_export_directory: Option<PathBuf> = None;
     let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
@@ -19666,6 +19733,15 @@ async fn main() {
             verify_option_count = verify_option_count.saturating_add(1);
         } else if let Some(path) = arg.strip_prefix("--horizon-output=") {
             horizon_output = Some(PathBuf::from(path));
+        } else if let Some(path) = arg.strip_prefix("--qualification-checkpoint-export=") {
+            if path.is_empty()
+                || checkpoint_export_directory
+                    .replace(PathBuf::from(path))
+                    .is_some()
+            {
+                eprintln!("--qualification-checkpoint-export requires one nonempty directory");
+                exit(2);
+            }
         } else if let Some(slot) = arg.strip_prefix("--qualification-end-slot=") {
             if qualification_end_slot.is_some() {
                 eprintln!("duplicate --qualification-end-slot option");
@@ -19813,6 +19889,7 @@ async fn main() {
         || continuation_plan_sha256.is_some()
     {
         let forbidden = horizon_output.is_some()
+            || checkpoint_export_directory.is_some()
             || qualification_end_slot.is_some()
             || epoch_hashes.is_some()
             || snapshot_archive_override.is_some()
@@ -20094,6 +20171,34 @@ async fn main() {
             exit(2);
         }
     };
+    if let Some(directory) = checkpoint_export_directory.as_deref() {
+        if let Err(error) = validate_checkpoint_export_mode(
+            qualification.is_some(),
+            verify_option_count,
+            inherited_epoch_lease
+                || root_checkpoint_cohort
+                || range_info.is_some()
+                || recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+                || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+        ) {
+            eprintln!("{error}");
+            exit(2);
+        }
+        if let Err(error) = validate_checkpoint_export_directory(directory) {
+            eprintln!("{error}");
+            exit(2);
+        }
+        if horizon_output
+            .as_ref()
+            .is_some_and(|p| fs::symlink_metadata(p).is_ok())
+        {
+            eprintln!("checkpoint export requires a fresh segment output; retain earlier attempts");
+            exit(2);
+        }
+    }
     if epoch163_first_output128::enabled()
         && let Err(error) = epoch163_first_output128::admit_launch(
             start_epoch,
@@ -21759,6 +21864,7 @@ async fn main() {
             exit(1);
         }
 
+        let registered_handoff_directory = env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR");
         let result = run_geyser_replay(
             epoch,
             allow_candidate_runtime,
@@ -21780,9 +21886,13 @@ async fn main() {
                 None
             },
             root_checkpoint_cohort.then(|| epoch_to_slot_range(end_epoch).1),
-            env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR")
+            checkpoint_export_directory
                 .as_deref()
-                .map(Path::new),
+                .map(SnapshotExportRequest::FocusedCheckpoint)
+                .or(registered_handoff_directory
+                    .as_deref()
+                    .map(Path::new)
+                    .map(SnapshotExportRequest::RegisteredHandoff)),
             epoch < end_epoch,
             None,
             if epoch223_prefix_preflight {
@@ -21921,6 +22031,71 @@ async fn main() {
                     ) {
                         eprintln!("error: {err}");
                         exit(1);
+                    }
+                    if let Some(exported) = result.checkpoint_snapshot.as_ref() {
+                        // Ordered worker shutdown has been acknowledged, and
+                        // the segment passed its full manifest readback. Kernel
+                        // reaping may still be pending; this is not stop authority.
+                        // Only now publish the snapshot's process-handoff evidence.
+                        let evidence = result
+                            .historical_evidence
+                            .as_ref()
+                            .expect("historical segment evidence checked");
+                        let selection = match compatibility::select_focused_qualification_runtime(
+                            plan.output_runtime_range(),
+                            allow_candidate_runtime,
+                        ) {
+                            Ok(selection) => selection,
+                            Err(error) => {
+                                eprintln!("{error}");
+                                exit(1);
+                            }
+                        };
+                        let manifest = HistoricalHandoffSnapshotManifest {
+                            schema_version: HANDOFF_SNAPSHOT_MANIFEST_SCHEMA_VERSION,
+                            boundary_slot: match plan.end_inclusive.checked_add(1) {
+                                Some(slot) => slot,
+                                None => {
+                                    eprintln!("checkpoint has no successor");
+                                    exit(1);
+                                }
+                            },
+                            snapshot_slot: plan.end_inclusive,
+                            accounts_hash: Hash::new_from_array(evidence.terminal.accounts_hash)
+                                .to_string(),
+                            archive_path: String::new(),
+                            archive_size: exported.archive_size,
+                            archive_sha256: exported.archive_sha256,
+                            source_runtime: match segment_runtime_identity(selection) {
+                                Ok(identity) => identity,
+                                Err(error) => {
+                                    eprintln!("{error}");
+                                    exit(1);
+                                }
+                            },
+                            source_worker_executable_sha256: result
+                                .historical_worker_executable_sha256
+                                .expect("segment writer required worker identity"),
+                            terminal: segment_checkpoint_summary(&evidence.terminal),
+                        };
+                        let publication = write_bound_handoff_snapshot_manifest(&exported.archive_path, manifest)
+                            .and_then(|(path, published)| {
+                                let readback = read_and_validate_handoff_snapshot_manifest(&exported.archive_path)?;
+                                if readback != published || published.archive_size != exported.archive_size || published.archive_sha256 != exported.archive_sha256 {
+                                    return Err(jetstreamer_node::handoff_snapshot::HandoffSnapshotManifestError::Invalid("checkpoint snapshot changed during evidence publication".into()));
+                                }
+                                Ok(path)
+                            });
+                        match publication {
+                            Ok(path) => info!(
+                                "focused checkpoint snapshot evidence {} committed after segment verification and worker shutdown; resume and pressure admission remain separate gates",
+                                path.display()
+                            ),
+                            Err(error) => {
+                                eprintln!("checkpoint snapshot evidence failed: {error}");
+                                exit(1);
+                            }
+                        }
                     }
                 } else if result.historical_evidence.is_some() {
                     info!("historical replay evidence captured for epoch {epoch}");

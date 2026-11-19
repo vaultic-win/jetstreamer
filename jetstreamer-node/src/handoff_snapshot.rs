@@ -180,9 +180,27 @@ pub fn handoff_snapshot_manifest_path(
 /// archive/sidecar pair before requesting a fresh worker export.
 pub fn write_handoff_snapshot_manifest(
     archive_path: impl AsRef<Path>,
-    mut manifest: HistoricalHandoffSnapshotManifest,
+    manifest: HistoricalHandoffSnapshotManifest,
 ) -> Result<(PathBuf, HistoricalHandoffSnapshotManifest), HandoffSnapshotManifestError> {
-    let archive_path = archive_path.as_ref();
+    write_handoff_snapshot_manifest_inner(archive_path.as_ref(), manifest, None)
+}
+
+/// Publishes only if the measured archive still matches the worker's export.
+/// Unlike the measuring writer, this checks the supplied size and digest before
+/// creating the evidence sidecar, so a changed export leaves no success marker.
+pub fn write_bound_handoff_snapshot_manifest(
+    archive_path: impl AsRef<Path>,
+    manifest: HistoricalHandoffSnapshotManifest,
+) -> Result<(PathBuf, HistoricalHandoffSnapshotManifest), HandoffSnapshotManifestError> {
+    let expected = (manifest.archive_size, manifest.archive_sha256);
+    write_handoff_snapshot_manifest_inner(archive_path.as_ref(), manifest, Some(expected))
+}
+
+fn write_handoff_snapshot_manifest_inner(
+    archive_path: &Path,
+    mut manifest: HistoricalHandoffSnapshotManifest,
+    expected: Option<(u64, [u8; 32])>,
+) -> Result<(PathBuf, HistoricalHandoffSnapshotManifest), HandoffSnapshotManifestError> {
     validate_archive_filename(archive_path, &manifest)?;
     let (mut archive, archive_metadata) =
         open_regular_file(archive_path, "opening snapshot archive")?;
@@ -191,6 +209,20 @@ pub fn write_handoff_snapshot_manifest(
     manifest.archive_size = archive_metadata.len();
     manifest.archive_sha256 = sha256_reader(&mut archive, archive_path, manifest.archive_size)?;
     ensure_path_names_open_file(archive_path, &archive_metadata)?;
+    if let Some((size, digest)) = expected {
+        if manifest.archive_size != size {
+            return Err(HandoffSnapshotManifestError::ArchiveSizeMismatch {
+                expected: size,
+                actual: manifest.archive_size,
+            });
+        }
+        if manifest.archive_sha256 != digest {
+            return Err(HandoffSnapshotManifestError::ArchiveDigestMismatch {
+                expected: sha256_hex_string(&digest),
+                actual: sha256_hex_string(&manifest.archive_sha256),
+            });
+        }
+    }
     manifest.validate()?;
 
     let sidecar_path = handoff_snapshot_manifest_path(archive_path)?;
@@ -567,6 +599,46 @@ mod tests {
         ));
         fs::write(&path, b"complete snapshot including status cache").unwrap();
         path
+    }
+
+    #[test]
+    fn bound_export_rejects_changed_bytes_before_publishing() {
+        let directory = TempDir::new().unwrap();
+        let mut evidence = manifest();
+        let archive = write_archive(&directory, &evidence);
+        let bytes = fs::read(&archive).unwrap();
+        evidence.archive_size = bytes.len() as u64;
+        evidence.archive_sha256 = Sha256::digest(&bytes).into();
+        let sidecar = handoff_snapshot_manifest_path(&archive).unwrap();
+
+        let mut wrong = evidence.clone();
+        wrong.archive_size += 1;
+        assert!(matches!(
+            write_bound_handoff_snapshot_manifest(&archive, wrong),
+            Err(HandoffSnapshotManifestError::ArchiveSizeMismatch { .. })
+        ));
+        assert!(!sidecar.exists());
+        let mut changed = bytes.clone();
+        changed[0] ^= 1;
+        fs::write(&archive, changed).unwrap();
+        assert!(matches!(
+            write_bound_handoff_snapshot_manifest(&archive, evidence.clone()),
+            Err(HandoffSnapshotManifestError::ArchiveDigestMismatch { .. })
+        ));
+        assert!(!sidecar.exists());
+
+        fs::write(&archive, bytes).unwrap();
+        let (_, published) =
+            write_bound_handoff_snapshot_manifest(&archive, evidence.clone()).unwrap();
+        assert_eq!(
+            published,
+            read_and_validate_handoff_snapshot_manifest(&archive).unwrap()
+        );
+        assert!(write_bound_handoff_snapshot_manifest(&archive, evidence).is_err());
+        assert_eq!(
+            published,
+            read_and_validate_handoff_snapshot_manifest(&archive).unwrap()
+        );
     }
 
     #[test]
