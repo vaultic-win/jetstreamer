@@ -348,3 +348,24 @@ units. The `deploy_prepare170` metadata helper checks their exact invocation IDs
 source equivalence to published build commit `00745fa4`, features, artifact and
 test evidence before normal runtime sealing. This does not supply genuine live
 epoch 167 evidence, fresh admission, or the outstanding operational positive test.
+
+The v4 epoch 141 check completed successfully at **00:10:21 UTC**, recording
+`receipts/retire141-check-bc98dfd68f4c144ab03bec877711cfe093ddf5cdd09d94f1769ffce312c1d616.json`
+under the private holding state. The retirement plan was created and execution
+started immediately afterward, using plan SHA-256
+`389e593db906ae9ac8440e5186c22d8be5f7c2df5a13f095c5c24b09ccb98e11`.
+The active terminal session is **22374**. Preserve it through the full original
+and quarantined-file hashes; do not start a duplicate or count capacity before
+`retirements/epoch141-completion.json` exists. After actual deletion, immediately
+refresh epoch 167's physical measurement, prepare, and run the sealed guarded
+launcher. Keep the scheduled 00:19 campaign observation/status refresh.
+
+Epoch 170's preparer is now sealed at
+`/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-prepare-20261118-v1/prepare`,
+SHA-256 `095d99efd0b0c6d657fb806943ecad86b0a19ea3528d273ca5d48d577e9bfaff`.
+Its adjacent `artifact-proof.json` has SHA-256
+`c106402b757c68f260fe79f5d7744ff85c3c214c93d6c79346bd3f12d0f52b4e`.
+The helper is published as `023dc3ba`. Genuine admitted/protected epoch 167,
+fresh two-peer preparation, its own fresh DATA witness/contract and a qualified
+guarded epoch 170 launcher remain required. Parent owns the continuation;
+no repair sub-agent is running.
