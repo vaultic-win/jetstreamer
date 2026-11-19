@@ -129,7 +129,7 @@ pub fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T> {
         file.metadata()?.len() <= MAX_JSON_BYTES,
         "JSON exceeds bound"
     );
-    Ok(serde_json::from_reader(file)?)
+    Ok(serde_json::from_reader(std::io::BufReader::new(file))?)
 }
 pub fn write_json(path: &Path, value: &impl Serialize, replace: bool) -> Result<()> {
     let mut bytes = serde_json::to_vec_pretty(value)?;

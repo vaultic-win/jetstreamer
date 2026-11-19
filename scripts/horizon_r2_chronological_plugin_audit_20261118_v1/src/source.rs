@@ -332,7 +332,7 @@ fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, Strin
         file.metadata()?.len() <= MAX_SOURCE_METADATA_LOG_BYTES,
         "Cargo metadata exceeds bound"
     );
-    let metadata: Value = serde_json::from_reader(file)?;
+    let metadata: Value = serde_json::from_reader(std::io::BufReader::new(file))?;
     let packages = metadata["packages"]
         .as_array()
         .context("metadata packages missing")?;
