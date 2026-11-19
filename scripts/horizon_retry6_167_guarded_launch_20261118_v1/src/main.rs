@@ -741,7 +741,9 @@ fn preflight(plan: &Value, at: u64) -> Result<(Value, Value)> {
         string(&plan["prepared"], "path")? == PREPARED,
         "wrong preparation path"
     );
-    let prepared = bound(&plan["prepared"], 8 << 20)?;
+    // Complete native resource evidence is 21.9 MB on this host. Preserve it
+    // without truncation while retaining a finite, checked metadata ceiling.
+    let prepared = bound(&plan["prepared"], 32 << 20)?;
     ensure!(
         prepared["schema"] == "horizon-standard-replacement-recipe-preparation-v1"
             && prepared["owner"] == "/root"
@@ -1124,7 +1126,7 @@ fn run() -> Result<()> {
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
         exe == Path::new(
-            "/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261118-v1/launch"
+            "/usr/local/lib/jetstreamer/horizon-retry6-single167-launch-20261119-v2/launch"
         ),
         "sealed launch image required"
     );
@@ -1154,6 +1156,17 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn actual_complete_preparation_fits_bounded_reader() {
+        let bytes=read_regular(Path::new(PREPARED),32<<20,false).unwrap();
+        assert!(bytes.len()>8<<20);
+        assert!(read_regular(Path::new(PREPARED),8<<20,false).is_err());
+        let value:Value=serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["schema"],"horizon-standard-replacement-recipe-preparation-v1");
+        assert_eq!(value["epoch"],167);
+        assert_eq!(value["replay_launched"],false);
+        assert!(value["resource_checks"].is_object());
+    }
     #[test]
     fn producer_route_requires_exact_epoch_and_unit() {
         let good = vec![

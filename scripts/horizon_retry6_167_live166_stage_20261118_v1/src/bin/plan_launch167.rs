@@ -72,12 +72,12 @@ fn main() -> Result<()> {
             && before.uid() == 0
             && before.nlink() == 1
             && before.mode() & 0o022 == 0
-            && before.len() <= 8 << 20,
+            && before.len() <= 32 << 20,
         "unsafe preparation"
     );
     let mut bytes = Vec::new();
     Read::by_ref(&mut file)
-        .take((8 << 20) + 1)
+        .take((32 << 20) + 1)
         .read_to_end(&mut bytes)?;
     let after = file.metadata()?;
     let current = fs::symlink_metadata(PREPARED)?;
