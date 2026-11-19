@@ -1,9 +1,8 @@
 # Epoch167 retry7 recovery qualification
 
-The guard is built, tested and normally sealed. The preparer has passed its
-full test suite and production build; its source/runtime sealing remains pending.
-Launcher, native witness, fleet admission and production launch are not yet
-qualified.
+The guard and preparer are built, tested and normally sealed. The launcher
+production build and eight source tests pass. Its two native tests, native
+witness, fleet admission and production launch remain pending.
 
 Guard release image SHA256:
 `e2821006426c497f25ecfdc8da26b63136d174a92c0ac15f78068bbc1078e581`.
@@ -51,10 +50,29 @@ test fixture binds the current attempt instead of the historical booking's
 attempt, and explicitly rejects a missing attempt. No production reservation
 validation was weakened.
 
-Two launcher native tests require genuine fresh epoch167 preparation and remain
-explicitly pending; they have not passed. Next steps: seal the preparer source,
-runtime and actual qualification proof, bind those hashes in the launcher, and
-finish launcher qualification. Before admission, publish all required sources to account-updates,
+`horizon-deploy-prepare167retry7-20261119-v1.service` succeeded with actual
+published source commit `ffc934b46ac9c42701c0583c1370fb484e280135`, contained
+in the pushed merge `681c6125`. Both the source and runtime used the normal
+deployment sealer:
+
+- Runtime: `/usr/local/lib/jetstreamer/horizon-epoch167-retry7-live166retry8-prepare-20261119-v1`.
+- Build proof SHA256: `d79b6622896c5427e21fad1291967db93918b74c95f9cd919ebd5ccd3dd0cf27`.
+- Runtime seal SHA256: `f4cb684e6bffa6f2b9c2a9fc2e575cd2ae5321a1602b66998cb1d1f5ae46f75f`.
+- Source seal SHA256: `2032dabfc0162b3cc141eff86f3a70f3e3541830ef21cdf6733f15d72d975e57`.
+
+The launcher binds that exact preparer image/proof and source commit, plus the
+qualified guard image. Native build/test units:
+
+- `horizon-retry7-167-launch-test-build-20261119-v1.service`: successful.
+- `horizon-retry7-167-launch-test-root-20261119-v1.service`: **8 passed,
+  zero failed, 2 ignored**. The ignored tests require genuine fresh epoch167
+  preparation; they have not passed and remain admission prerequisites.
+- `horizon-retry7-167-launch-build-20261119-v1.service`: successful production
+  release; SHA256 `201f331669734a9d80f6b247c37cd960aeff0bc39bf5d110584aeb5dfebfdfd8`.
+
+Next steps: prepare the current measurement/witness/fleet inputs, complete the
+native launcher tests and seal the launcher before actual guarded admission.
+Before admission, publish all required sources to account-updates,
 use the actual epoch166 retry8 identity and accepted current fleet, preserve
 all earlier retained promises plus the audit allocation, and requalify native
 DATA witness/preflight. Reuse the existing epoch167 retry7 root; no witness
