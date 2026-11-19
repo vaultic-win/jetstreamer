@@ -320,3 +320,52 @@ was 7,305,799,737,344 bytes; epoch 141's local input has not been retired.
 At the **23:56 UTC** audit check, **26 archives had passed, none had failed**,
 and epoch 26 was downloading under the unchanged controller PID 1590101.
 The next routine audit check is no earlier than **00:26:39 UTC**.
+
+## November 19 audit rate and next-lane preparation
+
+At the user-requested **00:01 UTC** audit check, **28 archives had passed, none
+had failed**, and epoch 28 was downloading. The ten completed cycles for epochs
+18–27 covered 30,819,625,246 archive bytes in 1,974 seconds: **18.24 epochs/hour**,
+or 197.4 seconds per epoch including download, plugin playback and cleanup.
+Epoch 27's native log records playback from 00:00:34.812194120 to
+00:01:09.425871283 UTC: about 34.614 seconds for 432,000 slots and 33,582,495
+transactions, approximately 12,480 slots/sec and 970,208 transactions/sec.
+This is a small-archive measurement, not a forecast for the larger remaining
+inventory. The next routine audit check is no earlier than **00:32 UTC**.
+The independent campaign observer remains scheduled for **00:19:25 UTC**.
+
+The optimized parallel epoch 141 retirement image is sealed at
+`/usr/local/lib/jetstreamer/horizon-holding141-retirement-20261118-v4/jetstreamer-r2`,
+SHA-256 `821539a5dd4e66b85de336646479e7abe07494174ec44cfc9ad55b81094a48dc`.
+Its full-file check started at approximately 00:04 UTC. No local deletion or
+free-space credit is claimed before a durable retirement completion. The exact
+check plan remains `bc98dfd68f4c144ab03bec877711cfe093ddf5cdd09d94f1769ffce312c1d616`.
+
+Epoch 170's preparer production build, all **303 tests**, and strict production
+Clippy completed successfully under the three retained
+`horizon-170-live166retry7-preparer-{production,tests,clippy}-20261118-v1.service`
+units. The `deploy_prepare170` metadata helper checks their exact invocation IDs,
+source equivalence to published build commit `00745fa4`, features, artifact and
+test evidence before normal runtime sealing. This does not supply genuine live
+epoch 167 evidence, fresh admission, or the outstanding operational positive test.
+
+The v4 epoch 141 check completed successfully at **00:10:21 UTC**, recording
+`receipts/retire141-check-bc98dfd68f4c144ab03bec877711cfe093ddf5cdd09d94f1769ffce312c1d616.json`
+under the private holding state. The retirement plan was created and execution
+started immediately afterward, using plan SHA-256
+`389e593db906ae9ac8440e5186c22d8be5f7c2df5a13f095c5c24b09ccb98e11`.
+The active terminal session is **22374**. Preserve it through the full original
+and quarantined-file hashes; do not start a duplicate or count capacity before
+`retirements/epoch141-completion.json` exists. After actual deletion, immediately
+refresh epoch 167's physical measurement, prepare, and run the sealed guarded
+launcher. Keep the scheduled 00:19 campaign observation/status refresh.
+
+Epoch 170's preparer is now sealed at
+`/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-prepare-20261118-v1/prepare`,
+SHA-256 `095d99efd0b0c6d657fb806943ecad86b0a19ea3528d273ca5d48d577e9bfaff`.
+Its adjacent `artifact-proof.json` has SHA-256
+`c106402b757c68f260fe79f5d7744ff85c3c214c93d6c79346bd3f12d0f52b4e`.
+The helper is published as `023dc3ba`. Genuine admitted/protected epoch 167,
+fresh two-peer preparation, its own fresh DATA witness/contract and a qualified
+guarded epoch 170 launcher remain required. Parent owns the continuation;
+no repair sub-agent is running.
