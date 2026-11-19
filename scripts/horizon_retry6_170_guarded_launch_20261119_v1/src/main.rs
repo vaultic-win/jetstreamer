@@ -22,7 +22,7 @@ const ORIGINAL_FLEET_PREPARATION_MAX_AGE_SECONDS: u64 = 180;
 const UNIT: &str = "horizon-qualify-170-replacement-local3retry6-20261110-v1.service";
 const GUARD: &str = "horizon-guard-replacement-170-local3retry6-20261110-v1";
 const GUARD_STATE: &str =
-    "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch170/local3retry6/guard-state";
+    "/var/lib/jetstreamer/retry6-170-preparation-20261118-v1/epoch170/local3retry6/guard-state";
 const PEER_UNIT: &str = "horizon-qualify-166-replacement-local3retry7-20261110-v1.service";
 const PEER_GUARD: &str = "horizon-guard-replacement-166-local3retry7-20261110-v1";
 const PEER_ADMISSION: &str = "/var/lib/jetstreamer/retry7-single166-guarded-launch-20261118-v2/epoch166/ACTUAL_REPLACEMENT_ADMISSION.json";
@@ -30,7 +30,7 @@ const PEER_PROTECTION: &str = "/var/lib/jetstreamer/retry7-single166-guarded-lau
 const FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 288 << 30;
 const PREPARED: &str =
-    "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch170/local3retry6/prepared.json";
+    "/var/lib/jetstreamer/retry6-170-preparation-20261118-v1/epoch170/local3retry6/prepared.json";
 const OUTPUT_ROOT: &str =
     "/var/lib/jetstreamer/retry6-single170-guarded-launch-20261119-v1/epoch170";
 const NODE: &str = "/usr/local/lib/jetstreamer/horizon-independent170-singleton-package-20261109-v1/jetstreamer-node";

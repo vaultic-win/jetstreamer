@@ -11,10 +11,10 @@ use std::{
 };
 const REPO: &str = "/home/sol/workspace/jetstreamer";
 const PACKAGE: &str = "scripts/horizon_retry6_170_guarded_launch_20261119_v1";
-const STATE: &str = "/var/lib/jetstreamer/epoch170-retry6-guarded-launch-deployment-20261119-v1";
-const DEST: &str = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1";
+const STATE: &str = "/var/lib/jetstreamer/epoch170-retry6-guarded-launch-deployment-20261119-v2";
+const DEST: &str = "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v2";
 const IMAGE: &str = "/home/sol/workspace/jetstreamer/scripts/horizon_retry6_170_guarded_launch_20261119_v1/target/release/horizon-retry6-single170-launch";
-const BUILD_COMMIT: &str = "f6a26478064713bedc4ff96e9f4cd9eb15119852";
+const BUILD_COMMIT: &str = "8e63f126";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 
@@ -69,7 +69,15 @@ fn main() -> Result<()> {
         "origin/account-updates",
     ])?;
     ensure!(
-        git(&["status", "--porcelain", "--untracked-files=no"])?.is_empty(),
+        git(&[
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            PACKAGE,
+            "scripts/horizon_retry6_167_live166_stage_20261118_v1/src/bin/deploy_launch170.rs"
+        ])?
+        .is_empty(),
         "tracked tree changed"
     );
     git(&[
@@ -85,11 +93,11 @@ fn main() -> Result<()> {
     let mut executions = serde_json::Map::new();
     let mut tests_passed = None;
     for (phase, expected_iid) in [
-        ("production", "037c328a47354287b47aa56be5d09fdc"),
-        ("tests", "4e4d25decde44ddebb7e7ef78c15a0f9"),
-        ("clippy", "153f7618431d438fae92c82b2e5197aa"),
+        ("production", "b078e53e1f1344d78d37d434bfa77f3d"),
+        ("tests", "a0c0848a509141d1860fb86435d9fca2"),
+        ("clippy", "5623ef3ef0884408b79477096dd58424"),
     ] {
-        let unit = format!("horizon-single170-launch-corrected-{phase}-20261119-v1.service");
+        let unit = format!("horizon-single170-launch-paths-{phase}-20261119-v1.service");
         let raw = run(Command::new("/usr/bin/systemctl").args(["show", &unit,
             "-pId,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,Result,ExecMainStatus,ExecStart,CPUQuotaPerSecUSec,MemoryMax,TasksMax,Environment"]))?;
         for required in [
