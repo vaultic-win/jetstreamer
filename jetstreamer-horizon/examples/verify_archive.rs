@@ -1068,6 +1068,9 @@ fn usage() -> ! {
         "  --expected-terminal SLOT HASH  with --full, require this exact canonical final block; no partial/internal-only mode"
     );
     eprintln!(
+        "  --expected-successor SLOT PARENT_SLOT PARENT_HASH  prove a skipped tail from an independently authenticated successor; requires --full, --anchor and --expected-terminal"
+    );
+    eprintln!(
         "  --expected-provenance-sha256 HEX  with strict --full, bind the canonical encoded provenance to independently derived source evidence (not publication admission)"
     );
     eprintln!("  --chain              verify ordered, contiguous archives as one chain");
@@ -1114,6 +1117,26 @@ fn validate_provenance_expectation<R: Read + std::io::Seek>(
 
 fn terminal_expectation_matches(actual: Option<ChainPoint>, expected: Option<ChainPoint>) -> bool {
     expected.is_none() || actual == expected
+}
+
+#[derive(Clone, Copy, Debug)]
+struct SuccessorExpectation {
+    slot: u64,
+    parent: ChainPoint,
+}
+
+fn successor_proves_tail(
+    actual: Option<ChainPoint>,
+    expected_terminal: Option<ChainPoint>,
+    range_end: u64,
+    successor: Option<SuccessorExpectation>,
+) -> bool {
+    successor.is_some_and(|s| {
+        s.slot >= range_end
+            && s.parent.slot.checked_add(1).is_some_and(|n| n < range_end)
+            && actual == Some(s.parent)
+            && expected_terminal == Some(s.parent)
+    })
 }
 
 /// Prove that this exact verifier build can decode the historical pre-update
@@ -1447,11 +1470,12 @@ fn main() {
     }
     if args.first().map(String::as_str) == Some("--capacity-probe") {
         let result = run_capacity_probe();
-        if result == 0 && args.len() > 1 {
-            if let Err(error) = write_capacity_probe_receipt(&args[1..]) {
-                eprintln!("CAPACITY PROBE RECEIPT FAIL: {error}");
-                std::process::exit(1);
-            }
+        if result == 0
+            && args.len() > 1
+            && let Err(error) = write_capacity_probe_receipt(&args[1..])
+        {
+            eprintln!("CAPACITY PROBE RECEIPT FAIL: {error}");
+            std::process::exit(1);
         }
         std::process::exit(result);
     }
@@ -1459,6 +1483,7 @@ fn main() {
     let mut internal_full = false;
     let mut anchor = None;
     let mut expected_terminal = None;
+    let mut expected_successor = None;
     let mut expected_provenance_sha256 = None;
     let mut threads = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -1513,6 +1538,18 @@ fn main() {
                 }
                 expected_terminal = Some(parse_anchor(&args, &mut i));
             }
+            "--expected-successor" => {
+                if expected_successor.is_some() {
+                    usage();
+                }
+                i += 1;
+                let slot = args
+                    .get(i)
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or_else(|| usage());
+                let parent = parse_anchor(&args, &mut i);
+                expected_successor = Some(SuccessorExpectation { slot, parent });
+            }
             "--expected-provenance-sha256" => {
                 if expected_provenance_sha256.is_some() {
                     usage();
@@ -1541,6 +1578,15 @@ fn main() {
     if expected_terminal.is_some() && (!full || internal_full || !positionals.is_empty()) {
         usage();
     }
+    if expected_successor.is_some()
+        && (!full
+            || internal_full
+            || !positionals.is_empty()
+            || expected_terminal.is_none()
+            || anchor.is_none())
+    {
+        usage();
+    }
     if expected_provenance_sha256.is_some() && (!full || internal_full || !positionals.is_empty()) {
         usage();
     }
@@ -1558,7 +1604,20 @@ fn main() {
             expected_provenance_sha256,
         );
         let end = outcome.slot_start.saturating_add(outcome.slot_count);
-        let tail_ok = tail_requirement_satisfied(outcome.last_block_slot, end, !internal_full);
+        let tail_ok = if expected_successor.is_some() {
+            successor_proves_tail(outcome.terminal, expected_terminal, end, expected_successor)
+        } else {
+            tail_requirement_satisfied(outcome.last_block_slot, end, !internal_full)
+        };
+        if let Some(successor) = expected_successor {
+            println!(
+                "CANONICAL SUCCESSOR {}: slot={} parent={:?} archive_end_exclusive={}",
+                if tail_ok { "OK" } else { "FAIL" },
+                successor.slot,
+                successor.parent,
+                end
+            );
+        }
         if !tail_ok {
             println!(
                 "STRICT TAIL FAIL: no successor block proves skipped slots through {}",
@@ -1884,6 +1943,63 @@ mod tests {
         assert!(tail_requirement_satisfied(None, 10, false));
         assert!(!tail_requirement_satisfied(Some(8), 10, true));
         assert!(!tail_requirement_satisfied(None, 10, true));
+    }
+
+    #[test]
+    fn independently_bound_successor_must_match_actual_final_block_and_skipped_tail() {
+        let parent = ChainPoint {
+            slot: 108863995,
+            blockhash: Hash::new_from_array([1; 32]),
+        };
+        let successor = SuccessorExpectation {
+            slot: 108864012,
+            parent,
+        };
+        assert!(successor_proves_tail(
+            Some(parent),
+            Some(parent),
+            108864000,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            Some(parent),
+            None,
+            108864000,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            None,
+            Some(parent),
+            108864000,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            Some(parent),
+            Some(parent),
+            108863996,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            Some(parent),
+            Some(parent),
+            108864013,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            Some(ChainPoint {
+                blockhash: Hash::new_from_array([2; 32]),
+                ..parent
+            }),
+            Some(parent),
+            108864000,
+            Some(successor)
+        ));
+        assert!(!successor_proves_tail(
+            Some(parent),
+            Some(parent),
+            108864000,
+            None
+        ));
     }
 
     fn sig(b: u8) -> Signature {

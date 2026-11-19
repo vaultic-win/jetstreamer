@@ -69,6 +69,61 @@ struct EpochExpectation {
     terminal_blockhash: String,
     provenance_sha256: Option<String>,
     independent_evidence: Vec<Bound>,
+    #[serde(default)]
+    successor: Option<SuccessorExpectation>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SuccessorExpectation {
+    slot: u64,
+    response: Bound,
+    request: Bound,
+}
+
+fn validate_successor_values(
+    e: &EpochExpectation,
+    response: &Value,
+    request: &Value,
+) -> Result<()> {
+    let s = e.successor.as_ref().context("missing successor")?;
+    let end = e
+        .epoch
+        .checked_add(1)
+        .and_then(|n| n.checked_mul(432000))
+        .context("epoch overflow")?;
+    let expected_request = json!([s.slot,{"commitment":"finalized","transactionDetails":"none","rewards":false,"maxSupportedTransactionVersion":0}]);
+    ensure!(
+        s.slot >= end
+            && request["endpoint"] == "https://api.mainnet-beta.solana.com"
+            && request["request"]["jsonrpc"] == "2.0"
+            && request["request"]["method"] == "getBlock"
+            && request["request"]["params"] == expected_request
+            && request["response_sha256"] == s.response.sha256
+            && response["jsonrpc"] == "2.0"
+            && response["id"].as_u64().is_some()
+            && response["id"] == request["request"]["id"]
+            && response.get("error").is_none()
+            && response["result"]["parentSlot"] == e.terminal_slot
+            && response["result"]["previousBlockhash"] == e.terminal_blockhash,
+        "successor RPC evidence does not prove skipped epoch tail"
+    );
+    let blockhash = response["result"]["blockhash"]
+        .as_str()
+        .context("successor blockhash")?;
+    ensure!(
+        bs58::decode(blockhash)
+            .into_vec()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .len()
+            == 32,
+        "invalid successor blockhash"
+    );
+    ensure!(
+        e.independent_evidence.contains(&s.response) && e.independent_evidence.contains(&s.request),
+        "successor not bound in independent evidence"
+    );
+    Ok(())
 }
 
 fn full_arguments(
@@ -80,10 +135,14 @@ fn full_arguments(
     let first = epoch.checked_mul(432000).context("epoch overflow")?;
     let last = first.checked_add(431999).context("epoch overflow")?;
     ensure!(
-        e.schema == "horizon-current-reader-epoch-expectation-v1"
+        ((e.schema == "horizon-current-reader-epoch-expectation-v1"
+            && e.successor.is_none()
+            && e.terminal_slot == last)
+            || (e.schema == "horizon-current-reader-epoch-expectation-v2"
+                && e.successor.is_some()
+                && (first..last).contains(&e.terminal_slot)))
             && e.epoch == epoch
             && e.parent_slot < first
-            && e.terminal_slot == last
             && !e.independent_evidence.is_empty(),
         "missing independent full-epoch parent/terminal expectations"
     );
@@ -107,6 +166,15 @@ fn full_arguments(
         e.terminal_slot.to_string(),
         e.terminal_blockhash.clone(),
     ];
+    if let Some(s) = &e.successor {
+        validate_successor_values(e, &bound_json(&s.response)?, &bound_json(&s.request)?)?;
+        args.extend([
+            "--expected-successor".into(),
+            s.slot.to_string(),
+            e.terminal_slot.to_string(),
+            e.terminal_blockhash.clone(),
+        ]);
+    }
     if let Some(digest) = &e.provenance_sha256 {
         ensure!(hex(digest, 64), "invalid expected provenance digest");
         args.extend(["--expected-provenance-sha256".into(), digest.clone()]);
@@ -627,6 +695,30 @@ impl Gate {
 mod tests {
     use super::*;
 
+    #[test]
+    #[ignore = "root native validation of sealed independent skipped-tail RPC evidence"]
+    fn native_skipped_tail_expectation_generates_strict_verifier_arguments() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let binding: Bound =
+            serde_json::from_str(&std::env::var("HORIZON_TEST_TAIL_EXPECTATION").unwrap()).unwrap();
+        let e: EpochExpectation = serde_json::from_value(bound_json(&binding).unwrap()).unwrap();
+        let args = full_arguments(Path::new("/private/epoch-251.jet"), 251, 2, &e).unwrap();
+        let i = args
+            .iter()
+            .position(|x| x == "--expected-successor")
+            .unwrap();
+        assert_eq!(&args[i + 1..i + 3], &["108864012", "108863995"]);
+        assert_eq!(args[i + 3], "86y6Vyi2ZFR8e9wXhnsS2NSrnuH7rFwZYdu3pHLVHufa");
+        assert!(args.iter().any(|x| x == "--full"));
+        assert!(!args.iter().any(|x| x == "--internal-full"));
+        for evidence in &e.independent_evidence {
+            bound_file(evidence).unwrap();
+        }
+        let mut wrong = e;
+        wrong.schema = "horizon-current-reader-epoch-expectation-v1".into();
+        assert!(full_arguments(Path::new("/private/epoch-251.jet"), 251, 2, &wrong).is_err());
+    }
+
     fn complete_report() -> Value {
         json!({"schema":"jetstreamer-horizon-plugin-playback-v1", "source":"/readback",
             "invocation":["pipeline", "--verify-only"], "full_epoch_verified":true,
@@ -665,6 +757,7 @@ mod tests {
                 path: "/expectation".into(),
                 sha256: "b".repeat(64),
             }],
+            successor: None,
         };
         let args = full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).unwrap();
         assert!(
@@ -694,6 +787,59 @@ mod tests {
         e.parent_slot -= 1;
         e.independent_evidence.clear();
         assert!(full_arguments(Path::new("/epoch-251.jet"), 251, 2, &e).is_err());
+    }
+
+    #[test]
+    fn skipped_tail_requires_bound_finalized_successor_rpc() {
+        let response_binding = Bound {
+            path: "/successor.json".into(),
+            sha256: "a".repeat(64),
+        };
+        let request_binding = Bound {
+            path: "/request.json".into(),
+            sha256: "b".repeat(64),
+        };
+        let hash = bs58::encode([1; 32]).into_string();
+        let mut e = EpochExpectation {
+            schema: "horizon-current-reader-epoch-expectation-v2".into(),
+            epoch: 251,
+            parent_slot: 108431999,
+            parent_blockhash: hash.clone(),
+            terminal_slot: 108863995,
+            terminal_blockhash: hash.clone(),
+            provenance_sha256: None,
+            independent_evidence: vec![response_binding.clone(), request_binding.clone()],
+            successor: Some(SuccessorExpectation {
+                slot: 108864012,
+                response: response_binding,
+                request: request_binding,
+            }),
+        };
+        let response = json!({"jsonrpc":"2.0","id":7,"result":{"parentSlot":108863995,"previousBlockhash":hash,"blockhash":hash}});
+        let request = json!({"endpoint":"https://api.mainnet-beta.solana.com","response_sha256":"a".repeat(64),"request":{"jsonrpc":"2.0","id":7,"method":"getBlock","params":[108864012,{"commitment":"finalized","transactionDetails":"none","rewards":false,"maxSupportedTransactionVersion":0}]}});
+        validate_successor_values(&e, &response, &request).unwrap();
+        for (pointer, value) in [
+            ("/result/parentSlot", json!(108863994)),
+            (
+                "/result/previousBlockhash",
+                json!(bs58::encode([2; 32]).into_string()),
+            ),
+            ("/id", json!(8)),
+            ("/error", json!({"code":-1})),
+        ] {
+            let mut wrong = response.clone();
+            if pointer == "/error" {
+                wrong["error"] = value;
+            } else {
+                *wrong.pointer_mut(pointer).unwrap() = value;
+            }
+            assert!(validate_successor_values(&e, &wrong, &request).is_err());
+        }
+        let mut wrong = request.clone();
+        wrong["request"]["params"][1]["commitment"] = json!("confirmed");
+        assert!(validate_successor_values(&e, &response, &wrong).is_err());
+        e.independent_evidence.clear();
+        assert!(validate_successor_values(&e, &response, &request).is_err());
     }
 
     #[test]

@@ -64,7 +64,13 @@ fn digest(path: &Path) -> Result<String> {
 
 /// Expectations derive from fixed inputs and canonical PoH construction before
 /// writing; they are never extracted from the resulting archive.
-fn fixture(root: &Path, count: u64, missing_epoch: bool, wrong_poh: bool) -> Result<Hash> {
+fn fixture(
+    root: &Path,
+    count: u64,
+    missing_epoch: bool,
+    wrong_poh: bool,
+    skipped_tail: bool,
+) -> Result<Hash> {
     fs::DirBuilder::new().mode(0o700).create(root)?;
     let mut writer = ArchiveWriter::new(
         create(&root.join(format!("epoch-{EPOCH}.jet")))?,
@@ -93,7 +99,7 @@ fn fixture(root: &Path, count: u64, missing_epoch: bool, wrong_poh: bool) -> Res
     };
     for offset in 0..count {
         let slot = FIRST + offset;
-        if offset != 0 && offset != count - 1 {
+        if offset != 0 && offset != count - if skipped_tail { 5 } else { 1 } {
             writer.write_skipped_slot(slot)?;
             continue;
         }
@@ -191,14 +197,15 @@ fn main() -> Result<()> {
     fs::DirBuilder::new().mode(0o700).create(root)?;
     require(root.canonicalize()? == *root, "test root must be canonical")?;
     let mut checks = Vec::new();
-    for (label, count, missing_epoch, wrong_poh) in [
-        ("complete", SLOTS, false, false),
-        ("partial", SLOTS - 1, false, false),
-        ("missing-epoch", SLOTS, true, false),
-        ("wrong-poh", SLOTS, false, true),
+    for (label, count, missing_epoch, wrong_poh, skipped_tail) in [
+        ("complete", SLOTS, false, false, false),
+        ("partial", SLOTS - 1, false, false, false),
+        ("missing-epoch", SLOTS, true, false, false),
+        ("wrong-poh", SLOTS, false, true, false),
+        ("skipped-tail", SLOTS, false, false, true),
     ] {
         let source = root.join(label);
-        let terminal = fixture(&source, count, missing_epoch, wrong_poh)?;
+        let terminal = fixture(&source, count, missing_epoch, wrong_poh, skipped_tail)?;
         let archive = source.join(format!("epoch-{EPOCH}.jet"));
         let report = source.join("plugin.json");
         let to_string =
@@ -215,7 +222,7 @@ fn main() -> Result<()> {
                 "--verification-report".into(),
                 to_string(&report)?,
             ];
-            let success = label == "complete";
+            let success = label == "complete" || skipped_tail;
             checks.push(run(pipeline, &invocation, &source, "plugin", success)?);
             if success {
                 let value: Value = serde_json::from_reader(File::open(&report)?)?;
@@ -254,8 +261,8 @@ fn main() -> Result<()> {
                 )?;
             }
         }
-        if label == "complete" || wrong_poh {
-            let invocation = vec![
+        if label == "complete" || wrong_poh || skipped_tail {
+            let mut invocation = vec![
                 to_string(&archive)?,
                 "--full".into(),
                 "--threads".into(),
@@ -264,9 +271,53 @@ fn main() -> Result<()> {
                 (FIRST - 1).to_string(),
                 Hash::new_from_array([0x91; 32]).to_string(),
                 "--expected-terminal".into(),
-                (FIRST + SLOTS - 1).to_string(),
+                (FIRST + SLOTS - if skipped_tail { 5 } else { 1 }).to_string(),
                 terminal.to_string(),
             ];
+            if skipped_tail {
+                checks.push(run(
+                    verifier,
+                    &invocation,
+                    &source,
+                    "missing-successor",
+                    false,
+                )?);
+                invocation.extend([
+                    "--expected-successor".into(),
+                    (FIRST + SLOTS + 12).to_string(),
+                    (FIRST + SLOTS - 5).to_string(),
+                    terminal.to_string(),
+                ]);
+                let mut wrong = invocation.clone();
+                *wrong.last_mut().unwrap() = Hash::new_from_array([0x55; 32]).to_string();
+                checks.push(run(
+                    verifier,
+                    &wrong,
+                    &source,
+                    "wrong-successor-hash",
+                    false,
+                )?);
+                let mut wrong = invocation.clone();
+                let n = wrong.len();
+                wrong[n - 2] = (FIRST + SLOTS - 6).to_string();
+                checks.push(run(
+                    verifier,
+                    &wrong,
+                    &source,
+                    "wrong-successor-parent",
+                    false,
+                )?);
+                let mut wrong = invocation.clone();
+                let n = wrong.len();
+                wrong[n - 3] = (FIRST + SLOTS - 1).to_string();
+                checks.push(run(
+                    verifier,
+                    &wrong,
+                    &source,
+                    "successor-inside-epoch",
+                    false,
+                )?);
+            }
             checks.push(run(verifier, &invocation, &source, "full", !wrong_poh)?);
         }
         checks.push(json!({"fixture":archive,"sha256":digest(&archive)?,"synthetic":true}));

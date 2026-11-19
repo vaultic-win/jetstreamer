@@ -19,9 +19,9 @@ epoch. A skipped or unavailable terminal slot triggers a bounded tail and next-e
 block census. The collector fetches the last produced block and first successor,
 and requires that successor to name the exact last block as its parent with a
 matching previous blockhash. It retains this independent skipped-tail evidence,
-then still fails closed without emitting a v1 expectation: the current reader's
-strict terminal gate does not yet support this case. A missing RPC block alone
-never proves that a slot was skipped.
+then still fails closed without emitting a v1 expectation. A missing RPC block
+alone never proves that a slot was skipped. The evidence can instead support the
+separately qualified v2 reader expectation described below.
 Every blockhash must decode to 32 bytes. TLS validation remains enabled, redirects
 are disabled, each request has a 30-second timeout, and each response is limited
 to 1 MiB. The containing qualification service also needs a bounded runtime.
@@ -37,3 +37,38 @@ Tests reject unordered, duplicate, out-of-range or missing block censuses,
 disagreeing parent hashes, invalid boundary relationships and malformed hashes.
 These checks provide independent expectations only; full current-reader decoding,
 plugin playback, authenticated remote playback and publication gates still apply.
+
+## Epochs ending in skipped slots
+
+`horizon-current-reader-epoch-expectation-v1` still requires a produced block at
+the epoch's final slot. A v2 expectation requires a last produced slot inside the
+epoch and a `successor` object containing `slot`, `response` and `request`. The
+latter two are immutable path/SHA-256 bindings and must also appear in
+`independent_evidence`. The request must name the public mainnet RPC endpoint,
+`getBlock`, finalized commitment and the exact successor slot. The response must
+match its request ID and name the expected terminal slot/hash as its parent.
+The successor must lie beyond the epoch's end; malformed or missing evidence
+fails closed.
+
+The uploader passes this evidence to strict full verification using
+`--expected-successor SLOT PARENT_SLOT PARENT_HASH`, together with the independent
+anchor and expected terminal. The verifier requires its actual final decoded
+block to match that parent and requires a genuinely skipped tail. This option
+does not allow partial or internal-only verification, omit PoH validation, or
+replace full local and remote plugin playback.
+
+Epoch 251 provides a concrete case: its last produced block is 108863995,
+followed by four skipped slots, and finalized successor 108864012 names that
+block and its hash as parent. The immutable request/response evidence was
+collected independently of the replay archive. The collector currently retains
+the diagnostic proof; it does not automatically emit a v2 expectation.
+
+Qualification covers a synthetic full 432,000-slot archive with a skipped tail,
+ordinary complete playback, and rejection of missing/wrong successors, partial
+coverage, missing epoch metadata and bad PoH. A root-only ignored native test in
+`current_reader.rs` accepts `HORIZON_TEST_TAIL_EXPECTATION` as a JSON path/SHA-256
+binding and validates the real sealed epoch-251 evidence through production
+argument construction. Run native playback with the qualified
+`RUST_MIN_STACK=67108864` setting. These tests do not verify a canonical mainnet
+archive or authorize R2 publication. Rebuild and qualify the uploader and reader
+acceptance against the published source before using v2 for production delivery.
