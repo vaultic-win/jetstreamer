@@ -1,0 +1,69 @@
+Epoch170 retry6 preparer, live166retry8 successor.
+
+Nov19 current qualification supersedes the predecessor narrative below:
+- Binds live166 retry8 and requires genuine protected167 retry7.
+-305 tests passed with no failures or ignored tests in final v2 invocation
+ 6d2399398cdb4808a8fb70be7e07c563.
+- Production release build succeeded in invocation
+ d42f6283217c45f1877bb4a7a83780d3.
+- Strict Clippy passed in invocation c03f99c86a464dbd85cf1f3daad07ecb after
+ combining identical floor branches without changing their selected floor.
+- No epoch170 admission or replay has occurred. See NEXT_STEPS.md for current
+ remaining gates; historical retry7/retry6 peers below are predecessor context.
+
+Historical predecessor qualification:
+
+Supports exact live166 retry7 plus an actually admitted/protected167 retry6.
+Future167 IID/PID are never predicted: the request must bind real immutable
+admission and guard receipts, checked against the owner rows, actual native
+capture and guard plan. Its actual preparation plan must bind the retained
+167 booking used by this candidate. No fake future receipt is created.
+
+Retains complete DATA6794761027378, raw floor6829053656882, epoch167 cap512GiB,
+epoch170 cap288GiB, and the extra stopped166 retry6 root promise288GiB.
+Authenticates original170 partial retirement using the actual Nov18 cleanup
+selection/intent/completion and verifies absence through parent descriptor.
+Authenticates terminal170 retry5 in addition to the previous retry4 lineage.
+
+Localized 43 compile-time dependencies and fixtures (dependency-origins.json)
+and adopted the bounded two-pass streaming physical ledger at all three
+production allocation call sites.
+
+Validation: 303 tests passed, production Clippy -D warnings passed, using
+/var/lib/jetstreamer/epoch170-retry6-source-tests-20261118-v1/target.
+No runtime package, live worker, resource booking or R2 object was changed.
+Source was subsequently published by root to account-updates.
+
+Nov18 23:40 qualification follow-up:
+- The same localized source packet now exposes its guard as a separate Cargo
+  binary. Historical cfg feature names are declared without enabling any, and
+  the prepare binary explicitly requires its existing preparation feature.
+- Guard production and test builds pass with warnings denied. Strict Clippy
+  passes for production and tests. All 98 guard tests pass.
+- Exact persistent qualification units are horizon-170-live166retry7-guard-
+  production-20261118-v3, build-tests-20261118-v2, clippy-production-20261118-v2,
+  clippy-tests-20261118-v2, and ordinary-tests-20261118-v1 (all .service).
+- deploy_guard170 captures those actual executions and seals their image and
+  published source. Runtime sealing, own-image native witness and fresh
+  two-peer preparation remain operational gates; no epoch170 launch is claimed.
+
+Remaining gates:
+- Genuine epoch167 retry6 admission/protection must exist for the two-peer route.
+  If170 is prioritized first, qualify a separate one-peer/terminal167 route;
+  this candidate intentionally rejects absent167 and does not fake its identity.
+- Publish source to origin/account-updates before any admission.
+- Build/test/qualify/seal the successor170 guard under the exact GUARD_RUNTIME
+  path in retry170.rs, then capture own-image native witness and seal contract
+  at the exact contract path in retry170.rs. Existing lower-floor guard is not
+  accepted. prelaunch_data retains the full existing normal seal/artifact proof
+  checks (four strict configurations and five execution receipts).
+- Seal/build this preparer with matching source provenance and runtime IMAGE.
+- Fresh fleet, all retained DATA booking, own-image witness, native resident
+  capture, full growth fit, preparation and genuinely guarded launcher.
+- Operational outer positive test with genuine167 evidence remains pending;
+  current new peer tests are parser-only synthetic fixtures plus actual170 stop
+  and cleanup evidence. They do not constitute admission qualification.
+
+The preparer incorporates the earlier guard candidate's floor repair and fixes
+an inherited old-floor test in data_fulfillment.rs. If rebuilding the separate
+sibling guard candidate, apply the same fresh170_retry6 test correction there.
