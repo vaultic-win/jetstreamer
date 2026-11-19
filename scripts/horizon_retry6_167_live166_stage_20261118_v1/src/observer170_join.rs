@@ -164,7 +164,8 @@ fn scratch_from_executable(exe: &Path, producer: u64) -> Result<PathBuf> {
     );
     let bound = exe.parent().context("bound worker")?;
     let private = bound.parent().context("private worker")?;
-    let scratch = private.parent().context("scratch")?;
+    let runtime = private.parent().context("private runtime")?;
+    let scratch = runtime.parent().context("scratch")?;
     let run = scratch.parent().context("run")?;
     let run_name = run
         .file_name()
@@ -177,6 +178,7 @@ fn scratch_from_executable(exe: &Path, producer: u64) -> Result<PathBuf> {
                 .file_name()
                 .and_then(|v| v.to_str())
                 .is_some_and(|v| v.starts_with("jetstreamer-historical-parent-"))
+            && runtime.file_name().is_some_and(|v| v == ".historical-runtime")
             && scratch.file_name().is_some_and(|v| v == "scratch")
             && run_name
                 .strip_prefix(&run_prefix)
@@ -515,13 +517,15 @@ mod tests {
     #[test]
     fn scratch_requires_actual_producer_run_and_worker_layout() {
         let base = format!(
-            "{LANE}/private/destination-owned/work/root-cohort-170-170/run-123-456/scratch/jetstreamer-historical-parent-abc/bound-worker/historical-worker"
+            "{LANE}/private/destination-owned/work/root-cohort-170-170/run-123-456/scratch/.historical-runtime/jetstreamer-historical-parent-abc/bound-worker/historical-worker"
         );
         assert!(scratch_from_executable(Path::new(&base), 123).is_ok());
         assert!(scratch_from_executable(Path::new(&base), 124).is_err());
         for bad in [
             base.replace("root-cohort-170-170", "root-cohort-169-169"),
             base.replace("/scratch/", "/ledger/"),
+            base.replace("/.historical-runtime/", "/"),
+            base.replace("/.historical-runtime/", "/foreign-runtime/"),
             base.replace("run-123-456", "run-123-guessed"),
             base.replace("historical-parent-abc", "foreign-abc"),
         ] {
