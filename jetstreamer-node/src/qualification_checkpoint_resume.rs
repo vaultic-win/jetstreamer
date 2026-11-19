@@ -55,6 +55,7 @@ impl ValidatedResume {
     pub(crate) fn load(
         report: &Path,
         report_sha: &str,
+        exit_proof: Evidence,
         q: QualificationPlan,
         snapshot: &Path,
         suffix: &Path,
@@ -68,6 +69,7 @@ impl ValidatedResume {
         )?;
         let report: serde_json::Value =
             serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+        qualification_checkpoint_exit::load(&exit_proof, &report, report_sha, q.epoch)?;
         require(
             report["schema"] == "horizon-pressure-checkpoint-paused-v3"
                 && report["worker_shutdown_acknowledged"] == true
@@ -89,7 +91,7 @@ impl ValidatedResume {
             && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
         require(
             absent,
-            "checkpoint producer still exists; controller exit proof remains required",
+            "checkpoint producer exists after the recorded exit proof",
         )?;
         let prefix = PathBuf::from(
             report["verified_prefix"]["path"]

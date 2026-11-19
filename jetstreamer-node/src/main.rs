@@ -40,6 +40,7 @@ mod epoch224_qualification;
 mod epoch225_diagnostic;
 mod epoch225_qualification;
 mod failed_prefix220;
+mod qualification_checkpoint_exit;
 mod qualification_checkpoint_resume;
 mod singletons209_212;
 mod singletons209_212_profile;
@@ -5345,7 +5346,9 @@ fn usage(program: &str) -> String {
          checkpoint. A paused result requires separate prefix validation, worker\n\
          reap and recovery qualification; it is never full replay completion.\n\
          --qualification-checkpoint-resume=SEALED-PAUSED-REPORT and\n\
-         --qualification-checkpoint-resume-sha256=HEX resume privately from a\n\
+         --qualification-checkpoint-resume-sha256=HEX, together with\n\
+         --qualification-checkpoint-exit-proof=SEALED-EXIT-PROOF and\n\
+         --qualification-checkpoint-exit-proof-sha256=HEX, resume privately from a\n\
          reaped v3 pressure checkpoint. Existing focused flags must name the\n\
          exported snapshot, original canonical terminal and a fresh private\n\
          suffix output. A complete prefix reread and native restored-state\n\
@@ -19923,6 +19926,8 @@ async fn main() {
     let mut checkpoint_on_pressure = false;
     let mut checkpoint_resume_report: Option<PathBuf> = None;
     let mut checkpoint_resume_sha: Option<String> = None;
+    let mut checkpoint_exit_proof: Option<PathBuf> = None;
+    let mut checkpoint_exit_sha: Option<String> = None;
     let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
@@ -20001,6 +20006,17 @@ async fn main() {
         } else if let Some(hash) = arg.strip_prefix("--qualification-checkpoint-resume-sha256=") {
             if checkpoint_resume_sha.replace(hash.into()).is_some() {
                 eprintln!("duplicate checkpoint resume report SHA-256");
+                exit(2);
+            }
+        } else if let Some(path) = arg.strip_prefix("--qualification-checkpoint-exit-proof=") {
+            if path.is_empty() || checkpoint_exit_proof.replace(path.into()).is_some() {
+                eprintln!("checkpoint resume requires one nonempty sealed exit-proof path");
+                exit(2);
+            }
+        } else if let Some(hash) = arg.strip_prefix("--qualification-checkpoint-exit-proof-sha256=")
+        {
+            if checkpoint_exit_sha.replace(hash.into()).is_some() {
+                eprintln!("duplicate checkpoint exit-proof SHA-256");
                 exit(2);
             }
         } else if arg == "--qualification-checkpoint-on-pressure" {
@@ -20167,6 +20183,8 @@ async fn main() {
         let forbidden = horizon_output.is_some()
             || checkpoint_resume_report.is_some()
             || checkpoint_resume_sha.is_some()
+            || checkpoint_exit_proof.is_some()
+            || checkpoint_exit_sha.is_some()
             || checkpoint_export_directory.is_some()
             || checkpoint_on_pressure
             || qualification_end_slot.is_some()
@@ -20456,7 +20474,10 @@ async fn main() {
         );
         exit(2);
     }
-    let checkpoint_resume = if checkpoint_resume_report.is_some() || checkpoint_resume_sha.is_some()
+    let checkpoint_resume = if checkpoint_resume_report.is_some()
+        || checkpoint_resume_sha.is_some()
+        || checkpoint_exit_proof.is_some()
+        || checkpoint_exit_sha.is_some()
     {
         let result = (|| {
             qualification_checkpoint_resume::validate_mode(
@@ -20480,6 +20501,16 @@ async fn main() {
                 checkpoint_resume_sha
                     .as_deref()
                     .ok_or("checkpoint resume report SHA-256 is required")?,
+                checkpoint_continuation::Evidence {
+                    path: checkpoint_exit_proof
+                        .as_ref()
+                        .ok_or("checkpoint exit proof is required")?
+                        .clone(),
+                    sha256: checkpoint_exit_sha
+                        .as_ref()
+                        .ok_or("checkpoint exit-proof SHA-256 is required")?
+                        .clone(),
+                },
                 qualification.ok_or("checkpoint resume qualification missing")?,
                 snapshot_archive_override
                     .as_deref()

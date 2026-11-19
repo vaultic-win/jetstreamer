@@ -916,5 +916,22 @@ and establish the controller's process/cgroup checks only. They do not establish
 a full parent firehose pressure lifecycle or a usable mainnet checkpoint.
 Evidence: `/home/ubuntu/.codex/diagnostics/horizon-pressure-exit-20261119-v1`,
 deployment `/var/lib/jetstreamer/horizon-pressure-exit-20261119-v1`.
-The next integration must bind this exit receipt into resume/controller recovery
-and qualify the whole source-pressure, export, exit, restore and assembly path.
+Private resume now requires `--qualification-checkpoint-exit-proof=SEALED-PROOF`
+and `--qualification-checkpoint-exit-proof-sha256=HEX` in addition to the paused
+report. Before rereading archive bodies it validates the immutable proof and its
+separately sealed original plan, the qualified helper digest, exact paused-report
+digest, epoch, producer PID/invocation, stable clean terminal state and empty
+cgroup observations. It also rechecks that the recorded worker PID is absent.
+The paused report may be copied into an immutable deployment; content binding is
+preserved through the original path and digest in the sealed exit plan. Ordinary
+replay and other recovery modes cannot borrow these flags. Complete bundle reread,
+native restore comparison, canonical terminal verification and fresh admission
+remain separate requirements.
+
+This integration passed 31 focused tests, a full-node test consuming the actual
+sealed native exit proof, and four CLI rejection probes for missing proof/hash,
+orphan proof and duplicate proof. Evidence is retained under
+`/home/ubuntu/.codex/diagnostics/horizon-pressure-exit-consumer-20261119-v1`.
+The whole source-pressure, export, parent/cgroup exit, fresh restore and assembly
+lifecycle still needs qualification; accepting a standalone exit receipt does not
+establish that a usable mainnet checkpoint exists.
