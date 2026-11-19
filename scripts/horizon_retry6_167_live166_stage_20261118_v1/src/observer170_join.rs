@@ -265,7 +265,10 @@ fn producer_shape(
             && p["producer_invocation_id"] == iid
             && current["Id"] == UNIT
             && current["InvocationID"] == iid
-            && current["MainPID"] == pid.to_string()
+            && current["MainPID"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                == Some(pid)
             && current["ActiveState"] == "active"
             && current["SubState"] == "running"
             && current["NRestarts"] == "0"
@@ -273,7 +276,10 @@ fn producer_shape(
             && current["Job"] == ""
             && current["Result"] == "success"
             && original["InvocationID"] == iid
-            && original["MainPID"] == pid.to_string()
+            && original["MainPID"]
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                == Some(pid)
             && current["ExecMainStartTimestampMonotonic"]
                 == original["ExecMainStartTimestampMonotonic"],
         "actual guarded epoch170 identity differs"
@@ -459,10 +465,13 @@ pub fn validate_sample(row: &Value, owner: &Value) -> Result<()> {
             && row["producer_after"]["unit"] == UNIT
             && row["producer_after"]["invocation_id"] == owner["unit"]["InvocationID"]
             && owner["unit"]["MainPID"]
-                == row["producer_after"]["main_pid"]
-                    .as_u64()
-                    .context("sample PID")?
-                    .to_string()
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                == Some(
+                    row["producer_after"]["main_pid"]
+                        .as_u64()
+                        .context("sample PID")?
+                )
             && row["producer_after"]["active_state"] == "active"
             && row["producer_after"]["restarts"] == 0
             && row["scratch_path"] == owner["scratch_path"],

@@ -40,14 +40,14 @@ const NODE_SHA: &str = "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b
 const GUARD_IMAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch170-retry6-live166retry7-data-guard-20261118-v1/guard";
 const GUARD_SHA: &str = "2572c20c10b1473a9438e8d08d4aaf6ccb06fa9aa47e3508fe90e6bcaddddc6b";
-const PREPARER_IMAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
+const PREPARER_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/prepare";
 const PREPARER_SHA: &str = env!("HORIZON_170_PREPARER_V3_SHA256");
 const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/prepare-v3/artifact-proof.json";
-const PREPARER_BUILD_PROOF_SHA: &str =
-    env!("HORIZON_170_PREPARER_V3_PROOF_SHA256");
+const PREPARER_BUILD_PROOF_SHA: &str = env!("HORIZON_170_PREPARER_V3_PROOF_SHA256");
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
+const GUARD_PLAN_PARENT: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/guard-plans";
 
 fn now() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
@@ -517,22 +517,73 @@ fn actual_guard_plan(prepared: &Value, producer: &Value) -> Result<Value> {
     guard_plan["invocation_id"] = json!(string(producer, "InvocationID")?);
     Ok(guard_plan)
 }
+fn guard_plan_destination(iid: &str) -> Result<String> {
+    ensure!(
+        iid.len() == 32
+            && iid
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            && iid.bytes().any(|byte| byte != b'0'),
+        "actual lowercase native producer invocation required for guard destination"
+    );
+    Ok(format!("{GUARD_PLAN_PARENT}/guard-{iid}"))
+}
+fn guard_directory_identity(metadata: &fs::Metadata) -> Value {
+    json!([
+        metadata.dev(),
+        metadata.ino(),
+        metadata.uid(),
+        metadata.gid(),
+        metadata.mode()
+    ])
+}
+fn guard_plan_parent() -> Result<(File, Value)> {
+    let path = Path::new(GUARD_PLAN_PARENT);
+    directory(path)?;
+    let before = fs::symlink_metadata(path)?;
+    ensure!(
+        before.dev() == fs::metadata("/home/sol")?.dev(),
+        "guard plan parent is not on the home filesystem"
+    );
+    let handle = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_DIRECTORY | libc::O_CLOEXEC)
+        .open(path)?;
+    let identity = guard_directory_identity(&before);
+    ensure!(
+        guard_directory_identity(&handle.metadata()?) == identity
+            && guard_directory_identity(&fs::symlink_metadata(path)?) == identity,
+        "guard plan parent changed while opening"
+    );
+    Ok((handle, identity))
+}
+fn guard_plan_parent_unchanged(handle: &File, identity: &Value) -> Result<()> {
+    directory(Path::new(GUARD_PLAN_PARENT))?;
+    let current = fs::symlink_metadata(GUARD_PLAN_PARENT)?;
+    ensure!(
+        current.dev() == fs::metadata("/home/sol")?.dev()
+            && guard_directory_identity(&current) == *identity
+            && guard_directory_identity(&handle.metadata()?) == *identity,
+        "guard plan parent identity or home filesystem changed"
+    );
+    Ok(())
+}
 fn seal_guard(
     prepared: &Value,
     producer: &Value,
     dir: &Path,
 ) -> Result<(String, String, Vec<String>)> {
+    let (parent_handle, parent_identity) = guard_plan_parent()?;
     let guard_plan = actual_guard_plan(prepared, producer)?;
     let guard_bound = write_json(dir, "ACTUAL_GUARD_PLAN.json", &guard_plan)?;
     let plan_sha = string(&guard_bound, "sha256")?.to_string();
     let iid = string(producer, "InvocationID")?;
-    let destination = format!(
-        "/usr/local/lib/jetstreamer/horizon-replacement170-local3retry6-guard-{iid}-20261118-v1"
-    );
-    ensure!(
-        !Path::new(&destination).exists(),
-        "guard package destination already exists"
-    );
+    let destination = guard_plan_destination(iid)?;
+    match fs::symlink_metadata(&destination) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error).context("guard destination metadata"),
+        Ok(_) => bail!("guard package destination already exists"),
+    }
     let seal_plan = json!({"schema":"jetstreamer-sealed-deployment-plan-v1","destination":destination,
         "members":[{"source":string(&guard_bound,"path")?,"name":"guard-plan.json","sha256":plan_sha,"mode":292}]});
     let seal_bound = write_json(dir, "GUARD_SEAL_PLAN.json", &seal_plan)?;
@@ -544,6 +595,7 @@ fn seal_guard(
         "--self-sha256".into(),
         SEALER_SHA.into(),
     ];
+    guard_plan_parent_unchanged(&parent_handle, &parent_identity)?;
     command(
         &argv,
         dir,
@@ -551,6 +603,16 @@ fn seal_guard(
         Duration::from_secs(5),
         Some(0o022),
     )?;
+    guard_plan_parent_unchanged(&parent_handle, &parent_identity)?;
+    let destination_metadata = fs::symlink_metadata(&destination)?;
+    ensure!(
+        destination_metadata.is_dir()
+            && destination_metadata.uid() == 0
+            && destination_metadata.mode() & 0o022 == 0
+            && destination_metadata.dev() == parent_handle.metadata()?.dev()
+            && Path::new(&destination).canonicalize()? == Path::new(&destination),
+        "sealed guard directory identity or home placement differs"
+    );
     let sealed = format!("{destination}/guard-plan.json");
     ensure!(
         digest(&read_regular(Path::new(&sealed), 1 << 20, true)?) == plan_sha,
@@ -678,6 +740,7 @@ fn live_peer(prepared: &Value) -> Result<Value> {
     Ok(json!({"166":first,"167":second}))
 }
 fn preflight(plan: &Value, at: u64) -> Result<(Value, Value)> {
+    let _ = guard_plan_parent()?;
     ensure!(
         plan["schema"] == "horizon-retry6-single170-launch-plan-v1"
             && plan["owner"] == "/root"
@@ -938,10 +1001,16 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     // The identity stays constant across epoch transitions; storage does not.
     // Re-sample the exact archive, working allocation and DATA immediately before launch.
     let mut final_capacity = local_capacity(prepared)?;
-    ensure!(final_capacity["audit_native"] == capacity["audit_native"],
-        "audit owner changed during final home capacity check");
+    ensure!(
+        final_capacity["audit_native"] == capacity["audit_native"],
+        "audit owner changed during final home capacity check"
+    );
     final_capacity["revalidated_unix_seconds"] = json!(now()?);
-    let final_capacity_bound = write_json(output_root, "FINAL_PRELAUNCH_HOME_CAPACITY.json", &final_capacity)?;
+    let final_capacity_bound = write_json(
+        output_root,
+        "FINAL_PRELAUNCH_HOME_CAPACITY.json",
+        &final_capacity,
+    )?;
     ensure!(
         holding_budget::observe()? == capacity["holding_native"],
         "holding changed since additive admission"
@@ -1056,7 +1125,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     attempt
 }
 const LAUNCH_IMAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v5/launch";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v6/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),
@@ -1103,16 +1172,39 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn successor_v4_rejects_all_predecessor_destinations() {
+    fn successor_v6_rejects_all_predecessor_destinations() {
         require_launch_image(Path::new(LAUNCH_IMAGE)).unwrap();
         for path in [
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-20261119-v1/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v1/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v2/launch",
             "/usr/local/lib/jetstreamer/horizon-retry6-single170-launch-live166retry8-20261119-v3/launch",
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-v5/launch",
             "/tmp/launch",
         ] {
             assert!(require_launch_image(Path::new(path)).is_err());
+        }
+    }
+    #[test]
+    fn guard_destination_requires_exact_native_identity_and_home_parent() {
+        let iid = "0123456789abcdef0123456789abcdef";
+        let destination = guard_plan_destination(iid).unwrap();
+        assert_eq!(destination, format!("{GUARD_PLAN_PARENT}/guard-{iid}"));
+        assert_eq!(
+            Path::new(&destination).parent(),
+            Some(Path::new(GUARD_PLAN_PARENT))
+        );
+        for invalid in [
+            "".to_owned(),
+            "0".repeat(32),
+            iid.to_uppercase(),
+            format!("{iid}/../foreign"),
+            format!("/{iid}"),
+            format!("{iid}\n"),
+            "a".repeat(31),
+            "a".repeat(33),
+        ] {
+            assert!(guard_plan_destination(&invalid).is_err());
         }
     }
     #[test]
