@@ -20,6 +20,10 @@ use std::{
 pub struct Config {
     pub schema: String,
     pub state_directory: PathBuf,
+    /// Optional separately admitted archive-only filesystem. Evidence, source,
+    /// builds and sealed readers stay on the existing state filesystem.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_scratch: Option<ExternalScratch>,
     pub repository: String,
     pub cargo: PathBuf,
     pub rustc: PathBuf,
@@ -37,6 +41,16 @@ pub struct Config {
     pub build_timeout_seconds: u64,
     pub wait_seconds: u64,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalScratch {
+    pub directory: PathBuf,
+    pub device: u64,
+    pub inode: u64,
+    pub reserve_bytes: u64,
+}
+
 impl Config {
     fn validate(&self) -> Result<()> {
         ensure!(
@@ -51,6 +65,21 @@ impl Config {
             &self.git_home,
         ] {
             validate_absolute(p)?;
+        }
+        if let Some(scratch) = &self.external_scratch {
+            validate_absolute(&scratch.directory)?;
+            ensure!(
+                scratch.reserve_bytes > 0
+                    && scratch.device > 0
+                    && scratch.inode > 0
+                    && !scratch.directory.starts_with(&self.state_directory)
+                    && !self.state_directory.starts_with(&scratch.directory),
+                "external scratch needs disjoint custody and explicit positive reserve"
+            );
+            scratch
+                .reserve_bytes
+                .checked_add(self.max_archive_bytes)
+                .context("external scratch budget overflow")?;
         }
         ensure!(
             matches!(
@@ -91,6 +120,66 @@ impl Config {
             .context("resource budget overflow")?;
         Ok(())
     }
+
+    fn scratch_directory(&self) -> PathBuf {
+        self.external_scratch.as_ref().map_or_else(
+            || self.state_directory.join("scratch"),
+            |scratch| scratch.directory.clone(),
+        )
+    }
+
+    fn require_runtime_space(&self, archive_additional: u64) -> Result<()> {
+        if let Some(scratch) = &self.external_scratch {
+            validate_external_scratch(scratch, &self.state_directory)?;
+            require_space(&self.state_directory, self.reserve_bytes, 0)?;
+            require_space(
+                &scratch.directory,
+                scratch.reserve_bytes,
+                archive_additional,
+            )
+        } else {
+            require_space(
+                &self.state_directory,
+                self.reserve_bytes,
+                archive_additional,
+            )
+        }
+    }
+
+    fn require_download_capacity(&self, archive_bytes: u64) -> Result<()> {
+        ensure!(
+            archive_bytes <= self.max_archive_bytes,
+            "archive {archive_bytes} exceeds max_archive_bytes {}; operator must increase admitted config budget",
+            self.max_archive_bytes
+        );
+        let remaining = remaining_working_budget(&self.state_directory, self.build_reserve_bytes)?;
+        let (state_additional, scratch_additional) =
+            download_reservations(archive_bytes, remaining, self.external_scratch.is_some())?;
+        if let Some(scratch) = &self.external_scratch {
+            validate_external_scratch(scratch, &self.state_directory)?;
+            require_space(&self.state_directory, self.reserve_bytes, state_additional)?;
+            require_space(
+                &scratch.directory,
+                scratch.reserve_bytes,
+                scratch_additional,
+            )
+        } else {
+            require_space(&self.state_directory, self.reserve_bytes, state_additional)
+        }
+    }
+}
+
+fn download_reservations(archive: u64, remaining_work: u64, separate: bool) -> Result<(u64, u64)> {
+    if separate {
+        Ok((remaining_work, archive))
+    } else {
+        Ok((
+            archive
+                .checked_add(remaining_work)
+                .context("capacity overflow")?,
+            0,
+        ))
+    }
 }
 pub fn canonical_epoch(key: &str) -> Option<u64> {
     let value = key.strip_prefix("epoch-")?.strip_suffix(".jet")?;
@@ -128,6 +217,7 @@ pub fn progress(
             "schema":"horizon-r2-chronological-audit-progress-v1", "updated_at":now(), "pid":std::process::id(),
             "phase":phase, "epoch":epoch, "downloaded_bytes":bytes, "archive_bytes":total, "detail":detail,
             "reserve_bytes":cfg.reserve_bytes, "max_archive_bytes":cfg.max_archive_bytes,
+            "scratch_directory":cfg.scratch_directory(), "external_scratch":cfg.external_scratch,
             "next_capacity_check_at": if phase == "waiting_for_capacity" || phase == "waiting_for_reader" { Some(now()+cfg.wait_seconds) } else { None },
             "remote_mutations":false
         }),
@@ -222,17 +312,7 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
     // infrastructure trouble waits; it is not recorded as archive corruption.
     let mut sequence = 0;
     loop {
-        let capacity = remaining_working_budget(&cfg.state_directory, cfg.build_reserve_bytes)
-            .and_then(|remaining| {
-                require_space(
-                    &cfg.state_directory,
-                    cfg.reserve_bytes,
-                    object
-                        .bytes
-                        .checked_add(remaining)
-                        .context("capacity overflow")?,
-                )
-            });
+        let capacity = cfg.require_download_capacity(object.bytes);
         if let Err(error) = capacity {
             wait(
                 cfg,
@@ -241,10 +321,6 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
                 &error.to_string(),
             )
             .await?;
-            continue;
-        }
-        if object.bytes > cfg.max_archive_bytes {
-            wait(cfg,"waiting_for_capacity",object.epoch,&format!("archive {} exceeds max_archive_bytes {}; operator must increase admitted config budget", object.bytes,cfg.max_archive_bytes)).await?;
             continue;
         }
         progress(
@@ -283,7 +359,7 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
         progress(cfg,"downloading",Some(object.epoch),0,Some(object.bytes),None)?;
         let download = remote.download(cfg, object, &attempt).await?;
         outcome.download = Some(download.clone());
-        let archive = cfg.state_directory.join("scratch").join(&object.key);
+        let archive = cfg.scratch_directory().join(&object.key);
         // Re-fetch immediately before playback. If relevant reader changes land
         // during playback, repeat the whole epoch with that current build.
         loop {
@@ -296,7 +372,7 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
                 }
             };
             let native_report = attempt.join(format!("native-playback-{sequence}.json"));
-            let args = vec![format!("{}:{}",object.epoch,object.epoch), cfg.state_directory.join("scratch").to_string_lossy().into_owned(),
+            let args = vec![format!("{}:{}",object.epoch,object.epoch), cfg.scratch_directory().to_string_lossy().into_owned(),
                 "--threads".into(), cfg.threads.to_string(), "--verify-only".into(),
                 "--verification-report".into(), native_report.to_string_lossy().into_owned()];
             let mut invocation = vec![reader.artifact.to_string_lossy().into_owned()]; invocation.extend(args.clone());
@@ -304,12 +380,12 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
                 "environment":{"PATH":"/usr/bin:/bin","LC_ALL":"C","RUST_LOG":"info","RUST_MIN_STACK":"67108864"},"other_environment_removed":true}), false)?;
             progress(cfg,"playing_entire_epoch",Some(object.epoch),object.bytes,Some(object.bytes),None)?;
             let mut command = clean_command(&reader.artifact); command.args(&args);
-            command.current_dir(cfg.state_directory.join("scratch"));
+            command.current_dir(cfg.scratch_directory());
             let log = attempt.join(format!("playback-{sequence}.log"));
             outcome.reader = Some(reader.clone()); outcome.invocation = invocation;
-            ensure!(run_logged(command,&log,cfg.playback_timeout_seconds,cfg.max_log_bytes,&cfg.state_directory,cfg.reserve_bytes,cfg.build_reserve_bytes)?, "plugin playback exited unsuccessfully");
+            ensure!(run_logged(command,&log,cfg.playback_timeout_seconds,cfg.max_log_bytes,cfg)?, "plugin playback exited unsuccessfully");
             let mut report = evidence::validate_playback(&log,object.epoch,cfg.threads,cfg.max_log_bytes)?;
-            evidence::validate_native_report(&native_report, &mut report, &outcome.invocation, &cfg.state_directory.join("scratch"))?;
+            evidence::validate_native_report(&native_report, &mut report, &outcome.invocation, &cfg.scratch_directory())?;
             let owned: OwnedScratch = read_json(&cfg.state_directory.join("scratch-owner.json"))?;
             owned.identity.check(&archive)?;
             ensure!(hash_file(&archive)? == download.sha256, "audit archive changed during playback");
@@ -338,7 +414,7 @@ async fn audit_one(cfg: &Config, remote: &Remote, object: &Object) -> Result<()>
     // The immutable terminal receipt is committed before the only archive
     // deletion this program performs (its own download).
     write_json(&outcome_path(cfg, object.epoch), &outcome, false)?;
-    cleanup_scratch(&cfg.state_directory)?;
+    cleanup_scratch(cfg)?;
     write_json(
         &attempt.join("cleanup.json"),
         &json!({"at":now(),"removed_only_owned_audit_copy":true,"epoch":object.epoch}),
@@ -384,10 +460,26 @@ async fn main() -> Result<()> {
         budget_update.reserve_bytes = cfg.reserve_bytes;
         budget_update.max_archive_bytes = cfg.max_archive_bytes;
         budget_update.build_reserve_bytes = cfg.build_reserve_bytes;
+        budget_update.external_scratch = cfg.external_scratch.clone();
         ensure!(
             budget_update == cfg,
-            "reconfigure permits only resource budget changes; retain state/tool/source identity"
+            "reconfigure permits only resource budgets and idle scratch relocation; retain state/tool/source identity"
         );
+        let _old_scratch_lock = lock_external_scratch(&old)?;
+        let same_directory = old
+            .external_scratch
+            .as_ref()
+            .map(|s| (&s.directory, s.device, s.inode))
+            == cfg
+                .external_scratch
+                .as_ref()
+                .map(|s| (&s.directory, s.device, s.inode));
+        let _new_scratch_lock = if same_directory {
+            None
+        } else {
+            lock_external_scratch(&cfg)?
+        };
+        require_idle_scratch_change(&old, &cfg)?;
         write_json(
             &cfg.state_directory
                 .join(format!("config-change-{}.json", nonce())),
@@ -405,6 +497,7 @@ async fn main() -> Result<()> {
     } else {
         write_json(&config_path, &cfg, false)?;
     }
+    let _scratch_lock = lock_external_scratch(&cfg)?;
     let remote = Remote::from_env()?;
     let inventory_path = cfg.state_directory.join("inventory.json");
     let inventory: Inventory = if inventory_path.try_exists()? {
@@ -454,7 +547,7 @@ async fn main() -> Result<()> {
             false,
         )?;
     }
-    cleanup_scratch(&cfg.state_directory)?;
+    cleanup_scratch(&cfg)?;
     for object in &inventory.objects {
         if !finished(&cfg, object)? {
             audit_one(&cfg, &remote, object).await?;
@@ -482,6 +575,48 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn split_scratch_preserves_root_work_and_charges_archive_once() {
+        let archive = 385_290_386_716;
+        let remaining_work = 9_000_000_000;
+        assert_eq!(
+            download_reservations(archive, remaining_work, true).unwrap(),
+            (remaining_work, archive)
+        );
+        assert_eq!(
+            download_reservations(archive, remaining_work, false).unwrap(),
+            (archive + remaining_work, 0)
+        );
+        assert!(download_reservations(u64::MAX, 1, false).is_err());
+    }
+    #[test]
+    fn legacy_config_defaults_to_original_scratch() {
+        let cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        assert!(cfg.external_scratch.is_none());
+        assert_eq!(cfg.scratch_directory(), cfg.state_directory.join("scratch"));
+        assert!(
+            serde_json::to_value(&cfg)
+                .unwrap()
+                .get("external_scratch")
+                .is_none()
+        );
+    }
+    #[test]
+    fn scratch_config_rejects_overlap_and_unbounded_reservation() {
+        let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
+        cfg.external_scratch = Some(ExternalScratch {
+            directory: cfg.state_directory.join("scratch"),
+            device: 64512,
+            inode: 123,
+            reserve_bytes: 1,
+        });
+        assert!(cfg.validate().is_err());
+        cfg.external_scratch.as_mut().unwrap().directory = PathBuf::from("/separate-audit-scratch");
+        cfg.external_scratch.as_mut().unwrap().reserve_bytes = 0;
+        assert!(cfg.validate().is_err());
+        cfg.external_scratch.as_mut().unwrap().reserve_bytes = u64::MAX;
+        assert!(cfg.validate().is_err());
+    }
     #[test]
     fn canonical_filter_and_numeric_order() {
         let mut epochs: Vec<_> = [

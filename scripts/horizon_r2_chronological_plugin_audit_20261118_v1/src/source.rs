@@ -242,9 +242,7 @@ pub fn fetch(cfg: &Config, attempt: &Path, seq: u64) -> Result<String> {
             &attempt.join(format!("fetch-{seq}.log")),
             600,
             cfg.max_log_bytes,
-            &cfg.state_directory,
-            cfg.reserve_bytes,
-            cfg.build_reserve_bytes
+            cfg
         )?,
         "account-updates fetch failed"
     );
@@ -320,15 +318,7 @@ fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, Strin
     ]);
     let metadata_path = attempt.join(format!("cargo-metadata-{}.json", nonce()));
     ensure!(
-        run_logged(
-            command,
-            &metadata_path,
-            600,
-            32 * 1024 * 1024,
-            &cfg.state_directory,
-            cfg.reserve_bytes,
-            cfg.build_reserve_bytes
-        )?,
+        run_logged(command, &metadata_path, 600, 32 * 1024 * 1024, cfg)?,
         "Cargo metadata failed; inspect bounded metadata log"
     );
     let file = open_read(&metadata_path)?;
@@ -457,9 +447,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
             &attempt.join(format!("build-{seq}.log")),
             cfg.build_timeout_seconds,
             cfg.max_log_bytes,
-            &cfg.state_directory,
-            cfg.reserve_bytes,
-            cfg.build_reserve_bytes
+            cfg
         )?,
         "current account-updates reader build failed"
     );
@@ -523,9 +511,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
             &attempt.join(format!("reader-seal-{generation}.log")),
             300,
             cfg.max_log_bytes,
-            &cfg.state_directory,
-            cfg.reserve_bytes,
-            cfg.build_reserve_bytes
+            cfg
         )?,
         "root reader deployment sealing failed"
     );
@@ -539,15 +525,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
     probe.arg("--archive-capacity-probe");
     let capacity_path = attempt.join(format!("capacity-{seq}.json"));
     ensure!(
-        run_logged(
-            probe,
-            &capacity_path,
-            120,
-            1024 * 1024,
-            &cfg.state_directory,
-            cfg.reserve_bytes,
-            cfg.build_reserve_bytes
-        )?,
+        run_logged(probe, &capacity_path, 120, 1024 * 1024, cfg)?,
         "sealed reader capability probe failed"
     );
     let capacity: Value = read_json(&capacity_path)?;
@@ -602,7 +580,11 @@ mod tests {
         let mut cfg: Config = serde_json::from_str(include_str!("../config.example.json")).unwrap();
         cfg.state_directory = state.path().to_owned();
         cfg.cargo = "/usr/bin/mktemp".into();
-        let output = cargo(&cfg, state.path()).unwrap().arg("-d").output().unwrap();
+        let output = cargo(&cfg, state.path())
+            .unwrap()
+            .arg("-d")
+            .output()
+            .unwrap();
         assert!(output.status.success());
         let created = PathBuf::from(String::from_utf8(output.stdout).unwrap().trim());
         assert_eq!(created.parent().unwrap(), state.path().join("build-tmp"));
