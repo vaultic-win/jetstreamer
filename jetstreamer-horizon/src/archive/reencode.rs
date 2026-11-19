@@ -383,10 +383,60 @@ where
 /// Source/output semantic digests differ only when epoch range metadata is
 /// narrowed; the output digest is suitable for an independent output reread.
 pub fn reencode_archive_prefix<R, W>(
+    source: R,
+    sink: W,
+    writer_config: ArchiveWriterConfig,
+    prefix_slot_count: u64,
+) -> Result<(W, ReencodeStats), ArchiveFormatError>
+where
+    R: Read + Seek,
+    W: Write,
+{
+    reencode_prefix_inner(source, sink, writer_config, prefix_slot_count, None)
+}
+
+/// Converts an explicitly closed checkpoint source into a dense private V2
+/// prefix. The source still declares its original, longer range, but must
+/// contain exactly every frame through the checkpoint and nothing beyond it.
+/// Unlike [`reencode_archive_prefix`], this reads every source bucket in full
+/// and rejects missing, extra, or sparse coverage. Its final frame must be a
+/// block with the supplied frozen checkpoint's last blockhash.
+///
+/// This does not recover a torn archive, prove native snapshot equality or
+/// full PoH, or authorize publication/resume. The caller must drain and freeze
+/// the producer, close/fsync the source, authenticate its immutable identity,
+/// and independently validate the fresh no-clobber output and checkpoint.
+pub fn reencode_closed_checkpoint_prefix<R, W>(
+    source: R,
+    sink: W,
+    writer_config: ArchiveWriterConfig,
+    prefix_slot_count: u64,
+    terminal_blockhash: Hash,
+) -> Result<(W, ReencodeStats), ArchiveFormatError>
+where
+    R: Read + Seek,
+    W: Write,
+{
+    if terminal_blockhash == Hash::default() {
+        return Err(ArchiveFormatError::InvalidContainerLayout(
+            "closed checkpoint requires a nonzero terminal blockhash",
+        ));
+    }
+    reencode_prefix_inner(
+        source,
+        sink,
+        writer_config,
+        prefix_slot_count,
+        Some(terminal_blockhash),
+    )
+}
+
+fn reencode_prefix_inner<R, W>(
     mut source: R,
     sink: W,
     writer_config: ArchiveWriterConfig,
     prefix_slot_count: u64,
+    closed_terminal: Option<Hash>,
 ) -> Result<(W, ReencodeStats), ArchiveFormatError>
 where
     R: Read + Seek,
@@ -400,12 +450,26 @@ where
         || writer_config.format != super::ArchiveVersion::V2
         || prefix_slot_count == 0
         || prefix_slot_count >= header.slot_count
-        || !reader.has_complete_slot_coverage()?
     {
         return Err(invalid(
-            "prefix export requires a dense V2 source and a nonempty proper V2 prefix",
+            "prefix export requires a nonempty proper V2 prefix of a V2 source",
         ));
     }
+    if closed_terminal.is_none() && !reader.has_complete_slot_coverage()? {
+        return Err(invalid("prefix export requires a dense complete source"));
+    }
+    if closed_terminal.is_some()
+        && u64::try_from(reader.bucket_count()).ok()
+            != Some(prefix_slot_count.div_ceil(u64::from(header.bucket_slots)))
+    {
+        return Err(invalid(
+            "closed checkpoint source has missing or extra buckets",
+        ));
+    }
+    let end = header
+        .slot_start
+        .checked_add(prefix_slot_count)
+        .ok_or(invalid("prefix range overflow"))?;
     let Some(super::ArchiveProvenance::V2(mut provenance)) = reader.provenance()? else {
         return Err(invalid(
             "prefix export requires uninterrupted single-runtime V2 provenance",
@@ -448,7 +512,31 @@ where
         ));
         visitor.prefix_next_slot = Some(header.slot_start);
         visitor.prefix_last_blockhash = Some(anchor);
-        let slots = reader.read_slots(header.slot_start, prefix_slot_count, &mut visitor)?;
+        let slots = if closed_terminal.is_some() {
+            let mut slots = 0;
+            for index in 0..reader.bucket_count() {
+                let first = header.slot_start + slots;
+                let count = (end - first).min(u64::from(header.bucket_slots));
+                slots +=
+                    reader.read_bucket_with_header(index, &mut visitor, |bucket, visitor| {
+                        if bucket.first_slot != first
+                            || u64::from(bucket.slot_count) != count
+                            || Some(bucket.poh_start_hash) != visitor.prefix_last_blockhash
+                        {
+                            return Err(invalid(
+                                "closed checkpoint bucket range or anchor mismatch",
+                            ));
+                        }
+                        Ok(())
+                    })?;
+                if let Some(error) = visitor.error.take() {
+                    return Err(error);
+                }
+            }
+            slots
+        } else {
+            reader.read_slots(header.slot_start, prefix_slot_count, &mut visitor)?
+        };
         if let Some(error) = visitor.error.take() {
             return Err(error);
         }
@@ -458,16 +546,20 @@ where
         if visitor.prefix_first_block_slot.is_some() && !visitor.prefix_epoch_seen {
             return Err(invalid("prefix source first block has no epoch metadata"));
         }
+        if let Some(terminal) = closed_terminal {
+            if visitor.prefix_next_slot != Some(end)
+                || visitor.prefix_last_block_slot != Some(end - 1)
+                || visitor.prefix_last_blockhash != Some(terminal)
+            {
+                return Err(invalid("closed checkpoint terminal block mismatch"));
+            }
+        }
         (
             slots,
             visitor.source_digest.finish()?,
             visitor.output_digest.finish()?,
         )
     };
-    let end = header
-        .slot_start
-        .checked_add(prefix_slot_count)
-        .ok_or(invalid("prefix range overflow"))?;
     let selected = reader
         .bucket_index()
         .iter()
@@ -758,6 +850,7 @@ struct ReencodeVisitor<'a, W: Write> {
     prefix_range: Option<(u64, u64, u64, u64)>,
     prefix_next_slot: Option<u64>,
     prefix_last_blockhash: Option<Hash>,
+    prefix_last_block_slot: Option<u64>,
     prefix_epoch_seen: bool,
     prefix_first_block_slot: Option<u64>,
 }
@@ -775,6 +868,7 @@ impl<'a, W: Write> ReencodeVisitor<'a, W> {
             prefix_range: None,
             prefix_next_slot: None,
             prefix_last_blockhash: None,
+            prefix_last_block_slot: None,
             prefix_epoch_seen: false,
             prefix_first_block_slot: None,
         }
@@ -934,6 +1028,7 @@ impl<W: Write> SlotVisitor for ReencodeVisitor<'_, W> {
                 return;
             }
             self.prefix_last_blockhash = Some(meta.blockhash);
+            self.prefix_last_block_slot = Some(meta.slot);
         }
         self.source_digest.record_block(notification, entries, None);
         if let BlockNotification::Block(meta) = notification {

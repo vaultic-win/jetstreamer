@@ -28,8 +28,9 @@ use jetstreamer_horizon::{
         ArchiveProvenanceV3, ArchiveProvenanceV4, ArchiveReader, ArchiveWriterConfig,
         BootstrapStateKind, ChainMismatchPolicy, EpochMeta, RuntimeAdmission,
         RuntimeHandoffProvenance, RuntimeSegmentProvenance, RuntimeSegmentSource,
-        RuntimeStateCheckpoint, SlotVisitor, StateCommitment, StateCommitmentKind,
+        RuntimeStateCheckpoint, SemanticDigest, SlotVisitor, StateCommitment, StateCommitmentKind,
         TransactionMetadataPolicy, WriteVersionNormalization, merge_checkpoint_restart_segments,
+        reencode_closed_checkpoint_prefix,
     },
     transactions::Transaction,
 };
@@ -189,6 +190,14 @@ fn segment(
     results: &[EntryProcessed],
 ) -> Result<()> {
     let slot = end.slot;
+    let early_prefix = start.slot == 0
+        && std::env::var_os("JETSTREAMER_NATIVE_EARLY_PREFIX").as_deref() == Some("1".as_ref());
+    let declared_count = if early_prefix { 3 } else { 1 };
+    let source_path = if early_prefix {
+        path.with_extension("closed-source.jet")
+    } else {
+        path.to_owned()
+    };
     require(
         slot == start.slot + 1 && entries.len() == results.len() && !entries.is_empty(),
         "fixture extent mismatch",
@@ -211,22 +220,22 @@ fn segment(
             bootstrap_slot: start.slot,
             bootstrap_state_hash: hash(&start.accounts_hash)?,
             requested_slot_start: slot,
-            requested_slot_count: 1,
+            requested_slot_count: declared_count,
             transaction_metadata: TransactionMetadataPolicy::runtime_reconstructed_before(u64::MAX),
         },
         worker_executable_sha256: image,
     };
     let presence = Arc::new(SlotPresenceMap {
         start: slot,
-        end_inclusive: slot,
-        states: vec![SlotPresenceState::Present],
-        next_present_after: vec![None],
+        end_inclusive: slot + declared_count - 1,
+        states: vec![SlotPresenceState::Present; declared_count as usize],
+        next_present_after: vec![None; declared_count as usize],
     });
     horizon::init(
-        path,
+        &source_path,
         0,
         slot,
-        1,
+        declared_count,
         presence,
         &p.into(),
         Some((start.slot, hash(&start.last_blockhash)?)),
@@ -301,8 +310,46 @@ fn segment(
     for write in &end.writes {
         emit(write)?;
     }
-    let stats =
-        horizon::finish_checkpoint_segment(&checkpoint(end)?)?.ok_or("missing recorder stats")?;
+    let stats = if early_prefix {
+        let stats = horizon::close_checkpoint_prefix_source(&checkpoint(end)?)?
+            .ok_or("missing recorder stats")?;
+        let source_digest = digest(&source_path)?;
+        let mut source = ArchiveReader::open(File::open(&source_path)?)?;
+        require(
+            !source.has_complete_slot_coverage()?,
+            "early source falsely complete",
+        )?;
+        let (output, transformed) = reencode_closed_checkpoint_prefix(
+            File::open(&source_path)?,
+            create(path)?,
+            ArchiveWriterConfig::default(),
+            1,
+            hash(&end.last_blockhash)?,
+        )?;
+        output.sync_all()?;
+        File::open(path.parent().ok_or("missing output parent")?)?.sync_all()?;
+        let mut reader = ArchiveReader::open(File::open(path)?)?;
+        require(
+            reader.has_complete_slot_coverage()?,
+            "narrowed prefix incomplete",
+        )?;
+        let mut semantic = SemanticDigest::new();
+        require(
+            reader.read_slots(slot, 1, &mut semantic)? == 1,
+            "prefix reread length",
+        )?;
+        require(
+            semantic.finish()? == transformed.output_semantic_sha256,
+            "prefix semantic reread differs",
+        )?;
+        require(
+            digest(&source_path)? == source_digest,
+            "closed source changed",
+        )?;
+        stats
+    } else {
+        horizon::finish_checkpoint_segment(&checkpoint(end)?)?.ok_or("missing recorder stats")?
+    };
     require(
         stats.slots == 1 && stats.blocks == 1,
         "recorder did not close exact segment",

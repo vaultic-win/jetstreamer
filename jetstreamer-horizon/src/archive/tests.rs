@@ -892,6 +892,10 @@ fn full_reencode_preserves_v3_provenance_bytes() {
 }
 
 fn prefix_export_source(anchor: Hash, epoch_count: u64) -> Vec<u8> {
+    closed_prefix_export_source(anchor, epoch_count, 7)
+}
+
+fn closed_prefix_export_source(anchor: Hash, epoch_count: u64, actual_count: u64) -> Vec<u8> {
     let mut base = sample_archive_provenance_v1();
     base.requested_slot_count = 7;
     let provenance = ArchiveProvenance::V2(ArchiveProvenanceV2 {
@@ -914,7 +918,7 @@ fn prefix_export_source(anchor: Hash, epoch_count: u64) -> Vec<u8> {
     writer.preserve_initial_poh_anchor(432_000, anchor).unwrap();
     let mut parent = anchor;
     // Leading skipped slots exercise propagation of the source bucket anchor.
-    for offset in 0..7 {
+    for offset in 0..actual_count {
         let slot = 432_000 + offset;
         if offset < 2 {
             writer.write_skipped_slot(slot).unwrap();
@@ -967,6 +971,127 @@ fn prefix_export_source(anchor: Hash, epoch_count: u64) -> Vec<u8> {
         parent = block.blockhash;
     }
     writer.finish().unwrap().0
+}
+
+#[test]
+fn closed_checkpoint_prefix_reads_every_source_frame_and_narrows_metadata() {
+    let anchor = Hash::new_from_array([0xa5; 32]);
+    // Include a cut exactly at a bucket boundary and inside the next bucket.
+    for count in [3, 4, 5, 6] {
+        let source = closed_prefix_export_source(anchor, 7, count);
+        let terminal = Hash::new_from_array([(count - 1) as u8; 32]);
+        let mut original = ArchiveReader::open(std::io::Cursor::new(&source)).unwrap();
+        assert!(!original.has_complete_slot_coverage().unwrap());
+        // The ordinary prefix API must continue rejecting unfinished sources.
+        assert!(
+            reencode_archive_prefix(
+                std::io::Cursor::new(&source),
+                Vec::new(),
+                ArchiveWriterConfig::default(),
+                count,
+            )
+            .is_err()
+        );
+        for bucket_slots in [1, 2, 4, 8] {
+            let (output, stats) = reencode_closed_checkpoint_prefix(
+                std::io::Cursor::new(&source),
+                Vec::new(),
+                ArchiveWriterConfig {
+                    bucket_slots,
+                    ..Default::default()
+                },
+                count,
+                terminal,
+            )
+            .unwrap();
+            let mut reader = ArchiveReader::open(std::io::Cursor::new(&output)).unwrap();
+            assert!(reader.has_complete_slot_coverage().unwrap());
+            assert_eq!(reader.header().slot_count, count);
+            assert_eq!(
+                reader
+                    .provenance()
+                    .unwrap()
+                    .unwrap()
+                    .requested_range()
+                    .unwrap(),
+                432_000..432_000 + count
+            );
+            assert_eq!(
+                read_all(&output, 432_000, count, true),
+                read_all(&source, 432_000, count, true)
+            );
+            assert_eq!(stats.slots_reencoded, count);
+            assert_eq!(stats.source_buckets, original.bucket_count() as u64);
+            assert_eq!(
+                stats.source_semantic_sha256,
+                archive_semantic_sha256(&source)
+            );
+            assert_eq!(
+                stats.output_semantic_sha256,
+                archive_semantic_sha256(&output)
+            );
+            assert_ne!(stats.source_semantic_sha256, stats.output_semantic_sha256);
+        }
+    }
+}
+
+#[test]
+fn closed_checkpoint_prefix_rejects_inexact_extent_checkpoint_and_source() {
+    let anchor = Hash::new_from_array([0xa5; 32]);
+    let terminal = Hash::new_from_array([4; 32]);
+    let check = |bytes: &[u8], count, hash| {
+        reencode_closed_checkpoint_prefix(
+            std::io::Cursor::new(bytes),
+            Vec::new(),
+            ArchiveWriterConfig::default(),
+            count,
+            hash,
+        )
+    };
+    // Missing and extra frames, including extra frames in the same bucket.
+    for actual_count in [2, 3, 4, 6, 7] {
+        assert!(
+            check(
+                &closed_prefix_export_source(anchor, 7, actual_count),
+                5,
+                terminal
+            )
+            .is_err()
+        );
+    }
+    let source = closed_prefix_export_source(anchor, 7, 5);
+    for count in [0, 4, 6, 7, u64::MAX] {
+        assert!(check(&source, count, terminal).is_err());
+    }
+    for hash in [Hash::default(), anchor] {
+        assert!(check(&source, 5, hash).is_err());
+    }
+    for (anchor, epoch_count) in [(Hash::default(), 7), (anchor, 6), (anchor, 0)] {
+        assert!(
+            check(
+                &closed_prefix_export_source(anchor, epoch_count, 5),
+                5,
+                terminal
+            )
+            .is_err()
+        );
+    }
+    assert!(check(&source[..source.len() - 1], 5, terminal).is_err());
+    let all_skipped = closed_prefix_export_source(anchor, 7, 2);
+    assert!(check(&all_skipped, 2, anchor).is_err());
+    assert!(
+        reencode_closed_checkpoint_prefix(
+            std::io::Cursor::new(&source),
+            Vec::new(),
+            ArchiveWriterConfig {
+                format: ArchiveVersion::V1,
+                ..Default::default()
+            },
+            5,
+            terminal,
+        )
+        .is_err()
+    );
 }
 
 #[test]

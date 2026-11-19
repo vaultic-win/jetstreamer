@@ -142,7 +142,7 @@ pub fn init(
 /// disabled. Clears the slot so the next epoch's [`init`] can install a fresh
 /// archive.
 pub fn finish() -> Result<Option<ArchiveStats>, String> {
-    finish_recorder(None)
+    finish_recorder(None, false)
 }
 
 /// Finalize an exact checkpoint segment and release its active recorder.
@@ -150,11 +150,20 @@ pub fn finish() -> Result<Option<ArchiveStats>, String> {
 pub fn finish_checkpoint_segment(
     checkpoint: &RuntimeStateCheckpoint,
 ) -> Result<Option<ArchiveStats>, String> {
-    finish_recorder(Some(checkpoint))
+    finish_recorder(Some(checkpoint), false)
+}
+
+/// Release the recorder after closing an explicitly incomplete checkpoint
+/// source. See [`HorizonRecorder::close_checkpoint_prefix_source`].
+pub fn close_checkpoint_prefix_source(
+    checkpoint: &RuntimeStateCheckpoint,
+) -> Result<Option<ArchiveStats>, String> {
+    finish_recorder(Some(checkpoint), true)
 }
 
 fn finish_recorder(
     checkpoint: Option<&RuntimeStateCheckpoint>,
+    close_prefix_source: bool,
 ) -> Result<Option<ArchiveStats>, String> {
     let recorder = RECORDER
         .write()
@@ -162,7 +171,13 @@ fn finish_recorder(
         .take();
     match (recorder, checkpoint) {
         (Some(recorder), Some(checkpoint)) => {
-            recorder.finish_checkpoint_segment(checkpoint).map(Some)
+            if close_prefix_source {
+                recorder
+                    .close_checkpoint_prefix_source(checkpoint)
+                    .map(Some)
+            } else {
+                recorder.finish_checkpoint_segment(checkpoint).map(Some)
+            }
         }
         (Some(recorder), None) => recorder.finish().map(Some),
         (None, _) => Ok(None),
@@ -719,7 +734,7 @@ impl HorizonRecorder {
     /// The caller must freeze the final replayed bank first so the last
     /// slot's post-transaction orphan updates have been recorded.
     pub fn finish(&self) -> Result<ArchiveStats, String> {
-        self.finish_inner(None)
+        self.finish_inner(None, false)
     }
 
     /// Close a predeclared segment only at its exact complete runtime
@@ -730,20 +745,45 @@ impl HorizonRecorder {
         &self,
         checkpoint: &RuntimeStateCheckpoint,
     ) -> Result<ArchiveStats, String> {
-        self.finish_inner(Some(checkpoint))
+        self.finish_inner(Some(checkpoint), false)
+    }
+
+    /// Close a private source at an earlier frozen block without filling the
+    /// unexecuted suffix with skipped frames. Its original header/provenance
+    /// remain unchanged, so this is deliberately NOT a complete archive.
+    /// Producers must be drained, including freeze writes, with no buffered
+    /// input beyond the checkpoint. Then re-encode through
+    /// `reencode_closed_checkpoint_prefix` into a new private dense segment
+    /// and independently validate it before binding any snapshot or resume.
+    pub fn close_checkpoint_prefix_source(
+        &self,
+        checkpoint: &RuntimeStateCheckpoint,
+    ) -> Result<ArchiveStats, String> {
+        self.finish_inner(Some(checkpoint), true)
     }
 
     fn finish_inner(
         &self,
         checkpoint: Option<&RuntimeStateCheckpoint>,
+        close_prefix_source: bool,
     ) -> Result<ArchiveStats, String> {
         let mut state = self.lock();
         if state.finished {
             return Err("horizon recorder already finished".to_string());
         }
         if let Some(checkpoint) = checkpoint {
-            if !checkpoint.slot_complete || checkpoint.slot != state.slot_end_inclusive {
-                return Err("checkpoint must complete the predeclared segment boundary".into());
+            let boundary_matches = if close_prefix_source {
+                checkpoint.slot >= state.slot_start && checkpoint.slot < state.slot_end_inclusive
+            } else {
+                checkpoint.slot == state.slot_end_inclusive
+            };
+            if !checkpoint.slot_complete || !boundary_matches {
+                return Err(if close_prefix_source {
+                    "checkpoint must complete a block inside the declared range"
+                } else {
+                    "checkpoint must complete the predeclared segment boundary"
+                }
+                .into());
             }
             if state.assemblies.keys().any(|slot| *slot > checkpoint.slot)
                 || state.block_metas.keys().any(|slot| *slot > checkpoint.slot)
@@ -770,7 +810,14 @@ impl HorizonRecorder {
             .last_emitted
             .map(|s| s + 1)
             .unwrap_or(state.slot_start);
-        for slot in next..=state.slot_end_inclusive {
+        let close_end = if close_prefix_source {
+            checkpoint
+                .expect("prefix closure requires a checkpoint")
+                .slot
+        } else {
+            state.slot_end_inclusive
+        };
+        for slot in next..=close_end {
             state.check_gap_slot_skipped(slot);
             state.writer.write_skipped_slot(slot).map_err(|err| {
                 format!("horizon: failed to write trailing skipped slot {slot}: {err}")
@@ -812,8 +859,13 @@ impl HorizonRecorder {
             .sync_all()
             .map_err(|err| format!("horizon: failed to sync archive directory: {err}"))?;
         info!(
-            "horizon archive complete: slots={} blocks={} txs={} tx_updates={} orphan_updates={} \
+            "horizon {}: slots={} blocks={} txs={} tx_updates={} orphan_updates={} \
              epochs={} buckets={} bytes={} (payload {} uncompressed)",
+            if close_prefix_source {
+                "checkpoint source closed (incomplete declared range)"
+            } else {
+                "archive complete"
+            },
             stats.slots,
             stats.blocks,
             stats.transactions,
@@ -1567,6 +1619,118 @@ mod tests {
         assert_eq!(reader.read_slots(100, 1, &mut collected).unwrap(), 1);
         assert_eq!(collected.blocks[0].1, terminal);
         assert_eq!(collected.blocks[0].4, vec![10]);
+    }
+
+    #[test]
+    fn checkpoint_prefix_source_never_fabricates_unexecuted_suffix_or_discards_buffered_input() {
+        use jetstreamer_horizon::archive::AccountsHashKind;
+        for buffered_future in 0..3 {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("private-closed-source.jet");
+            let recorder = HorizonRecorder::create(
+                &path,
+                1,
+                100,
+                3,
+                presence_map(100, &[SlotPresenceState::Present; 3]),
+                None,
+                None,
+            )
+            .unwrap();
+            let anchor = Hash::new_unique();
+            let (tx, tx_meta) = legacy_tx(0x38, 1);
+            let terminal = solana_entry::entry::next_hash(&anchor, 1, std::slice::from_ref(&tx));
+            let rewards = KeyedRewardsAndNumPartitions {
+                keyed_rewards: vec![],
+                num_partitions: None,
+            };
+            recorder.record_block_meta(
+                100,
+                99,
+                &anchor.to_string(),
+                &terminal.to_string(),
+                &rewards,
+                None,
+                None,
+                1,
+                1,
+            );
+            recorder.record_committed_entry(100, 0, 1, vec![(tx, tx_meta)]);
+            recorder.record_account_update(100, &pk(1), &account(5, b"freeze", 2), None, 10);
+            let checkpoint = RuntimeStateCheckpoint {
+                slot: 100,
+                bank_hash: Hash::new_unique(),
+                accounts_hash_kind: AccountsHashKind::LegacyAccountsHash,
+                accounts_hash: Hash::new_unique(),
+                last_blockhash: terminal,
+                capitalization: 5,
+                transaction_count: 1,
+                tick_height: 1,
+                slot_complete: true,
+                next_write_version: 11,
+            };
+            // The ordinary API still refuses the earlier checkpoint.
+            assert!(recorder.finish_checkpoint_segment(&checkpoint).is_err());
+            for invalid in [
+                RuntimeStateCheckpoint {
+                    slot: 99,
+                    ..checkpoint
+                },
+                RuntimeStateCheckpoint {
+                    slot: 102,
+                    ..checkpoint
+                },
+                RuntimeStateCheckpoint {
+                    slot_complete: false,
+                    ..checkpoint
+                },
+                RuntimeStateCheckpoint {
+                    last_blockhash: Hash::new_unique(),
+                    ..checkpoint
+                },
+            ] {
+                assert!(recorder.close_checkpoint_prefix_source(&invalid).is_err());
+            }
+            if buffered_future == 1 {
+                recorder.record_block_meta(
+                    101,
+                    100,
+                    &terminal.to_string(),
+                    &Hash::new_unique().to_string(),
+                    &rewards,
+                    None,
+                    None,
+                    0,
+                    1,
+                );
+            } else if buffered_future == 2 {
+                recorder.record_account_update(101, &pk(1), &account(6, b"future", 2), None, 11);
+            }
+            if buffered_future != 0 {
+                assert!(
+                    recorder
+                        .close_checkpoint_prefix_source(&checkpoint)
+                        .is_err()
+                );
+                assert!(!recorder.lock().finished);
+                continue;
+            }
+            let stats = recorder
+                .close_checkpoint_prefix_source(&checkpoint)
+                .unwrap();
+            assert_eq!((stats.slots, stats.blocks), (1, 1));
+            assert!(
+                recorder
+                    .close_checkpoint_prefix_source(&checkpoint)
+                    .is_err()
+            );
+            let mut reader = ArchiveReader::open(File::open(path).unwrap()).unwrap();
+            assert_eq!(reader.header().slot_count, 3);
+            assert!(!reader.has_complete_slot_coverage().unwrap());
+            let mut collected = Collected::default();
+            assert_eq!(reader.read_slots(100, 3, &mut collected).unwrap(), 1);
+            assert_eq!(collected.blocks[0].4, vec![10]);
+        }
     }
 
     #[test]
