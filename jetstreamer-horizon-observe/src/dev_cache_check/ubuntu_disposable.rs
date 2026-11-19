@@ -1,5 +1,6 @@
-//! Two closed Ubuntu compiler-cache profiles. No source/runtime/data scope.
+//! Closed Ubuntu compiler-cache profiles. No source/runtime/data scope.
 use super::*;
+mod build_compiler;
 mod release_compiler;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
@@ -11,6 +12,11 @@ pub(super) const INCREMENTAL_PROFILE: &str =
 pub(super) const RELEASE_DEPS: &str = "/home/ubuntu/workspace/jetstreamer/target/release/deps";
 pub(super) const DEBUG_INCREMENTAL: &str =
     "/home/ubuntu/workspace/jetstreamer/target/debug/incremental";
+pub(super) const DEBUG_BUILD_PROFILE: &str = "jetstreamer-horizon-ubuntu-debug-build-cache-plan-v1";
+pub(super) const RELEASE_BUILD_PROFILE: &str =
+    "jetstreamer-horizon-ubuntu-release-build-cache-plan-v1";
+pub(super) const DEBUG_BUILD: &str = "/home/ubuntu/workspace/jetstreamer/target/debug/build";
+pub(super) const RELEASE_BUILD: &str = "/home/ubuntu/workspace/jetstreamer/target/release/build";
 const LEDGER_SCHEMA: &str = "jetstreamer-horizon-ubuntu-disposable-cache-check-v2";
 const LEDGER_BOUND: u64 = 256 << 20;
 
@@ -18,12 +24,16 @@ fn target(profile: &str) -> Result<&'static Path> {
     match profile {
         RELEASE_PROFILE => Ok(Path::new(RELEASE_DEPS)),
         INCREMENTAL_PROFILE => Ok(Path::new(DEBUG_INCREMENTAL)),
+        DEBUG_BUILD_PROFILE => Ok(Path::new(DEBUG_BUILD)),
+        RELEASE_BUILD_PROFILE => Ok(Path::new(RELEASE_BUILD)),
         _ => anyhow::bail!("not a closed Ubuntu disposable cache profile"),
     }
 }
 pub(super) fn reference_scope_for_target(t: &Path) -> Option<&'static Path> {
-    if t == Path::new(RELEASE_DEPS) {
+    if t == Path::new(RELEASE_DEPS) || t == Path::new(RELEASE_BUILD) {
         Some(Path::new(RELEASE_TARGET))
+    } else if t == Path::new(DEBUG_BUILD) {
+        Some(Path::new(TARGET))
     } else if t == Path::new(DEBUG_INCREMENTAL) {
         Some(Path::new(DEBUG_INCREMENTAL))
     } else {
@@ -196,7 +206,8 @@ fn manifest_scoped(t: &Path, policy_root: &Path) -> Result<Manifest> {
         let relative = p.strip_prefix(t)?;
         ensure!(
             !forbidden(policy_root, &policy_root.join(relative), &n.kind)
-                || release_compiler::qualified(policy_root, t, &p, &n)?,
+                || release_compiler::qualified(policy_root, t, &p, &n)?
+                || build_compiler::qualified(policy_root, t, &p, &n)?,
             "archive/checkpoint/lock/source artifact found inside cache: {} ({})",
             relative.display(),
             n.kind
@@ -625,7 +636,12 @@ mod tests {
     }
     #[test]
     fn new_profiles_cannot_borrow_source_lock_helper_or_other_profile_checks() {
-        for profile in [RELEASE_PROFILE, INCREMENTAL_PROFILE] {
+        for profile in [
+            RELEASE_PROFILE,
+            INCREMENTAL_PROFILE,
+            DEBUG_BUILD_PROFILE,
+            RELEASE_BUILD_PROFILE,
+        ] {
             let p = plan(profile);
             validate_plan(&p).unwrap();
             let t = target(profile).unwrap();
@@ -672,6 +688,19 @@ mod tests {
             Path::new(DEBUG_INCREMENTAL)
         );
         assert!(target("debug").is_err());
+        assert_eq!(target(DEBUG_BUILD_PROFILE).unwrap(), Path::new(DEBUG_BUILD));
+        assert_eq!(
+            target(RELEASE_BUILD_PROFILE).unwrap(),
+            Path::new(RELEASE_BUILD)
+        );
+        assert_eq!(
+            reference_scope_for_target(Path::new(DEBUG_BUILD)),
+            Some(Path::new(TARGET))
+        );
+        assert_eq!(
+            reference_scope_for_target(Path::new(RELEASE_BUILD)),
+            Some(Path::new(RELEASE_TARGET))
+        );
         assert!(cache_reference(
             b"ExecStart=./target/release/tool",
             Path::new(RELEASE_TARGET)

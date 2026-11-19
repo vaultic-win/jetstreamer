@@ -44,6 +44,8 @@ fn cache_target(schema: &str) -> Result<&'static Path> {
         ubuntu_disposable::INCREMENTAL_PROFILE => {
             Ok(Path::new(ubuntu_disposable::DEBUG_INCREMENTAL))
         }
+        ubuntu_disposable::DEBUG_BUILD_PROFILE => Ok(Path::new(ubuntu_disposable::DEBUG_BUILD)),
+        ubuntu_disposable::RELEASE_BUILD_PROFILE => Ok(Path::new(ubuntu_disposable::RELEASE_BUILD)),
         SOL_PROFILE => Ok(Path::new(SOL_TARGET)),
         SOL_RELEASE_DEPS_PROFILE => Ok(Path::new(SOL_RELEASE_DEPS)),
         SOL_PRIVATE_DEBUG_DEPS_PROFILE => Ok(Path::new(SOL_PRIVATE_DEBUG_DEPS)),
@@ -113,6 +115,8 @@ fn validate_plan(p: &Plan) -> Result<()> {
                 SOL_PROFILE
                     | ubuntu_disposable::RELEASE_PROFILE
                     | ubuntu_disposable::INCREMENTAL_PROFILE
+                    | ubuntu_disposable::DEBUG_BUILD_PROFILE
+                    | ubuntu_disposable::RELEASE_BUILD_PROFILE
                     | SOL_RELEASE_DEPS_PROFILE
                     | SOL_PRIVATE_DEBUG_DEPS_PROFILE
                     | UBUNTU_DEBUG_DEPS_PROFILE
@@ -440,8 +444,7 @@ fn relative_profile_token(bytes: &[u8], relative: &[u8]) -> bool {
             let end = i + needle.len();
             word == *needle
                 && (i == 0 || b"=\0\n\r\t '\";|&()<>[]{}:".contains(&bytes[i - 1]))
-                && (end == bytes.len()
-                    || b"/\0\n\r\t '\";|&()<>[]{}:".contains(&bytes[end]))
+                && (end == bytes.len() || b"/\0\n\r\t '\";|&()<>[]{}:".contains(&bytes[end]))
         })
     })
 }
@@ -566,7 +569,10 @@ pub fn run() -> Result<()> {
     validate_plan(&p)?;
     if matches!(
         p.schema.as_str(),
-        ubuntu_disposable::RELEASE_PROFILE | ubuntu_disposable::INCREMENTAL_PROFILE
+        ubuntu_disposable::RELEASE_PROFILE
+            | ubuntu_disposable::INCREMENTAL_PROFILE
+            | ubuntu_disposable::DEBUG_BUILD_PROFILE
+            | ubuntu_disposable::RELEASE_BUILD_PROFILE
     ) {
         return ubuntu_disposable::run(&p, &pb, &a[5]);
     }
@@ -1127,7 +1133,10 @@ mod tests {
                 // an earlier relative token with an invalid suffix.
                 format!("ExecStart=target/{profile}-other /private/target/{profile}/test\n"),
             ] {
-                assert!(!relative_cache_reference(command.as_bytes(), Path::new(target)), "{command}");
+                assert!(
+                    !relative_cache_reference(command.as_bytes(), Path::new(target)),
+                    "{command}"
+                );
             }
             for command in [
                 format!("ExecStart=target/{profile}/worker\n"),
@@ -1137,7 +1146,10 @@ mod tests {
                 format!("Environment=LD_LIBRARY_PATH=/other:./target/{profile}/deps\n"),
                 format!("ReadOnlyPaths=\"{SOL_REPO}/target/{profile}\"\n"),
             ] {
-                assert!(relative_cache_reference(command.as_bytes(), Path::new(target)), "{command}");
+                assert!(
+                    relative_cache_reference(command.as_bytes(), Path::new(target)),
+                    "{command}"
+                );
             }
         }
     }
@@ -1148,14 +1160,25 @@ mod tests {
         let unrelated = directory.path().join("other.service");
         fs::write(&unrelated, "ExecStart=/private/other/target/debug/test\nReadOnlyPaths=/private/other/target/release/deps\n").unwrap();
         for target in [SOL_TARGET, SOL_RELEASE_DEPS] {
-            assert!(staged_references(&[directory.path()], Path::new(target), &mut Vec::new()).unwrap().is_empty());
+            assert!(
+                staged_references(&[directory.path()], Path::new(target), &mut Vec::new())
+                    .unwrap()
+                    .is_empty()
+            );
         }
         let debug = directory.path().join("debug.service");
         fs::write(&debug, "ExecStart=./target/debug/test\n").unwrap();
         let release = directory.path().join("release.service");
-        fs::write(&release, format!("ExecStart={SOL_REPO}/target/release/worker\n")).unwrap();
+        fs::write(
+            &release,
+            format!("ExecStart={SOL_REPO}/target/release/worker\n"),
+        )
+        .unwrap();
         for (target, consumer) in [(SOL_TARGET, debug), (SOL_RELEASE_DEPS, release)] {
-            assert_eq!(staged_references(&[directory.path()], Path::new(target), &mut Vec::new()).unwrap(), vec![consumer.display().to_string()]);
+            assert_eq!(
+                staged_references(&[directory.path()], Path::new(target), &mut Vec::new()).unwrap(),
+                vec![consumer.display().to_string()]
+            );
         }
     }
     #[test]
