@@ -25,3 +25,5 @@ pub mod full265;
 pub mod foundation_holding213_review;
 
 pub mod staged247_rss;
+
+pub mod successor247;

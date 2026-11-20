@@ -2,6 +2,7 @@
 //! Private long-running prefix qualifications are comparable replay lanes;
 //! restore/repair/delivery stages consume RSS separately. No admission authority.
 use anyhow::{Context, Result, ensure};
+use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
@@ -101,6 +102,48 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 "staged 247 absent or ambiguous in delivery-specific RSS"
             );
             jetstreamer_horizon_observe::staged247_rss::validate(row)?;
+        }
+        if name == successor::UNIT {
+            ensure!(
+                row["sampled_unix_seconds"]
+                    == super::fleet::utc_seconds(
+                        o["recorded_at_utc"].as_str().context("247 sample clock")?
+                    )?,
+                "stale successor RSS"
+            );
+            let entry = ledger["active"]
+                .as_array()
+                .context("active roster")?
+                .iter()
+                .filter(|r| r["unit"]["Id"] == name)
+                .collect::<Vec<_>>();
+            let [active] = entry.as_slice() else {
+                anyhow::bail!("missing or duplicated successor active owner")
+            };
+            let owner = successor::load(&row["successor_owner"]["claim"])?;
+            ensure!(
+                active["epoch"] == 247
+                    && active["phase"] == "upload-readback"
+                    && active["expected_invocation_id"] == owner.iid
+                    && active["evidence"] == json!([owner.proof["booking"], owner.proof["launch"]]),
+                "successor claim differs from RSS"
+            );
+            ensure!(
+                o["delivery_resources"]
+                    .as_array()
+                    .context("delivery rows")?
+                    .iter()
+                    .filter(|d| d["producer_unit"] == name
+                        && d["expected_producer_invocation_id"] == owner.iid
+                        && d["delivery_resource_only"] == true
+                        && d["status"] == "observed"
+                        && &d["observation"] == row)
+                    .count()
+                    == 1,
+                "missing or duplicate successor RSS"
+            );
+            jetstreamer_horizon_observe::staged247_rss::validate_sample(row, &owner)?;
+            successor::historical_claims(ledger)?;
         }
         if !owners.contains_key(name) && super::fleet::terminal247::historical_row(ledger, row)? {
             ensure!(
@@ -212,6 +255,60 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn two_original_claims_survive_the_benchmark_reader_transition() -> Result<()> {
+        let f: Value = serde_json::from_str(include_str!(
+            "../../jetstreamer-horizon-observe/src/fixtures/successor247-history.json"
+        ))?;
+        assert_eq!(
+            f["original_failure"]["INVOCATION_ID"],
+            successor::ORIGINAL_IID
+        );
+        assert_eq!(f["prior_claim"]["invocation_id"], successor::PRIOR_IID);
+        let mut fleet = json!({"pipelines":f["historical_fleet_rows"],"active":f["historical_active"],"unit_census":{}});
+        let mut units = json!({});
+        for r in fleet["pipelines"].as_array().unwrap() {
+            units[r["unit"]["Id"].as_str().unwrap()] = r["unit"].clone();
+        }
+        fleet["unit_census"] = units;
+        assert!(successor::validate_history(&fleet, &f["previous"]).is_err());
+        // Original v147 was still live. Exercise a modeled exit, preserving every original claim.
+        let mut ended = fleet["unit_census"][successor::PRIOR_UNIT].clone();
+        for (key, value) in [
+            ("ActiveState", "failed"),
+            ("SubState", "failed"),
+            ("MainPID", "0"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("ControlGroup", ""),
+        ] {
+            ended[key] = json!(value);
+        }
+        let idx = fleet["pipelines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|r| r["unit"]["Id"] == successor::PRIOR_UNIT)
+            .unwrap();
+        fleet["unit_census"][successor::PRIOR_UNIT] = ended.clone();
+        fleet["pipelines"][idx]["unit"] = ended;
+        fleet["pipelines"][idx]["live"] = json!(false);
+        fleet["active"] = json!([]);
+        successor::validate_history(&fleet, &f["previous"])?;
+        let mut foreign = fleet.clone();
+        foreign["pipelines"][idx]["evidence"][0]["sha256"] = json!("f".repeat(64));
+        assert!(successor::validate_history(&foreign, &f["previous"]).is_err());
+        let mut dup = fleet.clone();
+        dup["pipelines"]
+            .as_array_mut()
+            .unwrap()
+            .push(fleet["pipelines"][idx].clone());
+        assert!(successor::validate_history(&dup, &f["previous"]).is_err());
+        let mut missing = fleet.clone();
+        missing["pipelines"].as_array_mut().unwrap().remove(idx);
+        assert!(successor::validate_history(&missing, &f["previous"]).is_err());
+        Ok(())
+    }
     #[test]
     #[ignore = "booked offline qualification with original v145 receipts and independent targeted staged RSS"]
     fn staged247_v145_memory_join_and_historical_failure() {

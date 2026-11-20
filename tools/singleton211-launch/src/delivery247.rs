@@ -1,6 +1,8 @@
 //! Preserve the actual, separately admitted epoch247 delivery during replay admission.
 use super::*;
 mod staged;
+mod successor;
+pub(super) use successor::evidence::UNIT as SUCCESSOR_UNIT;
 mod terminal;
 pub(super) use staged::UNIT as STAGED_UNIT;
 pub(super) const UNIT247: &str = "horizon-upload-247-singleton-20261119-v1.service";
@@ -21,10 +23,10 @@ fn original(e: &Value) -> bool {
     e["epoch"] == 247 && e["phase"] == "upload-readback" && e["unit"]["Id"] == UNIT247
 }
 pub(super) fn selected(e: &Value) -> bool {
-    original(e) || staged::selected(e)
+    original(e) || staged::selected(e) || successor::selected(e)
 }
 fn related(entry: &Value) -> bool {
-    if staged::selected(entry) {
+    if staged::selected(entry) || successor::selected(entry) {
         return false;
     }
     if staged::mentions(entry) {
@@ -40,6 +42,7 @@ fn related(entry: &Value) -> bool {
 pub(super) fn validate_roster(fleet: &Value, rows: &[capacity::Reservation]) -> Result<()> {
     let entries = fleet["pipelines"].as_array().context("pipeline census")?;
     staged::validate_roster(fleet, rows)?;
+    successor::roster(fleet, rows)?;
     let found: Vec<_> = entries.iter().filter(|e| related(e)).collect();
     if found.is_empty() {
         ensure!(
@@ -127,6 +130,15 @@ pub(super) fn validate(e: &Value, fleet: &Value, rows: &[capacity::Reservation])
     Ok(())
 }
 pub(super) fn verify_inputs(e: &Value) -> Result<()> {
+    if successor::selected(e) {
+        let o = successor::owner()?;
+        ensure!(
+            e["expected_invocation_id"] == o.iid
+                && e["evidence"] == json!([o.proof["booking"], o.proof["launch"]]),
+            "successor provenance differs"
+        );
+        return Ok(());
+    }
     if staged::selected(e) {
         return staged::verify_inputs(e);
     }
@@ -163,7 +175,7 @@ pub(super) fn verify_inputs(e: &Value) -> Result<()> {
 }
 
 pub(super) fn owner_cap(row: &capacity::Reservation) -> u64 {
-    if row.unit == STAGED_UNIT {
+    if row.unit == STAGED_UNIT || row.unit == SUCCESSOR_UNIT {
         staged::HARD_CAP
     } else {
         row.maximum_memory_bytes
@@ -171,11 +183,17 @@ pub(super) fn owner_cap(row: &capacity::Reservation) -> u64 {
 }
 
 pub(super) fn staged_owner(current: &Value) -> Result<()> {
+    if current["Id"] == SUCCESSOR_UNIT {
+        return successor::live_owner(current);
+    }
     staged::manager(current)?;
     staged::mapped_owner()
 }
 
 pub(super) fn terminal_owner(n: &mut Native, current: &Value) -> Result<()> {
+    if current["Id"] == STAGED_UNIT {
+        return staged::terminal(n, current);
+    }
     terminal::observe(n, current)
 }
 
