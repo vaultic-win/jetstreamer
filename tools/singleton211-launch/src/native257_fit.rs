@@ -1,4 +1,4 @@
-//! Capacity-only consumer for epoch 257 before the ordinary 211 launch.
+//! Capacity-only consumer for epoch 257 with the current epoch 211 booking.
 //! No systemd activation, resource release, token publication or remote writes.
 use super::*;
 
@@ -50,6 +50,9 @@ fn scenarios(
         Ok(v) => json!({"fits":true,"capacity":v}),
         Err(e) => json!({"fits":false,"reason":e.to_string()}),
     };
+    if rows.iter().any(|r| r.unit == UNIT) {
+        return json!({"limited_native257_with_booked_full211":fit(NATIVE257_MEMORY,NATIVE257_DISK)});
+    }
     json!({"limited_native257":fit(NATIVE257_MEMORY,NATIVE257_DISK),"ordinary211":fit(MEMORY,SCRATCH),
         "combined_control_excess_bytes":combined_control_excess,"limited_native257_and_ordinary211":fit(NATIVE257_MEMORY+MEMORY+combined_control_excess,NATIVE257_DISK+SCRATCH)})
 }
@@ -118,10 +121,16 @@ pub(super) fn booked_host(
         &rows,
     )?;
     peers::validate(&fleet, &rows)?;
-    finalization::validate(&fleet, &observer, &rows, boot.trim())?;
+    let full211 = full211_peer::registered(&fleet);
+    if full211 {
+        full211_peer::authenticate(n, &fleet, &observer, &rows)?;
+    }
+    ensure!(
+        rows.iter().any(|r| r.unit == UNIT) == full211,
+        "full211 booking and current fleet differ"
+    );
+    finalization::validate_roster(&fleet, &observer, &rows, boot.trim(), full211)?;
     finalization::verify_inputs(&fleet)?;
-    // This is an original 211 preactivation census with *no* candidate exceptions.
-    // A live full211, 257, or unknown peer must obtain its own complete booking.
     if native257_held.is_some() {
         ensure!(
             rows.iter().all(|r| r.unit != native257::UNIT),
@@ -133,7 +142,7 @@ pub(super) fn booked_host(
         native257::GUARD_UNIT,
         native257::TIMER,
     ));
-    let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed)?;
+    let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed, full211)?;
     let (effective, release) = native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
     let device = fs::metadata(path)?.dev();
@@ -208,14 +217,16 @@ pub(super) fn evaluate(
         "scratch backing changed during fit"
     );
     n.check()?;
-    Ok(
-        json!({"schema":"horizon-native257-current-fit-v1","epoch":257,"review":source,"boot_id":host.boot,
+    let mut fit = json!({"schema":"horizon-native257-current-fit-v1","epoch":257,"review":source,"boot_id":host.boot,
        "fleet":review["fleet"],"observer":review["observer"],"reservation_ledger":review["reservation_ledger"],
        "v126_minimum":Bound::new(BASELINE,BASELINE_SHA),"native265_runtime_growth_release":host.release,
        "scratch_filesystem":path,"scratch_st_dev":device,"actual_scratch_present":path==Path::new(SCRATCH257),"actual_current_memory":host.currents,
        "cpu_affinity_qualified":false,"scenarios":result,"recorded_unix_seconds":now()?,
-       "admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false}),
-    )
+       "admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false});
+    if host.rows.iter().any(|r| r.unit == UNIT) {
+        fit["full211_handoff"] = json!(full211_peer::handoff());
+    }
+    Ok(fit)
 }
 
 pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {
@@ -265,6 +276,44 @@ pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn booked_full211_and_its_guard_are_charged_once() {
+        let producer = capacity::Reservation {
+            unit: UNIT.into(),
+            invocation_id: "a".repeat(32),
+            maximum_memory_bytes: MEMORY,
+            remaining_disk_growth_bytes: SCRATCH,
+            minimum_free_bytes: 0,
+            source: full211_peer::handoff(),
+            release: None,
+        };
+        let guard = full211_peer::control().maximum_memory_bytes;
+        let resources = (
+            HOST + CONTROL + MEMORY + guard + NATIVE257_MEMORY,
+            u64::MAX,
+            1 + SCRATCH + NATIVE257_DISK,
+        );
+        let cases = scenarios(resources, 1, &[producer], &BTreeMap::new(), (0, guard), 0);
+        assert_eq!(cases.as_object().unwrap().len(), 1);
+        let fit = json!({"scenarios":cases,"full211_handoff":full211_peer::handoff()});
+        let review = |mode: &str| json!({"full211_capacity":mode});
+        let mode = native257::selected_scenario(&review("full211-booked"), &fit).unwrap();
+        let result = &fit["scenarios"][mode];
+        assert_eq!(result["fits"], true);
+        assert_eq!(
+            result["capacity"]["memory_obligation_after_bytes"],
+            resources.0
+        );
+        assert_eq!(
+            result["capacity"]["required_initial_free_bytes"],
+            resources.2
+        );
+        for mode in ["preserve-full211", "native257-first"] {
+            assert!(native257::selected_scenario(&review(mode), &fit).is_err());
+            native257::selected_scenario(&review(mode), &json!({})).unwrap();
+        }
+        assert!(native257::selected_scenario(&review("full211-booked"), &json!({})).is_err());
+    }
     #[test]
     fn historical_lowered_or_removed_bookings_are_rejected() {
         let rows: Vec<_> = (0..10)

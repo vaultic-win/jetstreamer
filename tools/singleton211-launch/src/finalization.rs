@@ -289,8 +289,18 @@ pub(super) fn validate(
     rows: &[capacity::Reservation],
     boot: &str,
 ) -> Result<()> {
+    validate_roster(fleet, observer, rows, boot, false)
+}
+pub(super) fn validate_roster(
+    fleet: &Value,
+    observer: &Value,
+    rows: &[capacity::Reservation],
+    boot: &str,
+    full211: bool,
+) -> Result<()> {
     ensure!(
-        fleet["diagnostics"] == json!([]) && fleet["auxiliary_diagnostics"] == json!([]),
+        (full211 || fleet["diagnostics"] == json!([]))
+            && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
     full265::validate(fleet, observer, rows, boot)?;
@@ -313,7 +323,7 @@ pub(super) fn validate(
     let mut diagnostics = Vec::new();
     let mut native265_diagnostic_seen = false;
     for d in observed_diagnostics {
-        if full265::diagnostic(d) {
+        if (full211 && full211_peer::observed(d)) || full265::diagnostic(d) {
             // Already authenticated by the complete full265 cross-census validator.
             continue;
         }
@@ -349,7 +359,7 @@ pub(super) fn validate(
         );
     }
     for a in fleet["active"].as_array().context("active census")? {
-        if a["epoch"] == 265 {
+        if (full211 && full211_peer::active(a)) || a["epoch"] == 265 {
             // Ordinary or exact post-EOF form validated above; no private promotion.
             continue;
         }
