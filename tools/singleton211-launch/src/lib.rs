@@ -173,6 +173,26 @@ fn trusted_parents(p: &Path) -> Result<()> {
     }
     Ok(())
 }
+/// Search the exact bytes of live maps and unit recipes. These inputs can be
+/// non-UTF8 and the controller also runs in unoptimized qualification builds.
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    assert!(!needle.is_empty());
+    if needle.len() > haystack.len() {
+        return None;
+    }
+    // SAFETY: both pointers refer to the stated readable slices. GNU memmem
+    // returns null or the first matching address within the haystack.
+    let found = unsafe {
+        libc::memmem(
+            haystack.as_ptr().cast(),
+            haystack.len(),
+            needle.as_ptr().cast(),
+            needle.len(),
+        )
+    };
+    (!found.is_null()).then(|| found.addr() - haystack.as_ptr().addr())
+}
+
 fn digest(b: &[u8]) -> String {
     format!("{:x}", Sha256::digest(b))
 }

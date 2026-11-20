@@ -173,7 +173,7 @@ pub(super) fn staged_recipes(
                 let matches = |bytes: &[u8]| {
                     needles
                         .iter()
-                        .any(|n| bytes.windows(n.len()).any(|s| s == *n))
+                        .any(|n| crate::find_bytes(bytes, n).is_some())
                 };
                 if target == Path::new("/dev/null") {
                     ensure!(!matches(name), "unexpected masked native211 actor");

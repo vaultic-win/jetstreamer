@@ -23,16 +23,16 @@ pub struct Scan {
     pub references: Vec<String>,
 }
 
-pub(crate) fn encoded_reference(bytes: &[u8], needle: &[u8], end_of_file: bool) -> bool {
-    bytes.windows(needle.len()).enumerate().any(|(i, word)| {
-        let end = i + needle.len();
-        word == needle
-            && if end == bytes.len() {
-                end_of_file
-            } else {
-                b"/\0\n\r\t '\";|&()<>[]{}".contains(&bytes[end])
-            }
-    })
+pub(crate) fn encoded_reference(mut bytes: &[u8], needle: &[u8], end_of_file: bool) -> bool {
+    while let Some(start) = crate::find_bytes(bytes, needle) {
+        match bytes.get(start + needle.len()) {
+            None => return end_of_file,
+            Some(boundary) if b"/\0\n\r\t '\";|&()<>[]{}".contains(boundary) => return true,
+            // An invalid suffix may itself overlap another occurrence.
+            Some(_) => bytes = &bytes[start + 1..],
+        }
+    }
+    false
 }
 
 // Stream mmap-heavy process maps rather than allocating a whole maps file.
@@ -181,6 +181,82 @@ pub fn scan(proc_root: &Path, target: &Path) -> Result<Scan> {
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+
+    #[test]
+    fn rejected_suffix_does_not_hide_an_overlapping_exact_reference() {
+        assert!(!encoded_reference(b"/a/a/a/b", b"/a/a/", false));
+        assert!(encoded_reference(b"ababa/", b"aba", false));
+        assert!(!encoded_reference(b"ababa", b"aba", false));
+        assert!(encoded_reference(b"ababa", b"aba", true));
+        assert!(encoded_reference(
+            b"\xff/root-more\0/root/file",
+            b"/root",
+            false
+        ));
+        assert!(!encoded_reference(b"/root-more", b"/root", true));
+    }
+
+    #[test]
+    fn fast_search_matches_the_original_byte_oracle_for_every_suffix() {
+        let needles: &[&[u8]] = &[b"/root", b"aba", b"aa", b"\xff\0", b"/"];
+        for needle in needles {
+            for suffix in 0..=u8::MAX {
+                let mut bytes = Vec::from(*needle);
+                bytes.push(suffix);
+                bytes.extend_from_slice(needle);
+                for eof in [false, true] {
+                    for end in 0..=bytes.len() {
+                        let input = &bytes[..end];
+                        let original = input.windows(needle.len()).enumerate().any(|(i, v)| {
+                            v == *needle
+                                && match input.get(i + needle.len()) {
+                                    Some(byte) => b"/\0\n\r\t '\";|&()<>[]{}".contains(byte),
+                                    None => eof,
+                                }
+                        });
+                        assert_eq!(encoded_reference(input, needle, eof), original);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "run in the booked epoch 257 build to measure the original VMA workload"]
+    fn compare_byte_search_on_v152_retained_worker_map_counts() {
+        // v152 guard receipts recorded 403576 and 411881 VMAs respectively.
+        // Generate bounded records without touching either worker's procfs.
+        let line = b"7f1234567000-7f1234568000 rw-s 00000000 103:01 123456 /home/ubuntu/replay/accounts/file\n";
+        let mut fixture = line.repeat(403576 + 411881);
+        // Include an actual late hit, a look-alike and an unmatched third target.
+        fixture.extend_from_slice(b"/run/horizon205206-private-tmpfs-copy\n/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1/file\n");
+        let targets: [&[u8]; 3] = [
+            b"/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
+            b"/run/horizon205206-private-tmpfs",
+            b"/home/ubuntu/.jetstreamer-private/native-input211-v1616-capped-v1",
+        ];
+        let start = std::time::Instant::now();
+        let original = targets.map(|n| {
+            let bytes = std::hint::black_box(fixture.as_slice());
+            bytes.windows(n.len()).enumerate().any(|(i, part)| {
+                part == n
+                    && bytes
+                        .get(i + n.len())
+                        .is_none_or(|b| b"/\0\n\r\t '\";|&()<>[]{}".contains(b))
+            })
+        });
+        let original_us = start.elapsed().as_micros();
+        let start = std::time::Instant::now();
+        let current =
+            targets.map(|n| stream_reference(fixture.as_slice(), n, MAX_PROC_BYTES).unwrap());
+        let current_us = start.elapsed().as_micros();
+        assert_eq!(original, [true, false, false]);
+        assert_eq!(current, original);
+        println!(
+            "original_us={original_us} current_us={current_us} fixture_bytes={} targets=3",
+            fixture.len()
+        );
+    }
 
     #[test]
     fn streaming_boundaries_are_exact_even_across_chunks() {
