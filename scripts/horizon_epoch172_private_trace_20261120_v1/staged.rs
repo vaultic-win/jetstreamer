@@ -52,11 +52,13 @@ pub(super) fn capture(id: &str, pid: u64, timer_id: &str) -> Result<Value> {
         input.read_to_end(&mut b)?;
         let v: Value = serde_json::from_slice(&b)?;
         ensure!(
-            v["schema"] == "epoch172-private-trace-inputs-v1"
+            v["schema"] == "epoch172-private-metered-inputs-v2"
                 && v["invocation_id"] == id
                 && v["node_sha256"]
                     == "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
-                && v["worker_sha256"] == env!("HORIZON172_TRACE_WORKER_SHA256")
+                && v["worker_sha256"] == WORKER_SHA
+                && v["worker_source_commit"] == WORKER_SOURCE
+                && v["worker_feature"] == WORKER_FEATURE
                 && v["bootstrap_sha256"]
                     == "fa7936328f4a4898ce9f35fd2892d9ba8f8ba03df345f8bc282ee6e913b2cc5f"
                 && v["bootstrap_bytes"] == 2_110_486_214u64
@@ -101,7 +103,7 @@ pub(super) fn capture(id: &str, pid: u64, timer_id: &str) -> Result<Value> {
             "changed staging owner"
         );
         return Ok(
-            json!({"actual_native":current,"verified_by_sealed_payload":binding(&file,&digest(&b)),"private_input_files":inputs,"protected_timer":t,"node_device":exe.dev(),"node_inode":exe.ino(),"bank_restoration_proven":false,"transaction_replay_claimed":false}),
+            json!({"actual_native":current,"log_inode":sinks.ino(),"log_device":sinks.dev(),"verified_by_sealed_payload":binding(&file,&digest(&b)),"private_input_files":inputs,"protected_timer":t,"node_device":exe.dev(),"node_inode":exe.ino(),"bank_restoration_proven":false,"transaction_replay_claimed":false}),
         );
     }
     bail!("verified snapshot staging and node exec exceeded 240s")

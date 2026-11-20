@@ -13,11 +13,11 @@ use std::process::Command;
 
 const LANE: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1";
 const RUN_PARENT: &str = "metadata-probes";
-const RUN: &str = "trace-hourly-20261120-v1";
+const RUN: &str = "metered-hourly-20261120-g2";
 const PKG: &str = "/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1";
-const UNIT: &str = "horizon-qualify-172-trace-hourly-20261120-v1.service";
+const UNIT: &str = "horizon-qualify-172-metered-hourly-20261120-g2.service";
 const WORKER: &str = "jetstreamer-historical-worker-v1-5-6";
-const TRACE_SHA: &str = env!("HORIZON172_TRACE_WORKER_SHA256");
+const TRACE_SHA: &str = guard172::WORKER_SHA;
 const NODE_SHA: &str = "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65";
 const SNAP: &str = "snapshot-74379198-7sUN98jiB8FuSu3nkpCm1gLBbPbFH1HtfocPKPV7asPj.tar.zst";
 const TERMINAL: &str = "snapshot-74382131-oFYTx673sc7Sq4Dw74vsAby6SHVAbin3QtT8dmGzaLo.tar.zst";
@@ -250,12 +250,7 @@ fn stage_and_exec() -> Result<()> {
     transfer(&node, 47_753_136, NODE_SHA, None)?;
     // The service has a read-only file bind of the sealed trace worker onto its original
     // worker pathname. The unmodified production worker fails this hash check.
-    transfer(
-        &worker,
-        env!("HORIZON172_TRACE_WORKER_BYTES").parse::<u64>()?,
-        TRACE_SHA,
-        None,
-    )?;
+    transfer(&worker, guard172::WORKER_BYTES, TRACE_SHA, None)?;
     route_terms(&serde_json::from_slice(ROUTE)?)?;
     let ledger = dir.join("ledger");
     let scratch = dir.join("scratch");
@@ -278,7 +273,7 @@ fn stage_and_exec() -> Result<()> {
     )?;
     let checkpoints = dir.join("canonical-hashes.txt");
     text_file(&checkpoints, format!("{SNAP}\n{TERMINAL}\n").as_bytes())?;
-    let receipt = json!({"schema":"epoch172-private-trace-inputs-v1","invocation_id":iid,"node_sha256":NODE_SHA,"worker_sha256":TRACE_SHA,"bootstrap_sha256":SNAP_SHA,"bootstrap_bytes":SNAP_BYTES,"target_slot":74380784,"target_entry":645,"target_transaction":984,"target_signature":SIGNATURE,"terminal_checkpoint":74382131,"bootstrap_generation":"1634786215364147","checkpoint_generation":"1634787172918779","terminal_checkpoint_name":TERMINAL,"canonical_error":"instruction2 ComputationalBudgetExceeded","original_local_error":"instruction2 ProgramFailedToComplete","account_state_verified":false,"publication_authorized":false});
+    let receipt = json!({"schema":"epoch172-private-metered-inputs-v2","invocation_id":iid,"node_sha256":NODE_SHA,"worker_sha256":TRACE_SHA,"worker_source_commit":guard172::WORKER_SOURCE,"worker_feature":guard172::WORKER_FEATURE,"bootstrap_sha256":SNAP_SHA,"bootstrap_bytes":SNAP_BYTES,"target_slot":74380784,"target_entry":645,"target_transaction":984,"target_signature":SIGNATURE,"terminal_checkpoint":74382131,"bootstrap_generation":"1634786215364147","checkpoint_generation":"1634787172918779","terminal_checkpoint_name":TERMINAL,"canonical_error":"instruction2 ComputationalBudgetExceeded","original_local_error":"instruction2 ProgramFailedToComplete","account_state_verified":false,"publication_authorized":false});
     text_file(
         &dir.join("inputs.json"),
         &serde_json::to_vec_pretty(&receipt)?,
@@ -344,6 +339,10 @@ fn read_trace(log: impl BufRead) -> Result<Value> {
     let key = format!(
         "epoch172 trace slot=74380784 entry=645 transaction=984 signature={SIGNATURE} execution="
     );
+    let feature_tag =
+        "historical per-byte logging feature at restored bank slot 74379198: activated_at=";
+    let mut activation = None;
+    let mut bootstrap_hash = None;
     let mut saw_restore = false;
     let mut trace = None;
     let mut checkpoint: Option<Value> = None;
@@ -362,6 +361,33 @@ fn read_trace(log: impl BufRead) -> Result<Value> {
             break;
         }
         let text = std::str::from_utf8(&line)?;
+        if let Some(value) = text.trim_end().strip_prefix(feature_tag) {
+            ensure!(
+                activation.is_none() && !saw_restore,
+                "duplicate or late restored feature"
+            );
+            activation = Some(value.to_owned());
+        }
+        if text.contains("historical checkpoint slot=74379198 bank_hash=") {
+            ensure!(
+                saw_restore
+                    && trace.is_none()
+                    && text.split_whitespace().any(|s| s == "complete=true"),
+                "bootstrap checkpoint incomplete or out of order"
+            );
+            let observed = text
+                .split_whitespace()
+                .find_map(|s| s.strip_prefix("accounts_hash="))
+                .context("bootstrap accounts hash")?
+                .to_owned();
+            ensure!(
+                bootstrap_hash
+                    .as_ref()
+                    .is_none_or(|prior| prior == &observed),
+                "conflicting bootstrap checkpoint"
+            );
+            bootstrap_hash = Some(observed);
+        }
         if text.contains(restored) {
             ensure!(!saw_restore, "duplicate worker initialization");
             saw_restore = true;
@@ -386,7 +412,7 @@ fn read_trace(log: impl BufRead) -> Result<Value> {
             );
             checkpoint = Some(observed);
         }
-        if trace.is_some() && text.trim_end().ends_with("snapshot verification complete") {
+        if checkpoint.is_some() && text.trim_end().ends_with("snapshot verification complete") {
             verifier_finished = true;
         }
         if let Some(payload) = text.trim_end().strip_prefix(&key) {
@@ -408,13 +434,42 @@ fn read_trace(log: impl BufRead) -> Result<Value> {
             let canonical: Vec<String> =
                 serde_json::from_slice(include_bytes!("canonical-logs.json"))?;
             let difference=(0..canonical.len().max(observed.len())).find(|&n|canonical.get(n)!=observed.get(n)).map(|n|json!({"log_index_zero_based":n,"canonical":canonical.get(n),"observed":observed.get(n)}));
+            let baseline: Vec<String> =
+                serde_json::from_slice(include_bytes!("unpatched-logs.json"))?;
+            let mut meter_rows = Vec::new();
+            for (i, expected) in canonical
+                .iter()
+                .enumerate()
+                .filter(|(_, s)| s.ends_with(" compute units"))
+            {
+                meter_rows.push(
+                    json!({"index":i, "unpatched":baseline.get(i), "metered":observed.get(i),
+                    "finalized":expected, "matches_finalized":observed.get(i)==Some(expected)}),
+                );
+            }
             trace = Some(
-                json!({"execution":execution,"matches_canonical_execution":execution=="Some(Err(InstructionError(2, ComputationalBudgetExceeded)))","matches_original_execution":execution=="Some(Err(InstructionError(2, ProgramFailedToComplete)))","observed_log_count":observed.len(),"canonical_log_count":canonical.len(),"first_differing_log":difference,"logs":observed}),
+                json!({"execution":execution,"matches_canonical_execution":execution=="Some(Err(InstructionError(2, ComputationalBudgetExceeded)))","matches_original_execution":execution=="Some(Err(InstructionError(2, ProgramFailedToComplete)))","meter_rows":meter_rows,"all_logs_match":observed==canonical,"observed_log_count":observed.len(),"canonical_log_count":canonical.len(),"first_differing_log":difference,"logs":observed}),
             );
         }
     }
+    let feature_matches = activation.as_deref() == Some("Some(66528004)");
+    let bootstrap_matches =
+        bootstrap_hash.as_deref() == Some("7sUN98jiB8FuSu3nkpCm1gLBbPbFH1HtfocPKPV7asPj");
+    let signed_match = trace
+        .as_ref()
+        .is_some_and(|t| t["all_logs_match"] == true && t["matches_canonical_execution"] == true);
+    let terminal_matches = checkpoint
+        .as_ref()
+        .is_some_and(|c| c["route_hash_matches"] == true && c["slot_complete"] == true);
     Ok(
-        json!({"schema":"epoch172-private-trace-observation-v1","bootstrap_initialization_seen":saw_restore,"target_slot":74380784,"entry":645,"transaction":984,"signature":SIGNATURE,"canonical_error":"instruction2 ComputationalBudgetExceeded","original_local_error":"instruction2 ProgramFailedToComplete","checkpoint_slot":74382131,"terminal_worker_checkpoint":checkpoint,"node_verifier_finished_after_target":verifier_finished,"trace":trace.context("target trace pending or absent")?,"archive_verified":false,"publication_authorized":false}),
+        json!({"schema":"epoch172-private-metered-observation-v2","bootstrap_initialization_seen":saw_restore,
+        "restored_bank_feature":activation, "restored_feature_matches_finalized":feature_matches,
+        "bootstrap_accounts_hash":bootstrap_hash,"bootstrap_hash_matches":bootstrap_matches,
+        "target_slot":74380784,"entry":645,"transaction":984,"signature":SIGNATURE,
+        "canonical_error":"instruction2 ComputationalBudgetExceeded","original_local_error":"instruction2 ProgramFailedToComplete",
+        "checkpoint_slot":74382131,"terminal_worker_checkpoint":checkpoint,"node_verifier_finished_after_target":verifier_finished,
+        "trace":trace, "focused_checks_passed":saw_restore && feature_matches && bootstrap_matches && signed_match && terminal_matches && verifier_finished,
+        "archive_verified":false,"publication_authorized":false}),
     )
 }
 
@@ -422,16 +477,22 @@ fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args.as_slice() {
         [a] if a == "run" => stage_and_exec(),
-        [a] if a == "trace" => {
+        [a] if a == "trace" || a == "progress" => {
             let dir = run_dir();
             root_dir(&dir)?;
             let f = stable_file(&dir.join("producer.log"))?;
             let mut v = read_trace(BufReader::new(&f))?;
+            ensure!(
+                a == "progress" || !v["trace"].is_null(),
+                "target trace pending or absent"
+            );
             let inputs = stable_file(&dir.join("inputs.json"))?;
             ensure!(inputs.metadata()?.len() < 8192, "oversize inputs receipt");
             let r: Value = serde_json::from_reader(inputs)?;
             ensure!(
                 r["worker_sha256"] == TRACE_SHA
+                    && r["worker_source_commit"] == guard172::WORKER_SOURCE
+                    && r["worker_feature"] == guard172::WORKER_FEATURE
                     && r["node_sha256"] == NODE_SHA
                     && r["bootstrap_sha256"] == SNAP_SHA
                     && r["target_signature"] == SIGNATURE
@@ -444,7 +505,7 @@ fn run() -> Result<()> {
             println!();
             Ok(())
         }
-        _ => anyhow::bail!("expected run or trace"),
+        _ => anyhow::bail!("expected run, trace or progress"),
     }
 }
 fn main() -> Result<()> {
@@ -491,9 +552,12 @@ mod tests {
         assert!(read_trace(format!("{INIT}{t}{t}").as_bytes()).is_err());
         assert!(
             read_trace(format!("{INIT}{}", t.replace("entry=645", "entry=646")).as_bytes())
-                .is_err()
+                .unwrap()["trace"]
+                .is_null()
         );
-        assert!(read_trace(format!("{INIT}{}", t.trim_end()).as_bytes()).is_err());
+        assert!(
+            read_trace(format!("{INIT}{}", t.trim_end()).as_bytes()).unwrap()["trace"].is_null()
+        );
         let v = read_trace(format!("{INIT}{t}").as_bytes()).unwrap();
         assert_eq!(v["archive_verified"], false);
         assert_eq!(v["trace"]["first_differing_log"]["log_index_zero_based"], 0);
@@ -505,5 +569,41 @@ mod tests {
                 .unwrap()
                 .contains("ProgramFailedToComplete")
         );
+    }
+    #[test]
+    fn success_requires_the_real_feature_and_every_terminal_phase() {
+        let logs: Vec<String> =
+            serde_json::from_slice(include_bytes!("canonical-logs.json")).unwrap();
+        let line = target()
+            .replace("ProgramFailedToComplete", "ComputationalBudgetExceeded")
+            .replace("[\"test VM log\"]", &serde_json::to_string(&logs).unwrap());
+        let activated = "historical per-byte logging feature at restored bank slot 74379198: activated_at=Some(66528004)\n";
+        let bootstrap = "historical checkpoint slot=74379198 bank_hash=b accounts_hash=7sUN98jiB8FuSu3nkpCm1gLBbPbFH1HtfocPKPV7asPj complete=true\n";
+        let terminal = "historical checkpoint slot=74382131 bank_hash=b accounts_hash=oFYTx673sc7Sq4Dw74vsAby6SHVAbin3QtT8dmGzaLo complete=true\n";
+        let finished = "[INFO] snapshot verification complete\n";
+        let complete = format!("{activated}{INIT}{bootstrap}{line}{terminal}{finished}");
+        let good = read_trace(complete.as_bytes()).unwrap();
+        assert_eq!(good["focused_checks_passed"], true);
+        assert_eq!(good["trace"]["meter_rows"].as_array().unwrap().len(), 10);
+        assert_ne!(
+            good["trace"]["meter_rows"][0]["unpatched"],
+            good["trace"]["meter_rows"][0]["finalized"]
+        );
+        for field in [activated, bootstrap, terminal, finished] {
+            assert_eq!(
+                read_trace(complete.replace(field, "").as_bytes()).unwrap()["focused_checks_passed"],
+                false
+            );
+        }
+        for (a, b) in [
+            ("66528004", "1"),
+            ("4429", "4499"),
+            ("oFYTx673sc7Sq4Dw74vsAby6SHVAbin3QtT8dmGzaLo", "wrong"),
+        ] {
+            assert_eq!(
+                read_trace(complete.replace(a, b).as_bytes()).unwrap()["focused_checks_passed"],
+                false
+            );
+        }
     }
 }

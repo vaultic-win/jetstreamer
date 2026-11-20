@@ -1,6 +1,7 @@
 //! One owner, one generation. The producer remains inside gate172 until actual guard
 //! completion and an independent second complete host fit permit the trace payload.
 #![recursion_limit = "384"]
+mod closure;
 mod fit;
 mod launch;
 mod peers;
@@ -20,7 +21,7 @@ use std::{
 };
 
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-trace-admission-20261120-v1/admission-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v1";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const RETIRED: &str =
@@ -253,10 +254,48 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
         }
         binaries[name] = json!(hash);
     }
-    let extra = inputs::verify(&json_pin(
+    let proof = json_pin(
         &pkg.join("artifact-proof.json"),
         at(&binaries, "artifact-proof.json")?,
-    )?)?;
+    )?;
+    for key in ["admit172", "gate172", "trace172"] {
+        ensure!(
+            proof["artifacts"][key] == binaries[key],
+            "controller build/seal differs for {key}"
+        );
+    }
+    let repo = "/home/sol/workspace/jetstreamer";
+    let git = |argv: &[&str]| -> Result<String> {
+        let mut args = vec![
+            "--no-replace-objects".to_owned(),
+            "-c".into(),
+            format!("safe.directory={repo}"),
+            "-C".into(),
+            repo.into(),
+        ];
+        args.extend(argv.iter().map(|s| s.to_string()));
+        run("/usr/bin/git", &args, bounded())
+    };
+    let tracked = git(&["rev-parse", "refs/remotes/origin/account-updates^{commit}"])?;
+    let tip = tracked.trim();
+    let observed = at(&proof, "observed_origin")?;
+    ensure!(
+        observed.len() == 40 && observed.bytes().all(|b| b.is_ascii_hexdigit()),
+        "invalid observed origin"
+    );
+    for commit in [source, WORKER_SOURCE] {
+        git(&["merge-base", "--is-ancestor", commit, observed])?;
+    }
+    git(&["merge-base", "--is-ancestor", observed, tip])?;
+    ensure!(
+        git(&["rev-parse", &format!("{source}^{{tree}}")])?.trim() == at(&proof, "source_tree")?,
+        "controller source tree differs"
+    );
+    ensure!(
+        git(&["rev-parse", &format!("{WORKER_SOURCE}^{{tree}}")])?.trim() == WORKER_TREE,
+        "worker source tree differs"
+    );
+    let extra = inputs::verify(&proof)?;
     pinned(Path::new(GUARD), GUARD_SHA)?;
     pinned(Path::new(SEALER), SEALER_SHA)?;
     let retired = json_pin(Path::new(RETIRED), RETIRED_SHA)?;
@@ -279,6 +318,15 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).is_some_and(|a| a == "--close") {
+        ensure!(
+            unsafe { libc::geteuid() } == 0 && args.len() == 5,
+            "usage: admit172 --close ADMISSION_SHA CONTROLLER_SEAL_SHA SOURCE_COMMIT"
+        );
+        let provenance = verify_inputs(&args[3], &args[4])?;
+        println!("{}", closure::collect(&args[2], provenance)?);
+        return Ok(());
+    }
     ensure!(
         unsafe { libc::geteuid() } == 0
             && args.len() == 6

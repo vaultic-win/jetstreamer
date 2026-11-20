@@ -121,6 +121,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
             && fleet["all_reservation_ending_bytes"] == 0,
         "fleet lost the complete historical allocation"
     );
+    let closed = crate::peers::closed_predecessor(&fleet)?;
     let baseline = peer::bound(&peer::pair(BASE, BASE_SHA))?;
     let prior = &baseline["combined_additive_resources"];
     let owners = live::owners(&fleet, &e)?;
@@ -145,6 +146,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
     let free = free_before.min(disk::free()?);
     let data = audit_budget::data_requirements(&fit, free)?;
     ensure!(audit == audit_budget::observe()?, "audit owner changed");
+    crate::peers::closed_predecessor(&fleet)?;
     let after = live::resident(&owners, own_iid, &local168)?;
     ensure!(
         owners == live::owners(&fleet, &e)? && local168 == crate::peers::active168(&fleet)?,
@@ -212,7 +214,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         "final HOME availability below full fit"
     );
     Ok(
-        json!({"schema":"epoch172-complete-trace-host-fit-v1","fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth172,"root_cap_bytes":guard172::CAP,"epoch172_tree":own_root,"nominal_epoch172_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_172_booking_bytes":growth172,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
+        json!({"schema":"epoch172-complete-metered-host-fit-v2","closed_unpatched_predecessor":closed,"fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth172,"root_cap_bytes":guard172::CAP,"epoch172_tree":own_root,"nominal_epoch172_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_172_booking_bytes":growth172,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
     )
 }
 fn retained_build_images(native: &Value) -> Result<Value> {

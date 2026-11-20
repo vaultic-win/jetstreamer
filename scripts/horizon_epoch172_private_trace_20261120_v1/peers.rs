@@ -133,6 +133,23 @@ fn check_peer136() -> Result<()> {
 }
 pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     check_peer136()?;
+    let jobs = run(
+        "/usr/bin/systemctl",
+        &["list-jobs".into(), "--plain".into(), "--no-legend".into()],
+        bounded(),
+    )?;
+    for unit in jobs.lines().filter_map(|s| s.split_whitespace().nth(1)) {
+        let is_candidate = ["horizon-qualify-", "horizon-admit-", "horizon-guard-"]
+            .iter()
+            .any(|prefix| unit.starts_with(prefix))
+            && ["136", "169", "172"]
+                .iter()
+                .any(|epoch| unit.split('-').any(|field| field == *epoch));
+        ensure!(
+            !is_candidate || own.is_some() && [UNIT, TIMER, GUARD_SERVICE].contains(&unit),
+            "competing candidate queued {unit}"
+        );
+    }
     let rows = run(
         "/usr/bin/systemctl",
         &[
@@ -141,6 +158,8 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
             "--plain".into(),
             "--no-legend".into(),
             "--state=active,activating,deactivating,reloading".into(),
+            "*169*.service".into(),
+            "*169*.timer".into(),
             "*172*.service".into(),
             "*172*.timer".into(),
         ],
@@ -251,4 +270,62 @@ pub(super) fn root172() -> Result<Value> {
     Ok(
         json!({"allocated_bytes":a.min(b),"whole_lane":LANE,"historical_allocated_credit_bytes":0,"original_booking":book}),
     )
+}
+
+const CLOSED: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-terminal-cadence-20261120-v1/CLOSURE.json";
+const CLOSED_SHA: &str = "854539f0d9450b388e136092567438134efaab19f0570dee7bdeb4fcf53120c7";
+
+pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
+    let receipt = binding(Path::new(CLOSED), CLOSED_SHA);
+    let old = json_pin(Path::new(CLOSED), CLOSED_SHA)?;
+    let cmp = &old["signed_target_comparison"];
+    let observed = serde_json::from_slice::<Value>(include_bytes!("unpatched-logs.json"))?;
+    ensure!(
+        fleet["terminal172_closure"] == receipt
+            && fleet["historical_preterminal_private172_admission"] == old["original_admission"]
+            && old["original_invocation"] == "5a691c24655a4ff489531d8d7cc50254"
+            && old["original_pid"] == 2823601
+            && old["classification"] == "original-instruction-2-mismatch-reproduced"
+            && old["native_terminal"]["original_pid_absent_or_reused"] == true
+            && cmp["trace"]["logs"] == observed
+            && cmp["trace"]["matches_original_execution"] == true
+            && cmp["trace"]["matches_canonical_execution"] == false
+            && old["resource_credit_bytes"] == 0
+            && old["resource_promise_ending_bytes"] == 0,
+        "missing or conflicting prior failed 172 run"
+    );
+    for u in [
+        "horizon-qualify-172-trace-hourly-20261120-v1.service",
+        "horizon-guard-172-trace-hourly-20261120-v1.service",
+        "horizon-guard-172-trace-hourly-20261120-v1.timer",
+    ] {
+        idle(u)?;
+        let procs = Path::new("/sys/fs/cgroup/system.slice")
+            .join(u)
+            .join("cgroup.procs");
+        match fs::read_to_string(procs) {
+            Ok(p) => ensure!(p.trim().is_empty(), "predecessor cgroup still occupied"),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(receipt)
+}
+
+#[cfg(test)]
+mod metered_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires the live host's authenticated predecessor closure, read only"]
+    fn real_unpatched_log_and_drained_predecessor_match_fleet() {
+        let fleet_path = std::env::var("HORIZON172_TEST_CLOSED_FLEET").unwrap();
+        let fleet: Value =
+            serde_json::from_slice(&read_root(Path::new(&fleet_path)).unwrap()).unwrap();
+        assert_eq!(closed_predecessor(&fleet).unwrap()["sha256"], CLOSED_SHA);
+        let mut stale = fleet;
+        stale["terminal172_closure"]["sha256"] = json!("wrong");
+        assert!(closed_predecessor(&stale).is_err());
+    }
 }

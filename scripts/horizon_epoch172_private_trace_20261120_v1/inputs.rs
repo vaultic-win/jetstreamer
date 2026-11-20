@@ -72,8 +72,8 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
         seal["destination"].as_str() == input_dir.to_str() && seal["remote_mutations"] == false,
         "wrong input package"
     );
-    let worker_sha = env!("HORIZON172_TRACE_WORKER_SHA256");
-    let worker_bytes: u64 = env!("HORIZON172_TRACE_WORKER_BYTES").parse()?;
+    let worker_sha = WORKER_SHA;
+    let worker_bytes = WORKER_BYTES;
     let member = |name: &str| -> Result<&Value> {
         let mut rows = members.iter().filter(|r| r["name"] == name);
         let r = rows.next().context("missing input member")?;
@@ -91,7 +91,16 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
     let meta = member("artifact-proof.json")?;
     let build = json_pin(&input_dir.join("artifact-proof.json"), at(meta, "sha256")?)?;
     ensure!(
-        build["worker_source_commit"] == MERGED_WORKER
+        build["worker_source_commit"] == WORKER_SOURCE
+            && build["worker_tree"] == WORKER_TREE
+            && build["worker_features"] == json!([WORKER_FEATURE])
+            && build["build_invocation"] == "837e462108564861851d0c7bdc3ae218"
+            && build["build_unit"] == "horizon-171-172-metered-worker-build-g3.service"
+            && build["evidence"]["release.jsonl"]
+                == "de59717a69f72c1cdf8c193da0cc29a40cd0844077d9df3f1d0862afa5418639"
+            && build["evidence"]["tests.log"]
+                == "300ba582612ff806af8457ae29d8c3e2bb8f61707f7073fc928696fc5cd36228"
+            && build["tests_passed"] == 48
             && build["worker_source_contained_in_origin_account_updates"] == true
             && build["worker_sha256"] == worker_sha
             && build["worker_bytes"] == worker_bytes
