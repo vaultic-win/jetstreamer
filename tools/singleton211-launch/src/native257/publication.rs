@@ -7,8 +7,35 @@ pub(super) fn validate(
     self_sha: &str,
     prepare_only: bool,
 ) -> Result<()> {
+    validate_native(
+        n,
+        proof,
+        guard,
+        self_sha,
+        prepare_only,
+        &SourceProfile {
+            epoch: 257,
+            harness: Bound::new(HARNESS, HARNESS_SHA),
+            worker: Bound::new(WORKER, WORKER_SHA),
+        },
+    )
+}
+
+pub(crate) struct SourceProfile {
+    pub(crate) epoch: u64,
+    pub(crate) harness: Bound,
+    pub(crate) worker: Bound,
+}
+pub(crate) fn validate_native(
+    n: &mut Native,
+    proof: &Value,
+    guard: &Bound,
+    self_sha: &str,
+    prepare_only: bool,
+    profile: &SourceProfile,
+) -> Result<()> {
     ensure!(
-        proof["schema"] == "horizon-native257-source-publication-v1"
+        proof["schema"] == format!("horizon-native{}-source-publication-v1", profile.epoch)
             && proof["remote_ref"] == "refs/heads/account-updates",
         "source publication schema/ref"
     );
@@ -55,7 +82,11 @@ pub(super) fn validate(
         git(n, &["merge-base", "--is-ancestor", commit, head])?;
         let provenance = binding(&r["provenance"])?.sealed()?;
         ensure!(
-            provenance["schema"] == "horizon-native257-exact-artifact-provenance-v1"
+            provenance["schema"]
+                == format!(
+                    "horizon-native{}-exact-artifact-provenance-v1",
+                    profile.epoch
+                )
                 && provenance["artifact"] == r["artifact"]
                 && provenance["source_commit"] == commit
                 && provenance["all_source_dependencies_enumerated"] == true,
@@ -79,10 +110,7 @@ pub(super) fn validate(
             );
         }
         match role {
-            "harness" => ensure!(
-                artifact == Bound::new(HARNESS, HARNESS_SHA),
-                "harness role mismatch"
-            ),
+            "harness" => ensure!(artifact == profile.harness, "harness role mismatch"),
             "guard" => ensure!(&artifact == guard, "guard role mismatch"),
             "sealer" => ensure!(
                 artifact == Bound::new(SEALER, SEALER_SHA),
@@ -92,10 +120,7 @@ pub(super) fn validate(
                 artifact.path == fs::canonicalize("/proc/self/exe")? && artifact.sha256 == self_sha,
                 "launcher role mismatch"
             ),
-            "worker" => ensure!(
-                artifact == Bound::new(WORKER, WORKER_SHA),
-                "worker role mismatch"
-            ),
+            "worker" => ensure!(artifact == profile.worker, "worker role mismatch"),
             "fleet" | "observer" | "inactive-status" => (),
             _ => bail!("unregistered source artifact role {role}"),
         }

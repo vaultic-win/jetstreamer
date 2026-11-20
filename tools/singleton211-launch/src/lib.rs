@@ -31,6 +31,7 @@ mod lifecycle;
 mod live;
 pub mod native257;
 pub mod native257_fit;
+pub mod native261;
 mod native265_growth;
 mod peer_window;
 mod peers;

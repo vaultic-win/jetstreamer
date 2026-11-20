@@ -6,11 +6,12 @@ mod handoff;
 mod retire;
 mod startup;
 mod units;
+pub(super) use units::cpu_sharing;
 const EXPECTED_FILESYSTEM: &str = ROOT;
 #[path = "../../native265-launch/src/qualification.rs"]
 mod stop;
 
-mod publication;
+pub(crate) mod publication;
 
 pub(super) const UNIT: &str = "horizon-257-native-input-20261120-v1.service";
 pub(super) const GUARD_UNIT: &str = "horizon-native257-protective-v1.service";
@@ -88,7 +89,7 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -
     );
     Ok(())
 }
-fn process_ticks(pid: u64) -> Result<u64> {
+pub(super) fn process_ticks(pid: u64) -> Result<u64> {
     let stat = fs::read_to_string(format!("/proc/{pid}/stat"))?;
     Ok(stat
         .rsplit_once(')')
