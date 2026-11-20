@@ -476,11 +476,22 @@ impl Drop for ChildGroup {
 // Child logs are bounded while the process runs. This is a local audit guard,
 // not an observation of or admission authority over campaign replay lanes.
 pub fn run_logged(
+    command: Command,
+    log: &Path,
+    timeout: u64,
+    max_log: u64,
+    cfg: &Config,
+) -> Result<bool> {
+    run_logged_observed(command, log, timeout, max_log, cfg, |_| Ok(()))
+}
+
+pub fn run_logged_observed(
     mut command: Command,
     log: &Path,
     timeout: u64,
     max_log: u64,
     cfg: &Config,
+    mut on_progress: impl FnMut(Option<bool>) -> Result<()>,
 ) -> Result<bool> {
     let state = &cfg.state_directory;
     // Establish both filesystem floors before the child can do useful work.
@@ -513,6 +524,7 @@ pub fn run_logged(
     let mut last_allocation_check = Instant::now().checked_sub(Duration::from_secs(30)).unwrap();
     loop {
         if let Some(exit) = owned.child.try_wait()? {
+            on_progress(Some(exit.success()))?;
             owned.reaped = true;
             file.sync_all()?;
             write_json(
@@ -532,6 +544,7 @@ pub fn run_logged(
             return Ok(exit.success());
         }
         let guard = (|| -> Result<()> {
+            on_progress(None)?;
             ensure!(
                 start.elapsed() <= Duration::from_secs(timeout),
                 "subprocess timeout"

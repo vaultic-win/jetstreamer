@@ -365,9 +365,6 @@ impl Retained {
             _lock: Arc::new(file),
         })
     }
-    pub(super) fn path(&self) -> PathBuf {
-        PathBuf::from(SCRATCH)
-    }
     pub(super) fn stream(&self) -> Result<Sink> {
         saved_inputs()?;
         let f = OpenOptions::new()
@@ -415,7 +412,7 @@ impl Retained {
     }
 }
 pub(crate) enum Sink {
-    New(File),
+    HashOnly,
     Compare {
         file: File,
         bytes: u64,
@@ -440,7 +437,7 @@ fn compare<W: Read>(reader: &mut W, mut bytes: &[u8]) -> io::Result<()> {
 impl Write for Sink {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            Self::New(f) => f.write(buf),
+            Self::HashOnly => Ok(buf.len()),
             Self::Compare { file, bytes, .. } => {
                 let next = bytes
                     .checked_add(buf.len() as u64)
@@ -456,8 +453,7 @@ impl Write for Sink {
     }
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            Self::New(f) => f.flush(),
-            Self::Compare { .. } => Ok(()),
+            Self::HashOnly | Self::Compare { .. } => Ok(()),
         }
     }
 }
@@ -471,7 +467,7 @@ fn finish_stream(reader: &mut impl Read, received: u64, expected: u64) -> Result
 impl Sink {
     pub(crate) fn sync_all(&mut self) -> Result<()> {
         match self {
-            Self::New(f) => f.sync_all()?,
+            Self::HashOnly => (),
             Self::Compare { file, bytes, owner } => {
                 finish_stream(file, *bytes, LENGTH)?;
                 ensure!(

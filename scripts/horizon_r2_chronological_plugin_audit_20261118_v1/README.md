@@ -1,13 +1,24 @@
 # Chronological Horizon R2 plugin audit
 
-This standalone Rust controller audits every canonical `epoch-N.jet` in a frozen,
-authenticated, bucket-wide inventory, in numeric epoch order. It uses a private
-scratch download, runs the current `account-updates` `horizon_pipeline` with the
-read-only `VerificationPlugin`, commits a pass/failure receipt, deletes only that
-audit download, and continues. It does not issue any R2 mutation, publish readiness
-sidecars, alter campaign status JSONs, retire existing local archives, or launch
-replay lanes. An archive without a checksum sidecar is included and its absence is
-recorded; it is never promoted to ready by this audit.
+Run `audit run-public CONFIG.json` for the chronological public archive audit. It
+freezes an authenticated bucket inventory, groups consecutive epoch numbers and
+runs one current `account-updates` verification plugin per range. Each public HTTP
+range read checks the numeric byte extent, total length, strong ETag and status.
+The only persistent playback output is metadata. The authenticated sidecar check
+records staging, metadata disagreement or failed sidecar inspection separately.
+
+The `public-stream-v1` directory under the configured state holds `inventory.json`,
+`progress.json`, `summary.json` and `results/epoch-N.json`. Each successful result
+binds a native full-epoch report, pinned object and plugin artifact. Each attempt
+retains its range command, log and exit record. A lost connection triggers bounded
+same-object retries. A second failed playback leaves an unresolved epoch with both
+attempts recorded, then later epochs continue. Branch or capacity interruptions
+preserve completed receipts. Restarting the same persistent unit resumes the first
+unfinished epoch. A separate state directory starts a new sweep.
+
+The previous `run` and `resume-downloaded` modes retain their historical download
+receipts and recovery protocol. The deployment history and scratch sizing below
+describe those modes.
 
 The independent service is the owner. An agent can inspect its JSONs or journal,
 but need not stay alive for the work to continue. The filesystem lock prevents

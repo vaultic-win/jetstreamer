@@ -399,11 +399,14 @@ fn report_shapes(
             && lp["invocation"] == json!(plugin_args(plan, false)),
         "original local plugin acceptance differs"
     );
-    validate_report(raw, EPOCH, Path::new(LOCAL), &plugin_args(plan, false))?;
+    validate_report(raw, EPOCH, LOCAL, &plugin_args(plan, false))?;
     validate_report(
         remote,
         EPOCH,
-        &Path::new(RUN).join("readback"),
+        Path::new(RUN)
+            .join("readback")
+            .to_str()
+            .context("non-UTF8 readback")?,
         &plugin_args(plan, true),
     )?;
     ensure!(

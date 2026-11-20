@@ -25,6 +25,9 @@ use std::task::{Context, Poll};
 
 use reqwest::{Client, Url};
 use rseek::Seekable;
+
+mod pinned;
+pub use pinned::PinnedArchives;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader, ReadBuf};
 
 use jetstreamer_horizon::account_updates::AccountUpdateView;
@@ -70,6 +73,8 @@ pub enum JetSource {
     /// A base URL under which `epoch-<N>.jet` is served, seeked with
     /// `rseek` HTTP range requests. Must end with `/` to join correctly.
     HttpBase(Url),
+    /// HTTPS range reads with an explicit authenticated ETag and length per epoch.
+    HttpPinned(PinnedArchives),
 }
 
 impl JetSource {
@@ -111,6 +116,7 @@ impl std::fmt::Debug for JetSource {
                 .field("len", &bytes.len())
                 .finish(),
             Self::LocalDir(dir) => f.debug_tuple("LocalDir").field(dir).finish(),
+            Self::HttpPinned(_) => f.write_str("HttpPinned"),
             Self::HttpBase(url) => f.debug_tuple("HttpBase").field(url).finish(),
         }
     }
@@ -185,10 +191,17 @@ where
     V: SlotVisitor + Send + 'static,
 {
     let threads = threads.max(1);
-    let client = Client::new();
+    let client = if matches!(src, JetSource::HttpPinned(_)) {
+        Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(io::Error::other)?
+    } else {
+        Client::new()
+    };
 
     // --- read framing once (header at the front, footer + index at the tail) ---
-    let mut probe = open_jet_stream(&src, epoch, &client).await?;
+    let mut probe = open_jet_stream(&src, epoch, &client, false).await?;
     let total_len = probe.len();
     if total_len < FOOTER_LEN as u64 {
         return Err(HorizonFirehoseError::Truncated);
@@ -262,7 +275,7 @@ where
                 return Ok(());
             }
 
-            let mut s = open_jet_stream(&src2, epoch, &client2).await?;
+            let mut s = open_jet_stream(&src2, epoch, &client2, true).await?;
             for b in chunk {
                 let e = index2[b];
                 let mut buf = recycle_rx.try_recv().unwrap_or_default();
@@ -411,24 +424,30 @@ async fn open_jet_stream(
     src: &JetSource,
     epoch: u64,
     client: &Client,
-) -> Result<EpochStream, HorizonFirehoseError> {
-    match src {
+    read_ahead: bool,
+) -> Result<RangeReader, HorizonFirehoseError> {
+    let stream = match src {
+        JetSource::HttpPinned(inventory) => {
+            return Ok(RangeReader::Pinned(
+                inventory.open(epoch, client, read_ahead)?,
+            ));
+        }
         JetSource::Memory { epoch: held, bytes } => {
             if *held != epoch {
                 return Err(HorizonFirehoseError::Url(format!(
                     "in-memory source holds epoch {held}, not {epoch}"
                 )));
             }
-            Ok(EpochStream::new(MemJetReader {
+            EpochStream::new(MemJetReader {
                 bytes: bytes.clone(),
                 pos: 0,
-            }))
+            })
         }
         JetSource::LocalDir(dir) => {
             let path = dir.join(format!("epoch-{epoch}.jet"));
             let file = tokio::fs::File::open(&path).await?;
             let len = file.metadata().await?.len();
-            Ok(EpochStream::new(LocalJetReader { file, len }))
+            EpochStream::new(LocalJetReader { file, len })
         }
         JetSource::HttpBase(base) => {
             let url = base
@@ -437,12 +456,13 @@ async fn open_jet_stream(
             let req_url = url.to_string();
             let c = client.clone();
             let seekable = Seekable::new(move || c.get(req_url.clone())).await;
-            Ok(EpochStream::new(BufReader::with_capacity(
-                1 << 20,
-                seekable,
-            )))
+            EpochStream::new(BufReader::with_capacity(1 << 20, seekable))
         }
-    }
+    };
+    Ok(RangeReader::Seekable {
+        stream,
+        position: 0,
+    })
 }
 
 /// One bucket's raw bytes on their way from a fetcher to its decoder:
@@ -466,27 +486,44 @@ impl RawBucket {
     }
 }
 
-/// Seeks to `offset` and reads exactly `len` bytes: one bucket frame (or a
-/// framing range) per call, mapping to a single HTTP range request.
-async fn read_range(stream: &mut EpochStream, offset: u64, len: usize) -> io::Result<Vec<u8>> {
-    stream.seek(io::SeekFrom::Start(offset)).await?;
+enum RangeReader {
+    Seekable { stream: EpochStream, position: u64 },
+    Pinned(pinned::Reader),
+}
+impl RangeReader {
+    fn len(&self) -> u64 {
+        match self {
+            Self::Seekable { stream, .. } => stream.len(),
+            Self::Pinned(stream) => stream.len(),
+        }
+    }
+}
+
+async fn read_range(stream: &mut RangeReader, offset: u64, len: usize) -> io::Result<Vec<u8>> {
     let mut buf = Vec::new();
-    try_resize_read_buffer(&mut buf, len)?;
-    stream.read_exact(&mut buf).await?;
+    read_range_into(stream, offset, len, &mut buf).await?;
     Ok(buf)
 }
 
-/// [`read_range`] into a caller-provided (recycled) buffer: no allocation
-/// once the buffer has grown to bucket size.
 async fn read_range_into(
-    stream: &mut EpochStream,
+    stream: &mut RangeReader,
     offset: u64,
     len: usize,
     buf: &mut Vec<u8>,
 ) -> io::Result<()> {
-    stream.seek(io::SeekFrom::Start(offset)).await?;
     try_resize_read_buffer(buf, len)?;
-    stream.read_exact(buf).await?;
+    match stream {
+        RangeReader::Pinned(reader) => reader.read_at(offset, buf).await?,
+        RangeReader::Seekable { stream, position } => {
+            if *position != offset {
+                stream.seek(io::SeekFrom::Start(offset)).await?;
+            }
+            stream.read_exact(buf).await?;
+            *position = offset
+                .checked_add(len as u64)
+                .ok_or_else(|| io::Error::other("range overflow"))?;
+        }
+    }
     Ok(())
 }
 

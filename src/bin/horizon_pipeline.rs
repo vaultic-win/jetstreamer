@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use jetstreamer_firehose::epochs::epoch_to_slot_range;
-use jetstreamer_firehose::firehose_horizon::JetSource;
+use jetstreamer_firehose::firehose_horizon::{JetSource, PinnedArchives};
 use jetstreamer_horizon::archive::{BlockNotification, EntryRecord};
 use jetstreamer_horizon::transactions::Transaction;
 use jetstreamer_plugin::horizon::{
@@ -52,12 +52,14 @@ fn usage() -> ! {
         "usage: horizon-pipeline --archive-capacity-probe\n\
          or: horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
          [--threads N] [--clickhouse-dsn URL] [--bench|--verify-only] \
-         [--no-account-bytes] [--no-preload] [--verification-report PATH]\n\
+         [--no-account-bytes] [--no-preload] [--archive-inventory PATH] [--verification-report PATH | --verification-report-dir DIR]\n\
          --verify-only runs the read-only Horizon verification plugin over \
          every decoded record and account-data byte; it does not start or \
          write to ClickHouse\n\
          --verification-report writes a new durable JSON result after successful \
          --verify-only playback of a single epoch; PATH must be absolute\n\
+         --archive-inventory binds each anonymous HTTPS request to the archive ETag and length in PATH\n\
+         --verification-report-dir writes epoch-N.json after each successful epoch in an existing absolute directory\n\
          --no-account-bytes (with --bench): declare account-update data \
          unconsumed so the decoder skips diff reconstruction — benchmarks \
          the metadata-only fast path (update counts stay real, bytes read 0)\n\
@@ -290,6 +292,8 @@ async fn main() {
     let mut no_account_bytes = false;
     let mut no_preload = false;
     let mut verification_report = None;
+    let mut report_directory = None;
+    let mut archive_inventory = None;
     while let Some(flag) = args.next() {
         match flag.as_str() {
             "--threads" => {
@@ -304,6 +308,16 @@ async fn main() {
             "--verify-only" => verify_only = true,
             "--verification-report" => {
                 verification_report = Some(std::path::PathBuf::from(
+                    args.next().unwrap_or_else(|| usage()),
+                ));
+            }
+            "--verification-report-dir" => {
+                report_directory = Some(std::path::PathBuf::from(
+                    args.next().unwrap_or_else(|| usage()),
+                ));
+            }
+            "--archive-inventory" => {
+                archive_inventory = Some(std::path::PathBuf::from(
                     args.next().unwrap_or_else(|| usage()),
                 ));
             }
@@ -348,6 +362,14 @@ async fn main() {
     }
 
     let (start_epoch, end_epoch) = parse_range(&range);
+    if end_epoch < start_epoch {
+        usage();
+    }
+    if let Some(dir) = &report_directory {
+        if !verify_only || verification_report.is_some() || !dir.is_absolute() || !dir.is_dir() {
+            usage();
+        }
+    }
     if let Some(path) = &verification_report {
         if !verify_only || start_epoch != end_epoch || !path.is_absolute() {
             eprintln!(
@@ -360,7 +382,17 @@ async fn main() {
             std::process::exit(1);
         }
     }
-    let src = if location.starts_with("http://") || location.starts_with("https://") {
+    let src = if let Some(path) = &archive_inventory {
+        if !verify_only || !path.is_absolute() {
+            usage();
+        }
+        JetSource::HttpPinned(
+            PinnedArchives::load(&location, path).unwrap_or_else(|error| {
+                eprintln!("error: invalid archive inventory: {error}");
+                std::process::exit(1);
+            }),
+        )
+    } else if location.starts_with("http://") || location.starts_with("https://") {
         JetSource::http(&location).unwrap_or_else(|err| {
             eprintln!("error: {err}");
             std::process::exit(1);
@@ -486,6 +518,35 @@ async fn main() {
             }
             _ = shutdown.notified() => {
                 failure = Some(format!("interrupted by CTRL+C during epoch {epoch}"));
+                break;
+            }
+        }
+        if let Some(dir) = &report_directory {
+            let result = verification_plugin
+                .last_report()
+                .filter(|report| report.epoch == epoch)
+                .ok_or_else(|| {
+                    std::io::Error::other("missing completed plugin verification result")
+                })
+                .and_then(|report| {
+                    let temporary =
+                        dir.join(format!(".epoch-{epoch}-{}.pending", std::process::id()));
+                    report.write_json(
+                        &temporary,
+                        &location,
+                        &std::env::args().collect::<Vec<_>>(),
+                        (lo, hi),
+                    )?;
+                    // A separate observer can consume this file as soon as it appears.
+                    // Link only the fully written/fsynced result, preserving no-clobber.
+                    std::fs::hard_link(&temporary, dir.join(format!("epoch-{epoch}.json")))?;
+                    std::fs::remove_file(&temporary)?;
+                    std::fs::File::open(dir)?.sync_all()
+                });
+            if let Err(error) = result {
+                failure = Some(format!(
+                    "epoch {epoch}: cannot persist plugin verification report: {error}"
+                ));
                 break;
             }
         }

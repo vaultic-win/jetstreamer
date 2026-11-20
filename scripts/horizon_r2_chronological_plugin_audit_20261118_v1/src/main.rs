@@ -1,6 +1,7 @@
 //! Serial, read-only historical R2 audit. See README.md for deployment gates.
 mod evidence;
 mod local;
+mod public;
 mod range;
 mod remote;
 mod resume;
@@ -686,13 +687,13 @@ async fn main() -> Result<()> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     ensure!(
         args.len() == 2,
-        "usage: horizon-r2-chronological-plugin-audit <inventory|run|resume-downloaded|status|reconfigure> CONFIG.json"
+        "usage: horizon-r2-chronological-plugin-audit <inventory|run|resume-downloaded|run-public|status|reconfigure> CONFIG.json"
     );
     let mode = args[0].to_str().context("invalid mode")?;
     ensure!(
         matches!(
             mode,
-            "inventory" | "run" | "resume-downloaded" | "status" | "reconfigure"
+            "inventory" | "run" | "resume-downloaded" | "run-public" | "status" | "reconfigure"
         ),
         "invalid mode"
     );
@@ -763,6 +764,9 @@ async fn main() -> Result<()> {
         );
     } else {
         write_json(&config_path, &cfg, false)?;
+    }
+    if mode == "run-public" {
+        return public::supervise(&cfg, &Remote::from_env()?).await;
     }
     let _scratch_lock = lock_external_scratch(&cfg)?;
     let remote = Remote::from_env()?;

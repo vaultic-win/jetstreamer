@@ -247,7 +247,10 @@ impl Remote {
         }
         Ok((head.version_id().map(str::to_owned), metadata_hash))
     }
-    async fn sidecar(&self, object: &Object) -> Result<(Option<String>, Option<String>)> {
+    pub(super) async fn sidecar(
+        &self,
+        object: &Object,
+    ) -> Result<(Option<String>, Option<String>)> {
         let key = format!("{}.sha256", object.key);
         let head = match self
             .client

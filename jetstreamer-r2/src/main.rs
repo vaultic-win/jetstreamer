@@ -3231,6 +3231,15 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             .as_deref()
             .expect("delivery requires a receipt directory"),
     )?;
+    let public = match env::var("HORIZON_PUBLIC_BASE_URL") {
+        Ok(origin) => parse_public_config(&origin)?,
+        Err(env::VarError::NotPresent) if r2.bucket == "solana-archive-with-accounts-data" => {
+            parse_public_config("https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev")?
+        }
+        Err(error) => {
+            return Err(error).context("archive playback requires HORIZON_PUBLIC_BASE_URL");
+        }
+    };
     let local = read_local_archive(&config.directory, epoch)?;
     let archive_key = format!("epoch-{epoch}.jet");
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
@@ -3413,7 +3422,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         sha256: local.sha256_hex.clone(),
     };
     let reader_gate = tokio::task::spawn_blocking(move || -> Result<_> {
-        reader_gate.verify_remote(remote_object)?;
+        reader_gate.verify_remote(remote_object, public.base_url.as_str())?;
         Ok(reader_gate)
     })
     .await??;

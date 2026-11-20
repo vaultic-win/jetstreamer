@@ -211,16 +211,16 @@ receipts or logs.
 The authenticated S3 endpoint is not a public object origin, and R2 does not support S3 object
 ACLs such as `public-read`. Public visibility is configured once at the bucket level through its
 managed `r2.dev` hostname or a custom domain; it applies to existing and future archive and sidecar
-objects without rewriting them. The Horizon delivery workflow does not require
-`HORIZON_PUBLIC_BASE_URL`, anonymous-origin checks, or per-object ACL changes. Authenticated R2
-readback and the durable private receipt are the storage-completion proof and must not be delayed by
-public-origin configuration.
+objects without rewriting them. For the canonical bucket, the uploader plays each uploaded
+archive through the current Jetstreamer verification plugin at
+`https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev`. An explicit
+`HORIZON_PUBLIC_BASE_URL` selects the corresponding public origin for another bucket.
 
 R2's S3 `UploadPart` currently rejects `x-amz-checksum-sha256` even though the R2 compatibility
 matrix advertises composite SHA-256. The uploader therefore sends R2-validated `Content-MD5` for
 every part, reconstructs and checks the final multipart ETag, and reads the completed archive back
-through R2 while recomputing its whole-file SHA-256. Only after those checks and local source
-revalidation does it upload and read back the canonical whole-file `.sha256` sidecar. The sidecar
+through R2 while recomputing its whole-file SHA-256. After full public plugin playback,
+reader-branch and object-identity checks, and local source revalidation, it uploads and read back the canonical whole-file `.sha256` sidecar. The sidecar
 is therefore the remote completion marker; an archive key without its sidecar is staged and must
 not be consumed as complete. An orphan sidecar with no archive fails closed. If R2 exposes a native
 composite SHA-256 for an object, the uploader validates and uses it. A private, fsynced receipt is
@@ -279,7 +279,7 @@ jetstreamer-r2 retire-local /absolute/horizon/directory \
 `jetstreamer-r2-progressive` permits authenticated R2 storage after the full and current-plugin
 receipts agree with the archive. The matching authenticated archive/sidecar readback receipt makes
 the pair storage-complete. Local retirement remains stricter and additionally requires both
-adjacent-boundary receipts. It does not require an anonymous public-origin receipt. This allows
+adjacent-boundary receipts. This allows
 disjoint producers to exchange a verified boundary neighbor through R2 without creating a circular
 upload dependency. Use the Rust coordinator for new deployments. The legacy
 `scripts/sync_horizon_r2_progressive.py` coordinator is retained only for already-sealed workflows
@@ -335,8 +335,7 @@ For an actively generated range, `jetstreamer-r2-progressive` watches for comple
 pairs and invokes `jetstreamer-r2` serially. It checks whether an existing private receipt still
 describes the current local archive identity before skipping authenticated sync. Local retirement
 requires the authenticated R2 receipt, receipts from the exact approved full verifier/script,
-plugin binary/script, and boundary verifier/script, plus both adjacent archive boundaries. No
-anonymous-origin receipt is required. Use `--local-mutation-lock` when a reserve retirement wrapper
+plugin binary/script, and boundary verifier/script, plus both adjacent archive boundaries. Use `--local-mutation-lock` when a reserve retirement wrapper
 is installed so upload and local retirement cannot inspect or mutate the same pair concurrently.
 The coordinator never deletes remote data; all R2 operations and optional local retirement remain
 delegated to `jetstreamer-r2`.

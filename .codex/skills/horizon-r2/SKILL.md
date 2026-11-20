@@ -8,7 +8,7 @@ description: Generate, verify, upload, and safely retire Horizon epoch archives 
 ## Campaign operating priority
 
 On `dev-samjohnson`, place all Horizon epoch work on the `/home/sol` filesystem:
-archives, replay ledgers, snapshots, audit downloads and state, source/build caches,
+archives, replay ledgers, snapshots, audit receipts, source/build caches,
 temporary files, logs and runtime artifacts. The small root filesystem must not
 limit work while admitted home capacity is available. Check `findmnt -T` and
 `statvfs` for the actual backing filesystem, not just the pathname. Root-owned
@@ -18,10 +18,9 @@ small system service/mount definitions on root. Migrate existing storage at a
 safe owner boundary, preserving receipts, hashes, locks and recovery state;
 do not restart healthy replay just to change a path. Charge copied bytes and
 remaining growth to the home filesystem's existing complete fleet commitments.
-For the serial R2 audit, reserve the exact next object's bytes plus its bounded
-working growth; the largest accepted archive is a ceiling, not a reservation
-for every small epoch. When storage blocks the audit, fixing placement takes
-priority over adding unrelated cleanup tooling.
+The chronological archive audit streams public HTTP ranges. Budget bounded reader memory,
+logs and per-epoch receipts on home. Reserve archive-sized disk only for an operation that
+actually restores a local copy.
 
 Keep one controlling conversation per host and assigned campaign. Before booking resources or
 starting shared builds, admissions, launches or status writers, check the recorded owner and any
@@ -87,15 +86,12 @@ authorizes its replacement; a mismatch alone does not establish which copy is wr
 Cloudflare R2 public access is a bucket-level origin setting, not an S3 object ACL. R2 does not
 support `public-read`, `PutObjectAcl`, or the `x-amz-acl` upload header. Keep the authenticated S3
 API endpoint in `HORIZON_S3_ENDPOINT`. Do not rewrite objects or attempt per-object ACL changes to
-make them public. Anonymous-origin verification is not part of this workflow and must not delay
-authenticated upload, completion, status cleanup, or local retirement.
-
-Interpret an explicit request to make or mark all `.jet` archives and sidecars public as authority
-to enable the named bucket's managed `r2.dev` origin or named custom domain once. It is not authority
-to rewrite objects, change metadata, attempt unsupported per-object ACLs, or expose a different
-bucket. The bucket-level setting covers both existing and future objects. If the supplied
-control-plane credential cannot inspect or enable that origin, preserve all objects and report the
-permission blocker without holding up the authenticated archive campaign.
+make them public. For the canonical archive bucket, the anonymous reader origin is
+`https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev`. Archives are at
+`/epoch-N.jet` and readiness markers at `/epoch-N.jet.sha256`. Authenticated inventory,
+upload, status and private holding operations continue to use the configured S3 endpoint.
+If asked to enable public access, change only the named bucket’s managed origin or custom
+domain through the authorized control plane. Preserve all existing objects and metadata.
 
 Before publishing a `.jet` archive to R2, establish that it is readable by the archive consumer
 from the current `origin/account-updates` branch. This compatibility gate applies to archives only;
@@ -117,38 +113,50 @@ ancestor containment alone is insufficient. Unrelated documentation or operator 
 no redundant archive scan when exact reader equivalence is established. Preserve existing R2
 objects during historical compatibility audits; a failure authorizes diagnosis, not replacement.
 
-### Full plugin playback of R2 archive readback
+### Public playback for archive publication and historical audits
 
-An archive's R2 readback is successful only after the epoch has played through the current
-`origin/account-updates` Horizon plugin from beginning to end without issue. Feed the plugin the
-actual authenticated remote stream or an immutable scratch copy produced by that readback, bound
-to the exact bucket/key, ETag or version, length and whole-file SHA-256. Do not substitute the
-original local archive, an earlier local plugin receipt, a prefix/sample, header-only decoding,
-checksum-only success, or an interrupted/resumed tail that omits earlier epoch content.
+Play the complete public `.jet` through the verification plugin from the current
+`origin/account-updates`. Pin every public range request to the strong ETag and exact
+length of the authenticated archive key. Bind each receipt to its URL, inventory, reader
+commit and binary hash, invocation, first and last slot, slot and record counts and
+semantic stream digest. Require all expected slot notifications, including legitimate
+leader skips, and successful plugin finalization. A prefix read qualifies only connectivity.
 
-Fetch `account-updates`, build or prove exact source/dependency/feature equivalence of the plugin
-and its playback pipeline, and require the full expected epoch slot range, terminal boundary,
-normal plugin integrity checks and clean process completion. Skipped/corrupt records, suppressed
-plugin errors, premature EOF or missing terminal evidence fail the gate. Record the branch commit,
-plugin/pipeline artifact hashes, remote object identity and digest, actual invocation, observed
-first/last slot and full-range completion evidence in a durable readback-playback receipt. Recheck
-relevant branch changes before sidecar commit and repeat playback with the new plugin if needed.
+**After an archive upload**, the Rust uploader streams and hashes the entire authenticated
+object, then plays the public object with a single-epoch result.
 
-For a new upload, complete whole-object authenticated readback and this full remote plugin playback,
-then revalidate the local source before publishing the canonical `.sha256` readiness sidecar.
-Keep the uploaded archive staged if playback fails; fix and merge compatibility code, qualify it,
-and repeat the full remote playback. Do not publish the sidecar or retire local data on a failed
-or missing playback receipt. Require the Rust uploader/coordinator to enforce this receipt before
-its sidecar step; an existing upload path that commits the sidecar immediately after hashing the
-readback is insufficient and must be upgraded before the next archive publication. This gate also
-applies when auditing an existing remote archive, while preserving its existing objects and
-reporting failures without unauthorized replacement or deletion.
+```sh
+horizon_pipeline "$epoch" "$public_origin" --verify-only --threads "$threads" \
+  --archive-inventory "$inventory" --verification-report "$report"
+```
 
-Give failed historical audits first priority when choosing the next available repair slot.
-Preserve the failed attempt and record the stage it reached. For an interrupted transfer,
-retry the same authenticated object under the existing capacity and retry guards, then
-verify its whole-file digest and play it through the current plugin. Report its integrity
-as unknown until those checks supply evidence. If a completed readback establishes an
+The authenticated SHA-256 covers file bytes. The local and public plugin reports
+use identical worker counts and must agree on decoded counters and stream digest. Recheck
+source, branch and remote identity before committing the canonical readiness sidecar.
+An unpublished sidecar stays pending if the public reader fails. Keep local source and
+failure evidence for a retry. No archive-sized playback scratch is needed on the ordinary
+upload path.
+
+**For a historical audit**, list the authenticated inventory, select canonical
+`epoch-N.jet` keys, sort numerically and group them into maximal consecutive ranges.
+Account for staged archives and sidecar anomalies explicitly. Pass each range to one process. Supply an absolute
+inventory path and an existing private report directory.
+
+```sh
+horizon_pipeline "$first:$last" "$public_origin" --verify-only --threads "$threads" \
+  --archive-inventory "$inventory" --verification-report-dir "$reports"
+```
+
+This reuses one verification plugin across the range and streams directly from R2.
+Keep a durable per-epoch receipt and report the first incomplete epoch on interruption.
+Resume from that epoch's beginning in a new attempt, preserving earlier receipts and
+rechecking object and reader identity. A methodology restart begins at the first epoch
+and keeps its receipts and counts separate from prior runs.
+
+Give failed historical audits first priority in the next repair slot. Record whether the
+failure occurred during transport, decoding, or plugin validation. Retry interrupted
+transport against the pinned object. Keep integrity unknown until full verification or
+independent byte evidence identifies the cause. If a completed readback establishes an
 archive defect, prioritize reconstructing that epoch from verified inputs. If the fault
 is in the reader, repair the reader and repeat playback. Keep healthy work running while
 preparing recovery. Reconstructed archives follow the same publication and existing-object
@@ -801,6 +809,16 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   same-cluster genesis expected by the loader. A cached snapshot does not imply the genesis is
   present. Preseed only from digest-bound retained evidence and verify the copied digest and
   ownership; otherwise validate noninteractive gcloud authentication for the service identity.
+- Evaluate Blockzilla bank snapshots at
+  `https://pub-97348740d6ef467aa2f1b4b62daa98dc.r2.dev` when an exact snapshot key or
+  catalog is available. The documented Compact V2 block and PoH files supply ledger inputs.
+  A replay bootstrap also needs the bank and account state. Before selecting a Blockzilla
+  snapshot, bind its cluster, object identity and digest, restore it with the intended
+  historical runtime, and check the bank slot/hash and first replayed slot against the
+  canonical epoch boundary. A post-slot bank already contains that slot's execution.
+  Bind any PoH verification receipt to the same data and range. Compare actual transfer
+  sizes for equivalent inputs and use measured bytes for capacity planning. Continue
+  using the qualified GCS generation for epochs awaiting this evidence.
 - Before sealing a generation-pinned GCS restore helper, exercise its metadata parser against the
   host's live `gcloud storage objects describe --format=json` output. Current Homebrew gcloud uses
   normalized `crc32c_hash`, `md5_hash`, integer `size`, and `storage_url` fields, while older
@@ -1637,7 +1655,7 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   ready-pair completion or positively proven inactive/orphaned work, with authenticated conditional
   deletion and durable evidence. No prefix or bulk deletion is authorized.
 - Never use `--overwrite-existing` without both positive evidence that the existing remote `.jet` is erroneous and explicit user authorization for its replacement.
-- Upload the sidecar only after the complete `.jet` has passed remote readback, full beginning-to-end playback of the readback through the current `account-updates` plugin, and local source revalidation; the matching sidecar is the readiness marker.
+- Upload the sidecar only after the complete `.jet` has passed remote readback, full beginning-to-end playback from the public archive URL through the current `account-updates` plugin, and local source revalidation; the matching sidecar is the readiness marker.
 - Never remove a local archive before its durable receipt exists and both remote objects have been re-observed.
 - Refuse to begin upload without exact full and current-plugin receipts. Refuse local retirement without both adjacent-boundary receipts as well.
 - Do not treat a sidecar alone as proof that the archive was uploaded.

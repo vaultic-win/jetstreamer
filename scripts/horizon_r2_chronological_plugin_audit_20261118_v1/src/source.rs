@@ -190,6 +190,28 @@ fn network_git(cfg: &Config) -> Result<Command> {
         .env("GIT_SSH_COMMAND", ssh_command);
     Ok(c)
 }
+pub fn branch_tip(cfg: &Config) -> Result<String> {
+    let mut command = network_git(cfg)?;
+    command.args([
+        "ls-remote",
+        "--exit-code",
+        &cfg.repository,
+        "refs/heads/account-updates",
+    ]);
+    let text = capture(command)?;
+    let (commit, branch) = text
+        .trim()
+        .split_once('\t')
+        .context("missing remote branch")?;
+    ensure!(
+        branch == "refs/heads/account-updates"
+            && commit.len() == 40
+            && commit.bytes().all(|b| b.is_ascii_hexdigit()),
+        "invalid remote branch tip"
+    );
+    Ok(commit.to_owned())
+}
+
 fn cargo(cfg: &Config, source: &Path) -> Result<Command> {
     // ProtectSystem=strict makes the service's global /tmp read-only. Native
     // dependency build scripts must use scratch included in our allocation walk.

@@ -223,7 +223,6 @@ pub struct Gate {
     length: u64,
     digest: String,
     directory: PathBuf,
-    readback: PathBuf,
     retained: Option<staged247::Retained>,
     local_playback: Value,
     remote_playback: Option<Value>,
@@ -449,7 +448,7 @@ fn configure_thread_stack(command: &mut Command, bytes: Option<u64>) -> Result<(
     Ok(())
 }
 
-fn validate_report(report: &Value, epoch: u64, source: &Path, invocation: &[String]) -> Result<()> {
+fn validate_report(report: &Value, epoch: u64, source: &str, invocation: &[String]) -> Result<()> {
     let first = epoch.checked_mul(432000).context("epoch range overflow")?;
     let last = first.checked_add(431999).context("epoch range overflow")?;
     let r = &report["report"];
@@ -564,7 +563,7 @@ impl Gate {
             if retained.is_some() {
                 staged247::BUDGET
             } else {
-                length
+                0
             },
         )?;
         let directory = plan.scratch_directory.join(format!(
@@ -573,15 +572,6 @@ impl Gate {
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::DirBuilder::new().mode(0o700).create(&directory)?;
-        let readback = if let Some(prior) = &retained {
-            prior.path()
-        } else {
-            let remote_directory = directory.join("readback");
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(&remote_directory)?;
-            remote_directory.join(format!("epoch-{epoch}.jet"))
-        };
         let mut gate = Self {
             plan,
             plan_binding: binding,
@@ -589,20 +579,25 @@ impl Gate {
             length,
             digest: digest.into(),
             directory,
-            readback,
             retained,
             local_playback: Value::Null,
             remote_playback: None,
             minimum_thread_stack_bytes: qualification.minimum_thread_stack_bytes,
         };
         ensure!(
-            archive.file_name() == gate.readback.file_name(),
+            archive.file_name().and_then(|n| n.to_str()) == Some(&format!("epoch-{epoch}.jet")),
             "noncanonical local archive name"
         );
         let args = full_args;
         gate.command(&gate.plan.full_verifier, &args)?;
-        gate.local_playback =
-            gate.playback(archive.parent().context("archive parent")?, "local")?;
+        gate.local_playback = gate.playback(
+            archive
+                .parent()
+                .and_then(Path::to_str)
+                .context("archive parent")?,
+            "local",
+            None,
+        )?;
         write_json(
             &gate.directory.join("local-acceptance.json"),
             &json!({"schema":"horizon-current-reader-local-acceptance-v1","fetched_branch_commit":current,"source_equivalence":source_equivalence,"reader_plan":gate.plan_binding,"local_playback":gate.local_playback,"full_verifier":gate.plan.full_verifier,"full_invocation":args,"full_exit_code":0,"minimum_thread_stack_bytes":gate.minimum_thread_stack_bytes}),
@@ -624,17 +619,24 @@ impl Gate {
         bound_file(executable)
     }
 
-    fn playback(&self, source: &Path, label: &str) -> Result<Value> {
+    fn playback(&self, source: &str, label: &str, inventory: Option<&Bound>) -> Result<Value> {
         let path = self.directory.join(format!("{label}-plugin.json"));
-        let args = vec![
+        let mut args = vec![
             self.epoch.to_string(),
-            source.to_str().context("non-UTF8 source")?.into(),
+            source.into(),
             "--verify-only".into(),
             "--threads".into(),
             self.plan.threads.to_string(),
             "--verification-report".into(),
             path.to_str().context("non-UTF8 report")?.into(),
         ];
+        if let Some(binding) = inventory {
+            bound_file(binding)?;
+            args.extend([
+                "--archive-inventory".into(),
+                binding.path.to_str().context("non-UTF8 inventory")?.into(),
+            ]);
+        }
         self.command(&self.plan.pipeline, &args)?;
         let mut invocation = vec![
             self.plan
@@ -663,24 +665,17 @@ impl Gate {
         )
     }
 
-    /// Accept every byte from the authenticated R2 stream, either writing a new
-    /// scratch archive or comparing against the original retained readback.
+    /// The caller hashes the authenticated stream. The staged recovery additionally
+    /// compares those bytes with its retained, identity-bound inode.
     pub fn create_readback(&self) -> Result<staged247::Sink> {
         if let Some(prior) = &self.retained {
             check_readback_capacity(&self.plan, staged247::BUDGET)?;
             return prior.stream();
         }
-        check_readback_capacity(&self.plan, self.length)?;
-        Ok(staged247::Sink::New(
-            OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&self.readback)?,
-        ))
+        Ok(staged247::Sink::HashOnly)
     }
 
-    pub fn verify_remote(&mut self, remote: RemoteObject) -> Result<()> {
+    pub fn verify_remote(&mut self, remote: RemoteObject, public_origin: &str) -> Result<()> {
         self.remote_playback = None;
         ensure!(
             remote.key == format!("epoch-{}.jet", self.epoch)
@@ -693,25 +688,25 @@ impl Gate {
         if let Some(prior) = &self.retained {
             prior.verify_object(&remote)?;
             prior.proof()?;
-        } else {
-            fs::set_permissions(&self.readback, fs::Permissions::from_mode(0o400))?;
-            File::open(&self.readback)?.sync_all()?;
-            File::open(self.readback.parent().context("readback parent")?)?.sync_all()?;
         }
+        let inventory = write_json(
+            &self.directory.join("public-archive-inventory.json"),
+            &json!({
+                "schema":"horizon-r2-chronological-audit-inventory-v1",
+                "bucket":remote.bucket, "observed_at":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                "objects":[{"epoch":self.epoch, "key":remote.key, "bytes":remote.length,
+                    "etag":format!("\"{}\"",remote.etag)}]
+            }),
+        )?;
+        let result = self.playback(public_origin, "remote", Some(&inventory))?;
         ensure!(
-            hash_file(&self.readback)? == (self.digest.clone(), self.length),
-            "readback differs before playback"
+            result["report"]["report"] == self.local_playback["report"]["report"],
+            "public verification counters or stream digest differ from local playback"
         );
-        let before = identity(&fs::symlink_metadata(&self.readback)?);
-        let result = self.playback(self.readback.parent().context("readback parent")?, "remote")?;
-        ensure!(
-            identity(&fs::symlink_metadata(&self.readback)?) == before
-                && hash_file(&self.readback)? == (self.digest.clone(), self.length),
-            "readback changed during playback"
-        );
-        self.remote_playback = Some(
-            json!({"object":remote,"readback_path":self.readback,"readback_identity":before,"playback":result}),
-        );
+        self.remote_playback = Some(json!({
+            "object":remote, "public_origin":public_origin, "archive_inventory":inventory,
+            "playback":result
+        }));
         Ok(())
     }
 
@@ -789,7 +784,7 @@ mod tests {
         validate_report(
             v,
             251,
-            Path::new("/readback"),
+            "/readback",
             &["pipeline".into(), "--verify-only".into()],
         )
     }
@@ -1015,7 +1010,6 @@ mod tests {
             length: 1,
             digest: "a".repeat(64),
             directory: dir.path().into(),
-            readback: dir.path().join("readback"),
             retained: None,
             local_playback: json!({}),
             remote_playback: None,
