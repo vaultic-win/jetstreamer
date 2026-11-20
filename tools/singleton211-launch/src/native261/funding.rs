@@ -16,7 +16,7 @@ pub(super) fn charges(controls: &Value, controller: &str) -> Result<Value> {
         if unit == controller {
             ensure!(
                 !found && bytes == CONTROLLER_MEMORY,
-                "incorrect 261 controller booking"
+                "incorrect {EPOCH} controller booking"
             );
             found = true;
         } else {
@@ -27,7 +27,7 @@ pub(super) fn charges(controls: &Value, controller: &str) -> Result<Value> {
     let needed = capacity::add(other, capacity::add(GUARD_MEMORY, CONTROLLER_MEMORY)?)?;
     ensure!(
         needed <= CONTROL,
-        "existing control envelope does not cover 261 and booked controls"
+        "existing control envelope does not cover {EPOCH} and booked controls"
     );
     Ok(
         json!({"producer_maximum_bytes":MEMORY,"guard_maximum_bytes":GUARD_MEMORY,
@@ -39,61 +39,80 @@ pub(super) fn charges(controls: &Value, controller: &str) -> Result<Value> {
     )
 }
 
-// Preserve the neighbouring 257 slot when the second boundary booking funds 261.
-// A nominal 257 ledger row already contributes its memory and disk in booked_arithmetic.
+// When retry funding is used, preserve each pending neighbouring producer.
+// A producer already in the ledger contributes its memory and disk there.
 fn candidate_capacity(
     host: &native257_fit::BookedHost,
     resources: (u64, u64, u64),
     envelope: &Value,
     controls: &Value,
 ) -> Result<Value> {
-    let incoming = host.retry_memory.is_some();
-    let existing = host.rows.iter().find(|r| r.unit == native257::UNIT);
-    let (peer_memory, peer_disk, control_excess) = if incoming {
-        let guard_booked = controls
-            .as_array()
-            .context("booked controls")?
-            .iter()
-            .find(|r| r["unit"] == native257::GUARD_UNIT);
-        if let Some(g) = guard_booked {
-            ensure!(
-                num(g, "maximum_memory_bytes")? == GUARD_MEMORY,
-                "257 guard cap differs"
-            );
-        }
-        let additional_guard = if guard_booked.is_some() {
-            0
-        } else {
-            GUARD_MEMORY
-        };
-        let (memory, disk, controller) = if let Some(r) = existing {
-            ensure!(
-                r.release.is_none()
-                    && r.maximum_memory_bytes == native257_fit::NATIVE257_MEMORY
-                    && r.remaining_disk_growth_bytes >= native257_fit::NATIVE257_DISK,
-                "257 reservation cannot cover the paired native producer"
-            );
-            (0, 0, 0)
-        } else {
-            ensure!(
-                !host.currents.contains_key(native257::UNIT),
-                "live 257 lacks full booking"
-            );
-            // The outer 257 launcher is reserved for a separate, future activation.
+    let mut peer_memory = 0;
+    let mut peer_disk = 0;
+    let mut total_controls = num(envelope, "total_control_charged_bytes")?;
+    let mut paired = Vec::new();
+    if host.retry_memory.is_some() {
+        // The completed retry funds the neighbouring 257 and 261 starts. Preserve
+        // each unconsumed hold once, including when 212 is the incoming candidate.
+        let peers = [
             (
+                257,
+                native257::UNIT,
+                native257::GUARD_UNIT,
                 native257_fit::NATIVE257_MEMORY,
                 native257_fit::NATIVE257_DISK,
                 512 << 20,
-            )
-        };
-        let required = capacity::add(
-            num(envelope, "total_control_charged_bytes")?,
-            capacity::add(additional_guard, controller)?,
-        )?;
-        (memory, disk, required.saturating_sub(CONTROL))
-    } else {
-        (0, 0, 0)
-    };
+            ),
+            (
+                261,
+                crate::native261::UNIT,
+                crate::native261::GUARD_UNIT,
+                crate::native261::MEMORY,
+                crate::native261::DISK_RECEIPTS,
+                crate::native261::CONTROLLER_MEMORY,
+            ),
+        ];
+        let control_rows = controls.as_array().context("booked controls")?;
+        for (epoch, unit, guard, memory, disk, controller) in peers {
+            if unit == UNIT {
+                continue;
+            }
+            let original_excess = total_controls.saturating_sub(CONTROL);
+            let existing = host.rows.iter().find(|r| r.unit == unit);
+            if let Some(r) = existing {
+                ensure!(
+                    r.release.is_none()
+                        && r.maximum_memory_bytes == memory
+                        && r.remaining_disk_growth_bytes >= disk,
+                    "native {epoch} reservation cannot cover its paired producer"
+                );
+            } else {
+                ensure!(
+                    !host.currents.contains_key(unit),
+                    "live {epoch} lacks its booking"
+                );
+                peer_memory = capacity::add(peer_memory, memory)?;
+                peer_disk = capacity::add(peer_disk, disk)?;
+                total_controls = capacity::add(total_controls, controller)?;
+            }
+            if let Some(row) = control_rows.iter().find(|r| r["unit"] == guard) {
+                ensure!(
+                    num(row, "maximum_memory_bytes")? == GUARD_MEMORY,
+                    "paired guard cap differs"
+                );
+            } else {
+                total_controls = capacity::add(total_controls, GUARD_MEMORY)?;
+            }
+            paired.push((
+                epoch,
+                json!({"unit":unit,"already_in_ledger":existing.is_some(),
+                "additional_producer_memory_bytes":if existing.is_some(){0}else{memory},
+                "additional_control_envelope_bytes":total_controls.saturating_sub(CONTROL) - original_excess,
+                "additional_disk_bytes":if existing.is_some(){0}else{disk}}),
+            ));
+        }
+    }
+    let control_excess = total_controls.saturating_sub(CONTROL);
     let mut cap = capacity::candidate_arithmetic(
         resources,
         host.century,
@@ -105,13 +124,15 @@ fn candidate_capacity(
             capacity::add(DISK_RECEIPTS, peer_disk)?,
         ),
     )?;
-    if incoming {
-        // Keep the pending 257 floor during subsequent 261 pretoken checks.
+    if !paired.is_empty() {
+        // The producer must preserve its neighbours’ original disk floor before token issuance.
         cap["protected_existing_floor_bytes"] = json!(capacity::add(
             num(&cap, "protected_existing_floor_bytes")?,
             peer_disk
         )?);
-        cap["paired_native257"] = json!({"unit":native257::UNIT,"already_in_ledger":existing.is_some(),"additional_producer_memory_bytes":peer_memory,"additional_disk_bytes":peer_disk,"additional_control_envelope_bytes":control_excess});
+        for (epoch, detail) in paired {
+            cap[format!("paired_native{epoch}")] = detail;
+        }
     }
     Ok(cap)
 }
@@ -124,7 +145,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
         ensure!(
             fs::read_to_string("/proc/self/cgroup")?.trim()
                 == format!("0::/system.slice/{controller}"),
-            "261 admission outside booked controller"
+            "{EPOCH} admission outside booked controller"
         );
         Ok(())
     };
@@ -132,7 +153,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     let owner = n.show(controller)?;
     ensure!(
         text(&owner, "MainPID")?.parse::<u32>()? == std::process::id() && owner["Type"] == "exec",
-        "261 controller is not main process"
+        "{EPOCH} controller is not main process"
     );
     live::finite_owner(&owner, controller, &iid, CONTROLLER_MEMORY)?;
     let path = Path::new(FILESYSTEM);
@@ -144,7 +165,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     }
     ensure!(
         disk_info.f_type == libc::EXT4_SUPER_MAGIC,
-        "261 receipt ledger is not on the admitted ext4 filesystem"
+        "{EPOCH} receipt ledger is not on the admitted ext4 filesystem"
     );
     if held {
         let producer = n.show(UNIT)?;
@@ -168,7 +189,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
         host.rows
             .iter()
             .all(|row| row.unit != UNIT && row.unit != GUARD_UNIT && row.unit != controller),
-        "261 owner or control already booked as producer"
+        "{EPOCH} owner or control already booked as producer"
     );
     ensure!(
         disk_fd.metadata()?.dev() == host.device,
@@ -186,7 +207,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     let capacity = candidate_capacity(&host, resources, &envelope, &r["control_units"])?;
     ensure!(
         pristine(host.device)? == mount,
-        "261 tmpfs changed across host accounting"
+        "{EPOCH} tmpfs changed across host accounting"
     );
     let after = n.show(controller)?;
     live::same_owner(&owner, &after)?;
@@ -206,7 +227,7 @@ mod tests {
     use super::*;
     #[test]
     fn charges_candidate_once_and_preserves_other_controls() {
-        let ctl = "horizon261-controller.service";
+        let ctl = "horizon-test-controller.service";
         let row = |u: &str, b: u64| json!({"unit":u,"maximum_memory_bytes":b});
         let rows = json!([
             row(ctl, CONTROLLER_MEMORY),
@@ -214,12 +235,9 @@ mod tests {
         ]);
         let result = charges(&rows, ctl).unwrap();
         assert_eq!(result["total_control_charged_bytes"], CONTROL);
-        assert_eq!(result["candidate_total_memory_bytes"], 192_536_870_912u64);
+        assert_eq!(result["candidate_total_memory_bytes"], MEMORY + (512 << 20));
         assert_eq!(result["disk_receipt_growth_bytes"], 268_435_456u64);
-        assert_eq!(
-            result["additional_producer_memory_bytes"],
-            192_000_000_000u64
-        );
+        assert_eq!(result["additional_producer_memory_bytes"], MEMORY);
         for bad in [
             json!([]),
             json!([row(ctl, CONTROLLER_MEMORY - 1)]),
@@ -258,17 +276,25 @@ mod paired_tests {
         }
     }
     #[test]
-    fn new_retry_funding_protects_both_candidates_and_leaves_the_257_disk_floor_for_261() {
+    fn retry_funding_keeps_each_paired_producer_and_disk_floor() {
         let mut h = host();
         let e = json!({"total_control_charged_bytes":CONTROL});
         let ctl = json!([]);
         let both = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
+        let (extra_memory, extra_disk) = if EPOCH == 212 {
+            (
+                crate::native261::MEMORY + crate::native261::CONTROLLER_MEMORY + GUARD_MEMORY,
+                crate::native261::DISK_RECEIPTS,
+            )
+        } else {
+            (0, 0)
+        };
         h.retry_memory = None;
         let original = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
         assert_eq!(
             num(&both, "memory_obligation_after_bytes").unwrap()
                 - num(&original, "memory_obligation_after_bytes").unwrap(),
-            native257_fit::NATIVE257_MEMORY + 3 * GUARD_MEMORY
+            native257_fit::NATIVE257_MEMORY + 3 * GUARD_MEMORY + extra_memory
         );
         for k in [
             "required_initial_free_bytes",
@@ -276,7 +302,7 @@ mod paired_tests {
         ] {
             assert_eq!(
                 num(&both, k).unwrap() - num(&original, k).unwrap(),
-                native257_fit::NATIVE257_DISK
+                native257_fit::NATIVE257_DISK + extra_disk
             );
         }
         h.retry_memory = Some(json!({}));

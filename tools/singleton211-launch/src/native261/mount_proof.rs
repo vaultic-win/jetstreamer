@@ -8,7 +8,7 @@ pub(super) fn check_devices(latest: &Value, admitted: &Value) -> Result<()> {
             && latest["disk_device"] == admitted["disk_device"]
             && latest["boot_id"] == admitted["boot_id"]
             && latest["tmpfs"] == admitted["tmpfs"],
-        "261 devices changed since admission"
+        "{EPOCH} devices changed since admission"
     );
     Ok(())
 }
@@ -36,7 +36,7 @@ pub(super) fn check_mount_sample(a: &Value, g: &Value) -> Result<()> {
             && r["maximum_physical_bytes"] == ROOT_CAP
             && r["conservative_physical_bytes"] == 0
             && r["exceeds_budget"] == false,
-        "261 first guard did not protect the admitted empty tmpfs"
+        "{EPOCH} first guard did not protect the admitted empty tmpfs"
     );
     Ok(())
 }
