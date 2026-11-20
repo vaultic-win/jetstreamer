@@ -559,6 +559,12 @@ fn run() -> Result<()> {
         !a.is_empty(),
         "expected inventory|establish|prepare|post|session|register-status|release"
     );
+    if a.first().is_some_and(|mode| mode == "audit-owner") {
+        ensure!(a.len() == 3, "audit-owner FLEET SHA");
+        let fleet = json_pin(Path::new(&a[1]), &a[2])?;
+        println!("{}", fit::observe_audit(&fleet["continuing_audit_obligation"])?);
+        return Ok(());
+    }
     if a == ["inventory"] {
         println!(
             "{}",

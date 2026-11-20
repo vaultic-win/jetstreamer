@@ -76,6 +76,19 @@ sends `R`. That code and the original 7,396-slot reproduction are unchanged.
    donor fencing only with the existing `release` mode after actual candidate,
    guard, writer drain and admission expiry. A written source packet is not a run.
 
+## Public audit compatibility
+
+Run `admit136 audit-owner FLEET SHA` as the writer identity to qualify the read-only
+audit check independently of donor availability. The production fit uses the same
+check before and after its disk measurement. For public playback, expose the sealed
+observer package, its launch and predecessor receipts, audit state, deployed audit
+binary and config, and native systemd, proc and cgroup information to the writer.
+The controller verifies the public launch, PID, start ticks, executable, command
+line, cgroup, shared four-CPU slice and fleet inventory. Full-range playback streams
+archives with zero archive staging. The fit retains the 16 GiB working allowance,
+2 GiB Cargo allowance, existing HOME floors, memory, CPU and all replay obligations.
+Earlier download-mode fleets retain their exact archive and process checks.
+
 ## Parent evidence contract
 
 Let `REQUEST` and `READY` be exact path/SHA bindings to the emitted request and

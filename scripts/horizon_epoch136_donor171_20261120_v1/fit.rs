@@ -9,6 +9,9 @@ mod audit_budget;
 mod auxiliary_phases;
 #[path = "../horizon_epoch168_trace_admission_20261120_v1/fit_disk.rs"]
 mod disk;
+#[path = "fit_audit.rs"]
+mod audit;
+pub(super) use audit::observe as observe_audit;
 #[path = "fit_peers.rs"]
 mod live;
 #[allow(dead_code)]
@@ -130,8 +133,8 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
     let before = live::resident(&owners, own_iid, &local168)?;
     let memory_before = memory()?;
     let free_before = disk::free()?;
-    audit_budget::validate_fleet_obligation(&fleet["continuing_audit_obligation"])?;
-    let audit = audit_budget::observe()?;
+    let obligation = &fleet["continuing_audit_obligation"];
+    let audit = observe_audit(obligation)?;
     let auxiliary = aux(&fleet, &e)?;
     let roots = disk::measure()?;
     let own_growth = n(&roots, "remaining_standard_root_bytes")?;
@@ -145,8 +148,8 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         .try_fold(0, sum)?;
     let fit = json!({"complete_concurrent_remaining_growth_bytes":growth,"fresh_subtree_overlap_bytes":overlap,"unrelated_growth_margin_bytes":margin,"additional_growth_not_covered_by_existing_promise_bytes":peer::CAP,"required_raw_available_bytes":raw});
     let free = free_before.min(disk::free()?);
-    let data = audit_budget::data_requirements(&fit, free)?;
-    ensure!(audit == audit_budget::observe()?, "audit owner changed");
+    let data = audit::data(&fit, free, obligation)?;
+    ensure!(audit == observe_audit(obligation)?, "audit owner changed");
     let after = live::resident(&owners, own_iid, &local168)?;
     ensure!(
         owners == live::owners(&fleet, &e)? && local168 == crate::active168(&fleet)?,
