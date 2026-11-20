@@ -187,8 +187,12 @@ pub struct ThisComputeMeter {
 }
 impl ComputeMeter for ThisComputeMeter {
     fn consume(&mut self, amount: u64) -> Result<(), InstructionError> {
+        #[cfg(feature = "epoch136-charge-trace")]
+        let before = self.remaining;
         let exceeded = self.remaining < amount;
         self.remaining = self.remaining.saturating_sub(amount);
+        #[cfg(feature = "epoch136-charge-trace")]
+        crate::epoch136_trace::meter_charge(amount, before, self.remaining, exceeded);
         if exceeded {
             return Err(InstructionError::ComputationalBudgetExceeded);
         }
@@ -894,6 +898,8 @@ impl MessageProcessor {
         bpf_compute_budget: BpfComputeBudget,
     ) -> Result<(), TransactionError> {
         for (instruction_index, instruction) in message.instructions.iter().enumerate() {
+            #[cfg(feature = "epoch136-charge-trace")]
+            let _instruction_scope = crate::epoch136_trace::instruction(instruction_index);
             let instruction_recorder = instruction_recorders
                 .as_ref()
                 .map(|recorders| recorders[instruction_index].clone());
@@ -926,6 +932,50 @@ mod tests {
         native_loader::create_loadable_account,
     };
     use std::iter::FromIterator;
+
+    #[cfg(feature = "epoch136-charge-trace")]
+    #[test]
+    fn epoch136_actual_compute_meter_retains_exact_and_insufficient_boundaries() {
+        use crate::epoch136_trace as trace;
+        use solana_sdk::signature::Signature;
+        use std::str::FromStr;
+        let signature = Signature::from_str("2B96JV6WYJDwxNF3MS4KtS4jb1ToCcQ3xxhcKNysJsdK1jbZ45NCF1EiEWk5GK7Yr5LGVzrT1fBA6Jnvc9VU36L3").unwrap();
+        let message = Message::default();
+        let request = trace::arm(59_183_097, 197, &signature, &message).unwrap();
+        let mut meter = ThisComputeMeter { remaining: 2 };
+        {
+            let _transaction = trace::transaction(&signature, &message).unwrap();
+            let _instruction = trace::instruction(2).unwrap();
+            assert_eq!(meter.consume(2), Ok(()));
+            assert_eq!(
+                meter.consume(1),
+                Err(InstructionError::ComputationalBudgetExceeded)
+            );
+            assert_eq!(meter.get_remaining(), 0);
+        }
+        let report = request.finish().unwrap();
+        assert!(report.complete);
+        assert_eq!(report.events.len(), 2);
+        assert_eq!(
+            report.events[0].kind,
+            trace::Kind::Meter {
+                requested: 2,
+                before: 2,
+                after: 0,
+                exceeded: false,
+            }
+        );
+        assert_eq!(
+            report.events[1].kind,
+            trace::Kind::Meter {
+                requested: 1,
+                before: 0,
+                after: 0,
+                exceeded: true,
+            }
+        );
+        assert_eq!(report.first_failure, Some(report.events[1]));
+    }
 
     #[test]
     fn test_invoke_context() {

@@ -248,24 +248,68 @@ impl RuntimeState {
             if let Some(error) = batch.lock_results().iter().find(|result| result.is_err()) {
                 return Err(format!("entry account locking failed: {:?}", error));
             }
+            #[cfg(feature = "epoch136-compute-error-diagnostic")]
+            let trace_index = transactions.iter().position(|transaction| {
+                transaction.signatures.get(0).map_or(false, |signature| {
+                    crate::epoch136_compute_trace::selected(
+                        request.slot,
+                        request.entry_index,
+                        &signature.to_string(),
+                    )
+                })
+            });
+            #[cfg(feature = "epoch136-charge-trace")]
+            let mut trace_request = trace_index
+                .and_then(|index| {
+                    let tx = &transactions[index];
+                    let signature = tx.signatures.get(0)?;
+                    Some(solana_runtime::epoch136_trace::arm(
+                        request.slot,
+                        request.entry_index,
+                        signature,
+                        &tx.message,
+                    ))
+                })
+                .flatten();
+            #[cfg(feature = "epoch136-compute-error-diagnostic")]
+            let record_logs = trace_index.is_some();
+            #[cfg(not(feature = "epoch136-compute-error-diagnostic"))]
+            let record_logs = false;
             let (results, _balances, _inner_instructions, _log_messages) =
                 self.bank.load_execute_and_commit_transactions(
                     &batch,
                     max_age,
                     false,
                     false,
-                    false,
+                    record_logs,
                     &mut ExecuteTimings::default(),
                 );
+            #[cfg(feature = "epoch136-charge-trace")]
+            if let Some(request) = trace_request.take() {
+                if let Some(report) = request.finish() {
+                    eprintln!("epoch136 charge trace: {:?}", report);
+                }
+            }
+            #[cfg(feature = "epoch136-compute-error-diagnostic")]
+            if let Some(index) = trace_index {
+                eprintln!(
+                    // Historical Bank omits logs for load failures, so this
+                    // vector is not necessarily transaction-index aligned.
+                    "epoch136 compute diagnostic: slot={} entry={} transaction={} message={:?} result={:?} entry_logs={:?}; log_transaction_indices_unbound=true; publication_authorized=false",
+                    request.slot,
+                    request.entry_index,
+                    index,
+                    transactions[index].message,
+                    results.execution_results[index].0,
+                    _log_messages,
+                );
+            }
             drop(batch);
             if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
                 for (transaction, result) in transactions.iter().zip(&results.execution_results) {
                     if matches!(
                         result.0,
-                        Err(TransactionError::InstructionError(
-                            _,
-                            InstructionError::Custom(2)
-                        ))
+                        Err(TransactionError::InstructionError(_, InstructionError::Custom(2)))
                     ) {
                         let slot_hashes = self
                             .bank
@@ -1954,17 +1998,24 @@ mod tests {
             state.accounts_shrink_consumed_budget = *debt;
             state.maintain_accounts_storage().unwrap();
             let remaining = debt.saturating_sub(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
-            assert_eq!(state.accounts_shrink_consumed_budget,
+            assert_eq!(
+                state.accounts_shrink_consumed_budget,
                 if cfg!(feature = "capped-shrink-candidate") {
                     remaining.min(ACCOUNTS_SHRINK_RECOVERY_PER_ROOT)
-                } else { remaining });
+                } else {
+                    remaining
+                }
+            );
             if cfg!(feature = "capped-shrink-candidate") {
                 state.maintain_accounts_storage().unwrap();
                 assert_eq!(state.accounts_shrink_consumed_budget, 0);
                 state.maintain_accounts_storage().unwrap();
                 assert!(state.accounts_shrink_consumed_budget <= ACCOUNTS_SHRINK_RECOVERY_PER_ROOT);
             }
-            assert_eq!(state.bank.accounts().accounts_db.next_write_version(), cursor);
+            assert_eq!(
+                state.bank.accounts().accounts_db.next_write_version(),
+                cursor
+            );
             assert_eq!(state.bank.get_balance(&mint_keypair.pubkey()), balance);
             assert_eq!(state.bank.capitalization(), capitalization);
             assert_eq!(state.bank.last_blockhash(), blockhash);

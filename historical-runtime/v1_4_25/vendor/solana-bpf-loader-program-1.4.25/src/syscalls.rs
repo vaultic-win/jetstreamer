@@ -73,14 +73,44 @@ impl From<SyscallError> for EbpfError<BPFError> {
 }
 
 trait SyscallConsume {
-    fn consume(&mut self, amount: u64) -> Result<(), EbpfError<BPFError>>;
+    fn consume(&mut self, amount: u64, site: u16) -> Result<(), EbpfError<BPFError>>;
 }
 impl SyscallConsume for Rc<RefCell<dyn ComputeMeter>> {
-    fn consume(&mut self, amount: u64) -> Result<(), EbpfError<BPFError>> {
-        self.try_borrow_mut()
-            .map_err(|_| SyscallError::InvokeContextBorrowFailed)?
+    fn consume(&mut self, amount: u64, _site: u16) -> Result<(), EbpfError<BPFError>> {
+        let mut meter = match self.try_borrow_mut() {
+            Ok(meter) => meter,
+            Err(_) => {
+                #[cfg(feature = "epoch136-charge-trace")]
+                solana_runtime::epoch136_trace::syscall_charge(
+                    _site,
+                    amount,
+                    None,
+                    None,
+                    solana_runtime::epoch136_trace::Outcome::BorrowFailed,
+                );
+                return Err(SyscallError::InvokeContextBorrowFailed.into());
+            }
+        };
+        #[cfg(feature = "epoch136-charge-trace")]
+        let before = meter.get_remaining();
+        let result = meter
             .consume(amount)
-            .map_err(SyscallError::InstructionError)?;
+            .map_err(SyscallError::InstructionError);
+        #[cfg(feature = "epoch136-charge-trace")]
+        let after = meter.get_remaining();
+        drop(meter);
+        #[cfg(feature = "epoch136-charge-trace")]
+        solana_runtime::epoch136_trace::syscall_charge(
+            _site,
+            amount,
+            Some(before),
+            Some(after),
+            result
+                .as_ref()
+                .map(|_| solana_runtime::epoch136_trace::Outcome::Success)
+                .unwrap_or(solana_runtime::epoch136_trace::Outcome::MeterExceeded),
+        );
+        result?;
         Ok(())
     }
 }
@@ -387,7 +417,7 @@ impl<'a> SyscallObject<BPFError> for SyscallLog<'a> {
         ro_regions: &[MemoryRegion],
         _rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        self.compute_meter.consume(self.cost, 10)?;
         translate_string_and_do(
             addr,
             len,
@@ -419,7 +449,7 @@ impl SyscallObject<BPFError> for SyscallLogU64 {
         _ro_regions: &[MemoryRegion],
         _rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        self.compute_meter.consume(self.cost, 11)?;
         stable_log::program_log(
             &self.logger,
             &format!(
@@ -448,7 +478,7 @@ impl SyscallObject<BPFError> for SyscallLogBpfComputeUnits {
         _ro_regions: &[MemoryRegion],
         _rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        self.compute_meter.consume(self.cost, 12)?;
         let logger = self
             .logger
             .try_borrow_mut()
@@ -481,7 +511,7 @@ impl<'a> SyscallObject<BPFError> for SyscallLogPubkey<'a> {
         ro_regions: &[MemoryRegion],
         _rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        self.compute_meter.consume(self.cost, 13)?;
         let pubkey = translate_type!(Pubkey, pubkey_addr, ro_regions, self.loader_id)?;
         stable_log::program_log(&self.logger, &pubkey.to_string());
         Ok(0)
@@ -575,7 +605,9 @@ impl<'a> SyscallObject<BPFError> for SyscallCreateProgramAddress<'a> {
         ro_regions: &[MemoryRegion],
         rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        #[cfg(feature = "epoch136-charge-trace")]
+        solana_runtime::epoch136_trace::record(solana_runtime::epoch136_trace::Kind::PdaEntered);
+        self.compute_meter.consume(self.cost, 14)?;
 
         let (seeds, program_id) = translate_program_address_inputs(
             seeds_addr,
@@ -585,7 +617,11 @@ impl<'a> SyscallObject<BPFError> for SyscallCreateProgramAddress<'a> {
             self.loader_id,
         )?;
 
-        self.compute_meter.consume(self.cost)?;
+        #[cfg(feature = "epoch136-charge-trace")]
+        solana_runtime::epoch136_trace::record(
+            solana_runtime::epoch136_trace::Kind::PdaInputsTranslated,
+        );
+        self.compute_meter.consume(self.cost, 15)?;
         let new_address = match Pubkey::create_program_address(&seeds, program_id) {
             Ok(address) => address,
             Err(_) => return Ok(1),
@@ -627,7 +663,7 @@ impl<'a> SyscallObject<BPFError> for SyscallTryFindProgramAddress<'a> {
                 let mut seeds_with_bump = seeds.to_vec();
                 seeds_with_bump.push(&bump_seed);
 
-                self.compute_meter.consume(self.cost)?;
+                self.compute_meter.consume(self.cost, 16)?;
                 if let Ok(new_address) =
                     Pubkey::create_program_address(&seeds_with_bump, program_id)
                 {
@@ -664,7 +700,7 @@ impl<'a> SyscallObject<BPFError> for SyscallSha256<'a> {
         ro_regions: &[MemoryRegion],
         rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.sha256_base_cost)?;
+        self.compute_meter.consume(self.sha256_base_cost, 17)?;
         let hash_result =
             translate_slice_mut!(u8, result_addr, HASH_BYTES, rw_regions, self.loader_id)?;
         let mut hasher = Hasher::default();
@@ -674,7 +710,7 @@ impl<'a> SyscallObject<BPFError> for SyscallSha256<'a> {
                 let bytes =
                     translate_slice!(u8, val.as_ptr(), val.len(), ro_regions, self.loader_id)?;
                 self.compute_meter
-                    .consume(self.sha256_byte_cost * (val.len() as u64 / 2))?;
+                    .consume(self.sha256_byte_cost * (val.len() as u64 / 2), 18)?;
                 hasher.hash(bytes);
             }
         }
@@ -700,7 +736,7 @@ impl<'a> SyscallObject<BPFError> for SyscallRistrettoMul<'a> {
         ro_regions: &[MemoryRegion],
         rw_regions: &[MemoryRegion],
     ) -> Result<u64, EbpfError<BPFError>> {
-        self.compute_meter.consume(self.cost)?;
+        self.compute_meter.consume(self.cost, 19)?;
 
         let point = translate_type!(RistrettoPoint, point_addr, ro_regions, self.loader_id)?;
         let scalar = translate_type!(Scalar, scalar_addr, ro_regions, self.loader_id)?;
@@ -1304,10 +1340,12 @@ fn call<'a>(
     ro_regions: &[MemoryRegion],
     rw_regions: &[MemoryRegion],
 ) -> Result<u64, EbpfError<BPFError>> {
+    #[cfg(feature = "epoch136-charge-trace")]
+    solana_runtime::epoch136_trace::record(solana_runtime::epoch136_trace::Kind::CpiEntered);
     let mut invoke_context = syscall.get_context_mut()?;
     invoke_context
         .get_compute_meter()
-        .consume(invoke_context.get_bpf_compute_budget().invoke_units)?;
+        .consume(invoke_context.get_bpf_compute_budget().invoke_units, 20)?;
 
     let use_loaded_program_accounts =
         invoke_context.is_feature_active(&use_loaded_program_accounts::id());
@@ -1321,6 +1359,10 @@ fn call<'a>(
             .max_cpi_instruction_size,
         ro_regions,
     )?;
+    #[cfg(feature = "epoch136-charge-trace")]
+    solana_runtime::epoch136_trace::record(solana_runtime::epoch136_trace::Kind::CpiTranslated {
+        callee: instruction.program_id,
+    });
     let caller_program_id = invoke_context
         .get_caller()
         .map_err(SyscallError::InstructionError)?;
@@ -1398,6 +1440,10 @@ fn call<'a>(
         executable_accounts.push(programdata);
     }
 
+    #[cfg(feature = "epoch136-charge-trace")]
+    solana_runtime::epoch136_trace::record(solana_runtime::epoch136_trace::Kind::CpiDispatch {
+        callee: callee_program_id,
+    });
     #[allow(clippy::deref_addrof)]
     match MessageProcessor::process_cross_program_instruction(
         &message,
@@ -1468,6 +1514,152 @@ mod tests {
         process_instruction::{MockComputeMeter, MockLogger},
     };
     use std::str::FromStr;
+
+    #[cfg(feature = "epoch136-charge-trace")]
+    #[test]
+    fn epoch136_syscall_borrow_failure_is_recorded_without_consuming() {
+        use solana_runtime::epoch136_trace as trace;
+        use solana_sdk::{message::Message, signature::Signature};
+        let signature = Signature::from_str("2B96JV6WYJDwxNF3MS4KtS4jb1ToCcQ3xxhcKNysJsdK1jbZ45NCF1EiEWk5GK7Yr5LGVzrT1fBA6Jnvc9VU36L3").unwrap();
+        let message = Message::default();
+        let request = trace::arm(59_183_097, 197, &signature, &message).unwrap();
+        let meter: Rc<RefCell<dyn ComputeMeter>> =
+            Rc::new(RefCell::new(MockComputeMeter { remaining: 7 }));
+        {
+            let _transaction = trace::transaction(&signature, &message).unwrap();
+            let _instruction = trace::instruction(2).unwrap();
+            let borrowed = meter.borrow();
+            let mut caller = meter.clone();
+            assert!(matches!(
+                caller.consume(3, 14),
+                Err(EbpfError::UserError(_))
+            ));
+            assert_eq!(borrowed.get_remaining(), 7);
+        }
+        let report = request.finish().unwrap();
+        assert!(report.complete);
+        assert_eq!(report.events.len(), 1);
+        assert_eq!(
+            report.events[0].kind,
+            trace::Kind::SyscallCharge {
+                site: 14,
+                requested: 3,
+                before: None,
+                after: None,
+                result: trace::Outcome::BorrowFailed,
+            }
+        );
+    }
+
+    #[cfg(feature = "epoch136-charge-trace")]
+    #[test]
+    fn epoch136_pda_translation_failure_does_not_claim_second_charge() {
+        use solana_runtime::epoch136_trace as trace;
+        use solana_sdk::{message::Message, signature::Signature};
+        let signature = Signature::from_str("2B96JV6WYJDwxNF3MS4KtS4jb1ToCcQ3xxhcKNysJsdK1jbZ45NCF1EiEWk5GK7Yr5LGVzrT1fBA6Jnvc9VU36L3").unwrap();
+        let message = Message::default();
+        let request = trace::arm(59_183_097, 197, &signature, &message).unwrap();
+        let meter: Rc<RefCell<dyn ComputeMeter>> =
+            Rc::new(RefCell::new(MockComputeMeter { remaining: 7 }));
+        let loader_id = bpf_loader::id();
+        let mut syscall = SyscallCreateProgramAddress {
+            cost: 1,
+            compute_meter: meter.clone(),
+            loader_id: &loader_id,
+        };
+        {
+            let _transaction = trace::transaction(&signature, &message).unwrap();
+            let _instruction = trace::instruction(2).unwrap();
+            // Nonempty seeds with no mapped memory must fail translation.
+            assert!(matches!(
+                syscall.call(0, 1, 0, 0, 0, &[], &[]),
+                Err(EbpfError::AccessViolation(..))
+            ));
+        }
+        assert_eq!(meter.borrow().get_remaining(), 6);
+        let report = request.finish().unwrap();
+        assert!(report.complete);
+        assert_eq!(report.events.len(), 2);
+        assert_eq!(report.events[0].kind, trace::Kind::PdaEntered);
+        assert_eq!(
+            report.events[1].kind,
+            trace::Kind::SyscallCharge {
+                site: 14,
+                requested: 1,
+                before: Some(7),
+                after: Some(6),
+                result: trace::Outcome::Success,
+            }
+        );
+    }
+
+    #[cfg(feature = "epoch136-charge-trace")]
+    #[test]
+    fn epoch136_pda_second_charge_failure_follows_successful_translation() {
+        use solana_runtime::epoch136_trace as trace;
+        use solana_sdk::{message::Message, signature::Signature};
+        let signature = Signature::from_str("2B96JV6WYJDwxNF3MS4KtS4jb1ToCcQ3xxhcKNysJsdK1jbZ45NCF1EiEWk5GK7Yr5LGVzrT1fBA6Jnvc9VU36L3").unwrap();
+        let message = Message::default();
+        let request = trace::arm(59_183_097, 197, &signature, &message).unwrap();
+        let meter: Rc<RefCell<dyn ComputeMeter>> =
+            Rc::new(RefCell::new(MockComputeMeter { remaining: 1 }));
+        let loader_id = bpf_loader::id();
+        let program_id = Pubkey::new_unique();
+        let seed = b"seed";
+        let seeds: &[&[u8]] = &[seed];
+        let seeds_addr = seeds.as_ptr() as u64;
+        let program_id_addr = &program_id as *const _ as u64;
+        let mut ro_regions = vec![
+            MemoryRegion {
+                addr_host: seeds_addr,
+                addr_vm: seeds_addr,
+                len: size_of::<&[u8]>() as u64,
+            },
+            MemoryRegion {
+                addr_host: seed.as_ptr() as u64,
+                addr_vm: seed.as_ptr() as u64,
+                len: seed.len() as u64,
+            },
+            MemoryRegion {
+                addr_host: program_id_addr,
+                addr_vm: program_id_addr,
+                len: size_of::<Pubkey>() as u64,
+            },
+        ];
+        ro_regions.sort_by_key(|region| region.addr_vm);
+        let mut syscall = SyscallCreateProgramAddress {
+            cost: 1,
+            compute_meter: meter.clone(),
+            loader_id: &loader_id,
+        };
+        {
+            let _transaction = trace::transaction(&signature, &message).unwrap();
+            let _instruction = trace::instruction(2).unwrap();
+            assert_eq!(
+                syscall.call(seeds_addr, 1, program_id_addr, 0, 0, &ro_regions, &[]),
+                Err(EbpfError::UserError(BPFError::SyscallError(
+                    SyscallError::InstructionError(InstructionError::ComputationalBudgetExceeded)
+                )))
+            );
+        }
+        assert_eq!(meter.borrow().get_remaining(), 0);
+        let report = request.finish().unwrap();
+        assert!(report.complete);
+        assert_eq!(report.events.len(), 4);
+        assert_eq!(report.events[0].kind, trace::Kind::PdaEntered);
+        assert_eq!(report.events[2].kind, trace::Kind::PdaInputsTranslated);
+        assert_eq!(
+            report.events[3].kind,
+            trace::Kind::SyscallCharge {
+                site: 15,
+                requested: 1,
+                before: Some(0),
+                after: Some(0),
+                result: trace::Outcome::MeterExceeded,
+            }
+        );
+        assert_eq!(report.first_failure, Some(report.events[3]));
+    }
 
     macro_rules! assert_access_violation {
         ($result:expr, $va:expr, $len:expr) => {

@@ -677,7 +677,24 @@ impl InstructionMeter for ThisInstructionMeter {
     fn consume(&mut self, amount: u64) {
         // 1 to 1 instruction to compute unit mapping
         // ignore error, Ebpf will bail if exceeded
-        let _ = self.compute_meter.borrow_mut().consume(amount);
+        let mut meter = self.compute_meter.borrow_mut();
+        #[cfg(feature = "epoch136-charge-trace")]
+        let before = meter.get_remaining();
+        let result = meter.consume(amount);
+        #[cfg(feature = "epoch136-charge-trace")]
+        let after = meter.get_remaining();
+        drop(meter);
+        #[cfg(feature = "epoch136-charge-trace")]
+        solana_runtime::epoch136_trace::instruction_charge(
+            amount,
+            Some(before),
+            Some(after),
+            result
+                .as_ref()
+                .map(|_| solana_runtime::epoch136_trace::Outcome::Success)
+                .unwrap_or(solana_runtime::epoch136_trace::Outcome::MeterExceeded),
+        );
+        let _ = result;
     }
     fn get_remaining(&self) -> u64 {
         self.compute_meter.borrow().get_remaining()
@@ -729,8 +746,12 @@ impl Executor for BPFExecutor {
             };
 
             stable_log::program_invoke(&logger, program_id, invoke_depth);
+            #[cfg(feature = "epoch136-charge-trace")]
+            let _trace_frame = solana_runtime::epoch136_trace::frame(*program_id, invoke_depth);
             let instruction_meter = ThisInstructionMeter::new(compute_meter.clone());
             let before = compute_meter.borrow().get_remaining();
+            #[cfg(feature = "epoch136-charge-trace")]
+            solana_runtime::epoch136_trace::vm_enter(before);
             let result = vm.execute_program_metered(
                 parameter_bytes.as_slice(),
                 &[],
@@ -738,6 +759,32 @@ impl Executor for BPFExecutor {
                 instruction_meter,
             );
             let after = compute_meter.borrow().get_remaining();
+            #[cfg(feature = "epoch136-charge-trace")]
+            if solana_runtime::epoch136_trace::capturing_instruction() {
+                solana_runtime::epoch136_trace::vm_return(
+                    after,
+                    match result.as_ref().err() {
+                        None => solana_runtime::epoch136_trace::Outcome::Success,
+                        Some(EbpfError::ExceededMaxInstructions(remaining)) => {
+                            solana_runtime::epoch136_trace::Outcome::VmError {
+                                code: 1,
+                                detail: Some(*remaining),
+                            }
+                        }
+                        Some(EbpfError::UserError(_)) => {
+                            solana_runtime::epoch136_trace::Outcome::VmError {
+                                code: 2,
+                                detail: None,
+                            }
+                        }
+                        Some(_) => solana_runtime::epoch136_trace::Outcome::VmError {
+                            code: 0,
+                            detail: None,
+                        },
+                    },
+                    result.as_ref().err().map(|error| format!("{:?}", error)),
+                );
+            }
             log!(
                 logger,
                 "Program {} consumed {} of {} compute units",

@@ -1,3 +1,5 @@
+#[cfg(feature = "epoch136-compute-error-diagnostic")]
+mod epoch136_compute_trace;
 #[cfg(feature = "epoch141-freeze-component-diagnostic")]
 mod epoch141_freeze_trace;
 mod leader_schedule;

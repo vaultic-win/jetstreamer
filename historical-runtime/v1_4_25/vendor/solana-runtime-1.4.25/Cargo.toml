@@ -11,6 +11,7 @@ edition = "2018"
 [features]
 # Offline typed Bank-field observation only; not a replay/runtime promotion flag.
 epoch140-snapshot-clock-diagnostic = []
+epoch136-charge-trace = []
 
 [dependencies]
 bincode = "1.3.1"
