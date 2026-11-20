@@ -16,6 +16,9 @@ use std::{
     time::Duration,
 };
 
+#[path = "retry_epoch90.rs"]
+mod epoch90;
+
 const MAX_RECOVERIES: u32 = 2;
 const LAST_SLOT: u32 = MAX_RECOVERIES + 1;
 const BACKOFF_SECONDS: [u64; LAST_SLOT as usize] = [30, 120, 120];
@@ -57,7 +60,9 @@ pub struct View {
 }
 impl View {
     fn retry_limit(&self) -> u32 {
-        if self.completed_recoveries == MAX_RECOVERIES
+        if self.original_sha256 == epoch90::RESULT {
+            1
+        } else if self.completed_recoveries == MAX_RECOVERIES
             && self.latest.epoch == 79
             && self.original_sha256 == EPOCH79_ORIGINAL
             && self.latest_sha256 == EPOCH79_RETRY2
@@ -89,6 +94,9 @@ fn retryable(result: &Outcome, sha256: &str) -> bool {
         return false;
     }
     if result.transfer_interruption.is_some() {
+        return true;
+    }
+    if epoch90::eligible(result, sha256) {
         return true;
     }
     result.retry_of.is_none()
@@ -126,6 +134,17 @@ fn read_outcome(path: &Path, object: &Object) -> Result<(Outcome, String)> {
     let result: Outcome = serde_json::from_slice(&bytes)?;
     validate_outcome(&result, object)?;
     Ok((result, digest(&bytes)))
+}
+
+fn prior_identity(view: &View) -> Result<Option<TransferIdentity>> {
+    if epoch90::eligible(&view.latest, &view.latest_sha256) {
+        return Ok(Some(epoch90::evidence(&view.latest)?));
+    }
+    Ok(view
+        .latest
+        .transfer_interruption
+        .as_ref()
+        .map(|e| e.identity.clone()))
 }
 
 fn validate_ticket(
@@ -170,12 +189,7 @@ fn validate_ticket(
         "retry backoff was shortened"
     );
     ensure!(
-        ticket.prior_identity
-            == prior
-                .latest
-                .transfer_interruption
-                .as_ref()
-                .map(|e| e.identity.clone()),
+        ticket.prior_identity == prior_identity(prior)?,
         "retry lost the prior authenticated transfer identity"
     );
     Ok(())
@@ -198,6 +212,13 @@ pub fn view(cfg: &Config, object: &Object) -> Result<Option<View>> {
         latest.retry_of.is_none(),
         "original result has a retry binding"
     );
+    if epoch90::eligible(&latest, &sha256) {
+        ensure!(
+            latest.attempt.parent() == Some(cfg.state_directory.join("attempts").as_path()),
+            "epoch90 predecessor outside accepted state"
+        );
+        epoch90::evidence(&latest)?;
+    }
     let mut view = View {
         latest,
         original_sha256: sha256.clone(),
@@ -267,6 +288,7 @@ fn prepare_ticket(cfg: &Config, object: &Object) -> Result<RetryTicket> {
     );
     let ordinal = view.completed_recoveries + 1;
     let recorded_at = now();
+    let prior_identity = prior_identity(&view)?;
     let ticket = RetryTicket {
         schema: "horizon-r2-audit-transfer-retry-intent-v1".into(),
         object: object.clone(),
@@ -287,11 +309,7 @@ fn prepare_ticket(cfg: &Config, object: &Object) -> Result<RetryTicket> {
                 .checked_add(BACKOFF_SECONDS[(ordinal - 1) as usize])
                 .context("retry deadline overflow")?,
         ),
-        prior_identity: view
-            .latest
-            .transfer_interruption
-            .as_ref()
-            .map(|e| e.identity.clone()),
+        prior_identity,
     };
     Ok(ticket)
 }

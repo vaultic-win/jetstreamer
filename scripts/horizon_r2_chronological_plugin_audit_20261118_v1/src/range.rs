@@ -94,7 +94,10 @@ impl Intercept for ExactRangeResponse {
         let check: Result<()> = (|| {
             ensure!(
                 response.status().as_u16() == 206,
-                "range GET requires HTTP206"
+                "range GET requires HTTP206; received HTTP{} for {} of {} bytes",
+                response.status().as_u16(),
+                self.span.request(),
+                self.span.total
             );
             let headers = response.headers();
             for (key, expected) in [
