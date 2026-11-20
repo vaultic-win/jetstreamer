@@ -22,9 +22,9 @@ const SCRATCH: &str =
     "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1/scratch";
 const UNIT: &str = "horizon-265-native-input-20261119-v1.service";
 const IID: &str = "ce5f66a82fdd4c0e93ca99f27b925112";
-const STATE: &str = "/var/lib/jetstreamer/horizon-native265-scratch-retirement-20261120-v1";
+const STATE: &str = "/var/lib/jetstreamer/horizon-native265-scratch-retirement-20261120-v2";
 const IMAGE: &str =
-    "/var/lib/jetstreamer/horizon-native265-scratch-retirer-20261120-v1/native265-scratch-retire";
+    "/var/lib/jetstreamer/horizon-native265-scratch-retirer-20261120-v2/native265-scratch-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const TERMINAL: &str =
     "/var/lib/jetstreamer/horizon-native265-terminal-proof-2048-20261119-v1/proof.json";
@@ -373,6 +373,25 @@ fn show() -> Result<BTreeMap<String, String>> {
     }
     Ok(m)
 }
+// PID1 may clear only its presentation history while retaining this terminal
+// invocation. Accept the two observed exact histories; never normalize commands.
+const NATIVE_COMMAND: &str = "{ path=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; argv[]=/var/lib/jetstreamer/horizon265-native-input-daa786c0-20261119-v1/horizon265-native-input ; ignore_errors=no";
+const ORIGINAL_HISTORY: &str = "[Thu 2026-11-19 19:54:52 UTC] ; stop_time=[Thu 2026-11-19 20:04:20 UTC] ; pid=1307638 ; code=exited ; status=0 }";
+const RESET_HISTORY: &str = "[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+fn native_command(value: &str) -> Result<&str> {
+    ensure!(
+        value.matches(" ; start_time=").count() == 1,
+        "ambiguous native265 command framing"
+    );
+    let (command, history) = value
+        .split_once(" ; start_time=")
+        .context("native265 command history")?;
+    ensure!(
+        command == NATIVE_COMMAND && matches!(history, ORIGINAL_HISTORY | RESET_HISTORY),
+        "native265 command or terminal display history changed"
+    );
+    Ok(command)
+}
 fn terminal_properties(m: &BTreeMap<String, String>, proof: &Value) -> Result<()> {
     for (k, want) in [
         ("Id", UNIT),
@@ -399,8 +418,16 @@ fn terminal_properties(m: &BTreeMap<String, String>, proof: &Value) -> Result<()
         );
     }
     let old = &proof["original_evidence"]["terminal_manager"];
+    ensure!(
+        native_command(m.get("ExecStart").context("current native ExecStart")?)?
+            == native_command(
+                old["ExecStart"]
+                    .as_str()
+                    .context("original native ExecStart")?
+            )?,
+        "native265 exact command changed"
+    );
     for k in [
-        "ExecStart",
         "FragmentPath",
         "DropInPaths",
         "MemoryMax",
@@ -697,7 +724,7 @@ fn run() -> Result<()> {
         "missing exact fresh phase booking"
     );
     booking_valid(&booking)?;
-    let controller = format!("horizon-native265-scratch-retirement-{mode}-20261120-v1.service");
+    let controller = format!("horizon-native265-scratch-retirement-{mode}-20261120-v2.service");
     ensure!(
         fs::read_to_string("/proc/self/cgroup")?.trim() == format!("0::/system.slice/{controller}"),
         "run only in the exact bounded retirement controller"

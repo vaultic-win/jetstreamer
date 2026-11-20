@@ -120,6 +120,10 @@ fn terminal_properties_reject_restarted_replaced_or_live_native_owner() {
     ] {
         m.insert(k.into(), format!("original-{k}"));
     }
+    m.insert(
+        "ExecStart".into(),
+        format!("{NATIVE_COMMAND} ; start_time={ORIGINAL_HISTORY}"),
+    );
     let proof = json!({"original_evidence":{"terminal_manager":m}});
     terminal_properties(&m, &proof).unwrap();
     for (key, bad) in [
@@ -138,5 +142,67 @@ fn terminal_properties_reject_restarted_replaced_or_live_native_owner() {
         let mut changed = m.clone();
         changed.insert(key.into(), bad.into());
         assert!(terminal_properties(&changed, &proof).is_err(), "{key}");
+    }
+}
+
+#[test]
+fn actual_post_reload_display_preserves_all_twenty_eight_terminal_properties() {
+    let original: Value =
+        serde_json::from_str(include_str!("fixtures/original-terminal.json")).unwrap();
+    let old: BTreeMap<String, String> =
+        serde_json::from_value(original["terminal_manager"].clone()).unwrap();
+    let current: BTreeMap<String, String> =
+        include_str!("fixtures/post-reload-terminal.properties")
+            .lines()
+            .map(|l| {
+                let (k, v) = l.split_once('=').unwrap();
+                (k.into(), v.into())
+            })
+            .collect();
+    assert_eq!(current.len(), 28);
+    assert_ne!(current["ExecStart"], old["ExecStart"]);
+    for (k, v) in &current {
+        if k != "ExecStart" {
+            assert_eq!(v, &old[k], "{k}");
+        }
+    }
+    assert_eq!(
+        native_command(&current["ExecStart"]).unwrap(),
+        native_command(&old["ExecStart"]).unwrap()
+    );
+    let proof = json!({"original_evidence":original});
+    terminal_properties(&old, &proof).unwrap();
+    terminal_properties(&current, &proof).unwrap();
+}
+#[test]
+fn display_reset_never_accepts_changed_command_or_malformed_suffix_even_when_equal() {
+    let original = format!("{NATIVE_COMMAND} ; start_time={ORIGINAL_HISTORY}");
+    let reset = format!("{NATIVE_COMMAND} ; start_time={RESET_HISTORY}");
+    for bad in [
+        original.replace(
+            "horizon265-native-input-daa786c0",
+            "replacement-native-input",
+        ),
+        reset.replace("ignore_errors=no", "ignore_errors=yes"),
+        reset.replace("argv[]=", "argv[]=--extra "),
+        reset.replace("pid=0", "pid=1307638"),
+        reset.replace("code=(null)", "code=exited"),
+        reset.replace("status=0/0", "status=0"),
+        reset.replace("start_time=[n/a]", "start_time=[]"),
+        reset.replace("stop_time=[n/a]", "stop_time=[unknown]"),
+        format!("{reset} trailing"),
+        format!("{reset} ; start_time={RESET_HISTORY}"),
+        "unframed".into(),
+    ] {
+        assert!(native_command(&bad).is_err(), "{bad}");
+        let mut m: BTreeMap<String, String> = serde_json::from_value(
+            serde_json::from_str::<Value>(include_str!("fixtures/original-terminal.json")).unwrap()
+                ["terminal_manager"]
+                .clone(),
+        )
+        .unwrap();
+        m.insert("ExecStart".into(), bad);
+        let proof = json!({"original_evidence":{"terminal_manager":m}});
+        assert!(terminal_properties(&m, &proof).is_err());
     }
 }
