@@ -12,7 +12,17 @@ pub(super) fn stat(pid: u64) -> Result<(u64, u64)> {
     ensure!(fields.len() >= 20, "265 short stat");
     Ok((fields[1].parse()?, fields[19].parse()?))
 }
+#[cfg(test)]
 pub(super) fn sample(v: &Value, gp: &Value, main: u64) -> Result<()> {
+    sample_for(v, gp, main, c::TEST, c::TEST_SHA)
+}
+pub(super) fn sample_for(
+    v: &Value,
+    gp: &Value,
+    main: u64,
+    harness: &str,
+    harness_sha: &str,
+) -> Result<()> {
     ensure!(
         v["stable_census"] == true && v["boot_id"] == gp["boot_id"],
         "265 unstable process sample"
@@ -30,8 +40,8 @@ pub(super) fn sample(v: &Value, gp: &Value, main: u64) -> Result<()> {
             pid > 1
                 && ids.insert(pid)
                 && p["boot_id"] == gp["boot_id"]
-                && p["executable"] == if is_main { c::TEST } else { c::WORKER }
-                && p["sha256"] == if is_main { c::TEST_SHA } else { c::WORKER_SHA }
+                && p["executable"] == if is_main { harness } else { c::WORKER }
+                && p["sha256"] == if is_main { harness_sha } else { c::WORKER_SHA }
                 && p["parent_pid"] == if is_main { 1 } else { main }
                 && c::num(p, "start_ticks")? >= c::num(gp, "main_start_ticks")?
                 && (!is_main || p["start_ticks"] == gp["main_start_ticks"])
@@ -55,6 +65,16 @@ pub(super) fn sample(v: &Value, gp: &Value, main: u64) -> Result<()> {
     Ok(())
 }
 pub(super) fn live(members: &[String], main: u64, guard: &Value) -> Result<()> {
+    live_for(members, main, guard, c::UNIT, c::TEST, c::TEST_SHA)
+}
+pub(super) fn live_for(
+    members: &[String],
+    main: u64,
+    guard: &Value,
+    unit: &str,
+    harness: &str,
+    harness_sha: &str,
+) -> Result<()> {
     let gb = c::binding(guard)?;
     let gp = c::sealed(&gb)?;
     let initial = stat(main)?;
@@ -67,9 +87,9 @@ pub(super) fn live(members: &[String], main: u64, guard: &Value) -> Result<()> {
         let pid = id.parse::<u64>()?;
         ensure!(pid > 1 && seen.insert(pid), "265 duplicate PID");
         let before = stat(pid)?;
-        let exe = if pid == main { c::TEST } else { c::WORKER };
+        let exe = if pid == main { harness } else { c::WORKER };
         let sha = if pid == main {
-            c::TEST_SHA
+            harness_sha
         } else {
             c::WORKER_SHA
         };
@@ -92,18 +112,15 @@ pub(super) fn live(members: &[String], main: u64, guard: &Value) -> Result<()> {
                 && disk.ino() == mapped.ino()
                 && hex_lower(&Sha256::digest(fs::read(&path)?)) == sha
                 && fs::read_to_string(format!("/proc/{pid}/cgroup"))?.trim()
-                    == format!("0::/system.slice/{}", c::UNIT)
+                    == format!("0::/system.slice/{unit}")
                 && stat(pid)? == before,
             "265 mapped process differs"
         );
     }
-    let after = fs::read_to_string(format!(
-        "/sys/fs/cgroup/system.slice/{}/cgroup.procs",
-        c::UNIT
-    ))?
-    .split_whitespace()
-    .map(str::parse)
-    .collect::<std::result::Result<BTreeSet<u64>, _>>()?;
+    let after = fs::read_to_string(format!("/sys/fs/cgroup/system.slice/{unit}/cgroup.procs"))?
+        .split_whitespace()
+        .map(str::parse)
+        .collect::<std::result::Result<BTreeSet<u64>, _>>()?;
     ensure!(
         after == seen && seen.contains(&main) && (1..=2).contains(&seen.len()),
         "265 process census raced"
@@ -111,7 +128,10 @@ pub(super) fn live(members: &[String], main: u64, guard: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn drained(main: u64, worker: u64) -> Result<()> {
-    for pid in [main, worker] {
+    drained_for(c::UNIT, &[main, worker])
+}
+pub(super) fn drained_for(unit: &str, pids: &[u64]) -> Result<()> {
+    for &pid in pids {
         ensure!(pid > 1, "265 terminal PID");
         match fs::symlink_metadata(format!("/proc/{pid}")) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
@@ -119,7 +139,7 @@ pub(super) fn drained(main: u64, worker: u64) -> Result<()> {
             Ok(_) => bail!("265 original process still present or PID reused"),
         }
     }
-    let group = PathBuf::from(format!("/sys/fs/cgroup/system.slice/{}", c::UNIT));
+    let group = PathBuf::from(format!("/sys/fs/cgroup/system.slice/{unit}"));
     match fs::symlink_metadata(&group) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e.into()),

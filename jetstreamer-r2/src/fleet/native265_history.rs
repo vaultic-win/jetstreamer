@@ -2,15 +2,39 @@
 use super::native265 as c;
 use super::*;
 pub(super) fn result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
+    result_for(
+        v,
+        origin,
+        h,
+        265,
+        "horizon265-exact-worker-cold-input-result-v1",
+        114_479_281,
+        c::ACCOUNTS_HASH,
+        c::SNAPSHOT_SHA,
+        "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst",
+    )
+}
+#[allow(clippy::too_many_arguments)]
+pub(super) fn result_for(
+    v: &Value,
+    origin: &Value,
+    h: &Value,
+    epoch: u64,
+    schema: &str,
+    slot: u64,
+    accounts_hash: &str,
+    snapshot_sha: &str,
+    snapshot: &str,
+) -> Result<u64> {
     ensure!(
-        v["schema"] == "horizon265-exact-worker-cold-input-result-v1"
-            && v["epoch"] == 265
+        v["schema"] == schema
+            && v["epoch"] == epoch
             && v["worker"] == json!({"path":c::WORKER,"sha256":c::WORKER_SHA})
-            && v["bootstrap_sha256"] == c::SNAPSHOT_SHA
+            && v["bootstrap_sha256"] == snapshot_sha
             && v["genesis_sha256"]
                 == "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
-            && v["bootstrap_slot"] == 114_479_281u64
-            && v["accounts_hash"] == c::ACCOUNTS_HASH
+            && v["bootstrap_slot"] == slot
+            && v["accounts_hash"] == accounts_hash
             && v["full_accounts_commitment_verified"] == true
             && v["worker_shutdown_acknowledged"] == true
             && v["worker_reaped"] == true
@@ -52,18 +76,17 @@ pub(super) fn result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
     };
     let source = &initial["source"]["SnapshotArchive"];
     ensure!(
-        initial["slot"] == 114_479_281u64
+        initial["slot"] == slot
             && initial["genesis_hash"] == handshake["required_genesis_hash"]
             && c::num(initial, "ticks_per_slot")? > 0
-            && source["archive_path"]
-                == "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst"
+            && source["archive_path"] == snapshot
             && bs58::encode(bytes(&source["expected_accounts_hash"])?).into_string()
-                == c::ACCOUNTS_HASH
+                == accounts_hash
             && checkpoint["slot"] == initial["slot"]
             && checkpoint["slot_complete"] == true
             && checkpoint["writes"] == json!([])
             && checkpoint["next_write_version"] == initial["next_write_version"]
-            && bs58::encode(bytes(&checkpoint["accounts_hash"])?).into_string() == c::ACCOUNTS_HASH,
+            && bs58::encode(bytes(&checkpoint["accounts_hash"])?).into_string() == accounts_hash,
         "265 canonical checkpoint differs"
     );
     bytes(&initial["last_blockhash"])?;
