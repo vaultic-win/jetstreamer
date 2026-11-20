@@ -916,3 +916,85 @@ mod tests {
         assert!(native211_pass_through(&config, Some(&b), Some(&bad)).is_err());
     }
 }
+
+#[cfg(test)]
+mod full211_offline_integration {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[test]
+    #[ignore = "Main's isolated synthetic full211 fixture namespace only"]
+    fn complete_wrapper_rejects_independently_substituted_full211_tuples() {
+        assert_eq!(
+            std::env::var("HORIZON211_OFFLINE_FIXTURE_ONLY").unwrap(),
+            "synthetic-not-runtime"
+        );
+        assert_ne!(
+            fs::read_link("/proc/self/ns/mnt").unwrap(),
+            fs::read_link("/proc/1/ns/mnt").unwrap()
+        );
+        let cases: Value = serde_json::from_slice(
+            &fs::read("/var/lib/jetstreamer/horizon211-offline-integration-fixture/cases.json")
+                .unwrap(),
+        )
+        .unwrap();
+        let a = &cases["cases"][0];
+        let b = &cases["cases"][1];
+        let iid = a["value"]["invocation_id"].as_str().unwrap();
+        let state = tempfile::tempdir().unwrap();
+        fs::set_permissions(state.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        let unused = Bound {
+            path: "/unused".into(),
+            sha256: "1".repeat(64),
+        };
+        let mut p = Plan {
+            schema: "horizon-terminal-aware-observation-plan-v1".into(),
+            config: unused,
+            handoff_plans: vec![],
+            native211_handoff: None,
+            native265_handoff: None,
+            singleton211_handoff: Some(serde_json::from_value(a["handoff"].clone()).unwrap()),
+            state_directory: state.path().into(),
+            deployment: "/var/lib/jetstreamer/horizon-terminal-aware-cycle-offline-fixture".into(),
+        };
+        let peer = json!({"schema":"horizon-singleton-delivery-handoff-plan-v1","epoch":247,"producer_unit":"horizon-offline-peer247.service","producer_invocation_id":"7".repeat(32)});
+        let row = json!({"range":"211-211","controller_unit":"horizon-singleton-211-capped-4aeca563-v1.service","producer_unit":"horizon-singleton-211-capped-4aeca563-v1.service","expected_controller_invocation_id":iid,"expected_producer_invocation_id":iid,"scratch_path":"/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1","worker_executable_basename":"historical-worker"});
+        let config = json!({"schema":"jetstreamer-horizon-live-resource-sample-config-v2","replays":[{"range":"247-247","producer_unit":peer["producer_unit"],"expected_producer_invocation_id":peer["producer_invocation_id"]}],"diagnostic_replays":[row],"native_input_diagnostics":[]});
+        validate(&p, &config, std::slice::from_ref(&peer)).unwrap();
+        for (key, value) in [
+            ("range", json!("210-211")),
+            ("controller_unit", json!("replacement.service")),
+            (
+                "producer_unit",
+                json!("archive-211-v1616-native-input-actual-v1.service"),
+            ),
+            (
+                "expected_controller_invocation_id",
+                b["value"]["invocation_id"].clone(),
+            ),
+            (
+                "expected_producer_invocation_id",
+                b["value"]["invocation_id"].clone(),
+            ),
+            ("scratch_path", json!("/foreign")),
+            ("worker_executable_basename", json!("native-input-test")),
+        ] {
+            let mut bad = config.clone();
+            bad["diagnostic_replays"][0][key] = value;
+            assert!(
+                validate(&p, &bad, std::slice::from_ref(&peer)).is_err(),
+                "{key}"
+            );
+        }
+        p.singleton211_handoff = Some(serde_json::from_value(b["handoff"].clone()).unwrap());
+        assert!(validate(&p, &config, std::slice::from_ref(&peer)).is_err());
+        p.singleton211_handoff = Some(serde_json::from_value(a["handoff"].clone()).unwrap());
+        let mut bad = config.clone();
+        bad["native_input_diagnostics"] = json!([{"epoch":211}]);
+        assert!(validate(&p, &bad, std::slice::from_ref(&peer)).is_err());
+        let mut bad = config.clone();
+        bad["diagnostic_replays"].as_array_mut().unwrap().push(row);
+        assert!(validate(&p, &bad, std::slice::from_ref(&peer)).is_err());
+        p.singleton211_handoff = None;
+        assert!(validate(&p, &config, std::slice::from_ref(&peer)).is_err());
+    }
+}

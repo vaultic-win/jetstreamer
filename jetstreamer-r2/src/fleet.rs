@@ -6018,3 +6018,6 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), b"retained receipt");
     }
 }
+
+#[cfg(test)]
+mod offline_full211;

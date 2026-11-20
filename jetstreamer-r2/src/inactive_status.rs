@@ -872,6 +872,13 @@ pub(crate) fn native211_status_values_test(
 }
 
 #[cfg(test)]
+pub(crate) fn offline_full211_owner_units(
+    receipt: &StatusPublicationReceipt,
+) -> Result<Vec<(String, String)>> {
+    owner_units(receipt)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]

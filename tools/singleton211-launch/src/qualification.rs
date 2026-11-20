@@ -969,10 +969,10 @@ pub(super) fn retire_attempt(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
-    fn stop_fixture() -> (Value, Value, Value, Value, Value) {
+    pub(crate) fn stop_fixture() -> (Value, Value, Value, Value, Value) {
         let iid = "a".repeat(32);
         let gid = "b".repeat(32);
         let plan = Bound::new("/var/lib/jetstreamer/guard/guard-plan.json", "c".repeat(64));

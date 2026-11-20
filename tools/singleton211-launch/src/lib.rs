@@ -465,3 +465,6 @@ pub fn run_from_environment() -> Result<()> {
     }
     result
 }
+
+#[cfg(test)]
+mod offline_fixture;

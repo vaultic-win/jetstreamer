@@ -41,6 +41,32 @@ pub(super) fn same_command(v: &Value) -> bool {
         && !s.contains('\n')
 }
 pub(super) fn live(c: &DiagnosticClaim, current: &Value) -> Result<()> {
+    live_with_observation(
+        c,
+        current,
+        || {
+            singleton227_capture::properties(
+                UNIT,
+                "Id,InvocationID,MainPID,MemoryMax,MemorySwapMax,Restart,KillMode,Delegate,NRestarts",
+            )
+        },
+        |pid| {
+            let mapped = PathBuf::from(format!("/proc/{pid}/exe"));
+            Ok((
+                fs::read_link(&mapped)?,
+                fs::metadata(&mapped)?,
+                fs::symlink_metadata(NODE)?,
+            ))
+        },
+    )
+}
+// Keep all validation in the production path; tests substitute only OS observations.
+pub(super) fn live_with_observation(
+    c: &DiagnosticClaim,
+    current: &Value,
+    properties: impl FnOnce() -> Result<BTreeMap<String, String>>,
+    mapped_image: impl FnOnce(&str) -> Result<(PathBuf, fs::Metadata, fs::Metadata)>,
+) -> Result<()> {
     let v = bound_json(&c.launch_receipt)?;
     launch(c, &v)?;
     let command = |v: &Value| {
@@ -61,10 +87,7 @@ pub(super) fn live(c: &DiagnosticClaim, current: &Value) -> Result<()> {
             && current["NRestarts"] == "0",
         "full211 live owner changed"
     );
-    let props = singleton227_capture::properties(
-        UNIT,
-        "Id,InvocationID,MainPID,MemoryMax,MemorySwapMax,Restart,KillMode,Delegate,NRestarts",
-    )?;
+    let props = properties()?;
     singleton227_capture::require(
         &props,
         &[
@@ -80,13 +103,8 @@ pub(super) fn live(c: &DiagnosticClaim, current: &Value) -> Result<()> {
         ],
     )?;
     let pid = current["MainPID"].as_str().context("full211 live PID")?;
-    let mapped = PathBuf::from(format!("/proc/{pid}/exe"));
-    ensure!(
-        fs::read_link(&mapped)? == Path::new(NODE),
-        "full211 node was replaced"
-    );
-    let a = fs::metadata(&mapped)?;
-    let b = fs::symlink_metadata(NODE)?;
+    let (mapped, a, b) = mapped_image(pid)?;
+    ensure!(mapped == Path::new(NODE), "full211 node was replaced");
     ensure!(
         a.dev() == b.dev() && a.ino() == b.ino() && a.len() == b.len(),
         "full211 mapped inode changed"
