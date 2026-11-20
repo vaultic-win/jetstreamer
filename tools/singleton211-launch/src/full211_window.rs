@@ -138,7 +138,13 @@ impl Firing {
                     && self.start == new.start
                     && self.end == new.end
                     && self.sample == new.sample
-                    && self.journal.sha256 == new.journal.sha256,
+                    && self.lower_physical == new.lower_physical
+                    && self.free == new.free
+                    && (self.journal.sha256 == new.journal.sha256
+                        || equal_journal_rows(
+                            &self.journal.bytes(false)?,
+                            &new.journal.bytes(false)?
+                        )?),
                 "original full211 guard changed"
             );
         } else {
@@ -302,6 +308,12 @@ fn decode_journal(raw: &[u8]) -> Result<Vec<Value>> {
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?)
 }
+// journald may serialize fields in a different order on each read. Each raw
+// output retains its own digest. Compare all fields and the original row order.
+fn equal_journal_rows(left: &[u8], right: &[u8]) -> Result<bool> {
+    Ok(decode_journal(left)? == decode_journal(right)?)
+}
+
 fn reopen(f: &Firing, boot: &str) -> Result<()> {
     let c = full211_peer::control();
     let p = c.guard_plan.sealed()?;
@@ -471,6 +483,39 @@ mod tests {
             assert!(measurement(&bad, FLOOR, GID).is_err(), "{key}");
         }
     }
+    #[test]
+    fn repeat_read_accepts_json_field_order_but_preserves_every_row_and_field() {
+        let rows = br#"{"__CURSOR":"a","UNIT":"guard","__MONOTONIC_TIMESTAMP":"10"}
+{"__CURSOR":"b","MESSAGE_ID":"finished"}"#;
+        let reordered = br#"{"UNIT":"guard","__MONOTONIC_TIMESTAMP":"10","__CURSOR":"a"}
+{"MESSAGE_ID":"finished","__CURSOR":"b"}"#;
+        assert_ne!(digest(rows), digest(reordered));
+        assert!(equal_journal_rows(rows, reordered).unwrap());
+        let first = rows.split(|x| *x == b'\n').next().unwrap();
+        assert!(!equal_journal_rows(rows, first).unwrap());
+        let parsed = decode_journal(rows).unwrap();
+        for bad in [
+            vec![parsed[1].clone(), parsed[0].clone()],
+            vec![parsed[0].clone(), parsed[1].clone(), parsed[1].clone()],
+            vec![
+                parsed[0].clone(),
+                json!({"__CURSOR":"c","MESSAGE_ID":"finished"}),
+            ],
+            vec![
+                parsed[0].clone(),
+                json!({"__CURSOR":"b","MESSAGE_ID":"finished","new":"field"}),
+            ],
+        ] {
+            let raw = bad
+                .iter()
+                .map(Value::to_string)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(!equal_journal_rows(rows, raw.as_bytes()).unwrap());
+        }
+        assert!(equal_journal_rows(rows, b"incomplete").is_err());
+    }
+
     #[test]
     fn original_or_one_adjacent_timer_firing_only() {
         let a = firing(GID, CADENCE);
