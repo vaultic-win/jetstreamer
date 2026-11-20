@@ -229,13 +229,18 @@ pub(super) fn drain(n: &mut Native, r: &capacity::Reservation) -> Result<()> {
             && (before["ControlGroup"] == "" || before["ControlGroup"] == cg(&r.unit)),
         "terminal not drained/closed"
     );
-    let path = cgroup_path(&r.unit);
+    verify_drained_group(&r.unit)?;
+    same_terminal_census(&before, &n.show(&r.unit)?)?;
+    Ok(())
+}
+pub(super) fn verify_drained_group(unit: &str) -> Result<()> {
+    let path = cgroup_path(unit);
     match fs::symlink_metadata(&path) {
         Ok(_) => drained_tree(&path, &mut 1024)?,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
         Err(e) => return Err(e.into()),
     }
-    let group = cg(&r.unit);
+    let group = cg(unit);
     for e in fs::read_dir("/proc")? {
         let e = e?;
         if !e
@@ -256,7 +261,6 @@ pub(super) fn drain(n: &mut Native, r: &capacity::Reservation) -> Result<()> {
             Err(e) => return Err(e.into()),
         }
     }
-    same_terminal_census(&before, &n.show(&r.unit)?)?;
     Ok(())
 }
 fn campaign(unit: &str) -> bool {
@@ -336,6 +340,18 @@ pub(super) fn census_with_held(
                 && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
+        if r.unit == delivery247::UNIT247
+            && fleet["unit_census"][&r.unit]["ActiveState"] == "failed"
+        {
+            ensure!(
+                r.release.is_none(),
+                "original delivery reservation released"
+            );
+            let current = n.show(&r.unit)?;
+            delivery247::terminal_owner(n, &current)?;
+            retained_terminals.insert(r.unit.clone(), current);
+            continue;
+        }
         if peers::is_retained(&r.unit) {
             ensure!(r.release.is_none(), "native terminal reservation released");
             let v = n.show(&r.unit)?;
@@ -496,7 +512,11 @@ pub(super) fn census_with_held(
     for (unit, old) in retained_terminals {
         let after = n.show(&unit)?;
         same_terminal_census(&old, &after)?;
-        peers::terminal_owner(&unit, &after)?;
+        if unit == delivery247::UNIT247 {
+            delivery247::terminal_owner(n, &after)?;
+        } else {
+            peers::terminal_owner(&unit, &after)?;
+        }
     }
     for (unit, old) in before {
         let after = n.show(&unit)?;

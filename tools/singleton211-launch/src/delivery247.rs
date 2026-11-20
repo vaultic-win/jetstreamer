@@ -1,6 +1,7 @@
 //! Preserve the actual, separately admitted epoch247 delivery during replay admission.
 use super::*;
-const UNIT247: &str = "horizon-upload-247-singleton-20261119-v1.service";
+mod terminal;
+pub(super) const UNIT247: &str = "horizon-upload-247-singleton-20261119-v1.service";
 const IID247: &str = "69218e2e0924497ea595a1227a6c31db";
 const PID247: u64 = 1439838;
 const UPLOADER: &str =
@@ -17,13 +18,41 @@ const FLEET_OWNER_SHA: &str = "52f5c892af9acef8d2cb273ec6a2a5737facfb504e0d9e2f7
 pub(super) fn selected(e: &Value) -> bool {
     e["epoch"] == 247 && e["phase"] == "upload-readback" && e["unit"]["Id"] == UNIT247
 }
+fn related(entry: &Value) -> bool {
+    entry["epoch"] == 247
+        || entry["expected_invocation_id"] == IID247
+        || ["unit", "producer", "controller"]
+            .iter()
+            .any(|role| entry[*role]["Id"] == UNIT247 || entry[*role]["InvocationID"] == IID247)
+}
+
+pub(super) fn validate_roster(fleet: &Value, rows: &[capacity::Reservation]) -> Result<()> {
+    let entries = fleet["pipelines"].as_array().context("pipeline census")?;
+    let found: Vec<_> = entries.iter().filter(|e| related(e)).collect();
+    if found.is_empty() {
+        ensure!(
+            !rows
+                .iter()
+                .any(|r| r.unit == UNIT247 || r.invocation_id == IID247)
+                && !fleet["active"]
+                    .as_array()
+                    .context("active census")?
+                    .iter()
+                    .any(related),
+            "original epoch247 booking or active owner missing from pipeline census"
+        );
+        return Ok(());
+    }
+    ensure!(found.len() == 1, "duplicate epoch247 pipeline");
+    validate(found[0], fleet, rows)
+}
+
 pub(super) fn validate(e: &Value, fleet: &Value, rows: &[capacity::Reservation]) -> Result<()> {
     ensure!(
         selected(e)
-            && e["live"] == true
+            && e["live"].is_boolean()
             && e["expected_invocation_id"] == IID247
             && e["unit"]["InvocationID"] == IID247
-            && e["unit"]["MainPID"].as_str() == Some("1439838")
             && e["unit"] == fleet["unit_census"][UNIT247]
             && e["sampled_at_utc"] == fleet["sampled_at_utc"]
             && e["ordinary_replay_claim"] == false
@@ -35,35 +64,57 @@ pub(super) fn validate(e: &Value, fleet: &Value, rows: &[capacity::Reservation])
                 ]),
         "epoch247 delivery identity/evidence changed"
     );
-    for key in ["pipelines", "active"] {
-        ensure!(
-            fleet[key]
-                .as_array()
-                .context("delivery census")?
-                .iter()
-                .filter(|v| *v == e)
-                .count()
-                == 1,
-            "epoch247 delivery missing or duplicated in {key}"
-        );
+    let live = e["live"] == true;
+    let active: Vec<_> = fleet["active"]
+        .as_array()
+        .context("active census")?
+        .iter()
+        .filter(|a| related(a))
+        .collect();
+    ensure!(
+        if live {
+            active.as_slice() == [e]
+        } else {
+            active.is_empty()
+        },
+        "epoch247 active membership changed"
+    );
+    ensure!(
+        fleet["pipelines"]
+            .as_array()
+            .context("pipeline census")?
+            .iter()
+            .filter(|a| related(a))
+            .eq(std::iter::once(e)),
+        "epoch247 pipeline membership changed"
+    );
+    if live {
+        live::same_owner(&terminal::witness()?["transition"]["before"], &e["unit"])?;
+    } else {
+        terminal::fleet_owner(e)?;
     }
-    let bookings: Vec<_> = rows.iter().filter(|r| r.unit == UNIT247).collect();
+    let bookings: Vec<_> = rows
+        .iter()
+        .filter(|r| r.unit == UNIT247 || r.invocation_id == IID247)
+        .collect();
     ensure!(
         bookings.len() == 1,
         "epoch247 delivery booking missing/duplicated"
     );
     let r = bookings[0];
     ensure!(
-        r.invocation_id == IID247
+        r.unit == UNIT247
+            && r.invocation_id == IID247
             && r.maximum_memory_bytes == 7_000_000_000
             && r.remaining_disk_growth_bytes == 185_370_916_960
             && r.minimum_free_bytes == 3_000_000_000_000
-            && r.release.is_none(),
+            && r.release.is_none()
+            && (live || r.source == terminal::booking()),
         "epoch247 complete memory/readback/metadata/floor booking changed"
     );
     Ok(())
 }
-pub(super) fn verify_inputs() -> Result<()> {
+pub(super) fn verify_inputs(e: &Value) -> Result<()> {
     let review = Bound::new(REVIEW, REVIEW_SHA).sealed()?;
     ensure!(
         review["schema"] == "horizon247-current-reader-delivery-booking-v1"
@@ -84,6 +135,9 @@ pub(super) fn verify_inputs() -> Result<()> {
     );
     binding(&review["original_247_handoff"])?.json()?;
     Bound::new(UPLOADER, UPLOADER_SHA).artifact()?;
+    if e["live"] == false {
+        return terminal::verify_evidence(e);
+    }
     let mapped = PathBuf::from(format!("/proc/{PID247}/exe"));
     ensure!(
         fs::read_link(&mapped)? == Path::new(UPLOADER)
@@ -93,11 +147,15 @@ pub(super) fn verify_inputs() -> Result<()> {
     Ok(())
 }
 
+pub(super) fn terminal_owner(n: &mut Native, current: &Value) -> Result<()> {
+    terminal::observe(n, current)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     fn fixture() -> (Value, Value, Vec<capacity::Reservation>) {
-        let unit = json!({"Id":UNIT247,"InvocationID":IID247,"MainPID":PID247.to_string()});
+        let unit = terminal::witness().unwrap()["transition"]["before"].clone();
         let e = json!({"epoch":247,"phase":"upload-readback","live":true,"expected_invocation_id":IID247,
             "unit":unit,"sampled_at_utc":"sample","ordinary_replay_claim":false,
             "grants_launch_or_publication_authority":false,

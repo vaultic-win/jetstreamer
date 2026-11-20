@@ -21,11 +21,11 @@ mod full211_peer;
 mod full211_window;
 mod full265;
 // Reuse the exact observer consumer, including its semantic startup/token checks.
+pub mod foundation_holding_capacity;
 #[path = "../../../jetstreamer-horizon-observe/src/full265.rs"]
 pub mod full265_owner;
 mod gate;
 mod inputs;
-pub mod foundation_holding_capacity;
 mod launch;
 mod lifecycle;
 mod live;
@@ -340,8 +340,15 @@ impl Native {
             "unit suffix"
         );
         let properties = if unit == native261::UNIT {
-            format!("{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",live::PROPS)
-        } else { live::PROPS.to_owned() };
+            format!(
+                "{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",
+                live::PROPS
+            )
+        } else if unit == delivery247::UNIT247 {
+            format!("{},ExecMainExitTimestampMonotonic", live::PROPS)
+        } else {
+            live::PROPS.to_owned()
+        };
         let bytes = self.run(
             "/usr/bin/systemctl",
             &["show", unit, "--no-pager", "--property", &properties],
