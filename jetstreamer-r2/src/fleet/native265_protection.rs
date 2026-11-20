@@ -55,6 +55,17 @@ fn completed(
     now: u64,
     wall: u64,
 ) -> Result<String> {
+    completed_for(rows, m, boot, firing, now, wall, c::GUARD_UNIT)
+}
+pub(super) fn completed_for(
+    rows: &[Value],
+    m: &Value,
+    boot: &str,
+    firing: bool,
+    now: u64,
+    wall: u64,
+    unit: &str,
+) -> Result<String> {
     ensure!(
         !rows.is_empty() && rows.len() <= 64,
         "265 periodic PID1 bounds"
@@ -66,7 +77,7 @@ fn completed(
         ensure!(
             r["_PID"] == "1"
                 && r["_UID"] == "0"
-                && r["UNIT"] == c::GUARD_UNIT
+                && r["UNIT"] == unit
                 && r["_BOOT_ID"] == boot.replace('-', ""),
             "265 periodic PID1 identity"
         );
@@ -84,13 +95,13 @@ fn completed(
                 && !message.contains("timed out"),
             "265 recent guard failure"
         );
-        if message.starts_with(&format!("Starting {} -", c::GUARD_UNIT)) {
+        if message.starts_with(&format!("Starting {} -", unit)) {
             ensure!(
                 starts.insert(iid.to_owned(), mono).is_none(),
                 "265 duplicate guard start"
             );
         }
-        if message == format!("{}: Deactivated successfully.", c::GUARD_UNIT) {
+        if message == format!("{}: Deactivated successfully.", unit) {
             let realtime = text(r, "__REALTIME_TIMESTAMP")?.parse::<u64>()? / 1_000_000;
             last = Some((iid.to_owned(), mono, realtime));
         }

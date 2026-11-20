@@ -125,11 +125,40 @@ pub(super) fn sample_valid(
     wall: u64,
     maximum_age: u64,
 ) -> Result<()> {
+    sample_for(gp, g, gb, iid, pid, wall, maximum_age, &PROFILE)
+}
+pub(super) struct SampleProfile {
+    pub(super) unit: &'static str,
+    pub(super) guard_sha: &'static str,
+    pub(super) harness: &'static str,
+    pub(super) harness_sha: &'static str,
+    pub(super) memory: u64,
+    pub(super) scratch: u64,
+}
+const PROFILE: SampleProfile = SampleProfile {
+    unit: UNIT,
+    guard_sha: c::GUARD_SHA,
+    harness: c::TEST,
+    harness_sha: c::TEST_SHA,
+    memory: c::MEMORY,
+    scratch: c::SCRATCH,
+};
+#[allow(clippy::too_many_arguments)]
+pub(super) fn sample_for(
+    gp: &Value,
+    g: &Value,
+    gb: &Value,
+    iid: &str,
+    pid: u32,
+    wall: u64,
+    maximum_age: u64,
+    profile: &SampleProfile,
+) -> Result<()> {
     require(
         g["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
             && g["plan"] == gb["path"]
             && g["plan_sha256"] == gb["sha256"]
-            && g["guard_sha256"] == c::GUARD_SHA
+            && g["guard_sha256"] == profile.guard_sha
             && hex(text(g, "guard_invocation_id")?, 32)
             && g["producer_invocation_id"] == iid
             && g["producer"]["invocation_id"] == iid
@@ -142,19 +171,19 @@ pub(super) fn sample_valid(
             && g["producer"]["kill_mode"] == "control-group"
             && g["producer"]["delegated"] == false
             && g["producer"]["restarts"] == 0
-            && g["producer"]["cgroup"] == format!("/system.slice/{}", UNIT)
+            && g["producer"]["cgroup"] == format!("/system.slice/{}", profile.unit)
             && g["producer_stop_enabled"] == true
             && g["native_main"] == gp["native_main"]
             && g["minimum_free_bytes"] == gp["minimum_free_bytes"]
             && num(g, "available_bytes")? >= num(gp, "minimum_free_bytes")?
             && g["maximum_worker_vmas"] == 3500000
-            && g["maximum_root_physical_bytes"] == 506_191_984_640u64
-            && g["root_physical_observation"]["maximum_physical_bytes"] == 506_191_984_640u64
+            && g["maximum_root_physical_bytes"] == profile.scratch
+            && g["root_physical_observation"]["maximum_physical_bytes"] == profile.scratch
             && g["root_physical_observation"]["exceeds_budget"] == false
             && num(
                 &g["root_physical_observation"],
                 "conservative_physical_bytes",
-            )? <= 506_191_984_640u64
+            )? <= profile.scratch
             && g["workers"]
                 .as_array()
                 .is_some_and(|v| (1..=2).contains(&v.len()))
@@ -186,10 +215,16 @@ pub(super) fn sample_valid(
         g["process_observation"]["workers"] == g["workers"],
         "265 process/VMA sample differs"
     );
-    native265_process::sample(&g["process_observation"], gp, u64::from(pid))?;
+    native265_process::sample_for(
+        &g["process_observation"],
+        gp,
+        u64::from(pid),
+        profile.harness,
+        profile.harness_sha,
+    )?;
     let memory = &g["memory_observation"];
     ensure!(
-        num(memory, "current_bytes")? <= c::MEMORY
+        num(memory, "current_bytes")? <= profile.memory
             && memory["swap_bytes"] == 0
             && num(memory, "tasks")? <= 512
             && memory["events"]["oom"] == 0

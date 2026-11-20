@@ -38,6 +38,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-210-native-input-optimized-v1/native-input-test",
                 "2f33396ed027cefbb2529bee194a83e0d0c8dcd079b76cc9410a53852ad1cec6",
             ),
+            257 => (
+                "horizon-257-native-input-20261120-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+                "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input",
+                "b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce",
+            ),
             265 => (
                 "horizon-265-native-input-20261119-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
@@ -125,7 +131,7 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
         rss["census_stable"] == true
             && rss["error"].is_null()
             && rss["processes"].as_array().is_some_and(|v| {
-                if n.epoch == 265 {
+                if matches!(n.epoch, 257 | 265) {
                     (1..=2).contains(&v.len())
                         && v.iter().filter(|p| p["pid"] == n.main_pid).count() == 1
                 } else {
@@ -211,42 +217,57 @@ fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
         && a.mtime() == b.mtime()
         && a.mtime_nsec() == b.mtime_nsec()
 }
-fn native265_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
-    if n.epoch != 265 {
+fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
+    if !matches!(n.epoch, 257 | 265) {
         return Ok(Value::Null);
     }
     let rss = serde_json::to_value(&u.rss)?;
-    let rows = rss["processes"].as_array().context("265 process census")?;
+    let rows = rss["processes"]
+        .as_array()
+        .context("bootstrap process census")?;
     let mut children = rows.iter().filter(|p| p["pid"] != n.main_pid);
     let Some(child) = children.next() else {
         return Ok(Value::Null);
     };
-    ensure!(children.next().is_none(), "265 multiple children");
-    let pid = u32::try_from(child["pid"].as_u64().context("265 child PID")?)?;
+    ensure!(children.next().is_none(), "bootstrap multiple children");
+    let pid = u32::try_from(child["pid"].as_u64().context("bootstrap child PID")?)?;
     let proc = PathBuf::from(format!("/proc/{pid}"));
     let before = fs::read_to_string(proc.join("stat"))?;
-    let (_, tail) = before.rsplit_once(')').context("265 child stat")?;
+    let (_, tail) = before.rsplit_once(')').context("bootstrap child stat")?;
     let fields: Vec<_> = tail.split_whitespace().collect();
     ensure!(
         fields.len() >= 20
             && fields[1].parse::<u32>()? == n.main_pid
             && fields[19].parse::<u64>()?
-                == child["start_ticks"].as_u64().context("265 child start")?
+                == child["start_ticks"]
+                    .as_u64()
+                    .context("bootstrap child start")?
             && fs::read_to_string(proc.join("cgroup"))?.trim()
                 == format!("0::/system.slice/{}", n.unit),
-        "265 foreign child parent/start/cgroup"
+        "bootstrap foreign child parent/start/cgroup"
     );
-    let expected=NativeConfig {epoch:265,unit:n.unit.clone(),expected_invocation_id:n.expected_invocation_id.clone(),main_pid:pid,
-        scratch_path:n.scratch_path.clone(),executable:"/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15".into(),
-        executable_sha256:"c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4".into()};
-    let mut image = mapped_at(&expected, Path::new("/proc"), 0)?;
+    let mut image = mapped_image_at(
+        Path::new(
+            "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15",
+        ),
+        "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4",
+        pid,
+        Path::new("/proc"),
+        0,
+    )?;
     // Stat includes changing resource counters; only parent and start identify the process.
     let after = fs::read_to_string(proc.join("stat"))?;
-    let (_, tail) = after.rsplit_once(')').context("265 child stat after")?;
+    let (_, tail) = after
+        .rsplit_once(')')
+        .context("bootstrap child stat after")?;
     let after_fields: Vec<_> = tail.split_whitespace().collect();
     ensure!(
-        after_fields.len() >= 20 && after_fields[1] == fields[1] && after_fields[19] == fields[19],
-        "265 child reused"
+        after_fields.len() >= 20
+            && after_fields[1] == fields[1]
+            && after_fields[19] == fields[19]
+            && fs::read_to_string(proc.join("cgroup"))?.trim()
+                == format!("0::/system.slice/{}", n.unit),
+        "bootstrap child reused"
     );
     image["parent_pid"] = serde_json::json!(n.main_pid);
     image["start_ticks"] = child["start_ticks"].clone();
@@ -257,7 +278,7 @@ fn observe(n: &NativeConfig) -> Result<Value> {
     let before = observe_unit(&n.unit, &n.expected_invocation_id)?;
     identity(&before, n)?;
     let mapped_before = mapped_at(n, Path::new("/proc"), 0)?;
-    let child_before = native265_child(n, &before)?;
+    let child_before = bootstrap_child(n, &before)?;
     ensure!(
         n.scratch_path.canonicalize()? == n.scratch_path,
         "native input scratch noncanonical"
@@ -272,7 +293,7 @@ fn observe(n: &NativeConfig) -> Result<Value> {
     let after = observe_unit(&n.unit, &n.expected_invocation_id)?;
     identity(&after, n)?;
     let mapped_after = mapped_at(n, Path::new("/proc"), 0)?;
-    let child_after = native265_child(n, &after)?;
+    let child_after = bootstrap_child(n, &after)?;
     let end = fs::symlink_metadata(&n.scratch_path)?;
     ensure!(
         root.dev() == end.dev()
@@ -299,6 +320,8 @@ fn observe(n: &NativeConfig) -> Result<Value> {
     };
     ensure!(
         starts(&b)? == starts(&a)?
+            && mapped_before["mapped_inode"] == mapped_after["mapped_inode"]
+            && mapped_before["mapped_device"] == mapped_after["mapped_device"]
             && child_before["pid"] == child_after["pid"]
             && child_before["mapped_inode"] == child_after["mapped_inode"]
             && child_before["mapped_device"] == child_after["mapped_device"],
@@ -333,6 +356,38 @@ mod tests {
     use std::os::unix::fs::{PermissionsExt, symlink};
     fn config() -> NativeConfig {
         serde_json::from_value(serde_json::json!({"epoch":227,"unit":"horizon-native-input-227-capped-710f6523-v1.service","expected_invocation_id":"a".repeat(32),"main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input227-v1620-capped-v1/scratch","executable":"/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test","executable_sha256":"1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3"})).unwrap()
+    }
+    #[test]
+    fn native257_owns_only_its_registered_bootstrap_tuple() {
+        let good = json!({"epoch":257,"unit":"horizon-257-native-input-20261120-v1.service","expected_invocation_id":"a".repeat(32),
+            "main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+            "executable":"/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input",
+            "executable_sha256":"b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce"});
+        let n: NativeConfig = serde_json::from_value(good.clone()).unwrap();
+        n.validate().unwrap();
+        for (key, value) in [
+            ("epoch", json!(265)),
+            ("unit", json!("other")),
+            ("main_pid", json!(1)),
+            ("expected_invocation_id", json!("")),
+            ("scratch_path", json!("/tmp")),
+            ("executable", json!("/worker")),
+            ("executable_sha256", json!("c".repeat(64))),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = value;
+            assert!(
+                serde_json::from_value::<NativeConfig>(bad)
+                    .unwrap()
+                    .validate()
+                    .is_err(),
+                "{key}"
+            );
+        }
+        let unavailable = row(&n, Err(anyhow!("owner unavailable")));
+        assert_eq!(unavailable["status"], "unavailable");
+        assert_eq!(unavailable["entry_replay"], false);
+        assert_eq!(unavailable["ordinary_replay_claim"], false);
     }
     #[test]
     fn native265_tuple_is_closed_and_unavailable_never_claims_replay() {
