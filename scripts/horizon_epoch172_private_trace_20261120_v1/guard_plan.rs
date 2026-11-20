@@ -19,7 +19,7 @@ pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-m
 pub const GUARD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 pub const GUARD_SHA: &str = "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v1/trace172";
+pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2/trace172";
 // The retained 288-GiB booking survives. This diagnostic enforces a smaller
 // whole-tree ceiling to fit alongside 168's existing raw HOME floor.
 pub const CAP: u64 = 96 << 30;

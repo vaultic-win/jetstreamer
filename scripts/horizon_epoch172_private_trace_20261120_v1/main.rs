@@ -21,7 +21,7 @@ use std::{
 };
 
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const RETIRED: &str =
@@ -93,41 +93,53 @@ fn exclusive(p: &Path, data: &[u8], mode: u32) -> Result<()> {
     Ok(())
 }
 fn run(prog: &str, args: &[String], deadline: Instant) -> Result<String> {
-    // Only public status fields and bounded helper diagnostics enter this process.
-    // stdout is read after completion; this route's commands have small, fixed outputs.
+    use std::os::{fd::OwnedFd, unix::net::UnixStream};
+    const LIMIT: usize = 1 << 20;
+    let (mut reader, writer) = UnixStream::pair()?;
     let mut child = Command::new(prog)
         .args(args)
         .stdin(Stdio::null())
         .stderr(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(Stdio::from(OwnedFd::from(writer)))
         .spawn()?;
-    loop {
-        if let Some(status) = child.try_wait()? {
-            ensure!(
-                status.success(),
-                "{} failed ({status})",
-                Path::new(prog)
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-            );
-            let mut text = String::new();
-            child
-                .stdout
-                .take()
-                .context("stdout")?
-                .take(1 << 20)
-                .read_to_string(&mut text)?;
-            return Ok(text);
+    let result = (|| {
+        let mut output = Vec::new();
+        let mut chunk = [0; 16 * 1024];
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            ensure!(!remaining.is_zero(), "bounded {prog} timed out");
+            reader.set_read_timeout(Some(remaining))?;
+            match reader.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(n) => {
+                    ensure!(
+                        output.len() + n <= LIMIT,
+                        "{prog} output exceeded {LIMIT} bytes"
+                    );
+                    output.extend_from_slice(&chunk[..n]);
+                }
+                Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(err) => {
+                    return Err(err).with_context(|| format!("reading bounded {prog} output"));
+                }
+            }
         }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            bail!("bounded {} timed out", prog);
+        loop {
+            if let Some(status) = child.try_wait()? {
+                ensure!(status.success(), "{prog} failed ({status})");
+                return Ok(String::from_utf8(output)?);
+            }
+            ensure!(Instant::now() < deadline, "bounded {prog} timed out");
+            thread::sleep(Duration::from_millis(10));
         }
-        thread::sleep(Duration::from_millis(50));
+    })();
+    if result.is_err() {
+        let _ = child.kill();
+        child.wait()?;
     }
+    result
 }
+
 fn bounded() -> Instant {
     Instant::now() + Duration::from_secs(12)
 }
@@ -355,4 +367,30 @@ fn main() -> Result<()> {
         return Ok(());
     }
     launch::launch(fleet, &args[3], evidence, pre)
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::*;
+    #[test]
+    fn drains_output_before_waiting_for_exit() {
+        let args = ["-c", "262144", "/dev/zero"].map(String::from);
+        let output = run("/usr/bin/head", &args, bounded()).unwrap();
+        assert_eq!(output.len(), 262144);
+    }
+
+    #[test]
+    fn rejects_incomplete_or_excessive_output() {
+        let args = ["-c", "1048577", "/dev/zero"].map(String::from);
+        assert!(run("/usr/bin/head", &args, bounded()).is_err());
+        assert!(run("/usr/bin/false", &[], bounded()).is_err());
+        assert!(
+            run(
+                "/usr/bin/sleep",
+                &["2".into()],
+                Instant::now() + Duration::from_millis(100)
+            )
+            .is_err()
+        );
+    }
 }
