@@ -1,0 +1,21 @@
+{
+  "data_fulfillment": {
+    "contract": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/data-contract-r80702b/contract.json",
+      "sha256": "2ab43956ceeb88084b0b55592956d9ca5f2820873e0c5628aef5cb9c040a9b6b"
+    },
+    "deployment_seal": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/data-contract-r80702b/deployment-seal-receipt.json",
+      "sha256": "6c775ccec85421e50cdd36e125534964ebecbadf1ea588ec2999efc84e8d276c"
+    }
+  },
+  "filesystem": "/home/sol",
+  "invocation_id": "c2459faf6493457f97aee03ba46ec6c5",
+  "maximum_root_physical_bytes": 309237645312,
+  "maximum_worker_vmas": 3500000,
+  "minimum_free_bytes": 6829053656882,
+  "receipt_directory": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/preparation/epoch170/local3retry8/guard-state/receipts",
+  "schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+  "unit": "horizon-qualify-170-replacement-local3retry8-20261110-v1.service",
+  "worker_root": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1"
+}

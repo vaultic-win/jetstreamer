@@ -991,7 +991,7 @@ pub(super) fn qualify(seed_binding: &Bound, seal: &Bound, filesystem: &Path) -> 
     )
 }
 #[cfg(any(test, not(feature = "preparation")))]
-fn scope(s: &Scope<'_>) -> Result<()> {
+pub(super) fn scope(s: &Scope<'_>) -> Result<()> {
     let _ = s.initial_available_bytes;
     let (namespace, e) = [
         "local2",
@@ -1002,6 +1002,7 @@ fn scope(s: &Scope<'_>) -> Result<()> {
         "local3retry5",
         "local3retry6",
         "local3retry7",
+        "local3retry9",
     ]
     .into_iter()
     .find_map(|namespace| {
@@ -1023,7 +1024,7 @@ fn scope(s: &Scope<'_>) -> Result<()> {
                 || (e == 166 && s.raw_floor == CURRENT_FLOOR)
                 || (e == 167 && s.raw_floor == RETRY167_FLOOR)
                 || (e == 170 && s.raw_floor == RETRY170_LIVE1667_FLOOR))
-            && (namespace != "local3retry7"
+            && (!["local3retry7", "local3retry9"].contains(&namespace)
                 || (e == 170 && s.raw_floor == RETRY170_LIVE1667_FLOOR))
             && (namespace == "local2" || [166, 167, 169, 170].contains(&e))
             && s.unit == format!("horizon-qualify-{e}-replacement-{namespace}-20261110-v1.service")
@@ -1056,7 +1057,7 @@ fn scope(s: &Scope<'_>) -> Result<()> {
                     && ["local3retry4", "local3retry5", "local3retry6"].contains(&namespace)
                     && s.raw_floor == RETRY167_FLOOR)
                 || (e == 170
-                    && ["local3retry6", "local3retry7"].contains(&namespace)
+                    && ["local3retry6", "local3retry7", "local3retry9"].contains(&namespace)
                     && s.raw_floor == RETRY170_LIVE1667_FLOOR))
             && s.root_cap
                 == Some(
@@ -1534,14 +1535,21 @@ mod tests {
             let root = PathBuf::from(format!(
                 "/home/sol/.jetstreamer-private/epoch{epoch}-standard-lane-20261109-v1"
             ));
-            for attempt in ["local3retry5", "local3retry6", "local3retry7"] {
+            for attempt in [
+                "local3retry5",
+                "local3retry6",
+                "local3retry7",
+                "local3retry8",
+                "local3retry9",
+            ] {
                 let unit =
                     format!("horizon-qualify-{epoch}-replacement-{attempt}-20261110-v1.service");
                 let mut s = namespace_scope(&unit, &root);
                 s.raw_floor = RETRY170_LIVE1667_FLOOR;
                 assert_eq!(
                     scope(&s).is_ok(),
-                    epoch == 170 && ["local3retry6", "local3retry7"].contains(&attempt)
+                    epoch == 170
+                        && ["local3retry6", "local3retry7", "local3retry9"].contains(&attempt)
                 );
                 s.raw_floor -= 1;
                 assert!(scope(&s).is_err());

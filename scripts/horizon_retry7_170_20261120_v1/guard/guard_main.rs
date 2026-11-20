@@ -682,6 +682,34 @@ fn data_proof_trip(error: Option<&str>) -> Option<&'static str> {
     error.map(|_| "DATA-fulfillment-observation-failed")
 }
 
+fn fulfillment_scope<'a>(
+    plan: &'a Plan,
+    available: u64,
+    guard_sha256: &'a str,
+) -> data_fulfillment::Scope<'a> {
+    data_fulfillment::Scope {
+        unit: &plan.unit,
+        invocation_id: &plan.invocation_id,
+        filesystem: &plan.filesystem,
+        worker_root: &plan.worker_root,
+        raw_floor: plan.minimum_free_bytes,
+        root_cap: plan.maximum_root_physical_bytes,
+        max_vmas: plan.maximum_worker_vmas,
+        special_profile: plan.bounded_canary.is_some()
+            || plan.bounded_measurement.is_some()
+            || plan.native_main.is_some(),
+        initial_available_bytes: available,
+        guard_sha256,
+    }
+}
+
+fn validate_static_plan(plan: &Plan, guard_sha256: &str) -> Result<()> {
+    if plan.data_fulfillment.is_some() {
+        data_fulfillment::scope(&fulfillment_scope(plan, 0, guard_sha256))?;
+    }
+    Ok(())
+}
+
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "guard requires root");
     let args: Vec<_> = env::args().collect();
@@ -711,6 +739,7 @@ fn run() -> Result<()> {
     let plan: Plan = serde_json::from_slice(&bytes)?;
     validate_plan(&plan)?;
     if args.get(6).is_some_and(|a| a == "--validate-plan-only") {
+        validate_static_plan(&plan, &args[5])?;
         println!(
             "{}",
             json!({"schema":"jetstreamer-horizon-standalone-static-plan-validation-v1","plan_sha256":args[3],"self_sha256":args[5],"validated":true,"unit":plan.unit,"resource_samples_taken":0,"replay_launch_authorized":false,"protective_guard_proven":false,"producer_signaled":false,"remote_mutations":false,"r2_mutations":false})
@@ -826,23 +855,7 @@ fn run() -> Result<()> {
     // as a genuine guard trip. Do not use `?` on this live optional-proof result.
     let observed_data = if active(&before) {
         plan.data_fulfillment.as_ref().map(|binding| {
-            data_fulfillment::observe(
-                binding,
-                &data_fulfillment::Scope {
-                    unit: &plan.unit,
-                    invocation_id: &plan.invocation_id,
-                    filesystem: &plan.filesystem,
-                    worker_root: &plan.worker_root,
-                    raw_floor: plan.minimum_free_bytes,
-                    root_cap: plan.maximum_root_physical_bytes,
-                    max_vmas: plan.maximum_worker_vmas,
-                    special_profile: plan.bounded_canary.is_some()
-                        || plan.bounded_measurement.is_some()
-                        || plan.native_main.is_some(),
-                    initial_available_bytes: available,
-                    guard_sha256: &args[5],
-                },
-            )
+            data_fulfillment::observe(binding, &fulfillment_scope(&plan, available, &args[5]))
         })
     } else {
         None
@@ -1098,6 +1111,19 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn prelaunch_scope_checks_the_unit_from_the_prepared_plan() {
+        let mut plan: Plan =
+            serde_json::from_str(include_str!("retry8-stopped-plan.json")).unwrap();
+        let guard_sha = "a".repeat(64);
+        validate_plan(&plan).unwrap();
+        assert!(validate_static_plan(&plan, &guard_sha).is_err());
+        plan.unit = "horizon-qualify-170-replacement-local3retry9-20261110-v1.service".into();
+        validate_plan(&plan).unwrap();
+        validate_static_plan(&plan, &guard_sha).unwrap();
+        plan.minimum_free_bytes -= 1;
+        assert!(validate_static_plan(&plan, &guard_sha).is_err());
+    }
     #[test]
     fn root_capability_never_falls_through_to_the_producer_stop_path() {
         use std::cell::Cell;
