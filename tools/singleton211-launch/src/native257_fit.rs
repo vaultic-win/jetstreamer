@@ -10,8 +10,8 @@ const SCRATCH257: &str = "/home/ubuntu/.jetstreamer-private/native-input257-sele
 const BASELINE: &str =
     "/var/lib/jetstreamer/horizon-singleton211-bookings-v126-20261120-v1/current-ledger.json";
 const BASELINE_SHA: &str = "0a5ca1924d2b4c1bb5cf1cab5b6888299633d06faada66a5c94d0291311e53ee";
-const NATIVE257_MEMORY: u64 = 120_000_000_000;
-const NATIVE257_DISK: u64 = 256_000_000_000;
+pub(super) const NATIVE257_MEMORY: u64 = 120_000_000_000;
+pub(super) const NATIVE257_DISK: u64 = 256_000_000_000;
 
 fn preserves_baseline(
     old: &[capacity::Reservation],
@@ -90,6 +90,7 @@ pub(super) struct BookedHost {
     pub release: Option<Value>,
     pub full211_growth: Option<Value>,
     pub boundary_memory: Option<Value>,
+    pub retry_memory: Option<Value>,
     pub native211_growth: Option<Value>,
     pub boot: String,
     pub device: u64,
@@ -199,6 +200,14 @@ pub(super) fn booked_host_candidate(
     );
     let boundary_memory =
         failed_boundary205206::apply(n, review, &fleet, &currents, &mut effective)?;
+    let retry_memory = failed_boundary205206::retry_memory::apply(
+        n,
+        review,
+        &fleet,
+        &currents,
+        &mut effective,
+        boundary_memory.as_ref(),
+    )?;
     let native211_growth =
         native211_cold_growth::apply(n, review, &fleet, &currents, &mut effective, device)?;
     let mut resources = live::resources_at(path)?;
@@ -232,6 +241,7 @@ pub(super) fn booked_host_candidate(
         rows: effective,
         full211_growth,
         boundary_memory,
+        retry_memory,
         native211_growth,
         currents,
         overhead: (overhead, periodic::total(&periodic)?),
@@ -302,6 +312,9 @@ pub(super) fn evaluate(
     }
     if let Some(proof) = host.boundary_memory {
         fit["failed_boundary205206_memory_release"] = proof;
+    }
+    if let Some(proof) = host.retry_memory {
+        fit["completed_boundary205206_retry_memory_release"] = proof;
     }
     Ok(fit)
 }

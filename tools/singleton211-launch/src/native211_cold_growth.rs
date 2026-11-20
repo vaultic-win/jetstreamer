@@ -122,6 +122,13 @@ fn recipes(pins: &Value) -> Result<()> {
         b"horizon-native211-terminal-retention",
         b"horizon-native211-guard-binding-page1810-v3",
     ];
+    staged_recipes(&needles, &expected)
+}
+
+pub(super) fn staged_recipes(
+    needles: &[&[u8]],
+    expected: &BTreeMap<PathBuf, String>,
+) -> Result<()> {
     let mut seen = BTreeMap::new();
     let mut files = 0;
     for base in [
@@ -197,8 +204,8 @@ fn recipes(pins: &Value) -> Result<()> {
         }
     }
     ensure!(
-        seen == expected,
-        "new, removed or changed native211 consumer recipe"
+        &seen == expected,
+        "new, removed or changed staged consumer recipe"
     );
     Ok(())
 }
