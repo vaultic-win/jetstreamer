@@ -3,6 +3,8 @@
 use super::*;
 #[path = "failed_boundary205206.rs"]
 mod failed_boundary205206;
+#[path = "native211_cold_growth.rs"]
+mod native211_cold_growth;
 
 const SCRATCH257: &str = "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1";
 const BASELINE: &str =
@@ -88,6 +90,7 @@ pub(super) struct BookedHost {
     pub release: Option<Value>,
     pub full211_growth: Option<Value>,
     pub boundary_memory: Option<Value>,
+    pub native211_growth: Option<Value>,
     pub boot: String,
     pub device: u64,
 }
@@ -182,6 +185,8 @@ pub(super) fn booked_host_for(
     );
     let boundary_memory =
         failed_boundary205206::apply(n, review, &fleet, &currents, &mut effective)?;
+    let native211_growth =
+        native211_cold_growth::apply(n, review, &fleet, &currents, &mut effective, device)?;
     let mut resources = live::resources_at(path)?;
     let full211_growth = if full211 {
         ensure!(
@@ -213,6 +218,7 @@ pub(super) fn booked_host_for(
         rows: effective,
         full211_growth,
         boundary_memory,
+        native211_growth,
         currents,
         overhead: (overhead, periodic::total(&periodic)?),
         century,
@@ -276,6 +282,9 @@ pub(super) fn evaluate(
     if host.rows.iter().any(|r| r.unit == UNIT) {
         fit["full211_handoff"] = json!(full211_peer::handoff());
         fit["full211_growth"] = json!(host.full211_growth);
+    }
+    if let Some(proof) = host.native211_growth {
+        fit["native211_cold_growth_release"] = proof;
     }
     if let Some(proof) = host.boundary_memory {
         fit["failed_boundary205206_memory_release"] = proof;

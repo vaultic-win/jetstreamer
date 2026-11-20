@@ -435,8 +435,14 @@ fn mount_check(raw: &str, target: &Path) -> Result<()> {
     }
     Ok(())
 }
-fn no_owners() -> Result<Value> {
-    let scan = process_references::scan(Path::new("/proc"), Path::new(ROOT))?;
+pub(crate) fn scratch_ownership(
+    root: &Path,
+    scratch: &Path,
+    unit: &str,
+    original_pids: &[u32],
+    original_inodes: &[u64],
+) -> Result<Value> {
+    let scan = process_references::scan(Path::new("/proc"), root)?;
     ensure!(
         scan.references.is_empty(),
         "scratch has process references: {:?}",
@@ -462,21 +468,21 @@ fn no_owners() -> Result<Value> {
                 .context("process group")?
                 .parse::<u32>()?;
             ensure!(
-                ![1307638, 1307832].contains(&group),
+                !original_pids.contains(&group),
                 "original process group remains"
             );
             let cg = fs::read_to_string(p.join("cgroup"))?;
             ensure!(
-                !cg.contains(&format!("/system.slice/{UNIT}")),
+                !cg.contains(&format!("/system.slice/{unit}")),
                 "native cgroup still owns process"
             );
             let mounts = fs::read(p.join("mountinfo"))?;
             ensure!(mounts.len() < 16 << 20, "mountinfo bound");
-            mount_check(std::str::from_utf8(&mounts)?, Path::new(SCRATCH))?;
+            mount_check(std::str::from_utf8(&mounts)?, scratch)?;
             for link in ["cwd", "root", "exe"] {
                 match fs::metadata(p.join(link)) {
                     Ok(m) => ensure!(
-                        !(m.dev() == DEV && [ROOT_INO, SCRATCH_INO].contains(&m.ino())),
+                        !(m.dev() == DEV && original_inodes.contains(&m.ino())),
                         "alias reference to original scratch inode"
                     ),
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
@@ -486,7 +492,7 @@ fn no_owners() -> Result<Value> {
             for fd in fs::read_dir(p.join("fd"))? {
                 match fs::metadata(fd?.path()) {
                     Ok(m) => ensure!(
-                        !(m.dev() == DEV && [ROOT_INO, SCRATCH_INO].contains(&m.ino())),
+                        !(m.dev() == DEV && original_inodes.contains(&m.ino())),
                         "open scratch inode through alias"
                     ),
                     Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
@@ -502,10 +508,7 @@ fn no_owners() -> Result<Value> {
         }
         inspected += 1;
     }
-    mount_check(
-        &fs::read_to_string("/proc/self/mountinfo")?,
-        Path::new(SCRATCH),
-    )?;
+    mount_check(&fs::read_to_string("/proc/self/mountinfo")?, scratch)?;
     Ok(
         json!({"path_reference_scan":scan,"mount_and_inode_processes_inspected":inspected,"original_process_group_absent":true,"scratch_mount_aliases_absent":true}),
     )
@@ -518,7 +521,13 @@ pub(super) fn capture(n: &mut Native) -> Result<Value> {
     let before = show(n)?;
     terminal(&before, &proof)?;
     let preserved = baseline(false)?;
-    let ownership = no_owners()?;
+    let ownership = scratch_ownership(
+        Path::new(ROOT),
+        Path::new(SCRATCH),
+        UNIT,
+        &[1307638, 1307832],
+        &[ROOT_INO, SCRATCH_INO],
+    )?;
     let after = show(n)?;
     terminal(&after, &proof)?;
     ensure!(
