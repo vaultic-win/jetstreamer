@@ -1,4 +1,4 @@
-//! Exact retirement of three closed epoch223 duplicate CID indexes.
+//! Exact retirement of closed epoch223 duplicate CID indexes.
 //! Retains a full independently verified copy and every partial archive.
 //! Closed profile registry; no recursive removal, service mutation or R2 routes.
 mod process_references;
@@ -1568,10 +1568,10 @@ mod tests {
         (t, p)
     }
     #[test]
-    fn exact_three_profile_registry_and_archive_protection() {
+    fn exact_profile_registry_and_archive_protection() {
         let mut inodes = BTreeSet::new();
         let mut sum = 0;
-        for key in ["8457f800-v2", "0f7f1b6e-v1", "5072b7ba-v4"] {
+        for key in ["8457f800-v2", "0f7f1b6e-v1", "5072b7ba-v4", "full-root-v1"] {
             let p = profile(key).unwrap();
             assert_eq!(p.epoch, 223);
             assert!(inodes.insert(p.target_identity.ino));
@@ -1585,7 +1585,14 @@ mod tests {
             assert_eq!(p.target_identity.len, 9_709_637_370);
             sum += p.target_identity.blocks * 512;
         }
-        assert_eq!(sum, 29_128_945_664);
+        assert_eq!(sum, 38_838_599_680);
+        let full_root = profile("full-root-v1").unwrap();
+        assert!(!full_root.owner_success);
+        assert_eq!(full_root.owner_child_return_code, 1);
+        assert_eq!(
+            full_root.owner_invocation,
+            "e70aaf097e7c4583b216aba454145910"
+        );
         for bad in [
             "223",
             "249",
@@ -1793,7 +1800,7 @@ mod tests {
         let ids: Value =
             serde_json::from_str(include_str!("fixtures/survey-file-identities-before.json"))
                 .unwrap();
-        for key in ["8457f800-v2", "0f7f1b6e-v1", "5072b7ba-v4"] {
+        for key in ["8457f800-v2", "0f7f1b6e-v1", "5072b7ba-v4", "full-root-v1"] {
             let q = profile(key).unwrap();
             assert_eq!(survey["body_sha256"], q.sha256);
             assert_eq!(survey["bytes_per_body"], q.target_identity.len);
