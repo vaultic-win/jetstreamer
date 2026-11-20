@@ -35,6 +35,19 @@ const STAGED: Owner = Owner {
     cap: staged::CAP,
 };
 
+// systemd can clear the command's display PID and timestamps on daemon-reload.
+fn staged_exec_matches(recorded: &str, current: &str) -> bool {
+    if recorded == current {
+        return true;
+    }
+    let Some((command, _)) = recorded.split_once(" ; start_time=") else {
+        return false;
+    };
+    const RELOADED: &str =
+        " ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }";
+    current.strip_suffix(RELOADED) == Some(command)
+}
+
 fn staged_inputs() -> Result<Value> {
     let mut proof = json!({});
     let mut docs = json!({});
@@ -87,7 +100,12 @@ fn staged_inputs() -> Result<Value> {
         .output()?;
     ensure!(
         manager.status.success()
-            && c["expected_exec_start"] == std::str::from_utf8(&manager.stdout)?.trim(),
+            && staged_exec_matches(
+                c["expected_exec_start"]
+                    .as_str()
+                    .context("missing staged command")?,
+                std::str::from_utf8(&manager.stdout)?.trim(),
+            ),
         "staged 247 manager execution differs"
     );
     Ok(proof)
@@ -253,6 +271,28 @@ mod tests {
         assert_eq!(row["status"], "observed", "{row}");
         println!("STAGED247_RSS={row}");
     }
+    #[test]
+    fn reloaded_manager_retains_the_exact_staged_command() {
+        let command =
+            "{ path=/sealed/tool ; argv[]=/sealed/tool sync --epochs 247-247 ; ignore_errors=no";
+        let original = format!(
+            "{command} ; start_time=[Fri 2026-11-20 18:58:29 UTC] ; stop_time=[n/a] ; pid=2149076 ; code=(null) ; status=0/0 }}"
+        );
+        let reloaded = format!(
+            "{command} ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
+        );
+        assert!(staged_exec_matches(&original, &original));
+        assert!(staged_exec_matches(&original, &reloaded));
+        for altered in [
+            reloaded.replace("247-247", "247-248"),
+            reloaded.replace("ignore_errors=no", "ignore_errors=yes"),
+            reloaded.replace("pid=0", "pid=42"),
+            reloaded.replace("code=(null)", "code=exited"),
+        ] {
+            assert!(!staged_exec_matches(&original, &altered));
+        }
+    }
+
     #[test]
     fn unavailable_staged_owner_never_substitutes_original_or_zero() {
         let data = row(Err(anyhow!("changed")), STAGED);
