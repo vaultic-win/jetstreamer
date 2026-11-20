@@ -555,8 +555,7 @@ fn resident_bytes(
         .min(downloaded))
 }
 
-fn storage() -> Result<Value> {
-    let owner = observe()?;
+fn storage(owner: &Value) -> Result<Value> {
     let pid = owner["native"]["MainPID"]
         .as_str()
         .context("audit PID")?
@@ -589,7 +588,7 @@ fn storage() -> Result<Value> {
         "audit working allocation exceeds its bounded budget"
     );
     ensure!(
-        ticks(pid)? == number(&owner, "start_ticks")? && native()? == owner["native"],
+        ticks(pid)? == number(owner, "start_ticks")? && native()? == owner["native"],
         "audit owner changed during scratch observation"
     );
     Ok(
@@ -651,7 +650,13 @@ fn data_point(fit: &Value, storage: &Value, available: u64) -> Result<Value> {
     )
 }
 pub(super) fn data_requirements(fit: &Value, available: u64) -> Result<Value> {
-    let snapshot = storage()?;
+    data_requirements_for(fit, available, &observe()?)
+}
+
+/// Use the already authenticated owner to measure one exact archive. Native
+/// identity and start ticks are checked again after reading physical allocation.
+pub(super) fn data_requirements_for(fit: &Value, available: u64, owner: &Value) -> Result<Value> {
+    let snapshot = storage(owner)?;
     data_point(
         fit,
         &snapshot,
