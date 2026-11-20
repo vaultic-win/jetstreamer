@@ -24,6 +24,28 @@ pub(super) fn arithmetic(
     currents: &BTreeMap<String, u64>,
     (auxiliary_overhead, periodic_controls): (u64, u64),
 ) -> Result<Value> {
+    candidate_arithmetic(
+        (total, available, disk),
+        century,
+        rows,
+        currents,
+        (auxiliary_overhead, periodic_controls),
+        (MEMORY, SCRATCH),
+    )
+}
+
+pub(super) fn candidate_arithmetic(
+    (total, available, disk): (u64, u64, u64),
+    century: u64,
+    rows: &[Reservation],
+    currents: &BTreeMap<String, u64>,
+    (auxiliary_overhead, periodic_controls): (u64, u64),
+    (candidate_memory, candidate_disk): (u64, u64),
+) -> Result<Value> {
+    ensure!(
+        candidate_memory > 0 && candidate_disk > 0,
+        "empty candidate"
+    );
     ensure!(century > 0, "missing canonical century reserve");
     let mut hard = add(
         add(add(HOST, CONTROL)?, auxiliary_overhead)?,
@@ -60,10 +82,10 @@ pub(super) fn arithmetic(
         currents.keys().all(|u| seen.contains(u)),
         "unaccounted current memory"
     );
-    hard = add(hard, MEMORY)?;
-    growth = add(growth, MEMORY)?;
+    hard = add(hard, candidate_memory)?;
+    growth = add(growth, candidate_memory)?;
     let floor = inherited.max(add(century, disk_growth)?);
-    let disk_required = add(floor, SCRATCH)?;
+    let disk_required = add(floor, candidate_disk)?;
     ensure!(
         hard <= total,
         "all hard reservations plus candidate exceed physical memory: {hard} > {total}"

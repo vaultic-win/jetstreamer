@@ -26,6 +26,7 @@ mod inputs;
 mod launch;
 mod lifecycle;
 mod live;
+pub mod native257_fit;
 mod native265_growth;
 mod peer_window;
 mod peers;

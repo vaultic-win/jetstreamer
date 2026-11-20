@@ -492,6 +492,9 @@ pub(super) fn census(
     Ok(currents)
 }
 pub(super) fn resources() -> Result<(u64, u64, u64)> {
+    resources_at(Path::new("/"))
+}
+pub(super) fn resources_at(filesystem: &Path) -> Result<(u64, u64, u64)> {
     let mem = fs::read_to_string("/proc/meminfo")?;
     let value = |key: &str| -> Result<u64> {
         let row = mem
@@ -506,7 +509,7 @@ pub(super) fn resources() -> Result<(u64, u64, u64)> {
             .context("memory overflow")
     };
     let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
-    let path = std::ffi::CString::new("/")?;
+    let path = std::ffi::CString::new(filesystem.as_os_str().as_encoded_bytes())?;
     ensure!(
         unsafe { libc::statvfs(path.as_ptr(), &mut stat) } == 0,
         "statvfs"
