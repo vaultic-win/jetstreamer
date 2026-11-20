@@ -155,35 +155,6 @@ fn prepared_transition(
     );
     Ok(())
 }
-#[cfg(test)]
-mod preparation_tests {
-    use super::*;
-    #[test]
-    fn only_the_registered_inert_261_preparation_can_transfer() {
-        if EPOCH != 261 {
-            return;
-        }
-        let old = Bound::new(
-            "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch",
-            "12b14dad4e1465bc22a6466adee317f3059ae66e54106a81c4758b724646a2ba",
-        );
-        let new = Bound::new(LAUNCHER, "c".repeat(64));
-        let reference = Bound::new(
-            "/var/lib/jetstreamer/horizon-native261-prepared-host-stop-1259df1f-v1/prepared.json",
-            "71de86ca05fd28b38d6f1127ce04a0216f80444c6982cd0c962d9b795a4bdaf0",
-        );
-        let roles = |launcher: &Bound, commit: &str| json!({"artifacts":[{"role":"launcher","artifact":launcher,"source_commit":commit},{"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"a".repeat(40)},{"role":"guard","artifact":Bound::new(GUARD,GUARD_SHA),"source_commit":"b".repeat(40)}]});
-        let previous = roles(&old, "1259df1ff730e684a7b09c05c93d0d82cc3694ff");
-        let current = roles(&new, &"c".repeat(40));
-        prepared_transition(&reference, &old, &new, &previous, &current).unwrap();
-        let mut different = reference.clone();
-        different.sha256 = "f".repeat(64);
-        assert!(prepared_transition(&different, &old, &new, &previous, &current).is_err());
-        let mut bad = current.clone();
-        bad["artifacts"][1]["source_commit"] = json!("f".repeat(40));
-        assert!(prepared_transition(&reference, &old, &new, &previous, &bad).is_err());
-    }
-}
 fn refreshed_capacity(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     let mut latest = funding::current(n, r, held)?;
     latest["protected_existing_floor_bytes"] =
@@ -338,4 +309,34 @@ pub fn run() -> Result<()> {
         );
     }
     result
+}
+
+#[cfg(test)]
+mod preparation_tests {
+    use super::*;
+    #[test]
+    fn only_the_registered_inert_261_preparation_can_transfer() {
+        if EPOCH != 261 {
+            return;
+        }
+        let old = Bound::new(
+            "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch",
+            "12b14dad4e1465bc22a6466adee317f3059ae66e54106a81c4758b724646a2ba",
+        );
+        let new = Bound::new(LAUNCHER, "c".repeat(64));
+        let reference = Bound::new(
+            "/var/lib/jetstreamer/horizon-native261-prepared-host-stop-1259df1f-v1/prepared.json",
+            "71de86ca05fd28b38d6f1127ce04a0216f80444c6982cd0c962d9b795a4bdaf0",
+        );
+        let roles = |launcher: &Bound, commit: &str| json!({"artifacts":[{"role":"launcher","artifact":launcher,"source_commit":commit},{"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"a".repeat(40)},{"role":"guard","artifact":Bound::new(GUARD,GUARD_SHA),"source_commit":"b".repeat(40)}]});
+        let previous = roles(&old, "1259df1ff730e684a7b09c05c93d0d82cc3694ff");
+        let current = roles(&new, &"c".repeat(40));
+        prepared_transition(&reference, &old, &new, &previous, &current).unwrap();
+        let mut different = reference.clone();
+        different.sha256 = "f".repeat(64);
+        assert!(prepared_transition(&different, &old, &new, &previous, &current).is_err());
+        let mut bad = current.clone();
+        bad["artifacts"][1]["source_commit"] = json!("f".repeat(40));
+        assert!(prepared_transition(&reference, &old, &new, &previous, &bad).is_err());
+    }
 }
