@@ -1,0 +1,32 @@
+[package]
+name = "horizon-epoch169-focused-admission"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+guard168 = { package = "horizon-epoch168-trace-admission", path = "../horizon_epoch168_trace_admission_20261120_v1" }
+anyhow = "1"
+libc = "0.2"
+serde_json = "1"
+sha2 = "0.10"
+
+[[bin]]
+name = "admit169"
+path = "main.rs"
+
+[lib]
+name = "guard169"
+path = "guard_plan.rs"
+
+[[bin]]
+name = "gate169"
+path = "gate.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "focused169"
+path = "trace.rs"
