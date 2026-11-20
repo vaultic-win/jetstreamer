@@ -31,6 +31,35 @@ This exercises genuine local TLS, headers, response status, truncated streams,
 the original deadline, output permissions and untrusted certificate rejection.
 It does not cover the entire black-box capture/funding/fsync acceptance matrix.
 
-The 53 extractor tests, full transport/native acceptance matrix and historical
-source/state proof remain required before any epoch168 recovery. No epoch168
-source acquisition or replay has been launched by these compiler services.
+## November 20 native qualification and historical source
+
+The native harness completed all 55 cases on November 20. The receipt at
+`work/native168-controls-v1/controls/native-controls.json` has SHA-256
+`8fe3daa707a2c92a792ded315842e004d9ecb71a68ce39eca423fb1652527f1d`.
+The unexecuted status in the sealed harness source inventory describes its
+original handoff. The 05:25 UTC production capture stopped at the first CAR
+HEAD because the provider omitted an ETag. Both the CAR and slot-range
+objects also omitted ETags on bounded HTTP 206 responses.
+
+At 05:33 UTC a separate read-only investigation verified the published epoch
+CID against the CAR header and the SHA-256 of the epoch node. It followed
+the authenticated subset, block, entry and transaction links to slot
+72,728,191, entry 433, transaction 532. It verified the original wire
+signature. The segment occupies inclusive CAR offsets 53,089,080,641 through
+53,089,471,805. Its 391,165 bytes have SHA-256
+`f3f7c415ae3519c0b48fc54812232b9f715ba6c0932d761733db8787adce125a`.
+The provider publishes the root and checksum in its [epoch recap](https://files.old-faithful.net/168/168.recap.yaml).
+
+The transaction metadata contains a successful Raydium swap. The final
+program log records 199,916 of 200,000 compute units consumed. The saved
+worker incident reports `ProgramFailedToComplete` at instruction zero.
+The worker's raw VM error and pre-transaction bank state still need to be
+recovered to explain the difference. The 53 extractor tests, native
+extractor run and replay qualification remain outstanding.
+
+On the campaign host, the investigation is retained in
+`work/epoch168-cid-investigation-v1` under the HOME-backed build directory
+described in `BUILD_QUALIFICATION.md`. The investigation receipt digest is
+`ac9c634002bf37bdfb47ba8f189efe71f0432036379dc5ec181952d351528991`.
+The typed Protobuf text digest is
+`bfad1e6b84fb321341aa7f9b0896b5996f27b51f7be3abe556b0c1a78a06ab9d`.
