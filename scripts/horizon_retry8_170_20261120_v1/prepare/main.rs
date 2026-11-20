@@ -44,7 +44,6 @@ mod data_fulfillment;
 mod host_fulfillment;
 #[path = "capacity.rs"]
 mod join_capacity;
-#[path = "../../horizon_retry6_170_20261118_v1/prepare-live166retry8-v1/dep_a0f3a8a53444_local.rs"]
 mod local;
 #[path = "../../horizon_retry6_170_20261118_v1/prepare-live166retry8-v1/dep_3e1a6d32e7ac_native_guard.rs"]
 mod native_guard;
@@ -81,7 +80,7 @@ mod terminal169;
 mod terminal170;
 use local::LocalInputs;
 use profile::{Profile, profile};
-const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v1/prepare";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v2/prepare";
 const RETIRED170_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
 const RETIRED170_COMPLETION_SHA: &str =
     "0a6792c6fe26ebda05764a10c6f8e070c4340cc28f9b7a184056d013c334dde3";

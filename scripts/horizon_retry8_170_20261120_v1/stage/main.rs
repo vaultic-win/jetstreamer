@@ -237,7 +237,9 @@ fn process_claims() -> Result<Vec<Value>> {
 const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
-const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v1/prepare";
+const STAGE_IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/stage-v2/stage";
+const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v2/prepare";
 const PREPARER_SHA: &str = env!("HORIZON170_RETRY8_PREPARE_SHA");
 const PREPARER_PROOF_SHA: &str = env!("HORIZON170_RETRY8_PREPARE_PROOF_SHA");
 const LAUNCHER_SHA: &str = env!("HORIZON170_RETRY8_LAUNCH_SHA");
@@ -900,8 +902,9 @@ fn main() -> Result<()> {
         "CONFIG --plan-sha256 SHA --self-sha256 SHA (witness|launch-plan|measure TAG|prepare TAG MEASUREMENT)"
     );
     ensure!(
-        sha(&fs::read("/proc/self/exe")?) == a[5],
-        "wrapper self hash"
+        fs::read_link("/proc/self/exe")? == Path::new(STAGE_IMAGE)
+            && sha(&fs::read("/proc/self/exe")?) == a[5],
+        "sealed stage-v2 image path and self hash required"
     );
     launch_plan::published_sources()?;
     let cfg = read_bound(Path::new(&a[1]), &a[3])?;
@@ -1371,7 +1374,7 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/launch-v1/launch";
+        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/launch-v2/launch";
         ensure!(
             sha(&fs::read(launcher)?) == super::LAUNCHER_SHA,
             "sealed launcher differs"

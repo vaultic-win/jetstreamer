@@ -42,9 +42,9 @@ const NODE_SHA: &str = "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b
 const GUARD_IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/guard-v1/guard";
 const GUARD_SHA: &str = "47406f752751e730a809bfaa212a6cb8869e418d1d245240206225f7e2fff588";
-const PREPARER_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v1/prepare";
+const PREPARER_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v2/prepare";
 const PREPARER_SHA: &str = env!("HORIZON170_RETRY8_PREPARE_SHA");
-const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v1/artifact-proof.json";
+const PREPARER_BUILD_PROOF: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/prepare-v2/artifact-proof.json";
 const PREPARER_BUILD_PROOF_SHA: &str = env!("HORIZON170_RETRY8_PREPARE_PROOF_SHA");
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
@@ -1173,7 +1173,7 @@ fn launch(plan: &Value, prepared: &Value, capacity: &Value) -> Result<Value> {
     }
     attempt
 }
-const LAUNCH_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/launch-v1/launch";
+const LAUNCH_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry8-recovery-20261120-v1/launch-v2/launch";
 fn require_launch_image(exe: &Path) -> Result<()> {
     ensure!(
         exe == Path::new(LAUNCH_IMAGE),

@@ -142,11 +142,6 @@
       "bytes": 3652
     },
     {
-      "path": "scripts/horizon_retry6_170_20261118_v1/prepare-live166retry8-v1/dep_a0f3a8a53444_local.rs",
-      "sha256": "99e4b62a9aaa6409bdff5403e7f852bfef98d647a3723592d433ac89dc13ef05",
-      "bytes": 28094
-    },
-    {
       "path": "scripts/horizon_retry6_170_20261118_v1/prepare-live166retry8-v1/dep_ac8f7995cdd2_actual-retirement-terminal-fixtures.json",
       "sha256": "1af24b4120775898f5cf69a0c9373dc85ca8aa0c2c66bdffc67c70c7a8932731",
       "bytes": 101915
@@ -322,9 +317,14 @@
       "bytes": 9086
     },
     {
+      "path": "scripts/horizon_retry8_170_20261120_v1/prepare/local.rs",
+      "sha256": "9566dab628c5a4d9d835c07eeb881ec8289a67516ef097de3c1a043715f18c16",
+      "bytes": 30580
+    },
+    {
       "path": "scripts/horizon_retry8_170_20261120_v1/prepare/main.rs",
-      "sha256": "dc9318760aef7981a68476c75801e69a0321844c40d40a1defb7ff0598c0aeaa",
-      "bytes": 63050
+      "sha256": "170c3c65b9761f70ab44f738ae14da81e4d538817e6fea95f8aeb1a377c5be51",
+      "bytes": 62950
     },
     {
       "path": "scripts/horizon_retry8_170_20261120_v1/prepare/predecessor.rs",
