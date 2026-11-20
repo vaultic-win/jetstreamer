@@ -2,6 +2,39 @@
 use super::first_guard::first_guard;
 use super::*;
 use std::os::unix::fs::DirBuilderExt;
+pub(super) struct FirstGuardProof {
+    pub plan: Bound,
+    pub sample: Bound,
+    pub journal: Bound,
+}
+
+pub(super) fn cold_input_token(
+    startup: &Value,
+    startup_sha: &str,
+    guard_plan: &Value,
+    guard_iid: &str,
+    proof: FirstGuardProof,
+    recorded_us: u64,
+) -> Value {
+    let mut token = json!({
+        "schema": "horizon-native257-first-guard-token-v1",
+        "startup_plan_sha256": startup_sha,
+        "unit": UNIT,
+        "invocation_id": guard_plan["invocation_id"],
+        "main_pid": guard_plan["native_main"]["main_pid"],
+        "harness": startup["harness"],
+        "guard": startup["guard"],
+        "boot_id": startup["boot_id"],
+        "admission": startup["admission"],
+        "guard_invocation_id": guard_iid,
+        "guard_plan": proof.plan,
+        "guard_sample": proof.sample,
+        "guard_pid1_journal": proof.journal,
+        "recorded_monotonic_us": recorded_us,
+    });
+    deny_authority(&mut token);
+    token
+}
 fn verify_mount(alias: &Path, actual: &Path) -> Result<()> {
     let m = fs::symlink_metadata(alias)?;
     ensure!(
@@ -271,10 +304,18 @@ pub(super) fn run(
                 ("guard-PID1.json", jr.clone()),
             ],
         )?;
-        let mut token = json!({"schema":"horizon-native257-first-guard-token-v1","startup_plan_sha256":pr.sha256,"unit":UNIT,"invocation_id":iid,"main_pid":pid,"harness":p["harness"],"guard":guard,"boot_id":p["boot_id"],"admission":ar,"guard_invocation_id":gid,"guard_plan":deployed_gr,
-            "guard_sample":Bound::new(proof_package.join("guard-sample.json"),sr.sha256),"guard_pid1_journal":Bound::new(proof_package.join("guard-PID1.json"),jr.sha256),"recorded_monotonic_us":mono()?});
-        deny_authority(&mut token);
-        token["replay_launch_authorized"] = json!(true);
+        let token = cold_input_token(
+            &p,
+            &pr.sha256,
+            &gp,
+            gid,
+            FirstGuardProof {
+                plan: deployed_gr.clone(),
+                sample: Bound::new(proof_package.join("guard-sample.json"), sr.sha256),
+                journal: Bound::new(proof_package.join("guard-PID1.json"), jr.sha256),
+            },
+            mono()?,
+        );
         handoff::limited_sample(&p, &gp, &sample)?;
         first_guard(&p, &token, &gp, &sample, &journal, now()?)?;
         let (_, latest) = current(n, review, true)?;
