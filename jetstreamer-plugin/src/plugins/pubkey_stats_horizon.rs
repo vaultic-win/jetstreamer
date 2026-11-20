@@ -108,6 +108,10 @@ impl PubkeyStatsHorizonPlugin {
 }
 
 impl HorizonPlugin for PubkeyStatsHorizonPlugin {
+    fn supports_slot_ranges(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &'static str {
         "Pubkey Stats (horizon)"
     }

@@ -1,5 +1,5 @@
 //! Anonymous HTTP range reads bound to the authenticated archive inventory.
-use std::{collections::BTreeMap, io, path::Path, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, io, ops::Range, path::Path, sync::Arc, time::Duration};
 
 use reqwest::{Client, StatusCode, Url, header};
 use serde::Deserialize;
@@ -67,16 +67,29 @@ impl PinnedArchives {
         })
     }
 
-    pub(super) fn open(&self, epoch: u64, client: &Client, read_ahead: bool) -> io::Result<Reader> {
+    pub(super) fn open(
+        &self,
+        epoch: u64,
+        client: &Client,
+        worker_span: Option<Range<u64>>,
+    ) -> io::Result<Reader> {
         let object = self
             .objects
             .get(&epoch)
             .ok_or_else(|| io::Error::other("epoch absent from pinned inventory"))?;
+        if worker_span
+            .as_ref()
+            .is_some_and(|r| r.is_empty() || r.end > object.bytes)
+        {
+            return Err(io::Error::other(
+                "worker bucket span exceeds pinned archive",
+            ));
+        }
         Ok(Reader {
             url: self.base.join(&object.key).map_err(io::Error::other)?,
             object: object.clone(),
             client: client.clone(),
-            read_ahead,
+            worker_span,
             start: 0,
             cache: Vec::new(),
         })
@@ -87,12 +100,18 @@ pub(super) struct Reader {
     url: Url,
     object: Object,
     client: Client,
-    read_ahead: bool,
+    worker_span: Option<Range<u64>>,
     start: u64,
     cache: Vec<u8>,
 }
 
 impl Reader {
+    pub(super) fn log_verified_layout(&self) {
+        log::debug!(target: "jetstreamer_horizon_range",
+            "horizon_archive epoch={} url={} bytes={} etag={}",
+            self.object.epoch, self.url, self.object.bytes, self.object.etag);
+    }
+
     pub fn len(&self) -> u64 {
         self.object.bytes
     }
@@ -101,11 +120,11 @@ impl Reader {
         // Coalesce neighboring small buckets; retrying a connection never needs
         // a local archive and never changes the object identity.
         const CHUNK: u64 = 8 << 20;
-        let count = (self.len() - start).min(if self.read_ahead {
-            CHUNK
-        } else {
-            needed.min(CHUNK)
-        });
+        let count = self
+            .worker_span
+            .as_ref()
+            .map_or(needed, |span| span.end - start)
+            .min(CHUNK);
         let end = start + count - 1;
         let range = format!("bytes={start}-{end}");
         let expected = format!("bytes {start}-{end}/{}", self.len());
@@ -183,12 +202,14 @@ impl Reader {
     }
 
     pub async fn read_at(&mut self, mut offset: u64, mut dest: &mut [u8]) -> io::Result<()> {
-        if offset
-            .checked_add(dest.len() as u64)
-            .is_none_or(|end| end > self.len())
+        let bounds = self.worker_span.clone().unwrap_or(0..self.len());
+        if offset < bounds.start
+            || offset
+                .checked_add(dest.len() as u64)
+                .is_none_or(|end| end > bounds.end)
         {
             return Err(io::Error::other(
-                "requested range exceeds pinned archive length",
+                "requested range is outside the pinned read span",
             ));
         }
         while !dest.is_empty() {
@@ -211,7 +232,7 @@ mod tests {
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
 
-    fn serve(response: &'static str) -> (Reader, std::thread::JoinHandle<()>) {
+    fn serve(response: &'static str, range: &'static str) -> (Reader, std::thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let handle = std::thread::spawn(move || {
@@ -228,7 +249,7 @@ mod tests {
             }
             let headers = headers.to_ascii_lowercase();
             assert!(headers.starts_with("get /epoch-0.jet http/1.1\r\n"));
-            assert!(headers.contains("range: bytes=0-7\r\n"));
+            assert!(headers.contains(&format!("range: {range}\r\n")));
             assert!(headers.contains("if-match: \"original\"\r\n"));
             assert!(!headers.contains("authorization:"));
             socket.write_all(response.as_bytes()).unwrap();
@@ -243,7 +264,7 @@ mod tests {
                     bytes: 8,
                 },
                 client: Client::new(),
-                read_ahead: true,
+                worker_span: Some(0..8),
                 start: 0,
                 cache: Vec::new(),
             },
@@ -255,6 +276,7 @@ mod tests {
     async fn verifies_headers_and_coalesces_sequential_bucket_reads() {
         let (mut reader, server) = serve(
             "HTTP/1.1 206 Partial Content\r\nContent-Length: 8\r\nContent-Range: bytes 0-7/8\r\nETag: \"original\"\r\n\r\nabcdefgh",
+            "bytes=0-7",
         );
         let mut first = [0; 3];
         let mut second = [0; 5];
@@ -266,13 +288,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adjacent_workers_do_not_prefetch_each_others_buckets() {
+        let (mut reader, server) = serve(
+            "HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 3-6/12\r\nETag: \"original\"\r\n\r\ndefg",
+            "bytes=3-6",
+        );
+        reader.object.bytes = 12;
+        reader.worker_span = Some(3..7);
+        // Reject either neighbor before opening the worker's only request.
+        assert!(reader.read_at(2, &mut [0]).await.is_err());
+        assert!(reader.read_at(6, &mut [0; 2]).await.is_err());
+        let mut first = [0];
+        let mut rest = [0; 3];
+        reader.read_at(3, &mut first).await.unwrap();
+        reader.read_at(4, &mut rest).await.unwrap();
+        assert_eq!(&first, b"d");
+        assert_eq!(&rest, b"efg");
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
     async fn rejects_unconditional_or_wrong_generation_and_bounds() {
         for response in [
             "HTTP/1.1 200 OK\r\nContent-Length: 8\r\nETag: \"original\"\r\n\r\nabcdefgh",
             "HTTP/1.1 206 Partial Content\r\nContent-Length: 8\r\nContent-Range: bytes 0-7/8\r\nETag: \"replacement\"\r\n\r\nabcdefgh",
             "HTTP/1.1 206 Partial Content\r\nContent-Length: 8\r\nContent-Range: bytes 0-7/9\r\nETag: \"original\"\r\n\r\nabcdefgh",
         ] {
-            let (mut reader, server) = serve(response);
+            let (mut reader, server) = serve(response, "bytes=0-7");
             let mut bytes = [0; 8];
             assert!(reader.read_at(0, &mut bytes).await.is_err());
             assert_eq!(bytes, [0; 8]);

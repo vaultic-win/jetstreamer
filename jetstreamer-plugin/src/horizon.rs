@@ -18,13 +18,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use clickhouse::Client;
 use futures_util::FutureExt;
 
-use jetstreamer_firehose::firehose_horizon::{JetSource, firehose_horizon};
+use jetstreamer_firehose::epochs::slot_to_epoch;
+use jetstreamer_firehose::firehose_horizon::{JetSource, firehose_horizon, firehose_horizon_range};
 use jetstreamer_horizon::archive::{BlockNotification, EntryRecord, EpochMeta, SlotVisitor};
 use jetstreamer_horizon::transactions::Transaction;
 
 pub use jetstreamer_horizon::archive::Consumption;
 
 use crate::PluginFuture;
+
+mod range;
+pub use range::RangeRunReport;
+use range::{RangeLifecycle, RangeProgress, TransactionCount};
 
 /// Slots a worker decodes between row flushes (bounds in-memory accumulation).
 const FLUSH_INTERVAL_SLOTS: u32 = 1024;
@@ -49,6 +54,14 @@ pub fn clamp_slot(slot: u64) -> u32 {
 
 /// A boxed ClickHouse insert handed to the background writer.
 type WriteJob = Pin<Box<dyn Future<Output = Result<(), clickhouse::error::Error>> + Send>>;
+
+struct PendingWrite(Arc<AtomicU64>);
+
+impl Drop for PendingWrite {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
 
 /// Insert jobs the queue holds before `submit` applies backpressure. Sized to
 /// absorb a full flush burst (every worker flushing both plugins at once)
@@ -89,7 +102,7 @@ impl Output {
     /// while the write queue has room; otherwise blocks the calling (decode)
     /// thread until it does — deliberate backpressure. Must be called from a
     /// non-async context (plugin `flush` runs on blocking decode threads;
-    /// the runner wraps its final flush pass in `block_in_place`).
+    /// the runner executes its final flush pass on a blocking thread).
     pub fn submit<Fut>(&self, job: Fut)
     where
         Fut: Future<Output = Result<(), clickhouse::error::Error>> + Send + 'static,
@@ -151,6 +164,30 @@ pub trait HorizonPlugin: Send + Sync + 'static {
         Consumption::all()
     }
 
+    /// Opts into persistent workers that can cross epoch boundaries in a slot range.
+    /// A range gets one start and one finish hook for the entire invocation.
+    fn supports_slot_ranges(&self) -> bool {
+        false
+    }
+
+    /// Starts a nonempty half-open slot range. The default runs the usual setup
+    /// for the first epoch. Override when setup needs the full range.
+    fn on_start_range(&self, db: Arc<Client>, slots: Range<u64>) -> PluginFuture<'_> {
+        self.on_start(db, slot_to_epoch(slots.start))
+    }
+
+    /// Finishes a nonempty half-open slot range after every worker and database
+    /// write has completed. The default calls the usual finish hook for the
+    /// last epoch. Override when finalization needs the full range.
+    fn on_finish_range(&self, db: Arc<Client>, slots: Range<u64>) -> PluginFuture<'_> {
+        self.on_finish(db, slot_to_epoch(slots.end.saturating_sub(1)))
+    }
+
+    /// Releases state acquired by a successful range start when playback,
+    /// finalization, or a later plugin's setup fails, or the run is cancelled.
+    /// Workers still unwinding from that run must hold their own state.
+    fn on_abort_range(&self) {}
+
     /// Runs once before reading starts (e.g. `CREATE TABLE IF NOT EXISTS`).
     fn on_start(&self, _db: Arc<Client>, _epoch: u64) -> PluginFuture<'_> {
         async move { Ok(()) }.boxed()
@@ -165,6 +202,7 @@ pub trait HorizonPlugin: Send + Sync + 'static {
 /// The per-thread [`SlotVisitor`] the runner hands to [`firehose_horizon`].
 /// Forwards each callback to every worker and triggers periodic flushes.
 struct Dispatch {
+    transactions: Option<Arc<TransactionCount>>,
     workers: Vec<Box<dyn PluginWorker>>,
     output: Output,
     since_flush: u32,
@@ -193,6 +231,9 @@ impl SlotVisitor for Dispatch {
     fn on_transaction(&mut self, slot: u64, tx_index: u32, tx: &Transaction) {
         for w in &mut self.workers {
             w.on_transaction(slot, tx_index, tx);
+        }
+        if let Some(count) = &self.transactions {
+            count.increment();
         }
     }
 
@@ -261,6 +302,36 @@ impl HorizonPluginRunner {
         epoch: u64,
         slot_range: Range<u64>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.drive(src, Some(epoch), slot_range, None).await?;
+        Ok(())
+    }
+
+    /// Drives opted-in plugins over one half-open, nonempty slot range. Each
+    /// worker keeps its state across the epochs in its contiguous subrange.
+    /// Emits overall TPS from the start of the lifecycle through finalization.
+    pub async fn run_range(
+        &self,
+        src: JetSource,
+        slots: Range<u64>,
+    ) -> Result<RangeRunReport, Box<dyn std::error::Error + Send + Sync>> {
+        if slots.is_empty() {
+            return Err("run_range requires a nonempty slot range".into());
+        }
+        if let Some(plugin) = self.plugins.iter().find(|p| !p.supports_slot_ranges()) {
+            return Err(format!("plugin {} does not support slot ranges", plugin.name()).into());
+        }
+        let progress = RangeProgress::new(self.threads);
+        let work = self.drive(src, None, slots.clone(), Some(&progress));
+        progress.track(slots, work).await
+    }
+
+    async fn drive(
+        &self,
+        src: JetSource,
+        epoch: Option<u64>,
+        slots: Range<u64>,
+        progress: Option<&RangeProgress>,
+    ) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
         let db = Arc::new(
             crate::build_clickhouse_client(&self.dsn)
                 .with_setting("async_insert", "1")
@@ -272,8 +343,15 @@ impl HorizonPluginRunner {
                 .with_setting("wait_for_async_insert", "1"),
         );
 
+        let mut lifecycle = RangeLifecycle::default();
         for plugin in &self.plugins {
-            plugin.on_start(db.clone(), epoch).await?;
+            match epoch {
+                Some(epoch) => plugin.on_start(db.clone(), epoch).await?,
+                None => {
+                    plugin.on_start_range(db.clone(), slots.clone()).await?;
+                    lifecycle.started(plugin.as_ref());
+                }
+            }
         }
 
         // Background writer: runs insert jobs with bounded concurrency until
@@ -284,7 +362,8 @@ impl HorizonPluginRunner {
         let backlog = self.write_backlog.clone();
         let writer = tokio::spawn(async move {
             let mut inflight = tokio::task::JoinSet::new();
-            let log_result = |res: Result<
+            let mut first_error = None;
+            let mut log_result = |res: Result<
                 Result<(), clickhouse::error::Error>,
                 tokio::task::JoinError,
             >| {
@@ -292,9 +371,14 @@ impl HorizonPluginRunner {
                     Ok(Ok(())) => {}
                     Ok(Err(err)) => {
                         log::warn!(target: LOG_TARGET, "clickhouse insert failed: {err}");
+                        first_error
+                            .get_or_insert_with(|| format!("clickhouse insert failed: {err}"));
                     }
                     Err(join_err) => {
                         log::warn!(target: LOG_TARGET, "clickhouse insert task died: {join_err}");
+                        first_error.get_or_insert_with(|| {
+                            format!("clickhouse insert task died: {join_err}")
+                        });
                     }
                 }
             };
@@ -304,16 +388,16 @@ impl HorizonPluginRunner {
                         log_result(res);
                     }
                 }
-                let backlog = backlog.clone();
+                let pending = PendingWrite(backlog.clone());
                 inflight.spawn(async move {
-                    let res = job.await;
-                    backlog.fetch_sub(1, Ordering::SeqCst);
-                    res
+                    let _pending = pending;
+                    job.await
                 });
             }
             while let Some(res) = inflight.join_next().await {
                 log_result(res);
             }
+            first_error
         });
 
         let output = Output {
@@ -335,33 +419,56 @@ impl HorizonPluginRunner {
         );
         let plugins = self.plugins.clone();
         let make_visitor = move |thread_id: usize| Dispatch {
+            transactions: progress.map(|p| p.worker(thread_id)),
             workers: plugins.iter().map(|p| p.spawn_worker(thread_id)).collect(),
             output: output.clone(),
             since_flush: 0,
             consumption: combined,
         };
 
-        // `make_visitor` (and its captured `output`) is dropped when this
-        // await returns; each returned dispatch holds its own `output` clone
-        // until `finish()`, so the channel closes only once all final flushes
-        // are submitted — then the writer drains. The final flush pass runs
-        // under `block_in_place` because `Output::submit` may block on queue
-        // backpressure (requires the multi-thread runtime).
-        let dispatches =
-            firehose_horizon(self.threads, src, epoch, slot_range, make_visitor).await?;
-        tokio::task::block_in_place(|| {
-            for dispatch in dispatches {
-                dispatch.finish();
+        // Read failure drops unfinished workers. Already submitted writes must
+        // still drain before the caller gets the error.
+        let decoded = match epoch {
+            Some(epoch) => {
+                firehose_horizon(self.threads, src, epoch, slots.clone(), make_visitor).await
             }
-        });
-        writer.await?;
-
-        for plugin in &self.plugins {
-            plugin.on_finish(db.clone(), epoch).await?;
+            None => firehose_horizon_range(self.threads, src, slots.clone(), make_visitor).await,
+        };
+        let flushed = match decoded {
+            Ok(workers) => tokio::task::spawn_blocking(move || {
+                let count = workers.len();
+                for worker in workers {
+                    worker.finish();
+                }
+                count
+            })
+            .await
+            .map_err(|err| -> Box<dyn std::error::Error + Send + Sync> { err.into() }),
+            Err(err) => Err(err.into()),
+        };
+        let insert_error = writer.await?;
+        let workers = flushed?;
+        if epoch.is_none() {
+            if let Some(err) = insert_error {
+                return Err(err.into());
+            }
         }
-        Ok(())
+        for plugin in &self.plugins {
+            match epoch {
+                Some(epoch) => plugin.on_finish(db.clone(), epoch).await?,
+                None => {
+                    plugin.on_finish_range(db.clone(), slots.clone()).await?;
+                    lifecycle.finished();
+                }
+            }
+        }
+        Ok(workers)
     }
 }
+
+#[cfg(test)]
+#[path = "horizon/range_tests.rs"]
+mod range_tests;
 
 #[cfg(test)]
 #[path = "horizon_signed234_tests.rs"]
@@ -399,6 +506,7 @@ mod tests {
             db: Arc::new(Client::default()),
         };
         let mut dispatch = Dispatch {
+            transactions: None,
             workers: vec![Box::new(CountingWorker {
                 blocks: blocks.clone(),
                 flushes: flushes.clone(),

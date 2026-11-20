@@ -113,6 +113,10 @@ impl AccountWritesPlugin {
 }
 
 impl HorizonPlugin for AccountWritesPlugin {
+    fn supports_slot_ranges(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &'static str {
         "Account Writes (horizon)"
     }

@@ -311,9 +311,8 @@ pub struct BucketDecoder {
     scratch: Box<Transaction>,
     // Two permanent notification scratches, with one pinned to each variant.
     // Swapping a single scratch's variant would memset the whole ~225 MiB
-    // enum on every skipped-to-block boundary (measured at about 400 us per swap);
-    // with pinned variants the zeroing happens exactly twice, here at
-    // construction.
+    // enum on every skipped-to-block boundary. Both variants retain their
+    // original heap storage throughout the run.
     block_scratch: Box<BlockNotification>,
     skipped_scratch: Box<BlockNotification>,
     epoch_scratch: Box<EpochMeta>,
@@ -394,12 +393,7 @@ impl BucketDecoder {
                 MAX_BUCKET_DIFF_CACHE_KEYS,
             ),
             scratch: Transaction::new_boxed(),
-            block_scratch: {
-                // Pin to the Block variant once (one-time 225 MiB zeroing).
-                let mut b = BlockNotification::new_boxed();
-                set_notification_block(&mut b);
-                b
-            },
+            block_scratch: BlockNotification::new_block_boxed(),
             skipped_scratch: BlockNotification::new_boxed(), // already Skipped
             epoch_scratch: EpochMeta::new_boxed(),
             entries_scratch: Vec::with_capacity(2048),

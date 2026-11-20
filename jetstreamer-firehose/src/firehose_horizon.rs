@@ -14,15 +14,17 @@
 //! latency overlaps CPU decode.
 //!
 //! `.jet` buckets are independently compressed frames, so a slot lives in exactly
-//! one bucket and each bucket range is owned by exactly one worker, so there
-//! is no cross-worker coordination.
+//! one bucket. A slot-range worker may share a boundary bucket with a neighbor;
+//! each visitor receives only callbacks for its own half-open slot range.
+use std::collections::HashMap;
 use std::io;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 
+use futures_util::future::try_join_all;
 use reqwest::{Client, Url};
 use rseek::Seekable;
 
@@ -30,16 +32,19 @@ mod pinned;
 pub use pinned::PinnedArchives;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader, ReadBuf};
 
+use tokio::sync::{Mutex, OnceCell};
+
 use jetstreamer_horizon::account_updates::AccountUpdateView;
 use jetstreamer_horizon::archive::{
     ArchiveFormatError, BlockNotification, BucketDecoder, BucketIndexEntry, Consumption,
-    EntryRecord, EpochMeta, FOOTER_LEN, Footer, MAX_FILE_HEADER_BYTES, SlotKind, SlotVisitor,
-    bucket_containing, parse_bucket_index, parse_file_header, validate_bucket_index_layout,
-    validate_footer_layout,
+    EntryRecord, EpochMeta, FOOTER_LEN, FileHeader, Footer, MAX_FILE_HEADER_BYTES, SlotKind,
+    SlotVisitor, bucket_containing, parse_bucket_index, parse_file_header,
+    validate_bucket_index_layout, validate_footer_layout,
 };
 use jetstreamer_horizon::transactions::Transaction;
 
-use crate::epochs::EpochStream;
+use crate::epochs::{EpochStream, epoch_to_slot_range, slot_to_epoch};
+use crate::firehose::generate_subranges;
 use crate::node_reader::Len;
 
 /// Bytes fetched from the file front to cover every header accepted by the
@@ -191,17 +196,132 @@ where
     V: SlotVisitor + Send + 'static,
 {
     let threads = threads.max(1);
-    let client = if matches!(src, JetSource::HttpPinned(_)) {
+    let client = horizon_client(&src)?;
+    let layout = load_layout(&src, epoch, &client).await?;
+    if layout.index.is_empty() || slot_range.is_empty() {
+        return Ok((0..threads).map(&make_visitor).collect());
+    }
+    let buckets = layout.buckets(&slot_range);
+    let parts = partition_buckets(buckets.start, buckets.end - 1, threads);
+    try_join_all(parts.into_iter().enumerate().map(|(id, chunk)| {
+        stream_chunk(
+            &src,
+            &client,
+            &layout,
+            slot_range.clone(),
+            chunk,
+            make_visitor(id),
+        )
+    }))
+    .await
+}
+
+/// Streams a half-open slot range across epoch archives. Workers own the standard
+/// contiguous slot partitions and keep the same visitor across each epoch boundary.
+/// Results are returned in worker ID order, including idle workers for short ranges.
+pub async fn firehose_horizon_range<F, V>(
+    threads: usize,
+    src: JetSource,
+    slots: Range<u64>,
+    make_visitor: F,
+) -> Result<Vec<V>, HorizonFirehoseError>
+where
+    F: Fn(usize) -> V + Send + Sync,
+    V: SlotVisitor + Send + 'static,
+{
+    let threads = threads.max(1);
+    if slots.start > slots.end {
+        return Err(
+            io::Error::new(io::ErrorKind::InvalidInput, "reversed Horizon slot range").into(),
+        );
+    }
+    let ranges = generate_subranges(&slots, threads as u64);
+    let client = horizon_client(&src)?;
+    let cache = Mutex::new(HashMap::<u64, Weak<OnceCell<EpochLayout>>>::new());
+    let tasks = ranges.into_iter().enumerate().map(|(id, range)| {
+        log::debug!(target: "jetstreamer_horizon_range",
+            "horizon_worker id={id} first_slot={} end_slot_exclusive={}", range.start, range.end);
+        let mut visitor = make_visitor(id);
+        let (src, client, cache) = (&src, &client, &cache);
+        async move {
+            let mut start = range.start;
+            while start < range.end {
+                let epoch = slot_to_epoch(start);
+                let end = if epoch == slot_to_epoch(range.end - 1) {
+                    range.end
+                } else {
+                    epoch_to_slot_range(epoch).1 + 1
+                };
+                let cell = {
+                    let mut epochs = cache.lock().await;
+                    epochs.retain(|_, weak| weak.strong_count() > 0);
+                    match epochs.get(&epoch).and_then(Weak::upgrade) {
+                        Some(cell) => cell,
+                        None => {
+                            let cell = Arc::new(OnceCell::new());
+                            epochs.insert(epoch, Arc::downgrade(&cell));
+                            cell
+                        }
+                    }
+                };
+                let layout = cell
+                    .get_or_try_init(|| load_layout(src, epoch, client))
+                    .await?;
+                let header_end = layout
+                    .header
+                    .slot_start
+                    .checked_add(layout.header.slot_count)
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, "archive slot range overflows")
+                    })?;
+                if layout.index.is_empty() || start < layout.header.slot_start || end > header_end {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("epoch {epoch} archive does not cover slots {start}..{end}"),
+                    )
+                    .into());
+                }
+                let slots = start..end;
+                let buckets = layout.buckets(&slots);
+                visitor = stream_chunk(src, client, layout, slots, buckets, visitor).await?;
+                start = end;
+            }
+            Ok(visitor)
+        }
+    });
+    try_join_all(tasks).await
+}
+
+fn horizon_client(src: &JetSource) -> Result<Client, HorizonFirehoseError> {
+    Ok(if matches!(src, JetSource::HttpPinned(_)) {
         Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(io::Error::other)?
     } else {
         Client::new()
-    };
+    })
+}
 
-    // --- read framing once (header at the front, footer + index at the tail) ---
-    let mut probe = open_jet_stream(&src, epoch, &client, false).await?;
+struct EpochLayout {
+    header: FileHeader,
+    index: Arc<[BucketIndexEntry]>,
+}
+
+impl EpochLayout {
+    fn buckets(&self, slots: &Range<u64>) -> Range<usize> {
+        let lo = bucket_containing(&self.header, &self.index, slots.start);
+        let hi = bucket_containing(&self.header, &self.index, slots.end - 1);
+        lo..hi + 1
+    }
+}
+
+async fn load_layout(
+    src: &JetSource,
+    epoch: u64,
+    client: &Client,
+) -> Result<EpochLayout, HorizonFirehoseError> {
+    let mut probe = open_jet_stream(src, epoch, client, None).await?;
     let total_len = probe.len();
     if total_len < FOOTER_LEN as u64 {
         return Err(HorizonFirehoseError::Truncated);
@@ -226,134 +346,109 @@ where
         read_range(&mut probe, footer.index_offset, footer.index_len as usize).await?;
     let index: Arc<[BucketIndexEntry]> = parse_bucket_index(&index_bytes, &footer)?.into();
     validate_bucket_index_layout(&header, header_end as u64, footer.index_offset, &index)?;
-    drop(probe);
-
-    if index.is_empty() || slot_range.is_empty() {
-        return Ok((0..threads).map(&make_visitor).collect());
+    if let RangeReader::Pinned(reader) = &probe {
+        reader.log_verified_layout();
     }
+    Ok(EpochLayout { header, index })
+}
 
-    // --- buckets covering slot_range, partitioned across workers ---
-    let start_bucket = bucket_containing(&header, &index, slot_range.start);
-    let end_bucket = bucket_containing(&header, &index, slot_range.end - 1);
-    let chunks = partition_buckets(start_bucket, end_bucket, threads);
+async fn stream_chunk<V: SlotVisitor + Send + 'static>(
+    src: &JetSource,
+    client: &Client,
+    layout: &EpochLayout,
+    slots: Range<u64>,
+    chunk: Range<usize>,
+    mut visitor: V,
+) -> Result<V, HorizonFirehoseError> {
+    if chunk.is_empty() {
+        return Ok(visitor);
+    }
+    let epoch = layout.header.epoch;
+    let index = &layout.index;
+    let decoder_header = layout.header.clone();
+    let start = slots.start;
+    let end = slots.end;
+    let (tx, rx) = tokio::sync::mpsc::channel::<(BucketIndexEntry, RawBucket)>(PREFETCH_DEPTH);
+    // Drained fetch buffers travel back to the fetcher for reuse, so the
+    // stream path allocates a bounded handful of buffers per worker for
+    // the whole run instead of one ~bucket-sized Vec per bucket. Sized so
+    // a return can never block: at most PREFETCH_DEPTH buffers sit in
+    // `tx` plus one in each task.
+    let (recycle_tx, mut recycle_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(PREFETCH_DEPTH + 2);
 
-    // --- one (async fetcher + blocking decoder) pair per worker ---
-    let mut fetchers = Vec::with_capacity(threads);
-    let mut decoders = Vec::with_capacity(threads);
-    for (tid, chunk) in chunks.into_iter().enumerate() {
-        let (tx, rx) = tokio::sync::mpsc::channel::<(BucketIndexEntry, RawBucket)>(PREFETCH_DEPTH);
-        // Drained fetch buffers travel back to the fetcher for reuse, so the
-        // stream path allocates a bounded handful of buffers per worker for
-        // the whole run instead of one ~bucket-sized Vec per bucket. Sized so
-        // a return can never block: at most PREFETCH_DEPTH buffers sit in
-        // `tx` plus one in each task.
-        let (recycle_tx, mut recycle_rx) =
-            tokio::sync::mpsc::channel::<Vec<u8>>(PREFETCH_DEPTH + 2);
-
-        let src2 = src.clone();
-        let client2 = client.clone();
-        let index2 = index.clone();
-        fetchers.push(tokio::spawn(async move {
-            // In-memory source: hand the decoder shared slices of the one
-            // preloaded buffer, with zero per-bucket buffers and zero copies.
-            if let JetSource::Memory { bytes, .. } = &src2 {
-                for b in chunk {
-                    let e = index2[b];
-                    let bucket_start = e.offset as usize;
-                    let bucket_end = bucket_start + e.len as usize;
-                    if bucket_end > bytes.len() {
-                        return Err(HorizonFirehoseError::Truncated);
-                    }
-                    let shared = RawBucket::Shared {
-                        bytes: bytes.clone(),
-                        range: bucket_start..bucket_end,
-                    };
-                    if tx.send((e, shared)).await.is_err() {
-                        break; // decoder finished early or errored
-                    }
-                }
-                return Ok(());
-            }
-
-            let mut s = open_jet_stream(&src2, epoch, &client2, true).await?;
+    let fetch = async move {
+        // In-memory source: hand the decoder shared slices of the one
+        // preloaded buffer, with zero per-bucket buffers and zero copies.
+        if let JetSource::Memory { bytes, .. } = src {
             for b in chunk {
-                let e = index2[b];
-                let mut buf = recycle_rx.try_recv().unwrap_or_default();
-                read_range_into(&mut s, e.offset, e.len as usize, &mut buf).await?;
-                if tx.send((e, RawBucket::Owned(buf))).await.is_err() {
-                    break; // decoder finished early (reached end slot) or errored
+                let e = index[b];
+                let bucket_start = e.offset as usize;
+                let bucket_end = bucket_start + e.len as usize;
+                if bucket_end > bytes.len() {
+                    return Err(HorizonFirehoseError::Truncated);
                 }
-            }
-            Ok::<(), HorizonFirehoseError>(())
-        }));
-
-        let mut visitor = make_visitor(tid);
-        let start = slot_range.start;
-        let end = slot_range.end;
-        let decoder_header = header.clone();
-        decoders.push(tokio::task::spawn_blocking(move || {
-            let mut rx = rx;
-            let mut decoder = BucketDecoder::for_file_header(&decoder_header)?;
-            decoder.verify_chain = false;
-            // Honor the visitor's declared consumption: unconsumed
-            // account-update data is skipped, not reconstructed.
-            let consumption = visitor.consumption();
-            decoder.materialize_account_data = consumption.account_update_data;
-            decoder.materialize_block_account_update_arenas =
-                consumption.block_account_update_arenas;
-            'outer: while let Some((entry, raw)) = rx.blocking_recv() {
-                decoder.load_indexed_bucket_bytes(raw.as_slice(), entry)?;
-                // The decoder copied/decompressed what it needs; return the
-                // buffer to the fetcher (capacity ensures this never blocks;
-                // a closed channel just means the fetcher already finished).
-                if let RawBucket::Owned(buf) = raw {
-                    let _ = recycle_tx.try_send(buf);
-                }
-                let mut bounded = Bounded {
-                    inner: &mut visitor,
-                    end,
-                    current_slot: None,
+                let shared = RawBucket::Shared {
+                    bytes: bytes.clone(),
+                    range: bucket_start..bucket_end,
                 };
-                while decoder.slots_remaining() > 0 {
-                    decoder.decode_slot_frame(start, &mut bounded)?;
-                    if decoder.last_decoded_slot().is_some_and(|s| s + 1 >= end) {
-                        break 'outer; // past the requested range; stop this worker
-                    }
+                if tx.send((e, shared)).await.is_err() {
+                    break; // decoder finished early or errored
                 }
             }
-            Ok::<V, HorizonFirehoseError>(visitor)
-        }));
-    }
+            return Ok(());
+        }
 
-    // --- join: drain fetchers, collect visitors, surface the first error ---
-    let mut first_err: Option<HorizonFirehoseError> = None;
-    for f in fetchers {
-        match f.await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => {
-                first_err.get_or_insert(e);
-            }
-            Err(j) => {
-                first_err.get_or_insert(HorizonFirehoseError::Join(j.to_string()));
-            }
-        }
-    }
-    let mut visitors = Vec::with_capacity(threads);
-    for d in decoders {
-        match d.await {
-            Ok(Ok(v)) => visitors.push(v),
-            Ok(Err(e)) => {
-                first_err.get_or_insert(e);
-            }
-            Err(j) => {
-                first_err.get_or_insert(HorizonFirehoseError::Join(j.to_string()));
+        // The validated index has contiguous, non-overflowing bucket extents.
+        let first = index[chunk.start];
+        let last = index[chunk.end - 1];
+        let span = first.offset..last.offset + last.len;
+        let mut s = open_jet_stream(src, epoch, client, Some(span)).await?;
+        for b in chunk {
+            let e = index[b];
+            let mut buf = recycle_rx.try_recv().unwrap_or_default();
+            read_range_into(&mut s, e.offset, e.len as usize, &mut buf).await?;
+            if tx.send((e, RawBucket::Owned(buf))).await.is_err() {
+                break; // decoder finished early (reached end slot) or errored
             }
         }
-    }
-    if let Some(e) = first_err {
-        return Err(e);
-    }
-    Ok(visitors)
+        Ok::<(), HorizonFirehoseError>(())
+    };
+    let decode = tokio::task::spawn_blocking(move || {
+        let mut rx = rx;
+        let mut decoder = BucketDecoder::for_file_header(&decoder_header)?;
+        decoder.verify_chain = false;
+        // Honor the visitor's declared consumption: unconsumed
+        // account-update data is skipped, not reconstructed.
+        let consumption = visitor.consumption();
+        decoder.materialize_account_data = consumption.account_update_data;
+        decoder.materialize_block_account_update_arenas = consumption.block_account_update_arenas;
+        'outer: while let Some((entry, raw)) = rx.blocking_recv() {
+            decoder.load_indexed_bucket_bytes(raw.as_slice(), entry)?;
+            // The decoder copied/decompressed what it needs; return the
+            // buffer to the fetcher (capacity ensures this never blocks;
+            // a closed channel just means the fetcher already finished).
+            if let RawBucket::Owned(buf) = raw {
+                let _ = recycle_tx.try_send(buf);
+            }
+            let mut bounded = Bounded {
+                inner: &mut visitor,
+                end,
+                current_slot: None,
+            };
+            while decoder.slots_remaining() > 0 {
+                decoder.decode_slot_frame(start, &mut bounded)?;
+                if decoder.last_decoded_slot().is_some_and(|s| s >= end - 1) {
+                    break 'outer; // past the requested range; stop this worker
+                }
+            }
+        }
+        Ok::<V, HorizonFirehoseError>(visitor)
+    });
+    // Dropping the fetch future closes the channel even if a neighboring worker
+    // fails. The blocking decoder can then finish without an orphaned producer.
+    let (fetched, decoded) = tokio::join!(fetch, decode);
+    fetched?;
+    decoded.map_err(|e| HorizonFirehoseError::Join(e.to_string()))?
 }
 
 /// Visitor wrapper that drops slots at or beyond `end` (the exclusive upper
@@ -424,13 +519,15 @@ async fn open_jet_stream(
     src: &JetSource,
     epoch: u64,
     client: &Client,
-    read_ahead: bool,
+    worker_span: Option<Range<u64>>,
 ) -> Result<RangeReader, HorizonFirehoseError> {
     let stream = match src {
         JetSource::HttpPinned(inventory) => {
-            return Ok(RangeReader::Pinned(
-                inventory.open(epoch, client, read_ahead)?,
-            ));
+            return Ok(RangeReader::Pinned(inventory.open(
+                epoch,
+                client,
+                worker_span,
+            )?));
         }
         JetSource::Memory { epoch: held, bytes } => {
             if *held != epoch {
@@ -640,6 +737,78 @@ mod tests {
                 BlockNotification::Block(_) => self.blocks += 1,
             }
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn range_workers_keep_visitors_across_epoch_boundary() {
+        struct Slots {
+            worker: usize,
+            seen: Vec<u64>,
+        }
+        impl SlotVisitor for Slots {
+            fn on_block(&mut self, block: &BlockNotification, _: &[EntryRecord]) {
+                self.seen.push(block.slot());
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let boundary = epoch_to_slot_range(1).0;
+        for (epoch, range) in [(0, boundary - 96..boundary), (1, boundary..boundary + 96)] {
+            let mut writer = ArchiveWriter::new(
+                std::io::Cursor::new(Vec::new()),
+                epoch,
+                range.start,
+                range.end - range.start,
+                ArchiveWriterConfig::default(),
+            )
+            .unwrap();
+            for slot in range {
+                writer.write_skipped_slot(slot).unwrap();
+            }
+            let (sink, _) = writer.finish().unwrap();
+            std::fs::write(
+                dir.path().join(format!("epoch-{epoch}.jet")),
+                sink.into_inner(),
+            )
+            .unwrap();
+        }
+
+        let range = boundary - 60..boundary + 60;
+        let create = |worker| Slots {
+            worker,
+            seen: Vec::new(),
+        };
+        let visitors =
+            firehose_horizon_range(3, JetSource::local(dir.path()), range.clone(), create)
+                .await
+                .unwrap();
+        let expected = generate_subranges(&range, 3);
+        assert_eq!(visitors.len(), expected.len());
+        for (id, (visitor, slots)) in visitors.into_iter().zip(expected).enumerate() {
+            assert_eq!(visitor.worker, id);
+            assert_eq!(visitor.seen, slots.collect::<Vec<_>>());
+        }
+
+        let short = firehose_horizon_range(
+            3,
+            JetSource::local(dir.path()),
+            boundary..boundary + 1,
+            create,
+        )
+        .await
+        .unwrap();
+        assert_eq!(short[0].seen, vec![boundary]);
+        assert!(short[1..].iter().all(|worker| worker.seen.is_empty()));
+        assert!(
+            firehose_horizon_range(
+                2,
+                JetSource::local(dir.path()),
+                boundary - 8..boundary + 97,
+                create
+            )
+            .await
+            .is_err()
+        );
     }
 
     #[test]

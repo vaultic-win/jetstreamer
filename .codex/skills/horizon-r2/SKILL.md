@@ -156,6 +156,15 @@ Resume from that epoch's beginning in a new attempt, preserving earlier receipts
 rechecking object and reader identity. A methodology restart begins at the first epoch
 and keeps its receipts and counts separate from prior runs.
 
+For a throughput run over a continuous range, add `--slot-ranges` to the pinned
+`horizon_pipeline` invocation. This uses the Horizon consumer's full-range slot
+partitions. `--threads` or `JETSTREAMER_THREADS` sets the worker total across all
+archives. Capture the native cumulative `horizon_tps` pulses and final per-epoch
+receipts. This mode emits its receipts after the whole range succeeds. For digest
+comparisons, use identical range endpoints, partitioning mode and worker count on
+both sources. Keep the progressive chronological audit on its receipt-producing
+invocation when per-epoch resumption is required.
+
 Give failed historical audits first priority in the next repair slot. Record whether the
 failure occurred during transport, decoding, or plugin validation. Retry interrupted
 transport against the pinned object. Keep integrity unknown until full verification or

@@ -94,6 +94,9 @@ impl RunState {
 #[path = "verification/report.rs"]
 mod report;
 pub use report::VerificationReport;
+#[path = "verification/range.rs"]
+mod range;
+pub use range::RangeVerificationPlugin;
 
 /// Verifies delivery through [`crate::horizon::HorizonPluginRunner`].
 ///

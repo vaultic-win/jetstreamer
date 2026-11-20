@@ -198,16 +198,29 @@ impl BlockNotification {
     /// Allocates a fresh `BlockNotification` (Skipped(0)) directly on the
     /// heap without routing the ~225 MiB enum through the stack.
     pub fn new_boxed() -> Box<Self> {
+        Self::new_boxed_variant(false)
+    }
+
+    /// Allocate an empty block directly on zeroed heap storage. Selecting the
+    /// discriminant before constructing the box lets unused arena pages
+    /// remain demand-zeroed by the allocator.
+    pub(crate) fn new_block_boxed() -> Box<Self> {
+        Self::new_boxed_variant(true)
+    }
+
+    fn new_boxed_variant(block: bool) -> Box<Self> {
         use std::alloc::{Layout, alloc_zeroed, handle_alloc_error};
         let layout = Layout::new::<Self>();
-        // SAFETY: all-zero bytes = discriminant 0 (Skipped) with slot 0 —
-        // a valid value.
+        // SAFETY: repr(C, u8) places the tag at byte zero. Both SkippedSlot
+        // and BlockMeta accept all-zero storage, as in BlockMeta::new_boxed.
+        // No reference to the enum exists until its selected tag is valid.
         unsafe {
-            let ptr = alloc_zeroed(layout) as *mut Self;
+            let ptr = alloc_zeroed(layout);
             if ptr.is_null() {
                 handle_alloc_error(layout);
             }
-            Box::from_raw(ptr)
+            ptr.write(u8::from(block));
+            Box::from_raw(ptr.cast())
         }
     }
 

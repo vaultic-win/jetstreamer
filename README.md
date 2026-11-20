@@ -143,6 +143,25 @@ cargo run --release --bin horizon_pipeline -- \
   0:100 /path/to/horizon --threads 16 --verify-only
 ```
 
+To divide a continuous range among workers, pass `--slot-ranges`. This calls
+`HorizonPluginRunner::run_range` and uses the same `generate_subranges` splitter as
+the CAR firehose. Each worker keeps its plugin state as its slot partition crosses
+from one `epoch-N.jet` into the next. `JETSTREAMER_THREADS` sets the total number
+of workers across the range. An explicit `--threads` takes precedence.
+
+```bash
+JETSTREAMER_THREADS=256 horizon_pipeline 0:100 "$public_origin" \
+  --slot-ranges --verify-only --archive-inventory "$inventory" \
+  --verification-report-dir "$reports"
+```
+
+Here `0:100` includes both endpoint epochs. The runner logs cumulative transaction
+callbacks per second every 30 seconds and on successful finalization. The verifier
+then writes one report per epoch into the existing directory. Each semantic digest
+includes the worker IDs and their stream digests, so local and HTTPS digest comparisons
+require the same range, partitioning mode and worker count. The epoch-at-a-time
+invocation above can publish receipts progressively.
+
 This checks plugin compatibility and stream delivery. Archive acceptance also requires every
 `.sha256` sidecar, an ordered scan of every boundary inside the selected range, and the separate
 adjacent-edge receipts for its outer boundaries. Large ranges can recompute PoH in parallel by

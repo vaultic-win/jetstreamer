@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
-//!     [--threads N] [--clickhouse-dsn URL] [--bench|--verify-only]
+//!     [--threads N] [--slot-ranges] [--clickhouse-dsn URL] [--bench|--verify-only]
 //! ```
 //!
 //! `<jet-dir-or-base-url>` is a local directory of `epoch-<N>.jet` files, or
@@ -26,7 +26,9 @@ use jetstreamer_plugin::horizon::{
 };
 use jetstreamer_plugin::plugins::account_writes::AccountWritesPlugin;
 use jetstreamer_plugin::plugins::pubkey_stats_horizon::PubkeyStatsHorizonPlugin;
-use jetstreamer_plugin::plugins::verification::VerificationPlugin;
+use jetstreamer_plugin::plugins::verification::{
+    RangeVerificationPlugin, VerificationPlugin, VerificationReport,
+};
 
 #[path = "horizon_pipeline/capacity.rs"]
 mod capacity;
@@ -51,7 +53,7 @@ fn usage() -> ! {
     eprintln!(
         "usage: horizon-pipeline --archive-capacity-probe\n\
          or: horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
-         [--threads N] [--clickhouse-dsn URL] [--bench|--verify-only] \
+         [--threads N] [--slot-ranges] [--clickhouse-dsn URL] [--bench|--verify-only] \
          [--no-account-bytes] [--no-preload] [--archive-inventory PATH] [--verification-report PATH | --verification-report-dir DIR]\n\
          --verify-only runs the read-only Horizon verification plugin over \
          every decoded record and account-data byte; it does not start or \
@@ -66,7 +68,8 @@ fn usage() -> ! {
          --no-preload (with --bench): read from disk even when the epoch \
          file would fit in RAM (metadata-only benches preload by default \
          and measure pure decode)\n\
-         --threads defaults by declared plugin consumption: cores + 1/8 \
+         --slot-ranges partitions the complete range across workers; emits overall TPS every 30 seconds\n\
+         --threads overrides JETSTREAMER_THREADS, otherwise defaults by declared plugin consumption: cores + 1/8 \
          when no plugin consumes account-update data (CPU-bound decode), \
          cores/2 when one does (memory-bandwidth-bound); preload likewise \
          auto-disables in the byte-consuming regime"
@@ -150,6 +153,10 @@ struct BenchPlugin {
 }
 
 impl HorizonPlugin for BenchPlugin {
+    fn supports_slot_ranges(&self) -> bool {
+        true
+    }
+
     fn name(&self) -> &'static str {
         "TPS Bench"
     }
@@ -251,6 +258,57 @@ fn parse_range(s: &str) -> (u64, u64) {
     }
 }
 
+fn save_epoch_report(
+    report: &VerificationReport,
+    dir: &std::path::Path,
+    source: &str,
+    argv: &[String],
+) -> std::io::Result<()> {
+    let epoch = report.epoch;
+    let temporary = dir.join(format!(".epoch-{epoch}-{}.pending", std::process::id()));
+    report.write_json(&temporary, source, argv, epoch_to_slot_range(epoch))?;
+    // Publish the complete, fsynced report atomically without replacing evidence.
+    let published = std::fs::hard_link(&temporary, dir.join(format!("epoch-{epoch}.json")));
+    std::fs::remove_file(&temporary)?;
+    published?;
+    std::fs::File::open(dir)?.sync_all()
+}
+
+/// Publish results only after plugin finalization and the runner's independent
+/// dispatch count agree for the complete request.
+fn finish_range_reports(
+    verifier: &RangeVerificationPlugin,
+    run: &jetstreamer_plugin::horizon::RangeRunReport,
+    epochs: std::ops::RangeInclusive<u64>,
+    source: &str,
+    directory: Option<&std::path::Path>,
+    single_file: Option<&std::path::Path>,
+) -> std::io::Result<()> {
+    let reports = verifier.take_reports();
+    let transactions = reports.iter().try_fold(0_u64, |count, report| {
+        count.checked_add(report.transactions)
+    });
+    if transactions != Some(run.transactions) || !reports.iter().map(|r| r.epoch).eq(epochs) {
+        return Err(std::io::Error::other(
+            "per-epoch verification reports disagree with the range runner",
+        ));
+    }
+    let args = std::env::args().collect::<Vec<_>>();
+    for report in reports {
+        let epoch = report.epoch;
+        if let Some(dir) = directory {
+            save_epoch_report(&report, dir, source, &args)?;
+        } else if let Some(path) = single_file {
+            report.write_json(path, source, &args, epoch_to_slot_range(epoch))?;
+        }
+        log::info!(
+            "horizon pipeline: epoch {epoch} verified, {} transactions",
+            report.transactions
+        );
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     solana_logger::setup_with_default("info");
@@ -287,6 +345,7 @@ async fn main() {
     let mut threads_override: Option<usize> = None;
     let mut dsn =
         std::env::var("JETSTREAMER_CLICKHOUSE_DSN").unwrap_or_else(|_| DEFAULT_DSN.to_string());
+    let mut slot_ranges = false;
     let mut bench = false;
     let mut verify_only = false;
     let mut no_account_bytes = false;
@@ -305,6 +364,7 @@ async fn main() {
             }
             "--clickhouse-dsn" => dsn = args.next().unwrap_or_else(|| usage()),
             "--bench" => bench = true,
+            "--slot-ranges" => slot_ranges = true,
             "--verify-only" => verify_only = true,
             "--verification-report" => {
                 verification_report = Some(std::path::PathBuf::from(
@@ -362,7 +422,7 @@ async fn main() {
     }
 
     let (start_epoch, end_epoch) = parse_range(&range);
-    if end_epoch < start_epoch {
+    if end_epoch < start_epoch || end_epoch >= u64::MAX / epoch_to_slot_range(1).0 {
         usage();
     }
     if let Some(dir) = &report_directory {
@@ -431,7 +491,10 @@ async fn main() {
 
     let bench_counters = Arc::new(BenchCounters::default());
     let verification_plugin = Arc::new(VerificationPlugin::new());
-    let plugins: Vec<Arc<dyn HorizonPlugin>> = if verify_only {
+    let range_verifier = Arc::new(RangeVerificationPlugin::default());
+    let plugins: Vec<Arc<dyn HorizonPlugin>> = if verify_only && slot_ranges {
+        vec![range_verifier.clone()]
+    } else if verify_only {
         vec![verification_plugin.clone()]
     } else if bench {
         vec![Arc::new(BenchPlugin {
@@ -462,17 +525,33 @@ async fn main() {
             |acc, p| acc.union(p.consumption()),
         )
         .account_update_data;
-    let threads = threads_override.unwrap_or_else(|| {
-        let cores = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(8);
-        if consumes_bytes {
-            (cores / 2).max(1)
-        } else {
-            cores + cores.div_ceil(8)
-        }
-    });
-    let preload = bench && !no_preload && !consumes_bytes;
+    let threads = threads_override
+        .or_else(|| {
+            std::env::var("JETSTREAMER_THREADS").ok().map(|value| {
+                value
+                    .parse::<usize>()
+                    .ok()
+                    .filter(|n| *n > 0)
+                    .unwrap_or_else(|| {
+                        eprintln!("JETSTREAMER_THREADS must be a positive integer");
+                        usage()
+                    })
+            })
+        })
+        .unwrap_or_else(|| {
+            let cores = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(8);
+            if consumes_bytes {
+                (cores / 2).max(1)
+            } else {
+                cores + cores.div_ceil(8)
+            }
+        });
+    if threads == 0 {
+        usage();
+    }
+    let preload = !slot_ranges && bench && !no_preload && !consumes_bytes;
     if bench && !no_preload && consumes_bytes {
         log::info!(
             "bench: preload disabled (account-update data is consumed; materialized decode is \
@@ -487,97 +566,116 @@ async fn main() {
     }
 
     let mut failure = None;
-    for epoch in start_epoch..=end_epoch {
-        let (lo, hi) = epoch_to_slot_range(epoch);
-        log::info!("horizon pipeline: epoch {epoch} (slots {lo}..={hi}) with {threads} threads");
-        // Bench, metadata-only: preload the epoch into RAM when it fits, so
-        // the timed window below measures pure decode. The buffer is dropped
-        // when the epoch's run completes, before the next preload.
-        let epoch_src = if preload {
-            preload_epoch(&src, epoch)
-                .await
-                .unwrap_or_else(|| src.clone())
-        } else {
-            src.clone()
-        };
-        let before = (
-            bench_counters.slots.load(Ordering::Relaxed),
-            bench_counters.blocks.load(Ordering::Relaxed),
-            bench_counters.txs.load(Ordering::Relaxed),
-            bench_counters.tx_updates.load(Ordering::Relaxed),
-            bench_counters.orphan_updates.load(Ordering::Relaxed),
-            bench_counters.update_bytes.load(Ordering::Relaxed),
-        );
-        let start = Instant::now();
+    if slot_ranges {
+        let slots = epoch_to_slot_range(start_epoch).0..epoch_to_slot_range(end_epoch).1 + 1;
         tokio::select! {
-            res = runner.run(epoch_src, epoch, lo..hi + 1) => {
-                if let Err(err) = res {
-                    failure = Some(format!("epoch {epoch}: {err}"));
+            result = runner.run_range(src.clone(), slots) => match result {
+                Err(err) => failure = Some(err.to_string()),
+                Ok(run) if verify_only => {
+                    if let Err(err) = finish_range_reports(
+                        &range_verifier,
+                        &run,
+                        start_epoch..=end_epoch,
+                        &location,
+                        report_directory.as_deref(),
+                        verification_report.as_deref(),
+                    ) {
+                        failure = Some(format!("cannot finalize range verification: {err}"));
+                    }
+                }
+                Ok(_) => {}
+            },
+            _ = shutdown.notified() => failure = Some("interrupted during slot-range playback".into()),
+        }
+    } else {
+        for epoch in start_epoch..=end_epoch {
+            let (lo, hi) = epoch_to_slot_range(epoch);
+            log::info!(
+                "horizon pipeline: epoch {epoch} (slots {lo}..={hi}) with {threads} threads"
+            );
+            // Bench, metadata-only: preload the epoch into RAM when it fits, so
+            // the timed window below measures pure decode. The buffer is dropped
+            // when the epoch's run completes, before the next preload.
+            let epoch_src = if preload {
+                preload_epoch(&src, epoch)
+                    .await
+                    .unwrap_or_else(|| src.clone())
+            } else {
+                src.clone()
+            };
+            let before = (
+                bench_counters.slots.load(Ordering::Relaxed),
+                bench_counters.blocks.load(Ordering::Relaxed),
+                bench_counters.txs.load(Ordering::Relaxed),
+                bench_counters.tx_updates.load(Ordering::Relaxed),
+                bench_counters.orphan_updates.load(Ordering::Relaxed),
+                bench_counters.update_bytes.load(Ordering::Relaxed),
+            );
+            let start = Instant::now();
+            tokio::select! {
+                res = runner.run(epoch_src, epoch, lo..hi + 1) => {
+                    if let Err(err) = res {
+                        failure = Some(format!("epoch {epoch}: {err}"));
+                        break;
+                    }
+                }
+                _ = shutdown.notified() => {
+                    failure = Some(format!("interrupted by CTRL+C during epoch {epoch}"));
                     break;
                 }
             }
-            _ = shutdown.notified() => {
-                failure = Some(format!("interrupted by CTRL+C during epoch {epoch}"));
-                break;
+            if let Some(dir) = &report_directory {
+                let result = verification_plugin
+                    .last_report()
+                    .filter(|report| report.epoch == epoch)
+                    .ok_or_else(|| {
+                        std::io::Error::other("missing completed plugin verification result")
+                    })
+                    .and_then(|report| {
+                        save_epoch_report(
+                            &report,
+                            dir,
+                            &location,
+                            &std::env::args().collect::<Vec<_>>(),
+                        )
+                    });
+                if let Err(error) = result {
+                    failure = Some(format!(
+                        "epoch {epoch}: cannot persist plugin verification report: {error}"
+                    ));
+                    break;
+                }
             }
-        }
-        if let Some(dir) = &report_directory {
-            let result = verification_plugin
-                .last_report()
-                .filter(|report| report.epoch == epoch)
-                .ok_or_else(|| {
-                    std::io::Error::other("missing completed plugin verification result")
-                })
-                .and_then(|report| {
-                    let temporary =
-                        dir.join(format!(".epoch-{epoch}-{}.pending", std::process::id()));
-                    report.write_json(
-                        &temporary,
-                        &location,
-                        &std::env::args().collect::<Vec<_>>(),
-                        (lo, hi),
-                    )?;
-                    // A separate observer can consume this file as soon as it appears.
-                    // Link only the fully written/fsynced result, preserving no-clobber.
-                    std::fs::hard_link(&temporary, dir.join(format!("epoch-{epoch}.json")))?;
-                    std::fs::remove_file(&temporary)?;
-                    std::fs::File::open(dir)?.sync_all()
-                });
-            if let Err(error) = result {
-                failure = Some(format!(
-                    "epoch {epoch}: cannot persist plugin verification report: {error}"
-                ));
-                break;
-            }
-        }
-        if bench {
-            let elapsed = start.elapsed().as_secs_f64();
-            let slots = bench_counters.slots.load(Ordering::Relaxed) - before.0;
-            let blocks = bench_counters.blocks.load(Ordering::Relaxed) - before.1;
-            let txs = bench_counters.txs.load(Ordering::Relaxed) - before.2;
-            let tx_updates = bench_counters.tx_updates.load(Ordering::Relaxed) - before.3;
-            let orphan_updates = bench_counters.orphan_updates.load(Ordering::Relaxed) - before.4;
-            let update_bytes = bench_counters.update_bytes.load(Ordering::Relaxed) - before.5;
-            let rate = |n: u64| commas((n as f64 / elapsed) as u64);
-            log::info!(
-                "bench: epoch {epoch} done in {elapsed:.1}s — slots={} blocks={} txs={} \
+            if bench {
+                let elapsed = start.elapsed().as_secs_f64();
+                let slots = bench_counters.slots.load(Ordering::Relaxed) - before.0;
+                let blocks = bench_counters.blocks.load(Ordering::Relaxed) - before.1;
+                let txs = bench_counters.txs.load(Ordering::Relaxed) - before.2;
+                let tx_updates = bench_counters.tx_updates.load(Ordering::Relaxed) - before.3;
+                let orphan_updates =
+                    bench_counters.orphan_updates.load(Ordering::Relaxed) - before.4;
+                let update_bytes = bench_counters.update_bytes.load(Ordering::Relaxed) - before.5;
+                let rate = |n: u64| commas((n as f64 / elapsed) as u64);
+                log::info!(
+                    "bench: epoch {epoch} done in {elapsed:.1}s — slots={} blocks={} txs={} \
                  tx_updates={} orphan_updates={} update_bytes={}",
-                commas(slots),
-                commas(blocks),
-                commas(txs),
-                commas(tx_updates),
-                commas(orphan_updates),
-                commas(update_bytes),
-            );
-            log::info!(
-                "bench: epoch {epoch} rates — slots/s={} TPS={} updates/s={} update_MB/s={:.1}",
-                rate(slots),
-                rate(txs),
-                rate(tx_updates + orphan_updates),
-                (update_bytes as f64 / elapsed) / 1_000_000.0,
-            );
-        } else {
-            log::info!("horizon pipeline: epoch {epoch} complete");
+                    commas(slots),
+                    commas(blocks),
+                    commas(txs),
+                    commas(tx_updates),
+                    commas(orphan_updates),
+                    commas(update_bytes),
+                );
+                log::info!(
+                    "bench: epoch {epoch} rates — slots/s={} TPS={} updates/s={} update_MB/s={:.1}",
+                    rate(slots),
+                    rate(txs),
+                    rate(tx_updates + orphan_updates),
+                    (update_bytes as f64 / elapsed) / 1_000_000.0,
+                );
+            } else {
+                log::info!("horizon pipeline: epoch {epoch} complete");
+            }
         }
     }
 
@@ -618,7 +716,7 @@ async fn main() {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
-    if let Some(path) = verification_report {
+    if let Some(path) = verification_report.filter(|_| !slot_ranges) {
         let result = verification_plugin
             .last_report()
             .filter(|report| report.epoch == start_epoch)

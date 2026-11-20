@@ -284,6 +284,7 @@ fn dispatch_fixture(format: ArchiveVersion) {
     let (tx, _rx) = tokio::sync::mpsc::channel(WRITE_QUEUE_CAP);
     let seen = Arc::new(Mutex::new(Vec::new()));
     let mut dispatch = Dispatch {
+        transactions: None,
         workers: vec![
             plugin.spawn_worker(0),
             Box::new(Audit {
