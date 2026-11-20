@@ -2,8 +2,11 @@
 //! completion and an independent second complete host fit permit the trace payload.
 #![recursion_limit = "384"]
 mod fit;
+#[path = "../horizon_guard_floor_margin_20261120_v1/floor.rs"]
+mod guard_floor;
 mod launch;
 mod peers;
+#[path = "retry2.rs"]
 mod retry;
 mod staged;
 use anyhow::{Context, Result, bail, ensure};
@@ -20,7 +23,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-retry1-v1";
+const PACKAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v3/admission-v1";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 mod inputs;

@@ -12,8 +12,8 @@ expected=7cd290140ae1097fb8caa573a4afcffd55d4a279dc07fefe6e9299936d39c71e
 [[ $(sudo -n sha256sum "$node" | cut -d' ' -f1) == "$expected" ]]
 for layout in enclosed sibling preworker; do
     fixture=$(mktemp -d "$here/epoch169-offline-path.XXXXXXXX")
-    mkdir -m 700 "$fixture"/{v158,attempt-g2} "$fixture"/v158/scratch "$fixture"/attempt-g2/{tmp,private}
-    printf '%s' native-node-path-fixture > "$fixture/attempt-g2/OFFLINE_FIXTURE"
+    mkdir -m 700 "$fixture"/{v158,attempt-g3} "$fixture"/v158/scratch "$fixture"/attempt-g3/{tmp,private}
+    printf '%s' native-node-path-fixture > "$fixture/attempt-g3/OFFLINE_FIXTURE"
     sudo -n unshare --mount --net --propagation private -- /bin/bash -euo pipefail -c '
       src=$1; node=$2; exe=$3; layout=$4
       lane=/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1

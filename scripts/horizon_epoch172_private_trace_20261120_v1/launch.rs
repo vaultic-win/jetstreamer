@@ -297,8 +297,13 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
     }
     child_stage()?;
     let fresh = fit::inspect(fleet, sha, None)?;
-    let floor = check_fit(&fresh)?;
+    check_fit(&fresh)?;
+    let selection = guard_floor::select(&fresh)?;
+    let floor = selection["armed_floor_bytes"]
+        .as_u64()
+        .context("armed floor")?;
     record(root, "FINAL_PRELAUNCH_FIT.json", &fresh)?;
+    let selection_ref = record(root, "GUARD_FLOOR_RESERVATION.json", &selection)?;
     let static_plan = record(
         root,
         "STATIC_PLAN.json",
@@ -362,11 +367,17 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         owned_timer = Some(at(&native_timer, "InvocationID")?.to_owned());
         let first = sample(Path::new(RECEIPTS), &producer, floor, plan_sha, deadline)?;
         let first_ref = record(root, "FIRST_GUARD.json", &first)?;
-        let after = fit::inspect(fleet, sha, Some(id))?;
-        ensure!(
-            check_fit(&after)? <= floor,
-            "post-guard protected floor increased"
-        );
+        let mut after = fit::inspect(fleet, sha, Some(id))?;
+        let post_fit = record(root, "POST_GUARD_FIT.json", &after)?;
+        check_fit(&after)?;
+        let floor_check = guard_floor::post(&after, &selection)?;
+        let floor_proof = record(root, "POST_GUARD_FLOOR.json", &floor_check)?;
+        after["guard_floor_selection"] = selection_ref.clone();
+        after["post_guard_fit"] = post_fit;
+        after["post_guard_floor_proof"] = floor_proof;
+        after["armed_guard_floor_bytes"] = json!(floor);
+        after["complete_required_DATA_with_guard_margin_bytes"] =
+            floor_check["complete_required_DATA_with_guard_margin_bytes"].clone();
         let cap = record(root, "POST_GUARD_CAPACITY.json", &after)?;
         let n = show(UNIT)?;
         ensure!(

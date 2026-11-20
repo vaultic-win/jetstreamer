@@ -212,10 +212,10 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         "bootstrap headroom"
     );
     let required = sum(protected, candidate_growth)?;
-    ensure!(
-        free.min(disk::free()?) >= required,
-        "final HOME availability below full fit"
-    );
+    let free = free
+        .min(disk::free()?)
+        .min(n(&data["audit"], "conservative_available_DATA_bytes")?);
+    ensure!(free >= required, "final HOME availability below full fit");
     Ok(
         json!({"schema":format!("epoch{}-complete-metered-host-fit-v2", guard172::EPOCH),"closed_unpatched_predecessor":closed,"fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":candidate_growth,"root_cap_bytes":guard172::CAP,(format!("epoch{}_tree", guard172::EPOCH)):own_root,(format!("nominal_epoch{}_retained_entire_root_cap_bytes",guard172::EPOCH)):288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_172_booking_bytes":candidate_growth,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
     )

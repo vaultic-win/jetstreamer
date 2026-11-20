@@ -3,6 +3,8 @@
 #![recursion_limit = "384"]
 mod closure;
 mod fit;
+#[path = "../horizon_guard_floor_margin_20261120_v1/floor.rs"]
+mod guard_floor;
 mod launch;
 mod peers;
 mod staged;

@@ -1,5 +1,10 @@
 # Epoch 169 focused admission
 
+The current source prepares the separate G3 floor retry described in
+[FLOOR_RETRY.md](FLOOR_RETRY.md). Its runtime is `epoch169-focused-admission-20261120-v3`
+and its writable metadata is `attempt-g3`. The G2 deployment below is retained
+history; do not reuse or overwrite its receipt namespace for the new retry.
+
 Build from a commit already in account-updates with Rust 1.98.0 inside the authorized serial slot. The standalone crate reuses the checked-in 168 physical allocation census, 172 native replay peer census, 166 resource accounting, exact-byte R2 audit and the existing 170 root guard. The node and v1.5.8 worker are separate sealed inputs.
 
     cargo test --locked --offline -j 1 --manifest-path scripts/horizon_epoch169_focused_admission_20261120_v1/Cargo.toml

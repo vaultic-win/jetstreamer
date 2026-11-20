@@ -270,14 +270,19 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
     );
     let actor = producer_argv(&token)?;
     let fresh = fit::inspect(fleet, sha, None)?;
-    let floor = check_fit(&fresh)?;
-    let cold = record(root, "RETRY1_COLD_SETUP.json", &retry::cold()?)?;
+    check_fit(&fresh)?;
+    let selection = guard_floor::select(&fresh)?;
+    let floor = selection["armed_floor_bytes"]
+        .as_u64()
+        .context("armed floor")?;
+    let cold = record(root, "RETRY2_COLD_SETUP.json", &retry::cold()?)?;
     let retry_pre = record(
         root,
-        "RETRY1_PREFLIGHT.json",
+        "RETRY2_PREFLIGHT.json",
         &json!({"fleet":binding(fleet,sha),"provenance":provenance,"measurement":pre,"producer_argv":actor,"cold_setup":cold}),
     )?;
     record(root, "FINAL_PRELAUNCH_FIT.json", &fresh)?;
+    let selection_ref = record(root, "GUARD_FLOOR_RESERVATION.json", &selection)?;
     let static_plan = record(
         root,
         "STATIC_PLAN.json",
@@ -342,11 +347,18 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         owned_timer = Some(at(&native_timer, "InvocationID")?.to_owned());
         let first = sample(Path::new(RECEIPTS), &producer, floor, plan_sha, deadline)?;
         let first_ref = record(root, "FIRST_GUARD.json", &first)?;
-        let after = fit::inspect(fleet, sha, Some(id))?;
-        ensure!(
-            check_fit(&after)? <= floor,
-            "post-guard protected floor increased"
-        );
+        let mut after = fit::inspect(fleet, sha, Some(id))?;
+        // Preserve the actual failing measurement before any floor rejection.
+        let post_fit = record(root, "POST_GUARD_FIT.json", &after)?;
+        check_fit(&after)?;
+        let floor_check = guard_floor::post(&after, &selection)?;
+        let floor_proof = record(root, "POST_GUARD_FLOOR.json", &floor_check)?;
+        after["guard_floor_selection"] = selection_ref.clone();
+        after["post_guard_fit"] = post_fit;
+        after["post_guard_floor_proof"] = floor_proof;
+        after["armed_guard_floor_bytes"] = json!(floor);
+        after["complete_required_DATA_with_guard_margin_bytes"] =
+            floor_check["complete_required_DATA_with_guard_margin_bytes"].clone();
         crate::inputs::sandbox(at(&producer, "MainPID")?.parse()?)?;
         let cap = record(root, "POST_GUARD_CAPACITY.json", &after)?;
         let n = show(UNIT)?;
@@ -382,7 +394,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         record(
             root,
             "ACTUAL_ADMISSION_AND_PROTECTION.json",
-            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"retry1_cold_setup":cold,"retry1_preflight":retry_pre,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
+            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"retry2_cold_setup":cold,"retry2_preflight":retry_pre,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
         )
     })();
     match attempt {

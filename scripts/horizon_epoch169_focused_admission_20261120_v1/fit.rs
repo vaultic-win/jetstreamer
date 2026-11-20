@@ -211,10 +211,10 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         .context("169 guard budget exceeded")?;
     ensure!(growth169 >= 2_109_034_648u64 + 20_144, "bootstrap headroom");
     let required = sum(protected, growth169)?;
-    ensure!(
-        free.min(disk::free()?) >= required,
-        "final HOME availability below full fit"
-    );
+    let free = free
+        .min(disk::free()?)
+        .min(n(&data["audit"], "conservative_available_DATA_bytes")?);
+    ensure!(free >= required, "final HOME availability below full fit");
     Ok(
         json!({"schema":"epoch169-complete-trace-host-fit-v1","fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth169,"root_cap_bytes":guard169::CAP,"epoch169_tree":own_root,"nominal_epoch169_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_169_booking_bytes":growth169,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
     )
