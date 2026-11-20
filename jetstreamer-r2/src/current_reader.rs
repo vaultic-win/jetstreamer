@@ -493,6 +493,22 @@ fn validate_report(report: &Value, epoch: u64, source: &str, invocation: &[Strin
     Ok(())
 }
 
+// Source and invocation differ between the two independently validated reports.
+// Compare the full plugin payload, including every counter and stream digest.
+fn matching_playback(local: &Value, public: &Value) -> Result<()> {
+    let local = local["report"]["report"]
+        .as_object()
+        .context("missing local plugin counters")?;
+    let public = public["report"]["report"]
+        .as_object()
+        .context("missing public plugin counters")?;
+    ensure!(
+        local == public,
+        "public verification counters or stream digest differ from local playback"
+    );
+    Ok(())
+}
+
 fn check_readback_capacity(plan: &Plan, length: u64) -> Result<()> {
     // This is an operation-specific admission check, not another replay poll.
     use std::os::unix::ffi::OsStrExt;
@@ -699,10 +715,7 @@ impl Gate {
             }),
         )?;
         let result = self.playback(public_origin, "remote", Some(&inventory))?;
-        ensure!(
-            result["report"]["report"] == self.local_playback["report"]["report"],
-            "public verification counters or stream digest differ from local playback"
-        );
+        matching_playback(&self.local_playback, &result)?;
         self.remote_playback = Some(json!({
             "object":remote, "public_origin":public_origin, "archive_inventory":inventory,
             "playback":result
@@ -787,6 +800,22 @@ mod tests {
             "/readback",
             &["pipeline".into(), "--verify-only".into()],
         )
+    }
+
+    #[test]
+    fn local_public_equality_requires_matching_counters_and_digest() {
+        let local = json!({"report":complete_report()});
+        let mut public = local.clone();
+        public["report"]["source"] = json!("https://fixture.invalid/");
+        matching_playback(&local, &public).unwrap();
+        for key in local["report"]["report"].as_object().unwrap().keys() {
+            let mut bad = public.clone();
+            bad["report"]["report"].as_object_mut().unwrap().remove(key);
+            assert!(matching_playback(&local, &bad).is_err(), "{key}");
+        }
+        assert!(matching_playback(&Value::Null, &Value::Null).is_err());
+        public["report"]["report"]["stream_digest"][0] = json!(255);
+        assert!(matching_playback(&local, &public).is_err());
     }
 
     #[test]

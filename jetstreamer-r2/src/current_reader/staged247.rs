@@ -20,6 +20,13 @@ const SCRATCH: &str = "/home/ubuntu/.jetstreamer-private/current-reader-delivery
 const PLAN: &str =
     "/var/lib/jetstreamer/horizon-reader-delivery247-251-db1c31fe-20261119-v2/epoch-247-plan.json";
 const PLAN_SHA: &str = "cea94f810e84239475726eb49ad1bcd24d058ab91e96f10fb01def2fcbc7472d";
+const PUBLIC_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-6e644028-v1/epoch-247-plan.json";
+const PUBLIC_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-6e644028-v1/horizon_pipeline";
+const PUBLIC_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-6e644028-v1/main-acceptance.json";
+const PUBLIC_READER: &str = "6e644028374dc98f1b25dc82d774b67c3a31c736";
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
     "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
@@ -179,14 +186,39 @@ fn drained() -> Result<()> {
     }
     Ok(())
 }
+// Only the qualified public reader and its acceptance change. Keep the exact
+// original epoch evidence, retained verifier, repository, policy and disk bounds.
+fn public_plan(original: &Value, next: &Value) -> Result<()> {
+    let mut expected = original.clone();
+    for (field, path) in [
+        ("pipeline", PUBLIC_PIPELINE),
+        ("qualification", PUBLIC_QUALIFICATION),
+    ] {
+        let bound: Bound = serde_json::from_value(next[field].clone())?;
+        ensure!(
+            bound.path == Path::new(path) && hex(&bound.sha256, 64),
+            "foreign public {field}"
+        );
+        expected[field] = serde_json::to_value(bound)?;
+    }
+    expected["reader_commit"] = json!(PUBLIC_READER);
+    ensure!(
+        next == &expected,
+        "epoch 247 public plan changed retained policy or evidence"
+    );
+    Ok(())
+}
+
 pub(crate) fn config(c: &crate::Config) -> Result<()> {
     ensure!(
         c.command == crate::Command::Sync
             && c.epochs == std::collections::BTreeSet::from([247])
             && c.directory == Path::new(INPUT)
             && c.receipt_directory.as_deref() == Some(Path::new(STATE).join("receipts").as_path())
-            && c.current_reader_plan.as_deref() == Some(Path::new(PLAN))
-            && c.current_reader_plan_sha256.as_deref() == Some(PLAN_SHA)
+            && c.current_reader_plan.as_deref() == Some(Path::new(PUBLIC_PLAN))
+            && c.current_reader_plan_sha256
+                .as_deref()
+                .is_some_and(|sha| hex(sha, 64))
             && c.concurrency == 2
             && !c.overwrite_existing
             && !c.delete_local
@@ -195,7 +227,18 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
             && c.part_size == crate::DEFAULT_PART_SIZE,
         "invalid epoch 247 staged recovery scope"
     );
-    Ok(())
+    let original = bound_json(&Bound {
+        path: PLAN.into(),
+        sha256: PLAN_SHA.into(),
+    })?;
+    let next = bound_json(&Bound {
+        path: PUBLIC_PLAN.into(),
+        sha256: c
+            .current_reader_plan_sha256
+            .clone()
+            .context("missing public plan digest")?,
+    })?;
+    public_plan(&original, &next)
 }
 pub(crate) fn object(bucket: &str, key: &str, remote: Option<&crate::RemoteArchive>) -> Result<()> {
     let r = remote.context("staged 247 object missing")?;
@@ -486,6 +529,32 @@ impl Sink {
 mod tests {
     use super::*;
 
+    #[test]
+    fn public_successor_preserves_original_evidence_and_registered_images() {
+        let original = json!({"reader_commit":"old","pipeline":null,"qualification":null,"threads":2,
+            "epoch_expectations":{"247":"original"},"full_verifier":"sealed"});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(PUBLIC_READER);
+        next["pipeline"] = json!({"path":PUBLIC_PIPELINE,"sha256":"a".repeat(64)});
+        next["qualification"] = json!({"path":PUBLIC_QUALIFICATION,"sha256":"b".repeat(64)});
+        public_plan(&original, &next).unwrap();
+        for path in [
+            "/reader_commit",
+            "/pipeline/path",
+            "/qualification/path",
+            "/pipeline/sha256",
+            "/qualification/sha256",
+            "/threads",
+            "/epoch_expectations/247",
+            "/full_verifier",
+        ] {
+            let mut other = next.clone();
+            *other.pointer_mut(path).unwrap() = json!("foreign");
+            assert!(public_plan(&original, &other).is_err(), "{path}");
+        }
+        next["unknown"] = json!(1);
+        assert!(public_plan(&original, &next).is_err());
+    }
     #[test]
     fn staged_remote_identity_requires_the_recorded_key_bucket_digest_length_and_etag() {
         let r = crate::RemoteArchive {
