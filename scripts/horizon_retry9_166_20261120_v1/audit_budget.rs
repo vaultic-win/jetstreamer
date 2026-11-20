@@ -246,6 +246,7 @@ pub(super) fn observe() -> Result<Value> {
 }
 
 /// This is the observer's required successor envelope. Zero DATA and root-only envelopes fail.
+#[cfg(test)]
 pub(super) fn fleet_obligation() -> Value {
     json!({"home_storage_start_event":binding(START,START_SHA),
         "additional_memory_bytes":MEMORY,"additional_cpu_quota_micros":CPU,"tasks_max":512,
