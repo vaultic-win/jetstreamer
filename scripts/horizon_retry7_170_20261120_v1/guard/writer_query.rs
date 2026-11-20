@@ -1,4 +1,4 @@
-//! Preserve the original one-shot, ten-second query policy and its failed evidence.
+//! The two writer snapshots bracketing a retained-tree check share a bounded wait.
 use anyhow::{Context, Result, ensure};
 use std::{
     os::unix::process::ExitStatusExt,
@@ -8,6 +8,8 @@ use std::{
 
 const MAX_STDOUT_BYTES: usize = 16_384;
 const DIAGNOSTIC_BYTES: usize = 512;
+// Two original 10-second calls. A PID 1 reload can occupy more than 10 seconds.
+pub(super) const PAIR_BUDGET: Duration = Duration::from_secs(20);
 
 fn diagnostic(bytes: &[u8]) -> String {
     // JSON-style escaping keeps child output inside one readable diagnostic line.
@@ -34,16 +36,39 @@ fn accept(output: Output, elapsed: Duration, phase: &str) -> Result<Output> {
     Ok(output)
 }
 
-pub(super) fn query(units: &[&str], fields: &str, phase: &str) -> Result<Output> {
+fn bounded(command: &[&str], phase: &str, remaining: &mut Duration) -> Result<Output> {
+    ensure!(
+        !remaining.is_zero(),
+        "writer query budget exhausted; phase={phase:?}"
+    );
+    // GNU timeout treats zero as unlimited. Keep fractional seconds, including the
+    // final query's subsecond remainder, and also enforce the bound on child exit.
+    let limit = format!("{}.{:09}", remaining.as_secs(), remaining.subsec_nanos());
     let started = Instant::now();
     let output = Command::new("/usr/bin/timeout")
-        .args(["--signal=KILL", "10", "/usr/bin/systemctl", "show"])
-        .args(units)
-        .args(["--all", "--no-pager", "-p", fields])
+        .args(["--signal=KILL", &limit])
+        .args(command)
         .env("LC_ALL", "C")
         .output()
         .with_context(|| format!("bounded writer query spawn failed; phase={phase:?}"))?;
-    accept(output, started.elapsed(), phase)
+    let elapsed = started.elapsed();
+    let output = accept(output, elapsed, phase)?;
+    *remaining = remaining
+        .checked_sub(elapsed)
+        .with_context(|| format!("writer query exceeded remaining budget; phase={phase:?}"))?;
+    Ok(output)
+}
+
+pub(super) fn query(
+    units: &[&str],
+    fields: &str,
+    phase: &str,
+    remaining: &mut Duration,
+) -> Result<Output> {
+    let mut command = vec!["/usr/bin/systemctl", "show"];
+    command.extend_from_slice(units);
+    command.extend(["--all", "--no-pager", "-p", fields]);
+    bounded(&command, phase, remaining)
 }
 
 #[cfg(test)]
@@ -57,6 +82,22 @@ mod tests {
             stdout,
             stderr,
         }
+    }
+
+    #[test]
+    fn slow_first_query_leaves_its_actual_remainder_for_the_second() {
+        let mut budget = PAIR_BUDGET;
+        bounded(&["/usr/bin/sleep", "11"], "before", &mut budget).unwrap();
+        assert!(budget <= Duration::from_secs(9));
+        bounded(&["/usr/bin/true"], "after", &mut budget).unwrap();
+    }
+
+    #[test]
+    fn exhausted_and_fractional_budgets_fail_closed() {
+        let mut budget = Duration::ZERO;
+        assert!(bounded(&["/usr/bin/true"], "after", &mut budget).is_err());
+        let mut budget = Duration::from_millis(50);
+        assert!(bounded(&["/usr/bin/sleep", "1"], "after", &mut budget).is_err());
     }
 
     #[test]

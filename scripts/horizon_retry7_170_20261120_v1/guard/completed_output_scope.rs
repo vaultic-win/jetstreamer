@@ -111,8 +111,8 @@ fn absent(n: &Value) -> Result<()> {
     }
     Ok(())
 }
-fn native(phase: &str) -> Result<Vec<Value>> {
-    let r = crate::writer_query::query(&UNITS, FIELDS, phase)?;
+fn native(phase: &str, remaining: &mut std::time::Duration) -> Result<Vec<Value>> {
+    let r = crate::writer_query::query(&UNITS, FIELDS, phase, remaining)?;
     let mut rows = Vec::new();
     for block in std::str::from_utf8(&r.stdout)?.trim_end().split("\n\n") {
         let mut row = serde_json::Map::new();
@@ -269,7 +269,8 @@ pub fn validate(full_hash: bool) -> Result<Value> {
         );
         small_bound(&accepted["receipt"])?;
     }
-    let before = native("before retained-tree verification")?;
+    let mut query_budget = crate::writer_query::PAIR_BUDGET;
+    let before = native("before retained-tree verification", &mut query_budget)?;
     let records = review["exact_retained_records"]
         .as_array()
         .context("records")?;
@@ -287,7 +288,7 @@ pub fn validate(full_hash: bool) -> Result<Value> {
         "completed scope changed"
     );
     ensure!(
-        native("after retained-tree verification")? == before,
+        native("after retained-tree verification", &mut query_budget)? == before,
         "writer changed across retained-output check"
     );
     tree(Path::new(ROOT), records, RETAINED_CAP, false)?;
