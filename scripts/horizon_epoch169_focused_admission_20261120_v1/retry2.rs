@@ -1,7 +1,8 @@
-//! Fresh G3 execution namespace; G1, cold G2 and failed held-G2 evidence remain intact.
+//! Validate retained G2 and G3 evidence before opening the separate G4 execution namespace.
 use super::*;
 use std::collections::BTreeSet;
-pub(super) const OLD_SOURCE: &str = "5a67854cac09dbc4b73b9136d667f2d47c69b040";
+pub(super) const OLD_SOURCE: &str = "bf733bf0549bcaddd33a21b382ab5014297f34cd";
+const G2_SOURCE: &str = "5a67854cac09dbc4b73b9136d667f2d47c69b040";
 const OLD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2";
 const OLD_IID: &str = "5986d31775c647fc971d4bd41a482158";
@@ -179,7 +180,7 @@ fn retained() -> Result<Value> {
         &documents["PRODUCER_NATIVE.json"],
     )?;
     ensure!(
-        documents["admission-retry1-v1/artifact-proof.json"]["source_commit"] == OLD_SOURCE
+        documents["admission-retry1-v1/artifact-proof.json"]["source_commit"] == G2_SOURCE
             && documents["RETRY1_COLD_SETUP.json"]["schema"] == "epoch169-g2-pre-spawn-custody-v1",
         "retained source/cold stage changed"
     );
@@ -254,8 +255,66 @@ fn retained() -> Result<Value> {
         "rollback_verified":true,"barrier_still_empty":true,"old_producer_log_bytes":0,"resource_credit_bytes":0}),
     )
 }
+fn retained_g3() -> Result<Value> {
+    let root = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v3",
+    );
+    let previous = root.join("ACTUAL_ADMISSION_AND_PROTECTION.json");
+    let admission_sha = "10183aa990641c4d41fcce37ce9ee6c27cbac25c67a72c09b100fdccd1fa7084";
+    let admission = json_pin(&previous, admission_sha)?;
+    let terminal_path = root.join("TRANSFER_TERMINAL.json");
+    let terminal_sha = "511c7c8bbdf7788fb76f4e99f0bf2ed0dc5fddc76295218af7af4f0cd3e8d260";
+    let terminal = json_pin(&terminal_path, terminal_sha)?;
+    ensure!(
+        terminal["admission"] == binding(&previous, admission_sha)
+            && terminal["native"]["InvocationID"] == admission["producer_invocation_id"]
+            && terminal["restored_slot"] == 73007829
+            && terminal["transaction_replay_confirmed"] == false,
+        "G3 transfer lineage"
+    );
+    for key in ["post_guard_capacity", "last_guard_sample"] {
+        let r = &terminal[key];
+        pinned(Path::new(at(r, "path")?), at(r, "sha256")?)?;
+    }
+    let log_path = Path::new(LANE).join("attempt-g3/producer.log");
+    let mut log = checked_file(&log_path, Some(114236973), 1001, 1003, 0o600, 5615)?;
+    let mut bytes = Vec::new();
+    log.read_to_end(&mut bytes)?;
+    ensure!(
+        terminal["producer_log"] == binding(&log_path, &digest(&bytes)),
+        "G3 producer log changed"
+    );
+    for u in [
+        "horizon-qualify-169-focused-20261120-v3.service",
+        "horizon-guard-169-focused-20261120-v3.service",
+        "horizon-guard-169-focused-20261120-v3.timer",
+    ] {
+        drained(u)?;
+    }
+    let proof = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch169-index-projection-20261120-v1",
+    );
+    let comparison = proof.join("full-comparison.json");
+    let hash = "a7fafc89d8e40168b6efde85134d4966251b641eac5e01297fdaf67633e41ef9";
+    let verified = json_pin(&comparison, hash)?;
+    ensure!(
+        verified["matched_all_bytes"] == true
+            && verified["bytes"] == 4_322_853_290u64
+            && verified["source"] == json!(Path::new(cache::SOURCE).join(cache::CID))
+            && verified["sha256"]
+                == "e30ef8ef05b5f29deea60efad6ed6f2a75511447b26a94c529412d14897b04a4",
+        "invalid index comparison"
+    );
+    let projection = proof.join("projection.json");
+    let projection_sha = "82cfef595094cc89738f93ce3fc014041ea83d9d7c537a29dabefe418963d48a";
+    json_pin(&projection, projection_sha)?;
+    Ok(
+        json!({"terminal":binding(&terminal_path,terminal_sha),"comparison":binding(&comparison,hash),"projection":binding(&projection,projection_sha)}),
+    )
+}
 pub(super) fn cold() -> Result<Value> {
     let retained = retained()?;
+    let g3 = retained_g3()?;
     let root = Path::new(BASE);
     custody(root, 0, 0, None, 0o700)?;
     let mandatory = [
@@ -276,7 +335,7 @@ pub(super) fn cold() -> Result<Value> {
             && found
                 .iter()
                 .all(|s| mandatory.contains(&s.as_str()) || optional.contains(&s.as_str())),
-        "G3 runtime is not a clean prepared namespace"
+        "G4 runtime is not a clean prepared namespace"
     );
     for (name, mode) in [("barrier", 0o755), ("guard-receipts", 0o700)] {
         custody(&root.join(name), 0, 0, None, mode)?;
@@ -312,7 +371,7 @@ pub(super) fn cold() -> Result<Value> {
         "pending 169 job"
     );
     Ok(
-        json!({"schema":"epoch169-g3-floor-retry-cold-custody-v1","retained_g2":retained,
+        json!({"schema":"epoch169-g4-index-retry-cold-custody-v1","retained_g2":retained,"retained_g3":g3,
         "runtime_inode":fs::metadata(root)?.ino(),"runtime_entries":found,"attempt":attempt,
         "attempt_inode":fs::metadata(attempt)?.ino(),"producer_log_inode":log.ino(),"producer_log_bytes":0,
         "original_admission_lock":Path::new(OLD).join("admission.lock"),"admission_lock_inode":101132300,

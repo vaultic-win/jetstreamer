@@ -141,6 +141,16 @@ fn check_peer136() -> Result<()> {
 }
 pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     check_peer136()?;
+    for unit in [
+        "horizon-qualify-171-metered-hourly-20261120-g1.service",
+        "horizon-guard-171-metered-hourly-20261120-g1.timer",
+        "horizon-guard-171-metered-hourly-20261120-g1.service",
+        "horizon-qualify-172-metered-hourly-20261120-g3.service",
+        "horizon-guard-172-metered-hourly-20261120-g3.timer",
+        "horizon-guard-172-metered-hourly-20261120-g3.service",
+    ] {
+        drained(unit)?;
+    }
     let rows = run(
         "/usr/bin/systemctl",
         &[
@@ -296,6 +306,24 @@ pub(super) fn closed172(fleet: &Value) -> Result<()> {
                 .iter()
                 .any(|r| r["epoch"] == 172),
         "need reconciled post-172 fleet"
+    );
+    let prior = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3",
+    );
+    let admitted = prior.join("ACTUAL_ADMISSION_AND_PROTECTION.json");
+    let hash = "3a80d442a7f00cde93a2650a70194277a65340c7753fea460a773ccdfaae3b87";
+    let actor = json_pin(&admitted, hash)?;
+    let closure_path = prior.join("CLOSURE.json");
+    let closure: Value = serde_json::from_slice(&read_root(&closure_path)?)?;
+    ensure!(
+        closure["admission"] == binding(&admitted, hash)
+            && closure["producer_unit"] == actor["producer_unit"]
+            && closure["producer_invocation_id"] == actor["producer_invocation_id"]
+            && closure["schema"] == "epoch172-metered-diagnostic-closure-v2"
+            && closure["resource_credit_bytes"] == 0
+            && closure["resource_promise_ending_bytes"] == 0
+            && val >= u64::try_from(fs::metadata(&closure_path)?.mtime())?,
+        "need reconciled fleet after G3 epoch 172 closure"
     );
     Ok(())
 }

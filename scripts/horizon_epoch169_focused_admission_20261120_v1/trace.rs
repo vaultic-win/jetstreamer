@@ -193,10 +193,8 @@ fn stage_and_exec() -> Result<()> {
 
     let scratch = dir.join("scratch");
     root_dir(&scratch)?;
-    ensure!(
-        fs::read_dir(&scratch)?.next().is_none(),
-        "scratch was used since admission"
-    );
+    guard169::cache::scratch(&scratch)?;
+    guard169::cache::projected(Path::new(guard169::cache::DESTINATION))?;
     for sub in ["private", "tmp"] {
         fs::DirBuilder::new()
             .mode(0o700)

@@ -18,7 +18,7 @@ const SNAPSHOT: &str = "/home/sol/.jetstreamer-private/epoch169-standard-lane-20
 fn existing_names(names: &BTreeSet<String>) -> bool {
     let expected = PRESERVED
         .into_iter()
-        .chain(["scratch"])
+        .chain(["compact-indexes", "scratch"])
         .map(str::to_owned)
         .collect();
     *names == expected
@@ -117,10 +117,8 @@ pub(super) fn existing_destination(p: &Path) -> Result<()> {
         let child = p.join(name);
         custody(&child, 1001, 1003, Some(ino), 0o700)?;
         if name == "scratch" {
-            ensure!(
-                fs::read_dir(&child)?.next().is_none(),
-                "refuse used scratch"
-            );
+            cache::scratch(&child)?;
+            cache::host_cache(p)?;
         }
     }
     let path = p.join(CHECK);
@@ -301,6 +299,21 @@ pub(super) fn sandbox(pid: u64) -> Result<()> {
                 == fs::metadata(ATTEMPT)?.ino(),
         "wrong attempt mount"
     );
+    for (target, source) in [
+        (cache::DESTINATION.to_owned(), cache::SOURCE.to_owned()),
+        (
+            format!("{DEST}/compact-indexes/168"),
+            format!("{DEST}/compact-indexes/168"),
+        ),
+    ] {
+        let m = fs::metadata(&source)?;
+        let projected = fs::metadata(root.join(target.trim_start_matches('/')))?;
+        ensure!(
+            flags(mount(&mt, &target)?, "ro")
+                && (m.dev(), m.ino()) == (projected.dev(), projected.ino()),
+            "wrong compact index mount {target}"
+        );
+    }
     for name in PRESERVED {
         let p = Path::new(DEST).join(name);
         let host = fs::metadata(&p)?;
@@ -365,7 +378,7 @@ mod tests {
     fn destination_requires_the_exact_closed_first_attempt() {
         let mut names: BTreeSet<String> = PRESERVED
             .into_iter()
-            .chain(["scratch"])
+            .chain(["compact-indexes", "scratch"])
             .map(str::to_owned)
             .collect();
         assert!(existing_names(&names));

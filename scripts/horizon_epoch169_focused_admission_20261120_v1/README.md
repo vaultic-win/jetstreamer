@@ -1,9 +1,16 @@
 # Epoch 169 focused admission
 
-The current source prepares the separate G3 floor retry described in
-[FLOOR_RETRY.md](FLOOR_RETRY.md). Its runtime is `epoch169-focused-admission-20261120-v3`
-and its writable metadata is `attempt-g3`. The G2 deployment below is retained
-history; do not reuse or overwrite its receipt namespace for the new retry.
+Generation four uses `epoch169-focused-admission-20261120-v4` and `attempt-g4`.
+Generation three restored slot 73,007,829 and exited on the CID index transfer.
+The controller checks its admission, final guard sample, terminal receipt and
+drained units. It binds the upstream comparison to the retained 4,322,853,290-byte
+CID index by inode, size, mtime and ctime, checks the slot index files, and
+projects the standard lane’s epoch 169 cache read-only at the node’s normal
+path. The existing reservation includes that source tree. The held gate checks
+the actual mount, and the payload rechecks the index before spawning the node.
+A live 171 or 172 actor excludes this retry. Wait for the epoch 172 G3 closure
+and a reconciled fleet before admission. Earlier generations and their receipts
+are retained. The G3 floor contract is described in [FLOOR_RETRY.md](FLOOR_RETRY.md).
 
 Build from a commit already in account-updates with Rust 1.98.0 inside the authorized serial slot. The standalone crate reuses the checked-in 168 physical allocation census, 172 native replay peer census, 166 resource accounting, exact-byte R2 audit and the existing 170 root guard. The node and v1.5.8 worker are separate sealed inputs.
 

@@ -275,10 +275,10 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
     let floor = selection["armed_floor_bytes"]
         .as_u64()
         .context("armed floor")?;
-    let cold = record(root, "RETRY2_COLD_SETUP.json", &retry::cold()?)?;
+    let cold = record(root, "RETRY3_COLD_SETUP.json", &retry::cold()?)?;
     let retry_pre = record(
         root,
-        "RETRY2_PREFLIGHT.json",
+        "RETRY3_PREFLIGHT.json",
         &json!({"fleet":binding(fleet,sha),"provenance":provenance,"measurement":pre,"producer_argv":actor,"cold_setup":cold}),
     )?;
     record(root, "FINAL_PRELAUNCH_FIT.json", &fresh)?;
@@ -394,7 +394,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         record(
             root,
             "ACTUAL_ADMISSION_AND_PROTECTION.json",
-            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"retry2_cold_setup":cold,"retry2_preflight":retry_pre,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
+            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"retry3_cold_setup":cold,"retry3_preflight":retry_pre,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
         )
     })();
     match attempt {
@@ -428,7 +428,9 @@ mod tests {
             .collect();
         assert_eq!(writable, vec![format!("{DEST} {ATTEMPT}")]);
         let ro = PRESERVED.map(|n| format!("{DEST}/{n}")).join(" ");
-        assert!(argv.contains(&format!("--property=ReadOnlyPaths={ro}")));
+        assert!(argv.contains(&format!(
+            "--property=ReadOnlyPaths={DEST}/compact-indexes/168 {ro}"
+        )));
         assert!(argv.contains(&format!(
             "--property=StandardOutput=append:{ATTEMPT}/producer.log"
         )));
