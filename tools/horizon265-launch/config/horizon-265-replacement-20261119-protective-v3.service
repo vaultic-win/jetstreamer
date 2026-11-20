@@ -1,0 +1,22 @@
+# SOURCE ONLY. Preload before fresh admission; sealed EnvironmentFile supplies one exact real-IID plan digest without daemon-reload.
+[Unit]
+Description=Invocation-bound epoch 265 v3 startup disk and VMA guard
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Restart=no
+MemoryMax=1073741824
+MemorySwapMax=0
+CPUQuota=100%
+TasksMax=256
+TimeoutStartSec=90
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+AmbientCapabilities=CAP_DAC_OVERRIDE CAP_SYS_PTRACE
+ReadWritePaths=/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v3
+EnvironmentFile=/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v3/guard.env
+ExecStart=/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard /var/lib/jetstreamer/horizon265-replacement-20261119-guard-v3/guard-plan.json --plan-sha256 ${HORIZON265_GUARD_PLAN_SHA256} --self-sha256 938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d

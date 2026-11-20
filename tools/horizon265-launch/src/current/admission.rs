@@ -300,7 +300,7 @@ pub(super) fn validate(
     );
     super::super::inputs::capabilities(&binding(&review["input_capability"])?.sealed()?)?;
     let (rows, auxiliary_overhead, periodic) = reservations(review)?;
-    let failed_v1_floor = failed_v1::validate(n, review, &rows)?;
+    let (failed_v1_floor, failed_v2_floor) = failed_attempts::inherited_floors(n, review, &rows)?;
     peers::validate(&fleet, &rows)?;
     finalization::validate(&fleet, &observer, &rows, &boot)?;
     finalization::verify_inputs(&fleet)?;
@@ -329,15 +329,18 @@ pub(super) fn validate(
     )?;
     // Cancellation removes only the never-started former candidate. Retained
     // output/other-owner floor obligations survive, including its original floor.
-    let floor = num(&cap, "protected_existing_floor_bytes")?.max(failed_v1_floor);
+    let floor = num(&cap, "protected_existing_floor_bytes")?
+        .max(failed_v1_floor)
+        .max(failed_v2_floor);
     let required = capacity::add(floor, SCRATCH)?;
     ensure!(
         required <= disk,
-        "failed265 inherited floor plus full v2 growth does not fit"
+        "failed265 inherited floor plus full v3 growth does not fit"
     );
     cap["protected_existing_floor_bytes"] = json!(floor);
     cap["required_initial_free_bytes"] = json!(required);
     cap["failed_v1_preserved_inherited_floor_bytes"] = json!(failed_v1_floor);
+    cap["failed_v2_preserved_inherited_floor_bytes"] = json!(failed_v2_floor);
     let mut admission = json!({"schema":"horizon265-current-fleet-admission-v1","epoch":265,"mode":"ordinary-replay","unit":UNIT,
         "private_run_root":ROOT,"maximum_memory_bytes":MEMORY,"candidate_incremental_peak_bytes":SCRATCH,
         "protected_existing_floor_bytes":cap["protected_existing_floor_bytes"],"node":Bound::new(NODE,NODE_SHA),

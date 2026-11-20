@@ -2,6 +2,7 @@
 //! One-shot epoch 265 replacement adapter. No R2 or archive mutation commands.
 //! Preparation and launch require a separate fresh, Main-accepted admission.
 mod current;
+mod guard_binding;
 mod inputs;
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
@@ -25,16 +26,16 @@ const CAP: u64 = 506191984640;
 const HIGH: u64 = 100000000000;
 const MAX: u64 = 128000000000;
 const CONTROL: u64 = 1610612736;
-const UNIT: &str = "horizon-qualify-265-replacement-20261119-v2.service";
-const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v2.service";
-const TIMER: &str = "horizon-265-replacement-20261119-protective-v2.timer";
-const RETENTION: &str = "horizon265-replacement-terminal-retention-v2.target";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2";
-const STATE: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v2";
-const STATIC: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v2";
-const BOUND: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v2";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2";
-const RECEIPTS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v2";
+const UNIT: &str = "horizon-qualify-265-replacement-20261119-v3.service";
+const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v3.service";
+const TIMER: &str = "horizon-265-replacement-20261119-protective-v3.timer";
+const RETENTION: &str = "horizon265-replacement-terminal-retention-v3.target";
+const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3";
+const STATE: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v3";
+const STATIC: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v3";
+const BOUND: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v3";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v3";
+const RECEIPTS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v3";
 const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
@@ -314,7 +315,8 @@ fn templates() -> Result<(String, String, String)> {
         && producer.contains("--cohort-manifest-fingerprint=sha256:a126bce31196effaf656230c7185e92f73db9574e13a45e3976aae1859461e28")
         && producer.contains(&format!("{CACHE}:{ROOT}/output/compact-indexes/264"))
         && producer.contains(&format!("{CACHE}:{ROOT}/output/compact-indexes/265"))
-        && guard.contains("@ACTUAL_SEALED_PLAN_SHA256@")
+        && guard.contains("${HORIZON265_GUARD_PLAN_SHA256}")
+        && guard.contains(&format!("EnvironmentFile={BOUND}/guard.env"))
         && timer.contains(&format!("Unit={GUARD_UNIT}")), "sealed source route differs");
     Ok((producer, guard, timer))
 }
@@ -421,7 +423,15 @@ fn prepare(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result
         Path::new(STATIC).join(RETENTION),
         Path::new("/run/systemd/system").join(RETENTION),
     )?;
+    // Complete every unit-graph change before the later fresh retained-window admission.
+    for u in [GUARD_UNIT, TIMER] {
+        symlink(
+            Path::new(STATIC).join(u),
+            Path::new("/run/systemd/system").join(u),
+        )?;
+    }
     n.run("/usr/bin/systemctl", &["daemon-reload"])?;
+    guard_binding::loaded(n, true)?;
     n.run("/usr/bin/systemctl", &["start", RETENTION])?;
     retention(n)?;
     let (unstarted, _) = n.show(UNIT, "")?;
@@ -435,7 +445,7 @@ fn prepare(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result
         &n.root,
         "prepared.json",
         &serde_json::to_vec_pretty(
-            &json!({"schema":"horizon265-reboot-prepared-v1","plan":plan,"admission":admission,"input_auth":pin(Path::new(AUTH))?,"accepted_inputs_preserved":true,"worker_root":ROOT,"unit":UNIT,"replay_started":false}),
+            &json!({"schema":"horizon265-reboot-prepared-v1","plan":plan,"admission":admission,"input_auth":pin(Path::new(AUTH))?,"accepted_inputs_preserved":true,"worker_root":ROOT,"unit":UNIT,"replay_started":false,"all_daemon_reloads_completed":true,"guard_graph_preloaded":true,"preparation_completed_unix_seconds":now()?}),
         )?,
     )?;
     Ok(())
@@ -814,7 +824,11 @@ fn preflight_launch(n: &mut Native, a: &Value, plan: &Value) -> Result<Vec<u8>> 
         prepared["schema"] == "horizon265-reboot-prepared-v1"
             && prepared["plan"] == *plan
             && prepared["worker_root"] == ROOT
-            && prepared["replay_started"] == false,
+            && prepared["replay_started"] == false
+            && prepared["all_daemon_reloads_completed"] == true
+            && prepared["guard_graph_preloaded"] == true
+            && number(a, "issued_unix_seconds")?
+                > number(&prepared, "preparation_completed_unix_seconds")?,
         "invalid preparation"
     );
     ensure!(
@@ -824,12 +838,7 @@ fn preflight_launch(n: &mut Native, a: &Value, plan: &Value) -> Result<Vec<u8>> 
     let extra = "ExecStart,ExecStartPre,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,ReadWritePaths,ReadOnlyPaths,MemoryHigh,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec,AllowedCPUs,CPUAffinity,TasksMax,RuntimeMaxUSec,PrivateNetwork,ProtectHome,ProtectSystem,NoNewPrivileges,CapabilityBoundingSet,AmbientCapabilities,Slice,BindReadOnlyPaths";
     let (v, raw) = n.show(UNIT, extra)?;
     validate_loaded(&v, &raw)?;
-    for u in [GUARD_UNIT, TIMER] {
-        absent(&Path::new("/run/systemd/system").join(u))?;
-        let (v, _) = n.show(u, "")?;
-        closed(&v)?;
-        ensure!(row(&v, "LoadState")? == "not-found", "guard name consumed");
-    }
+    guard_binding::loaded(n, true)?;
     Ok(raw)
 }
 fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<()> {
@@ -859,23 +868,9 @@ fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<
     capture_namespace(n, &id, cp)?;
     let gp = guard_plan(a, &id)?;
     let gr = save_at(&n.root, "guard-plan.json", &serde_json::to_vec_pretty(&gp)?)?;
-    let (_, guard, timer) = templates()?;
-    ensure!(
-        guard.matches("@ACTUAL_SEALED_PLAN_SHA256@").count() == 1,
-        "guard placeholder count"
-    );
-    let guard = guard.replace("@ACTUAL_SEALED_PLAN_SHA256@", text(&gr, "sha256")?);
-    let sr = save_at(&n.root, "guard.service", guard.as_bytes())?;
-    let tr = save_at(&n.root, "guard.timer", timer.as_bytes())?;
-    n.seal(
-        BOUND,
-        vec![
-            json!({"source":gr["path"],"name":"guard-plan.json","sha256":gr["sha256"],"mode":292}),
-            json!({"source":sr["path"],"name":"guard.service","sha256":sr["sha256"],"mode":292}),
-            json!({"source":tr["path"],"name":"guard.timer","sha256":tr["sha256"],"mode":292}),
-        ],
-        "guard-seal-plan.json",
-    )?;
+    // The same preloaded unit resolves its one immutable digest argument at activation.
+    // There is deliberately no unit write/link/reload after fresh launch admission.
+    let guard_argument_binding = guard_binding::seal(n, &gr)?;
     n.run(
         GUARD,
         &[
@@ -887,31 +882,14 @@ fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<
             "--validate-plan-only",
         ],
     )?;
-    symlink(
-        Path::new(BOUND).join("guard.service"),
-        Path::new("/run/systemd/system").join(GUARD_UNIT),
-    )?;
-    symlink(
-        Path::new(BOUND).join("guard.timer"),
-        Path::new("/run/systemd/system").join(TIMER),
-    )?;
-    n.run("/usr/bin/systemctl", &["daemon-reload"])?;
-    let (g, _) = n.show(GUARD_UNIT, "ExecStart")?;
-    let (t, _) = n.show(TIMER, "Unit,NextElapseUSecMonotonic")?;
-    ensure!(
-        row(&g, "LoadState")? == "loaded"
-            && row(&t, "LoadState")? == "loaded"
-            && row(&g, "DropInPaths")?.is_empty()
-            && row(&t, "DropInPaths")?.is_empty()
-            && row(&g, "ExecStart")?.contains(text(&gr, "sha256")?)
-            && row(&t, "Unit")? == GUARD_UNIT,
-        "loaded guard graph differs"
-    );
+    guard_binding::loaded(n, true)?;
     pre(&n.show(UNIT, "")?.0, &id)?;
     n.run("/usr/bin/systemctl", &["start", TIMER])?;
     std::thread::sleep(Duration::from_secs(3));
     n.check()?;
-    let (g, gb) = n.show(GUARD_UNIT, "ExecStart")?;
+    guard_binding::verify(&gr)?;
+    guard_binding::loaded(n, false)?;
+    let (g, gb) = n.show(GUARD_UNIT, "ExecStart,EnvironmentFiles")?;
     let (t, tb) = n.show(TIMER, "Unit,NextElapseUSecMonotonic")?;
     let gid = row(&g, "InvocationID")?.to_string();
     ensure!(
@@ -1011,7 +989,7 @@ fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<
     save_at(&n.root, "producer-after-token.txt", &raw)?;
     current::validate_admission(a, plan)?;
     n.check()?;
-    let handoff = json!({"schema":"horizon265-reboot-guarded-startup-v2","recorded_unix_seconds":now()?,"producer":v,"guard_invocation_id":gid,"timer":t,"plan":plan,"admission":admission,"guard_plan":{"path":format!("{BOUND}/guard-plan.json"),"sha256":gr["sha256"]},"first_fire_token":{"path":format!("{token_dest}/guard-admission.json"),"sha256":token_ref["sha256"]},"remaining_original_setup_millis":n.deadline.unwrap().saturating_duration_since(Instant::now()).as_millis(),"transaction_replay_observed":false,"replacement_experiment_accepted":true,"replacement_fit_proven":true,"clean_1800_second_observer":true,"current_guard_receipts_verified":true,"remote_mutations":false});
+    let handoff = json!({"schema":"horizon265-reboot-guarded-startup-v2","recorded_unix_seconds":now()?,"producer":v,"guard_invocation_id":gid,"timer":t,"plan":plan,"admission":admission,"guard_plan":{"path":format!("{BOUND}/guard-plan.json"),"sha256":gr["sha256"]},"guard_argument_binding":guard_argument_binding,"first_fire_token":{"path":format!("{token_dest}/guard-admission.json"),"sha256":token_ref["sha256"]},"remaining_original_setup_millis":n.deadline.unwrap().saturating_duration_since(Instant::now()).as_millis(),"transaction_replay_observed":false,"replacement_experiment_accepted":true,"replacement_fit_proven":true,"clean_1800_second_observer":true,"current_guard_receipts_verified":true,"remote_mutations":false});
     let r = save_at(
         &n.root,
         "guarded-startup-handoff.json",

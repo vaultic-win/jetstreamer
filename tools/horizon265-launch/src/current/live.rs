@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn epoch265_candidate_guard_keeps_original_cap_inside_ordinary_control_reserve() {
         let template =
-            include_str!("../../config/horizon-265-replacement-20261119-protective-v2.service");
+            include_str!("../../config/horizon-265-replacement-20261119-protective-v3.service");
         assert!(
             template
                 .lines()
