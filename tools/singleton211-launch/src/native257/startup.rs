@@ -35,6 +35,17 @@ fn create_receipt_mount(alias: &Path, iid: &str) -> Result<PathBuf> {
     verify_mount(alias, &actual)?;
     Ok(actual)
 }
+fn preserves_admitted_space(latest: &Value, a: &Value) -> Result<()> {
+    let original = num(a, "protected_existing_floor_bytes")?;
+    let floor = num(latest, "protected_existing_floor_bytes")?;
+    ensure!(
+        floor <= original
+            && num(&latest["capacity"], "observed_available_bytes")?
+                >= capacity::add(original, RESERVATION)?,
+        "original admitted free space or floor no longer covered"
+    );
+    Ok(())
+}
 pub(super) fn run(
     n: &mut Native,
     review: &Value,
@@ -66,7 +77,7 @@ pub(super) fn run(
     ] {
         absent(path)?;
     }
-    let peers = peer_window::capture(n, review, a)?;
+    let mut peers = peer_window::capture(n, review, a)?;
     let ar = save_json(&n.root, "admission.json", a)?;
     n.seal(
         &admitted,
@@ -111,11 +122,9 @@ pub(super) fn run(
     // Recheck fresh capacity immediately before the first activation, without
     // rerunning Git/source hashing within the short first-fire clock.
     let (_, latest) = current(n, review, false)?;
-    ensure!(
-        latest["protected_existing_floor_bytes"] == a["protected_existing_floor_bytes"],
-        "floor changed before start"
-    );
+    preserves_admitted_space(&latest, a)?;
     units::producer(n, None, &pr, &affinity)?;
+    peers.verify(n)?;
     n.run("/usr/bin/systemctl", &["start", "--no-block", UNIT])?;
     let first = loop {
         n.check()?;
@@ -269,10 +278,7 @@ pub(super) fn run(
         handoff::limited_sample(&p, &gp, &sample)?;
         first_guard(&p, &token, &gp, &sample, &journal, now()?)?;
         let (_, latest) = current(n, review, true)?;
-        ensure!(
-            latest["protected_existing_floor_bytes"] == a["protected_existing_floor_bytes"],
-            "changed floor before token"
-        );
+        preserves_admitted_space(&latest, a)?;
         units::producer(n, Some(&iid), &pr, &affinity)?;
         gate::held_image(pid, &iid, UNIT, HARNESS)?;
         verify_mount(&receipt_mount, &receipts)?;
