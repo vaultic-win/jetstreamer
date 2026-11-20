@@ -237,7 +237,7 @@ fn process_claims() -> Result<Vec<Value>> {
 const COMPLETE_DATA: u64 = 6_794_761_027_378;
 const RAW_FLOOR: u64 = 6_829_053_656_882;
 const CAP: u64 = 309_237_645_312;
-const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/one-peer-prepare-v1/prepare";
+const PREPARER: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/one-peer-prepare-v2/prepare";
 const PREPARER_SHA: &str = env!("HORIZON170_JOIN_PREPARE_SHA");
 const PREPARER_PROOF_SHA: &str = env!("HORIZON170_JOIN_PREPARE_PROOF_SHA");
 const LAUNCHER_SHA: &str = env!("HORIZON170_JOIN_LAUNCH_SHA");
@@ -1257,6 +1257,7 @@ mod launch_plan {
     }
     fn git(args: &[&str]) -> Result<String> {
         let result = Command::new("git")
+            .arg("--no-optional-locks")
             .args(["-c", &format!("safe.directory={REPO}")])
             .arg("-C")
             .arg(REPO)
@@ -1328,7 +1329,7 @@ mod launch_plan {
             unsafe { libc::geteuid() } == 0,
             "Root required; plan_launch170 takes no arguments"
         );
-        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/one-peer-launch-v1/launch";
+        let launcher = "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/one-peer-launch-v2/launch";
         ensure!(
             sha(&fs::read(launcher)?) == super::LAUNCHER_SHA,
             "sealed launcher differs"

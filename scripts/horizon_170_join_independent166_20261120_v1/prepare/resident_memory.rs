@@ -33,6 +33,14 @@ pub(super) struct Owner {
     guard_protection: Bound,
 }
 type Census = BTreeMap<u64, (u64, u64)>;
+fn worker_lane(epoch: u64, unit: &str, iid: &str, standard_lane: &'static str) -> &'static str {
+    if epoch == 166 && unit == peer::UNIT && iid == peer::IID {
+        peer::ACTIVE_ROOT
+    } else {
+        standard_lane
+    }
+}
+
 fn qualified_peer_attempt(epoch: u64, unit: &str) -> Result<&'static str> {
     if epoch == 167 && unit == peer::NEXT167 {
         return Ok("local3retry8");
@@ -583,7 +591,12 @@ fn checked(
                     image["sha256"] == WORKER_SHA
                         && row["worker_before"]["executable"] == executable
                         && row["worker_after"]["executable"] == executable
-                        && Path::new(executable).starts_with(spec.lane),
+                        && Path::new(executable).starts_with(worker_lane(
+                            o.epoch,
+                            &o.unit,
+                            &o.invocation_id,
+                            spec.lane
+                        )),
                     "worker source/executable topology differs"
                 );
             }
@@ -811,7 +824,12 @@ pub(super) fn allocation_endpoint(request: &Request, p: &Plan, fleet: &Value) ->
             } else {
                 ensure!(
                     value["sha256"] == WORKER_SHA
-                        && Path::new(text_field(value, "executable")?).starts_with(spec.lane),
+                        && Path::new(text_field(value, "executable")?).starts_with(worker_lane(
+                            o.epoch,
+                            &o.unit,
+                            &o.invocation_id,
+                            spec.lane
+                        )),
                     "allocation worker image differs"
                 );
             }
@@ -983,6 +1001,21 @@ mod tests;
 #[cfg(test)]
 mod current_retry8_scope_tests {
     use super::*;
+    #[test]
+    fn independent_worker_root_is_bound_to_epoch_unit_and_invocation() {
+        let standard = "/home/sol/.jetstreamer-private/epoch166-standard-lane-20261109-v1";
+        assert_eq!(
+            worker_lane(166, peer::UNIT, peer::IID, standard),
+            peer::ACTIVE_ROOT
+        );
+        for (epoch, unit, iid) in [
+            (167, peer::UNIT, peer::IID),
+            (166, peer::NEXT167, peer::IID),
+            (166, peer::UNIT, "other"),
+        ] {
+            assert_eq!(worker_lane(epoch, unit, iid, standard), standard);
+        }
+    }
     #[test]
     fn current_peer_routes_are_exact_not_cross_epoch() {
         for epoch in [166, 167, 169, 170] {
