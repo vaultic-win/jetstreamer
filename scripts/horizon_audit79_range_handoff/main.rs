@@ -1,61 +1,19 @@
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+mod common;
+use common::*;
 use std::{
     collections::BTreeMap,
-    fs::{self, File, OpenOptions},
-    io::Write,
-    os::unix::fs::OpenOptionsExt,
+    fs,
     path::{Path, PathBuf},
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-const UNIT: &str = "horizon-r2-chronological-plugin-audit-20261118-v1.service";
 const IID: &str = "67725d9ba7aa4de994840564f44d963c";
-const STATE: &str = "/var/lib/jetstreamer/r2-chronological-plugin-audit-20261118-v1";
-const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/r2-audit-storage-20261119-v1";
 const ATTEMPT: &str = "attempts/epoch-84-1795142703909303859";
 const OLD: &str = "70d64c543ed79d8a05f3f2a9afd920ab5612133d4c6f89bfc9bffba1dcfe2ba2";
 const NEW: &str = "408703e0c58c738a55d30742e01e348e3720a1ec62357f555dbc887926de7435";
 const CONFIG: &str = "5d7d09bfb1ffdb08ac5aa04b228e9cd3827a6ef3bbb700723d7b777d2261e177";
 const TERMINAL79: &str = "c70b0fff4cc9b463adfaef3bde19818e6ca8f1eecd5f8d46236896e4f5d40d65";
-const CFG_DIR: &str =
-    "/etc/systemd/system/horizon-r2-chronological-plugin-audit-20261118-v1.service.d";
-fn sha(path: &Path) -> Result<String> {
-    let mut f = File::open(path)?;
-    let mut h = Sha256::new();
-    std::io::copy(&mut f, &mut h)?;
-    Ok(format!("{:x}", h.finalize()))
-}
-fn read(path: &Path) -> Result<Value> {
-    Ok(serde_json::from_reader(File::open(path)?)?)
-}
-fn run(cmd: &str, args: &[&str]) -> Result<String> {
-    let o = Command::new(cmd).args(args).output()?;
-    ensure!(
-        o.status.success(),
-        "{cmd} {args:?} failed: {}",
-        String::from_utf8_lossy(&o.stderr)
-    );
-    Ok(String::from_utf8(o.stdout)?)
-}
-fn native() -> Result<BTreeMap<String, String>> {
-    let raw = run(
-        "systemctl",
-        &[
-            "show",
-            UNIT,
-            "-p",
-            "InvocationID,SubState,MainPID,ControlGroup,FreezerState,Job,NRestarts,MemoryMax,CPUQuotaPerSecUSec,MemorySwapMax,TasksMax",
-        ],
-    )?;
-    Ok(raw
-        .lines()
-        .filter_map(|s| s.split_once('='))
-        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        .collect())
-}
 fn old_owner(n: &BTreeMap<String, String>) -> Result<()> {
     for (k, v) in [
         ("InvocationID", IID),
@@ -119,17 +77,6 @@ fn boundary(n: &BTreeMap<String, String>) -> Result<()> {
     );
     Ok(())
 }
-fn durable(path: &Path, data: &[u8]) -> Result<()> {
-    let mut f = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .mode(0o600)
-        .open(path)?;
-    f.write_all(data)?;
-    f.sync_all()?;
-    File::open(path.parent().context("no parent")?)?.sync_all()?;
-    Ok(())
-}
 fn check_deployment() -> Result<()> {
     let rt = Path::new(ROOT).join("runtime-v10");
     for (k, v) in [
@@ -157,12 +104,6 @@ fn check_deployment() -> Result<()> {
         "no eligible recovery"
     );
     Ok(())
-}
-struct Frozen;
-impl Drop for Frozen {
-    fn drop(&mut self) {
-        let _ = run("systemctl", &["thaw", UNIT]);
-    }
 }
 fn main() -> Result<()> {
     let mode = std::env::args()
