@@ -620,6 +620,7 @@ fn run() -> Result<()> {
 }
 // Called in-process by session so every phase retains the same writer IID and flock.
 fn phase(a: &[String]) -> Result<Value> {
+    let base = Path::new(BASE);
     ensure!(
         (matches!(a[0].as_str(), "establish" | "prepare") && a.len() == 5)
             || (a[0] == "post" && a.len() == 6),
