@@ -39,9 +39,17 @@ const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
 // Compatibility must be demonstrated by trusted checkpoints before the
 // parent may route or publish this candidate. Snapshot creator metadata alone
 // is not treated as evidence that v1.5.8 execution semantics apply out of era.
+// The separately compiled epoch-169 diagnostic replaces this ordinary
+// envelope with one exact root bootstrap and a checkpoint-bounded span.
+#[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
 const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 66_527_778;
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 73_007_829;
 const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
+#[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
 const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 68_256_000;
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 73_245_219;
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
 const ABSOLUTE_MAX_POH_THREADS: usize = 256;
 // The validator runs AccountsBackgroundService alongside replay. This worker
@@ -238,6 +246,18 @@ impl RuntimeState {
             Vec::new()
         };
 
+        #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+        if request.slot == 73_239_086 && request.entry_index == 164 {
+            let id = feature_set::per_byte_logging_cost::id();
+            eprintln!(
+                "epoch169 diagnostic bank feature at slot {} entry {}: per_byte_logging_cost active={} activated_slot={:?}",
+                request.slot,
+                request.entry_index,
+                self.bank.feature_set.is_active(&id),
+                self.bank.feature_set.activated_slot(&id),
+            );
+        }
+
         let mut outcomes = Vec::new();
         if transactions.is_empty() {
             self.bank.register_tick(&validation.hash);
@@ -262,7 +282,10 @@ impl RuntimeState {
                 for (transaction, result) in transactions.iter().zip(&results.execution_results) {
                     if matches!(
                         result.0,
-                        Err(TransactionError::InstructionError(_, InstructionError::Custom(2)))
+                        Err(TransactionError::InstructionError(
+                            _,
+                            InstructionError::Custom(2)
+                        ))
                     ) {
                         let slot_hashes = self
                             .bank
@@ -679,6 +702,14 @@ impl RuntimeState {
 }
 
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    if slot != MIN_SUPPORTED_SNAPSHOT_SLOT {
+        return Err(format!(
+            "epoch 169 diagnostic requires snapshot slot {}, got {}",
+            MIN_SUPPORTED_SNAPSHOT_SLOT, slot
+        ));
+    }
+    #[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
     if slot < MIN_SUPPORTED_SNAPSHOT_SLOT || slot >= MAX_SUPPORTED_SLOT_EXCLUSIVE {
         return Err(format!(
             "Solana v1.5.8 candidate snapshot slot {} is outside {}..{}",
@@ -1193,6 +1224,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
     fn candidate_range_is_closed_at_both_ends() {
         assert!(validate_candidate_snapshot_slot(MIN_SUPPORTED_SNAPSHOT_SLOT).is_ok());
         assert!(validate_candidate_snapshot_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
@@ -1203,6 +1235,20 @@ mod tests {
         assert!(validate_candidate_entry_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE - 1).is_ok());
         assert!(validate_candidate_entry_slot(MIN_SUPPORTED_ENTRY_SLOT - 1).is_err());
         assert!(validate_candidate_entry_slot(MAX_SUPPORTED_SLOT_EXCLUSIVE).is_err());
+    }
+
+    #[test]
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    fn epoch169_diagnostic_accepts_only_exact_bootstrap_and_entries() {
+        assert!(validate_candidate_snapshot_slot(73_007_829).is_ok());
+        for &slot in &[66_527_778, 68_255_999, 73_007_828, 73_007_830, 73_245_218] {
+            assert!(validate_candidate_snapshot_slot(slot).is_err(), "{}", slot);
+        }
+        assert!(validate_candidate_entry_slot(73_007_830).is_ok());
+        assert!(validate_candidate_entry_slot(73_245_218).is_ok());
+        for &slot in &[66_527_779, 68_255_999, 73_007_829, 73_245_219] {
+            assert!(validate_candidate_entry_slot(slot).is_err(), "{}", slot);
+        }
     }
 
     fn request_for(

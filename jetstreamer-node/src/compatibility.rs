@@ -2310,6 +2310,17 @@ static SOLANA_V1_6_16_FOCUSED_QUALIFICATION_ERA: RuntimeEra = RuntimeEra {
     admission: AdmissionLevel::Candidate,
 };
 
+/// A separately built, checkpoint-bound source-status experiment. The
+/// production registry and ordinary epoch-169 v1.5.6 route are unchanged.
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+static SOLANA_V1_5_8_EPOCH169_FOCUSED_ERA: RuntimeEra = RuntimeEra {
+    name: "solana-v1.5.8-epoch-169-focused-diagnostic",
+    start_slot: 73_007_830,
+    end_slot_exclusive: Some(73_245_219),
+    backend: EraBackend::Available(&SOLANA_V1_5_8_RUNTIME),
+    admission: AdmissionLevel::Candidate,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RuntimePlanningScope {
     Normal,
@@ -2320,6 +2331,12 @@ fn runtime_at_for_scope(
     slot: Slot,
     scope: RuntimePlanningScope,
 ) -> Result<&'static RuntimeEra, String> {
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    if scope == RuntimePlanningScope::FocusedQualification
+        && SOLANA_V1_5_8_EPOCH169_FOCUSED_ERA.contains(slot)
+    {
+        return Ok(&SOLANA_V1_5_8_EPOCH169_FOCUSED_ERA);
+    }
     if scope == RuntimePlanningScope::FocusedQualification
         && SOLANA_V1_6_16_FOCUSED_QUALIFICATION_ERA.contains(slot)
     {
@@ -4219,6 +4236,35 @@ mod tests {
                 OLD_FAITHFUL_UNTRUSTED_STATUS_ASSOCIATION_END_SLOT_EXCLUSIVE
             ),
             TransactionStatusValidation::SourceExact
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    fn epoch169_focused_route_is_not_a_production_era() {
+        let range = 73_007_830..73_245_219;
+        assert_eq!(
+            select_runtime(range.clone(), true).unwrap().backend,
+            RuntimeBackend::SolanaV1_5_6
+        );
+        assert!(select_focused_qualification_runtime(range.clone(), false).is_err());
+        assert_eq!(
+            select_focused_qualification_runtime(range, true)
+                .unwrap()
+                .backend,
+            RuntimeBackend::SolanaV1_5_8
+        );
+        assert_eq!(
+            select_focused_qualification_runtime(73_007_829..73_007_830, true)
+                .unwrap()
+                .backend,
+            RuntimeBackend::SolanaV1_5_6
+        );
+        assert_eq!(
+            select_focused_qualification_runtime(73_245_219..73_245_220, true)
+                .unwrap()
+                .backend,
+            RuntimeBackend::SolanaV1_5_6
         );
     }
 }

@@ -7,6 +7,8 @@ publish = false
 build = "build.rs"
 
 [features]
+# Separate worker image for the exact epoch-169 snapshot-backed comparison.
+epoch169-v1-5-8-diagnostic = []
 # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
 # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
 poh-force-soft = ["sha2-fast/force-soft"]

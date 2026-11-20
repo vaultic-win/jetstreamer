@@ -5575,6 +5575,51 @@ fn qualification_plan(
     }))
 }
 
+/// This feature build is a single private experiment, never an ordinary
+/// epoch-169 producer or an archive publication route. The trusted file
+/// contents and snapshot generation are validated by the normal input gates.
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+fn validate_epoch169_diagnostic_launch(
+    qualification: Option<QualificationPlan>,
+    allow_candidate_runtime: bool,
+    incompatible_mode: bool,
+    dest_dir: &Path,
+    snapshot_archive: Option<&Path>,
+    epoch_hashes: Option<&Path>,
+    horizon_output: Option<&Path>,
+    replay_scratch: Option<&Path>,
+) -> Result<(), String> {
+    let plan = qualification.ok_or("epoch 169 diagnostic requires focused qualification")?;
+    if plan.epoch != 169
+        || plan.bootstrap_slot != 73_007_829
+        || plan.replay_start != 73_007_830
+        || plan.end_inclusive != 73_245_218
+        || !allow_candidate_runtime
+        || incompatible_mode
+    {
+        return Err("epoch 169 diagnostic requires exact focused interval, candidate opt-in, and no other replay mode".into());
+    }
+    const SNAPSHOT_NAME: &str =
+        "snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst";
+    let snapshot = snapshot_archive.ok_or("epoch 169 diagnostic snapshot is missing")?;
+    if !snapshot.is_absolute() || snapshot.file_name() != Some(std::ffi::OsStr::new(SNAPSHOT_NAME))
+    {
+        return Err("epoch 169 diagnostic requires the named canonical bootstrap snapshot".into());
+    }
+    let private_root =
+        Path::new("/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1");
+    if dest_dir != private_root.join("v158")
+        || epoch_hashes != Some(dest_dir.join("epoch-hashes-169-focused.txt").as_path())
+        || horizon_output != Some(dest_dir.join("epoch-169-through-73245218.jet").as_path())
+        || replay_scratch != Some(dest_dir.join("scratch").as_path())
+    {
+        return Err(
+            "epoch 169 diagnostic requires exact private input, output, and scratch paths".into(),
+        );
+    }
+    Ok(())
+}
+
 fn runtime_slot_range(
     epoch: u64,
     qualification: Option<QualificationPlan>,
@@ -20363,6 +20408,33 @@ async fn main() {
             exit(2);
         }
     };
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    if let Err(error) = validate_epoch169_diagnostic_launch(
+        qualification,
+        env_truthy("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME"),
+        root_checkpoint_cohort
+            || recover_staged_only
+            || recover_staged_cohort_only
+            || recover_unreceipted_root_cohort_only
+            || inherited_epoch_lease
+            || checkpoint_on_pressure
+            || checkpoint_export_directory.is_some()
+            || checkpoint_resume_report.is_some()
+            || checkpoint_resume_sha.is_some()
+            || checkpoint_exit_proof.is_some()
+            || checkpoint_exit_sha.is_some()
+            || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+            || range_info.is_some()
+            || env_truthy("JETSTREAMER_LOAD_FROM_DIR"),
+        &dest_dir,
+        snapshot_archive_override.as_deref(),
+        epoch_hashes.as_deref(),
+        horizon_output.as_deref(),
+        replay_scratch.as_deref(),
+    ) {
+        eprintln!("error: {error}");
+        exit(2);
+    }
     if checkpoint_on_pressure && checkpoint_export_directory.is_none() {
         eprintln!(
             "--qualification-checkpoint-on-pressure requires --qualification-checkpoint-export"
@@ -25250,6 +25322,116 @@ mod early_snapshot_tests {
 
     fn qualification_snapshot(slot: Slot, hash: Hash) -> PathBuf {
         PathBuf::from(format!("snapshot-{slot}-{hash}.tar.bz2"))
+    }
+
+    #[test]
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    fn epoch169_diagnostic_requires_exact_private_experiment() {
+        let dest = Path::new(
+            "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/v158",
+        );
+        let snapshot = Path::new(
+            "/input/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst",
+        );
+        let hashes = dest.join("epoch-hashes-169-focused.txt");
+        let output = dest.join("epoch-169-through-73245218.jet");
+        let scratch = dest.join("scratch");
+        let plan = qualification_plan(
+            169,
+            169,
+            Some(73_245_218),
+            Some(true),
+            Some(snapshot),
+            Some(&hashes),
+            Some(&output),
+        )
+        .unwrap()
+        .unwrap();
+        let check =
+            |candidate, other_mode, destination: &Path, bootstrap: &Path, scratch: &Path| {
+                validate_epoch169_diagnostic_launch(
+                    Some(plan),
+                    candidate,
+                    other_mode,
+                    destination,
+                    Some(bootstrap),
+                    Some(&hashes),
+                    Some(&output),
+                    Some(scratch),
+                )
+            };
+        assert!(check(true, false, dest, snapshot, &scratch).is_ok());
+        assert!(
+            validate_epoch169_diagnostic_launch(
+                None,
+                true,
+                false,
+                dest,
+                Some(snapshot),
+                Some(&hashes),
+                Some(&output),
+                Some(&scratch),
+            )
+            .is_err()
+        );
+        for epoch in [168, 170] {
+            let wrong_epoch = QualificationPlan { epoch, ..plan };
+            assert!(
+                validate_epoch169_diagnostic_launch(
+                    Some(wrong_epoch),
+                    true,
+                    false,
+                    dest,
+                    Some(snapshot),
+                    Some(&hashes),
+                    Some(&output),
+                    Some(&scratch),
+                )
+                .is_err()
+            );
+        }
+        assert!(check(false, false, dest, snapshot, &scratch).is_err());
+        assert!(check(true, true, dest, snapshot, &scratch).is_err());
+        assert!(
+            check(
+                true,
+                false,
+                Path::new("/home/sol/horizon"),
+                snapshot,
+                &scratch
+            )
+            .is_err()
+        );
+        assert!(
+            check(
+                true,
+                false,
+                dest,
+                Path::new(
+                    "/input/snapshot-73007830-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst"
+                ),
+                &scratch
+            )
+            .is_err()
+        );
+        assert!(check(true, false, dest, snapshot, Path::new("/tmp/scratch")).is_err());
+        let shortened = QualificationPlan {
+            end_inclusive: 73_239_086,
+            ..plan
+        };
+        assert!(
+            validate_epoch169_diagnostic_launch(
+                Some(shortened),
+                true,
+                false,
+                dest,
+                Some(snapshot),
+                Some(&hashes),
+                Some(&output),
+                Some(&scratch),
+            )
+            .is_err()
+        );
     }
 
     #[test]
