@@ -170,7 +170,7 @@ fn decision(
     });
     Ok((false, cause, wall, end))
 }
-fn native_result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
+pub(super) fn native_result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
     native265_history::result_for(
         v,
         origin,
@@ -181,6 +181,7 @@ fn native_result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
         c::ACCOUNTS_HASH,
         c::SNAPSHOT_SHA,
         c::SNAPSHOT,
+        c::PROFILE.worker,
     )
 }
 fn registered(s: &Spec) -> Result<(Value, Value, Value, Value)> {

@@ -132,6 +132,7 @@ pub(super) struct SampleProfile {
     pub(super) guard_sha: &'static str,
     pub(super) harness: &'static str,
     pub(super) harness_sha: &'static str,
+    pub(super) worker: &'static c::WorkerProfile,
     pub(super) memory: u64,
     pub(super) scratch: u64,
 }
@@ -140,6 +141,7 @@ const PROFILE: SampleProfile = SampleProfile {
     guard_sha: c::GUARD_SHA,
     harness: c::TEST,
     harness_sha: c::TEST_SHA,
+    worker: &c::WORKER_PROFILE,
     memory: c::MEMORY,
     scratch: c::SCRATCH,
 };
@@ -221,6 +223,7 @@ pub(super) fn sample_for(
         u64::from(pid),
         profile.harness,
         profile.harness_sha,
+        profile.worker,
     )?;
     let memory = &g["memory_observation"];
     ensure!(

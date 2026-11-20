@@ -16,6 +16,18 @@ pub(super) const GUARD_SHA: &str =
 pub(super) const SNAPSHOT_SHA: &str =
     "04eb59e2dbbc2b0d4f1535741fa9d56794c32ad18e14c98df4fa76a5ae397641";
 pub(super) const ACCOUNTS_HASH: &str = "Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW";
+pub(super) struct WorkerProfile {
+    pub(super) path: &'static str,
+    pub(super) sha256: &'static str,
+    pub(super) backend: &'static str,
+    pub(super) solana_commit: &'static str,
+}
+pub(super) const WORKER_PROFILE: WorkerProfile = WorkerProfile {
+    path: WORKER,
+    sha256: WORKER_SHA,
+    backend: "solana-v1.7.15",
+    solana_commit: "4892eb4e1ad278d5249b6cda8983f88effb3e98b",
+};
 pub(super) const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 pub(super) const WORKER_SHA: &str =
     "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";

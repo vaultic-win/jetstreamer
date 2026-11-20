@@ -246,8 +246,8 @@ fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
             ensure!(
                 pid != main
                     && child["parent_pid"] == main
-                    && child["executable"] == native265::WORKER
-                    && child["sha256"] == native265::WORKER_SHA
+                    && child["executable"] == c::PROFILE.worker.path
+                    && child["sha256"] == c::PROFILE.worker.sha256
                     && pids.get(&pid) == Some(&num(child, "start_ticks")?)
                     && num(child, "start_ticks")? >= num(gp, "main_start_ticks")?,
                 "native bootstrap telemetry worker changed"
@@ -372,7 +372,7 @@ mod tests {
         let mut observation = json!({});
         for side in ["before", "after"] {
             observation[format!("native_main_{side}")] = json!({"pid":42,"executable":c::TEST,"sha256":c::TEST_SHA,"mapped_inode":111,"mapped_device":222});
-            observation[format!("native_child_{side}")] = json!({"pid":43,"parent_pid":42,"executable":native265::WORKER,"sha256":native265::WORKER_SHA,"start_ticks":7,"mapped_inode":112,"mapped_device":222});
+            observation[format!("native_child_{side}")] = json!({"pid":43,"parent_pid":42,"executable":c::PROFILE.worker.path,"sha256":c::PROFILE.worker.sha256,"start_ticks":7,"mapped_inode":112,"mapped_device":222});
             observation[format!("producer_{side}")] = json!({"unit":c::UNIT,"invocation_id":origin["invocation_id"],"main_pid":42,"control_group":format!("/system.slice/{}",c::UNIT),"rss":{"census_stable":true,"error":null,"processes":[{"pid":42,"start_ticks":5},{"pid":43,"start_ticks":7}]}});
         }
         telemetry_images(&observation, &origin, &gp).unwrap();

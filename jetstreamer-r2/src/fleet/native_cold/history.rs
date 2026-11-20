@@ -147,7 +147,7 @@ fn records(
     let mut pins = Vec::new();
     for (kind, exe, sha, parent) in [
         ("main", c::TEST, c::TEST_SHA, 1),
-        ("worker", native265::WORKER, native265::WORKER_SHA, main),
+        ("worker", c::PROFILE.worker.path, c::PROFILE.worker.sha256, main),
     ] {
         let Some(v) = files.get(&format!("{kind}-pin.json")) else {
             ensure!(
@@ -377,7 +377,7 @@ mod tests {
         sample["scratch_deleted"] = json!(false);
         let pin = json!({"pid":main,"parent_pid":1,"start_ticks":5,"boot_id":"boot","executable":c::TEST,"sha256":c::TEST_SHA,"uid":0,"nlink":1,"mode":0o100555});
         sample["process_observation"]["processes"] = json!([pin]);
-        let worker = json!({"pid":43,"parent_pid":main,"start_ticks":8,"boot_id":"boot","executable":native265::WORKER,"sha256":native265::WORKER_SHA,"uid":0,"nlink":1,"mode":0o100555});
+        let worker = json!({"pid":43,"parent_pid":main,"start_ticks":8,"boot_id":"boot","executable":c::PROFILE.worker.path,"sha256":c::PROFILE.worker.sha256,"uid":0,"nlink":1,"mode":0o100555});
         let bound = |mut v: Value| {
             v["plan_sha256"] = h["guard_plan"]["sha256"].clone();
             v["producer_invocation_id"] = json!(iid);

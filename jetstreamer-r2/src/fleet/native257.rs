@@ -22,6 +22,7 @@ pub(super) const PROFILE: native265_guard::SampleProfile = native265_guard::Samp
     guard_sha: GUARD_SHA,
     harness: TEST,
     harness_sha: TEST_SHA,
+    worker: &native265::WORKER_PROFILE,
     memory: 120_000_000_000,
     scratch: 160_000_000_000,
 };
