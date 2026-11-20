@@ -37,7 +37,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v2/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v3/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
@@ -50,6 +50,17 @@ fn qualify(r: &Value) -> Result<bool> {
         _ => bail!("unknown native257 operation"),
     }
 }
+pub(super) fn controller_scope(r: &Value) -> Result<()> {
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    ensure!(r["boot_id"] == boot.trim(), "boot changed");
+    fresh(num(r, "recorded_unix_seconds")?, now()?, 300)?;
+    let pid = num(r, "main_controller_pid")?;
+    ensure!(
+        pid > 1 && r["main_controller_start_ticks"] == process_ticks(pid)?,
+        "campaign controller replaced"
+    );
+    Ok(())
+}
 fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -> Result<()> {
     no_authority(r)?;
     ensure!(
@@ -61,14 +72,7 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -
             && r["guard"] == json!(Bound::new(GUARD, GUARD_SHA)),
         "unaccepted launch review"
     );
-    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
-    ensure!(r["boot_id"] == boot.trim(), "boot changed");
-    fresh(num(r, "recorded_unix_seconds")?, now()?, 300)?;
-    let pid = num(r, "main_controller_pid")?;
-    ensure!(
-        pid > 1 && r["main_controller_start_ticks"] == process_ticks(pid)?,
-        "campaign controller replaced"
-    );
+    controller_scope(r)?;
     units::affinity(r)?;
     qualify(r)?;
     publication::validate(
@@ -147,7 +151,12 @@ fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
     }
     Ok((fit, cap))
 }
-fn admit(n: &mut Native, r: &Value, rf: &Bound) -> Result<Value> {
+fn admit(
+    n: &mut Native,
+    r: &Value,
+    rf: &Bound,
+    select: bool,
+) -> Result<(Value, Option<peer_window::Window>)> {
     let qual = qualify(r)?;
     let lifecycle = binding(&r["prestart_qualification"])?.sealed()?;
     ensure!(
@@ -189,6 +198,12 @@ fn admit(n: &mut Native, r: &Value, rf: &Bound) -> Result<Value> {
     }
     let (fit, cap) = current(n, r, false)?;
     let fit = save_json(&n.root, "original-fit.json", &fit)?;
+    let window = if select {
+        let scope = json!({"epoch":257, "boot_id":r["boot_id"], "actual_current_memory":cap["actual_current_memory"], "review":rf});
+        Some(peer_window::select(n, r, &scope)?)
+    } else {
+        None
+    };
     let issued = now()?;
     let mut a = json!({"schema":"horizon-native257-current-fleet-admission-v1","epoch":257,"mode":"native-cold",
         "operation":r["operation"],"unit":UNIT,"maximum_memory_bytes":MEMORY,"candidate_incremental_peak_bytes":RESERVATION,
@@ -199,7 +214,7 @@ fn admit(n: &mut Native, r: &Value, rf: &Bound) -> Result<Value> {
         "observer":r["observer"],"fleet":r["fleet"],"review":rf,"cpu_affinity":r["cpu_affinity"],"issued_unix_seconds":issued,
         "expires_unix_seconds":issued.checked_add(60).context("clock")?});
     deny_authority(&mut a);
-    Ok(a)
+    Ok((a, window))
 }
 /// Authenticate the original on-host startup graph without taking another resource sample.
 pub fn validate_saved_handoff(path: &Path, sha: &str) -> Result<Value> {
@@ -269,7 +284,7 @@ pub fn run() -> Result<()> {
             args[1] == "admit" || (args[1] == "qualify-guard") == qualify(&r)?,
             "operation mismatch"
         );
-        let a = admit(&mut n, &r, &rf)?;
+        let (a, window) = admit(&mut n, &r, &rf, args[1] == "qualify-guard")?;
         if args[1] == "admit" {
             println!(
                 "{}",
@@ -277,7 +292,7 @@ pub fn run() -> Result<()> {
             );
             Ok(())
         } else {
-            startup::run(&mut n, &r, &rf, &args[4], &a)
+            startup::run(&mut n, &r, &args[4], &a, window)
         }
     })();
     if let Err(ref e) = result {

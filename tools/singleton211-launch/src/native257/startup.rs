@@ -82,9 +82,9 @@ fn preserves_admitted_space(latest: &Value, a: &Value) -> Result<()> {
 pub(super) fn run(
     n: &mut Native,
     review: &Value,
-    _review_ref: &Bound,
     self_sha: &str,
     a: &Value,
+    selected: Option<peer_window::Window>,
 ) -> Result<()> {
     let qualification = qualify(review)?;
     let attempt = text(review, "attempt")?;
@@ -110,7 +110,10 @@ pub(super) fn run(
     ] {
         absent(path)?;
     }
-    let mut peers = peer_window::capture(n, review, a)?;
+    let mut peers = match selected {
+        Some(window) => window,
+        None => peer_window::capture(n, review, a)?,
+    };
     let ar = save_json(&n.root, "admission.json", a)?;
     n.seal(
         &admitted,

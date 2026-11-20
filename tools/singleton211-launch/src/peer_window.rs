@@ -1,6 +1,8 @@
 //! Fence the original held gate by each live replay peer's *observed* timer window.
 //! Periodic booking and the ordinary admission census still cover dormant commitments.
 use super::*;
+mod selection;
+pub(super) use selection::select;
 
 const MARGIN: u64 = 5_000_000;
 fn start_limit(next: u64, clock: u64) -> Result<u64> {
@@ -17,7 +19,10 @@ pub(super) fn deadline(n: &mut Native, timer: &str) -> Result<u64> {
     timer_clock(n, timer, "NextElapseUSecMonotonic")
 }
 pub(super) fn timer_clock(n: &mut Native, timer: &str, property: &str) -> Result<u64> {
-    let id: String = timer
+    unit_clock(n, timer, "org.freedesktop.systemd1.Timer", property)
+}
+fn unit_clock(n: &mut Native, unit: &str, interface: &str, property: &str) -> Result<u64> {
+    let id: String = unit
         .bytes()
         .map(|b| {
             if b.is_ascii_alphanumeric() {
@@ -33,7 +38,7 @@ pub(super) fn timer_clock(n: &mut Native, timer: &str, property: &str) -> Result
             "get-property",
             "org.freedesktop.systemd1",
             &format!("/org/freedesktop/systemd1/unit/{id}"),
-            "org.freedesktop.systemd1.Timer",
+            interface,
             property,
         ],
     )?;
@@ -167,7 +172,7 @@ impl Window {
         n.check()
     }
 }
-pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> {
     let fleet = binding(&review["fleet"])?.json()?;
     let (_, _, controls) = admission::reservations(review)?;
     let current = a["actual_current_memory"]
@@ -185,10 +190,7 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
         }
     }
     let mut seen = BTreeSet::new();
-    let mut peers = Vec::new();
-    let mut rows = Vec::new();
-    let mut limit = u64::MAX;
-    let mut full211 = None;
+    let mut entries = Vec::new();
     for c in controls {
         let p = c.guard_plan.sealed()?;
         let unit = text(&p, "unit")?;
@@ -204,10 +206,36 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
             ensure!(
                 matches!(a["epoch"].as_u64(), Some(257 | 261))
                     && !expected.is_empty()
-                    && current.contains_key(UNIT)
-                    && full211.is_none(),
+                    && current.contains_key(UNIT),
                 "full211 rollover scope differs"
             );
+        }
+        entries.push((c, p));
+    }
+    ensure!(
+        expected.is_subset(&seen),
+        "live replay has no held timer window"
+    );
+    Ok(entries)
+}
+pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+    capture_roster(n, review, a, roster(review, a)?)
+}
+fn capture_roster(
+    n: &mut Native,
+    review: &Value,
+    a: &Value,
+    entries: Vec<(periodic::Control, Value)>,
+) -> Result<Window> {
+    let mut peers = Vec::new();
+    let mut rows = Vec::new();
+    let mut limit = u64::MAX;
+    let mut full211 = None;
+    for (c, p) in entries {
+        let unit = text(&p, "unit")?;
+        let iid = text(&p, "invocation_id")?;
+        if c.unit == GUARD_UNIT {
+            ensure!(full211.is_none(), "duplicate full211 window");
             let window = full211_window::Window::admitted(n, review)?;
             rows.push(json!({"control":c,"producer":unit,"producer_iid":iid,"qualification":review["full211_window_qualification"],"completed_firing":window.receipt()}));
             full211 = Some(window);
@@ -228,10 +256,6 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
             sample,
         });
     }
-    ensure!(
-        expected.is_subset(&seen),
-        "live replay has no held timer window"
-    );
     if !peers.is_empty() {
         start_limit(limit + MARGIN, mono()?)?;
     }

@@ -256,7 +256,7 @@ pub(super) fn stable_command(value: &str) -> Result<&str> {
     );
     Ok(command)
 }
-fn service_values(c: &Control, s: &Value) -> Result<bool> {
+pub(super) fn service_values(c: &Control, s: &Value) -> Result<bool> {
     if c.unit == full265::GUARD_UNIT {
         full265::guard_properties(s)?;
     } else if c.unit == GUARD_UNIT {
@@ -313,7 +313,7 @@ fn service_values(c: &Control, s: &Value) -> Result<bool> {
 fn num_string(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
 }
-fn timer_values(c: &Control, t: &Value, dormant: bool) -> Result<()> {
+pub(super) fn timer_values(c: &Control, t: &Value, dormant: bool) -> Result<()> {
     ensure!(
         t["Id"] == c.timer
             && t["LoadState"] == "loaded"
