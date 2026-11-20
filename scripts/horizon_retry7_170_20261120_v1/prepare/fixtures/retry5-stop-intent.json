@@ -1,0 +1,76 @@
+{
+  "plan_sha256": "d348dc434adc78b0924d008fede3fea40d46624605c59d414c2b4f8004ac2178",
+  "producer_invocation_id": "aab865eb4cee44d69f536944e4c5f722",
+  "reason": "DATA-fulfillment-observation-failed",
+  "sample": {
+    "DATA_fulfillment": null,
+    "DATA_fulfillment_observation_error": "anchored no-follow open failed: No such file or directory (os error 2)",
+    "available_bytes": 7132955865088,
+    "available_plus_fulfilled_bytes": 7132955865088,
+    "bounded_canary": null,
+    "bounded_measurement": false,
+    "canary_target_error": null,
+    "canary_target_stop_valid": false,
+    "effective_required_free_bytes": 6519816011570,
+    "fulfilled_existing_DATA_bytes": 0,
+    "guard_invocation_id": "9119db3e54894e388095f95852e5c63f",
+    "guard_sha256": "349ace408884628d29323787db58f1bb0299afdbd0eb8c19b5c36538c1e38170",
+    "maximum_root_physical_bytes": 309237645312,
+    "maximum_worker_vmas": 3500000,
+    "minimum_free_bytes": 6519816011570,
+    "native_main": null,
+    "plan": "/usr/local/lib/jetstreamer/horizon-replacement170-local3retry5-guard-aab865eb4cee44d69f536944e4c5f722-20261118-v1/guard-plan.json",
+    "plan_sha256": "d348dc434adc78b0924d008fede3fea40d46624605c59d414c2b4f8004ac2178",
+    "producer": {
+      "active": "active",
+      "cgroup": "/system.slice/horizon-qualify-170-replacement-local3retry5-20261110-v1.service",
+      "delegated": false,
+      "invocation_id": "aab865eb4cee44d69f536944e4c5f722",
+      "kill_mode": "control-group",
+      "load_state": "loaded",
+      "pid": 1180759,
+      "restart_policy": "no",
+      "restarts": 0,
+      "result": "success",
+      "sub": "running"
+    },
+    "producer_invocation_id": "aab865eb4cee44d69f536944e4c5f722",
+    "producer_stop_enabled": true,
+    "r2_mutations": false,
+    "recorded_unix_seconds": 1795004075,
+    "remote_mutations": false,
+    "root_physical_observation": {
+      "conservative_physical_bytes": 133390708736,
+      "exceeds_budget": false,
+      "first": {
+        "directories": 155,
+        "entries": 395634,
+        "physical_bytes": 133201694720,
+        "symlinks": 0,
+        "vanished_entries": 0
+      },
+      "maximum_physical_bytes": 309237645312,
+      "second": {
+        "directories": 155,
+        "entries": 395698,
+        "physical_bytes": 133390708736,
+        "symlinks": 0,
+        "vanished_entries": 0
+      }
+    },
+    "root_physical_observation_error": null,
+    "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+    "scratch_deleted": false,
+    "target_handoff": null,
+    "target_handoff_error": null,
+    "trip_reason": "DATA-fulfillment-observation-failed",
+    "worker_observation_error": null,
+    "workers": [
+      [
+        1181071,
+        395985
+      ]
+    ]
+  },
+  "schema": "jetstreamer-horizon-standalone-stop-intent-v1"
+}

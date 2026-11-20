@@ -1,6 +1,6 @@
 # Epoch170 retry7 recovery
 
-This successor is not admitted or deployed. Its predecessor stopped at
+This successor is not admitted for replay. Its predecessor stopped at
 2026-11-19 23:56:55 UTC after a bounded writer query failed. PID1 was processing
 a global daemon reload for 13.474 seconds, overlapping a query limited to ten
 seconds. The guard discarded the subprocess result, so the timeout diagnosis
@@ -31,3 +31,21 @@ terminal lineage, and obtain fresh whole-fleet admission. Preserve the retry6
 artifacts and all resource promises. The old 2315 witness cannot authenticate
 the rebuilt guard. The whole-lane cap includes retained old attempts; no
 reclamation or capacity credit is implied by this source change.
+
+The guard passed 108 native tests and strict all-target Clippy and is normally
+sealed under the HOME-backed `epoch170-retry7-recovery-20261120-v1/guard-v1`.
+The preparer uses that exact guard and preserves the genuine retry5 and retry6
+stop chain, including sampled producer identities and plan digests. Its DATA
+consumer shares the successor guard's scope validation. Its proof adapter binds
+the actual combined Clippy/release invocation and native test completion rather
+than requiring the predecessor's five separate execution receipts.
+
+The preparer passed strict all-target Clippy, release compilation and all 318
+native tests with the `preparation` feature. The initial native test invocation
+passed 314 tests and failed four genesis ownership fixtures because its sandbox
+lacked `CAP_CHOWN`; a fresh invocation of the unchanged test image passed all
+318 with that capability and the same fixed HOME filesystem, memory and CPU
+limits. The failed invocation is retained. The preparer's literal source closure
+is recorded in `prepare/SOURCE_CLOSURE.json`; its execution and deployment evidence
+remain separate. A fresh launcher, witness, contract and full admission are still
+required before useful replay can start.
