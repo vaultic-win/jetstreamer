@@ -1,6 +1,62 @@
 //! Fresh PID1/kernel census, twice, with strict owner and terminal drainage checks.
 use super::*;
 pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestampMonotonic,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,BindReadOnlyPaths,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
+// PID 1 exposes unit dependencies as sets; their iteration order can change
+// across daemon-reload. Do not normalize argv, environment, paths or outcomes.
+fn unit_relations(field: &str) -> bool {
+    matches!(
+        field,
+        "After"
+            | "Before"
+            | "Requires"
+            | "RequiredBy"
+            | "Wants"
+            | "WantedBy"
+            | "BindsTo"
+            | "BoundBy"
+            | "Upholds"
+            | "UpheldBy"
+            | "PartOf"
+            | "ConsistsOf"
+            | "Requisite"
+            | "RequisiteOf"
+            | "Triggers"
+            | "TriggeredBy"
+            | "OnSuccess"
+            | "OnFailure"
+            | "OnSuccessOf"
+            | "OnFailureOf"
+    )
+}
+
+fn members(value: &str) -> Result<BTreeSet<&str>> {
+    let mut units = BTreeSet::new();
+    for name in value.split_ascii_whitespace() {
+        ensure!(units.insert(name), "duplicate manager dependency {name}");
+    }
+    Ok(units)
+}
+
+pub(super) fn same_manager_properties(unit: &str, expected: &Value, actual: &Value) -> Result<()> {
+    let actual = actual.as_object().context("actual manager fields")?;
+    let original = expected.as_object().context("expected manager fields")?;
+    ensure!(
+        actual.len() == original.len(),
+        "changed manager property count for {unit}"
+    );
+    for (key, prior) in original {
+        let current = actual.get(key).context("missing manager property")?;
+        let same = if unit_relations(key) {
+            members(current.as_str().context("actual relation")?)?
+                == members(prior.as_str().context("original relation")?)?
+        } else {
+            current == prior
+        };
+        ensure!(same, "manager configuration changed: {unit} {key}");
+    }
+    Ok(())
+}
+
 fn scalar(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
 }
