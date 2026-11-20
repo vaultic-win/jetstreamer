@@ -18,7 +18,7 @@ use std::{
 };
 
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v1/admission-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v2/admission-v1";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 const RETIRED: &str =

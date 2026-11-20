@@ -9,9 +9,9 @@ pub const GUARD_SERVICE: &str = "horizon-guard-168-trace-local3-20261120-v1.serv
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1";
 pub const DEST: &str = "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/replacement-local1-20261110-v1/trace-local3-20261120-v1";
 pub const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v2";
 pub const RECEIPTS: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v1/guard-receipts";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-trace-admission-20261120-v2/guard-receipts";
 pub const GUARD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 pub const GUARD_SHA: &str = "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016";

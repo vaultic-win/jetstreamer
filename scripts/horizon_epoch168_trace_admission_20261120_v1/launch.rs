@@ -52,7 +52,8 @@ fn producer_argv(token: &str) -> Result<Vec<String>> {
             && args.contains(&"--property=CPUQuota=900%".to_owned()),
         "producer contract"
     );
-    args.push(GATE_ALIAS.into());
+    // systemd-run resolves the command on the host before PID 1 mounts the private gate.
+    args.extend(strings(&["/usr/bin/env", GATE_ALIAS]));
     Ok(args)
 }
 fn guard_argv(plan: &Path, sha: &str) -> Vec<String> {
@@ -430,7 +431,7 @@ mod tests {
     #[test]
     fn producer_uses_only_the_nested_home_tree_and_sealed_payload() {
         let argv = producer_argv("epoch168-trace-test").unwrap();
-        assert_eq!(argv.last().unwrap(), GATE_ALIAS);
+        assert!(argv.ends_with(&strings(&["/usr/bin/env", GATE_ALIAS])));
         let writable: Vec<_> = argv
             .iter()
             .filter_map(|a| a.strip_prefix("--property=ReadWritePaths="))
