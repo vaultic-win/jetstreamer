@@ -13,7 +13,7 @@ use std::{
 };
 mod network;
 mod probes;
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2";
+const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3";
 const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 const MANIFEST: &str =
@@ -21,7 +21,7 @@ const MANIFEST: &str =
 const MANIFEST_SHA: &str = "a269b418dc5bcd508850d0293cf05e64875d7610c402b696cf8d15f9775c5fcf";
 const FINGERPRINT: &str = "sha256:a126bce31196effaf656230c7185e92f73db9574e13a45e3976aae1859461e28";
 const TEMPLATE: &str = include_str!(
-    "../../horizon265-launch/config/horizon-qualify-265-replacement-20261119-v2.service"
+    "../../horizon265-launch/config/horizon-qualify-265-replacement-20261119-v3.service"
 );
 const PROPS: &str = "Id,LoadState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainCode,ExecMainStatus,NRestarts,ActiveState,SubState,Result,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,User,Group,UMask,Type,RemainAfterExit,NoNewPrivileges,ProtectSystem,ProtectHome,ProtectControlGroups,PrivateTmp,PrivateNetwork,RestrictAddressFamilies,ReadWritePaths,ReadOnlyPaths,BindReadOnlyPaths,WorkingDirectory,CapabilityBoundingSet,AmbientCapabilities,Environment,UnsetEnvironment,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,RuntimeMaxUSec,TimeoutStartUSec,TimeoutStopUSec,LimitFSIZE,CPUQuotaPerSecUSec,CPUAffinity,OOMPolicy,OOMScoreAdjust,StandardOutput,StandardError";
 #[derive(Clone, Deserialize, Serialize)]
