@@ -418,8 +418,10 @@ fn native257_pass_through(config: &Value, binding: Option<&Bound>) -> Result<Val
         "duplicate native257 diagnostic"
     );
     let b = binding.context("native257 handoff required")?;
-    let h = horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
-    native257_owner(config, row, &h)?;
+    horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
+    // The wrapper and launcher have separately qualified serde_json builds.
+    // Reopen the same digest-bound bytes with the wrapper's reader.
+    native257_owner(config, row, &bound(b)?)?;
     filtered["native_input_diagnostics"] = json!(
         rows.iter()
             .filter(|r| r["epoch"] != 257)
