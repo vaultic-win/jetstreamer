@@ -12,3 +12,6 @@ libc = "0.2"
 [[bin]]
 name = "stage"
 path = "main.rs"
+
+[dev-dependencies]
+tempfile = "3"
