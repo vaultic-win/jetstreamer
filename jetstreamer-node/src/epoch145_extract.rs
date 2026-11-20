@@ -4,6 +4,8 @@
 //! source retirement. A separately admitted controller must bind the completed
 //! producer and the exact worker pin, retain the full checkpoint-bearing source,
 //! supply a live output-budget guard, and persist the returned evidence.
+mod aligned;
+
 use crate::{
     archive_checksum::{
         ArchiveFileIdentity, archive_file_identity, open_regular_nofollow,
@@ -258,8 +260,40 @@ impl PinnedSource {
         Ok(BufReader::new(file))
     }
 
-    /// Creates a private, canonical-width candidate using the existing strict
-    /// prefix re-encoder. The caller's guard runs before every output write and
+    fn export_prefix<W: Write>(&self, sink: W, provenance: &ArchiveProvenance) -> Result<[u8; 32]> {
+        // This immutable, authenticated source has a bucket-aligned cut, one
+        // trailing checkpoint bucket and a width-preserving first epoch field.
+        // Other checkpoint sources retain the existing general re-encoder.
+        if sha256_hex_string(&self.manifest.archive_sha256)
+            == "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353"
+        {
+            return aligned::copy_aligned_prefix(
+                self.source_reader()?,
+                sink,
+                CANONICAL_SLOTS,
+                provenance,
+            );
+        }
+        let (_, stats) = reencode_archive_prefix(
+            self.source_reader()?,
+            sink,
+            ArchiveWriterConfig::default(),
+            CANONICAL_SLOTS,
+        )?;
+        ensure!(
+            stats.source_epoch == 145
+                && stats.source_slot_start == FIRST_SLOT
+                && stats.source_slot_count == FOCUSED_SLOTS
+                && stats.slots_reencoded == CANONICAL_SLOTS
+                && stats.source_zero_parent_resume_artifacts == 0
+                && stats.output_zero_parent_resume_artifacts == 0,
+            "145 prefix export shape or strict chain differs"
+        );
+        Ok(stats.output_semantic_sha256)
+    }
+
+    /// Creates a private, canonical-width candidate with strict source-link
+    /// validation. The caller's guard runs before every output write and
     /// must enforce its fresh admission/floor. No checksum/segment sidecar is
     /// created: the actual terminal checkpoint stays in the retained source.
     pub fn extract_private<G>(
@@ -298,32 +332,21 @@ impl PinnedSource {
         } else {
             None
         };
-        let stats = if let Some(t) = temporary.as_mut() {
+        let expected_semantic = if let Some(t) = temporary.as_mut() {
             let output = Limited {
                 sink: t.as_file_mut(),
                 bytes: 0,
                 maximum: maximum_bytes,
                 guard: &mut guard,
             };
-            let (_, stats) = reencode_archive_prefix(
-                self.source_reader()?,
-                output,
-                ArchiveWriterConfig::default(),
-                CANONICAL_SLOTS,
-            )?;
+            let digest = self.export_prefix(output, &expected)?;
             t.as_file_mut().flush()?;
             t.as_file().sync_all()?;
-            stats
+            digest
         } else {
-            // Receipt-recovery retry: derive the expected output semantics
-            // without allocating or replacing another archive.
-            reencode_archive_prefix(
-                self.source_reader()?,
-                io::sink(),
-                ArchiveWriterConfig::default(),
-                CANONICAL_SLOTS,
-            )?
-            .1
+            // Receipt-recovery retry derives the same expected semantics without
+            // allocating or replacing another archive.
+            self.export_prefix(io::sink(), &expected)?
         };
         let output_path = temporary
             .as_ref()
@@ -331,15 +354,6 @@ impl PinnedSource {
             .unwrap_or(target.as_path());
         let output_file = open_regular_nofollow(output_path)?;
         let output_identity = archive_file_identity(&output_file)?;
-        ensure!(
-            stats.source_epoch == 145
-                && stats.source_slot_start == FIRST_SLOT
-                && stats.source_slot_count == FOCUSED_SLOTS
-                && stats.slots_reencoded == CANONICAL_SLOTS
-                && stats.source_zero_parent_resume_artifacts == 0
-                && stats.output_zero_parent_resume_artifacts == 0,
-            "145 prefix export shape or strict chain differs"
-        );
         let mut reader = ArchiveReader::open(BufReader::new(open_regular_nofollow(output_path)?))?;
         reader.verify_chain = true;
         reader.chain_mismatch_policy = ChainMismatchPolicy::Reject;
@@ -357,7 +371,7 @@ impl PinnedSource {
         let mut semantic = SemanticDigest::new();
         ensure!(
             reader.read_slots(FIRST_SLOT, CANONICAL_SLOTS, &mut semantic)? == CANONICAL_SLOTS
-                && semantic.finish()? == stats.output_semantic_sha256,
+                && semantic.finish()? == expected_semantic,
             "145 independent output semantic reread failed"
         );
         let mut output = open_regular_nofollow(output_path)?;
@@ -406,7 +420,7 @@ impl PinnedSource {
             archive_bytes: bytes,
             output_slot_start: FIRST_SLOT,
             output_slot_count: CANONICAL_SLOTS,
-            output_semantic_sha256: sha256_hex_string(&stats.output_semantic_sha256),
+            output_semantic_sha256: sha256_hex_string(&expected_semantic),
             expected_output_provenance_sha256,
             retained_verification_tail_slots: 71,
             source_must_be_retained: true,
