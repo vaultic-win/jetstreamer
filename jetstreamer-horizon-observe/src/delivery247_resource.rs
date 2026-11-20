@@ -68,7 +68,10 @@ fn staged_inputs() -> Result<Value> {
             && c["unit"] == staged::UNIT
             && c["invocation_id"] == staged::IID
             && c["expected_exec_start"] == l["unit"]["ExecStart"]
-            && l["unit"]["MainPID"] == staged::PID.to_string(),
+            && l["unit"]["MainPID"]
+                .as_str()
+                .and_then(|pid| pid.parse::<u32>().ok())
+                == Some(staged::PID),
         "staged 247 resource provenance graph"
     );
     let cmd = fs::read(format!("/proc/{}/cmdline", staged::PID))?;
