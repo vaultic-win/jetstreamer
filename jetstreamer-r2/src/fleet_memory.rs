@@ -6,6 +6,41 @@ use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
+fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
+    let belongs =
+        |r: &&Value| r["unit"]["Id"] == successor::UNIT || r["expected_invocation_id"] == owner.iid;
+    let mut entries = fleet["pipelines"]
+        .as_array()
+        .context("successor pipeline census")?
+        .iter()
+        .filter(belongs);
+    let e = entries.next().context("missing successor pipeline")?;
+    ensure!(
+        entries.next().is_none()
+            && e["epoch"] == 247
+            && e["phase"] == "upload-readback"
+            && e["live"] == true
+            && e["sampled_at_utc"] == fleet["sampled_at_utc"]
+            && e["unit"] == fleet["unit_census"][successor::UNIT]
+            && e["unit"]["Id"] == successor::UNIT
+            && e["expected_invocation_id"] == owner.iid
+            && e["unit"]["InvocationID"] == owner.iid
+            && e["unit"]["MainPID"]
+                .as_str()
+                .and_then(|p| p.parse::<u32>().ok())
+                == Some(owner.pid)
+            && e["evidence"] == json!([owner.proof["booking"], owner.proof["launch"]])
+            && fleet["active"]
+                .as_array()
+                .context("active fleet census")?
+                .iter()
+                .filter(belongs)
+                .eq(std::iter::once(e)),
+        "successor claim, native census and active fleet differ"
+    );
+    Ok(())
+}
+
 fn checked(o: &Value, ledger: &Value) -> Result<Value> {
     ensure!(
         ledger["first_epoch"] == 201
@@ -34,6 +69,15 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                     && active["phase"] == "upload-readback"
                     && iid == jetstreamer_horizon_observe::staged247_rss::IID,
                 "foreign staged 247 fleet entry"
+            );
+        }
+        if active["epoch"] == 247 && active["phase"] == "upload-readback" {
+            ensure!(
+                matches!(
+                    name,
+                    successor::ORIGINAL | successor::PRIOR_UNIT | successor::UNIT
+                ),
+                "unregistered epoch 247 uploader"
             );
         }
         let comparable = matches!(
@@ -111,23 +155,8 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                     )?,
                 "stale successor RSS"
             );
-            let entry = ledger["active"]
-                .as_array()
-                .context("active roster")?
-                .iter()
-                .filter(|r| r["unit"]["Id"] == name)
-                .collect::<Vec<_>>();
-            let [active] = entry.as_slice() else {
-                anyhow::bail!("missing or duplicated successor active owner")
-            };
             let owner = successor::load(&row["successor_owner"]["claim"])?;
-            ensure!(
-                active["epoch"] == 247
-                    && active["phase"] == "upload-readback"
-                    && active["expected_invocation_id"] == owner.iid
-                    && active["evidence"] == json!([owner.proof["booking"], owner.proof["launch"]]),
-                "successor claim differs from RSS"
-            );
+            registered_upload(ledger, &owner)?;
             ensure!(
                 o["delivery_resources"]
                     .as_array()
@@ -256,7 +285,7 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 mod tests {
     use super::*;
     #[test]
-    fn two_original_claims_survive_the_benchmark_reader_transition() -> Result<()> {
+    fn two_actual_claims_survive_the_direct_bounded_reader_transition() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!(
             "../../jetstreamer-horizon-observe/src/fixtures/successor247-history.json"
         ))?;
@@ -295,6 +324,34 @@ mod tests {
         fleet["pipelines"][idx]["live"] = json!(false);
         fleet["active"] = json!([]);
         successor::validate_history(&fleet, &f["previous"])?;
+        let prospective = successor::Owner {
+            iid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            pid: 12345,
+            argv: Value::Null,
+            command: String::new(),
+            proof: json!({"booking":{"path":"future/booking","sha256":"a".repeat(64)},
+            "launch":{"path":"future/launch","sha256":"b".repeat(64)}}),
+        };
+        let mut projected = fleet.clone();
+        projected["sampled_at_utc"] = f["observed_fleet_time"].clone();
+        let manager = json!({"Id":successor::UNIT,"InvocationID":prospective.iid,"MainPID":prospective.pid.to_string()});
+        let entry = json!({"epoch":247,"phase":"upload-readback","unit":manager,"live":true,
+            "expected_invocation_id":prospective.iid,"sampled_at_utc":projected["sampled_at_utc"],
+            "evidence":[prospective.proof["booking"],prospective.proof["launch"]]});
+        projected["unit_census"][successor::UNIT] = manager;
+        projected["active"] = json!([entry]);
+        projected["pipelines"]
+            .as_array_mut()
+            .unwrap()
+            .push(entry.clone());
+        registered_upload(&projected, &prospective)?;
+        successor::validate_history(&projected, &f["previous"])?;
+        let mut different_pid = projected.clone();
+        different_pid["unit_census"][successor::UNIT]["MainPID"] = json!("42");
+        assert!(registered_upload(&different_pid, &prospective).is_err());
+        let mut duplicate = projected;
+        duplicate["active"].as_array_mut().unwrap().push(entry);
+        assert!(registered_upload(&duplicate, &prospective).is_err());
         let mut foreign = fleet.clone();
         foreign["pipelines"][idx]["evidence"][0]["sha256"] = json!("f".repeat(64));
         assert!(successor::validate_history(&foreign, &f["previous"]).is_err());
@@ -304,6 +361,15 @@ mod tests {
             .unwrap()
             .push(fleet["pipelines"][idx].clone());
         assert!(successor::validate_history(&dup, &f["previous"]).is_err());
+        let mut never_launched = fleet.clone();
+        let mut phantom = fleet["pipelines"][idx].clone();
+        phantom["unit"]["Id"] = json!("horizon-upload-247-staged-99f30641-v1.service");
+        phantom["expected_invocation_id"] = json!("b".repeat(32));
+        never_launched["pipelines"]
+            .as_array_mut()
+            .unwrap()
+            .push(phantom);
+        assert!(successor::validate_history(&never_launched, &f["previous"]).is_err());
         let mut missing = fleet.clone();
         missing["pipelines"].as_array_mut().unwrap().remove(idx);
         assert!(successor::validate_history(&missing, &f["previous"]).is_err());

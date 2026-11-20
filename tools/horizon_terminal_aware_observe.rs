@@ -41,7 +41,10 @@ fn observer_image(qualified_native: bool) -> Result<(&'static str, &'static str)
     }
 }
 fn staged_delivery_selected(config: &Value) -> Result<bool> {
-    ensure!(config.get("successor247_claim").is_none() || config["staged247_resource_only"]==true,"successor claim requires staged resource collection");
+    ensure!(
+        config["successor247_claim"].is_null() || config["staged247_resource_only"] == true,
+        "successor claim requires staged resource collection"
+    );
     let Some(flag) = config.get("staged247_resource_only") else {
         return Ok(false);
     };
@@ -779,6 +782,8 @@ mod tests {
         assert!(staged_delivery_selected(&cfg).unwrap());
         assert_eq!(cfg, saved);
         assert!(!staged_delivery_selected(&json!({"delivery247_resource_only":true})).unwrap());
+        assert!(!staged_delivery_selected(&json!({"successor247_claim":null})).unwrap());
+        assert!(staged_delivery_selected(&json!({"successor247_claim":{"path":"/foreign"}})).is_err());
         assert!(
             staged_delivery_selected(
                 &json!({"delivery247_resource_only":true,"staged247_resource_only":true})

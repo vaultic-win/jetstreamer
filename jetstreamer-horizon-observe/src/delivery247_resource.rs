@@ -345,15 +345,32 @@ pub(super) fn sample(
 mod tests {
     use super::*;
     #[test]
-    fn benchmark_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
+    fn bounded_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!("fixtures/successor247-history.json"))?;
-        let recovery = &f["recovery"];
+        let old = &f["recovery"];
+        let tier: Value = serde_json::from_str(include_str!("fixtures/successor247-cf4d.json"))?;
+        let recovery = &tier["recovery"];
+        let plan = &tier["plan"];
+        let acceptance = &tier["main_acceptance"];
+        let source = &tier["source_acceptance"];
+        next::reader_source(plan, acceptance, source)?;
+        for (field, altered) in [
+            ("reader_commit", "99f306410aa59a41394e9c4bf379143fb2a4ada1"),
+            (
+                "uploader_commit",
+                "f72cefd577617c6b8332ca6713f71a01e3d03b12",
+            ),
+        ] {
+            let mut invalid = source.clone();
+            invalid[field] = json!(altered);
+            assert!(next::reader_source(plan, acceptance, &invalid).is_err());
+        }
         assert_eq!(
-            f["recovery_ref"],
+            tier["recovery_ref"],
             next::binding(next::RECOVERY, next::RECOVERY_SHA)
         );
         assert_eq!(
-            f["previous_ref"],
+            tier["recovery"]["prior_staged_owner"],
             next::binding(next::PRIOR, next::PRIOR_SHA)
         );
         let args = recovery["recovery_argv"]
@@ -372,6 +389,38 @@ mod tests {
         let booking = json!({"unit":next::UNIT,"argv":recovery["recovery_argv"],"approved_plan":next::binding(next::PLAN,next::PLAN_SHA),"capacity_credit":0,"local_reclamation_credit":0,"additional_memory_reserve":next::BOOKED,"disk_reserve":next::DISK});
         let launch = json!({"unit":{"Id":next::UNIT,"InvocationID":id,"NRestarts":"0","MemoryMax":next::HARD.to_string(),"MemorySwapMax":"0","ExecStart":cmd}});
         next::graph(&claim, &booking, &launch, recovery, &f["previous"])?;
+        assert!(next::graph(&claim, &booking, &launch, old, &f["previous"]).is_err());
+        // Model the coordinated resource row; an actual process is checked only in the observer.
+        let modeled = next::Owner {
+            iid: id.into(),
+            pid: 12345,
+            argv: recovery["recovery_argv"].clone(),
+            command: cmd.clone(),
+            proof: json!({"recovery":tier["recovery_ref"]}),
+        };
+        let endpoint = json!({"unit":next::UNIT, "invocation_id":id, "main_pid":modeled.pid,
+            "control_group":format!("/system.slice/{}",next::UNIT),
+            "active_state":"active","sub_state":"running","restarts":0,
+            "cgroup":{"gauges":{"memory.max":next::HARD,"memory.swap.max":0}},
+            "rss":{"census_stable":true,"error":null,"aggregate_rss_bytes":8192,
+                "processes":[{"pid":modeled.pid,"start_ticks":7100}]}});
+        let mapped = json!({"executable":next::IMAGE,"sha256":next::IMAGE_SHA,"pid":modeled.pid,"mapped_inode":31,"mapped_device":8});
+        let mut sample = json!({"range":"247-247","phase":"upload-readback","resource_only":true,"delivery_resource_only":true,
+            "entry_replay":false,"ordinary_replay_claim":false,"invocation_binding_stable":true,"useful_work":{"sufficient_for_rates":false},
+            "successor_owner":modeled.proof,"controller_before":endpoint,"producer_before":endpoint,
+            "controller_after":endpoint,"producer_after":endpoint,"mapped_image_before":mapped,"mapped_image_after":mapped});
+        staged::validate_sample(&sample, &modeled)?;
+        sample["mapped_image_after"]["sha256"] = old["uploader"]["sha256"].clone();
+        assert!(staged::validate_sample(&sample, &modeled).is_err());
+        sample["mapped_image_after"] = mapped;
+        let mut reused = endpoint;
+        reused["rss"]["processes"][0]["start_ticks"] = json!(7101);
+        sample["controller_after"] = reused.clone();
+        sample["producer_after"] = reused;
+        assert!(staged::validate_sample(&sample, &modeled).is_err());
+        let mut stale_booking = booking.clone();
+        stale_booking["approved_plan"] = old["current_reader_plan"].clone();
+        assert!(next::graph(&claim, &stale_booking, &launch, recovery, &f["previous"]).is_err());
         for key in [
             "prior_staged_owner",
             "historical_terminal",
