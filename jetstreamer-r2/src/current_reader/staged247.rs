@@ -46,6 +46,15 @@ const BENCH_VERIFIER: &str =
 const BENCH_QUALIFICATION: &str =
     "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/main-acceptance.json";
 const BENCH_READER: &str = "99f306410aa59a41394e9c4bf379143fb2a4ada1";
+const BOUNDED_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/epoch-247-plan.json";
+const BOUNDED_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/horizon_pipeline";
+const BOUNDED_VERIFIER: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/verify_archive";
+const BOUNDED_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/main-acceptance.json";
+const BOUNDED_READER: &str = "cf4d45a51820022fa8d2e4f63ca3e8bce261844d";
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
     "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
@@ -232,6 +241,11 @@ fn drained(unit: &str, iid: &str) -> Result<()> {
     }
     Ok(())
 }
+// Both successors follow the same registered staged uploader.
+fn requires_staged_terminal(plan: &Path) -> bool {
+    plan == Path::new(BENCH_PLAN) || plan == Path::new(BOUNDED_PLAN)
+}
+
 // Only the qualified public reader and its acceptance change. Keep the exact
 // original epoch evidence, retained verifier, repository, policy and disk bounds.
 fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
@@ -253,17 +267,26 @@ fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
                 ("qualification", CURRENT_QUALIFICATION),
             ],
         )
-    } else {
-        ensure!(
-            path == Path::new(BENCH_PLAN),
-            "unregistered epoch 247 recovery plan"
-        );
+    } else if path == Path::new(BENCH_PLAN) {
         (
             BENCH_READER,
             &[
                 ("pipeline", BENCH_PIPELINE),
                 ("full_verifier", BENCH_VERIFIER),
                 ("qualification", BENCH_QUALIFICATION),
+            ],
+        )
+    } else {
+        ensure!(
+            path == Path::new(BOUNDED_PLAN),
+            "unregistered epoch 247 recovery plan"
+        );
+        (
+            BOUNDED_READER,
+            &[
+                ("pipeline", BOUNDED_PIPELINE),
+                ("full_verifier", BOUNDED_VERIFIER),
+                ("qualification", BOUNDED_QUALIFICATION),
             ],
         )
     };
@@ -292,7 +315,8 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
             && c.current_reader_plan.as_deref().is_some_and(|p| [
                 PUBLIC_PLAN,
                 CURRENT_PLAN,
-                BENCH_PLAN
+                BENCH_PLAN,
+                BOUNDED_PLAN
             ]
             .iter()
             .any(|registered| p == Path::new(registered)))
@@ -457,7 +481,7 @@ impl Retained {
             "concurrent staged 247 recovery"
         );
         let failed_manager_event = failed_owner(UNIT, IID)?;
-        let staged_manager_event = if plan == Path::new(BENCH_PLAN) {
+        let staged_manager_event = if requires_staged_terminal(plan) {
             for (path, sha) in [staged::BOOKING, staged::CLAIM, staged::LAUNCH, staged::PLAN] {
                 bound_file(&Bound {
                     path: path.into(),
@@ -686,6 +710,40 @@ mod tests {
             ("/full_verifier/path", json!(CURRENT_VERIFIER)),
             ("/qualification/path", json!(CURRENT_QUALIFICATION)),
             ("/reader_commit", json!(CURRENT_READER)),
+            ("/threads", json!(1)),
+            ("/epoch_expectations/247", json!("foreign")),
+        ] {
+            let mut other = next.clone();
+            *other.pointer_mut(pointer).unwrap() = wrong;
+            assert!(public_plan(path, &original, &other).is_err());
+        }
+        next["features"] = json!(["other"]);
+        assert!(public_plan(path, &original, &next).is_err());
+    }
+
+    #[test]
+    fn bounded_reader_pins_images_layout_and_actual_staged_predecessor() {
+        let original = json!({"reader_commit":BENCH_READER, "threads":2, "epoch_expectations":{"247":"original"}});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(BOUNDED_READER);
+        for (key, path) in [
+            ("pipeline", BOUNDED_PIPELINE),
+            ("full_verifier", BOUNDED_VERIFIER),
+            ("qualification", BOUNDED_QUALIFICATION),
+        ] {
+            next[key] = json!({"path":path,"sha256":"a".repeat(64)});
+        }
+        let path = Path::new(BOUNDED_PLAN);
+        assert!(requires_staged_terminal(path));
+        assert!(requires_staged_terminal(Path::new(BENCH_PLAN)));
+        assert!(!requires_staged_terminal(Path::new(CURRENT_PLAN)));
+        public_plan(path, &original, &next).unwrap();
+        assert!(public_plan(Path::new(BENCH_PLAN), &original, &next).is_err());
+        for (pointer, wrong) in [
+            ("/pipeline/path", json!(BENCH_PIPELINE)),
+            ("/full_verifier/path", json!(BENCH_VERIFIER)),
+            ("/qualification/path", json!(BENCH_QUALIFICATION)),
+            ("/reader_commit", json!(BENCH_READER)),
             ("/threads", json!(1)),
             ("/epoch_expectations/247", json!("foreign")),
         ] {
