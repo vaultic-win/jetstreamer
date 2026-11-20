@@ -17,13 +17,20 @@ mod admission;
 mod capacity;
 mod delivery247;
 mod finalization;
+mod full265;
+// Reuse the exact observer consumer, including its semantic startup/token checks.
+#[path = "../../../jetstreamer-horizon-observe/src/full265.rs"]
+pub mod full265_owner;
 mod gate;
 mod inputs;
 mod launch;
 mod lifecycle;
 mod live;
+mod native265_growth;
+mod peer_window;
 mod peers;
 mod periodic;
+mod prepare;
 mod publication;
 mod qualification;
 
@@ -34,7 +41,7 @@ const RETENTION: &str = "horizon-singleton211-terminal-retention.target";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon-singleton211-startup-tokens";
 const GATE: &str =
-    "/var/lib/jetstreamer/horizon-singleton211-launch-20261119-v1/horizon-singleton211-launch";
+    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch";
 const NODE: &str =
     "/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node";
 const NODE_SHA: &str = "e4b1df9aa6430456e703c283a7ed3512f5b5ada489d016b98e9d47332836ec4f";
@@ -394,9 +401,9 @@ pub fn run_from_environment() -> Result<()> {
         args.len() == 6
             && matches!(
                 args[1].as_str(),
-                "admit" | "launch" | "qualify-guard" | "retire-qualification"
+                "prepare" | "admit" | "launch" | "qualify-guard" | "retire-qualification"
             ),
-        "usage: horizon-singleton211-launch admit|launch|qualify-guard|retire-qualification REVIEW_OR_CAPTURE SHA256 SELF_SHA256 NEW_EVIDENCE_DIRECTORY"
+        "usage: horizon-singleton211-launch prepare|admit|launch|qualify-guard|retire-qualification REVIEW_OR_CAPTURE SHA256 SELF_SHA256 NEW_EVIDENCE_DIRECTORY"
     );
     ensure!(unsafe { libc::geteuid() } == 0, "root required");
     ensure!(
@@ -433,10 +440,14 @@ pub fn run_from_environment() -> Result<()> {
         }
         qualification::operation(&review)?;
         ensure!(
-            (args[1] == "qualify-guard") == (review["operation"] == "qualify-guard"),
+            matches!(args[1].as_str(), "prepare" | "admit")
+                || (args[1] == "qualify-guard") == (review["operation"] == "qualify-guard"),
             "operation/review mismatch"
         );
         let a = admission::validate(&mut n, &review, &review_ref, &args[4], false)?;
+        if args[1] == "prepare" {
+            return prepare::run(&mut n, &review, &review_ref, &args[4]);
+        }
         if args[1] == "admit" {
             let b = save_json(&n.root, "admission.json", &a)?;
             println!("{}", serde_json::to_string(&b)?);

@@ -293,6 +293,7 @@ pub(super) fn validate(
         fleet["diagnostics"] == json!([]) && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
+    full265::validate(fleet, observer, rows, boot)?;
     // Delivery has its own live owner and full reservation, not replay telemetry.
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
         if delivery247::selected(e) {
@@ -304,7 +305,7 @@ pub(super) fn validate(
         .as_array()
         .context("pipeline census")?
         .iter()
-        .filter(|e| !peers::selected(e) && !delivery247::selected(e))
+        .filter(|e| !peers::selected(e) && !delivery247::selected(e) && !full265::pipeline(e))
         .collect();
     let observed_diagnostics = observer["diagnostic_replays"]
         .as_array()
@@ -312,6 +313,10 @@ pub(super) fn validate(
     let mut diagnostics = Vec::new();
     let mut native265_diagnostic_seen = false;
     for d in observed_diagnostics {
+        if full265::diagnostic(d) {
+            // Already authenticated by the complete full265 cross-census validator.
+            continue;
+        }
         if peers::terminal_diagnostic(d)? {
             ensure!(
                 !native265_diagnostic_seen,
@@ -344,6 +349,10 @@ pub(super) fn validate(
         );
     }
     for a in fleet["active"].as_array().context("active census")? {
+        if a["epoch"] == 265 {
+            // Ordinary or exact post-EOF form validated above; no private promotion.
+            continue;
+        }
         if delivery247::selected(a) {
             delivery247::validate(a, fleet, rows)?;
             continue;
@@ -367,12 +376,13 @@ pub(super) fn validate(
     Ok(())
 }
 pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
+    full265::verify_inputs(fleet)?;
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
         if delivery247::selected(e) {
             delivery247::verify_inputs()?;
             continue;
         }
-        if peers::selected(e) {
+        if peers::selected(e) || full265::pipeline(e) {
             continue;
         }
         let p = registered(num(e, "epoch")?)?;

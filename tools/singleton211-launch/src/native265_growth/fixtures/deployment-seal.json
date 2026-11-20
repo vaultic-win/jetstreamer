@@ -1,0 +1,55 @@
+{
+  "schema": "jetstreamer-sealed-deployment-receipt-v1",
+  "plan_sha256": "8b6d643d16749298c30c9012803d2ae880b7203f10d2c2c56c1ba1de9a203db3",
+  "sealer_sha256": "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a",
+  "destination": "/var/lib/jetstreamer/horizon-native265-scratch-retirer-20261120-v2",
+  "members": [
+    {
+      "source": "/run/horizon-native265-empty-scratch-qualification-20261120-v3/result/qualified-image",
+      "name": "native265-scratch-retire",
+      "sha256": "733771a1524281be7f0a05d3bdbb7fe319a15d08afc35bb09fd51ecfcaab711d",
+      "bytes": 1041608,
+      "mode": "0555"
+    },
+    {
+      "source": "/home/ubuntu/.codex/diagnostics/horizon-native265-scratch-retirement-qualification-20261120-v2/source.sha256",
+      "name": "source.sha256",
+      "sha256": "e36a658c177d25842273fedc370a45295958b27ab4464e9661dc37eefe778536",
+      "bytes": 630,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/ubuntu/.codex/diagnostics/horizon-native265-scratch-retirement-qualification-20261120-v2/qualification.json",
+      "name": "qualification.json",
+      "sha256": "94e83e8e6061c74c1adedcb8e1fffc2969e4807788f979a5bd772f3973e8fd01",
+      "bytes": 661,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/ubuntu/.codex/diagnostics/horizon-native265-scratch-retirement-qualification-20261120-v2/booking.json",
+      "name": "booking.json",
+      "sha256": "a3ae5dee49f1cffb656d449786f22bfd6a9b428cd77070bc65d7ac50904679ff",
+      "bytes": 2058,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/ubuntu/.codex/diagnostics/horizon-native265-scratch-retirement-qualification-20261120-v2/build",
+      "name": "build",
+      "sha256": "18a4ea2c8e097e93a3bdb2de7f6ce15d069ece3ddb1c85dcd542622d1a1a24cc",
+      "bytes": 1178,
+      "mode": "0444"
+    },
+    {
+      "source": "/home/ubuntu/.codex/diagnostics/horizon-native265-scratch-retirement-qualification-20261120-v2/build.log",
+      "name": "build.log",
+      "sha256": "bd3d3980784845924f8ea35a9151e45624f3bbf6a2f6c1e43dbe9f84deff9b4c",
+      "bytes": 4275,
+      "mode": "0444"
+    }
+  ],
+  "created_unix_seconds": 1795145106,
+  "publication_authorized": false,
+  "replay_launch_authorized": false,
+  "remote_mutations": false,
+  "r2_mutations": false
+}

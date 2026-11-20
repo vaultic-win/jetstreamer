@@ -209,10 +209,12 @@ fn retained_fleet_peer(
         );
         entry(p, f, found[0], terminal)?;
     } else {
+        // The completed native owner and the v3 ordinary replay share epoch265,
+        // not an invocation. Never reject the latter solely by epoch number.
         ensure!(
-            !entries
-                .iter()
-                .any(|e| e["epoch"] == 265 || e["unit"]["Id"] == p.unit),
+            !entries.iter().any(|e| e["unit"]["Id"] == p.unit
+                || e["producer"]["Id"] == p.unit
+                || e["controller"]["Id"] == p.unit),
             "native265 direct recovery must not invent a running claim"
         );
         ensure!(
@@ -220,8 +222,7 @@ fn retained_fleet_peer(
                 .as_array()
                 .context("active")?
                 .iter()
-                .any(|e| e["epoch"] == 265
-                    || e["unit"]["Id"] == p.unit
+                .any(|e| e["unit"]["Id"] == p.unit
                     || e["producer"]["Id"] == p.unit
                     || e["controller"]["Id"] == p.unit),
             "native265 direct terminal marked active"
@@ -536,6 +537,23 @@ mod tests {
         assert!(retained_fleet_peer(p, &bad, std::slice::from_ref(&r), &u, 900).is_err());
         assert!(retained_fleet_peer(p, &f, &[], &u, 900).is_err());
         assert!(retained_fleet_peer(p, &f, &[r.clone(), r], &u, 900).is_err());
+    }
+
+    #[test]
+    fn native265_terminal_does_not_alias_the_new_ordinary265_owner() {
+        let p = PEERS[1];
+        let (u, _, mut f, r) = fixture(p);
+        f["pipelines"] = json!([]);
+        f["active"] = json!([{"epoch":265,"phase":"replay",
+            "producer":{"Id":full265_owner::UNIT,"InvocationID":full265::IID},
+            "controller":{"Id":full265_owner::UNIT,"InvocationID":full265::IID}}]);
+        retained_fleet_peer(p, &f, std::slice::from_ref(&r), &u, 900).unwrap();
+        f["pipelines"] = json!([{"epoch":265,"phase":"producer-finalization",
+            "unit":{"Id":full265_owner::UNIT,"InvocationID":full265::IID}}]);
+        retained_fleet_peer(p, &f, std::slice::from_ref(&r), &u, 900).unwrap();
+        // The original successful native remains separately reserved and terminal.
+        f["active"][0]["controller"]["Id"] = json!(p.unit);
+        assert!(retained_fleet_peer(p, &f, std::slice::from_ref(&r), &u, 900).is_err());
     }
 
     #[test]

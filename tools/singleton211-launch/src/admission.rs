@@ -312,6 +312,10 @@ pub(super) fn validate(
     finalization::validate(&fleet, &observer, &rows, &boot)?;
     finalization::verify_inputs(&fleet)?;
     let currents = live::census(n, review, &fleet, &rows, &periodic, candidate)?;
+    // Authenticate original rows/census first; only the private arithmetic view
+    // may subtract the separately qualified old native265 future-growth booking.
+    let (effective_rows, native265_growth_release) =
+        native265_growth::arithmetic_view(n, review, &rows, &boot)?;
     let (total, available, disk) = live::resources()?;
     let obs_total = num(&observer["host_memory"], "total_kib")?
         .checked_mul(1024)
@@ -323,7 +327,7 @@ pub(super) fn validate(
         available,
         disk,
         century,
-        &rows,
+        &effective_rows,
         &currents,
         (overhead, periodic::total(&periodic)?),
     )?;
@@ -335,6 +339,7 @@ pub(super) fn validate(
         "guard":guard,"boot_id":boot,"admitted":true,"review":review_ref,"source_publication":review["source_publication"],
         "observer":review["observer"],"fleet":review["fleet"],"reservation_ledger":review["reservation_ledger"],
         "capacity":cap,"actual_current_memory":currents,"recorded_unix_seconds":admitted_at,"expires_unix_seconds":admitted_at.checked_add(60).context("clock overflow")?});
+    admission["native265_runtime_growth_release"] = json!(native265_growth_release);
     deny_authority(&mut admission);
     admission["replay_launch_authorized"] = json!(!qualification);
     Ok(admission)

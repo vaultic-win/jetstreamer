@@ -69,31 +69,31 @@ pub(super) fn environment() -> BTreeMap<String, String> {
         ),
     ])
 }
-pub(super) fn gate_command(plan: &Bound, self_sha: &str) -> String {
+pub(super) fn gate_command(plan: &Path, self_sha: &str) -> String {
     format!(
-        "{GATE} gate {} {} {self_sha}",
-        plan.path.display(),
-        plan.sha256
+        "{GATE} gate {} ${{HORIZON211_STARTUP_PLAN_SHA256}} {self_sha}",
+        plan.display()
     )
 }
-pub(super) fn producer_template(plan: &Bound, affinity: &str, self_sha: &str) -> String {
+pub(super) fn producer_template(plan: &Path, affinity: &str, self_sha: &str) -> String {
     let env = environment()
         .iter()
         .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>()
         .join(" ");
     format!(
-        "[Unit]\nDescription=Epoch 211 guarded full singleton replay\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=150000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=1600%\nCPUAffinity={affinity}\nRuntimeMaxSec=259200\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=no\nPrivateTmp=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nBindReadOnlyPaths={INPUT}/genesis.tar.bz2:{ROOT}/output/genesis.tar.bz2\nUMask=0077\nEnvironment={env}\nExecStart={}\n",
+        "[Unit]\nDescription=Epoch 211 guarded full singleton replay\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=150000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=1600%\nCPUAffinity={affinity}\nRuntimeMaxSec=259200\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=no\nPrivateTmp=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nBindReadOnlyPaths={INPUT}/genesis.tar.bz2:{ROOT}/output/genesis.tar.bz2\nUMask=0077\nEnvironment={env}\nEnvironmentFile={}\nExecStart={}\n",
+        plan.with_file_name("startup.env").display(),
         gate_command(plan, self_sha)
     )
 }
-pub(super) fn guard_template(guard: &Bound, plan: &Bound, receipts: &Path) -> String {
+pub(super) fn guard_template(guard: &Bound, plan: &Path, receipts: &Path) -> String {
     format!(
-        "[Unit]\nDescription=Epoch 211 singleton protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=15\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nExecStart={} {} --plan-sha256 {} --self-sha256 {}\n",
+        "[Unit]\nDescription=Epoch 211 singleton protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=15\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nEnvironmentFile={}\nExecStart={} {} --plan-sha256 ${{HORIZON211_GUARD_PLAN_SHA256}} --self-sha256 {}\n",
         receipts.display(),
+        plan.with_file_name("guard.env").display(),
         guard.path.display(),
-        plan.path.display(),
-        plan.sha256,
+        plan.display(),
         guard.sha256
     )
 }
@@ -104,8 +104,13 @@ pub(super) fn timer_template() -> String {
 }
 pub(super) fn retention_template() -> String {
     format!(
-        "[Unit]\nDescription=Retain epoch 211 singleton terminal evidence\nDefaultDependencies=no\nAfter={UNIT}\nIgnoreOnIsolate=yes\n"
+        "[Unit]\nDescription=Retain epoch 211 singleton terminal evidence\nDefaultDependencies=no\nAfter={UNIT} {GUARD_UNIT} {TIMER}\nIgnoreOnIsolate=yes\n"
     )
+}
+pub(super) fn retains_all(v: &Value) -> Result<bool> {
+    let rows: Vec<_> = text(v, "After")?.split_whitespace().collect();
+    Ok(rows.len() == 3
+        && rows.into_iter().collect::<BTreeSet<_>>() == BTreeSet::from([UNIT, GUARD_UNIT, TIMER]))
 }
 pub(super) fn retention(n: &mut Native, package: &Path) -> Result<Value> {
     let v = n.show(RETENTION)?;
@@ -113,7 +118,7 @@ pub(super) fn retention(n: &mut Native, package: &Path) -> Result<Value> {
         v["LoadState"] == "loaded"
             && v["ActiveState"] == "active"
             && v["SubState"] == "active"
-            && v["After"] == UNIT
+            && retains_all(&v)?
             && v["IgnoreOnIsolate"] == "yes"
             && v["DefaultDependencies"] == "no"
             && v["DropInPaths"] == ""
@@ -154,13 +159,6 @@ pub(super) fn pristine() -> Result<()> {
         id.2 == 0 && id.3 == 1000 && id.4 & 0o777 == 0o400,
         "genesis read-only mount placeholder differs"
     );
-    Ok(())
-}
-fn install(from: &Path, unit: &str) -> Result<()> {
-    let to = Path::new("/etc/systemd/system").join(unit);
-    absent(&to)?;
-    symlink(from, &to)?;
-    File::open("/etc/systemd/system")?.sync_all()?;
     Ok(())
 }
 pub(super) fn producer(
@@ -228,7 +226,7 @@ pub(super) fn producer_properties(
     );
     Bound::new(
         expected,
-        digest(producer_template(plan, affinity, self_sha).as_bytes()),
+        digest(producer_template(&plan.path, affinity, self_sha).as_bytes()),
     )
     .artifact()?;
     for (key, want) in [
@@ -276,9 +274,14 @@ pub(super) fn producer_properties(
         .map(str::parse)
         .collect::<std::result::Result<_, _>>()?;
     ensure!(actual == expected, "CPU set changed");
-    let command = format!("{{ path={GATE} ; argv[]={}", gate_command(plan, self_sha));
+    let command = format!(
+        "{{ path={GATE} ; argv[]={} ; ignore_errors=no",
+        gate_command(&plan.path, self_sha)
+    );
+    prepare::env_properties(v, &plan.path.with_file_name("startup.env"))?;
+    prepare::verify_pair(plan, prepare::STARTUP)?;
     ensure!(
-        text(v, "ExecStart")?.split(" ; ignore_errors=").next() == Some(command.as_str()),
+        periodic::stable_command(text(v, "ExecStart")?)? == command,
         "gate command changed"
     );
     let expected: BTreeSet<_> = environment()
@@ -442,34 +445,32 @@ pub(super) fn run(
     inputs::validate(&binding(&review["input_capability"])?.sealed()?)?;
     let guard = binding(&review["guard"])?;
     guard.artifact()?;
-    for unit in [UNIT, GUARD_UNIT, TIMER, RETENTION] {
-        ensure!(
-            n.show(unit)?["LoadState"] == "not-found",
-            "unit name already consumed"
-        );
-        for dir in ["/etc/systemd/system", "/run/systemd/system"] {
-            absent(&Path::new(dir).join(unit))?;
-            absent(&Path::new(dir).join(format!("{unit}.d")))?;
-        }
-    }
+    let prepared = prepare::accepted(n, review, self_sha, a)?;
     let admitted = package(attempt, "admission");
     let startup = package(attempt, "startup-plan");
     let producer_package = package(attempt, "producer");
-    let guard_package = package(attempt, "guard-binding");
+    let guard_binding = package(attempt, "guard-binding");
     let proof_package = package(attempt, "first-fire");
     let receipts = package(attempt, "guard-receipts");
     for path in [
         &admitted,
         &startup,
-        &producer_package,
-        &guard_package,
+        &guard_binding,
         &proof_package,
         &receipts,
     ] {
         absent(path)?;
     }
+    let peers = peer_window::capture(n, review, a)?;
     let ar = save_json(&n.root, "admission.json", a)?;
-    n.seal(&admitted, &[("admission.json", ar.clone())])?;
+    n.seal(
+        &admitted,
+        &[
+            ("admission.json", ar.clone()),
+            ("peer-window.json", peers.receipt.clone()),
+        ],
+    )?;
+    let wr = Bound::new(admitted.join("peer-window.json"), &peers.receipt.sha256);
     let ar = Bound::new(admitted.join("admission.json"), ar.sha256);
     fs::create_dir(&receipts)?;
     fs::set_permissions(&receipts, fs::Permissions::from_mode(0o700))?;
@@ -491,23 +492,14 @@ pub(super) fn run(
         .as_micros()
         .try_into()?;
     let (expires, deadline) = startup_window(issued, wall_us, num(a, "expires_unix_seconds")?)?;
-    n.deadline = Some(deadline);
-    let p = json!({"schema":"horizon-singleton211-startup-plan-v1","operation":review["operation"],"epoch":211,"unit":UNIT,"guard_unit":GUARD_UNIT,"worker_root":ROOT,"bootstrap_slot":91_151_575u64,
+    let expires = expires.min(peers.limit);
+    n.deadline = Some(deadline.min(peers.limit));
+    n.check()?;
+    let p = json!({"schema":"horizon-singleton211-startup-plan-v1","operation":review["operation"],"preparation":prepared,"peer_window":wr,"epoch":211,"unit":UNIT,"guard_unit":GUARD_UNIT,"worker_root":ROOT,"bootstrap_slot":91_151_575u64,
         "snapshot_sha256":SNAPSHOT_SHA,"maximum_root_physical_bytes":SCRATCH,"maximum_memory_bytes":MEMORY,"token_root":TOKENS,"boot_id":a["boot_id"],
         "gate":Bound::new(GATE,self_sha),"node":Bound::new(NODE,NODE_SHA),"worker":Bound::new(WORKER,WORKER_SHA),"input_capability":review["input_capability"],"native_input":Bound::new(NATIVE_PROOF,NATIVE_PROOF_SHA),"guard":guard,"admission":ar,"minimum_free_bytes":a["protected_existing_floor_bytes"],"issued_monotonic_us":issued,"expires_monotonic_us":expires});
     let pr = save_json(&n.root, "plan.json", &p)?;
-    n.seal(&startup, &[("plan.json", pr.clone())])?;
-    let pr = Bound::new(startup.join("plan.json"), pr.sha256);
-    let unit = save(
-        &n.root,
-        UNIT,
-        producer_template(&pr, &affinity, self_sha).as_bytes(),
-    )?;
-    let retain = save(&n.root, RETENTION, retention_template().as_bytes())?;
-    n.seal(&producer_package, &[(UNIT, unit), (RETENTION, retain)])?;
-    install(&producer_package.join(UNIT), UNIT)?;
-    install(&producer_package.join(RETENTION), RETENTION)?;
-    n.run("/usr/bin/systemctl", &["daemon-reload"])?;
+    let pr = prepare::seal_pair(n, &startup, &pr, prepare::STARTUP)?;
     producer(n, None, &pr, &affinity, self_sha, false)?;
     n.run("/usr/bin/systemctl", &["start", RETENTION])?;
     retention(n, &producer_package)?;
@@ -548,20 +540,8 @@ pub(super) fn run(
         };
         let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"filesystem":"/","minimum_free_bytes":guard_floor,"worker_root":ROOT,"maximum_root_physical_bytes":SCRATCH,"maximum_worker_vmas":3500000,"receipt_directory":receipts});
         let gr = save_json(&n.root, "guard-plan.json", &gp)?;
-        let deployed_gr = Bound::new(guard_package.join("guard-plan.json"), &gr.sha256);
-        let gu = save(
-            &n.root,
-            GUARD_UNIT,
-            guard_template(&guard, &deployed_gr, &receipts).as_bytes(),
-        )?;
-        let tu = save(&n.root, TIMER, timer_template().as_bytes())?;
-        n.seal(
-            &guard_package,
-            &[("guard-plan.json", gr), (GUARD_UNIT, gu), (TIMER, tu)],
-        )?;
-        install(&guard_package.join(GUARD_UNIT), GUARD_UNIT)?;
-        install(&guard_package.join(TIMER), TIMER)?;
-        n.run("/usr/bin/systemctl", &["daemon-reload"])?;
+        let deployed_gr = prepare::seal_pair(n, &guard_binding, &gr, prepare::GUARD_ARG)?;
+        prepare::guard_properties(&n.show(GUARD_UNIT)?, &guard, &deployed_gr.path)?;
         n.run(
             guard.path.to_str().context("guard path")?,
             &[
@@ -581,15 +561,7 @@ pub(super) fn run(
         };
         n.run("/usr/bin/systemctl", &["start", TIMER])?;
         if let Some(held) = held {
-            return qualification::capture_stop(
-                n,
-                &held,
-                &pr,
-                &deployed_gr,
-                &producer_package,
-                &guard_package,
-                &receipts,
-            );
+            return qualification::capture_stop(n, &held, &pr, &deployed_gr, attempt, &peers);
         }
         let g = loop {
             n.check()?;
@@ -623,35 +595,21 @@ pub(super) fn run(
                 && timer["DropInPaths"] == "",
             "timer not armed"
         );
-        let object = format!(
-            "/org/freedesktop/systemd1/unit/{}",
-            TIMER
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() {
-                    c.to_string()
-                } else {
-                    format!("_{:02x}", c as u32)
-                })
-                .collect::<String>()
-        );
-        let typed = n.run(
-            "/usr/bin/busctl",
-            &[
-                "get-property",
-                "org.freedesktop.systemd1",
-                &object,
-                "org.freedesktop.systemd1.Timer",
-                "NextElapseUSecMonotonic",
-            ],
-        )?;
-        let words: Vec<_> = std::str::from_utf8(&typed)?.split_whitespace().collect();
-        ensure!(words.len() == 2 && words[0] == "t", "typed timer deadline");
-        let next = words[1].parse::<u64>()?;
+        let next = peer_window::deadline(n, TIMER)?;
         let clock = mono()?;
         ensure!(
             next > clock && next - clock <= 35_000_000,
-            "timer next fire missing/late"
+            "candidate first timer deadline missing/late"
         );
+        let candidate_limit = next
+            .checked_sub(5_000_000)
+            .context("candidate timer margin")?;
+        n.deadline = Some(
+            n.deadline
+                .context("original operator clock")?
+                .min(candidate_limit),
+        );
+        n.check()?;
         let sample_path = receipts.join(format!("sample-{gid}.json"));
         let sample = Bound::new(&sample_path, hash(&sample_path)?).json()?;
         for stop in ["stop-intent.json", "stop-completion.json"] {
@@ -683,7 +641,7 @@ pub(super) fn run(
             ],
         )?;
         let mut token = json!({"schema":"horizon-singleton211-first-guard-token-v1","startup_plan_sha256":pr.sha256,"unit":UNIT,"invocation_id":iid,"main_pid":pid,"gate":p["gate"],"node":p["node"],"worker":p["worker"],"guard":guard,"boot_id":p["boot_id"],"admission":ar,"guard_invocation_id":gid,"guard_plan":deployed_gr,
-            "guard_sample":Bound::new(proof_package.join("guard-sample.json"),sr.sha256),"guard_pid1_journal":Bound::new(proof_package.join("guard-PID1.json"),jr.sha256),"recorded_monotonic_us":mono()?});
+            "guard_sample":Bound::new(proof_package.join("guard-sample.json"),sr.sha256),"guard_pid1_journal":Bound::new(proof_package.join("guard-PID1.json"),jr.sha256),"candidate_next_elapse_monotonic_us":next,"recorded_monotonic_us":mono()?});
         deny_authority(&mut token);
         token["replay_launch_authorized"] = json!(true);
         first_guard(&p, &token, &gp, &sample, &journal, now()?)?;
@@ -694,6 +652,17 @@ pub(super) fn run(
         );
         producer(n, Some(&iid), &pr, &affinity, self_sha, false)?;
         gate::held(pid, &iid)?;
+        peers.verify(n)?;
+        ensure!(
+            n.show(GUARD_UNIT)? == g
+                && n.show(TIMER)? == timer
+                && peer_window::deadline(n, TIMER)? == next,
+            "candidate first guard rolled over before token"
+        );
+        for stop in ["stop-intent.json", "stop-completion.json"] {
+            absent(&receipts.join(stop))?;
+        }
+        n.check()?;
         let tr = save_json(&n.root, "guard-admission.json", &token)?;
         let ts = save(
             &n.root,
@@ -826,7 +795,7 @@ mod tests {
             );
         }
         let retention = retention_template();
-        assert!(retention.contains(&format!("After={UNIT}\n")));
+        assert!(retention.contains(&format!("After={UNIT} {GUARD_UNIT} {TIMER}\n")));
         for forbidden in ["Wants=", "Requires=", "BindsTo=", "Upholds=", "[Install]"] {
             assert!(!retention.contains(forbidden));
         }

@@ -44,7 +44,7 @@ Build the actual retained guard feature union plus `epoch211-singleton-guard`.
 ## Executable route
 
 Seal the newly built launcher at exactly:
-`/var/lib/jetstreamer/horizon-singleton211-launch-20261119-v1/horizon-singleton211-launch`.
+`/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch`.
 Seal the separately qualified guard at exactly:
 `/var/lib/jetstreamer/horizon-211-singleton-main-guard-20261119-v1/horizon-standalone-guard`.
 The guard SHA is supplied through the immutable reviewed binding and verified

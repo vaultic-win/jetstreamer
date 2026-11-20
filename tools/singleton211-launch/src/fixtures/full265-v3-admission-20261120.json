@@ -1,0 +1,96 @@
+{
+  "admitted": true,
+  "candidate_epoch": 265,
+  "candidate_memory_max_bytes": 128000000000,
+  "candidate_root_cap_bytes": 506191984640,
+  "expires_unix_seconds": 1795142756,
+  "guard_minimum_free_bytes": 3908104436088,
+  "issued_unix_seconds": 1795142696,
+  "launch_plan": {
+    "path": "/var/lib/jetstreamer/horizon265-replacement-launch-plan-20261120-v3/plan.json",
+    "sha256": "7e1a06dd877c91162637dcde09e7b6d25a76c939e55820eed38b93e701a9ebc5"
+  },
+  "launcher_sha256": "199b6077d9233f59e21c0aebf47679cf92fbd5ad3bab120b8339a794407b48cc",
+  "native_admission": {
+    "actual_current_memory": {
+      "horizon-qualify-250-reboot-20261117-v1.service": 167009824768,
+      "horizon-qualify-251-replacement-20261118-v1.service": 95393681408,
+      "horizon-upload-247-singleton-20261119-v1.service": 6998429696
+    },
+    "admitted": true,
+    "boot_id": "3b17d005-5c3a-4a0e-8841-da097e0957b5",
+    "candidate_incremental_peak_bytes": 506191984640,
+    "canonical_sidecar_authorized": false,
+    "capacity": {
+      "allocation_credit_taken_bytes": 0,
+      "available_memory_bytes": 1071889432576,
+      "century_floor_bytes": 280581611288,
+      "control_reserve_bytes": 1610612736,
+      "failed_v1_preserved_inherited_floor_bytes": 3722733519128,
+      "failed_v2_preserved_inherited_floor_bytes": 3908104436088,
+      "fixed_auxiliary_overhead_bytes": 2640509440,
+      "host_memory_total_bytes": 1212136964096,
+      "host_reserve_bytes": 68719476736,
+      "memory_obligation_after_bytes": 863746110976,
+      "observed_available_bytes": 4502709014528,
+      "periodic_control_envelope_bytes": 4294967296,
+      "protected_existing_floor_bytes": 3908104436088,
+      "remaining_hard_growth_bytes": 594344175104,
+      "required_initial_free_bytes": 4414296420728,
+      "retained_disk_growth_bytes": 3627522824800
+    },
+    "entry_replay": false,
+    "epoch": 265,
+    "expires_unix_seconds": 1795142756,
+    "fleet": {
+      "path": "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle0240-20261120-v1/fleet-v1.json",
+      "sha256": "7d19e79c935ba4c3eae5ee91d20a1329af9a47930b4e61a46e204831e094ffaa"
+    },
+    "full_epoch_qualified": false,
+    "guard": {
+      "path": "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard",
+      "sha256": "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d"
+    },
+    "maximum_memory_bytes": 128000000000,
+    "mode": "ordinary-replay",
+    "node": {
+      "path": "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node",
+      "sha256": "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32"
+    },
+    "observer": {
+      "path": "/home/ubuntu/.codex/diagnostics/horizon-resume-observer-20261120-v120.json",
+      "sha256": "798921a8fe954c97f425b84e8c1ba9dd194155d4802f2ec52c99539f6a388af3"
+    },
+    "private_run_root": "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3",
+    "protected_existing_floor_bytes": 3908104436088,
+    "publication_authorized": false,
+    "r2_mutations": false,
+    "recorded_unix_seconds": 1795142696,
+    "remote_mutations": false,
+    "replay_launch_authorized": false,
+    "reservation_ledger": {
+      "path": "/var/lib/jetstreamer/horizon265-current-admission0240-20261120-prepare-r2/current-ledger.json",
+      "sha256": "9ba1b8eb190729e63e3387985714acd7bef1a8fc163adcfd16f96855b14b634c"
+    },
+    "review": {
+      "path": "/var/lib/jetstreamer/horizon265-current-admission0240-20261120-launch-r2/review.json",
+      "sha256": "faefbc4248710d4b3e4a226d0a8232e2473a811b4a55094dd8694c6b7bbf4488"
+    },
+    "runtime_promotion_authorized": false,
+    "schema": "horizon265-current-fleet-admission-v1",
+    "source_publication": {
+      "path": "/var/lib/jetstreamer/horizon265-attempt3-publication-20261120-v2/source-publication.json",
+      "sha256": "e1038fc00b242e437fcecfca622d0217f98f38bacb34d75f927164b70aab5982"
+    },
+    "unit": "horizon-qualify-265-replacement-20261119-v3.service"
+  },
+  "publication_authorized": false,
+  "remote_mutations": false,
+  "replay_observed": false,
+  "required_initial_free_bytes": 4414296420728,
+  "review": {
+    "path": "/var/lib/jetstreamer/horizon265-current-admission0240-20261120-launch-r2/review.json",
+    "sha256": "faefbc4248710d4b3e4a226d0a8232e2473a811b4a55094dd8694c6b7bbf4488"
+  },
+  "schema": "horizon265-current-fleet-launch-admission-v1"
+}

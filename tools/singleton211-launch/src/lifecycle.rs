@@ -53,6 +53,8 @@ pub(super) fn admission(a: &Value, p: &Value) -> Result<()> {
             && num(a, "expires_unix_seconds")? - num(a, "recorded_unix_seconds")? <= 60,
         "full replay admission differs"
     );
+    let review = binding(&a["review"])?.sealed()?;
+    prepare::historical(&review, p, a)?;
     for k in [
         "review",
         "source_publication",
@@ -205,7 +207,7 @@ pub(super) fn validate_handoff(v: &Value) -> Result<()> {
         wall,
     )?;
     let affinity = super::launch::cpus(&review)?;
-    let expected = launch::producer_template(&pr, &affinity, &gate.sha256);
+    let expected = launch::producer_template(&pr.path, &affinity, &gate.sha256);
     let unit = binding(&v["unit_file"])?;
     ensure!(
         unit.sha256 == digest(expected.as_bytes()) && unit.bytes(true)? == expected.as_bytes(),
@@ -226,17 +228,8 @@ pub(super) fn validate_handoff(v: &Value) -> Result<()> {
             && producer["Delegate"] == "no",
         "captured producer identity changed"
     );
-    let command = format!(
-        "{{ path={GATE} ; argv[]={}",
-        launch::gate_command(&pr, &gate.sha256)
-    );
-    ensure!(
-        text(producer, "ExecStart")?
-            .split(" ; ignore_errors=")
-            .next()
-            == Some(command.as_str()),
-        "captured command differs"
-    );
+    launch::producer_properties(producer, &pr, &affinity, &gate.sha256)?;
+    prepare::verify_pair(&binding(&v["guard_plan"])?, prepare::GUARD_ARG)?;
     let guard = binding(&p["guard"])?;
     ensure!(
         guard.path == Path::new(GUARD) && v["guard_sha256"] == guard.sha256,
@@ -248,7 +241,7 @@ pub(super) fn validate_handoff(v: &Value) -> Result<()> {
             && retain["LoadState"] == "loaded"
             && retain["ActiveState"] == "active"
             && retain["SubState"] == "active"
-            && retain["After"] == UNIT
+            && launch::retains_all(retain)?
             && retain["DefaultDependencies"] == "no"
             && retain["IgnoreOnIsolate"] == "yes"
             && retain["Job"] == ""

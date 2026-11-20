@@ -1,6 +1,6 @@
 //! Fresh PID1/kernel census, twice, with strict owner and terminal drainage checks.
 use super::*;
-pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestampMonotonic,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,BindReadOnlyPaths,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
+pub(super) const PROPS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecMainStartTimestampMonotonic,ExecStart,Job,Restart,KillMode,Delegate,ControlGroup,TriggeredBy,MemoryMax,MemoryHigh,MemorySwapMax,TasksMax,FragmentPath,DropInPaths,Type,User,Group,RuntimeMaxUSec,ProtectSystem,ProtectHome,PrivateNetwork,NoNewPrivileges,CapabilityBoundingSet,ReadWritePaths,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,CPUAffinity,CPUQuotaPerSecUSec,Unit,Transient,RemainAfterExit,StartLimitIntervalUSec,BindReadOnlyPaths,After,Wants,Requires,BindsTo,Upholds,IgnoreOnIsolate,DefaultDependencies";
 fn scalar(v: &Value, key: &str) -> Result<u64> {
     Ok(text(v, key)?.parse()?)
 }

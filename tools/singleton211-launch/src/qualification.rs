@@ -437,11 +437,11 @@ fn links(c: &Value, p: &Value, review: &Value) -> Result<Vec<(String, Bound)>> {
     let gp = binding(&c["guard_plan"])?;
     let guard = binding(&c["guard"])?;
     let producer = launch::package(attempt, "producer");
-    let guard_package = launch::package(attempt, "guard-binding");
+    let guard_package = launch::package(attempt, "guard-units");
     let receipts = launch::package(attempt, "guard-receipts");
     ensure!(
         startup.path == launch::package(attempt, "startup-plan").join("plan.json")
-            && gp.path == guard_package.join("guard-plan.json")
+            && gp.path == launch::package(attempt, "guard-binding").join("guard-plan.json")
             && c["producer_package"] == json!(producer)
             && c["guard_package"] == json!(guard_package)
             && c["receipts"] == json!(receipts),
@@ -452,7 +452,7 @@ fn links(c: &Value, p: &Value, review: &Value) -> Result<Vec<(String, Bound)>> {
             UNIT,
             producer.join(UNIT),
             launch::producer_template(
-                &startup,
+                &startup.path,
                 &launch::cpus(review)?,
                 text(&p["gate"], "sha256")?,
             ),
@@ -465,7 +465,7 @@ fn links(c: &Value, p: &Value, review: &Value) -> Result<Vec<(String, Bound)>> {
         (
             GUARD_UNIT,
             guard_package.join(GUARD_UNIT),
-            launch::guard_template(&guard, &gp, &receipts),
+            launch::guard_template(&guard, &gp.path, &receipts),
         ),
         (TIMER, guard_package.join(TIMER), launch::timer_template()),
     ];
@@ -599,19 +599,9 @@ fn validate_capture(c: &Value, guard: &Bound, self_sha: &str) -> Result<Vec<(Str
     )?;
     timer_idle(&c["timer_terminal"])?;
     let links = links(c, &p, &review)?;
-    let expected_guard_command = format!(
-        "{{ path={} ; argv[]={} {} --plan-sha256 {} --self-sha256 {} ; ignore_errors=no",
-        guard.path.display(),
-        guard.path.display(),
-        binding(&c["guard_plan"])?.path.display(),
-        text(&c["guard_plan"], "sha256")?,
-        guard.sha256
-    );
-    ensure!(
-        periodic::stable_command(text(&c["guard_terminal"], "ExecStart")?)?
-            == expected_guard_command,
-        "captured guard command changed"
-    );
+    let gr = binding(&c["guard_plan"])?;
+    prepare::verify_pair(&gr, prepare::GUARD_ARG)?;
+    prepare::guard_properties(&c["guard_terminal"], guard, &gr.path)?;
     for (unit, target) in &links {
         let captured = match unit.as_str() {
             GUARD_UNIT => &c["guard_terminal"],
@@ -652,10 +642,12 @@ pub(super) fn capture_stop(
     held: &Value,
     startup: &Bound,
     guard_plan: &Bound,
-    producer_package: &Path,
-    guard_package: &Path,
-    receipts: &Path,
+    attempt: &str,
+    peers: &peer_window::Window,
 ) -> Result<()> {
+    let producer_package = launch::package(attempt, "producer");
+    let guard_package = launch::package(attempt, "guard-units");
+    let receipts = launch::package(attempt, "guard-receipts");
     let p = startup.sealed()?;
     let iid = text(&held["producer"], "InvocationID")?;
     let pid = text(&held["producer"], "MainPID")?.parse::<u64>()?;
@@ -708,6 +700,7 @@ pub(super) fn capture_stop(
     validate_capture(&c, &binding(&p["guard"])?, text(&p["gate"], "sha256")?)?;
     drained(pid, iid, &held["pristine_root"])?;
     n.check()?;
+    peers.verify(n)?;
     let out = save_json(&n.root, "protective-stop-capture.json", &c)?;
     println!("{}", serde_json::to_string(&out)?);
     Ok(())
@@ -777,19 +770,59 @@ fn installed_link(unit: &str, target: &Bound) -> Result<Identity> {
     Ok(metadata_identity(&m))
 }
 
-pub(super) fn retire_attempt(
+fn collect_retired(n: &mut Native, links: &[(String, Bound)]) -> Result<BTreeMap<String, Value>> {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let mut after = BTreeMap::new();
+        for (unit, target) in links {
+            for root in ["/etc/systemd/system", "/run/systemd/system"] {
+                absent(&Path::new(root).join(unit))?;
+                absent(&Path::new(root).join(format!("{unit}.d")))?;
+            }
+            let v = n.show(unit)?;
+            ensure!(
+                v["Id"] == unit.as_str() && v["Job"] == "" && v["ActiveState"] == "inactive",
+                "qualification unit acquired another owner"
+            );
+            if v["LoadState"] == "not-found" {
+                after.insert(unit.clone(), v);
+            } else {
+                ensure!(
+                    v["LoadState"] == "loaded"
+                        && (v["FragmentPath"] == json!(target.path)
+                            || v["FragmentPath"] == format!("/etc/systemd/system/{unit}")),
+                    "unexpected cached definition"
+                );
+            }
+        }
+        if after.len() == 4 {
+            return Ok(after);
+        }
+        ensure!(
+            Instant::now() < deadline,
+            "qualification remains cached; preserve diagnostics"
+        );
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn retirement_intent(
     n: &mut Native,
     capture_ref: &Bound,
     c: &Value,
-    self_sha: &str,
-) -> Result<()> {
-    let guard = binding(&c["guard"])?;
-    ensure!(guard.path == Path::new(GUARD), "foreign guard deployment");
-    let links = validate_capture(c, &guard, self_sha)?;
-    ensure!(
-        text(c, "boot_id")? == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
-        "qualification boot changed"
-    );
+    links: &[(String, Bound)],
+    dest: &Path,
+) -> Result<Bound> {
+    let path = dest.join("retirement-before.json");
+    match fs::symlink_metadata(dest) {
+        Ok(_) => {
+            let b = Bound::new(&path, hash(&path)?);
+            b.sealed()?;
+            return Ok(b);
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+        Err(e) => return Err(e.into()),
+    }
     let iid = text(c, "producer_invocation_id")?;
     let pid = num(c, "producer_main_pid")?;
     let initial = n.show(UNIT)?;
@@ -807,7 +840,7 @@ pub(super) fn retire_attempt(
     let retain = launch::retention(n, Path::new(text(c, "producer_package")?))?;
     drained(pid, iid, &c["held"]["pristine_root"])?;
     let mut identities = BTreeMap::new();
-    for (unit, target) in &links {
+    for (unit, target) in links {
         identities.insert(unit.clone(), installed_link(unit, target)?);
         for dir in ["/etc/systemd/system", "/run/systemd/system"] {
             absent(&Path::new(dir).join(format!("{unit}.d")))?;
@@ -818,48 +851,112 @@ pub(super) fn retire_attempt(
         &n.root,
         "retirement-before.json",
         &json!({"capture":capture_ref,"producer":initial,
-        "retention":retain,"unit_files":links,"link_identities":identities,"root":c["held"]["pristine_root"],"remote_mutations":false}),
+        "guard":current_guard,"timer":current_timer,"retention":retain,"boot_id":c["boot_id"],
+        "unit_files":links,"link_identities":identities,"root":c["held"]["pristine_root"],"remote_mutations":false}),
     )?;
-    // Releasing the empty retention target cannot stop or activate another unit.
-    n.run("/usr/bin/systemctl", &["stop", RETENTION])?;
-    let released = n.show(UNIT)?;
+    n.seal(dest, &[("retirement-before.json", before.clone())])?;
+    Ok(Bound::new(path, before.sha256))
+}
+pub(super) fn retire_attempt(
+    n: &mut Native,
+    capture_ref: &Bound,
+    c: &Value,
+    self_sha: &str,
+) -> Result<()> {
+    let guard = binding(&c["guard"])?;
+    ensure!(guard.path == Path::new(GUARD), "foreign guard deployment");
+    let links = validate_capture(c, &guard, self_sha)?;
     ensure!(
-        released["MainPID"] == "0"
-            && released["ControlPID"] == "0"
-            && released["Job"] == ""
-            && released["ActiveState"] == "inactive"
-            && (released["InvocationID"] == iid || released["InvocationID"] == ""),
-        "producer changed during retention release"
+        text(c, "boot_id")? == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
+        "qualification boot changed"
     );
+    let iid = text(c, "producer_invocation_id")?;
+    let pid = num(c, "producer_main_pid")?;
+    // Serialize independent retirement invocations on their exact immutable capture.
+    let lock = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&capture_ref.path)?;
+    use std::os::fd::AsRawFd;
+    ensure!(
+        unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "qualification retirement already in progress"
+    );
+    let startup = binding(&c["startup_plan"])?.sealed()?;
+    let a = binding(&startup["admission"])?.sealed()?;
+    let review = binding(&a["review"])?.sealed()?;
+    let attempt = text(&review, "attempt")?;
+    ensure!(
+        launch::safe_attempt(attempt),
+        "retirement attempt namespace"
+    );
+    let before = retirement_intent(
+        n,
+        capture_ref,
+        c,
+        &links,
+        &launch::package(attempt, "retire-intent"),
+    )?;
+    let intent = before.sealed()?;
+    ensure!(
+        intent["capture"] == json!(capture_ref)
+            && intent["boot_id"] == c["boot_id"]
+            && intent["unit_files"] == json!(links)
+            && intent["root"] == c["held"]["pristine_root"]
+            && intent["timer"] == c["timer_terminal"]
+            && intent["remote_mutations"] == false,
+        "retirement intent belongs to another qualification"
+    );
+    same_terminal(&c["producer_terminal"], &intent["producer"])?;
+    same_terminal(&c["guard_terminal"], &intent["guard"])?;
     drained(pid, iid, &c["held"]["pristine_root"])?;
-    let current_guard = n.show(GUARD_UNIT)?;
-    guard_terminal(&current_guard, text(c, "guard_invocation_id")?)?;
-    same_terminal(&c["guard_terminal"], &current_guard)?;
-    let current_timer = n.show(TIMER)?;
-    timer_idle(&current_timer)?;
-    ensure!(
-        current_timer == c["timer_terminal"],
-        "qualification timer changed after capture"
-    );
-    for (unit, target) in &links {
+    let active = n.show(RETENTION)?;
+    let targets = &intent["link_identities"];
+    let armed = active["ActiveState"] == "active";
+    if armed {
         ensure!(
-            installed_link(unit, target)? == identities[unit],
-            "qualification link replaced during retirement"
+            hex(text(&intent["retention"], "InvocationID")?, 32) && active == intent["retention"],
+            "retention was replaced or restarted"
         );
-        fs::remove_file(Path::new("/etc/systemd/system").join(unit))?;
+        same_terminal(&intent["producer"], &n.show(UNIT)?)?;
+        same_terminal(&intent["guard"], &n.show(GUARD_UNIT)?)?;
+        ensure!(
+            n.show(TIMER)? == intent["timer"],
+            "qualification timer changed before release"
+        );
+    } else {
+        ensure!(
+            active["ActiveState"] == "inactive" && active["Job"] == "",
+            "ambiguous retention release"
+        );
+    }
+    for (unit, target) in &links {
+        for root in ["/etc/systemd/system", "/run/systemd/system"] {
+            absent(&Path::new(root).join(format!("{unit}.d")))?;
+        }
+        absent(&Path::new("/run/systemd/system").join(unit))?;
+        let path = Path::new("/etc/systemd/system").join(unit);
+        match fs::symlink_metadata(&path) {
+            Ok(_) => {
+                ensure!(
+                    armed && targets[unit.as_str()] == json!(installed_link(unit, target)?),
+                    "qualification link or pinned retention was replaced"
+                );
+                fs::remove_file(path)?;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
     }
     File::open("/etc/systemd/system")?.sync_all()?;
-    n.run("/usr/bin/systemctl", &["daemon-reload"])?;
-    let mut after = BTreeMap::new();
-    for unit in [UNIT, GUARD_UNIT, TIMER, RETENTION] {
-        absent(&Path::new("/etc/systemd/system").join(unit))?;
-        let v = n.show(unit)?;
+    if armed {
         ensure!(
-            v["LoadState"] == "not-found" && v["Job"] == "" && v["ActiveState"] == "inactive",
-            "qualification unit not collected"
+            n.show(RETENTION)? == intent["retention"],
+            "retention changed before stop"
         );
-        after.insert(unit, v);
+        n.run("/usr/bin/systemctl", &["stop", RETENTION])?;
     }
+    let after = collect_retired(n, &links)?;
     drained(pid, iid, &c["held"]["pristine_root"])?;
     let mut retired = json!({"schema":"horizon-singleton211-qualification-unit-retirement-v1","capture":capture_ref,"before":before,"boot_id":c["boot_id"],
         "unit_files":links,"after":after,"sealed_packages_and_diagnostics_preserved":true,"producer_restarted":false,

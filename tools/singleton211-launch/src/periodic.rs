@@ -77,7 +77,10 @@ fn envelope(ledger: &Value, previous: &Value) -> Result<Vec<Control>> {
         e.schema == "horizon-native211-original-periodic-controls-v1",
         "periodic envelope schema"
     );
-    let expected = pins();
+    let mut expected = pins();
+    if e.controls.iter().any(|c| c.unit == full265::GUARD_UNIT) {
+        expected.push(full265::control());
+    }
     ensure!(
         e.controls.len() == expected.len(),
         "incomplete periodic obligations"
@@ -114,6 +117,9 @@ fn directive<'a>(source: &'a str, key: &str) -> Result<&'a str> {
     Ok(entries[0])
 }
 fn argv(c: &Control) -> String {
+    if c.unit == full265::GUARD_UNIT {
+        return full265::guard_argv(c, false);
+    }
     format!(
         "{} {} --plan-sha256 {} --self-sha256 {}",
         c.executable.path.display(),
@@ -128,19 +134,7 @@ pub(super) fn booking(
     rows: &[capacity::Reservation],
 ) -> Result<Vec<Control>> {
     let controls = envelope(ledger, previous)?;
-    let original_producers = [
-        "horizon-qualify-248-reboot-20261117-v1.service",
-        "horizon-qualify-249-reboot-20261117-v1.service",
-        "horizon-qualify-250-reboot-20261117-v1.service",
-        "horizon-qualify-251-replacement-20261118-v1.service",
-    ];
-    ensure!(
-        !rows
-            .iter()
-            .any(|r| original_producers.contains(&r.unit.as_str()))
-            || controls.len() == 4,
-        "original replay guards require complete v3 periodic booking even while inactive"
-    );
+    coverage(&controls, rows)?;
     for c in &controls {
         ensure!(
             !rows.iter().any(|r| r.unit == c.unit),
@@ -151,6 +145,9 @@ pub(super) fn booking(
         c.executable.artifact()?;
         let s = String::from_utf8(c.service_source.bytes(true)?)?;
         let t = String::from_utf8(c.timer_source.bytes(true)?)?;
+        if c.unit == full265::GUARD_UNIT {
+            full265::guard_source(&s)?;
+        }
         ensure!(
             directive(&s, "MemoryMax")?.parse::<u64>()? == c.maximum_memory_bytes
                 && directive(&s, "MemorySwapMax")? == "0"
@@ -177,6 +174,36 @@ pub(super) fn booking(
         );
     }
     Ok(controls)
+}
+fn coverage(controls: &[Control], rows: &[capacity::Reservation]) -> Result<()> {
+    let original_producers = [
+        "horizon-qualify-248-reboot-20261117-v1.service",
+        "horizon-qualify-249-reboot-20261117-v1.service",
+        "horizon-qualify-250-reboot-20261117-v1.service",
+        "horizon-qualify-251-replacement-20261118-v1.service",
+    ];
+    ensure!(
+        !rows
+            .iter()
+            .any(|r| original_producers.contains(&r.unit.as_str()))
+            || controls
+                .iter()
+                .filter(|c| c.unit != full265::GUARD_UNIT)
+                .count()
+                == 4,
+        "original replay guards require complete v3 periodic booking even while inactive"
+    );
+    ensure!(
+        rows.iter()
+            .filter(|r| r.unit == full265_owner::UNIT)
+            .count()
+            == controls
+                .iter()
+                .filter(|c| c.unit == full265::GUARD_UNIT)
+                .count(),
+        "full265 producer and periodic guard must both be booked exactly once"
+    );
+    Ok(())
 }
 // Only PID1's execution history is volatile. ignore_errors remains part of identity.
 pub(super) fn stable_command(value: &str) -> Result<&str> {
@@ -207,6 +234,9 @@ pub(super) fn stable_command(value: &str) -> Result<&str> {
     Ok(command)
 }
 fn service_values(c: &Control, s: &Value) -> Result<bool> {
+    if c.unit == full265::GUARD_UNIT {
+        full265::guard_properties(s)?;
+    }
     let expected = format!(
         "{{ path={} ; argv[]={} ; ignore_errors=no",
         c.executable.path.display(),
@@ -375,6 +405,17 @@ fn process_census(c: &Control, s: &Value, dormant: bool) -> Result<()> {
         );
         let image = fs::read_link(e.path().join("exe"))?;
         if pid == main {
+            if c.unit == full265::GUARD_UNIT {
+                let expected = full265::guard_argv(c, true)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join("\0")
+                    + "\0";
+                ensure!(
+                    fs::read(e.path().join("cmdline"))? == expected.as_bytes(),
+                    "full265 executing guard digest argument differs"
+                );
+            }
             ensure!(
                 image == c.executable.path
                     && metadata_identity(&fs::metadata(e.path().join("exe"))?)
@@ -408,6 +449,9 @@ fn process_census(c: &Control, s: &Value, dormant: bool) -> Result<()> {
     Ok(())
 }
 pub(super) fn observe(n: &mut Native, c: &Control) -> Result<()> {
+    if c.unit == full265::GUARD_UNIT {
+        full265::guard_environment()?;
+    }
     let s = n.show(&c.unit)?;
     let dormant = service_values(c, &s)?;
     fragment(&s, &c.service_source, &c.unit)?;
@@ -488,6 +532,9 @@ pub(super) fn observe(n: &mut Native, c: &Control) -> Result<()> {
     let timer_after = n.show(&c.timer)?;
     timer_values(c, &timer_after, dormant)?;
     fragment(&after, &c.service_source, &c.unit)?;
+    if c.unit == full265::GUARD_UNIT {
+        full265::guard_environment()?;
+    }
     fragment(&timer_after, &c.timer_source, &c.timer)?;
     Ok(())
 }
@@ -501,6 +548,85 @@ mod tests {
             json!({"schema":"horizon-native211-retained-reservations-v3","periodic_controls":e}),
             json!({"schema":"horizon-native211-prior-host-booking-v3","periodic_controls":e}),
         )
+    }
+    #[test]
+    fn full265_fifth_periodic_guard_preserves_original_four_and_requires_its_booking() {
+        let (mut l, mut p) = fixture();
+        let c = full265::control();
+        l["periodic_controls"]["controls"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!(c));
+        p["periodic_controls"] = l["periodic_controls"].clone();
+        let controls = envelope(&l, &p).unwrap();
+        assert_eq!(total(&controls).unwrap(), 5_368_709_120);
+        let row = capacity::Reservation {
+            unit: full265_owner::UNIT.into(),
+            invocation_id: full265::IID.into(),
+            maximum_memory_bytes: 128_000_000_000,
+            remaining_disk_growth_bytes: 506_191_984_640,
+            minimum_free_bytes: 3_908_104_436_088,
+            source: Bound::new("/unused", "a".repeat(64)),
+            release: None,
+        };
+        coverage(&controls, std::slice::from_ref(&row)).unwrap();
+        assert!(coverage(&controls, &[]).is_err());
+        assert!(coverage(&pins(), std::slice::from_ref(&row)).is_err());
+        for pointer in [
+            "/periodic_controls/controls/4/guard_plan/sha256",
+            "/periodic_controls/controls/4/service_source/sha256",
+            "/periodic_controls/controls/4/maximum_memory_bytes",
+        ] {
+            let mut a = l.clone();
+            *a.pointer_mut(pointer).unwrap() = json!(0);
+            let mut b = p.clone();
+            b["periodic_controls"] = a["periodic_controls"].clone();
+            assert!(envelope(&a, &b).is_err(), "{pointer}");
+        }
+        let mut a = l.clone();
+        a["periodic_controls"]["controls"]
+            .as_array_mut()
+            .unwrap()
+            .remove(0);
+        let mut b = p.clone();
+        b["periodic_controls"] = a["periodic_controls"].clone();
+        assert!(envelope(&a, &b).is_err());
+        assert!(envelope(&l, &fixture().1).is_err());
+    }
+    #[test]
+    fn full265_periodic_guard_binds_literal_manager_argument_and_exact_environment() {
+        let c = full265::control();
+        let mut s = service(&c);
+        s["EnvironmentFiles"] = json!(
+            "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v3/guard.env (ignore_errors=no)"
+        );
+        for k in [
+            "Environment",
+            "PassEnvironment",
+            "UnsetEnvironment",
+            "Group",
+        ] {
+            s[k] = json!("");
+        }
+        assert!(service_values(&c, &s).unwrap());
+        assert!(argv(&c).contains("${HORIZON265_GUARD_PLAN_SHA256}"));
+        assert!(!full265::guard_argv(&c, true).contains('$'));
+        for (k, v) in [
+            ("EnvironmentFiles", "/old/guard.env (ignore_errors=no)"),
+            ("Environment", "HORIZON265_GUARD_PLAN_SHA256=other"),
+            ("PassEnvironment", "HORIZON265_GUARD_PLAN_SHA256"),
+            ("UnsetEnvironment", "HORIZON265_GUARD_PLAN_SHA256"),
+        ] {
+            let mut bad = s.clone();
+            bad[k] = json!(v);
+            assert!(service_values(&c, &bad).is_err(), "{k}");
+        }
+        let mut bad = s.clone();
+        bad["ExecStart"] = json!(text(&s, "ExecStart").unwrap().replace(
+            "${HORIZON265_GUARD_PLAN_SHA256}",
+            "$HORIZON265_GUARD_PLAN_SHA256"
+        ));
+        assert!(service_values(&c, &bad).is_err());
     }
     #[test]
     fn original_periodic_booking_cannot_drop_shrink_rebind_or_duplicate_a_guard() {

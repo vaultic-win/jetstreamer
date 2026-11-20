@@ -74,6 +74,17 @@ pub(super) fn plan(p: &Value, self_sha: &str, boot: &str, current: u64) -> Resul
     qualification::operation(p)?;
     clock(p, current)
 }
+fn token_clock(p: &Value, t: &Value, current: u64) -> Result<()> {
+    clock(p, current)?;
+    let captured = num(t, "recorded_monotonic_us")?;
+    let next = num(t, "candidate_next_elapse_monotonic_us")?;
+    ensure!(
+        next.checked_sub(captured).is_some_and(|d| d <= 35_000_000)
+            && current.checked_add(5_000_000).is_some_and(|v| v < next),
+        "first candidate guard window expired"
+    );
+    Ok(())
+}
 pub(super) fn token(
     p: &Value,
     pr: &Bound,
@@ -87,7 +98,7 @@ pub(super) fn token(
         !qualification::operation(p)?,
         "protective-stop experiment cannot accept a release token"
     );
-    clock(p, current)?;
+    token_clock(p, t, current)?;
     ensure!(
         t["schema"] == "horizon-singleton211-first-guard-token-v1"
             && t["startup_plan_sha256"] == pr.sha256
@@ -189,7 +200,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
                     text(&t, "guard_invocation_id")?
                 );
                 return before_exec(
-                    || clock(&p, mono()?),
+                    || token_clock(&p, &t, mono()?),
                     || {
                         let error = Command::new(NODE)
                             .args(launch::node_args())
@@ -226,6 +237,14 @@ fn before_exec(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn real_candidate_first_timer_limits_token_through_same_pid_exec() {
+        let p = json!({"issued_monotonic_us":100,"expires_monotonic_us":60_000_100});
+        let t = json!({"recorded_monotonic_us":10_000_000,"candidate_next_elapse_monotonic_us":30_000_000});
+        token_clock(&p, &t, 24_999_999).unwrap();
+        assert!(token_clock(&p, &t, 25_000_000).is_err());
+        assert!(token_clock(&p, &json!({"recorded_monotonic_us":10_000_000}), 15_000_000).is_err());
+    }
     #[test]
     fn denied_start_never_executes_node_or_snapshot_work() {
         let called = std::cell::Cell::new(false);
