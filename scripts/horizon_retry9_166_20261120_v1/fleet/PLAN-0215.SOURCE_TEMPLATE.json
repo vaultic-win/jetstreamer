@@ -1,0 +1,21 @@
+{
+  "schema": "horizon-zero-replay-fleet-reconcile-plan-v1",
+  "owner": "/root",
+  "primary_thread": "01a1af2a-9ce8-76a2-8939-b2112bd38f53",
+  "previous_fleet": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/fleet0115-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+    "sha256": "0542829040ba09f4876adce3cc4a6e36932bd2ed9e208ac8c66f44dd4475be2d"
+  },
+  "recovery_events": [
+    {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/root0145-zero-recovery-20261120-v1/ROOT_OPERATIONAL_RECOVERY_EVENT.json",
+      "sha256": "e29f3b71e0214cd69611cabf28a3c095ff5aeb69e228ecd8ae5bc3ba8e36cd9b"
+    },
+    {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/root0215-zero-recovery-20261120-v1/ROOT_OPERATIONAL_RECOVERY_EVENT.json",
+      "sha256": "7eaa3f59a07b38fc7d7fddc5c2f7453f4fc5d462df8a69c7eafabfb45f47d6c7"
+    }
+  ],
+  "later_cycles": [],
+  "output_directory": "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry9-recovery-20261120-v1/fleet0215-v1"
+}
