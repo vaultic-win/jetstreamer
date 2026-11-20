@@ -366,7 +366,10 @@ pub(super) fn census_with_held(
         }
         let v = n.show(&r.unit)?;
         if v["ActiveState"] == "active" || v["ActiveState"] == "activating" {
-            let current = finite_owner(&v, &r.unit, &r.invocation_id, r.maximum_memory_bytes)?;
+            if r.unit == delivery247::STAGED_UNIT {
+                delivery247::staged_owner(&v)?;
+            }
+            let current = finite_owner(&v, &r.unit, &r.invocation_id, delivery247::owner_cap(r))?;
             let old = &fleet["unit_census"][&r.unit];
             ensure!(
                 old.is_object(),
@@ -521,11 +524,14 @@ pub(super) fn census_with_held(
     for (unit, old) in before {
         let after = n.show(&unit)?;
         same_owner(&old, &after)?;
-        let cap = rows
-            .iter()
-            .find(|r| r.unit == unit)
-            .unwrap()
-            .maximum_memory_bytes;
+        if unit == delivery247::STAGED_UNIT {
+            delivery247::staged_owner(&after)?;
+        }
+        let cap = delivery247::owner_cap(
+            rows.iter()
+                .find(|r| r.unit == unit)
+                .context("active reservation")?,
+        );
         let current = finite_owner(&after, &unit, text(&old, "InvocationID")?, cap)?;
         currents.entry(unit).and_modify(|v| *v = (*v).min(current));
     }

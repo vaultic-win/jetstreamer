@@ -1,6 +1,8 @@
 //! Preserve the actual, separately admitted epoch247 delivery during replay admission.
 use super::*;
+mod staged;
 mod terminal;
+pub(super) use staged::UNIT as STAGED_UNIT;
 pub(super) const UNIT247: &str = "horizon-upload-247-singleton-20261119-v1.service";
 const IID247: &str = "69218e2e0924497ea595a1227a6c31db";
 const PID247: u64 = 1439838;
@@ -15,10 +17,19 @@ const OWNER_SHA: &str = "6612e4c2f7f3de9c2ee85cd508575456a3fc85d16bd3e09d842905e
 const FLEET_OWNER: &str = "/home/ubuntu/.codex/diagnostics/horizon-fleet-cycle0010-20261120-v1/delivery247-initial-owner.json";
 const FLEET_OWNER_SHA: &str = "52f5c892af9acef8d2cb273ec6a2a5737facfb504e0d9e2f71f4434720a7a3f9";
 
-pub(super) fn selected(e: &Value) -> bool {
+fn original(e: &Value) -> bool {
     e["epoch"] == 247 && e["phase"] == "upload-readback" && e["unit"]["Id"] == UNIT247
 }
+pub(super) fn selected(e: &Value) -> bool {
+    original(e) || staged::selected(e)
+}
 fn related(entry: &Value) -> bool {
+    if staged::selected(entry) {
+        return false;
+    }
+    if staged::mentions(entry) {
+        return true;
+    }
     entry["epoch"] == 247
         || entry["expected_invocation_id"] == IID247
         || ["unit", "producer", "controller"]
@@ -28,6 +39,7 @@ fn related(entry: &Value) -> bool {
 
 pub(super) fn validate_roster(fleet: &Value, rows: &[capacity::Reservation]) -> Result<()> {
     let entries = fleet["pipelines"].as_array().context("pipeline census")?;
+    staged::validate_roster(fleet, rows)?;
     let found: Vec<_> = entries.iter().filter(|e| related(e)).collect();
     if found.is_empty() {
         ensure!(
@@ -49,7 +61,7 @@ pub(super) fn validate_roster(fleet: &Value, rows: &[capacity::Reservation]) -> 
 
 pub(super) fn validate(e: &Value, fleet: &Value, rows: &[capacity::Reservation]) -> Result<()> {
     ensure!(
-        selected(e)
+        original(e)
             && e["live"].is_boolean()
             && e["expected_invocation_id"] == IID247
             && e["unit"]["InvocationID"] == IID247
@@ -115,6 +127,9 @@ pub(super) fn validate(e: &Value, fleet: &Value, rows: &[capacity::Reservation])
     Ok(())
 }
 pub(super) fn verify_inputs(e: &Value) -> Result<()> {
+    if staged::selected(e) {
+        return staged::verify_inputs(e);
+    }
     let review = Bound::new(REVIEW, REVIEW_SHA).sealed()?;
     ensure!(
         review["schema"] == "horizon247-current-reader-delivery-booking-v1"
@@ -145,6 +160,19 @@ pub(super) fn verify_inputs(e: &Value) -> Result<()> {
         "epoch247 mapped uploader changed"
     );
     Ok(())
+}
+
+pub(super) fn owner_cap(row: &capacity::Reservation) -> u64 {
+    if row.unit == STAGED_UNIT {
+        staged::HARD_CAP
+    } else {
+        row.maximum_memory_bytes
+    }
+}
+
+pub(super) fn staged_owner(current: &Value) -> Result<()> {
+    staged::manager(current)?;
+    staged::mapped_owner()
 }
 
 pub(super) fn terminal_owner(n: &mut Native, current: &Value) -> Result<()> {
