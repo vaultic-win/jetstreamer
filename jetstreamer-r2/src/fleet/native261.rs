@@ -95,6 +95,22 @@ fn mount_fixture(sample: &mut Value, pin: &mut Value) {
     pin["device"] = r["device"].clone();
     pin["inode"] = r["inode"].clone();
 }
+fn observation_mount(observation: &Value, h: &Value) -> Result<()> {
+    let first = sealed(&binding(&h["first_guard_sample"])?)?;
+    let mut peak = 0;
+    for k in ["scratch_pass_1", "scratch_pass_2"] {
+        let r = &observation[k];
+        sample_mount(&first, &json!({"root_physical_observation":r}))?;
+        peak = peak.max(num(r, "conservative_physical_bytes")?);
+    }
+    ensure!(
+        observation["scratch_measurement_method"] == "dedicated tmpfs superblock"
+            && observation["conservative_observed_physical_bytes"] == peak,
+        "261 observer scratch accounting differs"
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod mount_tests {
     use super::*;
@@ -121,20 +137,4 @@ mod mount_tests {
         pin["device"] = json!(16);
         assert!(pin_mount(&s, &pin).is_err());
     }
-}
-
-fn observation_mount(observation: &Value, h: &Value) -> Result<()> {
-    let first = sealed(&binding(&h["first_guard_sample"])?)?;
-    let mut peak = 0;
-    for k in ["scratch_pass_1", "scratch_pass_2"] {
-        let r = &observation[k];
-        sample_mount(&first, &json!({"root_physical_observation":r}))?;
-        peak = peak.max(num(r, "conservative_physical_bytes")?);
-    }
-    ensure!(
-        observation["scratch_measurement_method"] == "dedicated tmpfs superblock"
-            && observation["conservative_observed_physical_bytes"] == peak,
-        "261 observer scratch accounting differs"
-    );
-    Ok(())
 }

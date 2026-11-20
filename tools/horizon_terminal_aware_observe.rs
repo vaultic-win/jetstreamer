@@ -412,14 +412,14 @@ fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Res
     let rows = rows.as_array().context("native diagnostics array")?;
     let mut candidates = rows.iter().filter(|row| row["epoch"] == epoch);
     let Some(row) = candidates.next() else {
-        ensure!(binding.is_none(), "unused native257 handoff");
+        ensure!(binding.is_none(), "unused cold input handoff");
         return Ok(filtered);
     };
     ensure!(
         candidates.next().is_none(),
-        "duplicate native257 diagnostic"
+        "duplicate cold input diagnostic"
     );
-    let b = binding.context("native257 handoff required")?;
+    let b = binding.context("cold input handoff required")?;
     match epoch {
         257 => {
             horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
@@ -447,11 +447,11 @@ fn cold_owner(config: &Value, row: &Value, handoff: &Value, epoch: u64) -> Resul
     });
     let unit = string(handoff, "unit")?;
     let expected = json!({"epoch":epoch,"unit":unit,"expected_invocation_id":string(handoff, "invocation_id")?,
-        "main_pid":handoff["main_pid"].as_u64().context("native257 handoff PID")?,"scratch_path":root,
+        "main_pid":handoff["main_pid"].as_u64().context("cold input handoff PID")?,"scratch_path":root,
         "executable":string(&handoff["harness"],"path")?,"executable_sha256":string(&handoff["harness"],"sha256")?});
     ensure!(
         row == &expected,
-        "native257 resource tuple differs from original handoff"
+        "cold input resource tuple differs from original handoff"
     );
     for replay in ["replays", "diagnostic_replays"]
         .iter()
@@ -468,7 +468,7 @@ fn cold_owner(config: &Value, row: &Value, handoff: &Value, epoch: u64) -> Resul
                 && replay["controller_unit"] != unit
                 && !scratch.starts_with(root)
                 && !root.starts_with(scratch),
-            "native257 replay owner overlaps"
+            "cold input replay owner overlaps"
         );
     }
     Ok(())
@@ -527,7 +527,7 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
         .as_array()
         .context("missing replay census")?;
     ensure!(
-        (!rows.is_empty() || (p.native257_handoff.is_some() || p.native261_handoff.is_some()))
+        (!rows.is_empty() || p.native257_handoff.is_some() || p.native261_handoff.is_some())
             && rows.len() == handoffs.len(),
         "handoff census differs"
     );
@@ -677,7 +677,8 @@ fn run(args: &[String]) -> Result<()> {
         !live.is_empty()
             || !finalization.is_empty()
             || p.singleton211_handoff.is_some()
-            || (p.native257_handoff.is_some() || p.native261_handoff.is_some()),
+            || p.native257_handoff.is_some()
+            || p.native261_handoff.is_some(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     let original_delivery = config.get("delivery247_resource_only").cloned();
@@ -740,36 +741,46 @@ fn main() {
 mod tests {
     use super::*;
     #[test]
-    fn native257_needs_the_original_resource_tuple_and_exclusive_range() {
-        let h = json!({"unit":"native.service","invocation_id":"a".repeat(32),"main_pid":42,
-            "harness":{"path":"/harness","sha256":"b".repeat(64)}});
-        let row = json!({"epoch":257,"unit":h["unit"],"expected_invocation_id":h["invocation_id"],"main_pid":42,
-            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
-            "executable":h["harness"]["path"],"executable_sha256":h["harness"]["sha256"]});
-        let replay = json!({"range":"211-211","producer_unit":"other","controller_unit":"other","scratch_path":"/unrelated"});
-        let mut config = json!({"diagnostic_replays":[replay],"native_input_diagnostics":[row]});
-        cold_owner(&config, &row, &h, 257).unwrap();
-        for key in row.as_object().unwrap().keys() {
-            let mut changed = row.clone();
-            changed[key] = Value::Null;
-            assert!(cold_owner(&config, &changed, &h, 257).is_err(), "{key}");
-        }
-        for (key, value) in [
-            ("range", json!("255-258")),
-            ("producer_unit", h["unit"].clone()),
-            ("controller_unit", h["unit"].clone()),
-            ("scratch_path", json!("/home/ubuntu/.jetstreamer-private")),
+    fn cold_diagnostics_need_the_original_resource_tuple_and_exclusive_range() {
+        for (epoch, root, overlap) in [
+            (
+                257,
+                "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+                "/home/ubuntu/.jetstreamer-private",
+            ),
+            (261, "/run/horizon261-native-cold-v1", "/run"),
         ] {
-            let mut changed = config.clone();
-            changed["diagnostic_replays"][0][key] = value;
-            assert!(cold_owner(&changed, &row, &h, 257).is_err(), "{key}");
+            let h = json!({"unit":"native.service","invocation_id":"a".repeat(32),"main_pid":42,
+            "harness":{"path":"/harness","sha256":"b".repeat(64)}});
+            let row = json!({"epoch":epoch,"unit":h["unit"],"expected_invocation_id":h["invocation_id"],"main_pid":42,
+            "scratch_path":root,
+            "executable":h["harness"]["path"],"executable_sha256":h["harness"]["sha256"]});
+            let replay = json!({"range":"211-211","producer_unit":"other","controller_unit":"other","scratch_path":"/unrelated"});
+            let mut config =
+                json!({"diagnostic_replays":[replay],"native_input_diagnostics":[row]});
+            cold_owner(&config, &row, &h, epoch).unwrap();
+            for key in row.as_object().unwrap().keys() {
+                let mut changed = row.clone();
+                changed[key] = Value::Null;
+                assert!(cold_owner(&config, &changed, &h, epoch).is_err(), "{key}");
+            }
+            for (key, value) in [
+                ("range", json!(format!("{epoch}-{epoch}"))),
+                ("producer_unit", h["unit"].clone()),
+                ("controller_unit", h["unit"].clone()),
+                ("scratch_path", json!(overlap)),
+            ] {
+                let mut changed = config.clone();
+                changed["diagnostic_replays"][0][key] = value;
+                assert!(cold_owner(&changed, &row, &h, epoch).is_err(), "{key}");
+            }
+            assert!(cold_pass_through(&config, None, epoch).is_err());
+            config["native_input_diagnostics"]
+                .as_array_mut()
+                .unwrap()
+                .push(row);
+            assert!(cold_pass_through(&config, None, epoch).is_err());
         }
-        assert!(cold_pass_through(&config, None, 257).is_err());
-        config["native_input_diagnostics"]
-            .as_array_mut()
-            .unwrap()
-            .push(row);
-        assert!(cold_pass_through(&config, None, 257).is_err());
     }
     #[test]
     fn native265_prescreen_preserves_diagnostic_and_refuses_partial_owner() {
