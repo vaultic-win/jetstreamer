@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+echo "Guest driver preflight"
+cat /etc/machine-id /proc/sys/kernel/random/boot_id /proc/self/cgroup
+cat /run/systemd/container
+for n in pid mnt cgroup net; do
+    readlink "/proc/self/ns/$n"
+    readlink "/proc/1/ns/$n"
+done
+cat /fixture/host-namespaces.json
+ls -ld /evidence /var/log/journal /run/systemd/private
+/fixture/sandbox-tests --list --ignored | /usr/bin/grep -F exact_guard_terminates_a_held_owner_without_a_release_token
+/usr/bin/journalctl --flush
+/usr/bin/systemctl log-level info
+/usr/bin/systemctl log-target journal

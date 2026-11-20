@@ -433,3 +433,7 @@ mod tests {
         assert!(order(&c, &p, b"", &guard).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "stop_sandbox.rs"]
+mod stop_sandbox;
