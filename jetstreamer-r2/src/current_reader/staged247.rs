@@ -497,7 +497,7 @@ impl Retained {
         Ok(Sink::Compare {
             file: f,
             bytes: 0,
-            owner: self.clone(),
+            owner: Box::new(self.clone()),
         })
     }
     pub(super) fn verify_object(&self, remote: &RemoteObject) -> Result<()> {
@@ -543,7 +543,7 @@ pub(crate) enum Sink {
     Compare {
         file: File,
         bytes: u64,
-        owner: Retained,
+        owner: Box<Retained>,
     },
 }
 fn compare<W: Read>(reader: &mut W, mut bytes: &[u8]) -> io::Result<()> {
