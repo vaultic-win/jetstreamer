@@ -352,7 +352,64 @@ fn closed172(fleet: &Value) -> Result<Value> {
     Ok(receipt)
 }
 
+fn cold_metered_stage() -> Result<()> {
+    let root = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2",
+    );
+    json_pin(
+        &root.join("PREFLIGHT.json"),
+        "17817ba37784460b956e28961708e1c1b80f1786fdd2ee34d2c44ea54f7d805c",
+    )?;
+    json_pin(
+        &root.join("admission-v2/deployment-seal-receipt.json"),
+        "bcd88df903c730f84038339495c5b6049a3ecf41492c353813818f5c25142b33",
+    )?;
+    for name in [
+        "FINAL_PRELAUNCH_FIT.json",
+        "PRODUCER_NATIVE.json",
+        "AUTHORIZED_GATED_PAYLOAD.json",
+        "ACTUAL_ADMISSION_AND_PROTECTION.json",
+    ] {
+        ensure!(
+            !root.join(name).try_exists()?,
+            "previous epoch 172 attempt advanced: {name}"
+        );
+    }
+    for (name, mode) in [("guard-receipts", 0o700), ("barrier", 0o755)] {
+        let directory = root.join(name);
+        custody(&directory, 0, 0, None, mode)?;
+        ensure!(
+            fs::read_dir(directory)?.next().is_none(),
+            "old epoch 172 guard or barrier populated"
+        );
+    }
+    let old = Path::new(
+        "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/metadata-probes/metered-hourly-20261120-g2",
+    );
+    custody(old, 1001, 1003, Some(114238111), 0o700)?;
+    let log = fs::symlink_metadata(old.join("producer.log"))?;
+    ensure!(
+        log.is_file()
+            && log.ino() == 114244344
+            && log.uid() == 1001
+            && log.gid() == 1003
+            && log.nlink() == 1
+            && log.len() == 0
+            && fs::read_dir(old)?.count() == 1,
+        "previous epoch 172 stage changed"
+    );
+    for unit in [
+        "horizon-qualify-172-metered-hourly-20261120-g2.service",
+        "horizon-guard-172-metered-hourly-20261120-g2.service",
+        "horizon-guard-172-metered-hourly-20261120-g2.timer",
+    ] {
+        idle(unit)?;
+    }
+    Ok(())
+}
+
 pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
+    cold_metered_stage()?;
     if EPOCH == 172 {
         return closed172(fleet);
     }
@@ -366,7 +423,7 @@ pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
         "competing candidate still present in reconciled fleet"
     );
     let other = Path::new(
-        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2",
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3",
     );
     let ad = other.join("ACTUAL_ADMISSION_AND_PROTECTION.json");
     if ad.try_exists()? {
@@ -380,7 +437,7 @@ pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
                 && final_record["producer_unit"] == admitted["producer_unit"]
                 && final_record["resource_promise_ending_bytes"] == 0
                 && final_record["archive_verified"] == false,
-            "172 g2 handoff incomplete"
+            "172 g3 handoff incomplete"
         );
     }
     let p = Path::new(

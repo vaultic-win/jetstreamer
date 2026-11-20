@@ -11,11 +11,11 @@ pub const BASE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1";
 pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1/guard-receipts";
 pub const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1/admission-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1/admission-v2";
 pub const ADMIT: &str = "admit171";
 pub const GATE: &str = "gate171";
 pub const TRACE: &str = "trace171";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1/admission-v1/trace171";
+pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch171-metered-admission-20261120-g1/admission-v2/trace171";
 pub const NODE_PACKAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1";
 pub const NODE: &str = "/usr/local/lib/jetstreamer/horizon-independent171-singleton-package-20261110-v1/jetstreamer-node";

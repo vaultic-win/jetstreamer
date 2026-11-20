@@ -1,21 +1,21 @@
 //! Authenticated private epoch 172 diagnostic route.
 pub const EPOCH: u64 = 172;
 pub const EPOCH_KEY: &str = "172";
-pub const UNIT: &str = "horizon-qualify-172-metered-hourly-20261120-g2.service";
-pub const TIMER: &str = "horizon-guard-172-metered-hourly-20261120-g2.timer";
-pub const GUARD_SERVICE: &str = "horizon-guard-172-metered-hourly-20261120-g2.service";
+pub const UNIT: &str = "horizon-qualify-172-metered-hourly-20261120-g3.service";
+pub const TIMER: &str = "horizon-guard-172-metered-hourly-20261120-g3.timer";
+pub const GUARD_SERVICE: &str = "horizon-guard-172-metered-hourly-20261120-g3.service";
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1";
-pub const RUN: &str = "metered-hourly-20261120-g2";
-pub const DEST: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/metadata-probes/metered-hourly-20261120-g2";
+pub const RUN: &str = "metered-hourly-20261120-g3";
+pub const DEST: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/metadata-probes/metered-hourly-20261120-g3";
 pub const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2";
-pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/guard-receipts";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3";
+pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3/guard-receipts";
 pub const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3/admission-v1";
 pub const ADMIT: &str = "admit172";
 pub const GATE: &str = "gate172";
 pub const TRACE: &str = "trace172";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2/trace172";
+pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g3/admission-v1/trace172";
 pub const NODE_PACKAGE: &str =
     "/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1";
 pub const NODE: &str = "/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/jetstreamer-node";
