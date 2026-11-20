@@ -139,8 +139,40 @@ fn controls(unit: &str) -> Result<PathBuf> {
     );
     Ok(cg)
 }
+/// Check the private 172 identity on the fleet that the parent actually signed.
+fn verify_172(fleet: &Value, state: &str, pid: &str, invocation: &str) -> Result<()> {
+    const IID: &str = "5a691c24655a4ff489531d8d7cc50254";
+    let mut owners = fleet["actual_active_private_diagnostics"]
+        .as_array()
+        .context("fleet private owner list")?
+        .iter()
+        .filter(|r| r["epoch"] == 172);
+    if let Some(owner) = owners.next() {
+        ensure!(
+            owners.next().is_none()
+                && state == "active"
+                && pid == "2823601"
+                && invocation == IID
+                && owner["unit"]["InvocationID"] == IID
+                && owner["admission"]["sha256"]
+                    == "3c4134506e7cd31f22a550456fd41e8f6e92f9c48b91c5059fc7b0d2bed621d8",
+            "172 active owner disagrees with fleet"
+        );
+    } else {
+        ensure!(
+            matches!(state, "inactive" | "failed")
+                && pid == "0"
+                && (invocation.is_empty() || invocation == IID)
+                && fleet["terminal172_closure"]["sha256"]
+                    == "854539f0d9450b388e136092567438134efaab19f0570dee7bdeb4fcf53120c7",
+            "172 terminal owner disagrees with fleet"
+        );
+    }
+    Ok(())
+}
+
 /// Parent supplies a fresh no-clobber release only after the actual guard
-/// prefire/complete ledger has accepted this invocation, including active172.
+/// prefire and complete fleet have accepted this invocation.
 fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
     let _cg = controls(unit)?;
     let m = fs::symlink_metadata(path)?;
@@ -221,7 +253,6 @@ fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
             && v["cpu_quota_micros"] == 1_000_000
             && v["maximum_new_bytes"] == GROWTH
             && v["no_initialize_authorized"] == true
-            && v["complete_fleet_includes_active172"] == true
             && v["serial_guard_prefire_passed"] == true
             && v["source_contained_in_origin_account_updates"] == true,
         "fresh parent serial release missing or stale"
@@ -233,6 +264,33 @@ fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
             b["sha256"].as_str().context("proof SHA")?,
         )?;
     }
+    let binding = &v["complete_fleet"];
+    let fleet_path = Path::new(binding["path"].as_str().context("fleet path")?);
+    ensure!(
+        fleet_path.canonicalize()? == fleet_path
+            && fleet_path.starts_with("/var/lib/jetstreamer/horizon_runtime_data")
+            && fleet_path
+                .file_name()
+                .is_some_and(|n| n == "ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
+        "unexpected fleet location"
+    );
+    let meta = fs::symlink_metadata(fleet_path)?;
+    ensure!(
+        meta.uid() == 0 && meta.mode() & 0o022 == 0 && meta.len() < 16 << 20,
+        "fleet custody"
+    );
+    let bytes = fs::read(fleet_path)?;
+    ensure!(
+        binding["sha256"] == hex(&Sha256::digest(&bytes)),
+        "fleet bytes changed"
+    );
+    let actor = "horizon-qualify-172-trace-hourly-20261120-v1.service";
+    verify_172(
+        &serde_json::from_slice(&bytes)?,
+        &native(actor, "ActiveState")?,
+        &native(actor, "MainPID")?,
+        &native(actor, "InvocationID")?,
+    )?;
     controls(unit)?;
     Ok(v)
 }
@@ -622,4 +680,17 @@ fn main() -> Result<()> {
         );
     }
     result
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::*;
+    #[test]
+    fn a_terminal_fleet_requires_the_bound_closure_and_drained_actor() {
+        let mut f = json!({"actual_active_private_diagnostics": [{"epoch":168}], "terminal172_closure": {"sha256": "854539f0d9450b388e136092567438134efaab19f0570dee7bdeb4fcf53120c7"}});
+        assert!(verify_172(&f, "failed", "0", "5a691c24655a4ff489531d8d7cc50254").is_ok());
+        assert!(verify_172(&f, "active", "2823601", "5a691c24655a4ff489531d8d7cc50254").is_err());
+        f["terminal172_closure"] = Value::Null;
+        assert!(verify_172(&f, "inactive", "0", "").is_err());
+    }
 }
