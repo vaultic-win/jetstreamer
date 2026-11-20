@@ -1,7 +1,8 @@
 //! Device-aware fleet admission for the bounded epoch 212 bootstrap.
 use super::*;
-#[path = "native261/funding.rs"]
-mod funding;
+mod funding {
+    include!("native261/funding.rs");
+}
 use native257::{process_ticks, publication};
 mod first_guard {
     include!("../../native265-launch/src/first_guard.rs");
@@ -9,8 +10,9 @@ mod first_guard {
 mod handoff {
     include!("native257/handoff.rs");
 }
-#[path = "native261/mount_proof.rs"]
-mod mount_proof;
+mod mount_proof {
+    include!("native261/mount_proof.rs");
+}
 mod retire {
     include!("native257/retire.rs");
 }
