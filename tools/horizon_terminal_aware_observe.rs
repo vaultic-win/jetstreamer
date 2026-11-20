@@ -20,8 +20,8 @@ mod full265;
 #[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
 mod singleton247_phase;
 
-const OBSERVER: &str = "/var/lib/jetstreamer/horizon-full265-attempt2-consumers-20261120-v1/jetstreamer-horizon-observe";
-const OBSERVER_SHA: &str = "e529ad65a621f7ca3fc7b7b09d2afc0bd9516dd779f5cb38153a86836cf1bc08";
+const OBSERVER: &str = "/var/lib/jetstreamer/horizon247-delivery-rss-consumers-20261120-v1/jetstreamer-horizon-observe";
+const OBSERVER_SHA: &str = "31b34549d20478b3a5a9ae39f9e2544b2467d3c25a9ba2376564e44fb153ecc4";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -580,6 +580,7 @@ fn run(args: &[String]) -> Result<()> {
         !live.is_empty() || !finalization.is_empty() || p.singleton211_handoff.is_some(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
+    let original_delivery = config.get("delivery247_resource_only").cloned();
     let original_native = config.get("native_input_diagnostics").cloned();
     config["replays"] = json!(live);
     config["singleton247_finalization"] = json!(false);
@@ -592,6 +593,10 @@ fn run(args: &[String]) -> Result<()> {
     ensure!(
         config.get("native_input_diagnostics") == original_native.as_ref(),
         "native diagnostic altered during prescreen"
+    );
+    ensure!(
+        config.get("delivery247_resource_only") == original_delivery.as_ref(),
+        "delivery RSS selection changed during prescreen"
     );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
     let seal = save(
