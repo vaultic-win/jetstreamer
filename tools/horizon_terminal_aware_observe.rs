@@ -22,7 +22,7 @@ mod singleton247_phase;
 
 const OBSERVER: &str = "/var/lib/jetstreamer/horizon-full265-attempt3-consumers-20261120-v1/jetstreamer-horizon-observe";
 const OBSERVER_SHA: &str = "673f779a402c8f6d4f7e957614e9583252f8d1d741f2fe0cb86e1627972c5107";
-fn observer_image(native257: bool) -> Result<(&'static str, &'static str)> {
+fn observer_image(qualified_native: bool) -> Result<(&'static str, &'static str)> {
     match (
         option_env!("HORIZON257_OBSERVER_PATH"),
         option_env!("HORIZON257_OBSERVER_SHA256"),
@@ -36,7 +36,7 @@ fn observer_image(native257: bool) -> Result<(&'static str, &'static str)> {
         {
             Ok((path, sha))
         }
-        (None, None) if !native257 => Ok((OBSERVER, OBSERVER_SHA)),
+        (None, None) if !qualified_native => Ok((OBSERVER, OBSERVER_SHA)),
         _ => anyhow::bail!("missing or invalid qualified observer binding"),
     }
 }
@@ -63,6 +63,8 @@ struct Plan {
     native265_handoff: Option<Bound>,
     #[serde(default)]
     native257_handoff: Option<Bound>,
+    #[serde(default)]
+    native261_handoff: Option<Bound>,
     #[serde(default)]
     singleton211_handoff: Option<Bound>,
     state_directory: PathBuf,
@@ -401,14 +403,14 @@ fn native265_pass_through(
     );
     Ok(filtered)
 }
-fn native257_pass_through(config: &Value, binding: Option<&Bound>) -> Result<Value> {
+fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Result<Value> {
     let mut filtered = config.clone();
     let rows = config
         .get("native_input_diagnostics")
         .cloned()
         .unwrap_or_else(|| json!([]));
     let rows = rows.as_array().context("native diagnostics array")?;
-    let mut candidates = rows.iter().filter(|row| row["epoch"] == 257);
+    let mut candidates = rows.iter().filter(|row| row["epoch"] == epoch);
     let Some(row) = candidates.next() else {
         ensure!(binding.is_none(), "unused native257 handoff");
         return Ok(filtered);
@@ -418,21 +420,33 @@ fn native257_pass_through(config: &Value, binding: Option<&Bound>) -> Result<Val
         "duplicate native257 diagnostic"
     );
     let b = binding.context("native257 handoff required")?;
-    horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
+    match epoch {
+        257 => {
+            horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
+        }
+        261 => {
+            horizon_singleton211_launch::native261::validate_saved_handoff(&b.path, &b.sha256)?;
+        }
+        _ => anyhow::bail!("unregistered cold input"),
+    }
     // The wrapper and launcher have separately qualified serde_json builds.
     // Reopen the same digest-bound bytes with the wrapper's reader.
-    native257_owner(config, row, &bound(b)?)?;
+    cold_owner(config, row, &bound(b)?, epoch)?;
     filtered["native_input_diagnostics"] = json!(
         rows.iter()
-            .filter(|r| r["epoch"] != 257)
+            .filter(|r| r["epoch"] != epoch)
             .collect::<Vec<_>>()
     );
     Ok(filtered)
 }
-fn native257_owner(config: &Value, row: &Value, handoff: &Value) -> Result<()> {
-    let root = Path::new("/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1");
+fn cold_owner(config: &Value, row: &Value, handoff: &Value, epoch: u64) -> Result<()> {
+    let root = Path::new(match epoch {
+        257 => "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+        261 => "/run/horizon261-native-cold-v1",
+        _ => anyhow::bail!("unregistered cold input"),
+    });
     let unit = string(handoff, "unit")?;
-    let expected = json!({"epoch":257,"unit":unit,"expected_invocation_id":string(handoff, "invocation_id")?,
+    let expected = json!({"epoch":epoch,"unit":unit,"expected_invocation_id":string(handoff, "invocation_id")?,
         "main_pid":handoff["main_pid"].as_u64().context("native257 handoff PID")?,"scratch_path":root,
         "executable":string(&handoff["harness"],"path")?,"executable_sha256":string(&handoff["harness"],"sha256")?});
     ensure!(
@@ -449,7 +463,7 @@ fn native257_owner(config: &Value, row: &Value, handoff: &Value) -> Result<()> {
         let scratch = Path::new(string(replay, "scratch_path")?);
         ensure!(
             first <= last
-                && !(first..=last).contains(&257)
+                && !(first..=last).contains(&epoch)
                 && replay["producer_unit"] != unit
                 && replay["controller_unit"] != unit
                 && !scratch.starts_with(root)
@@ -513,7 +527,8 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
         .as_array()
         .context("missing replay census")?;
     ensure!(
-        (!rows.is_empty() || p.native257_handoff.is_some()) && rows.len() == handoffs.len(),
+        (!rows.is_empty() || (p.native257_handoff.is_some() || p.native261_handoff.is_some()))
+            && rows.len() == handoffs.len(),
         "handoff census differs"
     );
     let mut seen = std::collections::BTreeSet::new();
@@ -598,9 +613,10 @@ fn run(args: &[String]) -> Result<()> {
     validate(&p, &config, &handoffs)?;
     let native_handoff = p.native211_handoff.as_ref().map(bound).transpose()?;
     let native265_handoff = p.native265_handoff.as_ref().map(bound).transpose()?;
-    let without257 = native257_pass_through(&config, p.native257_handoff.as_ref())?;
+    let without257 = cold_pass_through(&config, p.native257_handoff.as_ref(), 257)?;
+    let without261 = cold_pass_through(&without257, p.native261_handoff.as_ref(), 261)?;
     let other_native = native265_pass_through(
-        &without257,
+        &without261,
         p.native265_handoff.as_ref(),
         native265_handoff.as_ref(),
     )?;
@@ -609,7 +625,8 @@ fn run(args: &[String]) -> Result<()> {
         p.native211_handoff.as_ref(),
         native_handoff.as_ref(),
     )?;
-    let (observer, observer_sha) = observer_image(p.native257_handoff.is_some())?;
+    let (observer, observer_sha) =
+        observer_image(p.native257_handoff.is_some() || p.native261_handoff.is_some())?;
     ensure!(
         sha(&raw(Path::new(observer), 64 << 20)?) == observer_sha
             && sha(&raw(Path::new(SEALER), 64 << 20)?) == SEALER_SHA,
@@ -654,13 +671,13 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty()
             || !finalization.is_empty()
             || p.singleton211_handoff.is_some()
-            || p.native257_handoff.is_some(),
+            || (p.native257_handoff.is_some() || p.native261_handoff.is_some()),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     let original_delivery = config.get("delivery247_resource_only").cloned();
@@ -704,7 +721,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -731,11 +748,11 @@ mod tests {
             "executable":h["harness"]["path"],"executable_sha256":h["harness"]["sha256"]});
         let replay = json!({"range":"211-211","producer_unit":"other","controller_unit":"other","scratch_path":"/unrelated"});
         let mut config = json!({"diagnostic_replays":[replay],"native_input_diagnostics":[row]});
-        native257_owner(&config, &row, &h).unwrap();
+        cold_owner(&config, &row, &h, 257).unwrap();
         for key in row.as_object().unwrap().keys() {
             let mut changed = row.clone();
             changed[key] = Value::Null;
-            assert!(native257_owner(&config, &changed, &h).is_err(), "{key}");
+            assert!(cold_owner(&config, &changed, &h, 257).is_err(), "{key}");
         }
         for (key, value) in [
             ("range", json!("255-258")),
@@ -745,14 +762,14 @@ mod tests {
         ] {
             let mut changed = config.clone();
             changed["diagnostic_replays"][0][key] = value;
-            assert!(native257_owner(&changed, &row, &h).is_err(), "{key}");
+            assert!(cold_owner(&changed, &row, &h, 257).is_err(), "{key}");
         }
-        assert!(native257_pass_through(&config, None).is_err());
+        assert!(cold_pass_through(&config, None, 257).is_err());
         config["native_input_diagnostics"]
             .as_array_mut()
             .unwrap()
             .push(row);
-        assert!(native257_pass_through(&config, None).is_err());
+        assert!(cold_pass_through(&config, None, 257).is_err());
     }
     #[test]
     fn native265_prescreen_preserves_diagnostic_and_refuses_partial_owner() {
@@ -1068,6 +1085,7 @@ mod full211_offline_integration {
             native211_handoff: None,
             native265_handoff: None,
             native257_handoff: None,
+            native261_handoff: None,
             singleton211_handoff: Some(serde_json::from_value(a["handoff"].clone()).unwrap()),
             state_directory: state.path().into(),
             deployment: "/var/lib/jetstreamer/horizon-terminal-aware-cycle-offline-fixture".into(),

@@ -1,16 +1,16 @@
-//! Enumerate every guard artifact and reconcile its invocation with the original PID1 journal.
-use super::native257 as c;
-use super::native265::{binding, hex, num, sealed, text};
+// Enumerate every guard artifact and reconcile its invocation with the original PID1 journal.
+use super::current as c;
 use super::*;
-pub(super) fn actual(h: &Value, gp: &Value, a: &Value, issued: u64) -> Result<Value> {
-    let dir = native257_guard::directory(h, gp)?;
+use crate::fleet::native265::{binding, hex, num, sealed, text};
+pub(in crate::fleet) fn actual(h: &Value, gp: &Value, a: &Value, issued: u64) -> Result<Value> {
+    let dir = guard::directory(h, gp)?;
     let mut files = BTreeMap::new();
     for entry in fs::read_dir(&dir)? {
         let e = entry?;
         let name = e
             .file_name()
             .into_string()
-            .map_err(|_| anyhow!("invalid native257 guard filename"))?;
+            .map_err(|_| anyhow!("invalid native bootstrap guard filename"))?;
         if name == "guard.lock" {
             let m = fs::symlink_metadata(e.path())?;
             ensure!(
@@ -18,12 +18,12 @@ pub(super) fn actual(h: &Value, gp: &Value, a: &Value, issued: u64) -> Result<Va
                     && m.uid() == 0
                     && m.nlink() == 1
                     && e.path().canonicalize()? == e.path(),
-                "native257 lock custody"
+                "native bootstrap lock custody"
             );
             continue;
         }
-        ensure!(files.len() < 1024, "native257 guard record bound");
-        files.insert(name, native257_guard::record(&e.path())?);
+        ensure!(files.len() < 1024, "native bootstrap guard record bound");
+        files.insert(name, guard::record(&e.path())?);
     }
     let root = fs::symlink_metadata(c::ROOT)?;
     ensure!(
@@ -32,16 +32,16 @@ pub(super) fn actual(h: &Value, gp: &Value, a: &Value, issued: u64) -> Result<Va
             && root.uid() == 1000
             && root.gid() == 1000
             && root.mode() & 0o777 == 0o700,
-        "native257 scratch root replaced"
+        "native bootstrap scratch root replaced"
     );
     let pin = files
         .get("root-pin.json")
-        .context("native257 root pin absent")?;
+        .context("native bootstrap root pin absent")?;
     ensure!(
         pin["device"] == root.dev() && pin["inode"] == root.ino() && pin["mode"] == root.mode(),
-        "native257 scratch inode changed"
+        "native bootstrap scratch inode changed"
     );
-    let rows = native257_guard::journal(&[
+    let rows = guard::journal(&[
         format!(
             "--since=@{}",
             num(a, "issued_unix_seconds")?.saturating_sub(60)
@@ -58,7 +58,7 @@ pub(super) fn actual(h: &Value, gp: &Value, a: &Value, issued: u64) -> Result<Va
     Ok(json!({"records":files,"guard_pid1":kept}))
 }
 #[allow(clippy::too_many_arguments)]
-pub(super) fn validate(
+pub(in crate::fleet) fn validate(
     history: &Value,
     h: &Value,
     gp: &Value,
@@ -87,10 +87,10 @@ fn records(
 ) -> Result<(Vec<u64>, Option<String>)> {
     let files = history["records"]
         .as_object()
-        .context("native257 guard files")?;
+        .context("native bootstrap guard files")?;
     let rows = history["guard_pid1"]
         .as_array()
-        .context("native257 guard PID1")?;
+        .context("native bootstrap guard PID1")?;
     let mut starts = BTreeMap::new();
     let mut ends = BTreeMap::new();
     let mut last = issued;
@@ -104,21 +104,21 @@ fn records(
                 && r["_BOOT_ID"] == text(gp, "boot_id")?.replace('-', "")
                 && hex(gid, 32)
                 && mono >= last,
-            "native257 guard journal owner/clock"
+            "native bootstrap guard journal owner/clock"
         );
         last = mono;
         let msg = text(r, "MESSAGE")?;
         if msg.starts_with(&format!("Starting {} -", c::GUARD_UNIT)) {
             ensure!(
                 starts.insert(gid, mono).is_none(),
-                "duplicate native257 guard start"
+                "duplicate native bootstrap guard start"
             );
         }
         let good = msg == format!("{}: Deactivated successfully.", c::GUARD_UNIT);
         if good || msg.starts_with(&format!("{}: Failed with result ", c::GUARD_UNIT)) {
             ensure!(
                 ends.insert(gid, (mono, good)).is_none(),
-                "duplicate native257 guard end"
+                "duplicate native bootstrap guard end"
             );
         }
     }
@@ -128,7 +128,7 @@ fn records(
             && starts.iter().all(|(id, t)| ends
                 .get(id)
                 .is_some_and(|(end, _)| end > t && end - t <= 60_000_000)),
-        "native257 guard history truncated"
+        "native bootstrap guard history truncated"
     );
     let first_gid = text(first, "guard_invocation_id")?;
     ensure!(
@@ -136,11 +136,11 @@ fn records(
             && starts.contains_key(first_gid)
             && starts.get(first_gid) == starts.values().min()
             && starts[first_gid] - issued <= 60_000_000,
-        "native257 guard history lost first fire"
+        "native bootstrap guard history lost first fire"
     );
     ensure!(
         files.contains_key("root-pin.json"),
-        "native257 root pin missing"
+        "native bootstrap root pin missing"
     );
     let main = num(h, "main_pid")?;
     let mut ids = vec![main];
@@ -152,14 +152,14 @@ fn records(
         let Some(v) = files.get(&format!("{kind}-pin.json")) else {
             ensure!(
                 kind == "worker" && worker.is_none(),
-                "native257 process pin missing"
+                "native bootstrap process pin missing"
             );
             continue;
         };
         let p = &v["pin"];
         let pid = num(p, "pid")?;
         ensure!(
-            v["schema"] == "horizon257-native-guard-process-pin-v1"
+            v["schema"] == epoch_name!("horizon", "-native-guard-process-pin-v1")
                 && v["kind"] == kind
                 && v["remote_mutations"] == false
                 && p["boot_id"] == gp["boot_id"]
@@ -170,17 +170,17 @@ fn records(
                 && p["nlink"] == 1
                 && num(p, "mode")? & 0o222 == 0
                 && num(p, "start_ticks")? >= num(gp, "main_start_ticks")?,
-            "native257 process lineage differs"
+            "native bootstrap process lineage differs"
         );
         if kind == "main" {
             ensure!(
                 pid == main && p["start_ticks"] == gp["main_start_ticks"],
-                "native257 harness start differs"
+                "native bootstrap harness start differs"
             );
         } else {
             ensure!(
                 pid > 1 && pid != main && worker.is_none_or(|w| w == pid),
-                "native257 worker PID"
+                "native bootstrap worker PID"
             );
             ids.push(pid);
         }
@@ -194,15 +194,16 @@ fn records(
         ensure!(
             r["plan_sha256"] == h["guard_plan"]["sha256"]
                 && r["producer_invocation_id"] == h["invocation_id"],
-            "native257 foreign guard record {name}"
+            "native bootstrap foreign guard record {name}"
         );
         if name == "root-pin.json" {
+            c::pin_mount(first, r)?;
             ensure!(
-                r["schema"] == "horizon257-native-guard-root-pin-v1"
+                r["schema"] == epoch_name!("horizon", "-native-guard-root-pin-v1")
                     && r["uid"] == 1000
                     && r["gid"] == 1000
                     && num(r, "mode")? & 0o777 == 0o700,
-                "native257 root pin"
+                "native bootstrap root pin"
             );
             continue;
         }
@@ -212,30 +213,30 @@ fn records(
         let gid = text(r, "guard_invocation_id")?;
         let (end, good) = *ends
             .get(gid)
-            .context("native257 guard receipt lacks PID1 firing")?;
+            .context("native bootstrap guard receipt lacks PID1 firing")?;
         let start = starts[gid];
         if name == "stop-intent.json" {
             ensure!(
                 !clean
-                    && r["schema"] == "horizon257-native-guard-stop-intent-v1"
+                    && r["schema"] == epoch_name!("horizon", "-native-guard-stop-intent-v1")
                     && !text(r, "reason")?.is_empty()
                     && r["remote_mutations"] == false,
-                "native257 invalid stop intent"
+                "native bootstrap invalid stop intent"
             );
             if let Some(t) = r["transition"].as_str() {
                 ensure!(
                     t == format!("transition-{gid}.json")
                         && files.contains_key(t)
                         && r["reason"] == "producer-state-changed-during-sample",
-                    "native257 changed intent transition"
+                    "native bootstrap changed intent transition"
                 );
             } else {
                 let subject = files
                     .get(&format!("sample-{gid}.json"))
-                    .context("native257 intent sample")?;
+                    .context("native bootstrap intent sample")?;
                 ensure!(
                     r.get("sample") == Some(subject) && r["reason"] == subject["trip_reason"],
-                    "native257 intent does not match sample"
+                    "native bootstrap intent does not match sample"
                 );
             }
             continue;
@@ -245,16 +246,16 @@ fn records(
                 !clean
                     && intent.is_some()
                     && !good
-                    && r["schema"] == "horizon257-native-guard-stop-request-v1"
+                    && r["schema"] == epoch_name!("horizon", "-native-guard-stop-request-v1")
                     && r["drain_proven"] == false
                     && r["remote_mutations"] == false,
-                "native257 invalid stop request"
+                "native bootstrap invalid stop request"
             );
             continue;
         }
         ensure!(
             covered.insert(gid),
-            "native257 ambiguous primary guard record"
+            "native bootstrap ambiguous primary guard record"
         );
         if name == &format!("sample-{gid}.json") {
             ensure!(
@@ -267,31 +268,32 @@ fn records(
                     && r["producer"]["cgroup"] == format!("/system.slice/{}", c::UNIT)
                     && r["remote_mutations"] == false
                     && r["r2_mutations"] == false,
-                "native257 sample owner"
+                "native bootstrap sample owner"
             );
             if r.get("trip_reason") == Some(&Value::Null) {
-                ensure!(good, "native257 healthy guard failed");
-                native257_guard::sample(h, gp, r, num(r, "recorded_unix_seconds")?, 0)?;
+                ensure!(good, "native bootstrap healthy guard failed");
+                c::sample_mount(first, r)?;
+                guard::sample(h, gp, r, num(r, "recorded_unix_seconds")?, 0)?;
                 for pin in r["process_observation"]["processes"]
                     .as_array()
-                    .context("native257 sample process pins")?
+                    .context("native bootstrap sample process pins")?
                 {
                     ensure!(
                         pins.contains(pin),
-                        "native257 changed historical process pin"
+                        "native bootstrap changed historical process pin"
                     );
                 }
             } else {
                 ensure!(
                     !clean && !good && intent.is_some() && !text(r, "trip_reason")?.is_empty(),
-                    "native257 unaccounted guard trip"
+                    "native bootstrap unaccounted guard trip"
                 );
             }
             times.push(start);
         } else if name == &format!("transition-{gid}.json") {
             ensure!(
                 !good
-                    && r["schema"] == "horizon257-native-guard-transition-v1"
+                    && r["schema"] == epoch_name!("horizon", "-native-guard-transition-v1")
                     && r["before"]["pid"] == main
                     && r["before"]["invocation_id"] == h["invocation_id"]
                     && r["before"]["active"] == "active"
@@ -305,14 +307,14 @@ fn records(
                         intent.is_some() && !clean && r["after"]["pid"] == main
                     })
                     && (!clean || r.get("trip_reason") == Some(&Value::Null)),
-                "native257 transition not bound to terminal or stop"
+                "native bootstrap transition not bound to terminal or stop"
             );
             times.push(start);
         } else {
             ensure!(
                 name == &format!("terminal-{gid}.json")
                     && good
-                    && r["schema"] == "horizon257-native-guard-terminal-v1"
+                    && r["schema"] == epoch_name!("horizon", "-native-guard-terminal-v1")
                     && r["guard_sha256"] == c::GUARD_SHA
                     && r["terminal"]["invocation_id"] == h["invocation_id"]
                     && r["terminal"]["pid"] == 0
@@ -331,7 +333,7 @@ fn records(
                     && r["resource_release_authorized"] == false
                     && r["remote_mutations"] == false
                     && r["r2_mutations"] == false,
-                "native257 incomplete terminal guard drain"
+                "native bootstrap incomplete terminal guard drain"
             );
             drains += 1;
         }
@@ -343,7 +345,7 @@ fn records(
             && !times.is_empty()
             && times.windows(2).all(|w| w[1] - w[0] <= 120_000_000)
             && terminal.saturating_sub(*times.last().unwrap()) <= 120_000_000,
-        "native257 missing guard coverage or final drain"
+        "native bootstrap missing guard coverage or final drain"
     );
     Ok((
         ids,
@@ -382,7 +384,7 @@ mod tests {
             v
         };
         let drain = bound(
-            json!({"schema":"horizon257-native-guard-terminal-v1","guard_invocation_id":g2,"guard_sha256":c::GUARD_SHA,"terminal":{"invocation_id":iid,"pid":0,"control_pid":0,"active":"inactive","result":"success"},
+            json!({"schema":epoch_name!("horizon", "-native-guard-terminal-v1"),"guard_invocation_id":g2,"guard_sha256":c::GUARD_SHA,"terminal":{"invocation_id":iid,"pid":0,"control_pid":0,"active":"inactive","result":"success"},
         "prior_stop_intent":null,"drain_error":null,"drain":{"kernel_cgroup":"absent","original_processes_gone":true,"retained_process_pins":[pin,worker]},"resource_release_authorized":false,"remote_mutations":false,"r2_mutations":false}),
         );
         let event = |n, gid: &str, msg: String| json!({"_PID":"1","_UID":"0","UNIT":c::GUARD_UNIT,"_BOOT_ID":"boot","INVOCATION_ID":gid,"__MONOTONIC_TIMESTAMP":format!("{n}"),"MESSAGE":msg});
@@ -391,12 +393,13 @@ mod tests {
         let mut bundle = json!({"guard_pid1":[event(110,&g1,start.clone()),event(130,&g1,end.clone()),event(210,&g2,start),event(220,&g2,end)],"records":{}});
         for (kind, p) in [("main", pin), ("worker", worker)] {
             bundle["records"][format!("{kind}-pin.json")] = bound(
-                json!({"schema":"horizon257-native-guard-process-pin-v1","remote_mutations":false,"kind":kind,"pin":p}),
+                json!({"schema":epoch_name!("horizon", "-native-guard-process-pin-v1"),"remote_mutations":false,"kind":kind,"pin":p}),
             );
         }
         bundle["records"]["root-pin.json"] = bound(
-            json!({"schema":"horizon257-native-guard-root-pin-v1","uid":1000,"gid":1000,"mode":0o40700}),
+            json!({"schema":epoch_name!("horizon", "-native-guard-root-pin-v1"),"uid":1000,"gid":1000,"mode":0o40700}),
         );
+        c::mount_fixture(&mut sample, &mut bundle["records"]["root-pin.json"]);
         bundle["records"][format!("sample-{g1}.json")] = sample.clone();
         bundle["records"][format!("terminal-{g2}.json")] = drain;
         let good = json!({"ActiveState":"inactive","Result":"success"});

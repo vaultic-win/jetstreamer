@@ -1,12 +1,12 @@
-//! Validate the epoch-specific guard argument, kernel samples, and PID1 clock.
-use super::native257 as c;
-use super::native265::{EvidenceReader, FsEvidence, binding, hex, num, sealed, text};
+// Validate the epoch-specific guard argument, kernel samples, and PID1 clock.
+use super::current as c;
 use super::*;
-pub(super) fn directory(h: &Value, gp: &Value) -> Result<PathBuf> {
+use crate::fleet::native265::{EvidenceReader, FsEvidence, binding, hex, num, sealed, text};
+pub(in crate::fleet) fn directory(h: &Value, gp: &Value) -> Result<PathBuf> {
     let iid = text(h, "invocation_id")?;
-    ensure!(hex(iid, 32), "native257 invocation");
+    ensure!(hex(iid, 32), "native bootstrap invocation");
     let dir = PathBuf::from(format!(
-        "/var/lib/jetstreamer/horizon-native257-guard-receipts-{iid}"
+        "/var/lib/jetstreamer/horizon-native{EPOCH}-guard-receipts-{iid}"
     ));
     let alias = Path::new(text(h, "receipt_mount")?);
     let m = fs::symlink_metadata(&dir)?;
@@ -19,11 +19,11 @@ pub(super) fn directory(h: &Value, gp: &Value) -> Result<PathBuf> {
             && m.mode() & 0o7777 == 0o700
             && fs::symlink_metadata(alias)?.uid() == 0
             && fs::read_link(alias)? == dir,
-        "native257 changed receipt directory"
+        "native bootstrap changed receipt directory"
     );
     Ok(dir)
 }
-pub(super) fn record(path: &Path) -> Result<Value> {
+pub(in crate::fleet) fn record(path: &Path) -> Result<Value> {
     let m = fs::symlink_metadata(path)?;
     ensure!(
         path.canonicalize()? == path
@@ -31,15 +31,21 @@ pub(super) fn record(path: &Path) -> Result<Value> {
             && m.uid() == 0
             && m.nlink() == 1
             && m.mode() & 0o077 == 0,
-        "native257 guard record custody"
+        "native bootstrap guard record custody"
     );
     Ok(serde_json::from_slice(&read_stable_bounded(
         path,
         2 << 20,
-        "native257 guard record",
+        "native bootstrap guard record",
     )?)?)
 }
-pub(super) fn sample(h: &Value, gp: &Value, g: &Value, wall: u64, age: u64) -> Result<()> {
+pub(in crate::fleet) fn sample(
+    h: &Value,
+    gp: &Value,
+    g: &Value,
+    wall: u64,
+    age: u64,
+) -> Result<()> {
     native265_guard::sample_for(
         gp,
         g,
@@ -51,31 +57,31 @@ pub(super) fn sample(h: &Value, gp: &Value, g: &Value, wall: u64, age: u64) -> R
         &c::PROFILE,
     )?;
     let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
-    ensure!(page.is_power_of_two(), "native257 kernel page size");
+    ensure!(page.is_power_of_two(), "native bootstrap kernel page size");
     let m = &g["memory_observation"];
     ensure!(
         m["maximum_bytes"] == c::PROFILE.memory / page * page
             && m["high_bytes"] == 100_000_000_000u64 / page * page
             && num(m, "tasks")? > 0
             && g["scratch_deleted"] == false,
-        "native257 kernel sample limits"
+        "native bootstrap kernel sample limits"
     );
     Ok(())
 }
-pub(super) fn journal(args: &[String]) -> Result<Vec<Value>> {
+pub(in crate::fleet) fn journal(args: &[String]) -> Result<Vec<Value>> {
     let output = ProcessCommand::new("/usr/bin/journalctl")
         .args(["--all", "--no-pager", "--output=json", "--boot=0"])
         .args(args)
         .output()?;
     ensure!(
         output.status.success() && output.stdout.len() <= 16 << 20,
-        "native257 journal inaccessible or oversized"
+        "native bootstrap journal inaccessible or oversized"
     );
     Ok(serde_json::Deserializer::from_slice(&output.stdout)
         .into_iter::<Value>()
         .collect::<std::result::Result<Vec<_>, _>>()?)
 }
-pub(super) fn live(h: &Value) -> Result<()> {
+pub(in crate::fleet) fn live(h: &Value) -> Result<()> {
     let gb = binding(&h["guard_plan"])?;
     let gp = sealed(&gb)?;
     let dir = directory(h, &gp)?;
@@ -99,10 +105,10 @@ pub(super) fn live(h: &Value) -> Result<()> {
         ("User", "root"),
         ("TasksMax", "64"),
     ] {
-        ensure!(manager[k] == v, "native257 guard manager {k}");
+        ensure!(manager[k] == v, "native bootstrap guard manager {k}");
     }
     let env = gb.path.with_file_name("guard.env");
-    let bytes = format!("HORIZON257_GUARD_PLAN_SHA256={}\n", gb.sha256);
+    let bytes = format!("HORIZON{EPOCH}_GUARD_PLAN_SHA256={}\n", gb.sha256);
     FsEvidence.bytes(
         &BoundFile {
             path: env.clone(),
@@ -111,7 +117,7 @@ pub(super) fn live(h: &Value) -> Result<()> {
         256,
     )?;
     let command = format!(
-        "{{ path={} ; argv[]={0} {} --plan-sha256 ${{HORIZON257_GUARD_PLAN_SHA256}} --self-sha256 {}",
+        "{{ path={} ; argv[]={0} {} --plan-sha256 ${{HORIZON{EPOCH}_GUARD_PLAN_SHA256}} --self-sha256 {}",
         c::GUARD,
         gb.path.display(),
         c::GUARD_SHA
@@ -123,7 +129,7 @@ pub(super) fn live(h: &Value) -> Result<()> {
             == Some(command.as_str())
             && manager["EnvironmentFiles"] == format!("{} (ignore_errors=no)", env.display())
             && manager["ReadWritePaths"] == h["receipt_mount"],
-        "native257 guard arguments changed"
+        "native bootstrap guard arguments changed"
     );
     let firing = manager["ActiveState"] == "activating" && manager["SubState"] == "start";
     let mut ts = std::mem::MaybeUninit::<libc::timespec>::uninit();
@@ -137,14 +143,14 @@ pub(super) fn live(h: &Value) -> Result<()> {
         let start = text(&manager, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
         ensure!(
             start > 0 && start <= mono && mono - start <= native265_protection::MAX_FIRING_MICROS,
-            "native257 guard firing overdue"
+            "native bootstrap guard firing overdue"
         );
     } else {
         ensure!(
             manager["ActiveState"] == "inactive"
                 && manager["SubState"] == "dead"
                 && manager["ExecMainStatus"] == "0",
-            "native257 guard failed"
+            "native bootstrap guard failed"
         );
     }
     let wall = c::now()?;
@@ -163,13 +169,15 @@ pub(super) fn live(h: &Value) -> Result<()> {
         wall,
         c::GUARD_UNIT,
     )?;
+    let first = sealed(&binding(&h["first_guard_sample"])?)?;
     let check = |id: &str| -> Result<()> {
-        ensure!(hex(id, 32), "native257 guard iid");
+        ensure!(hex(id, 32), "native bootstrap guard iid");
         let value = record(&dir.join(format!("sample-{id}.json")))?;
         ensure!(
             value["guard_invocation_id"] == id,
-            "native257 guard substitution"
+            "native bootstrap guard substitution"
         );
+        c::sample_mount(&first, &value)?;
         sample(h, &gp, &value, wall, 120)
     };
     check(&last)?;
@@ -181,12 +189,12 @@ pub(super) fn live(h: &Value) -> Result<()> {
     }
     for entry in fs::read_dir(&dir)? {
         let name = entry?.file_name();
-        let name = name.to_str().context("native257 guard filename")?;
+        let name = name.to_str().context("native bootstrap guard filename")?;
         ensure!(
             !name.starts_with("stop-")
                 && !name.starts_with("transition-")
                 && !name.starts_with("terminal-"),
-            "native257 guard reports terminal/trip"
+            "native bootstrap guard reports terminal/trip"
         );
     }
     let t = c::props(
@@ -204,7 +212,7 @@ pub(super) fn live(h: &Value) -> Result<()> {
                 && !matches!(text(&t, "NextElapseUSecMonotonic")?, "" | "0" | "infinity"))
                 || (firing && t["SubState"] == "running"))
             && c::props(c::GUARD_UNIT, fields)? == manager,
-        "native257 protective timer/owner changed"
+        "native bootstrap protective timer/owner changed"
     );
     Ok(())
 }

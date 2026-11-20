@@ -44,6 +44,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input",
                 "b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce",
             ),
+            261 => (
+                "horizon-261-native-input-20261120-v1.service",
+                "/run/horizon261-native-cold-v1",
+                "/var/lib/jetstreamer/horizon261-native-input-tmpfs-20261120-v1/horizon261-native-input",
+                "b657cbaa98f543bb40fd9d01786ae0747ef30f4d2ed4727d81469461ea02d899",
+            ),
             265 => (
                 "horizon-265-native-input-20261119-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1",
@@ -131,7 +137,7 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
         rss["census_stable"] == true
             && rss["error"].is_null()
             && rss["processes"].as_array().is_some_and(|v| {
-                if matches!(n.epoch, 257 | 265) {
+                if matches!(n.epoch, 257 | 261 | 265) {
                     (1..=2).contains(&v.len())
                         && v.iter().filter(|p| p["pid"] == n.main_pid).count() == 1
                 } else {
@@ -218,7 +224,7 @@ fn same_file(a: &fs::Metadata, b: &fs::Metadata) -> bool {
         && a.mtime_nsec() == b.mtime_nsec()
 }
 fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
-    if !matches!(n.epoch, 257 | 265) {
+    if !matches!(n.epoch, 257 | 261 | 265) {
         return Ok(Value::Null);
     }
     let rss = serde_json::to_value(&u.rss)?;
@@ -273,6 +279,29 @@ fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
     image["start_ticks"] = child["start_ticks"].clone();
     Ok(image)
 }
+mod profile {
+    pub(super) const ROOT: &str = "/run/horizon261-native-cold-v1";
+    pub(super) const FILESYSTEM: &str = "/var/lib/jetstreamer";
+}
+#[path = "../../tools/horizon261-native-input/src/tmpfs.rs"]
+mod tmpfs;
+fn scratch_sample(n: &NativeConfig) -> Result<(Value, u64)> {
+    if n.epoch == 261 {
+        let sample = tmpfs::observe(false)?;
+        ensure!(
+            n.scratch_path == Path::new(profile::ROOT),
+            "foreign 261 scratch"
+        );
+        let used = sample.bytes;
+        return Ok((
+            serde_json::json!({"device":sample.device,"inode":sample.inode,"tmpfs_capacity_bytes":tmpfs::BYTES,"total_inodes":tmpfs::INODES,"free_inodes":sample.free_inodes,"conservative_physical_bytes":used,"exceeds_budget":used > 124u64 << 30 || sample.free_inodes < 4096}),
+            used,
+        ));
+    }
+    let scan = scan_scratch(&n.scratch_path)?;
+    let used = scan.physical_bytes;
+    Ok((serde_json::to_value(scan)?, used))
+}
 fn observe(n: &NativeConfig) -> Result<Value> {
     n.validate()?;
     let before = observe_unit(&n.unit, &n.expected_invocation_id)?;
@@ -288,8 +317,8 @@ fn observe(n: &NativeConfig) -> Result<Value> {
         root.is_dir() && root.uid() == 1000 && root.mode() & 0o077 == 0,
         "native input scratch owner/mode differs"
     );
-    let first = scan_scratch(&n.scratch_path)?;
-    let second = scan_scratch(&n.scratch_path)?;
+    let (first, first_bytes) = scratch_sample(n)?;
+    let (second, second_bytes) = scratch_sample(n)?;
     let after = observe_unit(&n.unit, &n.expected_invocation_id)?;
     identity(&after, n)?;
     let mapped_after = mapped_at(n, Path::new("/proc"), 0)?;
@@ -331,8 +360,8 @@ fn observe(n: &NativeConfig) -> Result<Value> {
         serde_json::json!({"range":format!("{}-{}",n.epoch,n.epoch),"resource_only":true,"native_input_diagnostic":true,
         "controller_before":before,"producer_before":before,"controller_after":after,"producer_after":after,
         "native_main_before":mapped_before,"native_main_after":mapped_after,"native_child_before":child_before,"native_child_after":child_after,"scratch_path":n.scratch_path,
-        "scratch_measurement_method":"two race-tolerant non-symlink-following physical-block scans",
-        "scratch_pass_1":first,"scratch_pass_2":second,"conservative_observed_physical_bytes":first.physical_bytes.max(second.physical_bytes),
+        "scratch_measurement_method":if n.epoch == 261 {"dedicated tmpfs superblock"} else {"two race-tolerant non-symlink-following physical-block scans"},
+        "scratch_pass_1":first,"scratch_pass_2":second,"conservative_observed_physical_bytes":first_bytes.max(second_bytes),
         "invocation_binding_stable":true,"useful_work":{"sufficient_for_rates":false,"entry_progress_observed":false},
         "entry_replay":false,"native_input_qualified":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )
@@ -363,6 +392,38 @@ mod tests {
             "main_pid":42,"scratch_path":"/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
             "executable":"/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input",
             "executable_sha256":"b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce"});
+        let n: NativeConfig = serde_json::from_value(good.clone()).unwrap();
+        n.validate().unwrap();
+        for (key, value) in [
+            ("epoch", json!(265)),
+            ("unit", json!("other")),
+            ("main_pid", json!(1)),
+            ("expected_invocation_id", json!("")),
+            ("scratch_path", json!("/tmp")),
+            ("executable", json!("/worker")),
+            ("executable_sha256", json!("c".repeat(64))),
+        ] {
+            let mut bad = good.clone();
+            bad[key] = value;
+            assert!(
+                serde_json::from_value::<NativeConfig>(bad)
+                    .unwrap()
+                    .validate()
+                    .is_err(),
+                "{key}"
+            );
+        }
+        let unavailable = row(&n, Err(anyhow!("owner unavailable")));
+        assert_eq!(unavailable["status"], "unavailable");
+        assert_eq!(unavailable["entry_replay"], false);
+        assert_eq!(unavailable["ordinary_replay_claim"], false);
+    }
+    #[test]
+    fn native261_owns_only_its_registered_bootstrap_tuple() {
+        let good = json!({"epoch":261,"unit":"horizon-261-native-input-20261120-v1.service","expected_invocation_id":"a".repeat(32),
+            "main_pid":42,"scratch_path":"/run/horizon261-native-cold-v1",
+            "executable":"/var/lib/jetstreamer/horizon261-native-input-tmpfs-20261120-v1/horizon261-native-input",
+            "executable_sha256":"b657cbaa98f543bb40fd9d01786ae0747ef30f4d2ed4727d81469461ea02d899"});
         let n: NativeConfig = serde_json::from_value(good.clone()).unwrap();
         n.validate().unwrap();
         for (key, value) in [

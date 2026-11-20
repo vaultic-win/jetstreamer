@@ -455,6 +455,16 @@ fn fresh_census(
         );
         fleet::validate_native257_inactive(terminal_fleet, &current, owners)?;
     }
+    let native261 = owners
+        .iter()
+        .any(|(unit, _)| unit == "horizon-261-native-input-20261120-v1.service");
+    if native261 {
+        ensure!(
+            plan.epoch == 261,
+            "native261 status attached to another epoch"
+        );
+        fleet::validate_native261_inactive(terminal_fleet, &current, owners)?;
+    }
     let native265 = plan.epoch == 265 && native265::recognized(terminal_fleet, owners);
     if native265 {
         native265::validate(&current, terminal_fleet, owners)?;
@@ -507,6 +517,7 @@ fn fresh_census(
             && !native210
             && !native211
             && !native257
+            && !native261
             && !native265
             && !native227_v1625
             && !native228

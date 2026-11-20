@@ -1,8 +1,9 @@
-//! Independent terminal decision for the original guarded bootstrap.
-use super::native257 as c;
-use super::native265::{binding, deny, namespace, num, sealed, text};
+// Independent terminal decision for the original guarded bootstrap.
+use super::current as c;
 use super::*;
-pub(super) const SCHEMA: &str = "jetstreamer-private-epoch257-native-terminal-proof-v1";
+use crate::fleet::native265::{binding, deny, namespace, num, sealed, text};
+pub(in crate::fleet) const SCHEMA: &str =
+    epoch_name!("jetstreamer-private-epoch", "-native-terminal-proof-v1");
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Spec {
@@ -12,7 +13,7 @@ struct Spec {
     fleet: BoundFile,
     output: PathBuf,
 }
-pub(super) fn matches(unit: &Value, proof: &Value) -> Result<()> {
+pub(in crate::fleet) fn matches(unit: &Value, proof: &Value) -> Result<()> {
     let original = &proof["terminal_manager"];
     for k in [
         "Id",
@@ -27,7 +28,7 @@ pub(super) fn matches(unit: &Value, proof: &Value) -> Result<()> {
     ] {
         ensure!(
             text(unit, k)? == text(original, k)?,
-            "native257 terminal status owner changed {k}"
+            "native bootstrap terminal status owner changed {k}"
         );
     }
     ensure!(
@@ -38,7 +39,7 @@ pub(super) fn matches(unit: &Value, proof: &Value) -> Result<()> {
             && unit["NRestarts"] == "0"
             && (unit["ActiveState"] == "inactive" && unit["SubState"] == "dead"
                 || unit["ActiveState"] == "failed" && unit["SubState"] == "failed"),
-        "native257 producer not terminal"
+        "native bootstrap producer not terminal"
     );
     Ok(())
 }
@@ -61,14 +62,14 @@ fn decision(
         let realtime = text(r, "__REALTIME_TIMESTAMP")?.parse::<u64>()?;
         ensure!(
             r["_BOOT_ID"] == boot.replace('-', "") && at >= last,
-            "native257 terminal journal clock/boot"
+            "native bootstrap terminal journal clock/boot"
         );
         last = at;
         let msg = text(r, "MESSAGE")?;
         if r["_PID"] == "1" {
             ensure!(
                 r["_UID"] == "0" && r["UNIT"] == c::UNIT && r["INVOCATION_ID"] == iid,
-                "native257 foreign PID1 terminal row"
+                "native bootstrap foreign PID1 terminal row"
             );
             let good = msg == format!("{}: Deactivated successfully.", c::UNIT);
             if good
@@ -81,7 +82,7 @@ fn decision(
             {
                 ensure!(
                     finished.replace((good, realtime, at)).is_none(),
-                    "native257 duplicate PID1 terminal"
+                    "native bootstrap duplicate PID1 terminal"
                 );
             }
         } else {
@@ -91,25 +92,28 @@ fn decision(
                     && r["_SYSTEMD_UNIT"] == c::UNIT
                     && r["_SYSTEMD_INVOCATION_ID"] == iid
                     && r["_EXE"] == c::TEST,
-                "native257 foreign harness journal row"
+                "native bootstrap foreign harness journal row"
             );
             if msg
-                == "epoch257 exact cold input completed; native PID1 and complete guard-history acceptance remain required"
+                == epoch_name!(
+                    "epoch",
+                    " exact cold input completed; native PID1 and complete guard-history acceptance remain required"
+                )
             {
                 ensure!(
                     marker.replace(at).is_none(),
-                    "native257 duplicate harness success"
+                    "native bootstrap duplicate harness success"
                 );
             }
-            if let Some(reason) = msg.strip_prefix("epoch257 cold input failed: ") {
+            if let Some(reason) = msg.strip_prefix(epoch_name!("epoch", " cold input failed: ")) {
                 ensure!(
                     !reason.trim().is_empty() && failure.replace((reason.to_owned(), at)).is_none(),
-                    "native257 ambiguous harness failure"
+                    "native bootstrap ambiguous harness failure"
                 );
             }
         }
     }
-    let (good, wall, end) = finished.context("native257 missing original PID1 terminal")?;
+    let (good, wall, end) = finished.context("native bootstrap missing original PID1 terminal")?;
     ensure!(
         manager["Id"] == c::UNIT
             && manager["InvocationID"] == iid
@@ -127,7 +131,7 @@ fn decision(
             && end - issued <= 2_760_000_000
             && marker.is_none_or(|t| t < end)
             && failure.as_ref().is_none_or(|(_, t)| *t < end),
-        "native257 terminal manager/clock differs"
+        "native bootstrap terminal manager/clock differs"
     );
     let successful = good
         && manager["ActiveState"] == "inactive"
@@ -146,7 +150,7 @@ fn decision(
     if successful {
         ensure!(
             marker.is_some() && failure.is_none(),
-            "native257 success lacks original harness completion"
+            "native bootstrap success lacks original harness completion"
         );
         return Ok((true, "bootstrap checkpoint verified".into(), wall, end));
     }
@@ -156,7 +160,7 @@ fn decision(
             && manager["SubState"] == "failed"
             && manager["Result"] != "success"
             && manager["ExecMainStatus"] != "0",
-        "native257 ambiguous failed terminal"
+        "native bootstrap ambiguous failed terminal"
     );
     let cause = failure.map(|(cause, _)| cause).unwrap_or_else(|| {
         format!(
@@ -171,37 +175,41 @@ fn native_result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
         v,
         origin,
         h,
-        257,
-        "horizon257-exact-worker-cold-input-result-v1",
-        111_022_755,
-        "8bRdfjkM7Lst2wWtAyv56VKTprAYt1DKPuVy2HzK1wX3",
-        "3e2b236f2cba29fbfe40f39f133fe9c845df9280e3fc6dd1cb70e4e018a4744d",
-        "/var/lib/jetstreamer/horizon-contiguous-257-260-current-46b4b4a-v1/snapshot-111022755-8bRdfjkM7Lst2wWtAyv56VKTprAYt1DKPuVy2HzK1wX3.tar.zst",
+        EPOCH,
+        epoch_name!("horizon", "-exact-worker-cold-input-result-v1"),
+        c::SLOT,
+        c::ACCOUNTS_HASH,
+        c::SNAPSHOT_SHA,
+        c::SNAPSHOT,
     )
 }
 fn registered(s: &Spec) -> Result<(Value, Value, Value, Value)> {
     ensure!(
-        s.schema == "jetstreamer-native257-terminal-capture-spec-v1",
-        "native257 terminal spec"
+        s.schema == epoch_name!("jetstreamer-native", "-terminal-capture-spec-v1"),
+        "native bootstrap terminal spec"
     );
-    namespace(&s.output, "horizon-native257-terminal-proof-", "proof.json")?;
+    namespace(
+        &s.output,
+        epoch_name!("horizon-native", "-terminal-proof-"),
+        "proof.json",
+    )?;
     let f = bound_json(&s.fleet)?;
     let o = bound_json(&s.observer)?;
     ensure!(
-        f["schema"] == super::SCHEMA
+        f["schema"] == crate::fleet::SCHEMA
             && f["first_epoch"] == 201
             && f["last_epoch"] == 300
             && f["observer_receipt"].as_str() == s.observer.path.to_str()
             && f["observer_sha256"] == s.observer.sha256
             && f["sampled_at_utc"] == o["recorded_at_utc"],
-        "native257 terminal observer/fleet substituted"
+        "native bootstrap terminal observer/fleet substituted"
     );
-    let p = native257_event::prior(&f)?;
-    let claim = native257_event::owner(&p)?
-        .context("native257 terminal lacks original registered running claim")?;
+    let p = event::prior(&f)?;
+    let claim = event::owner(&p)?
+        .context("native bootstrap terminal lacks original registered running claim")?;
     ensure!(
         claim.evidence == [s.running_origin.clone()] && p.observer == s.observer,
-        "native257 registered claim/observer mismatch"
+        "native bootstrap registered claim/observer mismatch"
     );
     let origin = sealed(&s.running_origin)?;
     let (h, a) = c::startup(&binding(&origin["startup_handoff"])?)?;
@@ -215,7 +223,7 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
     ensure!(
         s.output == output
             && proof["schema"] == SCHEMA
-            && proof["epoch"] == 257
+            && proof["epoch"] == EPOCH
             && proof["unit"] == c::UNIT
             && proof["main_pid"] == h["main_pid"]
             && proof["invocation_id"] == h["invocation_id"]
@@ -227,7 +235,7 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
             && proof["resource_samples_taken"] == 0
             && proof["ordinary_replay_claim"] == false
             && proof["resource_release_authorized"] == false,
-        "native257 terminal claim or authority differs"
+        "native bootstrap terminal claim or authority differs"
     );
     native265::no_authority(proof)?;
     matches(&proof["terminal_manager"], proof)?;
@@ -240,7 +248,7 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
     let (clean, cause, wall, end) = decision(
         proof["producer_journal"]
             .as_array()
-            .context("native257 terminal journal")?,
+            .context("native bootstrap terminal journal")?,
         &proof["terminal_manager"],
         &h,
         text(&a, "boot_id")?,
@@ -252,11 +260,11 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
     } else {
         ensure!(
             proof.get("native_result") == Some(&Value::Null),
-            "failed native257 counted native result"
+            "failed native bootstrap counted native result"
         );
         None
     };
-    let (ids, _) = native257_history::validate(
+    let (ids, _) = history::validate(
         &proof["guard_history"],
         &h,
         &gp,
@@ -274,7 +282,7 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
             && proof["terminal_monotonic_microseconds"] == end
             && num(proof, "recorded_unix_seconds")? >= wall / 1_000_000
             && proof["terminal_retention"] == retention_subset(&h)?,
-        "native257 terminal decision evidence differs"
+        "native bootstrap terminal decision evidence differs"
     );
     Ok(ids)
 }
@@ -300,14 +308,14 @@ fn retention_subset(h: &Value) -> Result<Value> {
     }
     Ok(Value::Object(v))
 }
-pub(super) fn validate(v: &Value, b: &BoundFile) -> Result<()> {
-    ensure!(sealed(b)? == *v, "native257 terminal proof changed");
+pub(in crate::fleet) fn validate(v: &Value, b: &BoundFile) -> Result<()> {
+    ensure!(sealed(b)? == *v, "native bootstrap terminal proof changed");
     validate_parts(v, &b.path)?;
     Ok(())
 }
 fn actual_journal(h: &Value) -> Result<Vec<Value>> {
     let iid = text(h, "invocation_id")?;
-    native257_guard::journal(&[
+    guard::journal(&[
         "_PID=1".into(),
         format!("UNIT={}", c::UNIT),
         format!("INVOCATION_ID={iid}"),
@@ -322,35 +330,35 @@ fn actual_result() -> Result<Value> {
     let m = fs::symlink_metadata(&path)?;
     ensure!(
         m.is_file() && m.uid() == 1000 && m.nlink() == 1 && path.canonicalize()? == path,
-        "native257 result custody"
+        "native bootstrap result custody"
     );
     Ok(serde_json::from_slice(&read_stable_bounded(
         &path,
         2 << 20,
-        "native257 actual bootstrap result",
+        "native bootstrap actual bootstrap result",
     )?)?)
 }
-pub(super) fn capture() -> Result<()> {
-    let (b, actor) = publication203::parsed_args("capture-native257-terminal")?;
+pub(in crate::fleet) fn capture() -> Result<()> {
+    let (b, actor) = publication203::parsed_args(epoch_name!("capture-native", "-terminal"))?;
     let s: Spec = serde_json::from_value(sealed(&b)?)?;
     let (_, h, a, f) = registered(&s)?;
     c::helper(&a, &actor, true)?;
     ensure!(
         a["boot_id"] == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
-        "native257 terminal boot changed"
+        "native bootstrap terminal boot changed"
     );
     if s.output.try_exists()? {
         let reference = binding(&private157::file_binding(&s.output)?)?;
         let old = sealed(&reference)?;
         ensure!(
             old["capture_spec"] == private157::binding(&b) && old["capture_helper_sha256"] == actor,
-            "native257 terminal retry changed"
+            "native bootstrap terminal retry changed"
         );
         return validate(&old, &reference);
     }
     let names = f["unit_census"]
         .as_object()
-        .context("native257 peer census")?
+        .context("native bootstrap peer census")?
         .keys()
         .cloned()
         .collect();
@@ -363,7 +371,7 @@ pub(super) fn capture() -> Result<()> {
         &sealed(&binding(&h["startup_plan"])?)?,
         "issued_monotonic_us",
     )?;
-    let history = native257_history::actual(&h, &gp, &a, issued)?;
+    let history = history::actual(&h, &gp, &a, issued)?;
     let journal = actual_journal(&h)?;
     let (clean, cause, wall, end) = decision(
         &journal,
@@ -374,7 +382,7 @@ pub(super) fn capture() -> Result<()> {
         history["records"].get("stop-intent.json"),
     )?;
     let result = if clean { actual_result()? } else { Value::Null };
-    let mut proof = json!({"schema":SCHEMA,"epoch":257,"unit":c::UNIT,"main_pid":h["main_pid"],"invocation_id":h["invocation_id"],"boot_id":a["boot_id"],"capture_spec":private157::binding(&b),"capture_helper_sha256":actor,
+    let mut proof = json!({"schema":SCHEMA,"epoch":EPOCH,"unit":c::UNIT,"main_pid":h["main_pid"],"invocation_id":h["invocation_id"],"boot_id":a["boot_id"],"capture_spec":private157::binding(&b),"capture_helper_sha256":actor,
         "observer":private157::binding(&s.observer),"fleet":private157::binding(&s.fleet),"running_origin":private157::binding(&s.running_origin),"sampled_at_utc":f["sampled_at_utc"],
         "resource_samples_taken":0,"ordinary_replay_claim":false,"resource_release_authorized":false,"native_input_qualified":clean,"repair_backlog_retained":!clean,"cause":cause,"recorded_unix_seconds":c::now()?,
         "terminal_unix_microseconds":wall,"terminal_monotonic_microseconds":end,"terminal_manager":m,"terminal_retention":retention_subset(&h)?,"producer_journal":journal,"guard_history":history,"native_result":result});
@@ -383,11 +391,11 @@ pub(super) fn capture() -> Result<()> {
     native265_process::drained_for(c::UNIT, &ids)?;
     ensure!(
         c::properties()? == m
-            && native257_history::actual(&h, &gp, &a, issued)? == history
+            && history::actual(&h, &gp, &a, issued)? == history
             && actual_journal(&h)? == journal
             && (!clean || actual_result()? == result)
             && census(&names, 201, 300)? == before,
-        "native257 terminal evidence changed during capture"
+        "native bootstrap terminal evidence changed during capture"
     );
     native265_process::drained_for(c::UNIT, &ids)?;
     private157::immutable_receipt(&s.output, &proof)
@@ -400,7 +408,7 @@ mod tests {
         let iid = "a".repeat(32);
         let h = json!({"invocation_id":iid,"main_pid":42});
         let mut m = json!({"Id":c::UNIT,"InvocationID":iid,"ExecMainPID":"42","MainPID":"0","ControlPID":"0","NRestarts":"0","Restart":"no","KillMode":"control-group","Delegate":"no","Job":"","TriggeredBy":"","LoadState":"loaded","ActiveState":"inactive","SubState":"dead","Result":"success","ExecMainCode":"1","ExecMainStatus":"0"});
-        let harness = json!({"_PID":"42","_UID":"1000","_EXE":c::TEST,"_BOOT_ID":"boot","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":iid,"__MONOTONIC_TIMESTAMP":"150","__REALTIME_TIMESTAMP":"1000000","MESSAGE":"epoch257 exact cold input completed; native PID1 and complete guard-history acceptance remain required"});
+        let harness = json!({"_PID":"42","_UID":"1000","_EXE":c::TEST,"_BOOT_ID":"boot","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":iid,"__MONOTONIC_TIMESTAMP":"150","__REALTIME_TIMESTAMP":"1000000","MESSAGE":epoch_name!("epoch", " exact cold input completed; native PID1 and complete guard-history acceptance remain required")});
         let pid1 = json!({"_PID":"1","_UID":"0","_BOOT_ID":"boot","UNIT":c::UNIT,"INVOCATION_ID":iid,"__MONOTONIC_TIMESTAMP":"200","__REALTIME_TIMESTAMP":"1000050","MESSAGE":format!("{}: Deactivated successfully.",c::UNIT)});
         let mut rows = vec![harness, pid1];
         assert!(decision(&rows, &m, &h, "boot", 100, None).unwrap().0);
@@ -417,7 +425,10 @@ mod tests {
             bad[idx][key] = Value::Null;
             assert!(decision(&bad, &m, &h, "boot", 100, None).is_err(), "{key}");
         }
-        rows[0]["MESSAGE"] = json!("epoch257 cold input failed: checkpoint mismatch");
+        rows[0]["MESSAGE"] = json!(epoch_name!(
+            "epoch",
+            " cold input failed: checkpoint mismatch"
+        ));
         rows[1]["MESSAGE"] = json!(format!("{}: Failed with result 'exit-code'.", c::UNIT));
         m["ActiveState"] = json!("failed");
         m["SubState"] = json!("failed");

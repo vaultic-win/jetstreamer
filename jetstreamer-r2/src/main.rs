@@ -3557,7 +3557,11 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("recover-reader205-finalization") {
         return recover_reader205::run().await;
     }
-    if env::args().nth(1).as_deref().is_some_and(holding::foundation_private_command) {
+    if env::args()
+        .nth(1)
+        .as_deref()
+        .is_some_and(holding::foundation_private_command)
+    {
         return holding::run().await;
     }
     if matches!(
@@ -3882,6 +3886,12 @@ async fn main() -> Result<()> {
     }
     if env::args().nth(1).as_deref() == Some("capture-native257-terminal") {
         return fleet::capture_native257_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native261-input") {
+        return fleet::capture_native261_input();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native261-terminal") {
+        return fleet::capture_native261_terminal();
     }
     if env::args().nth(1).as_deref() == Some("capture-native265-input") {
         return fleet::capture_native265_input();
@@ -4648,7 +4658,12 @@ mod tests {
     #[tokio::test]
     async fn instrumented_readback_preserves_digest_and_writer_failure_gates() {
         const BODY: &[u8] = b"readback-fixture";
-        for outcome in ["success", "digest-mismatch", "writer-failure", "etag-mismatch"] {
+        for outcome in [
+            "success",
+            "digest-mismatch",
+            "writer-failure",
+            "etag-mismatch",
+        ] {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let endpoint = format!("http://{}", listener.local_addr().unwrap());
             listener.set_nonblocking(true).unwrap();
@@ -4694,7 +4709,9 @@ mod tests {
                     BODY.len() - 1,
                     BODY.len()
                 );
-                connection.write_all(&[response.as_bytes(), BODY].concat()).unwrap();
+                connection
+                    .write_all(&[response.as_bytes(), BODY].concat())
+                    .unwrap();
             });
             let client = Client::from_conf(
                 S3ConfigBuilder::new()
@@ -4751,9 +4768,9 @@ mod tests {
                         .to_string()
                         .contains("remote SHA-256 mismatch")
                 ),
-                "etag-mismatch" => assert!(
-                    result.unwrap_err().to_string().contains("ETag mismatch")
-                ),
+                "etag-mismatch" => {
+                    assert!(result.unwrap_err().to_string().contains("ETag mismatch"))
+                }
                 "writer-failure" => assert!(
                     result
                         .unwrap_err()

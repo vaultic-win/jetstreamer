@@ -1,27 +1,27 @@
-//! Preserve unrelated owners and the original resource sample across epoch 257 events.
-use super::native257 as c;
-use super::native265::{num, sealed, text};
+// Preserve unrelated owners and the original resource sample across native bootstrap events.
+use super::current as c;
 use super::*;
-pub(super) fn prior(f: &Value) -> Result<Plan> {
+use crate::fleet::native265::{num, sealed, text};
+pub(in crate::fleet) fn prior(f: &Value) -> Result<Plan> {
     let plan = BoundFile {
         path: text(f, "plan")?.into(),
         sha256: text(f, "plan_sha256")?.into(),
     };
     Ok(serde_json::from_value(bound_json(&plan)?)?)
 }
-pub(super) fn owner(plan: &Plan) -> Result<Option<&PipelineClaim>> {
+pub(in crate::fleet) fn owner(plan: &Plan) -> Result<Option<&PipelineClaim>> {
     let mut registered = plan.pipeline_claims.iter().filter(|r| r.unit == c::UNIT);
     let first = registered.next();
     ensure!(
         registered.next().is_none(),
-        "native257 duplicate registered owner"
+        "native bootstrap duplicate registered owner"
     );
     if let Some(r) = first {
         c::claim(r)?;
     }
     Ok(first)
 }
-pub(super) fn predecessor(
+pub(in crate::fleet) fn predecessor(
     previous: &Value,
     p: &Plan,
     event: &Value,
@@ -31,20 +31,20 @@ pub(super) fn predecessor(
     let b = p
         .metadata_event
         .as_ref()
-        .context("native257 event binding")?;
-    let o = owner(p)?.context("native257 event needs registered ownership")?;
+        .context("native bootstrap event binding")?;
+    let o = owner(p)?.context("native bootstrap event needs registered ownership")?;
     let running = event["schema"] == c::SCHEMA;
     let start = if running {
         ensure!(
             o.evidence.first() == Some(b),
-            "native257 event substituted registered claim"
+            "native bootstrap event substituted registered claim"
         );
         num(event, "recorded_unix_seconds")?
     } else {
-        native257_terminal::validate(event, b)?;
+        terminal::validate(event, b)?;
         ensure!(
             event["running_origin"] == private157::binding(&o.evidence[0]),
-            "native257 terminal registration differs"
+            "native bootstrap terminal registration differs"
         );
         num(event, "recorded_unix_seconds")?
     };
@@ -56,7 +56,7 @@ pub(super) fn predecessor(
             && p.first_epoch == 201
             && p.last_epoch == 300
             && p.admission_transition_guard.is_none()
-            && previous["schema"] == super::SCHEMA
+            && previous["schema"] == crate::fleet::SCHEMA
             && previous["observer_receipt"].as_str() == p.observer.path.to_str()
             && previous["observer_sha256"] == p.observer.sha256
             && previous["sampled_at_utc"] == sampled
@@ -64,7 +64,7 @@ pub(super) fn predecessor(
             && p.previous_fleet
                 .as_ref()
                 .is_some_and(|f| event["fleet"] == private157::binding(f)),
-        "native257 event substituted resource observer or prior fleet"
+        "native bootstrap event substituted resource observer or prior fleet"
     );
     let old = prior(previous)?;
     if running {
@@ -75,25 +75,25 @@ pub(super) fn predecessor(
                     .pipeline_claims
                     .iter()
                     .all(|r| p.pipeline_claims.contains(r)),
-            "native257 changed existing pipeline ownership"
+            "native bootstrap changed existing pipeline ownership"
         );
         for r in previous["active"]
             .as_array()
-            .context("native257 old active")?
+            .context("native bootstrap old active")?
         {
             if let Some(epoch) = r["epoch"].as_u64() {
-                ensure!(epoch != 257, "native257 existing owner");
+                ensure!(epoch != EPOCH, "native bootstrap existing owner");
             } else {
                 ensure!(
-                    !parse_observer_claim_range(text(r, "range")?)?.contains(&257),
-                    "native257 overlapping active range"
+                    !parse_observer_claim_range(text(r, "range")?)?.contains(&EPOCH),
+                    "native bootstrap overlapping active range"
                 );
             }
         }
     } else {
         ensure!(
             old.pipeline_claims == p.pipeline_claims && event["sampled_at_utc"] == sampled,
-            "native257 terminal lost original registered history"
+            "native bootstrap terminal lost original registered history"
         );
     }
     let mut expected = old.tracked_units.iter().cloned().collect::<BTreeSet<_>>();
@@ -122,16 +122,19 @@ pub(super) fn predecessor(
                     && n.invocation_id == d.invocation_id
                     && n.scratch_path == d.scratch_path
                     && n.launch_receipt == d.launch_receipt)),
-        "native257 unrelated fleet settings changed"
+        "native bootstrap unrelated fleet settings changed"
     );
     for (epoch, g) in &old.gates {
-        let n = p.gates.get(epoch).context("native257 gate omitted")?;
+        let n = p
+            .gates
+            .get(epoch)
+            .context("native bootstrap gate omitted")?;
         ensure!(
             native265_event::same_operator_status(&g.operator_status, &n.operator_status)
                 && serde_json::to_value(&g.reserve_stop)? == serde_json::to_value(&n.reserve_stop)?,
-            "native257 unrelated status/reserve changed"
+            "native bootstrap unrelated status/reserve changed"
         );
-        if *epoch == 257 {
+        if *epoch == EPOCH {
             ensure!(
                 n.evidence.contains(b)
                     && g.evidence.iter().all(|v| n.evidence.contains(v))
@@ -153,12 +156,12 @@ pub(super) fn predecessor(
                                     "failed-needs-repair"
                                 }
                     }),
-                "native257 outcome gate mismatch"
+                "native bootstrap outcome gate mismatch"
             );
         } else {
             ensure!(
                 n.state == g.state && n.evidence == g.evidence && n.next_action == g.next_action,
-                "native257 unrelated gate changed"
+                "native bootstrap unrelated gate changed"
             );
         }
     }
@@ -167,21 +170,21 @@ pub(super) fn predecessor(
 fn telemetry(v: &Value, c: &PipelineClaim) -> Result<()> {
     let mut rows = v["diagnostic_replays"]
         .as_array()
-        .context("native257 diagnostic telemetry census")?
+        .context("native bootstrap diagnostic telemetry census")?
         .iter()
-        .filter(|r| r["range"] == "257-257" || r["producer_unit"] == super::native257::UNIT);
+        .filter(|r| r["range"] == RANGE || r["producer_unit"] == c::UNIT);
     let r = rows
         .next()
-        .context("native257 missing resource observation")?;
+        .context("native bootstrap missing resource observation")?;
     let obs = &r["observation"];
     ensure!(
         rows.next().is_none()
             && r["status"] == "observed"
             && r["expected_producer_invocation_id"] == c.invocation_id
-            && r["range"] == "257-257"
-            && r["producer_unit"] == super::native257::UNIT
+            && r["range"] == RANGE
+            && r["producer_unit"] == c::UNIT
             && r["native_resource_only"] == true
-            && r["scratch_path"] == super::native257::ROOT
+            && r["scratch_path"] == c::ROOT
             && r["ordinary_replay_claim"] == false
             && r["entry_replay"] == false
             && obs["invocation_binding_stable"] == true
@@ -189,11 +192,12 @@ fn telemetry(v: &Value, c: &PipelineClaim) -> Result<()> {
             && obs["native_input_qualified"] == false
             && obs["entry_replay"] == false
             && obs["publication_authorized"] == false,
-        "native257 observation missing/ambiguous"
+        "native bootstrap observation missing/ambiguous"
     );
     let origin = sealed(&c.evidence[0])?;
-    let (h, _) = super::native257::startup(&native265::binding(&origin["startup_handoff"])?)?;
+    let (h, _) = c::startup(&native265::binding(&origin["startup_handoff"])?)?;
     let gp = sealed(&native265::binding(&h["guard_plan"])?)?;
+    c::observation_mount(obs, &h)?;
     telemetry_images(obs, &origin, &gp)
 }
 fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
@@ -202,15 +206,15 @@ fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
     for side in ["before", "after"] {
         let image = &obs[format!("native_main_{side}")];
         ensure!(
-            image["executable"] == super::native257::TEST
-                && image["sha256"] == super::native257::TEST_SHA
+            image["executable"] == c::TEST
+                && image["sha256"] == c::TEST_SHA
                 && image["pid"] == origin["main_pid"],
-            "native257 telemetry harness differs"
+            "native bootstrap telemetry harness differs"
         );
         let u = &obs[format!("producer_{side}")];
         let child = obs
             .get(format!("native_child_{side}").as_str())
-            .context("native257 missing child census")?;
+            .context("native bootstrap missing child census")?;
         ensure!(
             u["unit"] == c::UNIT
                 && u["invocation_id"] == origin["invocation_id"]
@@ -218,25 +222,25 @@ fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
                 && u["control_group"] == format!("/system.slice/{}", c::UNIT)
                 && u["rss"]["census_stable"] == true
                 && u["rss"].get("error") == Some(&Value::Null),
-            "native257 RSS owner"
+            "native bootstrap RSS owner"
         );
         let rows = u["rss"]["processes"]
             .as_array()
-            .context("native257 telemetry process census")?;
+            .context("native bootstrap telemetry process census")?;
         let mut pids = BTreeMap::new();
         for row in rows {
             ensure!(
                 pids.insert(num(row, "pid")?, num(row, "start_ticks")?)
                     .is_none(),
-                "native257 duplicate telemetry PID"
+                "native bootstrap duplicate telemetry PID"
             );
         }
         ensure!(
             pids.get(&main) == Some(&num(gp, "main_start_ticks")?) && (1..=2).contains(&pids.len()),
-            "native257 main start or process count"
+            "native bootstrap main start or process count"
         );
         if pids.len() == 1 {
-            ensure!(child.is_null(), "native257 phantom worker");
+            ensure!(child.is_null(), "native bootstrap phantom worker");
         } else {
             let pid = num(child, "pid")?;
             ensure!(
@@ -246,14 +250,14 @@ fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
                     && child["sha256"] == native265::WORKER_SHA
                     && pids.get(&pid) == Some(&num(child, "start_ticks")?)
                     && num(child, "start_ticks")? >= num(gp, "main_start_ticks")?,
-                "native257 telemetry worker changed"
+                "native bootstrap telemetry worker changed"
             );
         }
         members.push(pids);
     }
     ensure!(
         members[0] == members[1],
-        "native257 unstable process membership"
+        "native bootstrap unstable process membership"
     );
     for role in ["native_main", "native_child"] {
         let before = &obs[format!("{role}_before")];
@@ -262,14 +266,14 @@ fn telemetry_images(obs: &Value, origin: &Value, gp: &Value) -> Result<()> {
             for field in ["mapped_inode", "mapped_device"] {
                 ensure!(
                     num(before, field)? == num(after, field)?,
-                    "native257 mapped executable changed"
+                    "native bootstrap mapped executable changed"
                 );
             }
         }
     }
     Ok(())
 }
-pub(super) fn census_check(
+pub(in crate::fleet) fn census_check(
     p: &Plan,
     previous: &Value,
     observation: &Value,
@@ -278,11 +282,11 @@ pub(super) fn census_check(
     let active = current.get(c::UNIT).is_some_and(diagnostic_stage_running);
     let registered = owner(p)?;
     let Some(owner) = registered else {
-        ensure!(!active, "unregistered native257 live owner");
+        ensure!(!active, "unregistered native bootstrap live owner");
         if previous.is_object() && previous["unit_census"].get(c::UNIT).is_some() {
             ensure!(
                 owner(&prior(previous)?)?.is_none(),
-                "native257 registered predecessor dropped"
+                "native bootstrap registered predecessor dropped"
             );
         }
         return Ok(());
@@ -290,14 +294,14 @@ pub(super) fn census_check(
     let predecessor = p
         .previous_fleet
         .as_ref()
-        .context("native257 missing fleet predecessor")?;
+        .context("native bootstrap missing fleet predecessor")?;
     let event = p.metadata_event.as_ref().map(bound_json).transpose()?;
     let origin = sealed(&owner.evidence[0])?;
     let initial = p.metadata_event.as_ref() == owner.evidence.first();
     if !initial {
         ensure!(
             self::owner(&prior(previous)?)? == Some(owner),
-            "native257 previous fleet changed ownership"
+            "native bootstrap previous fleet changed ownership"
         );
     }
     let same = previous["observer_receipt"].as_str() == p.observer.path.to_str()
@@ -308,50 +312,51 @@ pub(super) fn census_check(
                 && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
                 && observation["cadence"]["previous_sample_recorded_at_utc"]
                     == previous["sampled_at_utc"],
-            "native257 observation chain interrupted"
+            "native bootstrap observation chain interrupted"
         );
     }
     if initial
         || event
             .as_ref()
-            .is_some_and(|v| v["schema"] == native257_terminal::SCHEMA)
+            .is_some_and(|v| v["schema"] == terminal::SCHEMA)
     {
         ensure!(
-            event.as_ref().context("native257 event")?["fleet"] == private157::binding(predecessor),
-            "native257 predecessor mismatch"
+            event.as_ref().context("native bootstrap event")?["fleet"]
+                == private157::binding(predecessor),
+            "native bootstrap predecessor mismatch"
         );
         native265_capture::peers(previous, current, c::UNIT)?;
     }
     if active {
         ensure!(
-            p.gates[&257].state == "blocked-qualification",
-            "native257 live gate"
+            p.gates[&EPOCH].state == "blocked-qualification",
+            "native bootstrap live gate"
         );
         if private157::binding(&p.observer) != origin["observer"] {
             telemetry(observation, owner)?;
         }
     } else {
-        let proofs = p.gates[&257]
+        let proofs = p.gates[&EPOCH]
             .evidence
             .iter()
             .map(|b| Ok((b, bound_json(b)?)))
             .collect::<Result<Vec<_>>>()?;
         let mut terminal = proofs
             .iter()
-            .filter(|(_, v)| v["schema"] == native257_terminal::SCHEMA);
+            .filter(|(_, v)| v["schema"] == terminal::SCHEMA);
         let (b, proof) = terminal
             .next()
-            .context("native257 terminal lacks decision evidence")?;
+            .context("native bootstrap terminal lacks decision evidence")?;
         ensure!(
             terminal.next().is_none()
                 && proof["running_origin"] == private157::binding(&owner.evidence[0]),
-            "native257 ambiguous terminal"
+            "native bootstrap ambiguous terminal"
         );
-        native257_terminal::validate(proof, b)?;
-        native257_terminal::matches(
+        terminal::validate(proof, b)?;
+        terminal::matches(
             current
                 .get(c::UNIT)
-                .context("native257 terminal owner missing")?,
+                .context("native bootstrap terminal owner missing")?,
             proof,
         )?;
     }
