@@ -236,7 +236,10 @@ fn census(retry: &Value) -> Result<Value> {
         let inspect = || -> Result<(PathBuf, Option<String>)> {
             let cg = group(pid)?;
             ensure!(
-                cg != oldcg && !cg.starts_with(&format!("{oldcg}/")),
+                cg != oldcg
+                    && !cg.starts_with(&format!("{oldcg}/"))
+                    && (retry["LoadState"] != "not-found"
+                        || (cg != newcg && !cg.starts_with(&format!("{newcg}/")))),
                 "old boundary cgroup member"
             );
             let ns = fs::read_link(proc.join("ns/mnt"))?;
@@ -304,6 +307,86 @@ fn census(retry: &Value) -> Result<Value> {
     )
 }
 
+const COMPLETED_RETRY: &str = include_str!("failed_boundary205206/completed-retry.json");
+const BRIDGE: &str = "/home/ubuntu/.jetstreamer-private/verification-205-current-20261117-v2/boundary/receipts/boundary-205-206.bridge.json";
+const BRIDGE_SHA: &str = "901fce3fd550007e36c8cb65875ac27424ada589886b5db6d94b6cd2c05ae9c7";
+
+fn collected_retry(
+    n: &mut Native,
+    retry: &Value,
+    fleet: &Value,
+    booking: &capacity::Reservation,
+) -> Result<Value> {
+    let expected: Value = serde_json::from_str(COMPLETED_RETRY)?;
+    ensure!(
+        retry == &expected["native"]
+            && fleet["unit_census"][RETRY] == expected["fleet"]
+            && booking.unit == RETRY
+            && booking.invocation_id == RETRY_IID
+            && booking.release.is_none()
+            && booking.source
+                == Bound::new(
+                    "/var/lib/jetstreamer/horizon-native257-current-bookings-v138-ops-v1/boundary-booking.json",
+                    "834f51f10bf2221ccf5a48465a96c626db778481ce72af6518028c36530f77e6"
+                )
+            && booking.remaining_disk_growth_bytes == 268435456
+            && booking.maximum_memory_bytes == CAP,
+        "collected retry state or complete nominal booking changed"
+    );
+    let manager = records(
+        n,
+        MANAGER,
+        &[
+            "_PID=1",
+            &format!("UNIT={RETRY}"),
+            &format!("INVOCATION_ID={RETRY_IID}"),
+        ],
+    )?;
+    let process = records(
+        n,
+        PROCESS,
+        &[
+            &format!("_SYSTEMD_INVOCATION_ID={RETRY_IID}"),
+            "--grep=r2-readback-verified|restored and verified|private_receipt_sha256",
+        ],
+    )?;
+    history_matches(&expected, &manager, &process)?;
+    unavailable(
+        Path::new("/sys/fs/cgroup/system.slice")
+            .join(RETRY)
+            .as_path(),
+    )?;
+    unavailable(Path::new("/run/systemd/transient").join(RETRY).as_path())?;
+    let bridge = Bound::new(BRIDGE, BRIDGE_SHA);
+    let value = bridge.json()?;
+    ensure!(
+        value["authority"]["boundary_verified"] == true
+            && value["bridge"]["verifier_status"] == 0
+            && value["left"]["epoch"] == 205
+            && value["right"]["epoch"] == 206,
+        "completed retry boundary differs"
+    );
+    let canonical = Bound::new(
+        "/home/ubuntu/.jetstreamer-private/verification-205-current-20261117-v2/boundary/receipts/boundary-205-206.ok",
+        "369692d6a6bdfbacab0e6b0d51ce4b8b12ffef10b4b53393f1f2f1ed53efa28e",
+    );
+    ensure!(
+        value["canonical_receipt_paths"] == json!([canonical.path])
+            && value["canonical_receipt_sha256"] == canonical.sha256,
+        "canonical boundary changed"
+    );
+    canonical.bytes(false)?;
+    binding(&value["plan"])?.sealed()?;
+    Bound::new(
+        "/var/lib/jetstreamer/horizon205206-adjacent-boundary-v137-v2/verify-pair",
+        "ee7347fd0801eaa1a5c4c703479067f6db60aaf255dbadfaaff6e9a4f26113c8",
+    )
+    .artifact()?;
+    Ok(
+        json!({"unit":RETRY,"invocation_id":RETRY_IID,"manager":manager,"process":process,"bridge":bridge,"canonical":canonical,"released_memory_bytes":0,"released_disk_growth_bytes":0}),
+    )
+}
+
 pub(super) fn apply(
     n: &mut Native,
     review: &Value,
@@ -343,17 +426,40 @@ pub(super) fn apply(
     compare_terminal(&first, &original["unit"])?;
     live::same_owner(&fleet["unit_census"][OLD], &first)?;
     let retry = n.show(RETRY)?;
-    live::same_owner(&fleet["unit_census"][RETRY], &retry)?;
+    let completed_retry = if retry["LoadState"] == "not-found" {
+        ensure!(
+            !currents.contains_key(RETRY),
+            "collected retry still active"
+        );
+        let booking = rows
+            .iter()
+            .find(|r| r.unit == RETRY)
+            .context("missing retry")?;
+        Some(collected_retry(n, &retry, fleet, booking)?)
+    } else {
+        live::same_owner(&fleet["unit_census"][RETRY], &retry)?;
+        None
+    };
     historical(n, &original)?;
     let drainage = census(&retry)?;
     compare_terminal(&properties(n, &original["unit"])?, &original["unit"])?;
-    live::same_owner(&retry, &n.show(RETRY)?)?;
+    let after = n.show(RETRY)?;
+    if completed_retry.is_some() {
+        ensure!(after == retry, "collected retry changed during census");
+        unavailable(
+            Path::new("/sys/fs/cgroup/system.slice")
+                .join(RETRY)
+                .as_path(),
+        )?;
+    } else {
+        live::same_owner(&retry, &after)?;
+    }
     n.check()?;
     // Only this in-memory arithmetic view changes. booked_arithmetic continues
     // to charge this row's full disk growth and floor, and every other owner.
     rows[index].release = Some(terminal.clone());
     Ok(Some(
-        json!({"schema":"horizon-exact-failed-boundary205206-memory-release-v1","terminal":terminal,"unit":OLD,"invocation_id":IID,"retry_unit":RETRY,"retry_invocation_id":RETRY_IID,"retry_state":retry,"original_state":first,"drainage":drainage,"original_ledger_unchanged":true,"released_memory_bytes":CAP,"released_disk_growth_bytes":0,"physical_allocation_credit_bytes":0,"inherited_floor_credit_bytes":0}),
+        json!({"schema":"horizon-exact-failed-boundary205206-memory-release-v1","terminal":terminal,"unit":OLD,"invocation_id":IID,"retry_unit":RETRY,"retry_invocation_id":RETRY_IID,"retry_state":retry,"completed_retry":completed_retry,"original_state":first,"drainage":drainage,"original_ledger_unchanged":true,"released_memory_bytes":CAP,"released_disk_growth_bytes":0,"physical_allocation_credit_bytes":0,"inherited_floor_credit_bytes":0}),
     ))
 }
 

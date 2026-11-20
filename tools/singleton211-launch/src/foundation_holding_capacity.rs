@@ -149,6 +149,9 @@ fn evaluate(
         "minimum_free_bytes":capacity["protected_existing_floor_bytes"],"capacity":capacity,
         "all_live_growth_and_century_floor_protected":true,"local_retirement_authorized":false,
         "replay_launch_authorized":false,"remote_mutations":false,"recorded_unix_seconds":now()?});
+    if let Some(proof) = host.native211_growth {
+        result["native211_cold_growth_release"] = proof;
+    }
     if let Some(proof) = host.boundary_memory {
         result["failed_boundary205206_memory_release"] = proof;
     }
@@ -240,6 +243,7 @@ mod tests {
             century: 0,
             full211_growth: None,
             boundary_memory: None,
+            native211_growth: None,
             release: None,
             boot: String::new(),
             device: 0,
