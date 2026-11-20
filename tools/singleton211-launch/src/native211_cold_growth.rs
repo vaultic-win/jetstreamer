@@ -356,12 +356,13 @@ pub(super) fn apply(
             Ok(_) => bail!("original native211 process/cgroup still present"),
         }
     }
-    let before = dirs()?;
-    recipes(&pins)?;
+    let before = dirs().context("native211 original empty directories")?;
+    recipes(&pins).context("native211 initial staged recipe census")?;
     let root = Path::new(DIR);
     let owners =
-        native265_growth::scratch_ownership(root, &root.join("scratch"), OLD, &[1264515], &INODES)?;
-    recipes(&pins)?;
+        native265_growth::scratch_ownership(root, &root.join("scratch"), OLD, &[1264515], &INODES)
+            .context("native211 cold scratch ownership census")?;
+    recipes(&pins).context("native211 final staged recipe census")?;
     managers(n, &pins, fleet)?;
     ensure!(
         dirs()? == before,

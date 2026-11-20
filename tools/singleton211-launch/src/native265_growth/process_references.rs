@@ -69,7 +69,8 @@ fn missing(error: &std::io::Error) -> bool {
 
 fn proc_reference(path: &Path, needle: &[u8]) -> Result<bool> {
     match File::open(path) {
-        Ok(file) => stream_reference(file, needle, MAX_PROC_BYTES),
+        Ok(file) => stream_reference(file, needle, MAX_PROC_BYTES)
+            .with_context(|| format!("incomplete process read: {}", path.display())),
         Err(error) if missing(&error) => Ok(false),
         Err(error) => {
             Err(error).with_context(|| format!("incomplete process read: {}", path.display()))

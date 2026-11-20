@@ -435,6 +435,65 @@ fn mount_check(raw: &str, target: &Path) -> Result<()> {
     }
     Ok(())
 }
+fn proc_identity(stat: &str) -> Result<(&str, u32, u64)> {
+    let fields: Vec<_> = stat
+        .rsplit_once(')')
+        .context("process stat comm")?
+        .1
+        .split_ascii_whitespace()
+        .collect();
+    ensure!(fields.len() > 19, "incomplete process stat");
+    Ok((fields[0], fields[2].parse()?, fields[19].parse()?))
+}
+
+fn released_mount_namespace(proc: &Path, group: u32, start: u64) -> Result<()> {
+    // Linux returns EINVAL for mountinfo after exit releases nsproxy.
+    // A zombie group leader can still have live sibling threads.
+    let stat_path = proc.join("stat");
+    let same_zombie = || -> Result<bool> {
+        Ok(proc_identity(&fs::read_to_string(&stat_path)?)? == ("Z", group, start))
+    };
+    ensure!(
+        same_zombie()?,
+        "mountinfo EINVAL for a live or replaced owner"
+    );
+    let pid = proc.file_name().context("process directory")?;
+    let mut tasks = fs::read_dir(proc.join("task"))?;
+    ensure!(
+        tasks
+            .next()
+            .transpose()?
+            .is_some_and(|t| t.file_name() == pid)
+            && tasks.next().transpose()?.is_none(),
+        "mountinfo EINVAL with another task"
+    );
+    match fs::read_link(proc.join("ns/mnt")) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+        Err(e) => return Err(e.into()),
+        Ok(_) => bail!("mountinfo EINVAL with surviving mount namespace"),
+    }
+    ensure!(
+        same_zombie()?,
+        "process identity changed after mountinfo EINVAL"
+    );
+    Ok(())
+}
+
+fn inspect_mountinfo(proc: &Path, group: u32, start: u64, scratch: &Path) -> Result<()> {
+    let file = proc.join("mountinfo");
+    match fs::read(&file) {
+        Ok(mounts) => {
+            ensure!(mounts.len() < 16 << 20, "mountinfo bound");
+            mount_check(std::str::from_utf8(&mounts)?, scratch)
+        }
+        Err(error) if error.raw_os_error() == Some(libc::EINVAL) => {
+            released_mount_namespace(proc, group, start)
+        }
+        Err(error) => Err(error.into()),
+    }
+    .with_context(|| format!("read and verify {}", file.display()))
+}
+
 pub(crate) fn scratch_ownership(
     root: &Path,
     scratch: &Path,
@@ -442,7 +501,8 @@ pub(crate) fn scratch_ownership(
     original_pids: &[u32],
     original_inodes: &[u64],
 ) -> Result<Value> {
-    let scan = process_references::scan(Path::new("/proc"), root)?;
+    let scan =
+        process_references::scan(Path::new("/proc"), root).context("scratch process references")?;
     ensure!(
         scan.references.is_empty(),
         "scratch has process references: {:?}",
@@ -461,12 +521,7 @@ pub(crate) fn scratch_ownership(
         let p = e.path();
         let check = || -> Result<()> {
             let stat = fs::read_to_string(p.join("stat"))?;
-            let tail = stat.rsplit_once(')').context("process stat")?.1;
-            let group = tail
-                .split_whitespace()
-                .nth(2)
-                .context("process group")?
-                .parse::<u32>()?;
+            let (_, group, start) = proc_identity(&stat)?;
             ensure!(
                 !original_pids.contains(&group),
                 "original process group remains"
@@ -476,9 +531,7 @@ pub(crate) fn scratch_ownership(
                 !cg.contains(&format!("/system.slice/{unit}")),
                 "native cgroup still owns process"
             );
-            let mounts = fs::read(p.join("mountinfo"))?;
-            ensure!(mounts.len() < 16 << 20, "mountinfo bound");
-            mount_check(std::str::from_utf8(&mounts)?, scratch)?;
+            inspect_mountinfo(&p, group, start, scratch)?;
             for link in ["cwd", "root", "exe"] {
                 match fs::metadata(p.join(link)) {
                     Ok(m) => ensure!(
@@ -504,7 +557,7 @@ pub(crate) fn scratch_ownership(
         if let Err(err) = check()
             && p.try_exists()?
         {
-            return Err(err);
+            return Err(err).with_context(|| format!("scratch ownership {}", p.display()));
         }
         inspected += 1;
     }
@@ -542,6 +595,67 @@ pub(super) fn capture(n: &mut Native) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn linux_mountinfo_einval_requires_the_original_lone_zombie() {
+        // WNOWAIT leaves the child visible in procfs until our explicit reap.
+        let mut child = std::process::Command::new("/bin/true").spawn().unwrap();
+        let pid = child.id();
+        let mut info = std::mem::MaybeUninit::<libc::siginfo_t>::uninit();
+        assert_eq!(
+            unsafe {
+                libc::waitid(
+                    libc::P_PID,
+                    pid,
+                    info.as_mut_ptr(),
+                    libc::WEXITED | libc::WNOWAIT,
+                )
+            },
+            0
+        );
+        let proc = PathBuf::from(format!("/proc/{pid}"));
+        let stat = fs::read_to_string(proc.join("stat")).unwrap();
+        let (state, group, start) = proc_identity(&stat).unwrap();
+        let errno = fs::read(proc.join("mountinfo")).unwrap_err().raw_os_error();
+        let good = inspect_mountinfo(&proc, group, start, Path::new(SCRATCH));
+        let reused = inspect_mountinfo(&proc, group, start + 1, Path::new(SCRATCH));
+        child.wait().unwrap();
+        assert_eq!(state, "Z");
+        assert_eq!(errno, Some(libc::EINVAL));
+        good.unwrap();
+        assert!(reused.is_err());
+    }
+
+    #[test]
+    fn detached_namespace_does_not_exempt_live_or_multithreaded_owners() {
+        use std::os::unix::fs::symlink;
+        let tmp = tempfile::tempdir().unwrap();
+        let proc = tmp.path().join("187");
+        fs::create_dir_all(proc.join("task/187")).unwrap();
+        fs::create_dir(proc.join("ns")).unwrap();
+        let write_stat = |state: &str| {
+            let mut fields = vec!["0"; 20];
+            fields[0] = state;
+            fields[2] = "100";
+            fields[19] = "998";
+            fs::write(
+                proc.join("stat"),
+                format!("187 (held worker)) {}", fields.join(" ")),
+            )
+            .unwrap();
+        };
+        write_stat("S");
+        assert!(released_mount_namespace(&proc, 100, 998).is_err());
+        write_stat("Z");
+        released_mount_namespace(&proc, 100, 998).unwrap();
+        assert!(released_mount_namespace(&proc, 101, 998).is_err());
+        assert!(released_mount_namespace(&proc, 100, 997).is_err());
+        fs::create_dir(proc.join("task/188")).unwrap();
+        assert!(released_mount_namespace(&proc, 100, 998).is_err());
+        fs::remove_dir(proc.join("task/188")).unwrap();
+        symlink("mnt:[5]", proc.join("ns/mnt")).unwrap();
+        assert!(released_mount_namespace(&proc, 100, 998).is_err());
+    }
+
     #[test]
     fn retained_actual_terminal_rejects_changed_owner_caps_and_commands() {
         let terminal: Value =
