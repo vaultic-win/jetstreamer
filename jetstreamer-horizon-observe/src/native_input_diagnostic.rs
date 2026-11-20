@@ -137,9 +137,24 @@ fn identity(u: &UnitObservation, n: &NativeConfig) -> Result<()> {
     Ok(())
 }
 fn mapped_at(n: &NativeConfig, proc_root: &Path, trusted_uid: u32) -> Result<Value> {
-    let expected = fs::symlink_metadata(&n.executable)?;
+    mapped_image_at(
+        &n.executable,
+        &n.executable_sha256,
+        n.main_pid,
+        proc_root,
+        trusted_uid,
+    )
+}
+pub(super) fn mapped_image_at(
+    executable: &Path,
+    executable_sha256: &str,
+    main_pid: u32,
+    proc_root: &Path,
+    trusted_uid: u32,
+) -> Result<Value> {
+    let expected = fs::symlink_metadata(executable)?;
     ensure!(
-        n.executable.canonicalize()? == n.executable
+        executable.canonicalize()? == executable
             && expected.is_file()
             && expected.uid() == trusted_uid
             && expected.nlink() == 1
@@ -147,9 +162,9 @@ fn mapped_at(n: &NativeConfig, proc_root: &Path, trusted_uid: u32) -> Result<Val
             && expected.len() <= 256 << 20,
         "unsafe native input executable"
     );
-    let proc = proc_root.join(n.main_pid.to_string());
+    let proc = proc_root.join(main_pid.to_string());
     ensure!(
-        fs::read_link(proc.join("exe"))? == n.executable,
+        fs::read_link(proc.join("exe"))? == executable,
         "native input mapped path changed"
     );
     let mut exe = File::open(proc.join("exe"))?;
@@ -170,20 +185,20 @@ fn mapped_at(n: &NativeConfig, proc_root: &Path, trusted_uid: u32) -> Result<Val
         ensure!(bytes <= 256 << 20, "native input executable grew");
         hash.update(&buffer[..count]);
     }
-    let after = fs::symlink_metadata(&n.executable)?;
+    let after = fs::symlink_metadata(executable)?;
     ensure!(
         bytes == expected.len()
-            && sha256_equal(&format!("{:x}", hash.finalize()), &n.executable_sha256)
+            && sha256_equal(&format!("{:x}", hash.finalize()), executable_sha256)
             && same_file(&expected, &after)
             && same_file(&expected, &exe.metadata()?)
-            && fs::read_link(proc.join("exe"))? == n.executable,
+            && fs::read_link(proc.join("exe"))? == executable,
         "native input executable changed"
     );
     let maps = fs::read_to_string(proc.join("maps"))?;
     let vmas = maps.lines().count();
     ensure!(vmas > 0 && vmas <= 3_500_000, "native input VMA bound");
     Ok(
-        serde_json::json!({"pid":n.main_pid,"executable":n.executable,"sha256":n.executable_sha256,"vmas":vmas,"mapped_inode":expected.ino(),"mapped_device":expected.dev(),"historical_worker_claim":false}),
+        serde_json::json!({"pid":main_pid,"executable":executable,"sha256":executable_sha256,"vmas":vmas,"mapped_inode":expected.ino(),"mapped_device":expected.dev(),"historical_worker_claim":false}),
     )
 }
 fn sha256_equal(actual: &str, expected: &str) -> bool {

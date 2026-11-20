@@ -52,8 +52,10 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         .context("ordinary memory census")?
         .iter()
         .collect::<Vec<_>>();
-    if let Some(diagnostics) = o["diagnostic_replays"].as_array() {
-        for diagnostic in diagnostics {
+    // Delivery is a separate resource owner, not a native or finalization diagnostic.
+    // It still enters the same complete fleet-to-RSS join and gets no replay credit.
+    for key in ["diagnostic_replays", "delivery_resources"] {
+        for diagnostic in o[key].as_array().into_iter().flatten() {
             if diagnostic["status"] == "observed" {
                 rows.push(&diagnostic["observation"]);
             }
@@ -321,5 +323,59 @@ mod tests {
         assert_eq!(super::report(&unavailable, &ledger)["valid"], false);
         ledger["active"][0]["phase"] = json!("replay");
         assert_eq!(super::report(&o, &ledger)["valid"], false);
+    }
+    #[test]
+    fn same_sample_delivery_rss_is_required_and_never_replay_credit() {
+        let (mut o, mut ledger) = fixture();
+        let unit = "horizon-upload-247-singleton-20261119-v1.service";
+        let iid = "69218e2e0924497ea595a1227a6c31db";
+        let mut delivery = o["diagnostic_replays"][0].clone();
+        for role in [
+            "controller_before",
+            "controller_after",
+            "producer_before",
+            "producer_after",
+        ] {
+            delivery["observation"][role]["unit"] = json!(unit);
+            delivery["observation"][role]["invocation_id"] = json!(iid);
+        }
+        delivery["delivery_resource_only"] = json!(true);
+        delivery["observation"]["resource_only"] = json!(true);
+        delivery["observation"]["useful_work"]["sufficient_for_rates"] = json!(false);
+        o["diagnostic_replays"].as_array_mut().unwrap().remove(0);
+        o["delivery_resources"] = json!([delivery]);
+        ledger["active"][0]["phase"] = json!("upload-readback");
+        // Match the actual pipeline shape while retaining both replay owners.
+        let mut owner = ledger["active"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("producer")
+            .unwrap();
+        owner["Id"] = json!(unit);
+        owner["InvocationID"] = json!(iid);
+        ledger["active"][0]["unit"] = owner;
+        let result = report(&o, &ledger);
+        assert_eq!(result["valid"], true, "{result}");
+        assert_eq!(result["executing_lanes"], 2);
+        assert_eq!(result["non_replay_owner_count"], 1);
+        assert_eq!(result["non_replay_resident_bytes"], 142_216_388_608u64);
+        for mode in 0..4 {
+            let mut bad = o.clone();
+            match mode {
+                0 => bad["delivery_resources"] = json!([]),
+                1 => bad["delivery_resources"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(delivery.clone()),
+                2 => bad["delivery_resources"][0]["status"] = json!("unavailable"),
+                _ => {
+                    bad["delivery_resources"][0]["observation"]["producer_after"]["invocation_id"] =
+                        json!("wrong")
+                }
+            }
+            assert_eq!(report(&bad, &ledger)["valid"], false, "{mode}");
+        }
+        ledger["active"][0]["phase"] = json!("replay");
+        assert_eq!(report(&o, &ledger)["valid"], false);
     }
 }

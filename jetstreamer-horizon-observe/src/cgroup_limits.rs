@@ -30,7 +30,11 @@ fn checked(sample: &Value) -> Result<Value> {
         .iter()
         .collect();
     let mut unresolved = 0;
-    for key in ["diagnostic_replays", "epoch203_ram_auxiliary"] {
+    for key in [
+        "diagnostic_replays",
+        "epoch203_ram_auxiliary",
+        "delivery_resources",
+    ] {
         for row in sample[key].as_array().into_iter().flatten() {
             if row["status"] == "observed" && row["native_resource_only"] != true {
                 rows.push(&row["observation"]);

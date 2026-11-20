@@ -27,6 +27,7 @@ use {
 const CONFIG_SCHEMA: &str = "jetstreamer-horizon-live-resource-sample-config-v2";
 mod append_log;
 mod cgroup_limits;
+mod delivery247_resource;
 mod full265_telemetry;
 mod host_pressure;
 mod native_input_diagnostic;
@@ -119,6 +120,8 @@ struct Config {
     retained_prefix205_ram: bool,
     #[serde(default)]
     singleton247_finalization: bool,
+    #[serde(default)]
+    delivery247_resource_only: bool,
     #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
 }
@@ -335,6 +338,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
         !config.replays.is_empty()
             || !config.diagnostic_replays.is_empty()
             || !config.native_input_diagnostics.is_empty()
+            || config.delivery247_resource_only
             || config.singleton247_finalization
             || !config.singleton_finalization_epochs.is_empty(),
         "at least one replay is required"
@@ -358,6 +362,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
     native_input_diagnostic::validate(&config)?;
     singleton247_finalization::validate(&config)?;
     full265_telemetry::validate(&config)?;
+    delivery247_resource::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     Ok((config, sha256(&bytes)))
@@ -377,6 +382,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "diagnostic_replay_count": config.diagnostic_replays.len(),
             "native_input_resource_diagnostic_count":config.native_input_diagnostics.len(),
             "singleton247_finalization_resource_only":config.singleton247_finalization,
+            "delivery247_resource_only":config.delivery247_resource_only,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
@@ -1899,6 +1905,7 @@ fn run(config: Config) -> Result<()> {
     native_input_diagnostic::validate(&config)?;
     singleton247_finalization::validate(&config)?;
     full265_telemetry::validate(&config)?;
+    delivery247_resource::validate(&config)?;
     validate_ram_auxiliary(&config)?;
     retained_memory_parent::validate_config(&config)?;
     let (previous_bytes, previous_value, previous_timestamp, previous_unix) =
@@ -1966,6 +1973,8 @@ fn run(config: Config) -> Result<()> {
     for epoch in singleton247_finalization::epochs(&config)? {
         diagnostic_observations.push(singleton247_finalization::sample(epoch, started_unix)?);
     }
+    let delivery_resources =
+        delivery247_resource::sample(config.delivery247_resource_only, started_unix);
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
             std::slice::from_ref(&auxiliary.replay),
@@ -2072,6 +2081,7 @@ fn run(config: Config) -> Result<()> {
         "vm_max_map_count": vm_max_map_count()?,
         "replays": observations,
         "diagnostic_replays": diagnostic_observations,
+        "delivery_resources": delivery_resources,
         "epoch203_ram_auxiliary": auxiliary_observations,
         "auxiliary_policy": {
             "configured": config.epoch203_ram_auxiliary.is_some(),
@@ -2484,6 +2494,7 @@ mod tests {
             host_global_pressure: false,
             retained_prefix205_ram: false,
             singleton247_finalization: false,
+            delivery247_resource_only: false,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
