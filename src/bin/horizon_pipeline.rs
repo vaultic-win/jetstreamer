@@ -11,8 +11,8 @@
 //! `<jet-dir-or-base-url>` is a local directory of `epoch-<N>.jet` files, or
 //! an `http(s)://` base URL serving them. `--bench` swaps the real plugins for
 //! a counting-only plugin — the full framework path (dispatch, workers, flush
-//! cycle, ClickHouse spawned and connected as usual) with no data written —
-//! and reports decode+dispatch throughput.
+//! cycle) with no data written. Slot-range benchmarks report final counts and
+//! throughput as one JSON line on stdout and do not start a ClickHouse server.
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -20,15 +20,20 @@ use std::time::Instant;
 use jetstreamer_firehose::epochs::epoch_to_slot_range;
 use jetstreamer_firehose::firehose_horizon::{JetSource, PinnedArchives};
 use jetstreamer_horizon::archive::{BlockNotification, EntryRecord};
+use jetstreamer_horizon::epochs::EpochMeta;
 use jetstreamer_horizon::transactions::Transaction;
 use jetstreamer_plugin::horizon::{
-    Consumption, HorizonPlugin, HorizonPluginRunner, Output, PluginWorker,
+    Consumption, HorizonPlugin, HorizonPluginRunner, Output, PluginWorker, RangeRunReport,
 };
 use jetstreamer_plugin::plugins::account_writes::AccountWritesPlugin;
 use jetstreamer_plugin::plugins::pubkey_stats_horizon::PubkeyStatsHorizonPlugin;
 use jetstreamer_plugin::plugins::verification::{
     RangeVerificationPlugin, VerificationPlugin, VerificationReport,
 };
+
+#[cfg(test)]
+#[path = "horizon_pipeline/bench_tests.rs"]
+mod bench_tests;
 
 #[path = "horizon_pipeline/capacity.rs"]
 mod capacity;
@@ -60,7 +65,8 @@ fn usage() -> ! {
          write to ClickHouse\n\
          --verification-report writes a new durable JSON result after successful \
          --verify-only playback of a single epoch; PATH must be absolute\n\
-         --archive-inventory binds each anonymous HTTPS request to the archive ETag and length in PATH\n\
+         --archive-inventory (with --bench or --verify-only) binds each anonymous HTTPS request to the archive ETag and length in PATH\n\
+         --bench --slot-ranges prints final counting-plugin counters as JSON on stdout and skips embedded ClickHouse startup\n\
          --verification-report-dir writes epoch-N.json after each successful epoch in an existing absolute directory\n\
          --no-account-bytes (with --bench): declare account-update data \
          unconsumed so the decoder skips diff reconstruction — benchmarks \
@@ -77,7 +83,7 @@ fn usage() -> ! {
     std::process::exit(2);
 }
 
-/// Epoch-scoped totals the bench workers drain into at each flush.
+/// Invocation-wide totals the bench workers drain into at each flush.
 #[derive(Default)]
 struct BenchCounters {
     slots: AtomicU64,
@@ -85,7 +91,44 @@ struct BenchCounters {
     txs: AtomicU64,
     tx_updates: AtomicU64,
     orphan_updates: AtomicU64,
+    epoch_updates: AtomicU64,
     update_bytes: AtomicU64,
+}
+
+impl BenchCounters {
+    fn range_report(
+        &self,
+        run: &RangeRunReport,
+        consume_account_bytes: bool,
+    ) -> std::io::Result<serde_json::Value> {
+        let slots = self.slots.load(Ordering::Relaxed);
+        let transactions = self.txs.load(Ordering::Relaxed);
+        let transaction_updates = self.tx_updates.load(Ordering::Relaxed);
+        let orphan_updates = self.orphan_updates.load(Ordering::Relaxed);
+        let epoch_updates = self.epoch_updates.load(Ordering::Relaxed);
+        let account_data_bytes = self.update_bytes.load(Ordering::Relaxed);
+        if slots != run.slots.end - run.slots.start || transactions != run.transactions {
+            return Err(std::io::Error::other(
+                "counting plugin totals differ from requested slots or dispatched transactions",
+            ));
+        }
+        if !consume_account_bytes && account_data_bytes != 0 {
+            return Err(std::io::Error::other(
+                "metadata-only counting plugin received account data bytes",
+            ));
+        }
+        let seconds = run.elapsed.as_secs_f64();
+        Ok(serde_json::json!({
+            "schema": "horizon-range-benchmark-v1",
+            "start_slot": run.slots.start, "end_slot_exclusive": run.slots.end,
+            "workers": run.workers, "consume_account_bytes": consume_account_bytes,
+            "slots": slots, "blocks": self.blocks.load(Ordering::Relaxed), "transactions": transactions,
+            "transaction_updates": transaction_updates, "orphan_updates": orphan_updates,
+            "epoch_updates": epoch_updates, "account_updates": transaction_updates + orphan_updates + epoch_updates,
+            "account_data_bytes": account_data_bytes, "elapsed_seconds": seconds,
+            "overall_tps": if run.elapsed.is_zero() { 0.0 } else { transactions as f64 / seconds },
+        }))
+    }
 }
 
 /// `--bench` worker: counts locally on the hot path (no shared-state
@@ -100,10 +143,18 @@ struct BenchWorker {
     txs: u64,
     tx_updates: u64,
     orphan_updates: u64,
+    epoch_updates: u64,
     update_bytes: u64,
 }
 
 impl PluginWorker for BenchWorker {
+    fn on_epoch(&mut self, meta: &EpochMeta) {
+        for (_, data) in meta.updates.iter() {
+            self.epoch_updates += 1;
+            self.update_bytes += data.len() as u64;
+        }
+    }
+
     fn on_transaction(&mut self, _slot: u64, _tx_index: u32, tx: &Transaction) {
         self.txs += 1;
         for (_meta, data) in tx.iter_account_updates() {
@@ -135,14 +186,16 @@ impl PluginWorker for BenchWorker {
             .fetch_add(std::mem::take(&mut self.tx_updates), Ordering::Relaxed);
         c.orphan_updates
             .fetch_add(std::mem::take(&mut self.orphan_updates), Ordering::Relaxed);
+        c.epoch_updates
+            .fetch_add(std::mem::take(&mut self.epoch_updates), Ordering::Relaxed);
         c.update_bytes
             .fetch_add(std::mem::take(&mut self.update_bytes), Ordering::Relaxed);
     }
 }
 
 /// The counting-only plugin `--bench` swaps in for the real ones. Runs through
-/// the standard `HorizonPluginRunner` (ClickHouse connected as usual) but
-/// creates no tables and submits no inserts.
+/// the standard `HorizonPluginRunner` and its normal flush lifecycle.
+/// The worker creates no tables and submits no inserts.
 struct BenchPlugin {
     counters: Arc<BenchCounters>,
     /// With `--no-account-bytes` this is false: the plugin declares it does
@@ -443,7 +496,7 @@ async fn main() {
         }
     }
     let src = if let Some(path) = &archive_inventory {
-        if !verify_only || !path.is_absolute() {
+        if !(verify_only || bench) || !path.is_absolute() {
             usage();
         }
         JetSource::HttpPinned(
@@ -463,9 +516,10 @@ async fn main() {
 
     // Local DSN → spawn the embedded ClickHouse helper (binary unpacked into
     // bin/, same as the main jetstreamer runner) and wait until it's ready.
-    // Bench mode keeps this: the point is the full framework path with the
-    // connection present, just no data written to it.
-    let spawn_clickhouse = !verify_only && should_spawn_for_dsn(&dsn);
+    // Range benchmarks use the normal runner and its lazy client. The counting
+    // plugin never submits a query. Preserve the existing per-epoch bench setup.
+    let range_bench = bench && slot_ranges;
+    let spawn_clickhouse = !(verify_only || range_bench) && should_spawn_for_dsn(&dsn);
     let mut clickhouse_task = None;
     if spawn_clickhouse {
         let (mut ready_rx, clickhouse_future) =
@@ -485,6 +539,8 @@ async fn main() {
         }));
     } else if verify_only {
         log::info!("verification-only mode; ClickHouse is disabled");
+    } else if range_bench {
+        log::info!("counting-only slot-range benchmark; ClickHouse is disabled");
     } else {
         log::info!("using external ClickHouse at {dsn} (no embedded spawn)");
     }
@@ -583,6 +639,10 @@ async fn main() {
                         failure = Some(format!("cannot finalize range verification: {err}"));
                     }
                 }
+                Ok(run) if bench => match bench_counters.range_report(&run, !no_account_bytes) {
+                    Ok(report) => println!("{report}"),
+                    Err(error) => failure = Some(format!("cannot finalize range benchmark: {error}")),
+                },
                 Ok(_) => {}
             },
             _ = shutdown.notified() => failure = Some("interrupted during slot-range playback".into()),
@@ -610,6 +670,7 @@ async fn main() {
                 bench_counters.tx_updates.load(Ordering::Relaxed),
                 bench_counters.orphan_updates.load(Ordering::Relaxed),
                 bench_counters.update_bytes.load(Ordering::Relaxed),
+                bench_counters.epoch_updates.load(Ordering::Relaxed),
             );
             let start = Instant::now();
             tokio::select! {
@@ -655,22 +716,24 @@ async fn main() {
                 let orphan_updates =
                     bench_counters.orphan_updates.load(Ordering::Relaxed) - before.4;
                 let update_bytes = bench_counters.update_bytes.load(Ordering::Relaxed) - before.5;
+                let epoch_updates = bench_counters.epoch_updates.load(Ordering::Relaxed) - before.6;
                 let rate = |n: u64| commas((n as f64 / elapsed) as u64);
                 log::info!(
                     "bench: epoch {epoch} done in {elapsed:.1}s — slots={} blocks={} txs={} \
-                 tx_updates={} orphan_updates={} update_bytes={}",
+                 tx_updates={} orphan_updates={} update_bytes={} epoch_updates={}",
                     commas(slots),
                     commas(blocks),
                     commas(txs),
                     commas(tx_updates),
                     commas(orphan_updates),
                     commas(update_bytes),
+                    commas(epoch_updates),
                 );
                 log::info!(
                     "bench: epoch {epoch} rates — slots/s={} TPS={} updates/s={} update_MB/s={:.1}",
                     rate(slots),
                     rate(txs),
-                    rate(tx_updates + orphan_updates),
+                    rate(tx_updates + orphan_updates + epoch_updates),
                     (update_bytes as f64 / elapsed) / 1_000_000.0,
                 );
             } else {

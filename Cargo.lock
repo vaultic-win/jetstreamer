@@ -4733,6 +4733,7 @@ dependencies = [
  "libc",
  "log",
  "ratatui",
+ "serde_json",
  "solana-blake3-hasher",
  "solana-epoch-rewards-hasher",
  "solana-keccak-hasher",

@@ -152,6 +152,7 @@ tikv-jemallocator = { version = "0.6", features = [
 ] }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 solana-logger.workspace = true
+serde_json.workspace = true
 log.workspace = true
 jetstreamer-firehose.workspace = true
 jetstreamer-horizon.workspace = true
