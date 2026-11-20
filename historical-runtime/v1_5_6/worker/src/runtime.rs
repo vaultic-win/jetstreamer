@@ -41,9 +41,13 @@ const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 64_799_804;
 const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
 const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 75_168_000;
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
-const EPOCH168_TRACE_ENV: &str = "JETSTREAMER_HISTORICAL_TRACE_EPOCH168";
-const EPOCH168_TRACE_SIGNATURE: &str =
-    "3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz";
+struct TraceTarget {
+    epoch: u64,
+    ordinal: u64,
+    signature: &'static str,
+    enable_env: &'static str,
+}
+
 const ABSOLUTE_MAX_POH_THREADS: usize = 256;
 // The validator runs AccountsBackgroundService alongside replay. This worker
 // has no BankForks service, so perform the same storage-only maintenance at
@@ -259,28 +263,31 @@ impl RuntimeState {
             if let Some(error) = batch.lock_results().iter().find(|result| result.is_err()) {
                 return Err(format!("entry account locking failed: {:?}", error));
             }
-            let trace_epoch168 =
-                is_epoch168_trace_target(request.slot, request.entry_index, &transactions)
-                    && env::var_os(EPOCH168_TRACE_ENV).as_deref() == Some(OsStr::new("1"));
+            let trace_target = trace_target(request.slot, request.entry_index, &transactions)
+                .filter(|target| {
+                    env::var_os(target.enable_env).as_deref() == Some(OsStr::new("1"))
+                });
             let (results, _balances, _inner_instructions, log_messages) =
                 self.bank.load_execute_and_commit_transactions(
                     &batch,
                     max_age,
                     false,
                     false,
-                    trace_epoch168,
+                    trace_target.is_some(),
                     &mut ExecuteTimings::default(),
                 );
             drop(batch);
-            if trace_epoch168 {
+            if let Some(target) = trace_target {
                 // Keep the wire protocol on stdout and preserve the execution result even if
                 // the diagnostic sink is closed. The loader records CU and VM errors in logs.
                 let _ = writeln!(
                     std::io::stderr().lock(),
-                    "epoch168 trace slot={} entry={} transaction=532 signature={} execution={:?} logs={:?}",
+                    "epoch{} trace slot={} entry={} transaction={} signature={} execution={:?} logs={:?}",
+                    target.epoch,
                     request.slot,
                     request.entry_index,
-                    EPOCH168_TRACE_SIGNATURE,
+                    target.ordinal,
+                    target.signature,
                     results.execution_results.first().map(|result| &result.0),
                     log_messages.first(),
                 );
@@ -843,15 +850,39 @@ struct PreparedEntry {
     signatures_by_writable_key: HashMap<Vec<u8>, Option<Vec<u8>>>,
 }
 
-fn is_epoch168_trace_target(slot: u64, entry_index: u64, transactions: &[Transaction]) -> bool {
-    // Entry 433 consists solely of the target transaction. Log recording is batch-wide.
-    slot == 72_728_191
-        && entry_index == 433
-        && transactions.len() == 1
-        && transactions[0]
-            .signatures
-            .first()
-            .map_or(false, |sig| sig.to_string() == EPOCH168_TRACE_SIGNATURE)
+fn trace_target(slot: u64, entry_index: u64, transactions: &[Transaction]) -> Option<TraceTarget> {
+    // The Bank log switch applies to the entire batch. Each recorded incident
+    // is a singleton entry, so verify its first signature before enabling it.
+    let target = match (slot, entry_index) {
+        (72_728_191, 433) => TraceTarget {
+            epoch: 168,
+            ordinal: 532,
+            signature: "3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz",
+            enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH168",
+        },
+        (73_982_256, 602) => TraceTarget {
+            epoch: 171,
+            ordinal: 1104,
+            signature: "3NkLmaEpD2wRUuX3VRZWpbHXLfezpw5yu4E5DQ7FAkHE23dytiwWmPbHqTsc1B12XSTsRBw6WMqBEisAoBEsyr8K",
+            enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH171",
+        },
+        (74_380_784, 645) => TraceTarget {
+            epoch: 172,
+            ordinal: 984,
+            signature: "4Mc3qYm8t2AewCC1pax3hp11X7krbVmeWrAzcq8KqB2xtdut6i9fxo8XiMYU31jURU926HunHN2UZo7cQwdQ1chV",
+            enable_env: "JETSTREAMER_HISTORICAL_TRACE_EPOCH172",
+        },
+        _ => return None,
+    };
+    let tx = match transactions {
+        [tx] => tx,
+        _ => return None,
+    };
+    if tx.signatures.first()?.to_string() == target.signature {
+        Some(target)
+    } else {
+        None
+    }
 }
 
 fn prepare_entry(request: EntryRequest) -> Result<PreparedEntry, String> {
@@ -1290,19 +1321,36 @@ mod tests {
     #[test]
     fn epoch168_trace_requires_exact_singleton_entry_and_signature() {
         let mut tx = Transaction::default();
-        assert!(!is_epoch168_trace_target(72_728_191, 433, &[]));
-        assert!(!is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
-        tx.signatures.push(Default::default());
-        assert!(!is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
-        tx.signatures[0] = EPOCH168_TRACE_SIGNATURE.parse().unwrap();
-        assert!(is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
-        assert!(!is_epoch168_trace_target(72_728_190, 433, &[tx.clone()]));
-        assert!(!is_epoch168_trace_target(72_728_191, 432, &[tx.clone()]));
-        assert!(!is_epoch168_trace_target(
-            72_728_191,
-            433,
-            &[tx.clone(), tx]
-        ));
+        tx.signatures.push("3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz".parse().unwrap());
+        check_trace_target(168, 72_728_191, 433, 532, tx);
+    }
+
+    #[test]
+    fn swap_traces_match_the_signed_original_transactions() {
+        let wire171 = include_bytes!("../tests/fixtures/epoch171-swap.bin");
+        let wire172 = include_bytes!("../tests/fixtures/epoch172-swap.bin");
+        let tx171: Transaction = bincode::deserialize(wire171).unwrap();
+        let tx172: Transaction = bincode::deserialize(wire172).unwrap();
+        tx171.verify().unwrap();
+        tx172.verify().unwrap();
+        assert!(trace_target(73_982_256, 602, &[tx172.clone()]).is_none());
+        assert!(trace_target(74_380_784, 645, &[tx171.clone()]).is_none());
+        check_trace_target(171, 73_982_256, 602, 1104, tx171);
+        check_trace_target(172, 74_380_784, 645, 984, tx172);
+    }
+
+    fn check_trace_target(epoch: u64, slot: u64, entry: u64, ordinal: u64, tx: Transaction) {
+        let target = trace_target(slot, entry, &[tx.clone()]).unwrap();
+        assert_eq!((target.epoch, target.ordinal), (epoch, ordinal));
+        assert_eq!(
+            target.enable_env,
+            format!("JETSTREAMER_HISTORICAL_TRACE_EPOCH{}", epoch)
+        );
+        assert!(trace_target(slot, entry, &[]).is_none());
+        assert!(trace_target(slot, entry, &[Transaction::default()]).is_none());
+        assert!(trace_target(slot - 1, entry, &[tx.clone()]).is_none());
+        assert!(trace_target(slot, entry - 1, &[tx.clone()]).is_none());
+        assert!(trace_target(slot, entry, &[tx.clone(), tx]).is_none());
     }
 
     #[test]
