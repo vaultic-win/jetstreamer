@@ -2,7 +2,7 @@
 use super::*;
 // Admission sealing consumes the original wall-clock lease. Never renew it
 // when converting to the single monotonic gate deadline.
-fn startup_window(issued: u64, wall_us: u64, expires_s: u64) -> Result<(u64, u64)> {
+pub(super) fn startup_window(issued: u64, wall_us: u64, expires_s: u64) -> Result<(u64, u64)> {
     let remaining = expires_s
         .checked_mul(1_000_000)
         .and_then(|end| end.checked_sub(wall_us))

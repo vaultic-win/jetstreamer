@@ -95,7 +95,7 @@ fn killed(v: &Value, iid: &str) -> Result<()> {
     Ok(())
 }
 
-fn same_terminal(a: &Value, b: &Value) -> Result<()> {
+pub(super) fn same_terminal(a: &Value, b: &Value) -> Result<()> {
     live::same_owner(a, b)?;
     for k in [
         "ControlPID",
@@ -759,7 +759,7 @@ pub(super) fn accepted(review: &Value, guard: &Bound, self_sha: &str) -> Result<
     Ok(())
 }
 
-fn installed_link(unit: &str, target: &Bound) -> Result<Identity> {
+pub(super) fn installed_link(unit: &str, target: &Bound) -> Result<Identity> {
     let path = Path::new("/etc/systemd/system").join(unit);
     let m = fs::symlink_metadata(&path)?;
     ensure!(
@@ -770,7 +770,10 @@ fn installed_link(unit: &str, target: &Bound) -> Result<Identity> {
     Ok(metadata_identity(&m))
 }
 
-fn collect_retired(n: &mut Native, links: &[(String, Bound)]) -> Result<BTreeMap<String, Value>> {
+pub(super) fn collect_retired(
+    n: &mut Native,
+    links: &[(String, Bound)],
+) -> Result<BTreeMap<String, Value>> {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let mut after = BTreeMap::new();

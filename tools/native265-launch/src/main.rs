@@ -15,12 +15,15 @@ use std::{
 mod admission;
 mod capacity;
 mod finalization;
+mod first_guard;
+const EXPECTED_FILESYSTEM: &str = "/";
 mod launch;
 mod live;
 mod peer211;
 mod periodic;
 mod publication;
 mod qualification;
+mod retire_qualification;
 
 const UNIT: &str = "horizon-265-native-input-20261119-v1.service";
 const GUARD_UNIT: &str = "horizon-native265-protective-v1.service";
@@ -395,7 +398,7 @@ fn run() -> Result<()> {
     };
     let result = (|| {
         if args[1] == "retire-qualification" {
-            return qualification::retire_attempt(&mut n, &review);
+            return retire_qualification::retire_attempt(&mut n, &review);
         }
         ensure!(
             (args[1] == "qualify-guard") == (review["operation"] == "qualify-guard"),
@@ -425,3 +428,15 @@ fn main() {
         std::process::exit(1);
     }
 }
+
+const STOP_CAPTURE: &str = "horizon-native265-protective-stop-capture-v1";
+
+const STOP_ACCEPTED: &str = "horizon-native265-protective-stop-qualification-v1";
+
+const STOP_RETIRED: &str = "horizon-native265-qualification-unit-retirement-v1";
+
+const STOP_PRODUCER_PREFIX: &str = "horizon-native265-producer-";
+
+const STOP_GUARD_PREFIX: &str = "horizon-native265-guard-binding-";
+
+const STOP_REQUEST: &str = "horizon265-native-guard-stop-request-v1";

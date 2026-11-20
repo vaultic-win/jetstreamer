@@ -267,6 +267,23 @@ pub(super) fn census(
     periodic: &[periodic::Control],
     candidate: bool,
 ) -> Result<BTreeMap<String, u64>> {
+    census_with_held(
+        n,
+        review,
+        fleet,
+        rows,
+        periodic,
+        candidate.then_some((UNIT, GUARD_UNIT, TIMER)),
+    )
+}
+pub(super) fn census_with_held(
+    n: &mut Native,
+    review: &Value,
+    fleet: &Value,
+    rows: &[capacity::Reservation],
+    periodic: &[periodic::Control],
+    held: Option<(&str, &str, &str)>,
+) -> Result<BTreeMap<String, u64>> {
     let controls = review["control_units"]
         .as_array()
         .context("control units")?;
@@ -376,7 +393,7 @@ pub(super) fn census(
         if !campaign(unit) || !matches!(parts[2], "active" | "activating" | "deactivating") {
             continue;
         }
-        if candidate && matches!(unit, UNIT | GUARD_UNIT) {
+        if held.is_some_and(|(producer, guard, _)| unit == producer || unit == guard) {
             continue;
         }
         if periodic_names.contains(unit) {
@@ -415,7 +432,9 @@ pub(super) fn census(
             ensure!(
                 control_names.contains(unit)
                     || periodic_names.contains(unit)
-                    || (candidate && matches!(unit, UNIT | GUARD_UNIT | TIMER)),
+                    || held.is_some_and(|(producer, guard, timer)| unit == producer
+                        || unit == guard
+                        || unit == timer),
                 "unadmitted campaign job {unit}"
             );
         }
@@ -426,8 +445,8 @@ pub(super) fn census(
         .map(|u| cg(u))
         .chain(control_names.iter().map(|u| cg(u)))
         .chain(periodic_names.iter().map(|u| cg(u)))
-        .chain(candidate.then(|| cg(UNIT)))
-        .chain(candidate.then(|| cg(GUARD_UNIT)))
+        .chain(held.map(|(producer, _, _)| cg(producer)))
+        .chain(held.map(|(_, guard, _)| cg(guard)))
         .collect();
     for e in fs::read_dir("/proc")? {
         let e = e?;

@@ -37,6 +37,7 @@ fn scenarios(
     rows: &[capacity::Reservation],
     currents: &BTreeMap<String, u64>,
     overhead: (u64, u64),
+    combined_control_excess: u64,
 ) -> Value {
     let fit = |memory, disk| match capacity::candidate_arithmetic(
         resources,
@@ -50,7 +51,7 @@ fn scenarios(
         Err(e) => json!({"fits":false,"reason":e.to_string()}),
     };
     json!({"limited_native257":fit(NATIVE257_MEMORY,NATIVE257_DISK),"ordinary211":fit(MEMORY,SCRATCH),
-        "limited_native257_and_ordinary211":fit(NATIVE257_MEMORY+MEMORY,NATIVE257_DISK+SCRATCH)})
+        "combined_control_excess_bytes":combined_control_excess,"limited_native257_and_ordinary211":fit(NATIVE257_MEMORY+MEMORY+combined_control_excess,NATIVE257_DISK+SCRATCH)})
 }
 
 fn existing_scratch_filesystem() -> Result<(PathBuf, u64)> {
@@ -73,7 +74,12 @@ fn existing_scratch_filesystem() -> Result<(PathBuf, u64)> {
     Ok((used.to_owned(), m.dev()))
 }
 
-fn evaluate(n: &mut Native, review: &Value, source: &Bound) -> Result<Value> {
+pub(super) fn evaluate(
+    n: &mut Native,
+    review: &Value,
+    source: &Bound,
+    held: bool,
+) -> Result<Value> {
     no_authority(review)?;
     ensure!(
         review["schema"] == "horizon-native257-resource-review-v1"
@@ -108,7 +114,12 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound) -> Result<Value> {
     finalization::verify_inputs(&fleet)?;
     // This is an original 211 preactivation census with *no* candidate exceptions.
     // A live full211, 257, or unknown peer must obtain its own complete booking.
-    let currents = live::census(n, review, &fleet, &rows, &periodic, false)?;
+    let allowed = held.then_some((native257::UNIT, native257::GUARD_UNIT, native257::TIMER));
+    ensure!(
+        rows.iter().all(|r| r.unit != native257::UNIT),
+        "native257 already booked"
+    );
+    let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed)?;
     let (effective, release) = native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
     let (path, device) = existing_scratch_filesystem()?;
@@ -126,12 +137,22 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound) -> Result<Value> {
         Some(resources.0) == num(&observer["host_memory"], "total_kib")?.checked_mul(1024),
         "physical host changed"
     );
+    let control_bytes = review["control_units"]
+        .as_array()
+        .context("control units")?
+        .iter()
+        .try_fold(0, |bytes, unit| {
+            capacity::add(bytes, num(unit, "maximum_memory_bytes")?)
+        })?;
+    let combined_control_excess =
+        capacity::add(control_bytes, 2 * 268_435_456)?.saturating_sub(CONTROL);
     let result = scenarios(
         resources,
         century,
         &effective,
         &currents,
         (overhead, periodic::total(&periodic)?),
+        combined_control_excess,
     );
     ensure!(
         existing_scratch_filesystem()? == (path.clone(), device),
@@ -143,7 +164,7 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound) -> Result<Value> {
         json!({"schema":"horizon-native257-current-fit-v1","epoch":257,"review":source,"boot_id":boot.trim(),
        "fleet":review["fleet"],"observer":review["observer"],"reservation_ledger":review["reservation_ledger"],
        "v126_minimum":Bound::new(BASELINE,BASELINE_SHA),"native265_runtime_growth_release":release,
-       "scratch_filesystem":path,"scratch_st_dev":device,"actual_scratch_present":path==Path::new(SCRATCH257),
+       "scratch_filesystem":path,"scratch_st_dev":device,"actual_scratch_present":path==Path::new(SCRATCH257),"actual_current_memory":currents,
        "cpu_affinity_qualified":false,"scenarios":result,"recorded_unix_seconds":now()?,
        "admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false}),
     )
@@ -177,7 +198,7 @@ pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {
                 .context("review deadline overflow")?,
         ),
     };
-    let out = evaluate(&mut n, &v, &source);
+    let out = evaluate(&mut n, &v, &source, false);
     match &out {
         Ok(result) => {
             save_json(evidence, "fit.json", result)?;
@@ -227,6 +248,7 @@ mod tests {
             &[],
             &BTreeMap::new(),
             (0, 0),
+            0,
         );
         assert_eq!(r["limited_native257"]["fits"], true);
         assert_eq!(r["ordinary211"]["fits"], false);

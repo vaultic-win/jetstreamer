@@ -1,6 +1,6 @@
 //! Real protective-stop experiment: no restore token, no worker, no fabricated success.
 use super::*;
-fn check_sample(v: &Value, iid: &str, pid: u64, plan: &Bound) -> Result<()> {
+pub(super) fn check_sample(v: &Value, iid: &str, pid: u64, plan: &Bound) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
             && v["plan_sha256"] == plan.sha256
@@ -27,7 +27,7 @@ fn check_sample(v: &Value, iid: &str, pid: u64, plan: &Bound) -> Result<()> {
     );
     Ok(())
 }
-fn killed(v: &Value, iid: &str) -> Result<()> {
+pub(super) fn killed(v: &Value, iid: &str) -> Result<()> {
     ensure!(
         v["Id"] == UNIT
             && v["InvocationID"] == iid
@@ -43,7 +43,7 @@ fn killed(v: &Value, iid: &str) -> Result<()> {
     );
     Ok(())
 }
-fn empty_cgroup() -> Result<()> {
+pub(super) fn empty_cgroup() -> Result<()> {
     let root = Path::new("/sys/fs/cgroup/system.slice").join(UNIT);
     match fs::symlink_metadata(&root) {
         Ok(_) => live::drained_tree(&root, &mut 1024),
@@ -97,7 +97,7 @@ pub(super) fn capture_stop(
     let request_ref = Bound::new(&request, hash(&request)?);
     let request = request_ref.json()?;
     ensure!(
-        request["schema"] == "horizon265-native-guard-stop-request-v1"
+        request["schema"] == STOP_REQUEST
             && request["producer_invocation_id"] == iid
             && request["plan_sha256"] == guard_plan.sha256
             && request["guard_invocation_id"] == gid
@@ -158,7 +158,7 @@ pub(super) fn capture_stop(
         ],
     )?;
     let guard_journal_ref = save(&n.root, "qualification-guard-PID1.jsonl", &guard_journal)?;
-    let v = json!({"schema":"horizon-native265-protective-stop-capture-v1","harness":Bound::new(HARNESS,HARNESS_SHA),"guard":Bound::new(GUARD,GUARD_SHA),
+    let v = json!({"schema":STOP_CAPTURE,"harness":Bound::new(HARNESS,HARNESS_SHA),"guard":Bound::new(GUARD,GUARD_SHA),
         "producer_invocation_id":iid,"producer_main_pid":pid,"guard_invocation_id":gid,"boot_id":startup_value["boot_id"],
         "startup_plan":startup,"guard_plan":guard_plan,"sample":sample_ref,"stop_request":request_ref,
         "producer_terminal":terminal,"guard_terminal":guard,"producer_pid1":journal_ref,"guard_pid1":guard_journal_ref,
@@ -172,18 +172,18 @@ pub(super) fn capture_stop(
 }
 pub(super) fn accepted(review: &Value) -> Result<()> {
     ensure!(
-        review["schema"] == "horizon-native265-protective-stop-qualification-v1"
+        review["schema"] == STOP_ACCEPTED
             && review["Main_accepted"] == true
             && review["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
             && review["guard"] == json!(Bound::new(GUARD, GUARD_SHA))
             && review["actual_pid1_stop_ordering_verified"] == true
             && review["sandbox_permissions_verified"] == true
             && review["original_attempt_retired_with_evidence"] == true,
-        "native265 stop qualification missing"
+        "native stop qualification missing"
     );
     let capture = binding(&review["capture"])?.sealed()?;
     ensure!(
-        capture["schema"] == "horizon-native265-protective-stop-capture-v1"
+        capture["schema"] == STOP_CAPTURE
             && capture["harness"] == review["harness"]
             && capture["guard"] == review["guard"]
             && capture["token_absent"] == true
@@ -210,7 +210,7 @@ pub(super) fn accepted(review: &Value) -> Result<()> {
     }
     let retired = binding(&review["retirement"])?.sealed()?;
     ensure!(
-        retired["schema"] == "horizon-native265-qualification-unit-retirement-v1"
+        retired["schema"] == STOP_RETIRED
             && retired["sealed_packages_and_diagnostics_preserved"] == true
             && retired["producer_restarted"] == false
             && retired["replay_launch_authorized"] == false
@@ -225,131 +225,13 @@ pub(super) fn accepted(review: &Value) -> Result<()> {
     no_authority(review)?;
     Ok(())
 }
-pub(super) fn retire_attempt(n: &mut Native, capture: &Value) -> Result<()> {
-    ensure!(
-        capture["schema"] == "horizon-native265-protective-stop-capture-v1"
-            && capture["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
-            && capture["guard"] == json!(Bound::new(GUARD, GUARD_SHA))
-            && capture["actual_stop_observed"] == true
-            && capture["token_absent"] == true,
-        "foreign qualification capture"
-    );
-    let iid = text(capture, "producer_invocation_id")?;
-    ensure!(hex(iid, 32), "qualification IID");
-    let p = binding(&capture["guard_plan"])?;
-    check_sample(
-        &binding(&capture["sample"])?.json()?,
-        iid,
-        num(capture, "producer_main_pid")?,
-        &p,
-    )?;
-    let initial = n.show(UNIT)?;
-    killed(&initial, iid)?;
-    empty_cgroup()?;
-    absent(&PathBuf::from(format!(
-        "/proc/{}",
-        num(capture, "producer_main_pid")?
-    )))?;
-    absent(&Path::new(TOKENS).join(iid))?;
-    ensure!(
-        fs::read_dir(ROOT)?.next().is_none(),
-        "qualification root not empty"
-    );
-    for unit in [GUARD_UNIT, TIMER] {
-        let v = n.show(unit)?;
-        ensure!(
-            v["MainPID"].as_str().is_none_or(|s| s == "0")
-                && v["ControlPID"].as_str().is_none_or(|s| s == "0")
-                && v["Job"] == ""
-                && !matches!(v["ActiveState"].as_str(), Some("active" | "activating")),
-            "qualification control still executing"
-        );
-    }
-    let producer = Path::new(text(capture, "producer_package")?);
-    let guard = Path::new(text(capture, "guard_package")?);
-    ensure!(
-        producer.parent() == Some(Path::new("/var/lib/jetstreamer"))
-            && guard.parent() == producer.parent(),
-        "package namespace"
-    );
-    ensure!(
-        producer
-            .file_name()
-            .and_then(|p| p.to_str())
-            .is_some_and(|p| p.starts_with("horizon-native265-producer-"))
-            && guard
-                .file_name()
-                .and_then(|p| p.to_str())
-                .is_some_and(|p| p.starts_with("horizon-native265-guard-binding-")),
-        "foreign qualification package"
-    );
-    let links = [
-        (UNIT, producer.join(UNIT)),
-        (RETENTION, producer.join(RETENTION)),
-        (GUARD_UNIT, guard.join(GUARD_UNIT)),
-        (TIMER, guard.join(TIMER)),
-    ];
-    for (unit, target) in &links {
-        let link = Path::new("/etc/systemd/system").join(unit);
-        let m = fs::symlink_metadata(&link)?;
-        ensure!(
-            m.file_type().is_symlink() && m.uid() == 0 && fs::read_link(&link)? == *target,
-            "foreign installed qualification link"
-        );
-        Bound::new(target, hash(target)?).artifact()?;
-    }
-    n.run("/usr/bin/systemctl", &["stop", RETENTION])?;
-    let released = n.show(UNIT)?;
-    ensure!(
-        released["MainPID"] == "0"
-            && released["ControlPID"] == "0"
-            && released["Job"] == ""
-            && matches!(
-                released["ActiveState"].as_str(),
-                Some("inactive" | "failed")
-            )
-            && (released["InvocationID"] == iid || released["InvocationID"] == ""),
-        "qualification owner replaced during retention release"
-    );
-    let proof = save_json(
-        &n.root,
-        "retirement-before.json",
-        &json!({"capture":capture,"producer":initial,"links":links,"root_empty":true,"remote_mutations":false}),
-    )?;
-    // Only exact installed unit symlinks are removed. All sealed packages and
-    // native/guard diagnostics remain intact for Main acceptance and provenance.
-    for (unit, target) in &links {
-        let link = Path::new("/etc/systemd/system").join(unit);
-        ensure!(
-            fs::read_link(&link)? == *target,
-            "qualification link changed"
-        );
-        fs::remove_file(link)?;
-    }
-    File::open("/etc/systemd/system")?.sync_all()?;
-    n.run("/usr/bin/systemctl", &["reset-failed", GUARD_UNIT])?;
-    n.run("/usr/bin/systemctl", &["daemon-reload"])?;
-    for unit in [UNIT, GUARD_UNIT, TIMER, RETENTION] {
-        ensure!(
-            n.show(unit)?["LoadState"] == "not-found",
-            "qualification unit not collected"
-        );
-    }
-    save_json(
-        &n.root,
-        "retirement-complete.json",
-        &json!({"schema":"horizon-native265-qualification-unit-retirement-v1","before":proof,
-        "sealed_packages_and_diagnostics_preserved":true,"producer_restarted":false,"replay_launch_authorized":false,"remote_mutations":false}),
-    )?;
-    Ok(())
-}
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn failed_or_missing_qualification_cannot_admit_native_restore() {
         assert!(accepted(&json!({})).is_err());
-        assert!(accepted(&json!({"schema":"horizon-native265-protective-stop-qualification-v1","Main_accepted":true})).is_err());
+        assert!(accepted(&json!({"schema":STOP_ACCEPTED,"Main_accepted":true})).is_err());
     }
     #[test]
     fn timeout_or_clean_exit_is_not_a_protective_signal() {

@@ -3,15 +3,18 @@ use super::*;
 use std::os::unix::process::CommandExt;
 
 pub(super) fn held(pid: u64, iid: &str) -> Result<()> {
+    held_image(pid, iid, UNIT, GATE)
+}
+pub(super) fn held_image(pid: u64, iid: &str, unit: &str, exe: &str) -> Result<()> {
     ensure!(pid > 1 && hex(iid, 32), "held identity");
     let proc = PathBuf::from(format!("/proc/{pid}"));
     ensure!(
-        fs::read_link(proc.join("exe"))? == Path::new(GATE)
-            && metadata_identity(&fs::metadata(proc.join("exe"))?) == identity(Path::new(GATE))?,
+        fs::read_link(proc.join("exe"))? == Path::new(exe)
+            && metadata_identity(&fs::metadata(proc.join("exe"))?) == identity(Path::new(exe))?,
         "held gate mapped image differs"
     );
     ensure!(
-        fs::read_to_string(proc.join("cgroup"))?.trim() == format!("0::/system.slice/{UNIT}"),
+        fs::read_to_string(proc.join("cgroup"))?.trim() == format!("0::/system.slice/{unit}"),
         "held gate moved cgroup"
     );
     ensure!(
@@ -20,8 +23,8 @@ pub(super) fn held(pid: u64, iid: &str) -> Result<()> {
             .is_empty(),
         "gate has children before release"
     );
-    let members = fs::read_to_string(format!("/sys/fs/cgroup/system.slice/{UNIT}/cgroup.procs"))?;
-    for child in fs::read_dir(format!("/sys/fs/cgroup/system.slice/{UNIT}"))? {
+    let members = fs::read_to_string(format!("/sys/fs/cgroup/system.slice/{unit}/cgroup.procs"))?;
+    for child in fs::read_dir(format!("/sys/fs/cgroup/system.slice/{unit}"))? {
         ensure!(
             !child?.file_type()?.is_dir(),
             "held service has a descendant cgroup"

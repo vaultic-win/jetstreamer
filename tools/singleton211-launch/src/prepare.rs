@@ -4,9 +4,9 @@ use super::*;
 
 #[derive(Clone, Copy)]
 pub(super) struct Argument {
-    variable: &'static str,
-    env: &'static str,
-    plan: &'static str,
+    pub(super) variable: &'static str,
+    pub(super) env: &'static str,
+    pub(super) plan: &'static str,
 }
 pub(super) const STARTUP: Argument = Argument {
     variable: "HORIZON211_STARTUP_PLAN_SHA256",
