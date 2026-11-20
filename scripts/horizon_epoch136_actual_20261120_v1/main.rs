@@ -324,13 +324,35 @@ fn stage(p: &Plan) -> Result<()> {
         "ordinary_replay_claim":false,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false}),
     )
 }
+// The native node was qualified at TOOLS. The root-owned package can be
+// projected there as the very same directory without copying its members.
+fn tools_destination(destination: &Value) -> Result<()> {
+    if destination == contract::TOOLS {
+        return Ok(());
+    }
+    const SEALED: &str =
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch136-production-images-20261120-v1/tools";
+    ensure!(destination == SEALED, "unexpected production package");
+    let backing = fs::symlink_metadata(SEALED)?;
+    let visible = fs::symlink_metadata(contract::TOOLS)?;
+    ensure!(
+        backing.is_dir()
+            && visible.is_dir()
+            && backing.uid() == 0
+            && backing.mode() & 0o222 == 0
+            && backing.dev() == visible.dev()
+            && backing.ino() == visible.ino(),
+        "runtime tools differ from the sealed directory"
+    );
+    Ok(())
+}
 fn seal(p: &Plan) -> Result<()> {
     let s = value(&p.tools_seal)?;
     ensure!(
-        s["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
-            && s["destination"] == contract::TOOLS,
+        s["schema"] == "jetstreamer-sealed-deployment-receipt-v1",
         "136 tools seal scope"
     );
+    tools_destination(&s["destination"])?;
     let members = s["members"].as_array().context("136 tools members")?;
     for b in [
         &p.node,

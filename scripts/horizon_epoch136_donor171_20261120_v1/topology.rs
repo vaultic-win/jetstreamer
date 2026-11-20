@@ -54,6 +54,9 @@ pub(super) fn exclusive_post172(fleet: &Value) -> Result<()> {
         "horizon-qualify-172-metered-hourly-20261120-g2.service",
         "horizon-guard-172-metered-hourly-20261120-g2.service",
         "horizon-guard-172-metered-hourly-20261120-g2.timer",
+        "horizon-qualify-172-metered-hourly-20261120-g3.service",
+        "horizon-guard-172-metered-hourly-20261120-g3.service",
+        "horizon-guard-172-metered-hourly-20261120-g3.timer",
     ] {
         ensure!(closed(&show(unit)?), "exclusive peer remains open: {unit}");
         cgroup_empty(unit)?;

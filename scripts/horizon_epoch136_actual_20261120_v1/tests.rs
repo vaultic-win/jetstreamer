@@ -214,3 +214,10 @@ fn current_capacity_accepts_fresh_post_prefire_evidence_and_rejects_reused_credi
         assert!(contract::capacity_shape(&a, &wrong, 1021).is_err(), "{key}");
     }
 }
+
+#[test]
+fn unrecognized_tools_directory_cannot_supply_a_seal() {
+    assert!(tools_destination(&json!(TOOLS)).is_ok());
+    assert!(tools_destination(&json!("/home/sol/unrelated/tools")).is_err());
+    assert!(tools_destination(&Value::Null).is_err());
+}
