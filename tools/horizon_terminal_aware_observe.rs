@@ -20,8 +20,8 @@ mod full265;
 #[path = "../jetstreamer-horizon-observe/src/singleton247_phase.rs"]
 mod singleton247_phase;
 
-const OBSERVER: &str = "/var/lib/jetstreamer/horizon-full265-fast-consumers-20261119-v1/jetstreamer-horizon-observe";
-const OBSERVER_SHA: &str = "84871b441f17168a97364b7f9862ac592f8623232c22362cc886afc91bcc2e6d";
+const OBSERVER: &str = "/var/lib/jetstreamer/horizon-full265-attempt2-consumers-20261120-v1/jetstreamer-horizon-observe";
+const OBSERVER_SHA: &str = "e529ad65a621f7ca3fc7b7b09d2afc0bd9516dd779f5cb38153a86836cf1bc08";
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
