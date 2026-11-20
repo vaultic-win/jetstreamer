@@ -17,6 +17,7 @@ pub mod contains;
 pub mod epoch_stakes;
 pub mod genesis_utils;
 pub mod hardened_unpack;
+pub mod historical_per_byte_logging;
 pub mod inline_spl_token_v2_0;
 pub mod instruction_recorder;
 pub mod loader_utils;

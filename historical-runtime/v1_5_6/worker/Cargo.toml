@@ -7,6 +7,8 @@ publish = false
 build = "build.rs"
 
 [features]
+# Restore the upstream feature-account-gated logging meter for historical replay.
+historical-per-byte-logging = ["solana-runtime/historical-per-byte-logging"]
 # Test-only escape hatch used to exercise sha2 0.9.9's portable backend on
 # SHA-NI hosts. Production builds leave this disabled and runtime-dispatch.
 poh-force-soft = ["sha2-fast/force-soft"]

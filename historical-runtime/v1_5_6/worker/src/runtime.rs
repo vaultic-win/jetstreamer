@@ -132,6 +132,13 @@ impl RuntimeState {
                 ));
             }
         };
+        #[cfg(feature = "historical-per-byte-logging")]
+        eprintln!(
+            "historical per-byte logging feature at restored bank slot {}: activated_at={:?}",
+            bank.slot(),
+            bank.feature_set
+                .activated_slot(&solana_runtime::historical_per_byte_logging::id())
+        );
         let write_cursor = bank.accounts().accounts_db.next_write_version();
         let last_entry_hash = bank.last_blockhash();
         let initialized = Initialized {

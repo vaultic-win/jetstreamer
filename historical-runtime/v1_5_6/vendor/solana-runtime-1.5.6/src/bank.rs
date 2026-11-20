@@ -4716,6 +4716,15 @@ impl Bank {
 
     // Compute the active feature set based on the current bank state, and return the set of newly activated features
     fn compute_active_feature_set(&mut self, allow_new_activations: bool) -> HashSet<Pubkey> {
+        // The pinned 1.5.6 SDK predates this ID. Enroll it in the same
+        // account-backed activation path used for every other feature.
+        #[cfg(feature = "historical-per-byte-logging")]
+        {
+            let id = crate::historical_per_byte_logging::id();
+            if !self.feature_set.is_active(&id) && !self.feature_set.inactive.contains(&id) {
+                Arc::make_mut(&mut self.feature_set).inactive.insert(id);
+            }
+        }
         let mut active = self.feature_set.active.clone();
         let mut inactive = HashSet::new();
         let mut newly_activated = HashSet::new();
@@ -11018,6 +11027,33 @@ pub(crate) mod tests {
         assert_eq!(executors.borrow().executors.len(), 1);
         let executors = fork2.get_executors(&Message::default(), loaders);
         assert_eq!(executors.borrow().executors.len(), 1);
+    }
+
+    #[test]
+    fn test_historical_per_byte_logging_activation() {
+        let (genesis_config, _) = create_genesis_config(100_000);
+        let parent = Arc::new(Bank::new(&genesis_config));
+        let mut bank = Bank::new_from_parent(&parent, &Pubkey::default(), 8);
+        let id = crate::historical_per_byte_logging::id();
+        bank.feature_set = Arc::new(FeatureSet::default());
+        bank.compute_active_feature_set(false);
+        assert!(!bank.feature_set.is_active(&id));
+
+        // A funded non-feature account and an unactivated feature both stay inactive on restore.
+        bank.deposit(&id, 42);
+        bank.compute_active_feature_set(false);
+        assert!(!bank.feature_set.is_active(&id));
+        for activation in &[None, Some(9), Some(4)] {
+            let feature = Feature { activated_at: *activation };
+            bank.store_account(&id, &feature::create_account(&feature, 42));
+            bank.compute_active_feature_set(false);
+            let expected = if cfg!(feature = "historical-per-byte-logging") {
+                (*activation).filter(|slot| *slot <= bank.slot())
+            } else {
+                None
+            };
+            assert_eq!(bank.feature_set.activated_slot(&id), expected);
+        }
     }
 
     #[test]
