@@ -382,6 +382,15 @@ pub(super) fn cold() -> Result<Value> {
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "requires immutable production receipts and drained G2/G3 services"]
+    fn original_index_failure_and_remote_comparison() {
+        retained().unwrap();
+        retained_g3().unwrap();
+        cache::host_cache(Path::new(DEST)).unwrap();
+        cache::scratch(&Path::new(DEST).join("scratch")).unwrap();
+    }
+
+    #[test]
     fn different_guard_or_unsuccessful_rollback_cannot_fund_retry() {
         let failure = json!({"error":"post-guard protected floor increased","rolled_back":true,"rollback_error":null,"remote_mutations":false});
         let producer = json!({"Id":OLD_UNIT,"InvocationID":OLD_IID,"MainPID":"2955906"});
