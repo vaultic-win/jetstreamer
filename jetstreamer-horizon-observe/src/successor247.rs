@@ -1,28 +1,34 @@
-//! Evidence expected from the benchmark-reader uploader after both prior owners drain.
+//! Evidence expected from the bounded-reader uploader after both prior owners drain.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, io::Read, os::unix::fs::MetadataExt, path::Path};
 
-pub const UNIT: &str = "horizon-upload-247-staged-99f30641-v1.service";
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/jetstreamer-r2";
-pub const IMAGE_SHA: &str = "39bbc3b745a0ce15f615db9c20c0cfbb7d2423a8f62b6adf97093260273de460";
+pub const UNIT: &str = "horizon-upload-247-staged-cf4d45a5-v1.service";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/jetstreamer-r2";
+pub const IMAGE_SHA: &str = "388a8454ebab60c1fcd346a332abda3863d8b7addf0f8b68cffb52742b9ba995";
 pub const PLAN: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/epoch-247-plan.json";
-pub const PLAN_SHA: &str = "2c9b4723d9bd90ca0e954872ece43364f8e07f277d0d1bb379c92603dee02472";
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/epoch-247-plan.json";
+pub const PLAN_SHA: &str = "e2c03e00972ed32cc634adb19fa05f0899bc1853b1bc9dd921e4e7814722344f";
 pub const RECOVERY: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/staged247-recovery.json";
-pub const RECOVERY_SHA: &str = "649f8e1477c776352c07ef747b59b88bf321c85831ead6d631a94efa7ead22f5";
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/staged247-recovery.json";
+pub const RECOVERY_SHA: &str = "11ef28a2de54e0a4e6ea502760c06275536af4d5c00edf0150060cbdf308c15a";
+const READER: &str = "cf4d45a51820022fa8d2e4f63ca3e8bce261844d";
+const UPLOADER: &str = "16f900240c58dd779441c4d9bd7c720515673ee2";
+const ACCEPTANCE: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/main-acceptance.json";
+const SOURCE: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/source-acceptance.json";
 pub const PRIOR_UNIT: &str = "horizon-upload-247-staged-680e1173-v1.service";
 pub const PRIOR_IID: &str = "3e08307874db424886cd8c46b3ecfba6";
 pub const ORIGINAL: &str = "horizon-upload-247-singleton-20261119-v1.service";
 pub const ORIGINAL_IID: &str = "69218e2e0924497ea595a1227a6c31db";
-pub const ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-99f30641-v1";
+pub const ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-cf4d45a5-v1";
 pub const PRIOR: &str =
-    "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/prior-staged-owner.json";
+    "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/prior-staged-owner.json";
 pub const PRIOR_SHA: &str = "b53133a0d9f828a5543dece1f343dd39828c96de618dc65095e471ba9ce2cef2";
 pub const FIRST: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/original-uploader-terminal.json";
+    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/original-uploader-terminal.json";
 pub const FIRST_SHA: &str = "c8c3f9f09e84a11c13887628f9bc207bb5eac53c58328f4055b32ba8bb0643d0";
 pub const HARD: u64 = 10 << 30;
 pub const BOOKED: u64 = HARD + (512 << 20);
@@ -107,6 +113,8 @@ pub fn graph(
             && recovery["historical_terminal"] == binding(FIRST, FIRST_SHA)
             && recovery["current_reader_plan"] == binding(PLAN, PLAN_SHA)
             && recovery["uploader"] == binding(IMAGE, IMAGE_SHA)
+            && recovery["prior_staged_terminal_and_drain_required"] == true
+            && recovery["fresh_authenticated_sha256_and_byte_comparison_required"] == true
             && recovery["prior_staged_reservations_released"] == false
             && previous["unit"] == PRIOR_UNIT
             && previous["invocation_id"] == PRIOR_IID,
@@ -132,6 +140,24 @@ pub fn graph(
                     argv.join(" ")
                 ),
         "247 activation command differs"
+    );
+    Ok(())
+}
+pub fn reader_source(plan: &Value, acceptance: &Value, source: &Value) -> Result<()> {
+    ensure!(
+        plan["schema"] == "horizon-current-reader-plan-v1"
+            && plan["reader_commit"] == READER
+            && acceptance["schema"] == "horizon-current-reader-main-acceptance-v1"
+            && acceptance["reader_commit"] == READER
+            && acceptance["pipeline"] == plan["pipeline"]
+            && acceptance["full_verifier"] == plan["full_verifier"]
+            && acceptance["source_artifact_correspondence_accepted"] == true
+            && acceptance["full_and_plugin_capabilities_accepted"] == true
+            && source["reader_commit"] == READER
+            && source["uploader_commit"] == UPLOADER
+            && source["uploader_commit_is_ancestor"] == true
+            && source["complete_fixture_reports"] == true,
+        "epoch 247 bounded reader or uploader build differs"
     );
     Ok(())
 }
@@ -165,7 +191,17 @@ pub fn load(reference: &Value) -> Result<Owner> {
                 .join(file),
         )?;
     }
-    doc(&recovery["current_reader_plan"], Path::new(PLAN))?;
+    let plan = doc(&recovery["current_reader_plan"], Path::new(PLAN))?;
+    let acceptance = doc(&plan["qualification"], Path::new(ACCEPTANCE))?;
+    let mut sources = acceptance["source_build_evidence"]
+        .as_array()
+        .context("reader build evidence")?
+        .iter()
+        .filter(|entry| entry["path"] == SOURCE);
+    let source_ref = sources.next().context("bounded reader source acceptance")?;
+    ensure!(sources.next().is_none(), "ambiguous bounded reader source");
+    let source = doc(source_ref, Path::new(SOURCE))?;
+    reader_source(&plan, &acceptance, &source)?;
     graph(&c, &booking, &launch, &recovery, &previous)?;
     let pid = launch["unit"]["MainPID"]
         .as_str()
@@ -180,7 +216,7 @@ pub fn load(reference: &Value) -> Result<Owner> {
             .as_str()
             .context("successor command")?
             .into(),
-        proof: json!({"claim":reference,"booking":refs[0],"launch":refs[1],"recovery":recovery_ref,"previous":recovery["prior_staged_owner"],"original":recovery["historical_terminal"]}),
+        proof: json!({"claim":reference,"booking":refs[0],"launch":refs[1],"admission":booking["admission"],"recovery":recovery_ref,"bounded_reader_source":source_ref,"previous":recovery["prior_staged_owner"],"original":recovery["historical_terminal"]}),
     })
 }
 /// Bound the old PID 1 failures to the current boot before reporting the successor.
@@ -262,6 +298,14 @@ pub fn historical_claims(fleet: &Value) -> Result<()> {
 pub fn validate_history(fleet: &Value, prior: &Value) -> Result<()> {
     let claims = fleet["pipelines"].as_array().context("247 pipelines")?;
     let active = fleet["active"].as_array().context("247 active owners")?;
+    for r in claims.iter().chain(active) {
+        if r["epoch"] == 247 && r["phase"] == "upload-readback" {
+            ensure!(
+                matches!(r["unit"]["Id"].as_str(), Some(ORIGINAL | PRIOR_UNIT | UNIT)),
+                "epoch 247 has an unregistered uploader"
+            );
+        }
+    }
     let second = &prior["evidence"];
     for (unit, iid, evidence) in [
         (

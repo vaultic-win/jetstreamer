@@ -1,0 +1,296 @@
+{
+  "recovery_ref": {
+    "path": "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/staged247-recovery.json",
+    "sha256": "11ef28a2de54e0a4e6ea502760c06275536af4d5c00edf0150060cbdf308c15a"
+  },
+  "recovery": {
+    "epoch": 247,
+    "current_reader_plan": {
+      "path": "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/epoch-247-plan.json",
+      "sha256": "e2c03e00972ed32cc634adb19fa05f0899bc1853b1bc9dd921e4e7814722344f"
+    },
+    "recovery_argv": [
+      "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/jetstreamer-r2",
+      "sync",
+      "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output",
+      "--epochs",
+      "247-247",
+      "--receipt-directory",
+      "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/receipts",
+      "--concurrency",
+      "2",
+      "--current-reader-plan",
+      "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/epoch-247-plan.json",
+      "--current-reader-plan-sha256",
+      "e2c03e00972ed32cc634adb19fa05f0899bc1853b1bc9dd921e4e7814722344f",
+      "--recover-staged-247"
+    ],
+    "uploader": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/jetstreamer-r2",
+      "sha256": "388a8454ebab60c1fcd346a332abda3863d8b7addf0f8b68cffb52742b9ba995"
+    },
+    "original_preparation": {
+      "path": "/home/ubuntu/.codex/diagnostics/horizon247-staged-recovery-20261120-v1/preparation.json",
+      "sha256": "fb6f14b5fedac0aa306e4270f0ca8c65823cb863c1df21bccae82abba98072da"
+    },
+    "historical_terminal": {
+      "path": "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/original-uploader-terminal.json",
+      "sha256": "c8c3f9f09e84a11c13887628f9bc207bb5eac53c58328f4055b32ba8bb0643d0"
+    },
+    "original_invocation": "69218e2e0924497ea595a1227a6c31db",
+    "original_staged_recovery": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/legacy-and-recovery.json",
+      "sha256": "476165cd5529174873cb3e53afbbac2eac3ef89a5040c0fc37b02286d18065d8"
+    },
+    "prior_staged_owner": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/prior-staged-owner.json",
+      "sha256": "b53133a0d9f828a5543dece1f343dd39828c96de618dc65095e471ba9ce2cef2"
+    },
+    "prior_staged_terminal_and_drain_required": true,
+    "fresh_authenticated_sha256_and_byte_comparison_required": true,
+    "prior_staged_reservations_released": false,
+    "entry_replay": false,
+    "admission_authorized": false,
+    "publication_authorized": false
+  },
+  "plan": {
+    "schema": "horizon-current-reader-plan-v1",
+    "repository": "/home/ubuntu/workspace/jetstreamer",
+    "origin_url": "git@github-matt-vaultic:vaultic-win/jetstreamer.git",
+    "reader_commit": "cf4d45a51820022fa8d2e4f63ca3e8bce261844d",
+    "pipeline": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/horizon_pipeline",
+      "sha256": "075b72c122a4971997679cf3e4a0ff190d4d8b87e650d727976632ed771d1eb4"
+    },
+    "full_verifier": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/verify_archive",
+      "sha256": "7bef22d6bac8e9e11cf76184aff70083418d8651d830880e2bf142d01b33da20"
+    },
+    "qualification": {
+      "path": "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/main-acceptance.json",
+      "sha256": "0a18b5641901fcfc1338669c0e05e1a287ae1e24577d0f5c0ab94707b822e694"
+    },
+    "scratch_directory": "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/playback",
+    "threads": 2,
+    "maximum_archive_bytes": 300000000000,
+    "minimum_free_bytes": 3000000000000,
+    "epoch_expectations": {
+      "247": {
+        "path": "/var/lib/jetstreamer/horizon-boundaries247-250-20261119-v1/epoch-247.json",
+        "sha256": "3523c2838a470a1400ba08ad10071b914d148eea5cb6e8f5dda03a84c76f102d"
+      }
+    }
+  },
+  "main_acceptance": {
+    "schema": "horizon-current-reader-main-acceptance-v1",
+    "reader_commit": "cf4d45a51820022fa8d2e4f63ca3e8bce261844d",
+    "pipeline": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/horizon_pipeline",
+      "sha256": "075b72c122a4971997679cf3e4a0ff190d4d8b87e650d727976632ed771d1eb4"
+    },
+    "full_verifier": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/verify_archive",
+      "sha256": "7bef22d6bac8e9e11cf76184aff70083418d8651d830880e2bf142d01b33da20"
+    },
+    "cargo_features": [
+      "jetstreamer/default",
+      "jetstreamer-firehose/default"
+    ],
+    "rustc_flags": [
+      "horizon_pipeline -C opt-level=0 -C codegen-units=256",
+      "jetstreamer_firehose and jetstreamer_plugin -C opt-level=3 -C codegen-units=16",
+      "verify_archive -C opt-level=3 -C codegen-units=16",
+      "-C embed-bitcode=no",
+      "-C linker=/usr/bin/gcc-15",
+      "-C link-arg=-fuse-ld=bfd",
+      "jetstreamer_horizon -C opt-level=3 -C codegen-units=16"
+    ],
+    "minimum_thread_stack_bytes": 67108864,
+    "source_build_evidence": [
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/source-acceptance.json",
+        "sha256": "c742f4c07beb24e5fdb4f6e4de6039717fa50c68aa0ed9be58019481f31bf07b"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/request.json",
+        "sha256": "3ad6ad4dab80f89555d276c9e55cef31cda5cc033267cfa94bcc64f2437ac9e5"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/booking.json",
+        "sha256": "fb1c4c88bcf3d5bcbaa8d7d18fe3c500d2397c64b44941d541813bf78b84d999"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/launch.json",
+        "sha256": "1eed3c63660111b62fb5c9be37212a5555bc1bb4cd8d3b24ba5c93fb17a58e11"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/dependency-qualification.json",
+        "sha256": "165121c07c8a1fbdde701b9c95cfb5f9edfa6a439dcc9eb25a49c9b57ed8f4ba"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/reader-changes.json",
+        "sha256": "b5f8bcf08e75e5f7d3d69b9f75df4620258a0c8e615a6cc27d1191e2027c8802"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/compiler-inputs.json",
+        "sha256": "5a5d741793b8c317e58190a8c26bdf43d672b5a1b63da3e0fa3ca236318f1150"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/commands.json",
+        "sha256": "a272033f3de054c07e199bd336f193d3017b2b0345c451d99efde685a13dcca4"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/externs-tools.sha256",
+        "sha256": "6d09a7b375c041ce61db438dfa985138496942dc55e08c758556a79ecdda3608"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/source.sha256",
+        "sha256": "ff5f15b2adb57040d42793af48fb51469f6c3e55d8766e5927d08d0e769534b9"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/qualification.json",
+        "sha256": "685db51b8abc7749224c6321554b144d49ff789e5be991d5154fea77ccd9bd8c"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/pid1.jsonl",
+        "sha256": "9e6b244ce3cbe5e7c9862ee7ce2b8d5039304bc5764d818898049130f4072b2d"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/build.log",
+        "sha256": "9adbbdab62b00cd0d0612a1774a49ee9f09cea37ae3b0a3a5521a0a9a584dc33"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/full-fixture.json",
+        "sha256": "0d2331e958d85ccbc60fdd9b06c1142566a3f3f848aa6fcf6c736bff823b8b88"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/local-plugin.json",
+        "sha256": "0dba5386832671ffc2dfb2821f6531473d972cc50a4221f8d3b9ca0d19f8f1cd"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/public-plugin.json",
+        "sha256": "8df186a6f822dceee9eaf2959263fabaa80972e59b0d771c95cbd25009335aab"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/fixture-ranges.json",
+        "sha256": "84352d6f249af679de4b7f648d7cf1af3d6b85f4e125d8c7840d10024c2c3ce9"
+      },
+      {
+        "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/playback-layout.json",
+        "sha256": "f15f55463ec17fa574a8d6ec115779af141523d026016e9fa53a0ae75c5a2b89"
+      }
+    ],
+    "source_artifact_correspondence_accepted": true,
+    "full_and_plugin_capabilities_accepted": true
+  },
+  "source_acceptance": {
+    "reader_commit": "cf4d45a51820022fa8d2e4f63ca3e8bce261844d",
+    "uploader_commit": "16f900240c58dd779441c4d9bd7c720515673ee2",
+    "published_head": "7e09673521a16b848008c985da0dfab3870600ee",
+    "uploader_commit_is_ancestor": true,
+    "all_compiled_sources_matched": 462,
+    "compiled_reader_sources": [
+      "historical-runtime/v1_0_8/worker/src/poh_backend.rs",
+      "jetstreamer-firehose/src/archive.rs",
+      "jetstreamer-firehose/src/block.rs",
+      "jetstreamer-firehose/src/dataframe.rs",
+      "jetstreamer-firehose/src/entry.rs",
+      "jetstreamer-firehose/src/epoch.rs",
+      "jetstreamer-firehose/src/epochs.rs",
+      "jetstreamer-firehose/src/firehose.rs",
+      "jetstreamer-firehose/src/firehose_horizon.rs",
+      "jetstreamer-firehose/src/firehose_horizon/pinned.rs",
+      "jetstreamer-firehose/src/index.rs",
+      "jetstreamer-firehose/src/lib.rs",
+      "jetstreamer-firehose/src/network.rs",
+      "jetstreamer-firehose/src/node.rs",
+      "jetstreamer-firehose/src/node_reader.rs",
+      "jetstreamer-firehose/src/pace.rs",
+      "jetstreamer-firehose/src/rewards.rs",
+      "jetstreamer-firehose/src/source_quiescence.rs",
+      "jetstreamer-firehose/src/subset.rs",
+      "jetstreamer-firehose/src/system.rs",
+      "jetstreamer-firehose/src/transaction.rs",
+      "jetstreamer-firehose/src/transaction_status_meta.rs",
+      "jetstreamer-firehose/src/utils.rs",
+      "jetstreamer-horizon/examples/verify_archive.rs",
+      "jetstreamer-horizon/src/account_updates.rs",
+      "jetstreamer-horizon/src/archive/bucket.rs",
+      "jetstreamer-horizon/src/archive/capacity_probe.rs",
+      "jetstreamer-horizon/src/archive/conflict.rs",
+      "jetstreamer-horizon/src/archive/format.rs",
+      "jetstreamer-horizon/src/archive/merge.rs",
+      "jetstreamer-horizon/src/archive/mod.rs",
+      "jetstreamer-horizon/src/archive/provenance.rs",
+      "jetstreamer-horizon/src/archive/reader.rs",
+      "jetstreamer-horizon/src/archive/reencode.rs",
+      "jetstreamer-horizon/src/archive/writer.rs",
+      "jetstreamer-horizon/src/block_metas.rs",
+      "jetstreamer-horizon/src/convert.rs",
+      "jetstreamer-horizon/src/dedupe.rs",
+      "jetstreamer-horizon/src/entries.rs",
+      "jetstreamer-horizon/src/epochs.rs",
+      "jetstreamer-horizon/src/lib.rs",
+      "jetstreamer-horizon/src/limits.rs",
+      "jetstreamer-horizon/src/message_instructions.rs",
+      "jetstreamer-horizon/src/pubkey_prime.bin",
+      "jetstreamer-horizon/src/pubkey_prime.rs",
+      "jetstreamer-horizon/src/transactions.rs",
+      "jetstreamer-horizon/src/zero_vec.rs",
+      "jetstreamer-plugin/src/horizon.rs",
+      "jetstreamer-plugin/src/horizon/range.rs",
+      "jetstreamer-plugin/src/lib.rs",
+      "jetstreamer-plugin/src/metrics.rs",
+      "jetstreamer-plugin/src/plugins.rs",
+      "jetstreamer-plugin/src/plugins/account_writes.rs",
+      "jetstreamer-plugin/src/plugins/instruction_tracking.rs",
+      "jetstreamer-plugin/src/plugins/program_tracking.rs",
+      "jetstreamer-plugin/src/plugins/pubkey_stats.rs",
+      "jetstreamer-plugin/src/plugins/pubkey_stats_horizon.rs",
+      "jetstreamer-plugin/src/plugins/verification.rs",
+      "jetstreamer-plugin/src/plugins/verification/range.rs",
+      "jetstreamer-plugin/src/plugins/verification/report.rs",
+      "src/bin/horizon_pipeline.rs",
+      "src/bin/horizon_pipeline/bench_tests.rs",
+      "src/bin/horizon_pipeline/capacity.rs"
+    ],
+    "seal": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/deployment-seal-receipt.json",
+      "sha256": "48f7c610e689099df0a65e228ccf394aa729aee91a6e68ab86e5c3cdfe7e797b"
+    },
+    "tests": {
+      "path": "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/qualification.json",
+      "sha256": "685db51b8abc7749224c6321554b144d49ff789e5be991d5154fea77ccd9bd8c"
+    },
+    "root_manifest_sha256": "f7d0e30e6ab16f3523e360b656ef1cd6cb10835e41ce70325592075cb58fd9f6",
+    "root_lock_sha256": "3ea6eaa2020b2f1962a77ca77eb10f96772f66e5a15923fbda095eb75d9516b0",
+    "pipeline_serde_json": {
+      "extern": "serde_json=/home/ubuntu/.jetstreamer-private/current-reader-check-20261118-v1/target/release/deps/libserde_json-6758805fa840c1c6.rlib",
+      "sha256": "1143670dc72c938665e185c4b574d49859af42c42098c3be20c1f37f3974cb44"
+    },
+    "named_cli_test": "bench_tests::range_benchmark_counts_all_update_sources_with_and_without_payloads",
+    "named_pinned_tests": [
+      "pinned::tests::verifies_headers_and_coalesces_sequential_bucket_reads",
+      "pinned::tests::wide_audits_bound_aggregate_http_cache",
+      "pinned::tests::retry_after_applies_to_all_readers_without_shortening_existing_delay",
+      "pinned::tests::wide_reader_reads_large_bucket_directly_without_a_second_buffer",
+      "pinned::tests::compact_cache_coalesces_small_reads_to_its_worker_budget",
+      "pinned::tests::adjacent_workers_do_not_prefetch_each_others_buckets",
+      "pinned::tests::rejects_unconditional_or_wrong_generation_and_bounds"
+    ],
+    "firehose_manifest_sha256": "3240145e8dd8b2d364df1449c9388507e70d6dc2a4af09098bbfadd38f2eac18",
+    "httpdate": {
+      "jetstreamer_firehose": {
+        "extern": "httpdate=/home/ubuntu/.jetstreamer-private/current-reader-check-20261118-v1/target/release/deps/libhttpdate-13dd93ac870d4d9a.rmeta",
+        "sha256": "424b97821744fe2e1d99772f6487305636b259043b9c6e42f67631d98c2da5d0"
+      },
+      "pinned-tests": {
+        "extern": "httpdate=/home/ubuntu/.jetstreamer-private/current-reader-check-20261118-v1/target/release/deps/libhttpdate-13dd93ac870d4d9a.rlib",
+        "sha256": "19363594acd4ed39dbe176cf62a41d95c7d2a40ba614710d3325cd0f29ce98a5"
+      }
+    },
+    "dependency_qualification_sha256": "165121c07c8a1fbdde701b9c95cfb5f9edfa6a439dcc9eb25a49c9b57ed8f4ba",
+    "complete_fixture_reports": true,
+    "canonical_epochs_verified": false
+  }
+}
