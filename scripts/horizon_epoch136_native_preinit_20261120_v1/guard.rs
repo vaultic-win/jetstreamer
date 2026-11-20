@@ -85,7 +85,7 @@ struct StatVfs {
     fs_type: c_uint,
     spare: [c_int; 5],
 }
-extern "C" {
+unsafe extern "C" {
     fn geteuid() -> c_uint;
     fn fstatvfs(fd: c_int, out: *mut StatVfs) -> c_int;
     fn renameat2(
@@ -217,7 +217,7 @@ fn parse(args: &[String]) -> Result<Config> {
         "all explicit flags required exactly once"
     );
     let mut values = BTreeMap::new();
-    for pair in args.chunks_exact(2) {
+    for pair in args.as_chunks::<2>().0 {
         require!(FLAGS.contains(&pair[0].as_str()), "unknown flag");
         require!(
             values.insert(pair[0].as_str(), pair[1].as_str()).is_none(),
@@ -655,7 +655,7 @@ fn kernel_limits(config: &Config, current: &Owner) -> Result<()> {
                     && current.get("SubState")? == "start-pre"
                     && current.num("MainPID")? == 0 =>
                 {
-                    return Err(STARTUP_PID_GONE.into())
+                    return Err(STARTUP_PID_GONE.into());
                 }
                 None => return Err(format!("non-startup actor PID disappeared:{pid}")),
             };
@@ -1269,7 +1269,10 @@ fn run(config: Config) -> Result<()> {
                     retries += 1;
                     continue;
                 }
-                return Err(format!("actor identity/PIDs/state/policy changed across observation; before={:?}; after={:?}", current.values, after.values));
+                return Err(format!(
+                    "actor identity/PIDs/state/policy changed across observation; before={:?}; after={:?}",
+                    current.values, after.values
+                ));
             }
             if let Err(error) = kernel_limits(&config, &after) {
                 let next = owner(&config.unit)?;
@@ -1396,7 +1399,7 @@ mod tests {
     }
     use super::*;
     use std::{
-        os::unix::fs::{symlink, PermissionsExt},
+        os::unix::fs::{PermissionsExt, symlink},
         sync::atomic::{AtomicU64, Ordering},
     };
     static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -1649,15 +1652,17 @@ mod tests {
             !startup_membership_retry(&c, &running, &running, STARTUP_PID_GONE, 0, end).unwrap()
         );
         assert!(!startup_membership_retry(&c, &pre, &running, STARTUP_PID_GONE, 2, end).unwrap());
-        assert!(!startup_membership_retry(
-            &c,
-            &pre,
-            &running,
-            STARTUP_PID_GONE,
-            0,
-            Instant::now() - Duration::from_secs(1)
-        )
-        .unwrap());
+        assert!(
+            !startup_membership_retry(
+                &c,
+                &pre,
+                &running,
+                STARTUP_PID_GONE,
+                0,
+                Instant::now() - Duration::from_secs(1)
+            )
+            .unwrap()
+        );
         let mut changed = running.clone();
         changed.values.insert(
             "InvocationID".into(),
@@ -1710,14 +1715,16 @@ mod tests {
         assert!(startup_retry(&c, &pre, &running, 0, deadline).unwrap());
         assert!(startup_retry(&c, &pre, &running, 1, deadline).unwrap());
         assert!(!startup_retry(&c, &pre, &running, 2, deadline).unwrap());
-        assert!(!startup_retry(
-            &c,
-            &pre,
-            &running,
-            0,
-            Instant::now() - Duration::from_millis(1)
-        )
-        .unwrap());
+        assert!(
+            !startup_retry(
+                &c,
+                &pre,
+                &running,
+                0,
+                Instant::now() - Duration::from_millis(1)
+            )
+            .unwrap()
+        );
         // Permission to discard a raced observation is not a stable result.
         assert_ne!(pre, running);
         assert!(!startup_retry(&c, &running, &running, 0, deadline).unwrap());
@@ -1771,24 +1778,28 @@ mod tests {
         let t = Temp::new();
         let fd = open_dir(&t.0).unwrap();
         let m = fd.metadata().unwrap();
-        assert!(walk(
-            &fd,
-            m.dev(),
-            mount_id(&fd).unwrap() + 1,
-            0,
-            Instant::now() + Duration::from_secs(1),
-            &mut Scan::default()
-        )
-        .is_err());
-        assert!(walk(
-            &fd,
-            m.dev(),
-            mount_id(&fd).unwrap(),
-            MAX_DEPTH + 1,
-            Instant::now() + Duration::from_secs(1),
-            &mut Scan::default()
-        )
-        .is_err());
+        assert!(
+            walk(
+                &fd,
+                m.dev(),
+                mount_id(&fd).unwrap() + 1,
+                0,
+                Instant::now() + Duration::from_secs(1),
+                &mut Scan::default()
+            )
+            .is_err()
+        );
+        assert!(
+            walk(
+                &fd,
+                m.dev(),
+                mount_id(&fd).unwrap(),
+                MAX_DEPTH + 1,
+                Instant::now() + Duration::from_secs(1),
+                &mut Scan::default()
+            )
+            .is_err()
+        );
         let mut full = Scan {
             entries: MAX_ENTRIES,
             ..Scan::default()
@@ -1842,9 +1853,11 @@ mod tests {
         assert_eq!(fs::read(t.0.join("receipt")).unwrap(), b"original");
         symlink(t.0.join("outside"), t.0.join("link")).unwrap();
         assert_ne!(write("second", "link"), 0);
-        assert!(fs::symlink_metadata(t.0.join("link"))
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        assert!(
+            fs::symlink_metadata(t.0.join("link"))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
     }
 }

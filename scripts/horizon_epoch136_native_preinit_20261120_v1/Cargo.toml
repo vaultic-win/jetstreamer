@@ -21,4 +21,3 @@ path = "probe.rs"
 [[bin]]
 name = "epoch136-native-preinit-guard"
 path = "guard.rs"
-edition = "2021"
