@@ -41,7 +41,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v6/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v9/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
@@ -118,6 +118,28 @@ pub(super) fn selected_scenario(r: &Value, fit: &Value) -> Result<&'static str> 
         _ => bail!("review must select the observed full211 booking disposition"),
     }
 }
+// A sealed startup plan and guard keep the same floor across every subsequent
+// firing. Restore the live full211 allocation credit to its nominal growth
+// sum before choosing that floor, including when an inherited floor dominates.
+fn startup_floor(c: &Value, scenario: &str) -> Result<u64> {
+    let retained = capacity::add(
+        num(c, "retained_disk_growth_bytes")?,
+        num(c, "allocation_credit_taken_bytes")?,
+    )?;
+    let nominal = capacity::add(num(c, "century_floor_bytes")?, retained)?;
+    let mut floor = num(c, "protected_existing_floor_bytes")?.max(nominal);
+    if scenario == "limited_native257_and_ordinary211" {
+        floor = capacity::add(floor, super::SCRATCH)?;
+    }
+    let required = capacity::add(floor, RESERVATION)?;
+    let free = num(c, "observed_available_bytes")?;
+    ensure!(
+        free >= required,
+        "native257 nominal floor plus reservation requires {required} bytes, observed {free}"
+    );
+    Ok(floor)
+}
+
 fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
     let rf = binding(&r["resource_review"])?;
     let rr = rf.sealed()?;
@@ -140,13 +162,7 @@ fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
         "current fit failed for {scenario}: {}",
         selected["reason"]
     );
-    let floor = num(&selected["capacity"], "protected_existing_floor_bytes")?
-        .checked_add(if scenario == "limited_native257_and_ordinary211" {
-            super::SCRATCH
-        } else {
-            0
-        })
-        .context("shared floor overflow")?;
+    let floor = startup_floor(&selected["capacity"], scenario)?;
     let cpu = units::cpu_sharing(n, r)?;
     let mut cap = json!({"protected_existing_floor_bytes":floor,"cpu":cpu,"selected_scenario":scenario,"capacity":selected["capacity"],
         "actual_current_memory":fit["actual_current_memory"],"resource_review":rf,"full211_capacity":r["full211_capacity"]});
@@ -345,4 +361,44 @@ fn check_mount_sample(_: &Value, _: &Value) -> Result<()> {
 fn sample_fixture(_: &mut Value, _: &mut Value) {}
 fn refreshed_capacity(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     Ok(current(n, r, held)?.1)
+}
+
+#[cfg(test)]
+mod floor_tests {
+    use super::*;
+
+    #[test]
+    fn v148_full211_reallocation_preserves_the_sealed_nominal_floor() {
+        let c = |credit: u64, free: u64| {
+            let growth = 3_802_005_871_200u64 - credit;
+            let floor = 3_908_104_436_088u64.max(280_581_611_288 + growth);
+            json!({"century_floor_bytes":280_581_611_288u64,"retained_disk_growth_bytes":growth,
+                   "protected_existing_floor_bytes":floor,"allocation_credit_taken_bytes":credit,
+                   "observed_available_bytes":free})
+        };
+        let nominal = 4_082_587_482_488;
+        let required = nominal + RESERVATION;
+        for credit in [136_545_972_224, 136_545_968_128, 200_000_000_000, 0] {
+            let scenario = "limited_native257_with_booked_full211";
+            assert_eq!(
+                startup_floor(&c(credit, required), scenario).unwrap(),
+                nominal
+            );
+            assert!(startup_floor(&c(credit, required - 1), scenario).is_err());
+        }
+    }
+
+    #[test]
+    fn inherited_and_combined_floors_and_overflow_remain_protected() {
+        let mut c = json!({"century_floor_bytes":10,"retained_disk_growth_bytes":20,
+                           "protected_existing_floor_bytes":100,"allocation_credit_taken_bytes":5,
+                           "observed_available_bytes":u64::MAX});
+        assert_eq!(startup_floor(&c, "limited_native257").unwrap(), 100);
+        assert_eq!(
+            startup_floor(&c, "limited_native257_and_ordinary211").unwrap(),
+            100 + super::super::SCRATCH
+        );
+        c["retained_disk_growth_bytes"] = json!(u64::MAX);
+        assert!(startup_floor(&c, "limited_native257").is_err());
+    }
 }

@@ -110,10 +110,23 @@ fn properties(n: &mut Native, original: &Value) -> Result<Value> {
 }
 
 fn compare_terminal(actual: &Value, original: &Value) -> Result<()> {
-    ensure!(
-        actual == original,
-        "original boundary execution, manager, restart, queue or dependency changed"
-    );
+    if actual != original {
+        // PID1's transient ExecStart history may be cleared by daemon-reload.
+        // Keep every other manager property and the independently pinned
+        // original exit, fragment and PID1/process journal evidence exact.
+        let prefix = text(original, "ExecStart")?
+            .split_once(" ; start_time=")
+            .context("original boundary command")?
+            .0;
+        let mut cleared = original.clone();
+        cleared["ExecStart"] = json!(format!(
+            "{prefix} ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
+        ));
+        ensure!(
+            actual == &cleared,
+            "original boundary execution, manager, restart, queue or dependency changed"
+        );
+    }
     Ok(())
 }
 fn historical(n: &mut Native, original: &Value) -> Result<()> {
@@ -468,6 +481,40 @@ pub(super) fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actual_v146_original_boundary_reload_only_clears_exec_history() -> Result<()> {
+        let fixture: Value = serde_json::from_str(ORIGINAL)?;
+        let original = &fixture["unit"];
+        let mut cleared = original.clone();
+        cleared["ExecStart"] = json!(
+            "{ path=/var/lib/jetstreamer/horizon205206-adjacent-boundary-v135-v1/verify-pair ; argv[]=/var/lib/jetstreamer/horizon205206-adjacent-boundary-v135-v1/verify-pair ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }"
+        );
+        compare_terminal(&cleared, original)?;
+        for (old, new) in [
+            ("verify-pair", "other"),
+            ("ignore_errors=no", "ignore_errors=yes"),
+            ("pid=0", "pid=1989128"),
+            ("status=0/0", "status=1"),
+        ] {
+            let mut bad = cleared.clone();
+            bad["ExecStart"] = json!(text(&cleared, "ExecStart")?.replace(old, new));
+            assert!(compare_terminal(&bad, original).is_err());
+        }
+        for field in [
+            "InvocationID",
+            "ExecMainCode",
+            "ExecMainStatus",
+            "NRestarts",
+            "MainPID",
+            "FragmentPath",
+        ] {
+            let mut bad = cleared.clone();
+            bad[field] = json!("changed");
+            assert!(compare_terminal(&bad, original).is_err());
+        }
+        Ok(())
+    }
 
     #[test]
     fn retained_failed_manager_denies_active_replacement_restart_and_pending_work() -> Result<()> {

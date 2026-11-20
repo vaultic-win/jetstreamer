@@ -345,7 +345,7 @@ impl Native {
                 "{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",
                 live::PROPS
             )
-        } else if matches!(unit, delivery247::UNIT247 | delivery247::STAGED_UNIT) {
+        } else if matches!(unit, delivery247::UNIT247 | delivery247::STAGED_UNIT | delivery247::SUCCESSOR_UNIT) {
             // The admitted uploaders have private credentials in Environment.
             let properties = live::PROPS
                 .split(',')

@@ -39,7 +39,8 @@ pub(super) fn charges(controls: &Value, controller: &str) -> Result<Value> {
     )
 }
 
-// When retry funding is used, preserve each pending neighbouring producer.
+// Epoch 212 preserves both pending peers on every admission. The 261 paired
+// booking applies when using the completed retry release.
 // A producer already in the ledger contributes its memory and disk there.
 fn candidate_capacity(
     host: &native257_fit::BookedHost,
@@ -51,9 +52,7 @@ fn candidate_capacity(
     let mut peer_disk = 0;
     let mut total_controls = num(envelope, "total_control_charged_bytes")?;
     let mut paired = Vec::new();
-    if host.retry_memory.is_some() {
-        // The completed retry funds the neighbouring 257 and 261 starts. Preserve
-        // each unconsumed hold once, including when 212 is the incoming candidate.
+    if EPOCH == 212 || host.retry_memory.is_some() {
         let peers = [
             (
                 257,
@@ -290,7 +289,21 @@ mod paired_tests {
             (0, 0)
         };
         h.retry_memory = None;
-        let original = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
+        let without_retry = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
+        let original = capacity::candidate_arithmetic(
+            h.resources,
+            h.century,
+            &h.rows,
+            &h.currents,
+            h.overhead,
+            (MEMORY, DISK_RECEIPTS),
+        )
+        .unwrap();
+        if EPOCH == 212 {
+            assert_eq!(without_retry, both);
+        } else {
+            assert_eq!(without_retry, original);
+        }
         assert_eq!(
             num(&both, "memory_obligation_after_bytes").unwrap()
                 - num(&original, "memory_obligation_after_bytes").unwrap(),
@@ -326,6 +339,49 @@ mod paired_tests {
             both["required_initial_free_bytes"]
         );
         h.rows[0].release = Some(Bound::new("/unexpected", "a".repeat(64)));
+        assert!(candidate_capacity(&h, h.resources, &e, &ctl).is_err());
+    }
+
+    #[test]
+    fn native212_preserves_a_booked_peer_without_retry_credit() {
+        if EPOCH != 212 {
+            return;
+        }
+        let mut h = host();
+        h.retry_memory = None;
+        let e = json!({"total_control_charged_bytes":CONTROL});
+        let ctl =
+            json!([{"unit":crate::native261::GUARD_UNIT,"maximum_memory_bytes":GUARD_MEMORY}]);
+        let unit = crate::native261::UNIT;
+        h.currents.insert(unit.to_owned(), 1);
+        assert!(candidate_capacity(&h, h.resources, &e, &ctl).is_err());
+        h.rows.push(capacity::Reservation {
+            unit: unit.into(),
+            invocation_id: "a".repeat(32),
+            maximum_memory_bytes: crate::native261::MEMORY,
+            remaining_disk_growth_bytes: crate::native261::DISK_RECEIPTS,
+            minimum_free_bytes: 1,
+            source: Bound::new("/fixture", "a".repeat(64)),
+            release: None,
+        });
+        let fit = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
+        let booked = &fit["paired_native261"];
+        assert_eq!(booked["already_in_ledger"], true);
+        for field in [
+            "additional_producer_memory_bytes",
+            "additional_control_envelope_bytes",
+            "additional_disk_bytes",
+        ] {
+            assert_eq!(booked[field], 0);
+        }
+        assert_eq!(
+            fit["paired_native257"]["additional_disk_bytes"],
+            native257_fit::NATIVE257_DISK
+        );
+        h.rows.push(h.rows[0].clone());
+        assert!(candidate_capacity(&h, h.resources, &e, &ctl).is_err());
+        h.rows.pop();
+        h.rows[0].remaining_disk_growth_bytes -= 1;
         assert!(candidate_capacity(&h, h.resources, &e, &ctl).is_err());
     }
 

@@ -2,6 +2,7 @@
 //! Reuses native process-image checks and ordinary unit/cgroup/RSS sampling.
 use super::*;
 use jetstreamer_horizon_observe::staged247_rss as staged;
+use jetstreamer_horizon_observe::successor247 as next;
 use serde_json::json;
 const UNIT: &str = "horizon-upload-247-singleton-20261119-v1.service";
 const IID: &str = "69218e2e0924497ea595a1227a6c31db";
@@ -10,15 +11,15 @@ const IMAGE: &str =
     "/var/lib/jetstreamer/horizon-full265-fast-consumers-20261119-v1/jetstreamer-r2";
 const IMAGE_SHA: &str = "4f70b21bd930a6e2890088eb236858ca1952a2dfa4c6404bfb9d9e68d07ba0ba";
 #[derive(Clone, Copy)]
-struct Owner {
+struct Owner<'a> {
     unit: &'static str,
-    iid: &'static str,
+    iid: &'a str,
     pid: u32,
     image: &'static str,
     sha: &'static str,
     cap: u64,
 }
-const ORIGINAL: Owner = Owner {
+const ORIGINAL: Owner<'static> = Owner {
     unit: UNIT,
     iid: IID,
     pid: PID,
@@ -26,7 +27,7 @@ const ORIGINAL: Owner = Owner {
     sha: IMAGE_SHA,
     cap: 7_000_000_000,
 };
-const STAGED: Owner = Owner {
+const STAGED: Owner<'static> = Owner {
     unit: staged::UNIT,
     iid: staged::IID,
     pid: staged::PID,
@@ -115,7 +116,15 @@ pub(super) fn validate(c: &Config) -> Result<()> {
         !(c.delivery247_resource_only && c.staged247_resource_only),
         "choose one 247 delivery observation"
     );
-    let owner = if c.staged247_resource_only {
+    let registered;
+    let owner = if let Some(reference) = &c.successor247_claim {
+        ensure!(
+            c.staged247_resource_only,
+            "successor needs exclusive staged delivery RSS selection"
+        );
+        registered = next::load(reference)?;
+        successor_owner(&registered)
+    } else if c.staged247_resource_only {
         STAGED
     } else {
         ORIGINAL
@@ -173,7 +182,7 @@ fn process_starts(u: &UnitObservation) -> Result<BTreeMap<u64, u64>> {
     }
     Ok(found)
 }
-fn endpoint(u: &UnitObservation, owner: Owner) -> Result<u64> {
+fn endpoint(u: &UnitObservation, owner: Owner<'_>) -> Result<u64> {
     ensure!(
         u.unit == owner.unit
             && u.invocation_id == owner.iid
@@ -197,7 +206,49 @@ fn endpoint(u: &UnitObservation, owner: Owner) -> Result<u64> {
     );
     main_ticks(&raw["rss"], owner.pid)
 }
-fn observe(clock: u64, owner: Owner) -> Result<Value> {
+fn successor_owner(info: &next::Owner) -> Owner<'_> {
+    Owner {
+        unit: next::UNIT,
+        iid: &info.iid,
+        pid: info.pid,
+        image: next::IMAGE,
+        sha: next::IMAGE_SHA,
+        cap: next::HARD,
+    }
+}
+fn successor_input(reference: &Value, info: &next::Owner) -> Result<()> {
+    next::verify_drains()?;
+    let again = next::load(reference)?;
+    ensure!(
+        again.proof == info.proof && again.iid == info.iid && again.pid == info.pid,
+        "changed successor evidence"
+    );
+    let argv = fs::read(format!("/proc/{}/cmdline", info.pid))?;
+    let args = argv
+        .strip_suffix(&[0])
+        .context("successor argv terminator")?
+        .split(|b| *b == 0)
+        .map(std::str::from_utf8)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(json!(args) == info.argv, "successor argv differs");
+    let manager = Command::new("/usr/bin/systemctl")
+        .args(["show", next::UNIT, "--property=ExecStart", "--value"])
+        .output()?;
+    ensure!(
+        manager.status.success()
+            && staged_exec_matches(&info.command, std::str::from_utf8(&manager.stdout)?.trim()),
+        "successor PID1 command differs"
+    );
+    Ok(())
+}
+fn observe(
+    clock: u64,
+    owner: Owner<'_>,
+    successor: Option<(&Value, &next::Owner)>,
+) -> Result<Value> {
+    if let Some((reference, info)) = successor {
+        successor_input(reference, info)?;
+    }
     let provenance = if owner.iid == staged::IID {
         Some(staged_inputs()?)
     } else {
@@ -241,9 +292,14 @@ fn observe(clock: u64, owner: Owner) -> Result<Value> {
         sample["staged_owner"] = proof;
         staged::validate(&sample)?;
     }
+    if let Some((reference, info)) = successor {
+        successor_input(reference, info)?;
+        sample["successor_owner"] = info.proof.clone();
+        staged::validate_sample(&sample, info)?;
+    }
     Ok(sample)
 }
-fn row(result: Result<Value>, owner: Owner) -> Value {
+fn row(result: Result<Value>, owner: Owner<'_>) -> Value {
     let (status, observation, error) = match result {
         Ok(v) => ("observed", Some(v), None),
         Err(e) => ("unavailable", None, Some(format!("{e:#}"))),
@@ -253,10 +309,34 @@ fn row(result: Result<Value>, owner: Owner) -> Value {
         "entry_replay":false,"ordinary_replay_claim":false,"terminal_completion_proven":false,
         "resource_release_authorized":false,"publication_authorized":false,"r2_mutations":false})
 }
-pub(super) fn sample(enabled: bool, staged: bool, clock: u64) -> Vec<Value> {
+pub(super) fn sample(
+    enabled: bool,
+    staged: bool,
+    reference: Option<&Value>,
+    clock: u64,
+) -> Vec<Value> {
+    if let Some(r) = reference {
+        return match next::load(r) {
+            Ok(info) => {
+                let owner = successor_owner(&info);
+                vec![row(observe(clock, owner, Some((r, &info))), owner)]
+            }
+            Err(e) => vec![row(
+                Err(e),
+                Owner {
+                    unit: next::UNIT,
+                    iid: "",
+                    pid: 0,
+                    image: next::IMAGE,
+                    sha: next::IMAGE_SHA,
+                    cap: next::HARD,
+                },
+            )],
+        };
+    }
     if enabled || staged {
         let owner = if staged { STAGED } else { ORIGINAL };
-        vec![row(observe(clock, owner), owner)]
+        vec![row(observe(clock, owner, None), owner)]
     } else {
         Vec::new()
     }
@@ -265,9 +345,69 @@ pub(super) fn sample(enabled: bool, staged: bool, clock: u64) -> Vec<Value> {
 mod tests {
     use super::*;
     #[test]
+    fn benchmark_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
+        let f: Value = serde_json::from_str(include_str!("fixtures/successor247-history.json"))?;
+        let recovery = &f["recovery"];
+        assert_eq!(
+            f["recovery_ref"],
+            next::binding(next::RECOVERY, next::RECOVERY_SHA)
+        );
+        assert_eq!(
+            f["previous_ref"],
+            next::binding(next::PRIOR, next::PRIOR_SHA)
+        );
+        let args = recovery["recovery_argv"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let cmd = format!(
+            "{{ path={} ; argv[]={args} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",
+            next::IMAGE
+        );
+        let id = "1234567890abcdef1234567890abcdef";
+        let claim = json!({"epoch":247,"phase":"upload-readback","unit":next::UNIT,"invocation_id":id,"expected_exec_start":cmd});
+        let booking = json!({"unit":next::UNIT,"argv":recovery["recovery_argv"],"approved_plan":next::binding(next::PLAN,next::PLAN_SHA),"capacity_credit":0,"local_reclamation_credit":0,"additional_memory_reserve":next::BOOKED,"disk_reserve":next::DISK});
+        let launch = json!({"unit":{"Id":next::UNIT,"InvocationID":id,"NRestarts":"0","MemoryMax":next::HARD.to_string(),"MemorySwapMax":"0","ExecStart":cmd}});
+        next::graph(&claim, &booking, &launch, recovery, &f["previous"])?;
+        for key in [
+            "prior_staged_owner",
+            "historical_terminal",
+            "current_reader_plan",
+            "uploader",
+        ] {
+            let mut other = recovery.clone();
+            other[key]["sha256"] = json!("0".repeat(64));
+            assert!(next::graph(&claim, &booking, &launch, &other, &f["previous"]).is_err());
+        }
+        for key in [
+            "capacity_credit",
+            "local_reclamation_credit",
+            "additional_memory_reserve",
+            "disk_reserve",
+        ] {
+            let mut other = booking.clone();
+            other[key] = json!(1);
+            assert!(next::graph(&claim, &other, &launch, recovery, &f["previous"]).is_err());
+        }
+        assert!(
+            next::graph(
+                &f["prior_claim"],
+                &booking,
+                &launch,
+                recovery,
+                &f["previous"]
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+    #[test]
     #[ignore = "reads only the exact live staged uploader; no global observation or state change"]
     fn native_staged_owner_kernel_rss() {
-        let row = row(observe(now_unix().unwrap(), STAGED), STAGED);
+        let row = row(observe(now_unix().unwrap(), STAGED, None), STAGED);
         assert_eq!(row["status"], "observed", "{row}");
         println!("STAGED247_RSS={row}");
     }

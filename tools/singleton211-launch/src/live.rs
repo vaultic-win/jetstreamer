@@ -174,7 +174,7 @@ fn terminal_identity(current: &Value, receipt: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn same_terminal_census(before: &Value, after: &Value) -> Result<()> {
+pub(crate) fn same_terminal_census(before: &Value, after: &Value) -> Result<()> {
     ensure!(
         command_identity(text(before, "ExecStart")?)?
             == command_identity(text(after, "ExecStart")?)?,
@@ -340,8 +340,10 @@ pub(super) fn census_with_held(
                 && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
-        if r.unit == delivery247::UNIT247
-            && fleet["unit_census"][&r.unit]["ActiveState"] == "failed"
+        if matches!(
+            r.unit.as_str(),
+            delivery247::UNIT247 | delivery247::STAGED_UNIT
+        ) && fleet["unit_census"][&r.unit]["ActiveState"] == "failed"
         {
             ensure!(
                 r.release.is_none(),
@@ -366,7 +368,10 @@ pub(super) fn census_with_held(
         }
         let v = n.show(&r.unit)?;
         if v["ActiveState"] == "active" || v["ActiveState"] == "activating" {
-            if r.unit == delivery247::STAGED_UNIT {
+            if matches!(
+                r.unit.as_str(),
+                delivery247::STAGED_UNIT | delivery247::SUCCESSOR_UNIT
+            ) {
                 delivery247::staged_owner(&v)?;
             }
             let current = finite_owner(&v, &r.unit, &r.invocation_id, delivery247::owner_cap(r))?;
@@ -515,7 +520,10 @@ pub(super) fn census_with_held(
     for (unit, old) in retained_terminals {
         let after = n.show(&unit)?;
         same_terminal_census(&old, &after)?;
-        if unit == delivery247::UNIT247 {
+        if matches!(
+            unit.as_str(),
+            delivery247::UNIT247 | delivery247::STAGED_UNIT
+        ) {
             delivery247::terminal_owner(n, &after)?;
         } else {
             peers::terminal_owner(&unit, &after)?;
@@ -524,7 +532,10 @@ pub(super) fn census_with_held(
     for (unit, old) in before {
         let after = n.show(&unit)?;
         same_owner(&old, &after)?;
-        if unit == delivery247::STAGED_UNIT {
+        if matches!(
+            unit.as_str(),
+            delivery247::STAGED_UNIT | delivery247::SUCCESSOR_UNIT
+        ) {
             delivery247::staged_owner(&after)?;
         }
         let cap = delivery247::owner_cap(

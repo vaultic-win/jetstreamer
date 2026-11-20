@@ -210,6 +210,80 @@ pub(super) fn staged_recipes(
     Ok(())
 }
 
+// PID 1 exposes unit dependencies as sets; their iteration order can change
+// across daemon-reload. Do not normalize argv, environment, paths or outcomes.
+fn unit_relations(field: &str) -> bool {
+    matches!(
+        field,
+        "After"
+            | "Before"
+            | "Requires"
+            | "RequiredBy"
+            | "Wants"
+            | "WantedBy"
+            | "BindsTo"
+            | "BoundBy"
+            | "Upholds"
+            | "UpheldBy"
+            | "PartOf"
+            | "ConsistsOf"
+            | "Requisite"
+            | "RequisiteOf"
+            | "Triggers"
+            | "TriggeredBy"
+            | "OnSuccess"
+            | "OnFailure"
+            | "OnSuccessOf"
+            | "OnFailureOf"
+    )
+}
+
+fn members(value: &str) -> Result<BTreeSet<&str>> {
+    let mut units = BTreeSet::new();
+    for name in value.split_ascii_whitespace() {
+        ensure!(
+            units.insert(name),
+            "duplicate native211 unit relation {name}"
+        );
+    }
+    Ok(units)
+}
+
+fn checked_manager(unit: &str, raw: &str, expected: &Value) -> Result<Value> {
+    let mut actual = serde_json::Map::new();
+    for l in raw.lines() {
+        let (k, v) = l.split_once('=').context("manager scalar")?;
+        let value = if unit == GUARD_SERVICE && k == "ExecStart" {
+            periodic::stable_command(v)?
+        } else {
+            v
+        };
+        ensure!(
+            actual.insert(k.into(), json!(value)).is_none(),
+            "duplicate manager property"
+        );
+    }
+    let original = expected.as_object().context("expected manager fields")?;
+    ensure!(
+        actual.len() == original.len(),
+        "changed manager property count for {unit}"
+    );
+    for (key, prior) in original {
+        let current = actual.get(key).context("missing manager property")?;
+        let same = if unit_relations(key) {
+            members(current.as_str().context("actual relation")?)?
+                == members(prior.as_str().context("original relation")?)?
+        } else {
+            current == prior
+        };
+        ensure!(
+            same,
+            "native211 cold manager configuration changed: {unit} {key}"
+        );
+    }
+    Ok(Value::Object(actual))
+}
+
 fn managers(n: &mut Native, pins: &Value, fleet: &Value) -> Result<()> {
     for (unit, expected) in pins["units"].as_object().context("manager scope")? {
         let fields = expected
@@ -223,24 +297,7 @@ fn managers(n: &mut Native, pins: &Value, fleet: &Value) -> Result<()> {
             "/usr/bin/systemctl",
             &["show", "--all", unit, "--property", &fields],
         )?;
-        let mut actual = serde_json::Map::new();
-        for l in std::str::from_utf8(&raw)?.lines() {
-            let (k, v) = l.split_once('=').context("manager scalar")?;
-            let value = if unit == GUARD_SERVICE && k == "ExecStart" {
-                periodic::stable_command(v)?
-            } else {
-                v
-            };
-            ensure!(
-                actual.insert(k.into(), json!(value)).is_none(),
-                "duplicate manager property"
-            );
-        }
-        let actual = Value::Object(actual);
-        ensure!(
-            actual == *expected,
-            "native211 cold manager configuration changed: {unit}"
-        );
+        let actual = checked_manager(unit, std::str::from_utf8(&raw)?, expected)?;
         if unit == OLD {
             live::same_owner(&fleet["unit_census"][OLD], &actual)?;
         }
@@ -375,6 +432,41 @@ pub(super) fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn original_v147_guard_accepts_reordered_dependencies_only() -> Result<()> {
+        let raw = include_str!("fixtures/native211-guard-v147.properties");
+        let pins: Value = serde_json::from_str(PINS)?;
+        let expected = &pins["units"][GUARD_SERVICE];
+        assert_eq!(expected["Requires"], "system.slice sysinit.target");
+        let current = checked_manager(GUARD_SERVICE, raw, expected)?;
+        assert_eq!(current["Requires"], "sysinit.target system.slice");
+        for replacement in [
+            "sysinit.target",
+            "sysinit.target system.slice rogue.target",
+            "sysinit.target rogue.target",
+            "sysinit.target sysinit.target system.slice",
+        ] {
+            let changed = raw.replace("sysinit.target system.slice", replacement);
+            assert!(checked_manager(GUARD_SERVICE, &changed, expected).is_err());
+        }
+        for (before, after) in [
+            ("Restart=no", "Restart=always"),
+            ("ignore_errors=no", "ignore_errors=yes"),
+            ("Triggers=", "Triggers=rogue.service"),
+            ("--plan-sha256", "--self-sha256"),
+            ("User=root", "User=ubuntu"),
+            ("Wants=\n", ""),
+            ("Group=\n", "Group=\nGroup=\n"),
+        ] {
+            let changed = raw.replace(before, after);
+            assert!(checked_manager(GUARD_SERVICE, &changed, expected).is_err());
+        }
+        let mut duplicate = expected.clone();
+        duplicate["Requires"] = json!("system.slice system.slice sysinit.target");
+        assert!(checked_manager(GUARD_SERVICE, raw, &duplicate).is_err());
+        Ok(())
+    }
 
     fn row() -> capacity::Reservation {
         capacity::Reservation {

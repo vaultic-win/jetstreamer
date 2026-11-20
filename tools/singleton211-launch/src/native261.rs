@@ -52,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v5/horizon-native261-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
@@ -85,5 +85,15 @@ const STOP_ACCEPTED: &str = "horizon-native261-protective-stop-qualification-v1"
 const STOP_RETIRED: &str = "horizon-native261-qualification-unit-retirement-v1";
 
 const STOP_REQUEST: &str = "horizon261-native-guard-stop-request-v1";
+
+const PRIOR_PREPARATION: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-native261-prepared-host-stop-1259df1f-v1/prepared.json",
+    "71de86ca05fd28b38d6f1127ce04a0216f80444c6982cd0c962d9b795a4bdaf0",
+);
+const PRIOR_LAUNCHER: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch",
+    "12b14dad4e1465bc22a6466adee317f3059ae66e54106a81c4758b724646a2ba",
+);
+const PRIOR_LAUNCHER_COMMIT: &str = "1259df1ff730e684a7b09c05c93d0d82cc3694ff";
 
 include!("native261/controller.rs");

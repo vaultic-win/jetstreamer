@@ -70,10 +70,10 @@ pub(super) fn validate_roster(f: &Value, rows: &[capacity::Reservation]) -> Resu
         return Ok(());
     };
     let w = witness()?;
+    let live = e["live"].as_bool().context("staged owner liveness")?;
     ensure!(
         entries.next().is_none()
             && selected(e)
-            && e["live"] == true
             && e["expected_invocation_id"] == IID
             && e["unit"] == f["unit_census"][UNIT]
             && e["sampled_at_utc"] == f["sampled_at_utc"]
@@ -84,11 +84,15 @@ pub(super) fn validate_roster(f: &Value, rows: &[capacity::Reservation]) -> Resu
             && e.get("producer").is_none()
             && e.get("controller").is_none()
             && e["evidence"] == json!([booking(), launch()])
-            && owners.next() == Some(e)
+            && owners.next() == live.then_some(e)
             && owners.next().is_none(),
         "staged delivery identity, evidence or active membership changed"
     );
-    census(&e["unit"], &w)?;
+    if live {
+        census(&e["unit"], &w)?;
+    } else {
+        terminal_identity(&e["unit"], &w)?;
+    }
     ensure!(
         pipelines.iter().any(|p| original(p) && p["live"] == false),
         "staged delivery lacks its separately retained original"
@@ -103,7 +107,13 @@ pub(super) fn validate_roster(f: &Value, rows: &[capacity::Reservation]) -> Resu
             && r.maximum_memory_bytes == TOTAL_MEMORY
             && r.remaining_disk_growth_bytes == DISK
             && r.minimum_free_bytes == FLOOR
-            && r.release.is_none(),
+            && r.release.is_none()
+            && (live
+                || r.source
+                    == Bound::new(
+                        "/var/lib/jetstreamer/horizon-native257-current-bookings-v145-ops-v1/recovery247-source.json",
+                        "894935276887541c6be208249be4e0ddd42864f23757a831b6caa01a774e046a"
+                    )),
         "staged delivery booking changed"
     );
     Ok(())
@@ -189,12 +199,138 @@ pub(super) fn verify_inputs(e: &Value) -> Result<()> {
     Bound::new(PLAN, PLAN_SHA).sealed()?;
     Bound::new(IMAGE, IMAGE_SHA).artifact()?;
     Bound::new(text(&w["manager"], "FragmentPath")?, FRAGMENT_SHA).bytes(false)?;
-    mapped_owner()
+    if e["live"] == true {
+        mapped_owner()
+    } else {
+        terminal_identity(&e["unit"], &w)
+    }
+}
+
+fn terminal_identity(v: &Value, w: &Value) -> Result<()> {
+    successor::evidence::terminal(v, UNIT, IID)?;
+    ensure!(
+        v["Type"] == "exec"
+            && v["LoadState"] == "loaded"
+            && v["ControlGroup"] == ""
+            && periodic::stable_command(text(v, "ExecStart")?)?
+                == periodic::stable_command(text(&w["unit"], "ExecStart")?)?,
+        "staged failure command changed"
+    );
+    Ok(())
+}
+pub(super) fn terminal(n: &mut Native, v: &Value) -> Result<()> {
+    let w = witness()?;
+    terminal_identity(v, &w)?;
+    for (key, value) in w["manager"].as_object().context("staged manager proof")? {
+        ensure!(&v[key] == value, "staged terminal manager changed {key}");
+    }
+    ensure!(v["ExecMainCode"] == "1", "staged failure exit type");
+    Bound::new(text(v, "FragmentPath")?, FRAGMENT_SHA).bytes(false)?;
+    let bytes = n.run(
+        "/usr/bin/journalctl",
+        &[
+            "--boot=0",
+            "--no-pager",
+            "--output=json",
+            "_PID=1",
+            "_UID=0",
+            &format!("UNIT={UNIT}"),
+            &format!("INVOCATION_ID={IID}"),
+        ],
+    )?;
+    let events = std::str::from_utf8(&bytes)?
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    ensure!(
+        events.iter().all(|r| r["_PID"] == "1"
+            && r["_UID"] == "0"
+            && r["UNIT"] == UNIT
+            && r["INVOCATION_ID"] == IID
+            && r["_BOOT_ID"] == BOOT.replace('-', ""))
+            && events
+                .iter()
+                .filter(|r| r["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c"
+                    && r["UNIT_RESULT"] == "exit-code")
+                .count()
+                == 1
+            && events
+                .iter()
+                .filter(|r| r["EXIT_CODE"] == "exited" && r["EXIT_STATUS"] == v["ExecMainStatus"])
+                .count()
+                == 1,
+        "staged original PID1 failure missing"
+    );
+    for path in [
+        Path::new("/proc").join(PID),
+        Path::new("/sys/fs/cgroup/system.slice").join(UNIT),
+    ] {
+        match fs::symlink_metadata(path) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+            Ok(_) => bail!("staged process or cgroup not drained"),
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn terminal_recovery_retains_both_actual_v147_rows_without_credit() -> Result<()> {
+        let f: Value = serde_json::from_str(include_str!(
+            "../../../../jetstreamer-horizon-observe/src/fixtures/successor247-history.json"
+        ))?;
+        let mut fleet = json!({"sampled_at_utc":f["observed_fleet_time"],"pipelines":f["historical_fleet_rows"],"active":f["historical_active"],"unit_census":{},"diagnostics":[],"auxiliary_diagnostics":[]});
+        let mut units = json!({});
+        for e in fleet["pipelines"].as_array().unwrap() {
+            units[e["unit"]["Id"].as_str().unwrap()] = e["unit"].clone();
+        }
+        fleet["unit_census"] = units;
+        let mut rows: Vec<capacity::Reservation> =
+            serde_json::from_value(f["historical_reservations"]["rows"].clone())?;
+        super::super::validate_roster(&fleet, &rows)?;
+        let idx = fleet["pipelines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|e| e["unit"]["Id"] == UNIT)
+            .unwrap();
+        let mut ended = fleet["unit_census"][UNIT].clone();
+        for (k, v) in [
+            ("ActiveState", "failed"),
+            ("SubState", "failed"),
+            ("Result", "exit-code"),
+            ("ExecMainStatus", "1"),
+            ("MainPID", "0"),
+            ("ControlGroup", ""),
+        ] {
+            ended[k] = json!(v);
+        }
+        fleet["pipelines"][idx]["unit"] = ended.clone();
+        fleet["unit_census"][UNIT] = ended;
+        fleet["pipelines"][idx]["live"] = json!(false);
+        fleet["active"] = json!([]);
+        super::super::validate_roster(&fleet, &rows)?;
+        assert_eq!(
+            rows.iter().map(|r| r.maximum_memory_bytes).sum::<u64>(),
+            18_274_289_152
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|r| r.remaining_disk_growth_bytes)
+                .sum::<u64>(),
+            186_444_658_784
+        );
+        for r in &rows {
+            assert!(r.release.is_none());
+        }
+        let pos = rows.iter().position(|r| r.unit == UNIT).unwrap();
+        rows[pos].remaining_disk_growth_bytes -= 1;
+        assert!(super::super::validate_roster(&fleet, &rows).is_err());
+        Ok(())
+    }
     fn pair() -> (Value, Vec<capacity::Reservation>) {
         let original_unit = terminal::witness().unwrap()["transition"]["after"].clone();
         let original = json!({"epoch":247,"phase":"upload-readback","live":false,"expected_invocation_id":IID247,
