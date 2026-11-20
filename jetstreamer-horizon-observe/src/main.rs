@@ -123,6 +123,8 @@ struct Config {
     #[serde(default)]
     delivery247_resource_only: bool,
     #[serde(default)]
+    staged247_resource_only: bool,
+    #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
 }
 
@@ -338,6 +340,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
         !config.replays.is_empty()
             || !config.diagnostic_replays.is_empty()
             || !config.native_input_diagnostics.is_empty()
+            || config.staged247_resource_only
             || config.delivery247_resource_only
             || config.singleton247_finalization
             || !config.singleton_finalization_epochs.is_empty(),
@@ -383,6 +386,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "native_input_resource_diagnostic_count":config.native_input_diagnostics.len(),
             "singleton247_finalization_resource_only":config.singleton247_finalization,
             "delivery247_resource_only":config.delivery247_resource_only,
+            "staged247_resource_only":config.staged247_resource_only,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
@@ -1973,8 +1977,11 @@ fn run(config: Config) -> Result<()> {
     for epoch in singleton247_finalization::epochs(&config)? {
         diagnostic_observations.push(singleton247_finalization::sample(epoch, started_unix)?);
     }
-    let delivery_resources =
-        delivery247_resource::sample(config.delivery247_resource_only, started_unix);
+    let delivery_resources = delivery247_resource::sample(
+        config.delivery247_resource_only,
+        config.staged247_resource_only,
+        started_unix,
+    );
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
             std::slice::from_ref(&auxiliary.replay),
@@ -2495,6 +2502,7 @@ mod tests {
             retained_prefix205_ram: false,
             singleton247_finalization: false,
             delivery247_resource_only: false,
+            staged247_resource_only: false,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,

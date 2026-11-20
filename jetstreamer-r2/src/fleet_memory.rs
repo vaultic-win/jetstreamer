@@ -27,6 +27,14 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                 && unit["NRestarts"] == "0",
             "memory owner not stable/running"
         );
+        if name == jetstreamer_horizon_observe::staged247_rss::UNIT {
+            ensure!(
+                active["epoch"] == 247
+                    && active["phase"] == "upload-readback"
+                    && iid == jetstreamer_horizon_observe::staged247_rss::IID,
+                "foreign staged 247 fleet entry"
+            );
+        }
         let comparable = matches!(
             active["phase"].as_str(),
             Some(
@@ -65,6 +73,35 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
+        if name == jetstreamer_horizon_observe::staged247_rss::UNIT {
+            let timestamp = super::fleet::utc_seconds(
+                o["recorded_at_utc"]
+                    .as_str()
+                    .context("staged 247 sample time")?,
+            )?;
+            ensure!(
+                row["sampled_unix_seconds"] == timestamp,
+                "stale staged 247 resource sample"
+            );
+            let linked = o["delivery_resources"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|d| {
+                    d["producer_unit"] == name
+                        && d["expected_producer_invocation_id"]
+                            == jetstreamer_horizon_observe::staged247_rss::IID
+                        && d["status"] == "observed"
+                        && d["delivery_resource_only"] == true
+                        && &d["observation"] == row
+                })
+                .count();
+            ensure!(
+                linked == 1,
+                "staged 247 absent or ambiguous in delivery-specific RSS"
+            );
+            jetstreamer_horizon_observe::staged247_rss::validate(row)?;
+        }
         if !owners.contains_key(name) && super::fleet::terminal247::historical_row(ledger, row)? {
             ensure!(
                 seen.insert(name.to_string(), ()).is_none(),
@@ -175,6 +212,81 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "booked offline qualification with original v145 receipts and independent targeted staged RSS"]
+    fn staged247_v145_memory_join_and_historical_failure() {
+        use std::path::PathBuf;
+        let dir = PathBuf::from(std::env::var_os("STAGED247_RSS_FIXTURES").unwrap());
+        let read = |n: &str| -> Value {
+            serde_json::from_slice(&std::fs::read(dir.join(n)).unwrap()).unwrap()
+        };
+        let fleet = read("v145-fleet.json");
+        let original = read("v145-observer.json");
+        assert_eq!(report(&original, &fleet)["valid"], false);
+        assert_eq!(
+            fleet["memory_target"]["limiting_gate"],
+            "active fleet owner missing from coordinated RSS telemetry"
+        );
+        let mut row = read("staged-owner.json");
+        let owner = &mut row["observation"];
+        // Project only the registered process identities onto the two native v145
+        // host censuses for this offline test. The sealed v145 report stays invalid.
+        for suffix in ["before", "after"] {
+            let host = original["host_resident_memory"][suffix]["rss"]["processes"]
+                .as_array()
+                .unwrap();
+            let mut rss = owner[format!("producer_{suffix}")]["rss"].clone();
+            let mut sum = 0;
+            for process in rss["processes"].as_array_mut().unwrap() {
+                let matches: Vec<_> = host
+                    .iter()
+                    .filter(|p| {
+                        p["pid"] == process["pid"] && p["start_ticks"] == process["start_ticks"]
+                    })
+                    .collect();
+                assert_eq!(matches.len(), 1);
+                *process = matches[0].clone();
+                sum += process["rss_bytes"].as_u64().unwrap();
+            }
+            rss["aggregate_rss_bytes"] = json!(sum);
+            for role in ["controller", "producer"] {
+                owner[format!("{role}_{suffix}")]["rss"] = rss.clone();
+            }
+        }
+        owner["sampled_unix_seconds"] = json!(
+            super::super::fleet::utc_seconds(original["recorded_at_utc"].as_str().unwrap())
+                .unwrap()
+        );
+        let mut joined = original.clone();
+        joined["delivery_resources"] = json!([row]);
+        let v = report(&joined, &fleet);
+        assert_eq!(v["valid"], true, "{v}");
+        assert_eq!(v["executing_lanes"], 3);
+        assert_eq!(v["non_replay_owner_count"], 1);
+        assert_eq!(
+            v["non_replay_resident_bytes"],
+            joined["delivery_resources"][0]["observation"]["producer_after"]["rss"]["aggregate_rss_bytes"]
+        );
+        assert_eq!(v["admission_authorized"], false);
+        println!("V145_OFFLINE_JOIN={v}");
+        for pointer in [
+            "/observation/sampled_unix_seconds",
+            "/expected_producer_invocation_id",
+            "/observation/staged_owner/launch/sha256",
+            "/observation/mapped_image_after/sha256",
+            "/observation/producer_after/invocation_id",
+            "/observation/producer_after/rss/census_stable",
+            "/observation/producer_after/cgroup/gauges/memory.max",
+            "/observation/ordinary_replay_claim",
+        ] {
+            let mut altered = joined.clone();
+            *altered["delivery_resources"][0]
+                .pointer_mut(pointer)
+                .unwrap() = Value::Null;
+            assert_eq!(report(&altered, &fleet)["valid"], false, "{pointer}");
+        }
+        assert_eq!(original["delivery_resources"][0]["status"], "unavailable");
+    }
     #[test]
     fn proven_terminal_transition_retains_historical_rss_and_raw_sample() {
         let (mut o, mut ledger) = fixture();
