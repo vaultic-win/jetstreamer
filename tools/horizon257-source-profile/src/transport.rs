@@ -119,7 +119,12 @@ fn field<'a>(data: &mut &'a [u8]) -> Result<&'a [u8]> {
 }
 
 pub fn compact(prefix: &[u8], epoch: &Epoch, kind: &str) -> Result<Value> {
-    ensure!(prefix.len() == 4096, "compact index prefix length");
+    ensure!(
+        prefix.len() == 4096
+            || (kind == "cid-to-offset-and-size"
+                && prefix.len() == 130 + 16 * epoch.offset_buckets as usize),
+        "compact index prefix/table length"
+    );
     let (width, buckets, limit, header_bytes) = match kind {
         "slot-to-cid" => (36, epoch.slot_buckets, epoch.slot_bytes, 119),
         "cid-to-offset-and-size" => (9, epoch.offset_buckets, epoch.offset_bytes, 130),

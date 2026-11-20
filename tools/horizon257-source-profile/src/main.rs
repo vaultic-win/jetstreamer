@@ -1,7 +1,9 @@
+mod bootstrap;
 mod edges;
 mod manifest;
 mod ranges;
 mod repair;
+mod tables;
 mod transport;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -198,12 +200,20 @@ fn inspect() -> Result<Value> {
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.as_slice() == [std::ffi::OsString::from("measure-bootstrap-inputs")] {
+        println!("{}", serde_json::to_string_pretty(&bootstrap::measure()?)?);
+        return Ok(());
+    }
+    if args.as_slice() == [std::ffi::OsString::from("compact-tables")] {
+        println!("{}", serde_json::to_string_pretty(&tables::run()?)?);
+        return Ok(());
+    }
     if args.len() == 2 && args[0] == "repair" {
         return repair::run(Path::new(&args[1]));
     }
     ensure!(
         args.is_empty(),
-        "usage: horizon257-source-profile [repair NEW_OUTPUT]"
+        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT]"
     );
     println!("{}", serde_json::to_string_pretty(&inspect()?)?);
     Ok(())
