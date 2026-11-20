@@ -52,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v5/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v6/horizon-native261-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
@@ -96,4 +96,66 @@ const PRIOR_LAUNCHER: (&str, &str) = (
 );
 const PRIOR_LAUNCHER_COMMIT: &str = "1259df1ff730e684a7b09c05c93d0d82cc3694ff";
 
+const V151_PREPARED: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-native261-prepared-early-guard-v151-v1/prepared.json",
+    "b13dddcb78f037901ce0307deca903de10b3f2ff83a4f2f97b9a90902f90bf81",
+);
+const V151_GATE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v5/horizon-native261-launch",
+    "4fc9b06ff47a39ccf7c93b20683f2ecab8a95b6bb3b548d5aec12e3ba323ea17",
+);
+const V151_GATE_COMMIT: &str = "52df886711c0f700335dd952f73b6379bf513fbc";
+pub(super) fn v151_prepared(reference: &Bound, gate: &Bound, commit: &Value) -> bool {
+    reference == &Bound::new(V151_PREPARED.0, V151_PREPARED.1)
+        && gate == &Bound::new(V151_GATE.0, V151_GATE.1)
+        && commit == V151_GATE_COMMIT
+}
+pub(super) fn stop_window(census_us: u64) -> Result<u64> {
+    // Include the mandatory pre-start census, the existing five-second peer margin,
+    // and five seconds for the one-second first guard, sealing and manager work.
+    Ok(census_us
+        .checked_add(10_000_000)
+        .context("261 pre-start budget overflow")?
+        .max(30_000_000))
+}
+
 include!("native261/controller.rs");
+
+#[cfg(test)]
+mod v151_window_tests {
+    use super::*;
+    #[test]
+    fn only_the_original_v151_preparation_and_unchanged_images_transfer() {
+        let evidence: Value =
+            serde_json::from_str(include_str!("fixtures/native261-v151-window.json")).unwrap();
+        let reference = binding(&evidence["preparation"]).unwrap();
+        let previous = binding(&evidence["preparation_gate"]).unwrap();
+        let current = Bound::new(LAUNCHER, "c".repeat(64));
+        let roles = |gate: &Bound, commit: &str| {
+            json!({"artifacts":[
+            {"role":"launcher","artifact":gate,"source_commit":commit},
+            {"role":"guard","artifact":Bound::new(GUARD,GUARD_SHA),"source_commit":"9d9967df60eeb17d862ec08c9d5254de1cb3e248"},
+            {"role":"harness","artifact":Bound::new(INPUT,INPUT_SHA),"source_commit":"9d9967df60eeb17d862ec08c9d5254de1cb3e248"}]})
+        };
+        let old = roles(&previous, V151_GATE_COMMIT);
+        let new = roles(&current, &"d".repeat(40));
+        prepared_transition(&reference, &previous, &current, &old, &new).unwrap();
+        let other = Bound::new(&reference.path, "a".repeat(64));
+        assert!(prepared_transition(&other, &previous, &current, &old, &new).is_err());
+        assert!(
+            prepared_transition(
+                &reference,
+                &previous,
+                &current,
+                &roles(&previous, &"b".repeat(40)),
+                &new
+            )
+            .is_err()
+        );
+        let mut altered = new;
+        altered["artifacts"][1]["artifact"]["sha256"] = json!("e".repeat(64));
+        assert!(prepared_transition(&reference, &previous, &current, &old, &altered).is_err());
+        assert_eq!(stop_window(100).unwrap(), 30_000_000);
+        assert!(stop_window(u64::MAX).is_err());
+    }
+}

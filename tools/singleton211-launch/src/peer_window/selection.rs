@@ -1,4 +1,4 @@
-//! Observe natural firings before issuing the native257 protective-stop admission.
+//! Observe natural firings before issuing a protective-stop admission.
 use super::*;
 
 const SECOND: u64 = 1_000_000;
@@ -253,7 +253,12 @@ fn observe(
     bail!("guard failed to stabilize within natural firing observations")
 }
 
-fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Option<u64>> {
+fn next_probe(
+    rows: &[(bool, Observation)],
+    clock: u64,
+    end: u64,
+    minimum: u64,
+) -> Result<Option<u64>> {
     ensure!(clock < end, "simultaneous peer selection expired");
     let mut wake = None;
     for (full211, row) in rows {
@@ -267,7 +272,7 @@ fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Opti
                 if remaining > MARGIN {
                     continue;
                 }
-            } else if remaining >= 30 * SECOND {
+            } else if remaining >= minimum {
                 start_limit(*next, clock)?;
                 continue;
             }
@@ -286,7 +291,7 @@ fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Opti
     Ok(wake)
 }
 
-fn select_inner(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+fn select_inner(n: &mut Native, review: &Value, a: &Value, minimum: u64) -> Result<Window> {
     let entries = roster(review, a)?;
     let fleet_ref = binding(&review["fleet"])?;
     let fleet = fleet_ref.json()?;
@@ -319,11 +324,11 @@ fn select_inner(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
             observed.push((c.unit == GUARD_UNIT, row));
         }
         let clock = mono()?;
-        let wake = next_probe(&observed, clock, end)?;
+        let wake = next_probe(&observed, clock, end, minimum)?;
         save_json(
             &n.root,
             &format!("peer-selection-{pass:03}.json"),
-            &json!({"monotonic_us":clock,"end_monotonic_us":end,"wake_monotonic_us":wake,"observations":observed}),
+            &json!({"monotonic_us":clock,"end_monotonic_us":end,"minimum_retained_window_us":minimum,"wake_monotonic_us":wake,"observations":observed}),
         )?;
         if let Some(target) = wake {
             previous = observed;
@@ -368,7 +373,7 @@ fn select_inner(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
         }
         check()?;
         ensure!(
-            next_probe(&observed, mono()?, end)?.is_none(),
+            next_probe(&observed, mono()?, end, minimum)?.is_none(),
             "common peer window closed during capture"
         );
         return Ok(window);
@@ -376,12 +381,24 @@ fn select_inner(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
 }
 
 pub(crate) fn select(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+    select_minimum(n, review, a, 30 * SECOND)
+}
+pub(crate) fn select_minimum(
+    n: &mut Native,
+    review: &Value,
+    a: &Value,
+    minimum: u64,
+) -> Result<Window> {
+    ensure!(
+        (30 * SECOND..=65 * SECOND).contains(&minimum),
+        "peer guard cadence cannot accommodate required time"
+    );
     let end = mono()?
         .checked_add(MAX_WAIT)
         .context("selection clock overflow")?;
     let outer = n.deadline;
     n.deadline = Some(outer.map_or(end, |d| d.min(end)));
-    let result = select_inner(n, review, a);
+    let result = select_inner(n, review, a, minimum);
     n.deadline = outer;
     result
 }
@@ -389,6 +406,53 @@ pub(crate) fn select(n: &mut Native, review: &Value, a: &Value) -> Result<Window
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Option<u64>> {
+        super::next_probe(rows, clock, end, 30 * SECOND)
+    }
+    #[test]
+    fn actual_v151_251_deadline_waits_for_a_natural_successor() {
+        let case: Value =
+            serde_json::from_str(include_str!("../fixtures/native261-v151-window.json")).unwrap();
+        let next = case["timer_due_us"].as_u64().unwrap();
+        let end = case["controller_exit_us"].as_u64().unwrap();
+        let budget = crate::native261::stop_window(
+            case["prior_v150"]["capture_to_admission_write_us"]
+                .as_u64()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(budget, 38_519_097);
+        let old = completed(case["guard_iid"].as_str().unwrap(), next);
+        assert_eq!(next - end, 622315);
+        assert_eq!(
+            super::next_probe(&[(false, old)], end, end + MAX_WAIT, budget).unwrap(),
+            Some(next)
+        );
+        let now = next + 1_000_000;
+        let renewed = completed("modeled-next-original-firing", next + 61 * SECOND);
+        let other = completed("modeled-other-original", now + 45 * SECOND);
+        assert!(
+            super::next_probe(
+                &[(false, renewed.clone()), (false, other)],
+                now,
+                end + MAX_WAIT,
+                budget
+            )
+            .unwrap()
+            .is_none()
+        );
+        let short = completed("modeled-overlap-too-short", now + 35 * SECOND);
+        assert!(
+            super::next_probe(
+                &[(false, renewed), (false, short)],
+                now,
+                end + MAX_WAIT,
+                budget
+            )
+            .unwrap()
+            .is_some()
+        );
+    }
     fn completed(gid: &str, due: u64) -> Observation {
         Observation {
             guard: gid.into(),

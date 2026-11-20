@@ -58,13 +58,40 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -
     Ok(())
 }
 
-fn evaluate(n: &mut Native, r: &Value, source: &Bound) -> Result<(Value, peer_window::Window)> {
+fn evaluate(
+    n: &mut Native,
+    r: &Value,
+    source: &Bound,
+    timed_stop: bool,
+) -> Result<(Value, peer_window::Window)> {
     let initial = funding::current(n, r, false)?;
     let context = json!({"epoch":EPOCH,"boot_id":initial["boot_id"],"review":source,
         "actual_current_memory":initial["actual_current_memory"]});
-    let mut peers = peer_window::capture(n, r, &context)?;
-    n.deadline = Some(n.deadline.context("admission clock")?.min(peers.limit));
-    let current = funding::current(n, r, false)?;
+    let limit = n.deadline.context("admission clock")?;
+    let (current, mut peers) = if timed_stop {
+        // Finish both full funding views before binding a guard firing. Startup
+        // takes another complete census immediately before starting the producer.
+        let before = mono()?;
+        let current = funding::current(n, r, false)?;
+        let minimum = crate::native261::stop_window(
+            mono()?
+                .checked_sub(before)
+                .context("funding clock decreased")?,
+        )?;
+        let mut latest = context;
+        latest["actual_current_memory"] = current["actual_current_memory"].clone();
+        let peers = peer_window::select_minimum(n, r, &latest, minimum)?;
+        ensure!(
+            peers.limit.min(limit).saturating_sub(mono()?) >= minimum - 5_000_000,
+            "261 operator or peer window too short after selection"
+        );
+        (current, peers)
+    } else {
+        let peers = peer_window::capture(n, r, &context)?;
+        n.deadline = Some(limit.min(peers.limit));
+        (funding::current(n, r, false)?, peers)
+    };
+    n.deadline = Some(limit.min(peers.limit));
     ensure!(
         current["tmpfs"] == initial["tmpfs"]
             && current["disk_device"] == initial["disk_device"]
@@ -74,11 +101,12 @@ fn evaluate(n: &mut Native, r: &Value, source: &Bound) -> Result<(Value, peer_wi
     peers.verify(n)?;
     let issued = now()?;
     let clock = mono()?;
-    let remaining = peers
-        .limit
-        .checked_sub(clock)
-        .context("original guards expired")?
-        / 1_000_000;
+    let end = if timed_stop {
+        peers.limit.min(limit)
+    } else {
+        peers.limit
+    };
+    let remaining = end.checked_sub(clock).context("original guards expired")? / 1_000_000;
     let valid = remaining.min(60);
     ensure!(valid > 0, "no current owner guard window remains");
     n.check()?;
@@ -131,9 +159,15 @@ fn prepared_transition(
     );
     if gate != current {
         ensure!(
-            reference == &Bound::new(PRIOR_PREPARATION.0, PRIOR_PREPARATION.1)
+            (reference == &Bound::new(PRIOR_PREPARATION.0, PRIOR_PREPARATION.1)
                 && gate == &Bound::new(PRIOR_LAUNCHER.0, PRIOR_LAUNCHER.1)
                 && prepared["launcher"]["source_commit"] == PRIOR_LAUNCHER_COMMIT
+                || EPOCH == 261
+                    && crate::native261::v151_prepared(
+                        reference,
+                        gate,
+                        &prepared["launcher"]["source_commit"]
+                    ))
                 && current.path == Path::new(LAUNCHER),
             "unknown inert {EPOCH} launcher succession"
         );
@@ -281,7 +315,7 @@ pub fn run() -> Result<()> {
         if args[1] != "admit" {
             prestart(&r)?;
         }
-        let (a, peers) = evaluate(&mut n, &r, &rf)?;
+        let (a, peers) = evaluate(&mut n, &r, &rf, EPOCH == 261 && args[1] == "qualify-guard")?;
         if args[1] == "admit" {
             println!(
                 "{}",
