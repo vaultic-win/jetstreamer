@@ -16,19 +16,21 @@ from evidence import BASE, EPOCHS, bound, checked, digest, utc
 
 class ModelTests(unittest.TestCase):
     def setUp(self):
-        self.s = checked(event.SAMPLE)
+        self.oldsample = {"path":str(BASE/"sample-root194959-live166167170-20261120-v1.json"),
+                          "sha256":"c4c41fe73dab59b2345f1243fe59c83fceb5a4534812cee6af01d2b20b6fb25e"}
+        self.s = checked(self.oldsample)
         self.w = next(r["useful_work"] for r in self.s["replays"] if r["range"] == "167")
         self.prev = checked(event.PREVIOUS)
         self.model = event.expected()
 
     def test_recorded_downtime_and_recovery(self):
-        m = self.model["rolling_rate_evidence"]
+        m = rate.forecast(self.oldsample,662810859)
         self.assertEqual((m["slot_delta"],m["wall_microseconds"],m["estimated_remaining_millis"]), (20284,10741571652,228422792))
         self.assertEqual(m["state"], "advancing")
         self.assertLess(m["latest_transport_error_us"],m["last"]["realtime_microseconds"])
         self.assertEqual(len(m["samples"]),6)
         new = self.model["after_status"]
-        self.assertEqual(new, dict(self.prev["after_status"],estimated_remaining_millis=228422792))
+        self.assertEqual(new, dict(self.prev["after_status"],estimated_remaining_millis=217881025))
 
     def test_provenance(self):
         for k in ("journal_invocation_id","counter_resets","inode","main_pid","sha256","time","slot"):
@@ -43,9 +45,9 @@ class ModelTests(unittest.TestCase):
                 elif k == "slot": work["first"]["slot"] = 0
                 elif k == "counter_resets": work[k] = 1
                 else: work[k] = "foreign"
-                with patch.object(rate,"checked",side_effect=lambda ref: changed if ref == event.SAMPLE else checked(ref)):
+                with patch.object(rate,"checked",side_effect=lambda ref: changed if ref == self.oldsample else checked(ref)):
                     with self.assertRaises(ValueError):
-                        rate.forecast(event.SAMPLE,10)
+                        rate.forecast(self.oldsample,10)
         with self.assertRaises(ValueError):
             rate.captured_bytes(dict(self.w["append_log_evidence"],read_sha256="0"*64))
 
@@ -54,10 +56,10 @@ class ModelTests(unittest.TestCase):
         late = b"\n[2026-11-20T19:49:59.000000001Z WARN  jetstreamer::firehose] HTTP 429 Too Many Requests fetching epoch 167\n"
         self.assertFalse(rate.recovery(self.w,data+late)[0])
         with patch.object(rate,"captured_bytes",return_value=data+late):
-            m=rate.forecast(event.SAMPLE,662810859)
+            m=rate.forecast(self.oldsample,662810859)
         self.assertEqual((m["state"],m["estimated_remaining_millis"]),("stalled-or-recovery-unproven",662810859))
         with patch.object(rate, "chain", return_value=[(event.SAMPLE,self.s["recorded_at_utc"],dict(self.w,first=None,last=None))]*6):
-            m=rate.forecast(event.SAMPLE,662810859)
+            m=rate.forecast(self.oldsample,662810859)
         self.assertEqual((m["slot_delta"],m["estimated_remaining_millis"]), (0,662810859))
 
     def test_follow_exact_event(self):
@@ -76,6 +78,7 @@ class ModelTests(unittest.TestCase):
             self.assertEqual(status.follow_event(167,event.PREVIOUS,old["after_etag"],status.body(old["after_status"])),(event.PREVIOUS,old))
 
     def test_entire_scheduled_writer(self):
+        self.s = checked(event.SAMPLE)
         fleet = checked(event.FLEET)
         results = checked(fleet["authenticated_status_audit"])
         prior = {e:checked(results["receipts"][str(e)]) for e in EPOCHS}

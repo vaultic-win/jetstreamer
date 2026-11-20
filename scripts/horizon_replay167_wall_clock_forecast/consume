@@ -11,9 +11,9 @@ exec 9>>"$base/stable-cadence-controller-20261120-v1/consumer.lock"
 flock -n 9
 fleet=$1
 sha=$2
-if [[ "$fleet" == "$base/root194959-live166167170-20261120-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json" &&
-      "$sha" == d4783c9efb4c2f3ac4b4eb47849119e188bb198539a75b93cec9277fda7c17f9 &&
-      $(date +%s) -lt $(date -d '2026-11-20T20:18:45Z' +%s) ]]; then
+if [[ "$fleet" == "$base/root204959-live166167170-20261120-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json" &&
+      "$sha" == d0d537f25764799ed48242ed6a33a487712f77c5af7f9d5cd3043caf891db98d &&
+      $(date +%s) -lt $(date -d '2026-11-20T21:18:45Z' +%s) ]]; then
     systemd-run --quiet --collect --wait --unit=horizon-status-167-rolling-correction-20261120-v1 \
         -p UMask=0077 -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env \
         /usr/bin/python3 -B "$pkg/publish167.py" "$fleet" "$sha"

@@ -1,4 +1,4 @@
-"""Run under the singleton cadence consumer's lock at the exact 19:49 fleet handoff."""
+"""Run under the singleton cadence consumer's lock at the exact 20:49 fleet handoff."""
 import datetime as dt
 import fcntl
 import os
@@ -11,8 +11,8 @@ from owners import show
 from status import Storage, body, follow_event
 
 CONTROL = "horizon-archive-status-cadence-after172-20261120-v1.service"
-NEXT_TIMER = "horizon-observer-root201959-live166167170-20261120-v1.timer"
-DUE = "2026-11-20T20:19:59Z"
+NEXT_TIMER = "horizon-observer-root211959-live166167170-20261120-v1.timer"
+DUE = "2026-11-20T21:19:59Z"
 
 def owner_fence(intent):
     fleet = checked(event.FLEET)

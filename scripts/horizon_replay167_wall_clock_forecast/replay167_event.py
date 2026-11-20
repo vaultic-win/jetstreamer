@@ -3,13 +3,13 @@ from pathlib import Path
 from evidence import BASE, STATUS_ROOT, bound, checked, digest, need
 from replay167_rate import EPOCH, IID, PID, UNIT, forecast
 
-FLEET = {"path": str(BASE/"root194959-live166167170-20261120-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
-         "sha256": "d4783c9efb4c2f3ac4b4eb47849119e188bb198539a75b93cec9277fda7c17f9"}
-PREVIOUS = {"path": str(STATUS_ROOT/"cycle194959-live166167170-19-20261120-v1/epoch-167.receipt.json"),
-            "sha256": "18c696b60b21cb03520c125cf56edbd3a2ee47dd08a82eee944c53074ea58d64"}
-EVENT = STATUS_ROOT/"event-167-rolling-after194959-20261120-v1"
-SAMPLE = {"path": str(BASE/"sample-root194959-live166167170-20261120-v1.json"),
-          "sha256": "c4c41fe73dab59b2345f1243fe59c83fceb5a4534812cee6af01d2b20b6fb25e"}
+FLEET = {"path": str(BASE/"root204959-live166167170-20261120-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json"),
+         "sha256": "d0d537f25764799ed48242ed6a33a487712f77c5af7f9d5cd3043caf891db98d"}
+PREVIOUS = {"path": str(STATUS_ROOT/"cycle204959-live166167170-19-20261120-v1/epoch-167.receipt.json"),
+            "sha256": "be74152ca1f757ee1eee5820042c8931e8b611632787563dbb78d49f544db3f2"}
+EVENT = STATUS_ROOT/"event-167-rolling-after204959-20261120-v1"
+SAMPLE = {"path": str(BASE/"sample-root204959-live166167170-20261120-v1.json"),
+          "sha256": "a8312e934ed6201ab8e0c5257da44ff19529c07c68adb83b885e4ef828a2c682"}
 
 def expected():
     from status import body, key
@@ -30,7 +30,7 @@ def expected():
          archive["device"] == 64512 and archive["inode"] == 107692764 and archive["size"] == old["jet_size_bytes"] and
          archive["bound_producer_fds"] == [f"/proc/{PID}/fd/12"], "unqualified 167 source producer or archive")
     model = forecast(SAMPLE, old["estimated_remaining_millis"])
-    need(model["state"] == "advancing" and model["estimated_remaining_millis"] == 228422792, "captured 167 forecast differs")
+    need(model["state"] == "advancing" and model["estimated_remaining_millis"] == 217881025, "captured 167 forecast differs")
     after = dict(old, estimated_remaining_millis=model["estimated_remaining_millis"])
     return dict(schema="horizon-167-rolling-replay-estimate-event-v1", epoch=EPOCH, key=key(EPOCH), owner="/root",
                 previous_receipt=PREVIOUS, before_status=old, before_etag=prior["after_etag"],before_sha256=prior["after_sha256"],
