@@ -7,9 +7,8 @@ pub(super) const ROOT: &str =
 pub(super) const FINGERPRINT: &str =
     "sha256:d00f6c8ff2d66ec302aea39267ace8c28931d2602c9f5185c913eb5c96ab667b";
 const GATE: &str =
-    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch";
-const NODE: &str =
-    "/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node";
+    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch";
+const NODE: &str = "/var/lib/jetstreamer/horizon-singleton211-production-node-c17619b16d5d20f0-v1/jetstreamer-node";
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
     c.unit.starts_with("horizon-singleton-211-")
 }

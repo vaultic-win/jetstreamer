@@ -44,7 +44,7 @@ Build the actual retained guard feature union plus `epoch211-singleton-guard`.
 ## Executable route
 
 Seal the newly built launcher at exactly:
-`/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch`.
+`/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch`.
 Seal the separately qualified guard at exactly:
 `/var/lib/jetstreamer/horizon-211-singleton-main-guard-20261119-v1/horizon-standalone-guard`.
 The guard SHA is supplied through the immutable reviewed binding and verified
@@ -103,12 +103,12 @@ node with the same PID/IID. The launcher requires the mapped node transition
 before producing its handoff. The node's own source and binary stay unchanged:
 
 ```text
-/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node 211 /home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-singletons209-212-metadata-0d2856e7-v1/preflight211-singleton.json --cohort-manifest-fingerprint=sha256:d00f6c8ff2d66ec302aea39267ace8c28931d2602c9f5185c913eb5c96ab667b --snapshot-archive=/var/lib/jetstreamer/horizon-focused-211-complete-span-store8-ca2e38b-v1/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst
+/var/lib/jetstreamer/horizon-singleton211-production-node-c17619b16d5d20f0-v1/jetstreamer-node 211 /home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1/output --verify --root-checkpoint-cohort --cohort-manifest=/var/lib/jetstreamer/horizon-singletons209-212-metadata-0d2856e7-v1/preflight211-singleton.json --cohort-manifest-fingerprint=sha256:d00f6c8ff2d66ec302aea39267ace8c28931d2602c9f5185c913eb5c96ab667b --snapshot-archive=/var/lib/jetstreamer/horizon-focused-211-complete-span-store8-ca2e38b-v1/snapshot-91151575-xiEDMtStmnD9Pc8Ph9rJ4dFhfvvqZDSPeX89wjPELXx.tar.zst
 ```
 
 The node retains network access for canonical block/root inputs; only genesis
 is projected read-only into the fresh output. The selected copied v1.6.16
-worker is pinned to `4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc`.
+worker is pinned to `1c89b6a214f9487babfd9dc121ade06037b371fbfcc3243f0e6ec67b6b961c41`.
 The normal guard recursively tracks its `historical-worker` copy under the
 exact full211 root. It keeps the whole-root 471,798,691,840-byte cap and
 3,500,000-VMA ceiling, with no bounded or native exemptions.

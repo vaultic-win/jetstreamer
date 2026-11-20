@@ -756,7 +756,7 @@ mod tests {
     #[test]
     fn owner_rejects_native_profile_restarts_and_replacement() {
         let iid = "a".repeat(32);
-        let u = json!({"Id":c::UNIT,"LoadState":"loaded","InvocationID":iid,"NRestarts":"0","ActiveState":"active","SubState":"running","MainPID":"42","ExecStart":format!("{} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",format!("{{ path=/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch ; argv[]=/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch gate /var/lib/jetstreamer/horizon-singleton211-startup-plan-fixture/plan.json {} {}", "a".repeat(64),"b".repeat(64)))});
+        let u = json!({"Id":c::UNIT,"LoadState":"loaded","InvocationID":iid,"NRestarts":"0","ActiveState":"active","SubState":"running","MainPID":"42","ExecStart":format!("{} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}",format!("{{ path=/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch ; argv[]=/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch gate /var/lib/jetstreamer/horizon-singleton211-startup-plan-fixture/plan.json {} {}", "a".repeat(64),"b".repeat(64)))});
         assert!(owner(&u, &iid));
         for (key, value) in [
             ("Id", json!(native211::UNIT)),

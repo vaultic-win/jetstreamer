@@ -41,12 +41,11 @@ const RETENTION: &str = "horizon-singleton211-terminal-retention.target";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon-singleton211-startup-tokens";
 const GATE: &str =
-    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v2/horizon-singleton211-launch";
-const NODE: &str =
-    "/var/lib/jetstreamer/horizon-singletons209-212-node-0d2856e7-v1/jetstreamer-node";
-const NODE_SHA: &str = "e4b1df9aa6430456e703c283a7ed3512f5b5ada489d016b98e9d47332836ec4f";
-const WORKER: &str = "/var/lib/jetstreamer/horizon-v1616-shrink-budget-worker-003fe15-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
-const WORKER_SHA: &str = "4aeca56378a4bb2c55d0e590c1e334c4afa6a375a2c0d94894b412bea261f1cc";
+    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch";
+const NODE: &str = "/var/lib/jetstreamer/horizon-singleton211-production-node-c17619b16d5d20f0-v1/jetstreamer-node";
+const NODE_SHA: &str = "c17619b16d5d20f0d7aefc6e62ce99e68cc8b2bc88153f82183ebb0d4c5ede1d";
+const WORKER: &str = "/var/lib/jetstreamer/horizon-singleton211-production-worker-1c89b6a214f9487b-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
+const WORKER_SHA: &str = "1c89b6a214f9487babfd9dc121ade06037b371fbfcc3243f0e6ec67b6b961c41";
 const GUARD: &str =
     "/var/lib/jetstreamer/horizon-211-singleton-main-guard-20261119-v1/horizon-standalone-guard";
 const INPUT: &str = "/var/lib/jetstreamer/horizon-focused-211-complete-span-store8-ca2e38b-v1";
