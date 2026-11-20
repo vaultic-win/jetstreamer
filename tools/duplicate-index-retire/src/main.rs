@@ -24,7 +24,7 @@ const DEV: u64 = 66305;
 const LIMIT: u64 = 8 << 20;
 const FLOOR: u64 = 3_908_104_436_088;
 const IMAGE: &str =
-    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v3/duplicate-index-retire";
+    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v4/duplicate-index-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const PROTECTED: &str = "horizon-qualify-250-reboot-20261117-v1.service";
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -686,7 +686,40 @@ fn show(unit: &str) -> Result<BTreeMap<String, String>> {
             "duplicate manager property"
         );
     }
+    if out.get("LoadState").is_some_and(|state| state == "masked") && !out.contains_key("ExecStart")
+    {
+        verify_empty_commands(unit, &["ExecStart"])?;
+        out.insert("ExecStart".into(), String::new());
+    }
     Ok(out)
+}
+// systemctl omits empty command arrays even with --all. Ask PID1 for their typed values.
+fn verify_empty_commands(unit: &str, properties: &[&str]) -> Result<()> {
+    let mut object = String::from("/org/freedesktop/systemd1/unit/");
+    for byte in unit.bytes() {
+        if byte.is_ascii_alphanumeric() {
+            object.push(char::from(byte));
+        } else {
+            use std::fmt::Write;
+            write!(object, "_{byte:02x}")?;
+        }
+    }
+    let commands = Command::new("/usr/bin/busctl")
+        .args([
+            "--timeout=15s",
+            "get-property",
+            "org.freedesktop.systemd1",
+            &object,
+            "org.freedesktop.systemd1.Service",
+        ])
+        .args(properties)
+        .output()?;
+    ensure!(
+        commands.status.success()
+            && commands.stdout == b"a(sasbttttuii) 0\n".repeat(properties.len()),
+        "expected empty native command arrays for {unit}: {properties:?}"
+    );
+    Ok(())
 }
 fn compare(actual: &BTreeMap<String, String>, expected: &BTreeMap<String, String>) -> Result<()> {
     for (key, val) in expected {
@@ -757,29 +790,10 @@ fn controller(mode: &str, q: &Profile, b: &Value, args: &[String]) -> Result<(St
         fragment == Path::new(&format!("/run/systemd/transient/{unit}")),
         "helper fragment namespace"
     );
-    // PID1 omits empty Exec arrays from systemctl output even with --all.
-    // These fixed unit names contain only letters, digits, hyphens and a dot.
-    let object = format!(
-        "/org/freedesktop/systemd1/unit/{}",
-        unit.replace('-', "_2d").replace('.', "_2e")
-    );
-    let commands = Command::new("/usr/bin/busctl")
-        .args([
-            "--timeout=15s",
-            "get-property",
-            "org.freedesktop.systemd1",
-            &object,
-            "org.freedesktop.systemd1.Service",
-            "ExecStartPre",
-            "ExecStartPost",
-            "ExecStop",
-            "ExecStopPost",
-        ])
-        .output()?;
-    ensure!(
-        commands.status.success() && commands.stdout == b"a(sasbttttuii) 0\n".repeat(4),
-        "additional helper commands or incomplete native command properties"
-    );
+    verify_empty_commands(
+        &unit,
+        &["ExecStartPre", "ExecStartPost", "ExecStop", "ExecStopPost"],
+    )?;
     ensure!(b["controller_unit"] == unit, "booking controller differs");
     let raw = read_bounded(&fragment, 1 << 20)?;
     file_bytes(&fragment, &sha(&raw), 0, None, false)?;
