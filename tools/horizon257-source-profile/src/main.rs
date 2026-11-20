@@ -3,6 +3,7 @@ mod edges;
 mod manifest;
 mod ranges;
 mod repair;
+mod repair261;
 mod tables;
 mod transport;
 use anyhow::{Context, Result, ensure};
@@ -78,6 +79,16 @@ fn packet(
     seal_sha: &str,
     names: &BTreeSet<String>,
 ) -> Result<BTreeMap<String, Vec<u8>>> {
+    packet_bounded(dir, seal_sha, names, |name| {
+        if name == RAW { 5_184_000 } else { 16_384 }
+    })
+}
+fn packet_bounded(
+    dir: &str,
+    seal_sha: &str,
+    names: &BTreeSet<String>,
+    limit: impl Fn(&str) -> u64,
+) -> Result<BTreeMap<String, Vec<u8>>> {
     let dir = Path::new(dir);
     let md = fs::symlink_metadata(dir)?;
     ensure!(
@@ -105,7 +116,7 @@ fn packet(
             names.contains(name) && !out.contains_key(name) && v["mode"] == "0444",
             "wrong or duplicate seal member"
         );
-        let limit = if name == RAW { 5_184_000 } else { 16_384 };
+        let limit = limit(name);
         let b = read_checked(
             dir,
             name,
@@ -208,12 +219,15 @@ fn main() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&tables::run()?)?);
         return Ok(());
     }
+    if args.len() == 2 && args[0] == "repair-261" {
+        return repair261::run(Path::new(&args[1]));
+    }
     if args.len() == 2 && args[0] == "repair" {
         return repair::run(Path::new(&args[1]));
     }
     ensure!(
         args.is_empty(),
-        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT]"
+        "usage: horizon257-source-profile [measure-bootstrap-inputs|compact-tables|repair NEW_OUTPUT|repair-261 NEW_OUTPUT]"
     );
     println!("{}", serde_json::to_string_pretty(&inspect()?)?);
     Ok(())

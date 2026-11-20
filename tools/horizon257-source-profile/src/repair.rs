@@ -3,7 +3,7 @@
 use super::{PACKET, RAW, RAW_SHA, SEAL, hash, inputs, inspect, packet, read_checked};
 use crate::{
     edges::EDGES,
-    ranges::{CAR_SIZE, SLOTS, START},
+    ranges::{CAR_SIZE, SLOTS},
 };
 use anyhow::{Context, Result, ensure};
 use serde_cbor::Value as Cbor;
@@ -19,11 +19,11 @@ use std::{
 
 const PLAN: &[u8] = include_bytes!("../edge-windows.json");
 const PLAN_SHA: &str = "b8459e69dbecdffc9086c7954f1ae2bdd8a841ac70f85e034d38cfb8ec708f3b";
-const SOURCE_URL: &str = "https://files.old-faithful.net/257/epoch-257.car";
 const PREFIX_SHA: &str = "b05ac5e7b6c0d9b595c98bec38ba37b00d9183154eb5a922d6f69a05724affea";
 
 #[derive(Clone, Debug)]
-struct Window {
+pub(super) struct Window {
+    epoch_start: u64,
     edge: u64,
     left: u64,
     right: u64,
@@ -39,23 +39,45 @@ struct Block {
     cid: String,
 }
 
-fn record(raw: &[u8], slot: u64) -> (u64, u32) {
-    let i = (slot - START) as usize * 12;
+pub(super) fn record(raw: &[u8], slot: u64, first: u64) -> (u64, u32) {
+    let i = (slot - first) as usize * 12;
     (
         u64::from_le_bytes(raw[i..i + 8].try_into().unwrap()),
         u32::from_le_bytes(raw[i + 8..i + 12].try_into().unwrap()),
     )
 }
-fn windows(raw: &[u8]) -> Result<Vec<Window>> {
-    ensure!(hash(PLAN) == PLAN_SHA, "window plan changed");
-    let rows: Vec<Value> = serde_json::from_slice(PLAN)?;
-    ensure!(rows.len() == EDGES.len(), "edge coverage");
+pub(super) struct Source<'a> {
+    pub epoch: u64,
+    pub car_size: u64,
+    pub window_bytes: u64,
+    pub max_window: u64,
+    pub plan_sha: &'a str,
+    pub prefix_sha: &'a str,
+}
+impl Source<'_> {
+    fn first(&self) -> u64 {
+        self.epoch * SLOTS as u64
+    }
+}
+pub(super) fn windows(
+    raw: &[u8],
+    plan: &[u8],
+    edges: &[(u64, u64, u64, u64)],
+    source: &Source<'_>,
+) -> Result<Vec<Window>> {
+    ensure!(
+        raw.len() == SLOTS * 12 && hash(plan) == source.plan_sha,
+        "raw length or window plan changed"
+    );
+    let rows: Vec<Value> = serde_json::from_slice(plan)?;
+    ensure!(rows.len() == edges.len(), "edge coverage");
     let mut windows = Vec::new();
     let mut bytes = 0;
     let mut previous = 0;
-    for (row, &(left_edge, edge, _, _)) in rows.iter().zip(EDGES) {
+    for (row, &(left_edge, edge, _, _)) in rows.iter().zip(edges) {
         let get = |k: &str| row[k].as_u64().context("invalid plan integer");
         let w = Window {
+            epoch_start: source.first(),
             edge: get("edge")?,
             left: get("left")?,
             right: get("right")?,
@@ -64,30 +86,30 @@ fn windows(raw: &[u8]) -> Result<Vec<Window>> {
         };
         ensure!(
             w.edge == edge
-                && (START..left_edge).contains(&w.left)
+                && (source.first()..left_edge).contains(&w.left)
                 && w.right > edge
-                && w.right < START + SLOTS as u64
+                && w.right < source.first() + SLOTS as u64
                 && w.start >= previous
                 && w.end > w.start
-                && w.end - w.start <= 6971573,
+                && w.end - w.start <= source.max_window,
             "window scope"
         );
-        let (lo, ln) = record(raw, w.left);
-        let (ro, rn) = record(raw, w.right);
+        let (lo, ln) = record(raw, w.left, w.epoch_start);
+        let (ro, rn) = record(raw, w.right, w.epoch_start);
         ensure!(
             lo == w.start && ln > 0 && rn > 0 && ro + u64::from(rn) == w.end,
             "window endpoints differ from original"
         );
         ensure!(
-            (w.left + 1..left_edge).all(|s| record(raw, s) == (0, 0))
-                && (edge + 1..w.right).all(|s| record(raw, s) == (0, 0)),
+            (w.left + 1..left_edge).all(|s| record(raw, s, w.epoch_start) == (0, 0))
+                && (edge + 1..w.right).all(|s| record(raw, s, w.epoch_start) == (0, 0)),
             "window anchors are not the nearest unaffected records"
         );
         bytes += w.end - w.start;
         previous = w.end;
         windows.push(w);
     }
-    ensure!(bytes == 118427890, "download budget");
+    ensure!(bytes == source.window_bytes, "download budget");
     Ok(windows)
 }
 
@@ -180,7 +202,7 @@ fn ancestry<'a>(w: &Window, blocks: &'a [Block], raw: &[u8]) -> Result<BTreeMap<
     let first = blocks.first().context("empty window")?;
     let last = blocks.last().unwrap();
     for (anchor, expect) in [(first, w.left), (last, w.right)] {
-        let (o, n) = record(raw, expect);
+        let (o, n) = record(raw, expect, w.epoch_start);
         ensure!(
             anchor.slot == expect && (anchor.start, anchor.end) == (o, o + u64::from(n)),
             "physical exterior anchor disagrees"
@@ -222,9 +244,9 @@ fn apply_window(raw: &mut [u8], w: &Window, blocks: &[Block]) -> Result<Value> {
         } else {
             (0, 0)
         };
-        let before = record(raw, slot);
+        let before = record(raw, slot, w.epoch_start);
         if before != after {
-            let pos = ((slot - START) * 12) as usize;
+            let pos = ((slot - w.epoch_start) * 12) as usize;
             raw[pos..pos + 8].copy_from_slice(&after.0.to_le_bytes());
             raw[pos + 8..pos + 12].copy_from_slice(&after.1.to_le_bytes());
             patches.push(json!({"slot":slot,"before":before,"after":after}));
@@ -236,7 +258,7 @@ fn apply_window(raw: &mut [u8], w: &Window, blocks: &[Block]) -> Result<Value> {
     )
 }
 
-fn write_new(dir: &Path, name: &str, bytes: &[u8]) -> Result<()> {
+pub(super) fn write_new(dir: &Path, name: &str, bytes: &[u8]) -> Result<()> {
     let mut f = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -270,11 +292,49 @@ pub fn run(out: &Path) -> Result<()> {
     let download: Value = serde_json::from_slice(&b)?;
     let source = packet(PACKET, SEAL, &inputs())?;
     let mut raw = source[RAW].clone();
-    let planned = windows(&raw)?;
+    let profile = Source {
+        epoch: 257,
+        car_size: CAR_SIZE,
+        window_bytes: 118427890,
+        max_window: 6971573,
+        plan_sha: PLAN_SHA,
+        prefix_sha: PREFIX_SHA,
+    };
+    let planned = windows(&raw, PLAN, EDGES, &profile)?;
+    let reviews = repair_windows(&profile, &mut raw, &planned, &download, |name, len, sha| {
+        read_checked(dir, &format!("{name}.car"), len, sha)
+    })?;
+    let (present, gaps) = scan_candidate(&profile, &raw)?;
     ensure!(
-        download["schema"] == "horizon257-window-download-v1"
-            && download["plan_sha256"] == PLAN_SHA
-            && download["total_bytes"] == 118436082,
+        present == 385300
+            && gaps == 0
+            && hash(&raw) == "5810e796b7565404320544ebb5cd98055eb5cfaf60af64884c96481e5f75d126",
+        "exact measured candidate changed"
+    );
+    let report = json!({"schema":"horizon257-direct-car-repair-candidate-v1","source_sha256":RAW_SHA,"candidate_sha256":hash(&raw),"windows_seal_sha256":seal_hash,"download_plan_sha256":PLAN_SHA,"candidate_present":present,"candidate_gaps":gaps,"all_windows_verified":true,"edges":reviews,"replay_launch_authorized":false,"admission_authorized":false,"publication_authorized":false,"canonical_remote_objects_changed":false});
+    new_output(out)?;
+    write_new(out, "epoch-257-slot-ranges.candidate.raw", &raw)?;
+    write_new(
+        out,
+        "repair-candidate.json",
+        &serde_json::to_vec_pretty(&report)?,
+    )?;
+    File::open(out)?.sync_all()?;
+    File::open(out.parent().unwrap())?.sync_all()?;
+    Ok(())
+}
+
+pub(super) fn repair_windows(
+    source: &Source<'_>,
+    raw: &mut [u8],
+    planned: &[Window],
+    download: &Value,
+    mut read: impl FnMut(&str, u64, &str) -> Result<Vec<u8>>,
+) -> Result<Vec<Value>> {
+    ensure!(
+        download["schema"] == format!("horizon{}-window-download-v1", source.epoch)
+            && download["plan_sha256"] == source.plan_sha
+            && download["total_bytes"] == source.window_bytes + 8192,
         "wrong download manifest"
     );
     let resources = download["resources"]
@@ -294,15 +354,18 @@ pub fn run(out: &Path) -> Result<()> {
         ensure!(
             r["name"] == name
                 && r["status"] == 206
-                && r["url"] == SOURCE_URL
+                && r["url"]
+                    == format!(
+                        "https://files.old-faithful.net/{0}/epoch-{0}.car",
+                        source.epoch
+                    )
                 && r["bytes"] == end - start
                 && r["request_range"] == format!("bytes={start}-{}", end - 1)
-                && r["content_range"] == format!("bytes {start}-{}/{CAR_SIZE}", end - 1),
+                && r["content_range"] == format!("bytes {start}-{}/{}", end - 1, source.car_size),
             "bounded HTTP source differs"
         );
-        let bytes = read_checked(
-            dir,
-            &format!("{name}.car"),
+        let bytes = read(
+            &name,
             end - start,
             r["sha256"].as_str().context("body digest")?,
         )?;
@@ -311,61 +374,53 @@ pub fn run(out: &Path) -> Result<()> {
             "capture digest"
         );
         if name.starts_with("prefix-") {
-            ensure!(r["sha256"] == PREFIX_SHA, "CAR source anchor");
+            ensure!(r["sha256"] == source.prefix_sha, "CAR source anchor");
         } else {
             let w = &planned[i - 1];
             let blocks = decode(w, &bytes).with_context(|| format!("decode edge {}", w.edge))?;
-            let mut report = apply_window(&mut raw, w, &blocks)
-                .with_context(|| format!("derive edge {}", w.edge))?;
+            let mut report =
+                apply_window(raw, w, &blocks).with_context(|| format!("derive edge {}", w.edge))?;
             report["capture_sha256"] = r["sha256"].clone();
             reviews.push(report);
         }
     }
+    Ok(reviews)
+}
+pub(super) fn scan_candidate(source: &Source<'_>, raw: &[u8]) -> Result<(u64, u64)> {
+    ensure!(raw.len() == SLOTS * 12, "candidate index length");
     let mut previous_end = 59;
     let mut present = 0;
     let mut gaps = 0;
-    for slot in START..START + SLOTS as u64 {
-        let (o, n) = record(&raw, slot);
+    for slot in source.first()..source.first() + SLOTS as u64 {
+        let (o, n) = record(raw, slot, source.first());
         if n == 0 {
             ensure!(o == 0, "partial absent record");
             continue;
         }
         let end = o.checked_add(u64::from(n)).context("overflow")?;
         ensure!(
-            o >= previous_end && end <= CAR_SIZE,
+            o >= previous_end && end <= source.car_size,
             "candidate still overlaps or exceeds CAR at {slot}"
         );
         gaps += u64::from(o > previous_end);
         present += 1;
         previous_end = end;
     }
-    ensure!(
-        present == 385300
-            && gaps == 0
-            && hash(&raw) == "5810e796b7565404320544ebb5cd98055eb5cfaf60af64884c96481e5f75d126",
-        "exact measured candidate changed"
-    );
-    let report = json!({"schema":"horizon257-direct-car-repair-candidate-v1","source_sha256":RAW_SHA,"candidate_sha256":hash(&raw),"windows_seal_sha256":seal_hash,"download_plan_sha256":PLAN_SHA,"candidate_present":present,"candidate_gaps":gaps,"all_windows_verified":true,"edges":reviews,"replay_launch_authorized":false,"admission_authorized":false,"publication_authorized":false,"canonical_remote_objects_changed":false});
+    Ok((present, gaps))
+}
+pub(super) fn new_output(out: &Path) -> Result<()> {
     ensure!(
         out.is_absolute()
             && out.parent().context("output parent")?.canonicalize()? == out.parent().unwrap(),
         "use fresh canonical output"
     );
     std::os::unix::fs::DirBuilderExt::mode(&mut fs::DirBuilder::new(), 0o700).create(out)?;
-    write_new(out, "epoch-257-slot-ranges.candidate.raw", &raw)?;
-    write_new(
-        out,
-        "repair-candidate.json",
-        &serde_json::to_vec_pretty(&report)?,
-    )?;
-    File::open(out)?.sync_all()?;
-    File::open(out.parent().unwrap())?.sync_all()?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ranges::START;
     fn frame(v: Cbor) -> Vec<u8> {
         let p = serde_cbor::to_vec(&v).unwrap();
         let mut n = 36 + p.len();
@@ -410,6 +465,7 @@ mod tests {
             o += b.len() as u64;
         }
         let w = Window {
+            epoch_start: START,
             edge: l + 4,
             left: l,
             right: l + 4,
@@ -420,9 +476,9 @@ mod tests {
         let decoded = decode(&w, &bytes)?;
         let r = apply_window(&mut raw, &w, &decoded)?;
         assert_eq!(r["blocks"][1]["on_anchor_chain"], false);
-        assert_eq!(record(&raw, l + 1), (0, 0));
+        assert_eq!(record(&raw, l + 1, START), (0, 0));
         assert_eq!(
-            record(&raw, l + 2),
+            record(&raw, l + 2, START),
             (
                 59 + (rows[0].len() + rows[1].len()) as u64,
                 rows[2].len() as u32
@@ -447,6 +503,7 @@ mod tests {
         }
         let body = frame(Cbor::Array(vec![Cbor::Integer(4)]));
         let w = Window {
+            epoch_start: START,
             edge: START,
             left: START,
             right: START + 1,
