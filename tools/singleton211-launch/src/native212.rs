@@ -57,7 +57,7 @@ const PACKET_SHA: &str = "6c69e2da820cc696ad67c0866e504f8666075aefcacad314898077
 const WORKER: &str = "/var/lib/jetstreamer/horizon-singleton211-production-worker-1c89b6a214f9487b-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";
 const WORKER_SHA: &str = "1c89b6a214f9487babfd9dc121ade06037b371fbfcc3243f0e6ec67b6b961c41";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon212-native-launch-tmpfs-20261120-v4/horizon-native212-launch";
+    "/var/lib/jetstreamer/horizon212-native-launch-tmpfs-20261120-v5/horizon-native212-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native212-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native212-startup-plan-v1";
