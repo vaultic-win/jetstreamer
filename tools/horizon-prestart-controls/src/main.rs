@@ -890,3 +890,6 @@ mod tests {
         assert!(write_new(&link, b"replacement", 0o600).is_err());
     }
 }
+
+#[cfg(test)]
+mod no_reload_native;
