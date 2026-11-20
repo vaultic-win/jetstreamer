@@ -277,7 +277,7 @@ fn read_artifact(b: &Bound, max: u64, immutable: bool) -> Result<Vec<u8>> {
             && b.path.canonicalize()? == b.path,
         "consumer artifact not in required custody"
     );
-    let bytes = read_stable_bounded(&b.path, max, "retry6 consumer artifact")?;
+    let bytes = read_stable_bounded(&b.path, max, "epoch 166 consumer artifact")?;
     ensure!(
         hex_lower(&Sha256::digest(&bytes)) == b.sha256,
         "transitive consumer artifact changed"
@@ -519,7 +519,7 @@ fn reverse_graph(
 }
 fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
     ensure!(
-        r.schema == "horizon-closed166-retry6-transitive-consumer-closure-v1"
+        r.schema == profile!("horizon-closed166-", "-transitive-consumer-closure-v1")
             && r.owner == "/root"
             && r.source == Path::new(SOURCE)
             && r.sha256 == SHA
@@ -542,7 +542,7 @@ fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
             && r.unresolved_edges.is_empty()
             && !r.nodes.is_empty()
             && r.nodes.len() <= 4096,
-        "genuine fresh complete retry6 transitive reader graph required"
+        "genuine fresh complete epoch 166 transitive reader graph required"
     );
     let classes: BTreeSet<_> = r
         .classes
@@ -642,6 +642,42 @@ struct Corpus {
     entries: usize,
     bytes: u64,
 }
+// Starting with retries 7 and 8, sealed tools and plans also live on HOME.
+// Search root-owned package containers, including new ones installed since the
+// previous review. Leave sol-owned replay inputs and writable audit data alone.
+fn runtime_packages(
+    path: &Path,
+    ancestors: &mut BTreeSet<(u64, u64)>,
+    entries: &mut usize,
+    packages: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
+    let md = fs::symlink_metadata(path)?;
+    if !md.is_dir() || md.uid() != 0 || path == Path::new(LIFECYCLE) {
+        return Ok(());
+    }
+    let id = (md.dev(), md.ino());
+    ensure!(
+        ancestors.len() < 32 && ancestors.insert(id),
+        "runtime package directory cycle or depth bound"
+    );
+    if md.mode() & 0o222 == 0 && path.join("deployment-seal-receipt.json").try_exists()? {
+        packages.insert(path.to_owned());
+    } else {
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            *entries += 1;
+            ensure!(
+                *entries <= 500_000,
+                "runtime package inventory exceeded its entry bound"
+            );
+            if entry.file_type()?.is_dir() {
+                runtime_packages(&entry.path(), ancestors, entries, packages)?;
+            }
+        }
+    }
+    ancestors.remove(&id);
+    Ok(())
+}
 fn collect() -> Result<Corpus> {
     let mut sealed = BTreeMap::new();
     let mut definitions = BTreeMap::new();
@@ -656,6 +692,25 @@ fn collect() -> Result<Corpus> {
         &mut budget,
         &mut aliases,
     )?;
+    if let Some(root) = RUNTIME_PACKAGE_ROOT {
+        let mut packages = BTreeSet::new();
+        runtime_packages(Path::new(root), &mut BTreeSet::new(), &mut 0, &mut packages)?;
+        ensure!(
+            packages.contains(Path::new(PARK_PLAN).parent().context("park package")?),
+            "original sealed park package missing from HOME census"
+        );
+        for package in packages {
+            census_walk(
+                &package,
+                false,
+                0,
+                &mut BTreeSet::new(),
+                &mut sealed,
+                &mut budget,
+                &mut aliases,
+            )?;
+        }
+    }
     let mut seen = BTreeSet::new();
     for root in ROOTS {
         census_walk(
@@ -711,7 +766,7 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
     ensure!(
         same_bound(spec, &binding(PARK_PLAN, PARK_PLAN_SHA))
             && fs::read_link("/proc/self/exe")?.parent() == Some(Path::new(LIFECYCLE)),
-        "retry6 consumer census requires the exact existing park plan and sealed lifecycle tool"
+        "epoch 166 consumer census requires the exact existing park plan and sealed lifecycle tool"
     );
     let plan: Park = serde_json::from_value(bound(spec)?)?;
     source_scope(&plan, &bound(&plan.eligibility)?)?;
@@ -728,7 +783,7 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
         "definition":c.all[path].definition,"edges":edges})
         })
         .collect();
-    let receipt = json!({"schema":"horizon-closed166-retry6-transitive-consumer-census-v1","source":SOURCE,"sha256":SHA,"length":LENGTH,
+    let receipt = json!({"schema":profile!("horizon-closed166-", "-transitive-consumer-census-v1"),"source":SOURCE,"sha256":SHA,"length":LENGTH,
         "park_plan":spec,"sealed_metadata_root":SEALED,"definition_roots":ROOTS,
         "sealed_metadata_census_sha256":c.sealed_sha,"definition_census_sha256":c.definitions_sha,
         "nodes":nodes,"censused_entries":c.entries,"censused_bytes":c.bytes,
@@ -741,7 +796,8 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
         "consumer census receipt exceeds bound; do not truncate graph"
     );
     let path = Path::new(STATE).join("receipts").join(format!(
-        "retire166-retry6-consumer-census-{}.json",
+        "{}-{}.json",
+        profile!("retire166-", "-consumer-census"),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     persist(&path, &receipt)?;
@@ -825,7 +881,7 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
         }
     }
     Ok(
-        json!({"schema":"horizon-retry6-transitive-consumer-gate-v1","review":p.consumer_closure,
+        json!({"schema":profile!("horizon-", "-transitive-consumer-gate-v1"),"review":p.consumer_closure,
         "sealed_metadata_census_sha256":sealed_sha,"definition_census_sha256":definitions_sha,
         "nodes":graph.len(),"edges":graph.values().map(BTreeSet::len).sum::<usize>(),
         "compiled_consumers":r.compiled_consumers.len(),"censused_entries":c.entries,"censused_bytes":c.bytes,
@@ -1224,7 +1280,7 @@ mod tests {
     }
     fn review(nodes: Vec<Node>) -> Review {
         Review {
-            schema: "horizon-closed166-retry6-transitive-consumer-closure-v1".into(),
+            schema: profile!("horizon-closed166-", "-transitive-consumer-closure-v1").into(),
             owner: "/root".into(),
             source: SOURCE.into(),
             sha256: SHA.into(),

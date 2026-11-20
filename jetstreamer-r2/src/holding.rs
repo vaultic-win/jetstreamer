@@ -13,6 +13,10 @@ mod epoch157_laned_retire;
 mod epoch166_retire;
 #[path = "holding_epoch166_retry6_retire.rs"]
 mod epoch166_retry6_retire;
+#[path = "holding_epoch166_retry7_retire.rs"]
+mod epoch166_retry7_retire;
+#[path = "holding_epoch166_retry8_retire.rs"]
+mod epoch166_retry8_retire;
 #[path = "holding_epoch169_retire.rs"]
 mod epoch169_retire;
 #[path = "holding_epoch185.rs"]
@@ -1238,6 +1242,13 @@ pub(super) async fn run() -> Result<()> {
     );
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
+    match args[1].as_str() {
+        "holding-capture166-retry7-terminal" => return epoch166_retry7_retire::capture_terminal(&spec),
+        "holding-capture166-retry8-terminal" => return epoch166_retry8_retire::capture_terminal(&spec),
+        "holding-census166-retry7-consumers" => return epoch166_retry7_retire::inspect_consumers(&spec),
+        "holding-census166-retry8-consumers" => return epoch166_retry8_retire::inspect_consumers(&spec),
+        _ => (),
+    }
     if args[1] == "holding-census166-retry6-consumers" {
         return epoch166_retry6_retire::inspect_consumers(&spec);
     }
@@ -1295,6 +1306,10 @@ pub(super) async fn run() -> Result<()> {
         "holding-retire169" => epoch169_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire166" => epoch166_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
+        "holding-check-retire166-retry7" => epoch166_retry7_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-retire166-retry7" => epoch166_retry7_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
+        "holding-check-retire166-retry8" => epoch166_retry8_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-retire166-retry8" => epoch166_retry8_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         _ => bail!("unsupported holding action"),
