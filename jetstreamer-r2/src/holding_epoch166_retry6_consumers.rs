@@ -1,5 +1,5 @@
-//! Bounded reverse reference graph plus separately evidenced native/dynamic
-//! reader review. A direct empty source census does not satisfy this gate.
+// Bounded reverse reference graph plus separately evidenced native/dynamic
+// reader review. A direct empty source census does not satisfy this gate.
 use super::*;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use std::{borrow::Cow, collections::BTreeSet};

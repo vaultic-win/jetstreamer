@@ -1,5 +1,7 @@
-#[path = "holding_epoch166_retry6_consumers.rs"]
-mod consumers;
+// Compile the census against this retirement profile's exact paths and identity.
+mod consumers {
+    include!("holding_epoch166_retry6_consumers.rs");
+}
 pub(super) fn inspect_consumers(spec: &Bound) -> Result<()> {
     consumers::inspect(spec)
 }
