@@ -9,7 +9,7 @@ pub(super) const SNAP_SHA: &str =
 const SRC: &str = "/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work/171-172-incident-inputs-20261120-g1/download";
 const WORKER: &str = "jetstreamer-historical-worker-v1-5-6";
 const MERGED_WORKER: &str = "4ec0291d9bc3aa8164ff28e94eee46276cc0a624";
-fn user_input(p: &Path, expected: u64, mode: u32) -> Result<File> {
+fn retained_input(p: &Path, expected: u64) -> Result<File> {
     ensure!(p.canonicalize()? == p, "noncanonical download");
     let f = OpenOptions::new()
         .read(true)
@@ -19,9 +19,9 @@ fn user_input(p: &Path, expected: u64, mode: u32) -> Result<File> {
     ensure!(
         m.is_file()
             && m.nlink() == 1
-            && m.uid() == 1001
-            && m.gid() == 1003
-            && m.mode() & 0o7777 == mode
+            && m.uid() == 0
+            && m.gid() == 0
+            && m.mode() & 0o7777 == 0o444
             && m.len() == expected,
         "unexpected download {}",
         p.display()
@@ -103,7 +103,7 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
     // The payload rehashes every byte while copying the read-only bind, before exec.
     let headers = Path::new(SRC).join("172.headers");
     let mut h = String::new();
-    user_input(&headers, 832, 0o600)?.read_to_string(&mut h)?;
+    retained_input(&headers, 832)?.read_to_string(&mut h)?;
     ensure!(
         digest(h.as_bytes()) == "47f19b3e5ca44acf625f63cc7f6a4ef9b05b96fbc011f15ad884d85dca8a9005"
             && h.lines()
@@ -113,7 +113,7 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
         "hourly generation"
     );
     let p = Path::new(SRC).join(SNAP);
-    let f = user_input(&p, 2_110_486_214, 0o400)?;
+    let f = retained_input(&p, 2_110_486_214)?;
     let hourly_dir = Path::new(
         "/var/lib/jetstreamer/horizon_runtime_data/epoch171-172-hourly-snapshots-20261120-g1",
     );
@@ -152,12 +152,8 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
     );
     let mut written = String::new();
     let expected = format!("{SNAP_SHA}  {SNAP}\n");
-    user_input(
-        &Path::new(SRC).join("172.sha256"),
-        expected.len() as u64,
-        0o600,
-    )?
-    .read_to_string(&mut written)?;
+    retained_input(&Path::new(SRC).join("172.sha256"), expected.len() as u64)?
+        .read_to_string(&mut written)?;
     ensure!(written == expected, "download digest");
     Ok(
         json!({"download":binding(&p,SNAP_SHA),"download_device":f.metadata()?.dev(),"download_inode":f.metadata()?.ino(),"hourly_inputs":binding(&hourly_dir.join("inputs.json"),hourly_sha),"gcs_generation":"1634786215364147","canonical_response":response,"original_terminal":terminal,"worker_seal":proof["input_seal_sha256"],"worker_sha256":worker_sha}),
