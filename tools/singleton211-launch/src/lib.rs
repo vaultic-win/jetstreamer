@@ -345,8 +345,14 @@ impl Native {
                 "{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",
                 live::PROPS
             )
-        } else if unit == delivery247::UNIT247 {
-            format!("{},ExecMainExitTimestampMonotonic", live::PROPS)
+        } else if matches!(unit, delivery247::UNIT247 | delivery247::STAGED_UNIT) {
+            // The admitted uploaders have private credentials in Environment.
+            let properties = live::PROPS
+                .split(',')
+                .filter(|k| *k != "Environment")
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{properties},ExecMainExitTimestampMonotonic,AllowedCPUs")
         } else {
             live::PROPS.to_owned()
         };
