@@ -3,6 +3,7 @@
 use super::*;
 mod selection;
 pub(super) use selection::select;
+pub(super) use selection::select_minimum;
 
 const MARGIN: u64 = 5_000_000;
 fn start_limit(next: u64, clock: u64) -> Result<u64> {
