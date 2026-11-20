@@ -144,6 +144,16 @@ readback is insufficient and must be upgraded before the next archive publicatio
 applies when auditing an existing remote archive, while preserving its existing objects and
 reporting failures without unauthorized replacement or deletion.
 
+Give failed historical audits first priority when choosing the next available repair slot.
+Preserve the failed attempt and record the stage it reached. For an interrupted transfer,
+retry the same authenticated object under the existing capacity and retry guards, then
+verify its whole-file digest and play it through the current plugin. Report its integrity
+as unknown until those checks supply evidence. If a completed readback establishes an
+archive defect, prioritize reconstructing that epoch from verified inputs. If the fault
+is in the reader, repair the reader and repeat playback. Keep healthy work running while
+preparing recovery. Reconstructed archives follow the same publication and existing-object
+replacement rules. Report significant reconstruction outcomes or decisions the owner needs to make.
+
 Use the repository's `jetstreamer-r2` binary for upload and remote proof. Do not reimplement its multipart protocol in shell or Python. R2's S3 `UploadPart` currently rejects its advertised SHA-256 header, so the binary uses R2-enforced `Content-MD5`, checks the multipart ETag independently, and reads the completed remote object back while computing its whole-file SHA-256. It must fully upload, complete, read back, pass full beginning-to-end playback of that remote archive through the current `account-updates` plugin, and revalidate the `.jet` before it uploads the canonical `.sha256` sidecar. It then reads the sidecar back and fsyncs a private receipt before eligible local retirement. Treat presence of the matching sidecar as the remote readiness commit marker; an archive without one is staged, and a sidecar without an archive or whose digest does not match the archive is an error. If R2 begins returning native composite SHA-256 evidence, the binary validates and prefers it.
 
 ## Rust-first implementation policy
