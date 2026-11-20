@@ -601,3 +601,190 @@ async fn shared_transport_keeps_canonical_and_holding_uploads_conditional_and_fu
         assert_eq!(fs::read(&path).unwrap(), BODY);
     }
 }
+
+/// Native opt-in qualification. The sandbox exposes one disposable bounded
+/// tmpfs and the original Foundation genesis fixture and custody receipts.
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "booked Foundation host, authenticated R2 reads and isolated 1 MiB tmpfs"]
+async fn foundation_genesis_real_readback_and_interrupted_restore() -> Result<()> {
+    use jetstreamer_horizon_observe::foundation_holding213_review as host;
+    const SOURCE: &str =
+        "/var/lib/jetstreamer/horizon-foundation-holding-probe-input-v1/genesis.tar.bz2";
+    const ORIGINAL: &str = "/home/ubuntu/.jetstreamer-private/r2-holding-foundation-node-01-v1";
+    const RECEIPT: &str =
+        "receipts/restore-79e0c1c7fa31c580f57890d5692e46c685ccb5441679cb55d00ff1cc99c9460b.json";
+    const CUSTODY: &str =
+        "receipts/custody-b86895ec0fb533fe40813892983ff1e86c0e8fda56b1d77b8470f7684882be5d.json";
+    const MANIFEST: &str = "75183d37b8f6ae32f1964f5d24990f94cbee003513c2866954d6d7e6acf877ea";
+    const ETAG: &str = "9b5672c84087d9117238849647317523-1";
+    const ROOT: &str = "/run/horizon223-foundation-genesis-qualification-v1";
+    const LENGTH: u64 = 20_144;
+    const FLOOR: u64 = 256 * 1024;
+    let dir = Path::new(ROOT);
+    let source = Path::new(SOURCE);
+    host::validate_host_mapping()?;
+    private(dir)?;
+    let mut fs_info = std::mem::MaybeUninit::<libc::statfs>::uninit();
+    let path = std::ffi::CString::new(ROOT)?;
+    ensure!(
+        unsafe { libc::statfs(path.as_ptr(), fs_info.as_mut_ptr()) } == 0,
+        "statfs failed"
+    );
+    let fs_info = unsafe { fs_info.assume_init() };
+    ensure!(
+        fs_info.f_type == libc::TMPFS_MAGIC
+            && fs::metadata(dir)?.dev() != fs::metadata("/run")?.dev(),
+        "disposable private tmpfs required"
+    );
+    let capacity = fs_info
+        .f_blocks
+        .checked_mul(u64::try_from(fs_info.f_bsize)?)
+        .context("unexpected tmpfs size")?;
+    ensure!(
+        capacity == 1 << 20
+            && available(dir)? >= FLOOR + LENGTH
+            && fs::read_dir(dir)?.next().is_none(),
+        "expected empty <=1 MiB disposable mount with enough reserved space"
+    );
+    let binding = |leaf: &str, sha: &str| Bound {
+        path: Path::new(ORIGINAL).join(leaf),
+        sha256: sha.into(),
+    };
+    let custody = binding(
+        CUSTODY,
+        "6683031470c506a7b5cd24f4b6962288bf711c6d3176f345a876d1cad826c788",
+    );
+    let restore = binding(
+        RECEIPT,
+        "a913fce8eb00ffb2dfa69f87272b041e4703ee9590118898f5a841e2cbe9bff6",
+    );
+    let c = evidence(&custody, true)?;
+    let r = evidence(&restore, true)?;
+    let key = format!("{}objects/{GENESIS_PROBE_SHA}.blob", host::PREFIX);
+    let manifest = format!("{}manifests/{MANIFEST}.json", host::PREFIX);
+    ensure!(
+        c["host"] == host::HOST
+            && c["bucket"] == BUCKET
+            && c["artifact"] == "genesis-probe"
+            && c["sha256"] == GENESIS_PROBE_SHA
+            && c["length"] == LENGTH
+            && c["source"] == SOURCE
+            && c["mapping"]["sha256"] == host::MAPPING_SHA
+            && c["object_key"] == key
+            && c["object_etag"] == ETAG
+            && c["manifest_key"] == manifest
+            && c["remote_sha256_readback"] == true
+            && c["local_source_revalidated"] == true
+            && r["custody"] == serde_json::to_value(&custody)?
+            && r["restoration_complete"] == true
+            && r["remote_sha256_readback"] == true
+            && r["staging_only"] == true,
+        "historical fixture/custody differs"
+    );
+    let previous = Path::new(ORIGINAL)
+        .join("restores")
+        .join(format!("{GENESIS_PROBE_SHA}.blob"));
+    ensure!(
+        r["destination"] == serde_json::to_value(&previous)?
+            && fs::symlink_metadata(&previous)?.mode() & 0o777 == 0o400
+            && fs::read(&previous)? == fs::read(source)?,
+        "historical restore differs"
+    );
+    let id = regular_identity(source)?;
+    ensure!(
+        id.length == LENGTH
+            && fs::metadata(source)?.uid() == 0
+            && fs::metadata(source)?.mode() & 0o222 == 0,
+        "immutable genesis input changed"
+    );
+    let proof = hash_and_etag(source, id, DEFAULT_PART_SIZE)?;
+    ensure!(
+        proof.sha256_hex == GENESIS_PROBE_SHA && proof.multipart_etag == ETAG,
+        "local fixture changed"
+    );
+    let cfg = r2_config_from_env()?;
+    ensure!(cfg.bucket == BUCKET, "foreign bucket");
+    let client = s3_client(&cfg);
+    let owner_key = format!("{}owner.json", host::PREFIX);
+    let owner = get_mutable_object(&client, BUCKET, &owner_key)
+        .await?
+        .context("missing owner")?;
+    let expected_owner = json!({"schema":"jetstreamer-horizon-holding-owner-v2","host":host::HOST,"prefix":host::PREFIX});
+    ensure!(
+        owner.bytes == serde_json::to_vec(&expected_owner)?,
+        "Foundation owner bytes changed"
+    );
+    let remote_manifest = get_mutable_object(&client, BUCKET, &manifest)
+        .await?
+        .context("missing manifest")?;
+    ensure!(
+        hex_lower(&Sha256::digest(&remote_manifest.bytes)) == MANIFEST
+            && serde_json::from_slice::<Value>(&remote_manifest.bytes)? == c["manifest"],
+        "manifest changed"
+    );
+    let remote = head_archive(&client, BUCKET, &key)
+        .await?
+        .context("missing fixture")?;
+    remote_matches(&remote, &key, LENGTH, GENESIS_PROBE_SHA, Some(ETAG))?;
+    native_checksum(&remote, &proof, LENGTH)?;
+    verify_remote_sha256(&client, BUCKET, &key, ETAG, LENGTH, GENESIS_PROBE_SHA, 2).await?;
+    let target = || BlobRestore {
+        key: &key,
+        etag: ETAG,
+        sha: GENESIS_PROBE_SHA,
+        length: LENGTH,
+        directory: dir,
+        minimum: FLOOR,
+    };
+    let injected = restore_blob(&client, target(), || {
+        anyhow::bail!("disposable fixture precommit interruption")
+    })
+    .await;
+    ensure!(
+        injected
+            .as_ref()
+            .is_err_and(|err| err.to_string() == "disposable fixture precommit interruption"),
+        "unexpected first restore outcome"
+    );
+    let partial = dir.join(format!(".{GENESIS_PROBE_SHA}.partial"));
+    let destination = dir.join(format!("{GENESIS_PROBE_SHA}.blob"));
+    let staged = regular_identity(&partial)?;
+    ensure!(
+        staged.length == LENGTH
+            && !destination.try_exists()?
+            && fs::metadata(&partial)?.mode() & 0o777 == 0o400
+            && hash_and_etag(&partial, staged, DEFAULT_PART_SIZE)?.sha256_hex == GENESIS_PROBE_SHA,
+        "interruption left invalid partial"
+    );
+    let output = restore_blob(&client, target(), || Ok(())).await?;
+    let repeated = restore_blob(&client, target(), || {
+        anyhow::bail!("existing fixture attempted second commit")
+    })
+    .await?;
+    ensure!(
+        output == destination
+            && repeated == destination
+            && !partial.try_exists()?
+            && fs::read_dir(dir)?.count() == 1
+            && fs::metadata(&output)?.ino() == staged.inode
+            && fs::read(&output)? == fs::read(source)?,
+        "resume/re-entry did not preserve exact fixture"
+    );
+    let after = head_archive(&client, BUCKET, &key)
+        .await?
+        .context("fixture disappeared")?;
+    remote_matches(&after, &key, LENGTH, GENESIS_PROBE_SHA, Some(ETAG))?;
+    native_checksum(&after, &proof, LENGTH)?;
+    ensure!(
+        available(dir)? >= FLOOR && regular_identity(source)? == id,
+        "source changed during fixture"
+    );
+    println!(
+        "{}",
+        json!({"schema":"horizon-foundation-genesis-native-transport-probe-v1","object_key":key,"original_source":source,"mapping_sha256":host::MAPPING_SHA,
+        "object_etag":ETAG,"length":LENGTH,"sha256":GENESIS_PROBE_SHA,"original_custody":custody,"original_restore":restore,
+        "authenticated_whole_readback":true,"download_complete_before_interruption":true,"same_inode_after_resume":true,"restored_device":staged.device,"restored_inode":staged.inode,"tmpfs_bytes":capacity,"floor_bytes":FLOOR,
+        "completed_reentry_and_byte_comparison":true,"remote_mutations":false,"local_source_retirement":false})
+    );
+    Ok(())
+}
