@@ -17,3 +17,8 @@ tempfile = "3"
 [[bin]]
 name = "epoch136-native-preinit-probe"
 path = "probe.rs"
+
+[[bin]]
+name = "epoch136-native-preinit-guard"
+path = "guard.rs"
+edition = "2021"

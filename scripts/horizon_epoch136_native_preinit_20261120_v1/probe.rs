@@ -107,6 +107,20 @@ fn cgroup() -> Result<PathBuf> {
 fn controls(unit: &str) -> Result<PathBuf> {
     ensure!(unsafe { libc::geteuid() } == 0, "root supervisor required");
     let cg = cgroup()?;
+    let slice = cg.parent().context("serial aggregate cgroup")?;
+    ensure!(
+        slice.file_name().and_then(|s| s.to_str()) == Some("horizon136preinit.slice")
+            && fs::read_to_string(slice.join("memory.max"))?.trim() == MEMORY.to_string()
+            && fs::read_to_string(slice.join("memory.swap.max"))?.trim() == "0"
+            && fs::read_to_string(slice.join("pids.max"))?.trim() == "128",
+        "probe and guard must share the original serial aggregate bounds"
+    );
+    let cpu = fs::read_to_string(slice.join("cpu.max"))?;
+    let parts: Vec<_> = cpu.split_whitespace().collect();
+    ensure!(
+        parts.len() == 2 && parts[0] == parts[1],
+        "serial aggregate CPU limit"
+    );
     ensure!(
         cg.file_name().and_then(|n| n.to_str()) == Some(unit),
         "wrong serial unit"
@@ -173,7 +187,7 @@ fn verify_172(fleet: &Value, state: &str, pid: &str, invocation: &str) -> Result
 
 /// Parent supplies a fresh no-clobber release only after the actual guard
 /// prefire and complete fleet have accepted this invocation.
-fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
+fn release(path: &Path, digest: &str, unit: &str, gate: bool) -> Result<Value> {
     let _cg = controls(unit)?;
     let m = fs::symlink_metadata(path)?;
     ensure!(
@@ -199,7 +213,8 @@ fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
     let ready = path
         .parent()
         .context("request parent")?
-        .join(format!("actual-{iid}.json"));
+        .join(format!("actual-{iid}"))
+        .join("release.json");
     let started = Instant::now();
     let mut heartbeat = Instant::now();
     loop {
@@ -234,6 +249,35 @@ fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
         thread::sleep(Duration::from_millis(200));
     }
     let v: Value = serde_json::from_slice(&fs::read(&ready)?)?;
+    let release_digest = hex(&Sha256::digest(fs::read(&ready)?));
+    let seal_path = ready
+        .parent()
+        .context("token package")?
+        .join("deployment-seal-receipt.json");
+    let seal_meta = fs::symlink_metadata(&seal_path)?;
+    ensure!(
+        seal_meta.is_file()
+            && seal_meta.uid() == 0
+            && seal_meta.nlink() == 1
+            && seal_meta.mode() & 0o222 == 0,
+        "token seal custody"
+    );
+    let seal: Value = serde_json::from_slice(&fs::read(&seal_path)?)?;
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"]
+                == ready
+                    .parent()
+                    .context("token package")?
+                    .to_str()
+                    .context("token UTF8")?
+            && seal["members"]
+                .as_array()
+                .context("token seal members")?
+                .iter()
+                .any(|m| m["name"] == "release.json" && m["sha256"] == release_digest),
+        "matching normal Rust seal required for actual invocation release"
+    );
     let t = now()?;
     let born = v["recorded_unix_seconds"]
         .as_u64()
@@ -263,6 +307,37 @@ fn release(path: &Path, digest: &str, unit: &str) -> Result<Value> {
             Path::new(b["path"].as_str().context("proof path")?),
             b["sha256"].as_str().context("proof SHA")?,
         )?;
+    }
+    let guard: Value = serde_json::from_slice(&fs::read(
+        v["serial_guard_prefire"]["path"]
+            .as_str()
+            .context("guard path")?,
+    )?)?;
+    ensure!(
+        guard["schema"] == "jetstreamer-horizon-build-guard-sample-v1"
+            && guard["unit"] == unit
+            && guard["actor_invocation_id"] == iid
+            && guard["native_ActiveState"] == "activating"
+            && guard["native_SubState"] == "start-pre"
+            && guard["native_MainPID"] == 0
+            && guard["native_NRestarts"] == 0
+            && guard["trip"] == false
+            && guard["native_owner_stable"] == true
+            && guard["memory_max_bytes"] == MEMORY
+            && guard["cpu_quota_usec"] == 1_000_000
+            && guard["tasks_max"] == 128
+            && guard["maximum_root_bytes"] == GROWTH,
+        "guard does not prove this native pre-start actor and unchanged bounds"
+    );
+    if gate {
+        ensure!(
+            guard["native_ControlPID"] == std::process::id()
+                && native(unit, "ControlPID")? == std::process::id().to_string()
+                && native(unit, "MainPID")? == "0"
+                && native(unit, "ActiveState")? == "activating"
+                && native(unit, "SubState")? == "start-pre",
+            "guard control PID is not this actual start gate"
+        );
     }
     let binding = &v["complete_fleet"];
     let fleet_path = Path::new(binding["path"].as_str().context("fleet path")?);
@@ -658,17 +733,32 @@ fn run(work: &Path, parent: &Value) -> Result<()> {
 fn main() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
-        args.len() == 5 && matches!(args[1].as_str(), "stage" | "run"),
-        "usage: probe stage|run WORK RELEASE_PATH RELEASE_SHA256"
+        args.len() == 5
+            && matches!(
+                args[1].as_str(),
+                "stage" | "run" | "gate-stage" | "gate-run"
+            ),
+        "usage: probe stage|run|gate-stage|gate-run WORK REQUEST_PATH REQUEST_SHA256"
     );
     let work = Path::new(&args[2]);
     ensure!(
         work == Path::new(WORK),
         "foreign native probe work generation"
     );
-    let unit = if args[1] == "stage" { STAGE_UNIT } else { UNIT };
-    let parent = release(Path::new(&args[3]), &args[4], unit)?;
-    let result = if args[1] == "stage" {
+    let unit = if args[1].ends_with("stage") {
+        STAGE_UNIT
+    } else {
+        UNIT
+    };
+    let parent = release(
+        Path::new(&args[3]),
+        &args[4],
+        unit,
+        args[1].starts_with("gate-"),
+    )?;
+    let result = if args[1].starts_with("gate-") {
+        Ok(())
+    } else if args[1] == "stage" {
         stage(work)
     } else {
         run(work, &parent)

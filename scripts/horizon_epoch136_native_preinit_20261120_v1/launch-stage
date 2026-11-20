@@ -7,6 +7,9 @@ readonly work=/home/sol/.jetstreamer-private/epoch168-trace-worker-build-2026112
 exec /usr/bin/systemd-run \
   --unit=horizon-node-native-qualification-136-preinit-stage-g1 \
   --property=Type=exec --property=RemainAfterExit=yes --property=Restart=no \
+  --property=Slice=horizon136preinit.slice \
+  --property="ExecStartPre=$package/epoch136-native-preinit-probe gate-stage $work $request $request_sha" \
+  --property=TimeoutStartSec=150 \
   --property=MemoryMax=2147483648 --property=MemorySwapMax=0 \
   --property=CPUQuota=100% --property=TasksMax=128 \
   --property=RuntimeMaxSec=900 --property=TimeoutStopSec=20 \
