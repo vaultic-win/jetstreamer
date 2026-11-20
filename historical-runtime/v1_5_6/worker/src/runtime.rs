@@ -25,7 +25,7 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use solana_vote_program::vote_instruction::VoteInstruction;
-use std::{cmp, collections::HashMap, env, path::Path, sync::Arc};
+use std::{cmp, collections::HashMap, env, ffi::OsStr, io::Write, path::Path, sync::Arc};
 use tempfile::TempDir;
 
 const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
@@ -41,6 +41,9 @@ const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 64_799_804;
 const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
 const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 75_168_000;
 const POH_THREADS_ENV: &str = "JETSTREAMER_HISTORICAL_POH_THREADS";
+const EPOCH168_TRACE_ENV: &str = "JETSTREAMER_HISTORICAL_TRACE_EPOCH168";
+const EPOCH168_TRACE_SIGNATURE: &str =
+    "3qysw2HZ4pE11jjL3HpXA9UJ6kxqPkY2se93agYERfzDNoweP6sxqvhPGPjBkmwmD2m9SrRB96y75Vbi3mACtrpz";
 const ABSOLUTE_MAX_POH_THREADS: usize = 256;
 // The validator runs AccountsBackgroundService alongside replay. This worker
 // has no BankForks service, so perform the same storage-only maintenance at
@@ -256,16 +259,32 @@ impl RuntimeState {
             if let Some(error) = batch.lock_results().iter().find(|result| result.is_err()) {
                 return Err(format!("entry account locking failed: {:?}", error));
             }
-            let (results, _balances, _inner_instructions, _log_messages) =
+            let trace_epoch168 =
+                is_epoch168_trace_target(request.slot, request.entry_index, &transactions)
+                    && env::var_os(EPOCH168_TRACE_ENV).as_deref() == Some(OsStr::new("1"));
+            let (results, _balances, _inner_instructions, log_messages) =
                 self.bank.load_execute_and_commit_transactions(
                     &batch,
                     max_age,
                     false,
                     false,
-                    false,
+                    trace_epoch168,
                     &mut ExecuteTimings::default(),
                 );
             drop(batch);
+            if trace_epoch168 {
+                // Keep the wire protocol on stdout and preserve the execution result even if
+                // the diagnostic sink is closed. The loader records CU and VM errors in logs.
+                let _ = writeln!(
+                    std::io::stderr().lock(),
+                    "epoch168 trace slot={} entry={} transaction=532 signature={} execution={:?} logs={:?}",
+                    request.slot,
+                    request.entry_index,
+                    EPOCH168_TRACE_SIGNATURE,
+                    results.execution_results.first().map(|result| &result.0),
+                    log_messages.first(),
+                );
+            }
             if env::var_os("JETSTREAMER_HISTORICAL_TRACE").is_some() {
                 for (transaction, result) in transactions.iter().zip(&results.execution_results) {
                     if matches!(
@@ -824,6 +843,17 @@ struct PreparedEntry {
     signatures_by_writable_key: HashMap<Vec<u8>, Option<Vec<u8>>>,
 }
 
+fn is_epoch168_trace_target(slot: u64, entry_index: u64, transactions: &[Transaction]) -> bool {
+    // Entry 433 consists solely of the target transaction. Log recording is batch-wide.
+    slot == 72_728_191
+        && entry_index == 433
+        && transactions.len() == 1
+        && transactions[0]
+            .signatures
+            .first()
+            .map_or(false, |sig| sig.to_string() == EPOCH168_TRACE_SIGNATURE)
+}
+
 fn prepare_entry(request: EntryRequest) -> Result<PreparedEntry, String> {
     if request.hash.len() != 32 {
         return Err(format!(
@@ -1255,6 +1285,24 @@ mod tests {
             RuntimeState::from_test_bank(bank, false, state_dir),
             genesis.mint_keypair,
         )
+    }
+
+    #[test]
+    fn epoch168_trace_requires_exact_singleton_entry_and_signature() {
+        let mut tx = Transaction::default();
+        assert!(!is_epoch168_trace_target(72_728_191, 433, &[]));
+        assert!(!is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
+        tx.signatures.push(Default::default());
+        assert!(!is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
+        tx.signatures[0] = EPOCH168_TRACE_SIGNATURE.parse().unwrap();
+        assert!(is_epoch168_trace_target(72_728_191, 433, &[tx.clone()]));
+        assert!(!is_epoch168_trace_target(72_728_190, 433, &[tx.clone()]));
+        assert!(!is_epoch168_trace_target(72_728_191, 432, &[tx.clone()]));
+        assert!(!is_epoch168_trace_target(
+            72_728_191,
+            433,
+            &[tx.clone(), tx]
+        ));
     }
 
     #[test]
