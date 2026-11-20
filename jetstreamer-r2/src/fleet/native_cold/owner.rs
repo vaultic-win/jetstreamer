@@ -188,6 +188,7 @@ pub(super) fn live_owner(h: &Value) -> Result<Value> {
         UNIT,
         TEST,
         TEST_SHA,
+        PROFILE.worker,
     )?;
     let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
     ensure!(page.is_power_of_two(), "invalid kernel page size");

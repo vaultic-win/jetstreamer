@@ -14,7 +14,7 @@ pub(super) fn stat(pid: u64) -> Result<(u64, u64)> {
 }
 #[cfg(test)]
 pub(super) fn sample(v: &Value, gp: &Value, main: u64) -> Result<()> {
-    sample_for(v, gp, main, c::TEST, c::TEST_SHA)
+    sample_for(v, gp, main, c::TEST, c::TEST_SHA, &c::WORKER_PROFILE)
 }
 pub(super) fn sample_for(
     v: &Value,
@@ -22,6 +22,7 @@ pub(super) fn sample_for(
     main: u64,
     harness: &str,
     harness_sha: &str,
+    worker: &c::WorkerProfile,
 ) -> Result<()> {
     ensure!(
         v["stable_census"] == true && v["boot_id"] == gp["boot_id"],
@@ -40,8 +41,8 @@ pub(super) fn sample_for(
             pid > 1
                 && ids.insert(pid)
                 && p["boot_id"] == gp["boot_id"]
-                && p["executable"] == if is_main { harness } else { c::WORKER }
-                && p["sha256"] == if is_main { harness_sha } else { c::WORKER_SHA }
+                && p["executable"] == if is_main { harness } else { worker.path }
+                && p["sha256"] == if is_main { harness_sha } else { worker.sha256 }
                 && p["parent_pid"] == if is_main { 1 } else { main }
                 && c::num(p, "start_ticks")? >= c::num(gp, "main_start_ticks")?
                 && (!is_main || p["start_ticks"] == gp["main_start_ticks"])
@@ -65,7 +66,15 @@ pub(super) fn sample_for(
     Ok(())
 }
 pub(super) fn live(members: &[String], main: u64, guard: &Value) -> Result<()> {
-    live_for(members, main, guard, c::UNIT, c::TEST, c::TEST_SHA)
+    live_for(
+        members,
+        main,
+        guard,
+        c::UNIT,
+        c::TEST,
+        c::TEST_SHA,
+        &c::WORKER_PROFILE,
+    )
 }
 pub(super) fn live_for(
     members: &[String],
@@ -74,6 +83,7 @@ pub(super) fn live_for(
     unit: &str,
     harness: &str,
     harness_sha: &str,
+    worker: &c::WorkerProfile,
 ) -> Result<()> {
     let gb = c::binding(guard)?;
     let gp = c::sealed(&gb)?;
@@ -87,11 +97,11 @@ pub(super) fn live_for(
         let pid = id.parse::<u64>()?;
         ensure!(pid > 1 && seen.insert(pid), "265 duplicate PID");
         let before = stat(pid)?;
-        let exe = if pid == main { harness } else { c::WORKER };
+        let exe = if pid == main { harness } else { worker.path };
         let sha = if pid == main {
             harness_sha
         } else {
-            c::WORKER_SHA
+            worker.sha256
         };
         ensure!(
             before.0 == if pid == main { 1 } else { main } && before.1 >= initial.1,

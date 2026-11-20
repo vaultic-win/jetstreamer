@@ -12,6 +12,7 @@ pub(super) fn result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
         c::ACCOUNTS_HASH,
         c::SNAPSHOT_SHA,
         "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst",
+        &c::WORKER_PROFILE,
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -25,11 +26,12 @@ pub(super) fn result_for(
     accounts_hash: &str,
     snapshot_sha: &str,
     snapshot: &str,
+    worker: &c::WorkerProfile,
 ) -> Result<u64> {
     ensure!(
         v["schema"] == schema
             && v["epoch"] == epoch
-            && v["worker"] == json!({"path":c::WORKER,"sha256":c::WORKER_SHA})
+            && v["worker"] == json!({"path":worker.path,"sha256":worker.sha256})
             && v["bootstrap_sha256"] == snapshot_sha
             && v["genesis_sha256"]
                 == "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
@@ -61,9 +63,9 @@ pub(super) fn result_for(
     let handshake = &v["handshake"];
     ensure!(
         handshake["protocol_version"] == 5
-            && handshake["backend_id"] == "solana-v1.7.15"
+            && handshake["backend_id"] == worker.backend
             && handshake["qualification"] == "Candidate"
-            && handshake["solana_commit"] == "4892eb4e1ad278d5249b6cda8983f88effb3e98b"
+            && handshake["solana_commit"] == worker.solana_commit
             && handshake["required_genesis_hash"] == "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
         "265 handshake differs"
     );
@@ -337,7 +339,7 @@ pub(super) fn complete_directory(bundle: &Value, h: &Value) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     struct Reader {
         values: BTreeMap<PathBuf, Value>,
@@ -421,8 +423,7 @@ mod tests {
             .pop();
         assert!(validate(&bundle, &h, &origin, 250, 43, &reader).is_err());
     }
-    #[test]
-    fn standalone_result_binds_worker_commitments_and_gate_to_original_owner() {
+    pub(in crate::fleet) fn result_fixture() -> (Value, Value, Value) {
         let origin = json!({"invocation_id":"a".repeat(32),"main_pid":42});
         let h = json!({"startup_plan":binding("startup"),"first_guard_token":binding("token")});
         let hash = bs58::decode(c::ACCOUNTS_HASH).into_vec().unwrap();
@@ -433,6 +434,11 @@ mod tests {
             "initialized":{"slot":114479281,"genesis_hash":"5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d","ticks_per_slot":64,"last_blockhash":vec![0;32],"next_write_version":5,"source":{"SnapshotArchive":{"archive_path":"/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst","expected_accounts_hash":hash}}},
             "checkpoint":{"slot":114479281,"slot_complete":true,"writes":[],"next_write_version":5,"accounts_hash":hash,"last_blockhash":vec![0;32],"bank_hash":vec![0;32],"capitalization":1,"transaction_count":2,"tick_height":3},"worker_pid":43,
             "entry_replay":false,"snapshot_export":false,"downloads":false,"admission_authorized":false,"replay_launch_authorized":false,"publication_authorized":false,"full_epoch_qualified":false,"remote_mutations":false,"r2_mutations":false});
+        (v, origin, h)
+    }
+    #[test]
+    fn standalone_result_binds_worker_commitments_and_gate_to_original_owner() {
+        let (v, origin, h) = result_fixture();
         assert_eq!(result(&v, &origin, &h).unwrap(), 43);
         for (pointer, bad) in [
             ("/worker_reaped", json!(false)),
