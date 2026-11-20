@@ -1,7 +1,7 @@
 //! Read-only revalidation of the exact scratch-only retirement scope.
 use super::super::*;
 #[path = "process_references.rs"]
-mod process_references;
+pub(super) mod process_references;
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1";
 const SCRATCH: &str =
     "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1/scratch";

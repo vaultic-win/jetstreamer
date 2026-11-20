@@ -141,16 +141,18 @@ fn evaluate(
         fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
     }
     n.check()?;
-    Ok(
-        json!({"schema":"jetstreamer-foundation-holding-current-capacity-v1","host":"horizon-vaultic",
+    let mut result = json!({"schema":"jetstreamer-foundation-holding-current-capacity-v1","host":"horizon-vaultic",
         "first_epoch":201,"last_epoch":300,"restore_only":true,"review":source,"fleet":review["fleet"],
         "observer":review["observer"],"reservation_ledger":review["reservation_ledger"],"century":review["century"],
         "native265_runtime_growth_release":host.release,"full211_growth":host.full211_growth,"boot_id":host.boot,"filesystem":path,"st_dev":host.device,
         "unit":unit,"invocation_id":iid,"holding_artifact":actor_artifact,"additional_bytes":additional,
         "minimum_free_bytes":capacity["protected_existing_floor_bytes"],"capacity":capacity,
         "all_live_growth_and_century_floor_protected":true,"local_retirement_authorized":false,
-        "replay_launch_authorized":false,"remote_mutations":false,"recorded_unix_seconds":now()?}),
-    )
+        "replay_launch_authorized":false,"remote_mutations":false,"recorded_unix_seconds":now()?});
+    if let Some(proof) = host.boundary_memory {
+        result["failed_boundary205206_memory_release"] = proof;
+    }
+    Ok(result)
 }
 
 pub fn check(basis: &Value, additional: u64) -> Result<Value> {
@@ -237,6 +239,7 @@ mod tests {
             overhead: (0, 0),
             century: 0,
             full211_growth: None,
+            boundary_memory: None,
             release: None,
             boot: String::new(),
             device: 0,

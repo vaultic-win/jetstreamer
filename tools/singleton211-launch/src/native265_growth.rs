@@ -3,6 +3,7 @@
 use super::*;
 mod pins;
 mod runtime;
+pub(crate) use runtime::process_references::scan as tree_references;
 const OLD_UNIT: &str = "horizon-265-native-input-20261119-v1.service";
 const OLD_IID: &str = "ce5f66a82fdd4c0e93ca99f27b925112";
 const OLD_ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1";
