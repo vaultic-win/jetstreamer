@@ -86,4 +86,14 @@ const STOP_RETIRED: &str = "horizon-native261-qualification-unit-retirement-v1";
 
 const STOP_REQUEST: &str = "horizon261-native-guard-stop-request-v1";
 
+const PRIOR_PREPARATION: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-native261-prepared-host-stop-1259df1f-v1/prepared.json",
+    "71de86ca05fd28b38d6f1127ce04a0216f80444c6982cd0c962d9b795a4bdaf0",
+);
+const PRIOR_LAUNCHER: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch",
+    "12b14dad4e1465bc22a6466adee317f3059ae66e54106a81c4758b724646a2ba",
+);
+const PRIOR_LAUNCHER_COMMIT: &str = "1259df1ff730e684a7b09c05c93d0d82cc3694ff";
+
 include!("native261/controller.rs");
