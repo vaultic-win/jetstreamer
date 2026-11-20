@@ -42,7 +42,7 @@ const RETENTION: &str = "horizon-singleton211-terminal-retention.target";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon-singleton211-startup-tokens";
 const GATE: &str =
-    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v3/horizon-singleton211-launch";
+    "/var/lib/jetstreamer/horizon-singleton211-launch-20261120-v4/horizon-singleton211-launch";
 const NODE: &str = "/var/lib/jetstreamer/horizon-singleton211-production-node-c17619b16d5d20f0-v1/jetstreamer-node";
 const NODE_SHA: &str = "c17619b16d5d20f0d7aefc6e62ce99e68cc8b2bc88153f82183ebb0d4c5ede1d";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-singleton211-production-worker-1c89b6a214f9487b-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget";

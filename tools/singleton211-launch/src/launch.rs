@@ -297,11 +297,17 @@ pub(super) fn producer_properties(
         "replay environment differs"
     );
     ensure!(
-        v["BindReadOnlyPaths"] == format!("{INPUT}/genesis.tar.bz2:{ROOT}/output/genesis.tar.bz2"),
+        expected_genesis_bind(text(v, "BindReadOnlyPaths")?),
         "genesis mount differs"
     );
     Ok(())
 }
+fn expected_genesis_bind(value: &str) -> bool {
+    // PID1 may render the default recursive bind explicitly in the effective property.
+    value.strip_suffix(":rbind").unwrap_or(value)
+        == format!("{INPUT}/genesis.tar.bz2:{ROOT}/output/genesis.tar.bz2")
+}
+
 pub(super) fn first_guard(
     p: &Value,
     t: &Value,
@@ -724,6 +730,22 @@ pub(super) fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn accept_only_the_exact_genesis_source_and_destination() {
+        let bind = format!("{INPUT}/genesis.tar.bz2:{ROOT}/output/genesis.tar.bz2");
+        assert!(expected_genesis_bind(&bind));
+        assert!(expected_genesis_bind(&format!("{bind}:rbind")));
+        for wrong in [
+            format!("-{bind}:rbind"),
+            format!("{bind}:rbind:rbind"),
+            format!("{bind}:norbind"),
+            format!("{bind}:rbind /unrelated:/target"),
+            bind.replace("/output/", "/state/"),
+            bind.replacen("/genesis.tar.bz2", "/other.tar.bz2", 1),
+        ] {
+            assert!(!expected_genesis_bind(&wrong), "{wrong}");
+        }
+    }
     #[test]
     fn first_guard_requires_real_held_gate_sample_and_original_pid1_window() {
         let p = json!({"boot_id":"00000000-0000-0000-0000-000000000001","guard":{"sha256":"d".repeat(64)},"minimum_free_bytes":100,"issued_monotonic_us":1000,"expires_monotonic_us":60_001_000});
