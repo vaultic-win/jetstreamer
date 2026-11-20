@@ -161,4 +161,54 @@ mod tests {
         assert!(!error.contains('\n'));
         assert!(!error.contains('\0'));
     }
+
+    #[test]
+    fn native_failed_command_retains_real_exit_status_and_stderr() {
+        let started = Instant::now();
+        let result = Command::new("/usr/bin/stat")
+            .args(["--", "/proc/self/this-horizon-fixture-path-must-not-exist"])
+            .env("LC_ALL", "C")
+            .output()
+            .unwrap();
+        assert!(!result.status.success() && !result.stderr.is_empty());
+        let error = accept(result, started.elapsed(), "native-command-failure")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("No such file or directory"));
+        assert!(error.contains("exit_code=Some(1)"));
+        assert!(error.contains("native-command-failure"));
+    }
+
+    #[test]
+    fn native_excess_output_is_rejected_after_successful_child_exit() {
+        let started = Instant::now();
+        let result = Command::new("/usr/bin/head")
+            .args(["-c", "16384", "/dev/zero"])
+            .output()
+            .unwrap();
+        assert!(result.status.success() && result.stderr.is_empty());
+        assert_eq!(result.stdout.len(), MAX_STDOUT_BYTES);
+        let error = accept(result, started.elapsed(), "native-output-bound")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("stdout_bytes=16384"));
+        assert!(error.len() < 2048);
+    }
+
+    #[test]
+    fn native_ten_second_timeout_is_reaped_and_preserved() {
+        let started = Instant::now();
+        let result = Command::new("/usr/bin/timeout")
+            .args(["--signal=KILL", "10", "/usr/bin/sleep", "11"])
+            .output()
+            .unwrap();
+        let elapsed = started.elapsed();
+        assert!(elapsed >= Duration::from_secs(10));
+        assert!(!result.status.success());
+        let error = accept(result, elapsed, "native-timeout")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("signal=Some(9)"));
+        assert!(error.contains("native-timeout"));
+    }
 }

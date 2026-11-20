@@ -349,8 +349,8 @@
     },
     {
       "path": "scripts/horizon_retry7_170_20261120_v1/guard/writer_query.rs",
-      "sha256": "ae25ddb32fa7c4ce508454e579b7a3bb5b9b05bcae4ec8883d01197125ff4e60",
-      "bytes": 5257
+      "sha256": "52913bee818efbb89ff3b798d28f5b24135107b34a138c550ac880b3fae095a7",
+      "bytes": 7231
     }
   ],
   "new_runtime_authority": false
