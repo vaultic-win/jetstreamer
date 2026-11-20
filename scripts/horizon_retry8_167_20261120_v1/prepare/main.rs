@@ -31,12 +31,17 @@ mod completed167_native_guard;
 mod completed_output_report;
 #[path = "../../horizon_retry7_167_20261119_v1/prepare/dep_b08f73821177_completed_output_scope.rs"]
 mod completed_output_scope;
-#[path = "../../horizon_retry7_167_20261119_v1/prepare/current_allocation.rs"]
 mod current_allocation;
 #[path = "../../horizon_retry7_167_20261119_v1/prepare/current_budget.rs"]
 mod current_budget;
 #[path = "../guard/data_fulfillment.rs"]
-#[cfg_attr(all(feature = "preparation", not(test)), expect(dead_code, reason = "the shared guard module also declares constants for live guard scopes"))]
+#[cfg_attr(
+    all(feature = "preparation", not(test)),
+    expect(
+        dead_code,
+        reason = "the shared guard module also declares constants for live guard scopes"
+    )
+)]
 mod data_fulfillment;
 #[path = "../../horizon_retry7_167_20261119_v1/prepare/dep_27eebadac385_host_fulfillment.rs"]
 mod host_fulfillment;
@@ -77,7 +82,7 @@ mod guard_proof;
 #[allow(dead_code)]
 #[path = "../peer/main.rs"]
 mod independent166;
-const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch167-retry8-recovery-20261120-v1/prepare-v1/prepare";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch167-retry8-recovery-20261120-v1/prepare-v2/prepare";
 const EVENT: &str = "/var/lib/jetstreamer/seven-standard-reserve-stop-20261110-v1/ORIGINAL_SEVEN_RESERVE_STOPS_AND_REPAIR_MODEL.json";
 const EVENT_SHA: &str = "b3bff5d44d24dc507313d8dfdb8e5cd5bec50a7732b288327106ee20b7a7b0eb";
 const RETIRED167_COMPLETION: &str = "/home/sol/horizon-disk-audit-20261116T2052Z/superseded-partials-cleanup-complete-20261118T1213Z.json";
