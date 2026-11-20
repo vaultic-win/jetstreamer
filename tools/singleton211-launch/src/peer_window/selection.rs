@@ -39,83 +39,218 @@ impl Observation {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ManagerState {
+    timer: String,
+    guard: String,
+    start: u64,
+    dormant: bool,
+}
+impl ManagerState {
+    fn read(c: &periodic::Control, guard: &Value, timer: &Value) -> Result<Self> {
+        let dormant = periodic::service_values(c, guard)?;
+        // The two manager reads can span a guard transition. A stable dormant
+        // sample below still requires the timer to be waiting.
+        periodic::timer_values(c, timer, false)?;
+        let tid = text(timer, "InvocationID")?;
+        let gid = text(guard, "InvocationID")?;
+        ensure!(
+            hex(tid, 32) && hex(gid, 32),
+            "original peer identities absent"
+        );
+        Ok(Self {
+            timer: tid.into(),
+            guard: gid.into(),
+            start: text(guard, "ExecMainStartTimestampMonotonic")?.parse()?,
+            dormant,
+        })
+    }
+    fn same_firing(&self, other: &Self) -> bool {
+        self.timer == other.timer && self.guard == other.guard && self.start == other.start
+    }
+    fn natural_edge(&self, after: &Self, prior: Option<&Observation>, trigger: u64) -> Result<()> {
+        ensure!(
+            self.timer == after.timer,
+            "original peer timer replaced in read bracket"
+        );
+        if self.same_firing(after) {
+            ensure!(
+                !self.dormant && after.dormant && self.start.abs_diff(trigger) <= SECOND,
+                "guard changed outside a natural completion"
+            );
+        } else {
+            // Only advance from a completed, already authenticated firing whose
+            // concrete deadline was observed before the crossing.
+            let previous = prior.context("no prior original deadline for changed guard")?;
+            let (due, _) = previous
+                .completed
+                .as_ref()
+                .context("uncompleted peer guard replaced")?;
+            ensure!(
+                self.dormant
+                    && self.guard != after.guard
+                    && self.guard == previous.guard
+                    && self.timer == previous.timer
+                    && self.start == previous.start
+                    && after.start > self.start
+                    && after.start.abs_diff(trigger) <= SECOND
+                    && trigger >= *due
+                    && trigger - *due <= TRIGGER_TOLERANCE,
+                "unproven peer successor in read bracket"
+            );
+        }
+        Ok(())
+    }
+}
+
+fn completed_journal(
+    n: &mut Native,
+    c: &periodic::Control,
+    row: &Observation,
+    next: u64,
+) -> Result<()> {
+    let raw = n.run(
+        "/usr/bin/journalctl",
+        &[
+            "--all",
+            "--no-pager",
+            "--output=json",
+            "--boot=0",
+            "_PID=1",
+            &format!("UNIT={}", c.unit),
+            &format!("INVOCATION_ID={}", row.guard),
+        ],
+    )?;
+    let rows = serde_json::Deserializer::from_slice(&raw)
+        .into_iter::<Value>()
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    let (started, ended) = full211_window::guard_clocks(&rows, boot.trim(), &c.unit, &row.guard)?;
+    ensure!(
+        started.abs_diff(row.start) <= SECOND
+            && started.abs_diff(row.trigger) <= SECOND
+            && ended < next,
+        "peer PID1 history differs from actual guard firing"
+    );
+    Ok(())
+}
+
 fn observe(
     n: &mut Native,
     c: &periodic::Control,
     plan: &Value,
     owner: &Value,
     ticks: u64,
+    previous: Option<&Observation>,
 ) -> Result<Observation> {
     let unit = text(plan, "unit")?;
     let pid = text(owner, "MainPID")?.parse()?;
-    let actual = n.show(unit)?;
-    live::same_owner(owner, &actual)?;
-    ensure!(
-        actual["Job"] == "" && native257::process_ticks(pid)? == ticks,
-        "retained producer process replaced"
-    );
-
     let receipts = Path::new(text(plan, "receipt_directory")?);
-    for name in ["stop-intent.json", "stop-completion.json"] {
-        absent(&receipts.join(name))?;
-    }
-    let guard = n.show(&c.unit)?;
-    let dormant = periodic::service_values(c, &guard)?;
-    let timer = n.show(&c.timer)?;
-    periodic::timer_values(c, &timer, dormant)?;
-    let guard_id = text(&guard, "InvocationID")?;
-    let timer_id = text(&timer, "InvocationID")?;
-    ensure!(
-        hex(guard_id, 32) && hex(timer_id, 32),
-        "original peer identities absent"
-    );
-    let trigger = timer_clock(n, &c.timer, "LastTriggerUSecMonotonic")?;
-    let start = text(&guard, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
-    ensure!(
-        trigger > 0 && trigger <= mono()? && trigger.abs_diff(start) <= SECOND,
-        "peer guard did not start at original timer trigger"
-    );
-    let completed = if dormant {
-        let next = deadline(n, &c.timer)?;
-        let elapsed = next
-            .checked_sub(trigger)
-            .context("invalid original timer cadence")?;
-        if c.unit == GUARD_UNIT {
-            ensure!(
-                elapsed.abs_diff(30 * SECOND) <= SECOND,
-                "full211 timer cadence changed"
-            );
+    let mut crossing: Option<(ManagerState, u64)> = None;
+    // One attempt may span a start and the second its completion. Only a
+    // third stable read can finish that sequence, under the outer deadline.
+    for _ in 0..3 {
+        n.check()?;
+        let actual = n.show(unit)?;
+        live::same_owner(owner, &actual)?;
+        ensure!(
+            actual["Job"] == "" && native257::process_ticks(pid)? == ticks,
+            "retained producer process replaced"
+        );
+        for name in ["stop-intent.json", "stop-completion.json"] {
+            absent(&receipts.join(name))?;
+        }
+        let guard = n.show(&c.unit)?;
+        let timer = n.show(&c.timer)?;
+        let before = ManagerState::read(c, &guard, &timer)?;
+        let trigger = timer_clock(n, &c.timer, "LastTriggerUSecMonotonic")?;
+        let timing = if before.dormant {
+            let next = deadline(n, &c.timer)?;
+            let ended = if c.unit == GUARD_UNIT {
+                None
+            } else {
+                Some(unit_clock(
+                    n,
+                    &c.unit,
+                    "org.freedesktop.systemd1.Unit",
+                    "InactiveEnterTimestampMonotonic",
+                )?)
+            };
+            Some((next, ended))
         } else {
-            // OnUnitInactiveSec=60s is relative to the actual completed service.
-            let ended = unit_clock(
-                n,
-                &c.unit,
-                "org.freedesktop.systemd1.Unit",
-                "InactiveEnterTimestampMonotonic",
-            )?;
+            None
+        };
+        let guard_after = n.show(&c.unit)?;
+        let timer_after = n.show(&c.timer)?;
+        let after = ManagerState::read(c, &guard_after, &timer_after)?;
+        if let Some((pinned, stamp)) = &crossing {
             ensure!(
-                ended >= start
-                    && next
-                        .checked_sub(ended)
-                        .is_some_and(|d| d.abs_diff(60 * SECOND) <= SECOND),
-                "peer completion or timer cadence changed"
+                pinned.same_firing(&before)
+                    && *stamp == trigger
+                    && (!pinned.dormant || before.dormant),
+                "guard or trigger changed across re-observation"
             );
         }
-        Some((next, healthy_sample(c, plan, guard_id)?))
-    } else {
-        None
-    };
-    ensure!(
-        guard == n.show(&c.unit)? && timer == n.show(&c.timer)?,
-        "peer changed during observation"
-    );
-    Ok(Observation {
-        timer: timer_id.into(),
-        guard: guard_id.into(),
-        trigger,
-        start,
-        completed,
-    })
+        if guard != guard_after || timer != timer_after {
+            // Obtain the after trigger again: a start can occur after the first
+            // timestamp read. Do not use any mixed cadence or sample as proof.
+            let after_trigger = timer_clock(n, &c.timer, "LastTriggerUSecMonotonic")?;
+            ensure!(
+                after_trigger > 0 && after_trigger <= mono()?,
+                "unusable guard trigger"
+            );
+            if before.same_firing(&after) {
+                ensure!(trigger == after_trigger, "same guard trigger changed");
+            }
+            before.natural_edge(&after, previous, after_trigger)?;
+            crossing = Some((after, after_trigger));
+            continue;
+        }
+        periodic::timer_values(c, &timer, before.dormant)?;
+        ensure!(
+            trigger > 0 && trigger <= mono()? && trigger.abs_diff(before.start) <= SECOND,
+            "peer guard did not start at original timer trigger"
+        );
+        let completed = if let Some((next, ended)) = timing {
+            if let Some(ended) = ended {
+                ensure!(
+                    ended >= before.start
+                        && next
+                            .checked_sub(ended)
+                            .is_some_and(|d| d.abs_diff(60 * SECOND) <= SECOND),
+                    "peer completion or timer cadence changed"
+                );
+            } else {
+                ensure!(
+                    next.checked_sub(trigger)
+                        .is_some_and(|d| d.abs_diff(30 * SECOND) <= SECOND),
+                    "full211 timer cadence changed"
+                );
+            }
+            Some((next, healthy_sample(c, plan, &before.guard)?))
+        } else {
+            None
+        };
+        let row = Observation {
+            timer: before.timer,
+            guard: before.guard,
+            start: before.start,
+            trigger,
+            completed,
+        };
+        if let Some(prior) = previous {
+            row.follows(prior)?;
+        }
+        if let Some((next, _)) = &row.completed
+            && (crossing.is_some()
+                || previous
+                    .is_some_and(|prior| prior.guard != row.guard || prior.completed.is_none()))
+        {
+            completed_journal(n, c, &row, *next)?;
+        }
+        return Ok(row);
+    }
+    bail!("guard failed to stabilize within natural firing observations")
 }
 
 fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Option<u64>> {
@@ -180,10 +315,7 @@ fn select_inner(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
         n.check()?;
         let mut observed = Vec::new();
         for (i, ((c, p), (owner, ticks))) in entries.iter().zip(&owners).enumerate() {
-            let row = observe(n, c, p, owner, *ticks)?;
-            if let Some((_, last)) = previous.get(i) {
-                row.follows(last)?;
-            }
+            let row = observe(n, c, p, owner, *ticks, previous.get(i).map(|(_, r)| r))?;
             observed.push((c.unit == GUARD_UNIT, row));
         }
         let clock = mono()?;
@@ -302,6 +434,50 @@ mod tests {
             .is_none()
         );
         assert!(next_probe(&rows, 339816000000, 339820000000).is_err());
+    }
+    #[test]
+    fn v142_actual_same_pid1_guard_completes_between_manager_reads() {
+        let state = |gid: &str, tid: &str, start, dormant| ManagerState {
+            guard: gid.into(),
+            timer: tid.into(),
+            start,
+            dormant,
+        };
+        let gid = "24fb9ec1c08149be840ca21d7ed752f4";
+        let tid = "8a2ba7744065496b8bf4c794d225935f";
+        let trigger = 341627306350;
+        let running = state(gid, tid, 341627308440, false);
+        let done = state(gid, tid, running.start, true);
+        running.natural_edge(&done, None, trigger).unwrap();
+        assert!(done.natural_edge(&running, None, trigger).is_err());
+        assert!(
+            running
+                .natural_edge(&state("foreign", tid, running.start, true), None, trigger)
+                .is_err()
+        );
+        assert!(
+            running
+                .natural_edge(
+                    &state(gid, "replacement", running.start, true),
+                    None,
+                    trigger
+                )
+                .is_err()
+        );
+        assert!(
+            running
+                .natural_edge(&done, None, trigger - 2 * SECOND)
+                .is_err()
+        );
+        let first = completed("prior", 341627301629);
+        let old = state(&first.guard, &first.timer, first.start, true);
+        let later = state(gid, &first.timer, running.start, false);
+        old.natural_edge(&later, Some(&first), trigger).unwrap();
+        assert!(old.natural_edge(&later, None, trigger).is_err());
+        assert!(
+            old.natural_edge(&later, Some(&first), 341627301628)
+                .is_err()
+        );
     }
     #[test]
     fn changed_timer_spoofed_firing_and_late_successor_are_fatal() {
