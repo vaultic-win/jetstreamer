@@ -17,7 +17,12 @@ use std::{
 };
 
 const MAX_RECOVERIES: u32 = 2;
-const BACKOFF_SECONDS: [u64; 2] = [30, 120];
+const LAST_SLOT: u32 = MAX_RECOVERIES + 1;
+const BACKOFF_SECONDS: [u64; LAST_SLOT as usize] = [30, 120, 120];
+// The three whole-response attempts for this object predate sequential ranged GET.
+// Pin both ends of the validated append-only chain before permitting one ranged read.
+const EPOCH79_ORIGINAL: &str = "00bb8f2a04c4f1b947145090565f69843d57d60dfd16812d3853fd1145690a43";
+const EPOCH79_RETRY2: &str = "c70b0fff4cc9b463adfaef3bde19818e6ca8f1eecd5f8d46236896e4f5d40d65";
 // The v5 producer did not persist typed failure stages. Admit only this exact
 // inspected old receipt, not all old failures with similar-looking messages.
 const LEGACY73_SHA: &str = "e1edc7906e39a22ec6f9ab40416eeb5452e2dfdce63b11a84f30e4ce67b5db6a";
@@ -51,9 +56,20 @@ pub struct View {
     incomplete: Option<RetryTicket>,
 }
 impl View {
+    fn retry_limit(&self) -> u32 {
+        if self.completed_recoveries == MAX_RECOVERIES
+            && self.latest.epoch == 79
+            && self.original_sha256 == EPOCH79_ORIGINAL
+            && self.latest_sha256 == EPOCH79_RETRY2
+        {
+            LAST_SLOT
+        } else {
+            MAX_RECOVERIES
+        }
+    }
     pub fn retry_available(&self) -> bool {
         self.incomplete.is_none()
-            && self.completed_recoveries < MAX_RECOVERIES
+            && self.completed_recoveries < self.retry_limit()
             && retryable(&self.latest, &self.latest_sha256)
     }
 }
@@ -122,6 +138,7 @@ fn validate_ticket(
     ensure!(
         ticket.schema == "horizon-r2-audit-transfer-retry-intent-v1"
             && ticket.object == *object
+            && (1..=prior.retry_limit()).contains(&ordinal)
             && ticket.binding.ordinal == ordinal
             && ticket.binding.original_result_sha256 == prior.original_sha256
             && ticket.binding.previous_result_sha256 == prior.latest_sha256
@@ -167,7 +184,7 @@ fn validate_ticket(
 pub fn view(cfg: &Config, object: &Object) -> Result<Option<View>> {
     let original = outcome_path(cfg, object.epoch);
     if !original.try_exists()? {
-        for ordinal in 1..=MAX_RECOVERIES {
+        for ordinal in 1..=LAST_SLOT {
             ensure!(
                 !result_path(cfg, object.epoch, ordinal).try_exists()?
                     && !ticket_path(cfg, object.epoch, ordinal).try_exists()?,
@@ -189,7 +206,7 @@ pub fn view(cfg: &Config, object: &Object) -> Result<Option<View>> {
         incomplete: None,
     };
     let mut gap = false;
-    for ordinal in 1..=MAX_RECOVERIES {
+    for ordinal in 1..=LAST_SLOT {
         let ticket_file = ticket_path(cfg, object.epoch, ordinal);
         let result_file = result_path(cfg, object.epoch, ordinal);
         if !ticket_file.try_exists()? {
@@ -360,7 +377,9 @@ pub async fn run_pending(cfg: &Config, remote: &Remote, object: &Object) -> Resu
             Some(object.bytes),
             Some(&format!(
                 "transfer retry {}/{}; not before {}; original failure retained",
-                ticket.binding.ordinal, MAX_RECOVERIES, ticket.not_before
+                ticket.binding.ordinal,
+                current.retry_limit(),
+                ticket.not_before
             )),
         )?;
         while now() < ticket.not_before {
@@ -377,7 +396,9 @@ pub async fn run_pending(cfg: &Config, remote: &Remote, object: &Object) -> Resu
                     Some(object.bytes),
                     Some(&format!(
                         "heartbeat; retry {}/{} remains scheduled at {}; no transfer started",
-                        ticket.binding.ordinal, MAX_RECOVERIES, ticket.not_before
+                        ticket.binding.ordinal,
+                        current.retry_limit(),
+                        ticket.not_before
                     )),
                 )?;
             }
@@ -451,6 +472,33 @@ mod tests {
         )
         .unwrap();
     }
+    #[test]
+    fn only_exact_exhausted_whole_response_chain_gets_one_ranged_recovery() {
+        let d = tempfile::tempdir().unwrap();
+        let cfg = config(d.path());
+        let mut obj = object();
+        obj.epoch = 79;
+        let mut view = View {
+            latest: failed(&cfg, &obj),
+            original_sha256: EPOCH79_ORIGINAL.into(),
+            latest_sha256: EPOCH79_RETRY2.into(),
+            completed_recoveries: MAX_RECOVERIES,
+            incomplete: None,
+        };
+        assert!(view.retry_available());
+        view.completed_recoveries = LAST_SLOT;
+        assert!(!view.retry_available());
+        view.completed_recoveries = MAX_RECOVERIES;
+        view.latest.epoch = 80;
+        assert!(!view.retry_available());
+        view.latest.epoch = 79;
+        view.latest_sha256 = "0".repeat(64);
+        assert!(!view.retry_available());
+        view.latest_sha256 = EPOCH79_RETRY2.into();
+        view.original_sha256 = "0".repeat(64);
+        assert!(!view.retry_available());
+    }
+
     #[test]
     fn preparation_interruptions_leave_the_original_retry_budget_available() {
         let d = tempfile::tempdir().unwrap();
