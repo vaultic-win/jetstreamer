@@ -1472,6 +1472,13 @@ mod launch_plan {
             let path = output.join("genesis.tar.bz2");
             fs::write(&path, b"genesis fixture").unwrap();
             fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            // Native qualification also reads root-owned predecessor receipts. Give the
+            // fixture the same owner as a genesis file staged for the replay service.
+            if unsafe { libc::geteuid() } == 0 {
+                for member in [&output, &path] {
+                    std::os::unix::fs::chown(member, Some(1001), None).unwrap();
+                }
+            }
             let source =
                 json!({"path":"/immutable/genesis.tar.bz2","sha256":sha(b"genesis fixture")});
             let prepared = json!({"fresh_subtree":{"path":root,"identity":identity(&fs::metadata(&root).unwrap())},
