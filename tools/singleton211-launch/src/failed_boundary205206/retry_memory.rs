@@ -50,7 +50,7 @@ fn original_sources(row: &capacity::Reservation, bridge: &Bound) -> Result<Value
             && l["booking"] == json!(booking)
             && l["unit"]["InvocationID"] == RETRY_IID
             && l["unit"]["Id"] == RETRY
-            && l["unit"]["MemoryMax"] == CAP.to_string()
+            && text(&l["unit"], "MemoryMax")?.parse::<u64>()? == CAP
             && l["unit"]["MemorySwapMax"] == "0"
             && b["actor"] == RETRY
             && b["actual_credit"] == 0
