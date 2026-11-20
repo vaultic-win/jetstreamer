@@ -42,6 +42,7 @@ solana-signature.workspace = true
 solana-sdk-ids.workspace = true
 prost_011.workspace = true
 solana-entry.workspace = true
+httpdate = "1"
 reqwest = { workspace = true, features = ["json", "stream"] }
 tokio = { workspace = true, features = ["rt", "sync", "io-util", "fs"] }
 futures-util.workspace = true

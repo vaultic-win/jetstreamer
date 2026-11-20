@@ -4762,6 +4762,7 @@ dependencies = [
  "dashmap 6.1.0",
  "fnv",
  "futures-util",
+ "httpdate",
  "jetstreamer-horizon",
  "libc",
  "log",
