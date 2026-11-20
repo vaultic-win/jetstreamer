@@ -94,13 +94,6 @@ fn guard_argv(plan: &Path, sha: &str) -> Vec<String> {
     ]);
     a
 }
-fn mkdir(path: &Path, mode: u32) -> Result<()> {
-    fs::DirBuilder::new().mode(mode).create(path)?;
-    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
-    custody(path, 0, 0, None, mode)?;
-    File::open(path.parent().context("dir parent")?)?.sync_all()?;
-    Ok(())
-}
 fn sample(dir: &Path, producer: &Value, floor: u64, sha: &str, deadline: Instant) -> Result<Value> {
     let id = at(producer, "InvocationID")?;
     let pid = at(producer, "MainPID")?.parse::<u64>()?;
@@ -264,40 +257,26 @@ fn rollback(token: &str, timer_owned: Option<&str>) -> Result<()> {
 }
 pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> Result<()> {
     let root = Path::new(BASE);
-    custody(root, 0, 0, None, 0o700)?;
-    let lock = OpenOptions::new()
-        .create_new(true)
-        .read(true)
-        .write(true)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(root.join("admission.lock"))?;
+    let lock = retry::open_lock()?;
     ensure!(
         unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "concurrent admission"
     );
-    for unit in [UNIT, GUARD_SERVICE, TIMER] {
-        unused(unit)?;
-    }
+    retry::cold()?;
     check_fit(&pre)?;
     let token = format!(
         "epoch169-focused-{}",
         fs::read_to_string("/proc/sys/kernel/random/uuid")?.trim()
     );
     let actor = producer_argv(&token)?;
-    record(
-        root,
-        "PREFLIGHT.json",
-        &json!({"fleet":binding(fleet,sha),"provenance":provenance,"measurement":pre,"producer_argv":actor}),
-    )?;
-    mkdir(Path::new(RECEIPTS), 0o700)?;
-    mkdir(&root.join("barrier"), 0o755)?;
-    for name in ["guard.stdout", "guard.stderr"] {
-        exclusive(&root.join(name), &[], 0o600)?;
-    }
-    child_stage()?;
     let fresh = fit::inspect(fleet, sha, None)?;
     let floor = check_fit(&fresh)?;
+    let cold = record(root, "RETRY1_COLD_SETUP.json", &retry::cold()?)?;
+    let retry_pre = record(
+        root,
+        "RETRY1_PREFLIGHT.json",
+        &json!({"fleet":binding(fleet,sha),"provenance":provenance,"measurement":pre,"producer_argv":actor,"cold_setup":cold}),
+    )?;
     record(root, "FINAL_PRELAUNCH_FIT.json", &fresh)?;
     let static_plan = record(
         root,
@@ -403,7 +382,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         record(
             root,
             "ACTUAL_ADMISSION_AND_PROTECTION.json",
-            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
+            &json!({"schema":"epoch169-focused-private-guarded-admission-v1","epoch":169,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"retry1_cold_setup":cold,"retry1_preflight":retry_pre,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
         )
     })();
     match attempt {

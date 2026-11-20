@@ -4,6 +4,7 @@
 mod fit;
 mod launch;
 mod peers;
+mod retry;
 mod staged;
 use anyhow::{Context, Result, bail, ensure};
 use guard169::*;
@@ -12,15 +13,14 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
-    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-v1";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-retry1-v1";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 mod inputs;
@@ -164,57 +164,6 @@ fn custody(path: &Path, uid: u32, gid: u32, ino: Option<u64>, mode: u32) -> Resu
     );
     Ok(())
 }
-fn child_stage() -> Result<()> {
-    let dest = Path::new(DEST);
-    let parent = dest.parent().context("nested parent")?;
-    custody(Path::new(LANE), 1001, 1003, Some(111744585), 0o700)?;
-    custody(parent, 1001, 1003, Some(111744585), 0o700)?;
-    let pid = unsafe { libc::fork() };
-    ensure!(pid >= 0, "fork staging");
-    if pid == 0 {
-        let ok = unsafe {
-            libc::setgroups(0, std::ptr::null()) == 0
-                && libc::setgid(1003) == 0
-                && libc::setuid(1001) == 0
-        };
-        let created = ok
-            && (|| -> Result<()> {
-                custody(parent, 1001, 1003, Some(111744585), 0o700)?;
-                custody(dest, 1001, 1003, Some(111744588), 0o700)?;
-                inputs::existing_destination(dest)?;
-                let attempt = Path::new(ATTEMPT);
-                fs::DirBuilder::new().mode(0o700).create(attempt)?;
-                custody(attempt, 1001, 1003, None, 0o700)?;
-                exclusive(&attempt.join("producer.log"), &[], 0o600)?;
-                File::open(attempt)?.sync_all()?;
-                File::open(parent)?.sync_all()?;
-                Ok(())
-            })()
-            .is_ok();
-        unsafe {
-            libc::_exit(if created { 0 } else { 1 });
-        }
-    }
-    let mut status = 0;
-    ensure!(
-        unsafe { libc::waitpid(pid, &mut status, 0) } == pid
-            && libc::WIFEXITED(status)
-            && libc::WEXITSTATUS(status) == 0,
-        "subtree or log already exists or failed staging"
-    );
-    custody(dest, 1001, 1003, None, 0o700)?;
-    let log = fs::symlink_metadata(Path::new(ATTEMPT).join("producer.log"))?;
-    ensure!(
-        log.is_file()
-            && log.len() == 0
-            && log.uid() == 1001
-            && log.gid() == 1003
-            && log.mode() & 0o7777 == 0o600
-            && log.nlink() == 1,
-        "wrong log"
-    );
-    Ok(())
-}
 fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     let pkg = Path::new(PACKAGE);
     ensure!(
@@ -284,6 +233,11 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
         observed.len() == 40 && observed.bytes().all(|b| b.is_ascii_hexdigit()),
         "invalid observed origin"
     );
+    ensure!(
+        source != retry::OLD_SOURCE,
+        "original controller cannot execute recovery"
+    );
+    git(&["merge-base", "--is-ancestor", retry::OLD_SOURCE, source])?;
     for commit in [
         source,
         "dead395c32e6c46d3f600eaffda9554b16123ec4",
@@ -298,10 +252,7 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     );
     inputs::failed_g1()?;
     inputs::existing_destination(Path::new(DEST))?;
-    ensure!(
-        !Path::new(ATTEMPT).try_exists()?,
-        "generation two already staged"
-    );
+    retry::cold()?;
     let extra = inputs::verify(&proof)?;
     pinned(Path::new(GUARD), GUARD_SHA)?;
     pinned(Path::new(SEALER), SEALER_SHA)?;

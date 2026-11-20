@@ -244,7 +244,7 @@ pub(super) fn free() -> Result<u64> {
         .checked_mul(st.f_bavail)
         .context("HOME free bytes")
 }
-fn whole() -> Result<u64> {
+fn whole_custody() -> Result<()> {
     let m = canonical(Path::new(LANE))?;
     let home = canonical(Path::new("/home/sol"))?;
     ensure!(
@@ -268,20 +268,31 @@ fn whole() -> Result<u64> {
             .any(|s| Path::new(s).starts_with(LANE)),
         "submount inside allocated lane"
     );
-    let r = Command::new("/usr/bin/du")
-        .args(["-s", "-x", "-B1", "--", LANE])
-        .output()?;
-    ensure!(
-        r.status.success(),
-        "whole 168 allocation measurement failed"
-    );
-    let raw = std::str::from_utf8(&r.stdout)?.trim_end();
-    let (bytes, root) = raw.split_once('\t').context("du record")?;
-    ensure!(
-        root == LANE && canonical(Path::new(LANE))?.ino() == m.ino(),
-        "whole root changed"
-    );
-    Ok(bytes.parse()?)
+    Ok(())
+}
+#[path = "whole_du.rs"]
+mod whole_du;
+fn whole() -> Result<u64> {
+    whole_du::scan(|| {
+        whole_custody()?;
+        let output = Command::new("/usr/bin/timeout")
+            .env("LC_ALL", "C")
+            .env("QUOTING_STYLE", "shell-always")
+            .args([
+                "--kill-after=1s",
+                "6s",
+                "/usr/bin/du",
+                "-s",
+                "-x",
+                "-B1",
+                "--",
+                LANE,
+            ])
+            .output()
+            .context("starting timed whole 168 du")?;
+        whole_custody()?;
+        Ok(output)
+    })
 }
 pub(super) fn measure() -> Result<Value> {
     let prep = peer::bound(&peer::pair(PREP, PREP_SHA))?;
@@ -326,4 +337,16 @@ pub(super) fn measure() -> Result<Value> {
     Ok(
         json!({"peer_remaining_growth_bytes":growth,"standard_peer_realized_bytes":credit,"native_membership":peer::pair(PREP,PREP_SHA),"standard_root_allocated_bytes":a.min(b),"remaining_standard_root_bytes":CAP-a.min(b),"root_cap_bytes":CAP,"retained168":ancestry}),
     )
+}
+
+#[cfg(test)]
+mod whole_tree_tests {
+    #[test]
+    #[ignore = "real HOME epoch168 lane, requires full read custody"]
+    fn two_complete_live_scans() {
+        let first = super::whole().unwrap();
+        let second = super::whole().unwrap();
+        assert!(first > 0 && second > 0);
+        eprintln!("first={first} second={second}");
+    }
 }

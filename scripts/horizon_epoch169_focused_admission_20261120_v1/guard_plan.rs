@@ -27,7 +27,7 @@ pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-f
 pub const GUARD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 pub const GUARD_SHA: &str = "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-v1/focused169";
+pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-retry1-v1/focused169";
 // The retained 288-GiB standard booking covers both roots. This diagnostic enforces a smaller
 // whole-tree ceiling to fit alongside 168's existing raw HOME floor.
 pub const CAP: u64 = 96 << 30;
