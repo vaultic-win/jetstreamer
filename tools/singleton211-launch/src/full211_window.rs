@@ -84,7 +84,12 @@ fn measurement(s: &Value, floor: u64, gid: &str) -> Result<(u64, u64)> {
     );
     Ok((a.min(b), free))
 }
-fn clocks(rows: &[Value], boot: &str, gid: &str) -> Result<(u64, u64)> {
+pub(super) fn guard_clocks(
+    rows: &[Value],
+    boot: &str,
+    unit: &str,
+    gid: &str,
+) -> Result<(u64, u64)> {
     let mut start = None;
     let mut end = None;
     for r in rows {
@@ -92,28 +97,28 @@ fn clocks(rows: &[Value], boot: &str, gid: &str) -> Result<(u64, u64)> {
             r["_BOOT_ID"] == boot.replace('-', "")
                 && r["_PID"] == "1"
                 && r["_UID"] == "0"
-                && r["UNIT"] == GUARD_UNIT
+                && r["UNIT"] == unit
                 && r["INVOCATION_ID"] == gid,
-            "unexpected full211 PID1 record"
+            "unexpected periodic guard PID1 record"
         );
         let t = text(r, "__MONOTONIC_TIMESTAMP")?.parse()?;
         let msg = text(r, "MESSAGE")?;
         match text(r, "MESSAGE_ID")? {
             "7d4958e842da4a758f6c1cdc7b36dcc5"
-                if msg.starts_with(&format!("Starting {GUARD_UNIT} -")) =>
+                if msg.starts_with(&format!("Starting {unit} -")) =>
             {
                 ensure!(start.replace(t).is_none(), "repeated guard start")
             }
             "7ad2d189f7e94e70a38c781354912448"
-                if msg == format!("{GUARD_UNIT}: Deactivated successfully.") =>
+                if msg == format!("{unit}: Deactivated successfully.") =>
             {
                 ensure!(end.replace(t).is_none(), "repeated guard exit")
             }
             "39f53479d3a045ac8e11786248231fbf"
-                if msg.starts_with(&format!("Finished {GUARD_UNIT} -")) => {}
+                if msg.starts_with(&format!("Finished {unit} -")) => {}
             "ae8f7b866b0347b9af31fe1c80b127c0"
-                if msg.starts_with(&format!("{GUARD_UNIT}: Consumed ")) => {}
-            _ => bail!("unexpected full211 PID1 result"),
+                if msg.starts_with(&format!("{unit}: Consumed ")) => {}
+            _ => bail!("unexpected periodic guard PID1 result"),
         }
     }
     let (start, end) = (
@@ -237,7 +242,7 @@ impl Firing {
         journal.bytes(false)?;
         let rows = decode_journal(&raw)?;
         let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
-        let (start, end) = clocks(&rows, boot.trim(), gid)?;
+        let (start, end) = guard_clocks(&rows, boot.trim(), GUARD_UNIT, gid)?;
         let clock = mono()?;
         ensure!(
             start.abs_diff(*trigger) <= ACCURACY
@@ -310,7 +315,7 @@ fn reopen(f: &Firing, boot: &str) -> Result<()> {
     trusted_parents(&f.journal.path)?;
     let rows = decode_journal(&f.journal.bytes(false)?)?;
     ensure!(
-        clocks(&rows, boot, &f.guard)? == (f.start, f.end)
+        guard_clocks(&rows, boot, GUARD_UNIT, &f.guard)? == (f.start, f.end)
             && (lower, free) == (f.lower_physical, f.free)
             && f.start.abs_diff(f.trigger) <= ACCURACY
             && f.next.saturating_sub(f.trigger).abs_diff(CADENCE) <= ACCURACY
