@@ -266,6 +266,12 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 4 && args[1] == "--measure-replay-reservations" {
+        ensure!(unsafe { libc::geteuid() } == 0, "privileged measurement required");
+        let fleet = json_pin(Path::new(&args[2]), &args[3])?;
+        println!("{}", fit::measure_replay_reservations(&fleet)?);
+        return Ok(());
+    }
     ensure!(
         unsafe { libc::geteuid() } == 0
             && args.len() == 6

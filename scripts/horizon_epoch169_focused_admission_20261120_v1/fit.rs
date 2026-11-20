@@ -79,6 +79,29 @@ fn aux(fleet: &Value, e: &Value) -> Result<Value> {
         json!({"retained_bookings":a,"phase_admissions":bindings,"native":native,"corrected_images":more,"fixed_image_remaining_growth_bytes":fixed_remaining,"remaining_growth_bytes":growth,"memory_bytes":mem,"cpu_quota_micros":cpu}),
     )
 }
+/// Read the live, identity-bound disk, auxiliary and temporary-owner inputs for a
+/// second admission without starting this controller or claiming a resource credit.
+pub(super) fn measure_replay_reservations(fleet: &Value) -> Result<Value> {
+    let e = peer::evidence()?;
+    ensure!(
+        fleet["complete_DATA_bytes"] == 6_794_761_027_378u64
+            && fleet["complete_projected_memory_bytes"] == 761_131_708_416u64
+            && fleet["independent166_post_guard_capacity"] == e["post_guard_capacity"]
+            && fleet["all_reservation_ending_bytes"] == 0,
+        "different complete historical allocation"
+    );
+    let (memory, cpu, temporary) = crate::peers::temporary_workers()?;
+    Ok(json!({
+        "roots": disk::measure()?,
+        "auxiliary": aux(fleet, &e)?,
+        "historical_floor_bytes": peer::FLOOR,
+        "independent166_whole_cap_bytes": peer::CAP,
+        "temporary_memory": memory,
+        "temporary_cpu_micros": cpu,
+        "temporary_workers": temporary,
+    }))
+}
+
 fn memory() -> Result<(u64, u64)> {
     let data = fs::read_to_string("/proc/meminfo")?;
     let get = |key: &str| -> Result<u64> {
