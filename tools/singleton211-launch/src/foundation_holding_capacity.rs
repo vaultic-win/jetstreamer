@@ -209,6 +209,7 @@ mod tests {
             currents: BTreeMap::new(),
             overhead: (0, 0),
             century: 0,
+            full211_growth: None,
             release: None,
             boot: String::new(),
             device: 0,

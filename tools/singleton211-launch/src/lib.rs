@@ -18,6 +18,7 @@ mod capacity;
 mod delivery247;
 mod finalization;
 mod full211_peer;
+mod full211_window;
 mod full265;
 // Reuse the exact observer consumer, including its semantic startup/token checks.
 #[path = "../../../jetstreamer-horizon-observe/src/full265.rs"]

@@ -84,6 +84,7 @@ pub(super) struct BookedHost {
     pub overhead: (u64, u64),
     pub century: u64,
     pub release: Option<Value>,
+    pub full211_growth: Option<Value>,
     pub boot: String,
     pub device: u64,
 }
@@ -143,7 +144,8 @@ pub(super) fn booked_host(
         native257::TIMER,
     ));
     let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed, full211)?;
-    let (effective, release) = native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;
+    let (mut effective, release) =
+        native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
     let device = fs::metadata(path)?.dev();
     // The original bookings have one shared filesystem floor. Compare its
@@ -155,7 +157,22 @@ pub(super) fn booked_host(
             && fs::metadata(ledger_fs)?.dev() == device,
         "existing disk reservations need a per-device transition"
     );
-    let resources = live::resources_at(path)?;
+    let mut resources = live::resources_at(path)?;
+    let full211_growth = if full211 {
+        ensure!(
+            device == fs::metadata(ROOT)?.dev(),
+            "candidate and full211 allocation are on different devices"
+        );
+        let firing = full211_window::Firing::capture(n)?;
+        let row = effective
+            .iter_mut()
+            .find(|r| r.unit == UNIT)
+            .context("missing full211 arithmetic row")?;
+        resources.2 = resources.2.min(live::resources_at(path)?.2);
+        Some(firing.capacity(row, &mut resources.2)?)
+    } else {
+        None
+    };
     ensure!(
         Some(resources.0) == num(&observer["host_memory"], "total_kib")?.checked_mul(1024),
         "physical host changed"
@@ -170,6 +187,7 @@ pub(super) fn booked_host(
     Ok(BookedHost {
         resources,
         rows: effective,
+        full211_growth,
         currents,
         overhead: (overhead, periodic::total(&periodic)?),
         century,
@@ -204,7 +222,7 @@ pub(super) fn evaluate(
     let combined_control_excess =
         capacity::add(control_bytes, 2 * 268_435_456)?.saturating_sub(CONTROL);
     let host = booked_host(n, review, &path, Some(held))?;
-    let result = scenarios(
+    let mut result = scenarios(
         host.resources,
         host.century,
         &host.rows,
@@ -212,6 +230,13 @@ pub(super) fn evaluate(
         host.overhead,
         combined_control_excess,
     );
+    if let Some(growth) = &host.full211_growth {
+        let selected = &mut result["limited_native257_with_booked_full211"];
+        if selected["fits"] == true {
+            selected["capacity"]["allocation_credit_taken_bytes"] =
+                growth["guard"]["lower_physical"].clone();
+        }
+    }
     ensure!(
         host.device == device && existing_scratch_filesystem()? == (path.clone(), device),
         "scratch backing changed during fit"
@@ -225,10 +250,69 @@ pub(super) fn evaluate(
        "admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false});
     if host.rows.iter().any(|r| r.unit == UNIT) {
         fit["full211_handoff"] = json!(full211_peer::handoff());
+        fit["full211_growth"] = json!(host.full211_growth);
     }
     Ok(fit)
 }
 
+/// Capture two consecutive natural firings without starting a worker, timer or guard.
+pub fn qualify_full211_window(evidence: &Path) -> Result<Value> {
+    use std::os::unix::fs::DirBuilderExt;
+    ensure!(
+        unsafe { libc::geteuid() } == 0
+            && evidence.parent() == Some(Path::new("/var/lib/jetstreamer"))
+            && evidence
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("horizon-native257-full211-window-")),
+        "rollover evidence namespace or identity"
+    );
+    trusted_parents(evidence)?;
+    match fs::DirBuilder::new().mode(0o700).create(evidence) {
+        Ok(()) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            let m = fs::symlink_metadata(evidence)?;
+            ensure!(
+                m.is_dir()
+                    && m.uid() == 0
+                    && m.gid() == 0
+                    && m.mode() & 0o7777 == 0o700
+                    && evidence.canonicalize()? == evidence
+                    && fs::read_dir(evidence)?.next().is_none(),
+                "precreated qualification leaf must be empty and root private"
+            );
+        }
+        Err(e) => return Err(e.into()),
+    }
+    save_json(
+        evidence,
+        "started.json",
+        &json!({"boot_id":fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),"monotonic_us":mono()?}),
+    )?;
+    let mut n = Native {
+        root: evidence.into(),
+        counter: 0,
+        deadline: Some(
+            mono()?
+                .checked_add(55_000_000)
+                .context("qualification clock overflow")?,
+        ),
+    };
+    let result = full211_window::qualify(&mut n);
+    match &result {
+        Ok(v) => {
+            save_json(evidence, "window.json", v)?;
+        }
+        Err(e) => {
+            save_json(
+                evidence,
+                "failure.json",
+                &json!({"error":format!("{e:#}"),"guard_or_producer_mutations":false}),
+            )?;
+        }
+    }
+    result
+}
 pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
