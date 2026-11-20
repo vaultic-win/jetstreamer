@@ -299,11 +299,14 @@ pub(super) fn physical_ledger(root: &Path) -> Result<Value> {
     }
     anyhow::bail!("missing second lane capture")
 }
+// The stopped epoch 166 lane has 1,197,731 entries. Both passes stream
+// their records into the digest and retain only the current directory listing.
+const MAX_COMPACT_ENTRIES: u64 = 2_000_000;
 fn compact_record(path: &str, m: &fs::Metadata, hash: &mut Sha256, count: &mut u64, bytes: &mut u64) -> Result<()> {
     let allocated = m.blocks().checked_mul(512).context("compact allocation overflow")?;
     *bytes = bytes.checked_add(allocated).context("compact ledger sum overflow")?;
     *count += 1;
-    ensure!(*count <= 1_000_000, "compact lane ledger bound exceeded");
+    ensure!(*count <= MAX_COMPACT_ENTRIES, "compact lane ledger bound exceeded");
     let row = serde_json::to_vec(&json!({"path":path,"identity":identity(m),"physical_bytes":allocated}))?;
     hash.update((row.len() as u64).to_le_bytes());
     hash.update(row);
@@ -313,7 +316,7 @@ fn compact_at(
     dir: &File, prefix: &str, device: u64, depth: usize,
     hash: &mut Sha256, count: &mut u64, bytes: &mut u64,
 ) -> Result<()> {
-    ensure!(depth <= 64 && *count < 1_000_000, "compact lane ledger bound exceeded");
+    ensure!(depth <= 64 && *count < MAX_COMPACT_ENTRIES, "compact lane ledger bound exceeded");
     let before = dir.metadata()?;
     ensure!(before.is_dir() && before.dev() == device, "foreign compact ledger directory");
     compact_record(prefix, &before, hash, count, bytes)?;
@@ -627,7 +630,7 @@ pub(super) fn staged_genesis(fresh: &Path, expected: &Value) -> Result<Value> {
 pub(super) fn ledger_summary(ledger: &Value) -> Result<Value> {
     if ledger["compact_streaming_ledger"] == true {
         ensure!(ledger["physical_bytes"].as_u64().is_some()
-            && ledger["complete_ledger_entry_count"].as_u64().is_some_and(|n| n > 0 && n <= 1_000_000)
+            && ledger["complete_ledger_entry_count"].as_u64().is_some_and(|n| n > 0 && n <= MAX_COMPACT_ENTRIES)
             && ledger["complete_ledger_sha256"].as_str().is_some_and(|s| s.len() == 64)
             && ledger["full_two_capture_identity_and_allocation_check_passed"] == true,
             "invalid compact ledger summary");
@@ -660,6 +663,21 @@ mod summary_tests {
             ledger_summary(&a).unwrap()["complete_ledger_sha256"],
             ledger_summary(&b).unwrap()["complete_ledger_sha256"]
         );
+    }
+    #[test]
+    fn compact_record_and_summary_use_the_same_expanded_limit() {
+        let t = tempfile::tempdir().unwrap();
+        let m = t.path().metadata().unwrap();
+        let mut count = MAX_COMPACT_ENTRIES - 1;
+        let mut hash = Sha256::new();
+        let mut bytes = 0;
+        compact_record("last", &m, &mut hash, &mut count, &mut bytes).unwrap();
+        let mut summary = json!({"compact_streaming_ledger":true,"physical_bytes":bytes,"complete_ledger_entry_count":count,
+            "complete_ledger_sha256":"a".repeat(64),"full_two_capture_identity_and_allocation_check_passed":true});
+        ledger_summary(&summary).unwrap();
+        assert!(compact_record("extra", &m, &mut hash, &mut count, &mut bytes).is_err());
+        summary["complete_ledger_entry_count"] = json!(count);
+        assert!(ledger_summary(&summary).is_err());
     }
     #[test]
     fn compact_ledger_covers_every_inode_and_rejects_links() {

@@ -624,15 +624,17 @@ fn run(a: &[String]) -> Result<()> {
     );
     let exe = fs::read_link("/proc/self/exe")?;
     ensure!(
-        exe == base().join("stage-v1/stage166") && sha(&fs::read(&exe)?) == a[a.len() - 1],
+        exe == base().join("stage-v2/stage166") && sha(&fs::read(&exe)?) == a[a.len() - 1],
         "sealed stage image mismatch"
     );
     let args = &a[1..a.len() - 2];
-    let q = read_bound(Path::new(QUAL), QUAL_SHA)?;
+    let mut q = read_bound(Path::new(QUAL), QUAL_SHA)?;
+    // Same qualified guard and launcher; the larger historical ledger requires the v2 preparer.
+    q["images"]["prepare"] = json!({"path":base().join("prepare-v2/prepare"),"sha256":"46ad9a36b93867aea4df446e7f4404f1b955f19fe7156f90e577f24c7da26cf9"});
     let images = &q["images"];
     for (key, name) in [
         ("guard", "guard-v1/guard"),
-        ("prepare", "prepare-v1/prepare"),
+        ("prepare", "prepare-v2/prepare"),
         ("launch", "launch-v1/launch"),
     ] {
         ensure!(
