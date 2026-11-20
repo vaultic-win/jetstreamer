@@ -1,3 +1,5 @@
+pub(crate) const MEMORY: u64 = 128_000_000_000;
+pub(crate) const ROOT_CAP: u64 = 506_191_984_640;
 // Closed epoch-specific production bindings.
 pub(crate) const GUARD_UNIT: &str = "horizon-native265-protective-v1.service";
 pub(crate) const UNIT: &str = "horizon-265-native-input-20261119-v1.service";

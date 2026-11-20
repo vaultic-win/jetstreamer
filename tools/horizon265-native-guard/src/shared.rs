@@ -17,9 +17,7 @@ use std::{
 };
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
-const MEMORY: u64 = 128_000_000_000;
 const HIGH: u64 = 100_000_000_000;
-const ROOT_CAP: u64 = 506_191_984_640;
 const VMAS: u64 = 3_500_000;
 const PROCS: &str = "/proc";
 const CGROUPS: &str = "/sys/fs/cgroup";

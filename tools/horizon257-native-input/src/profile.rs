@@ -1,3 +1,6 @@
+pub(crate) const MEMORY: u64 = 120_000_000_000;
+pub(crate) const ROOT_CAP: u64 = 160_000_000_000;
+pub(crate) const RESERVATION: u64 = 256_000_000_000;
 // Closed epoch-specific production bindings.
 pub(crate) const GUARD_UNIT: &str = "horizon-native257-protective-v1.service";
 pub(crate) const UNIT: &str = "horizon-257-native-input-20261120-v1.service";
@@ -27,7 +30,7 @@ pub(crate) const INPUT_VERIFIED: &str = "all_native_input_bytes_verified";
 const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 pub(crate) const HARNESS: &str =
-    "/var/lib/jetstreamer/horizon257-native-input-20261120-v1/horizon257-native-input";
+    "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input";
 pub(crate) fn harness_allowed(path: &std::path::Path) -> bool {
     path == std::path::Path::new(HARNESS)
 }

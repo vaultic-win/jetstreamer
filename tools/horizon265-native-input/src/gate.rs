@@ -152,8 +152,8 @@ fn plan_valid(
             && p["genesis_sha256"] == super::GENESIS_SHA
             && p["input_packet"]["path"] == super::PACKET
             && p["input_packet"]["sha256"] == super::PACKET_SHA
-            && p["maximum_root_physical_bytes"] == 506_191_984_640u64
-            && p["maximum_memory_bytes"] == 128_000_000_000u64
+            && p["maximum_root_physical_bytes"] == ROOT_CAP
+            && p["maximum_memory_bytes"] == MEMORY
             && p["token_root"] == TOKENS
             && p["boot_id"] == boot
             && harness_allowed(exe)
@@ -207,7 +207,7 @@ fn token_valid(
             && gp["filesystem"] == FILESYSTEM
             && gp["worker_root"] == ROOT
             && gp["minimum_free_bytes"] == p["minimum_free_bytes"]
-            && gp["maximum_root_physical_bytes"] == 506_191_984_640u64
+            && gp["maximum_root_physical_bytes"] == ROOT_CAP
             && gp["maximum_worker_vmas"] == 3500000
             && gp["native_main"]["main_pid"] == pid
             && gp["native_main"]["executable"] == p["harness"]["path"]
@@ -239,13 +239,13 @@ fn token_valid(
             && g["minimum_free_bytes"] == p["minimum_free_bytes"]
             && num(g, "available_bytes")? >= num(p, "minimum_free_bytes")?
             && g["maximum_worker_vmas"] == 3500000
-            && g["maximum_root_physical_bytes"] == 506_191_984_640u64
-            && g["root_physical_observation"]["maximum_physical_bytes"] == 506_191_984_640u64
+            && g["maximum_root_physical_bytes"] == ROOT_CAP
+            && g["root_physical_observation"]["maximum_physical_bytes"] == ROOT_CAP
             && g["root_physical_observation"]["exceeds_budget"] == false
             && num(
                 &g["root_physical_observation"],
                 "conservative_physical_bytes",
-            )? <= 506_191_984_640u64
+            )? <= ROOT_CAP
             && g["workers"].as_array().map_or(false, |v| v.len() == 1)
             && g["workers"][0][0] == pid
             && g["workers"][0][1]
@@ -343,7 +343,7 @@ pub(super) fn admit() -> Result<Value> {
             && a["mode"] == "native-cold"
             && a["unit"] == UNIT
             && a["maximum_memory_bytes"] == p["maximum_memory_bytes"]
-            && a["candidate_incremental_peak_bytes"] == 506_191_984_640u64
+            && a["candidate_incremental_peak_bytes"] == RESERVATION
             && a["protected_existing_floor_bytes"] == p["minimum_free_bytes"]
             && a["harness"] == p["harness"]
             && a["guard"] == p["guard"]
@@ -520,12 +520,12 @@ mod tests {
             "worker":{"path":super::super::WORKER,"sha256":super::super::WORKER_SHA},
             "genesis_sha256":super::super::GENESIS_SHA,
             "input_packet":{"path":super::super::PACKET,"sha256":super::super::PACKET_SHA},
-            "maximum_root_physical_bytes":506_191_984_640u64,"maximum_memory_bytes":128_000_000_000u64,
+            "maximum_root_physical_bytes":ROOT_CAP,"maximum_memory_bytes":MEMORY,
             "token_root":TOKENS,"boot_id":"boot","harness":harness,"guard":guard,
             "minimum_free_bytes":10,"issued_monotonic_us":100,"expires_monotonic_us":200,
             "admission":{"path":"/admission","sha256":"e".repeat(64)}});
         let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,
-            "filesystem":FILESYSTEM,"worker_root":ROOT,"minimum_free_bytes":10,"maximum_root_physical_bytes":506_191_984_640u64,
+            "filesystem":FILESYSTEM,"worker_root":ROOT,"minimum_free_bytes":10,"maximum_root_physical_bytes":ROOT_CAP,
             "maximum_worker_vmas":3500000,"native_main":{"main_pid":42,"executable":harness["path"],"sha256":harness["sha256"]}});
         let t = json!({"schema":TOKEN_SCHEMA,"startup_plan_sha256":"f".repeat(64),
             "unit":UNIT,"invocation_id":iid,"main_pid":42,"harness":harness,"guard":guard,"boot_id":"boot",
@@ -536,8 +536,8 @@ mod tests {
             "producer":{"invocation_id":iid,"pid":42,"active":"active","sub":"running","restarts":0,
                 "load_state":"loaded","result":"success","restart_policy":"no","kill_mode":"control-group","delegated":false,
                 "cgroup":format!("/system.slice/{}",UNIT)},"producer_stop_enabled":true,"native_main":gp["native_main"],
-            "minimum_free_bytes":10,"available_bytes":20,"maximum_worker_vmas":3500000,"maximum_root_physical_bytes":506_191_984_640u64,
-            "root_physical_observation":{"maximum_physical_bytes":506_191_984_640u64,"exceeds_budget":false,"conservative_physical_bytes":0},
+            "minimum_free_bytes":10,"available_bytes":20,"maximum_worker_vmas":3500000,"maximum_root_physical_bytes":ROOT_CAP,
+            "root_physical_observation":{"maximum_physical_bytes":ROOT_CAP,"exceeds_budget":false,"conservative_physical_bytes":0},
             "workers":[[42,100]],"trip_reason":null,"worker_observation_error":null,"root_physical_observation_error":null,
             "canary_target_error":null,"target_handoff_error":null,"bounded_measurement":false,
             "bounded_canary":null,"target_handoff":null,"remote_mutations":false,"r2_mutations":false,"recorded_unix_seconds":1000});
