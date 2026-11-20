@@ -86,6 +86,24 @@ pub(super) fn check(r: &Request, p: &Plan) -> Result<()> {
         "staged fleet lost terminal lineage or original promises"
     );
     let parent = p.fresh_subtree.parent().context("retry9 parent")?;
+    check_parent(parent)
+}
+
+fn check_parent(parent: &Path) -> Result<()> {
+    let recorded = bound(&exact(
+        "/var/lib/jetstreamer/horizon_runtime_data/root-zero-166167-stop-20261120-v1/SUCCESSOR_ROOTS_BEFORE_WITNESS.json",
+        "d9e8ae44c9726811b2104cac494b4ccc4a5ef3cb7bf56e5cadec6bf6f9b4be89",
+    ))?;
+    let mut rows = recorded["roots"]
+        .as_array()
+        .context("precreated roots")?
+        .iter()
+        .filter(|row| row["epoch"] == 170);
+    let row = rows.next().context("missing original epoch 170 root")?;
+    ensure!(
+        rows.next().is_none() && row["path"].as_str().map(Path::new) == Some(parent),
+        "wrong original epoch 170 root"
+    );
     let m = fs::symlink_metadata(parent)?;
     ensure!(
         parent
@@ -94,8 +112,8 @@ pub(super) fn check(r: &Request, p: &Plan) -> Result<()> {
             )
             && parent.canonicalize()? == parent
             && m.is_dir()
-            && m.dev() == 64512
-            && m.ino() == 111106426
+            && row["dev"].as_u64() == Some(m.dev())
+            && row["ino"].as_u64() == Some(m.ino())
             && m.uid() == 1001
             && m.gid() == 1003
             && m.mode() & 0o7777 == 0o700,
@@ -106,6 +124,14 @@ pub(super) fn check(r: &Request, p: &Plan) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn corroborates_the_retry9_parent_against_the_original_precreation_receipt() {
+        let parent = Path::new(
+            "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1",
+        );
+        check_parent(parent).unwrap();
+        assert!(check_parent(parent.parent().unwrap()).is_err());
+    }
     #[test]
     fn authentic_stop7_rejects_mixed_guard_and_terminal() {
         let stop = bound(&exact(STOP7, STOP7_SHA)).unwrap();
