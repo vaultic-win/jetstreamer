@@ -13,17 +13,17 @@ use std::{
     process::Command,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-const UNIT: &str = "horizon265-prestart-control-v2.service";
-const OVERRIDE: &str = "horizon265-prestart-override-v2.service";
-const RETENTION: &str = "horizon265-prestart-control-retention-v2.target";
-const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v3";
+const UNIT: &str = "horizon265-prestart-control-v3.service";
+const OVERRIDE: &str = "horizon265-prestart-override-v3.service";
+const RETENTION: &str = "horizon265-prestart-control-retention-v3.target";
+const PACKAGE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-package-v4";
 const BINARY: &str =
-    "/var/lib/jetstreamer/horizon265-prestart-control-package-v3/horizon-prestart-controls";
-const STATE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2/tokens";
-const MARKERS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v2/markers";
-const PROD_TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1";
-const PROD_UNIT: &str = "horizon-qualify-265-replacement-20261119-v1.service";
+    "/var/lib/jetstreamer/horizon265-prestart-control-package-v4/horizon-prestart-controls";
+const STATE: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v3";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v3/tokens";
+const MARKERS: &str = "/var/lib/jetstreamer/horizon265-prestart-control-state-v3/markers";
+const PROD_TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2";
+const PROD_UNIT: &str = "horizon-qualify-265-replacement-20261119-v2.service";
 const FIELDS: &str = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,NRestarts,Result,ExecMainCode,ExecMainStatus,ExecMainPID,ExecStartPre,ExecStart,Job,FragmentPath,DropInPaths,Restart,KillMode,Delegate,ControlGroup,Environment,EnvironmentFiles,PassEnvironment,UnsetEnvironment,MemoryMax,MemorySwapMax,TasksMax,TimeoutStartUSec,NoNewPrivileges,PrivateNetwork,ProtectSystem,ProtectHome,CapabilityBoundingSet,AmbientCapabilities,ReadWritePaths,ReadOnlyPaths,Type,User,Group,RemainAfterExit";
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

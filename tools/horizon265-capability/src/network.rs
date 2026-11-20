@@ -1,8 +1,8 @@
 use super::*;
-const UNIT: &str = "horizon265-car-header-network-proof-20261119-v1.service";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1";
+const UNIT: &str = "horizon265-car-header-network-proof-20261120-v2.service";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2";
 const NATIVE_ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/horizon265-network-native-evidence-20261119-v1";
+    "/home/ubuntu/.jetstreamer-private/horizon265-network-native-evidence-20261120-v2";
 const CID: &str = "bafyreibgf4smruua7seioyolngrziiqsgeae3d4zmcvptg7m4xwzyafqwu";
 const CID_HEX: &str = "01711220262f24c8d280fc888761cb69a394221231004d8f9960aaf99bece5ed9c00b0b5";
 fn directory() -> PathBuf {
@@ -195,7 +195,7 @@ fn namespace() -> Result<Value> {
         (NATIVE_ROOT, true),
         (
             concat!(
-                "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v1",
+                "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2",
                 "/output/compact-indexes"
             ),
             false,
@@ -357,7 +357,7 @@ pub(super) fn capture(p: &Value, plan: &Bound, self_sha: &str) -> Result<()> {
         (helper.sha256 == self_sha
             || (helper.path
                 == Path::new(
-                    "/var/lib/jetstreamer/horizon265-capability-20261119-v1/horizon265-capability"
+                    "/var/lib/jetstreamer/horizon265-capability-attempt2-20261120-v1/horizon265-capability"
                 )
                 && helper.sha256
                     == "42ae5a68f01de38568d54a1cc1c9bff482f957a29af7cbfcd68f760fabf526fd"))

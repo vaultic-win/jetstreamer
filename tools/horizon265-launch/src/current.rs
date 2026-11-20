@@ -567,3 +567,150 @@ fn retained_guards(n: &mut Native, review: &Value) -> Result<()> {
 pub(super) fn native_input(reference: &Value) -> Result<()> {
     peers::input265(reference)
 }
+
+// Use an actual retained timer window; never infer a fresh 60s interval from a
+// manually triggered guard or accept a different guard IID under the old claim.
+const RETAINED_START_WINDOW_US: u64 = 30_000_000;
+const RETAINED_WINDOW_MARGIN_US: u64 = 5_000_000;
+pub(super) fn guard_window_budget(next: u64, clock: u64) -> Result<u64> {
+    let remaining = next
+        .checked_sub(clock)
+        .context("retained timer already due")?;
+    ensure!(
+        (RETAINED_START_WINDOW_US..=65_000_000).contains(&remaining),
+        "retained timer lacks an actual 30s startup window"
+    );
+    Ok(remaining - RETAINED_WINDOW_MARGIN_US)
+}
+fn guard_window_next(raw: &[u8], clock: u64) -> Result<u64> {
+    let words: Vec<_> = std::str::from_utf8(raw)?.split_whitespace().collect();
+    ensure!(
+        words.len() == 2 && words[0] == "t",
+        "retained timer deadline type"
+    );
+    let next = words[1].parse::<u64>()?;
+    guard_window_budget(next, clock)?;
+    Ok(next)
+}
+pub(super) fn guard_start_window(outer: &mut super::Native, a: &Value) -> Result<u64> {
+    validate_admission(a, &a["launch_plan"])?;
+    outer.check()?;
+    outer.counter += 1;
+    let root = outer
+        .root
+        .join(format!("retained-window-{:03}", outer.counter));
+    absent(&root)?;
+    fs::create_dir(&root)?;
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
+    let mut n = Native {
+        root,
+        counter: 0,
+        deadline: None,
+    };
+    let review = binding(&a["review"])?.sealed()?;
+    retained_guards(&mut n, &review)?;
+    let claims = review["retained_replay_guards"]
+        .as_array()
+        .context("retained claims")?;
+    ensure!(!claims.is_empty(), "no retained timer window");
+    let mut earliest = u64::MAX;
+    let mut evidence = Vec::new();
+    for c in claims {
+        let guard_unit = text(c, "guard_unit")?;
+        let timer_unit = text(c, "timer_unit")?;
+        let sample = binding(&c["sample"])?.json()?;
+        let guard_before = n.show(guard_unit)?;
+        let timer_before = n.show(timer_unit)?;
+        ensure!(
+            guard_before["InvocationID"] == sample["guard_invocation_id"],
+            "retained guard changed before window capture"
+        );
+        let object = format!(
+            "/org/freedesktop/systemd1/unit/{}",
+            timer_unit
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() {
+                    c.to_string()
+                } else {
+                    format!("_{:02x}", c as u32)
+                })
+                .collect::<String>()
+        );
+        let raw = n.run(
+            "/usr/bin/busctl",
+            &[
+                "get-property",
+                "org.freedesktop.systemd1",
+                &object,
+                "org.freedesktop.systemd1.Timer",
+                "NextElapseUSecMonotonic",
+            ],
+        )?;
+        let clock = mono()?;
+        let next = guard_window_next(&raw, clock)?;
+        let guard_after = n.show(guard_unit)?;
+        let timer_after = n.show(timer_unit)?;
+        // Exact snapshots deliberately reject a rollover, jobs, or timer changes.
+        ensure!(
+            guard_before == guard_after && timer_before == timer_after,
+            "retained guard/timer changed across window capture"
+        );
+        earliest = earliest.min(next);
+        evidence.push(json!({"claim":c,"guard":guard_after,"timer":timer_after,
+            "typed_deadline":String::from_utf8(raw)?,"clock_monotonic_us":clock,
+            "next_elapse_monotonic_us":next}));
+    }
+    // Reapply every original sample/owner/command/health check after all reads.
+    retained_guards(&mut n, &review)?;
+    guard_window_budget(earliest, mono()?)?;
+    save_json(
+        &n.root,
+        "accepted-retained-window.json",
+        &json!({
+        "schema":"horizon265-actual-retained-start-window-v1", "review":a["review"],
+        "evidence":evidence,"earliest_next_elapse_monotonic_us":earliest,
+        "minimum_start_window_us":RETAINED_START_WINDOW_US,
+        "deadline_margin_us":RETAINED_WINDOW_MARGIN_US,
+        "guard_iid_rollover_accepted":false,"lease_renewed":false,
+        "existing_units_changed":false,"replay_launch_authorized":false}),
+    )?;
+    validate_admission(a, &a["launch_plan"])?;
+    outer.check()?;
+    Ok(earliest)
+}
+#[cfg(test)]
+mod guard_window_tests {
+    use super::*;
+    #[test]
+    fn actual_28s_window_cannot_be_misreported_as_60s() {
+        assert!(guard_window_budget(128_000_000, 100_000_000).is_err());
+        assert_eq!(
+            guard_window_budget(160_000_000, 100_000_000).unwrap(),
+            55_000_000
+        );
+        assert_eq!(
+            guard_window_budget(130_000_000, 100_000_000).unwrap(),
+            25_000_000
+        );
+    }
+    #[test]
+    fn elapsed_windows_and_nonmonotonic_typed_deadlines_fail_closed() {
+        for raw in [
+            "s 160000000",
+            "t 160000000 extra",
+            "t 0",
+            "t 100000000",
+            "t 99999999",
+            "t 166000000",
+        ] {
+            assert!(
+                guard_window_next(raw.as_bytes(), 100_000_000).is_err(),
+                "{raw}"
+            );
+        }
+        assert_eq!(
+            guard_window_next(b"t 160000000\n", 100_000_000).unwrap(),
+            160_000_000
+        );
+    }
+}

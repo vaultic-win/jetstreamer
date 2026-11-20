@@ -25,16 +25,16 @@ const CAP: u64 = 506191984640;
 const HIGH: u64 = 100000000000;
 const MAX: u64 = 128000000000;
 const CONTROL: u64 = 1610612736;
-const UNIT: &str = "horizon-qualify-265-replacement-20261119-v1.service";
-const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v1.service";
-const TIMER: &str = "horizon-265-replacement-20261119-protective-v1.timer";
-const RETENTION: &str = "horizon265-replacement-terminal-retention.target";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v1";
-const STATE: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v1";
-const STATIC: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v1";
-const BOUND: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v1";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1";
-const RECEIPTS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v1";
+const UNIT: &str = "horizon-qualify-265-replacement-20261119-v2.service";
+const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v2.service";
+const TIMER: &str = "horizon-265-replacement-20261119-protective-v2.timer";
+const RETENTION: &str = "horizon265-replacement-terminal-retention-v2.target";
+const ROOT: &str = "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2";
+const STATE: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v2";
+const STATIC: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v2";
+const BOUND: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v2";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2";
+const RECEIPTS: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v2";
 const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
@@ -836,12 +836,20 @@ fn launch(n: &mut Native, a: &Value, plan: &Value, admission: &Value) -> Result<
     let raw = preflight_launch(n, a, plan)?;
     save_at(&n.root, "producer-loaded.txt", &raw)?;
     // All setup and prerequisite checks finish before this single original clock.
+    let retained_next = current::guard_start_window(n, a)?;
     let started = now()?;
     let remaining = number(a, "expires_unix_seconds")?
         .checked_sub(started)
         .context("original admission expired")?;
     ensure!(remaining > 0, "original admission expired");
-    n.deadline = Some(Instant::now() + Duration::from_secs(remaining.min(50)));
+    // Actual PID1 timer deadlines, not receipt age or a manual guard start,
+    // define the remaining accepted-IID window. This only tightens the original
+    // admission/setup deadline; it cannot renew either clock.
+    let guard_budget = current::guard_window_budget(retained_next, monotonic_us()?)?;
+    n.deadline = Some(
+        Instant::now()
+            + Duration::from_secs(remaining.min(50)).min(Duration::from_micros(guard_budget)),
+    );
     n.run("/usr/bin/systemctl", &["start", "--no-block", UNIT])?;
     let (v, raw) = n.show(UNIT, "")?;
     let id = row(&v, "InvocationID")?.to_string();

@@ -1,15 +1,15 @@
 //! The accepted packet supplies immutable identity evidence; no large reads on startup clock.
 use super::*;
 const CAPABILITY: &str =
-    "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v1/input-capability.json";
+    "/var/lib/jetstreamer/horizon265-replacement-20261119-static-v2/input-capability.json";
 const PRODUCER_TEMPLATE: &str =
-    include_str!("../config/horizon-qualify-265-replacement-20261119-v1.service");
+    include_str!("../config/horizon-qualify-265-replacement-20261119-v2.service");
 const GUARD_TEMPLATE: &str =
-    include_str!("../config/horizon-265-replacement-20261119-protective-v1.service");
+    include_str!("../config/horizon-265-replacement-20261119-protective-v2.service");
 const TIMER_TEMPLATE: &str =
-    include_str!("../config/horizon-265-replacement-20261119-protective-v1.timer");
+    include_str!("../config/horizon-265-replacement-20261119-protective-v2.timer");
 const RETENTION_TEMPLATE: &str =
-    include_str!("../config/horizon265-replacement-terminal-retention.target");
+    include_str!("../config/horizon265-replacement-terminal-retention-v2.target");
 fn packet_identity(p: &Path) -> Result<Value> {
     let m = fs::symlink_metadata(p)?;
     ensure!(
