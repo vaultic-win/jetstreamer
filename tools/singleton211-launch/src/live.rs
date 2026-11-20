@@ -314,13 +314,10 @@ pub(super) fn census(
                 && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
         );
-        if peer211::is_retained_terminal(fleet, &r.unit) {
-            ensure!(
-                r.release.is_none(),
-                "native211 terminal reservation released"
-            );
+        if peers::is_retained(&r.unit) {
+            ensure!(r.release.is_none(), "native terminal reservation released");
             let v = n.show(&r.unit)?;
-            peer211::terminal_owner(&v)?;
+            peers::terminal_owner(&r.unit, &v)?;
             retained_terminals.insert(r.unit.clone(), v);
             // Keep the entire hard cap, growth, and floor; no current-memory credit.
             continue;
@@ -475,7 +472,7 @@ pub(super) fn census(
     for (unit, old) in retained_terminals {
         let after = n.show(&unit)?;
         same_terminal_census(&old, &after)?;
-        peer211::terminal_owner(&after)?;
+        peers::terminal_owner(&unit, &after)?;
     }
     for (unit, old) in before {
         let after = n.show(&unit)?;

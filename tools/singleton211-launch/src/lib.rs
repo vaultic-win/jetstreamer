@@ -15,13 +15,13 @@ use std::{
 };
 mod admission;
 mod capacity;
+mod delivery247;
 mod finalization;
 mod gate;
 mod inputs;
 mod launch;
 mod lifecycle;
 mod live;
-mod peer211;
 mod peers;
 mod periodic;
 mod publication;

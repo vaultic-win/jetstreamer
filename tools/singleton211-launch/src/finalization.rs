@@ -293,39 +293,41 @@ pub(super) fn validate(
         fleet["diagnostics"] == json!([]) && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
-    peer211::validate(fleet, rows)?;
-    let pipelines = fleet["pipelines"].as_array().context("pipeline census")?;
-    let diagnostics = observer["diagnostic_replays"]
+    // Delivery has its own live owner and full reservation, not replay telemetry.
+    for e in fleet["pipelines"].as_array().context("pipeline census")? {
+        if delivery247::selected(e) {
+            delivery247::validate(e, fleet, rows)?;
+        }
+    }
+    // Admission independently authenticates both exact native terminal peers.
+    let pipelines: Vec<_> = fleet["pipelines"]
+        .as_array()
+        .context("pipeline census")?
+        .iter()
+        .filter(|e| !peers::selected(e) && !delivery247::selected(e))
+        .collect();
+    let observed_diagnostics = observer["diagnostic_replays"]
         .as_array()
         .context("diagnostic observation census")?;
-    let ordinary: Vec<_> = pipelines.iter().filter(|e| !peers::native(e)).collect();
-    let native_epochs: BTreeSet<_> = pipelines
-        .iter()
-        .filter(|e| peers::native(e))
-        .map(|e| num(e, "epoch"))
-        .collect::<Result<_>>()?;
-    let diagnostics: Vec<_> = diagnostics
-        .iter()
-        .filter(|d| {
-            !native_epochs
-                .iter()
-                .any(|e| d["range"] == format!("{e}-{e}"))
-        })
-        .collect();
+    let mut diagnostics = Vec::new();
+    let mut native265_diagnostic_seen = false;
+    for d in observed_diagnostics {
+        if peers::terminal_diagnostic(d)? {
+            ensure!(
+                !native265_diagnostic_seen,
+                "duplicate native265 terminal diagnostic"
+            );
+            native265_diagnostic_seen = true;
+        } else {
+            diagnostics.push(d);
+        }
+    }
     ensure!(
-        ordinary.len() == diagnostics.len() && ordinary.len() <= 4,
+        pipelines.len() == diagnostics.len() && pipelines.len() <= 4,
         "missing/unregistered finalization owner"
     );
     let mut seen = BTreeSet::new();
-    for entry in pipelines {
-        if peers::native(entry) {
-            peers::validate(entry, fleet, rows)?;
-            ensure!(
-                seen.insert(num(entry, "epoch")?),
-                "duplicate native/finalization owner"
-            );
-            continue;
-        }
+    for &entry in &pipelines {
         row(entry, fleet, rows, boot)?;
         let epoch = num(entry, "epoch")?;
         ensure!(seen.insert(epoch), "duplicate finalization owner");
@@ -342,16 +344,13 @@ pub(super) fn validate(
         );
     }
     for a in fleet["active"].as_array().context("active census")? {
-        if peers::native(a) {
-            ensure!(
-                a["live"] == true && pipelines.iter().filter(|e| *e == a).count() == 1,
-                "unbound active native owner"
-            );
+        if delivery247::selected(a) {
+            delivery247::validate(a, fleet, rows)?;
             continue;
         }
         if a["phase"] == "producer-finalization" {
             ensure!(
-                pipelines.iter().filter(|p| *p == a).count() == 1,
+                pipelines.iter().filter(|p| **p == a).count() == 1,
                 "unbound active finalization"
             );
         } else {
@@ -369,8 +368,11 @@ pub(super) fn validate(
 }
 pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
-        if peers::native(e) {
-            peers::mapped(e)?;
+        if delivery247::selected(e) {
+            delivery247::verify_inputs()?;
+            continue;
+        }
+        if peers::selected(e) {
             continue;
         }
         let p = registered(num(e, "epoch")?)?;
@@ -475,6 +477,28 @@ mod tests {
         fleet["active"] = json!([]);
         validate(&fleet, &observer, &rows, &"b".repeat(32)).unwrap();
         fleet["diagnostics"] = json!([{}]);
+        assert!(validate(&fleet, &observer, &rows, &"b".repeat(32)).is_err());
+    }
+    #[test]
+    fn retained_native265_resource_diagnostic_is_exact_and_unique() {
+        let (fleet, mut observer, rows) = fixture_for(PROFILES[1]);
+        let terminal: Value = serde_json::from_str(include_str!(
+            "fixtures/retained-native265-diagnostic-20261119.json"
+        ))
+        .unwrap();
+        observer["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(terminal.clone());
+        validate(&fleet, &observer, &rows, &"b".repeat(32)).unwrap();
+        observer["diagnostic_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(terminal);
+        assert!(validate(&fleet, &observer, &rows, &"b".repeat(32)).is_err());
+        observer["diagnostic_replays"].as_array_mut().unwrap().pop();
+        observer["diagnostic_replays"][1]["expected_producer_invocation_id"] =
+            json!("f".repeat(32));
         assert!(validate(&fleet, &observer, &rows, &"b".repeat(32)).is_err());
     }
 }

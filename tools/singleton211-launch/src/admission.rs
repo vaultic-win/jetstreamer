@@ -308,6 +308,7 @@ pub(super) fn validate(
         "complete cadence observation required"
     );
     let (rows, overhead, periodic) = reservations(review)?;
+    peers::validate(&fleet, &rows)?;
     finalization::validate(&fleet, &observer, &rows, &boot)?;
     finalization::verify_inputs(&fleet)?;
     let currents = live::census(n, review, &fleet, &rows, &periodic, candidate)?;
