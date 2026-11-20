@@ -407,6 +407,10 @@ fn validate_replay_origin(
 }
 
 fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> {
+    // This exact Type=simple delivery owner emits Started without Starting.
+    // Keep its phase clock separate from the original epoch247 replay clock.
+    let exact247_uploader = unit == "horizon-upload-247-singleton-20261119-v1.service"
+        && invocation == "69218e2e0924497ea595a1227a6c31db";
     let starts: Vec<_> = records
         .iter()
         .filter(|r| {
@@ -415,12 +419,18 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["_PID"] == "1"
                 && r["_UID"] == "0" && r["MESSAGE"].as_str().is_some_and(|s| {
                 (s.starts_with("Starting ")
+                    && !exact247_uploader
                     && !(unit == super::singleton247_finalization::UNIT
                         && invocation == super::singleton247_finalization::IID)
                     && !super::original_singleton_finalization::original_owner(unit, invocation)
                     && unit != jetstreamer_horizon_observe::full265::UNIT)
-                    || (((unit == jetstreamer_horizon_observe::full265::UNIT
-                        && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                    || (((exact247_uploader
+                        && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
+                        && s.starts_with(
+                            "Started horizon-upload-247-singleton-20261119-v1.service - ",
+                        ))
+                        || (unit == jetstreamer_horizon_observe::full265::UNIT
+                            && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
                         || (unit == super::cohort_finalization::CONTROLLER
                             && invocation == super::cohort_finalization::CONTROLLER_INVOCATION)
                         || (unit == super::cohort198_handoff::CONTROLLER
@@ -965,6 +975,138 @@ pub(super) fn native_input_matches_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn actual247_uploader_start() -> Value {
+        let mut records = serde_json::Deserializer::from_str(include_str!(
+            "pipeline_status/fixtures/epoch247-uploader-start.jsonl"
+        ))
+        .into_iter::<Value>();
+        let event = records.next().unwrap().unwrap();
+        assert!(records.next().is_none());
+        event
+    }
+
+    #[test]
+    fn exact247_uploader_uses_genuine_started_event_and_keeps_original_replay_clock() {
+        let event = actual247_uploader_start();
+        let unit = event["UNIT"].as_str().unwrap();
+        let iid = event["INVOCATION_ID"].as_str().unwrap();
+        assert_eq!(
+            start_millis(std::slice::from_ref(&event), unit, iid).unwrap(),
+            1_795_132_639_884
+        );
+        let mut waiting = event.clone();
+        waiting["MESSAGE"] = json!(format!("Starting {unit}..."));
+        waiting["MESSAGE_ID"] = json!("7d4958e842da4a758f6c1cdc7b36dcc5");
+        waiting["__REALTIME_TIMESTAMP"] = json!("1795132630000000");
+        assert!(start_millis(std::slice::from_ref(&waiting), unit, iid).is_err());
+        assert_eq!(
+            start_millis(&[waiting, event.clone()], unit, iid).unwrap(),
+            1_795_132_639_884
+        );
+        // The delivery phase must never substitute for the origin replay event.
+        let origin_unit = super::super::singleton247_finalization::UNIT;
+        let origin_iid = super::super::singleton247_finalization::IID;
+        assert!(start_millis(std::slice::from_ref(&event), origin_unit, origin_iid).is_err());
+        let origin = json!({"UNIT":origin_unit,"INVOCATION_ID":origin_iid,"_PID":"1","_UID":"0",
+            "MESSAGE_ID":"39f53479d3a045ac8e11786248231fbf","MESSAGE":"Started epoch247 singleton.",
+            "__REALTIME_TIMESTAMP":"1794882675000000"});
+        let both = [origin, event];
+        assert_eq!(
+            start_millis(&both, origin_unit, origin_iid).unwrap(),
+            1_794_882_675_000
+        );
+        assert_eq!(
+            start_millis(
+                &both,
+                "horizon-upload-247-singleton-20261119-v1.service",
+                "69218e2e0924497ea595a1227a6c31db"
+            )
+            .unwrap(),
+            1_795_132_639_884
+        );
+    }
+
+    #[test]
+    fn exact247_uploader_rejects_changed_identity_message_duplicate_and_invalid_clock() {
+        let event = actual247_uploader_start();
+        let unit = event["UNIT"].as_str().unwrap();
+        let iid = event["INVOCATION_ID"].as_str().unwrap();
+        assert!(start_millis(&[], unit, iid).is_err());
+        assert!(start_millis(&[event.clone(), event.clone()], unit, iid).is_err());
+        for key in [
+            "UNIT",
+            "INVOCATION_ID",
+            "_PID",
+            "_UID",
+            "MESSAGE_ID",
+            "MESSAGE",
+        ] {
+            let mut changed = event.clone();
+            changed[key] = json!("foreign");
+            assert!(
+                start_millis(&[changed], unit, iid).is_err(),
+                "changed {key}"
+            );
+            let mut missing = event.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            assert!(
+                start_millis(&[missing], unit, iid).is_err(),
+                "missing {key}"
+            );
+        }
+        let mut wrong_message = event.clone();
+        wrong_message["MESSAGE"] =
+            json!("Started horizon-upload-248-singleton-20261119-v1.service - another epoch.");
+        assert!(start_millis(&[wrong_message], unit, iid).is_err());
+        for value in [
+            Value::Null,
+            json!("0"),
+            json!("invalid"),
+            json!("18446744073709551616"),
+        ] {
+            let mut changed = event.clone();
+            changed["__REALTIME_TIMESTAMP"] = value;
+            assert!(start_millis(&[changed], unit, iid).is_err());
+        }
+    }
+
+    #[test]
+    fn exact247_uploader_does_not_register_replacement_invocations_or_other_uploaders() {
+        let event = actual247_uploader_start();
+        for (unit, iid) in [
+            (
+                "horizon-upload-247-singleton-20261119-v1.service",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+            (
+                "horizon-upload-247-singleton-20261119-v2.service",
+                "69218e2e0924497ea595a1227a6c31db",
+            ),
+            (
+                "horizon-upload-248-singleton-20261119-v1.service",
+                "69218e2e0924497ea595a1227a6c31db",
+            ),
+        ] {
+            let mut changed = event.clone();
+            changed["UNIT"] = json!(unit);
+            changed["INVOCATION_ID"] = json!(iid);
+            changed["MESSAGE"] = json!(format!("Started {unit} - delivery."));
+            assert!(start_millis(&[changed], unit, iid).is_err());
+        }
+        // Existing nonregistered Starting semantics are intentionally unchanged.
+        let legacy = json!({"UNIT":"legacy.service","INVOCATION_ID":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "_PID":"1","_UID":"0","MESSAGE":"Starting legacy service...","__REALTIME_TIMESTAMP":"1000000"});
+        assert_eq!(
+            start_millis(
+                &[legacy],
+                "legacy.service",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+            .unwrap(),
+            1000
+        );
+    }
+
     #[test]
     fn full265_uses_actual_started_clock_after_first_guard_wait() {
         let unit = jetstreamer_horizon_observe::full265::UNIT;

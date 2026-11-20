@@ -9,11 +9,11 @@ use std::{
     path::Path,
     process::Command,
 };
-pub const UNIT: &str = "horizon-qualify-265-replacement-20261119-v1.service";
+pub const UNIT: &str = "horizon-qualify-265-replacement-20261119-v2.service";
 pub const ROOT: &str =
-    "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v1";
+    "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2";
 pub const OUTPUT: &str =
-    "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v1/output";
+    "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v2/output";
 pub const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 pub const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 pub const MANIFEST: &str =
@@ -22,12 +22,12 @@ pub const MANIFEST_SHA: &str = "a269b418dc5bcd508850d0293cf05e64875d7610c402b696
 pub const FINGERPRINT: &str =
     "sha256:a126bce31196effaf656230c7185e92f73db9574e13a45e3976aae1859461e28";
 pub const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-contiguous-265-265-current-46b4b4a-v1/snapshot-114479281-Jo2p1i6wNNn71fwwkyoA6shEtYtovbqzVc6p2W16FzW.tar.zst";
-pub const HANDOFF: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v1/launch-v1/guarded-startup-handoff.json";
+pub const HANDOFF: &str = "/var/lib/jetstreamer/horizon265-replacement-20261119-state-v2/launch-v1/guarded-startup-handoff.json";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon-full265-fast-controller-20261119-v1/horizon265-launch";
-const LAUNCHER_SHA: &str = "95e3034b85440e737434be10d9cc273339f98950ed4e14ad90abb19a13f10632";
+    "/var/lib/jetstreamer/horizon-full265-attempt2-controller-20261120-v1/horizon265-launch";
+const LAUNCHER_SHA: &str = "5e4551691c66d6cd9c5b0516be04446027ce92255656f43cdaff615a17235908";
 const GUARD_SHA: &str = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d";
-const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v1.service";
+const GUARD_UNIT: &str = "horizon-265-replacement-20261119-protective-v2.service";
 const NATIVE: &str =
     "/var/lib/jetstreamer/horizon-native265-terminal-proof-2048-20261119-v1/proof.json";
 const NATIVE_SHA: &str = "62d7d71ee1a9c7215c4fffa7d5fec49ef449bb6be24de3e450432217a3efa519";
@@ -161,10 +161,10 @@ fn startup(h: &Value, a: &Value, t: &Value) -> Result<()> {
     ensure!(
         h["first_fire_token"]["path"]
             == format!(
-                "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1/{iid}/guard-admission.json"
+                "/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2/{iid}/guard-admission.json"
             )
             && h["guard_plan"]["path"]
-                == "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v1/guard-plan.json"
+                == "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v2/guard-plan.json"
             && t["schema"] == "horizon265-reboot-real-first-timer-guard-admission-v1"
             && t["actual_invocation_id"] == iid
             && t["admission"] == h["admission"]
@@ -577,11 +577,11 @@ mod tests {
     fn chain() -> (Value, Value, Value) {
         let iid = "a".repeat(32);
         let gid = "c".repeat(32);
-        let gp = json!({"path":"/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v1/guard-plan.json","sha256":"d".repeat(64)});
+        let gp = json!({"path":"/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v2/guard-plan.json","sha256":"d".repeat(64)});
         let admission =
             json!({"path":"/var/lib/jetstreamer/admission/admission.json","sha256":"e".repeat(64)});
         let plan = json!({"path":"/var/lib/jetstreamer/plan/plan.json","sha256":"f".repeat(64)});
-        let h = json!({"schema":"horizon265-reboot-guarded-startup-v2","producer":{"Id":UNIT,"LoadState":"loaded","InvocationID":iid,"ActiveState":"activating","SubState":"start-pre","MainPID":"0","NRestarts":"0","Restart":"no","KillMode":"control-group","Delegate":"no"},"transaction_replay_observed":false,"remote_mutations":false,"recorded_unix_seconds":120,"plan":plan,"admission":admission,"guard_plan":gp,"guard_invocation_id":gid,"first_fire_token":{"path":format!("/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v1/{iid}/guard-admission.json"),"sha256":"0".repeat(64)}});
+        let h = json!({"schema":"horizon265-reboot-guarded-startup-v2","producer":{"Id":UNIT,"LoadState":"loaded","InvocationID":iid,"ActiveState":"activating","SubState":"start-pre","MainPID":"0","NRestarts":"0","Restart":"no","KillMode":"control-group","Delegate":"no"},"transaction_replay_observed":false,"remote_mutations":false,"recorded_unix_seconds":120,"plan":plan,"admission":admission,"guard_plan":gp,"guard_invocation_id":gid,"first_fire_token":{"path":format!("/var/lib/jetstreamer/horizon265-replacement-20261119-tokens-v2/{iid}/guard-admission.json"),"sha256":"0".repeat(64)}});
         let a = json!({"schema":"horizon265-current-fleet-launch-admission-v1","candidate_epoch":265,"admitted":true,"launch_plan":plan,"launcher_sha256":LAUNCHER_SHA,"candidate_memory_max_bytes":128_000_000_000u64,"candidate_root_cap_bytes":506_191_984_640u64,"remote_mutations":false,"publication_authorized":false,"issued_unix_seconds":100,"expires_unix_seconds":160,"guard_minimum_free_bytes":1000,"required_initial_free_bytes":1500});
         let t = json!({"schema":"horizon265-reboot-real-first-timer-guard-admission-v1","actual_invocation_id":iid,"admission":admission,"guard_plan_sha256":gp["sha256"],"guard_sha256":GUARD_SHA,"first_guard_invocation_id":gid,"producer_before_and_after_first_guard_zero_restart_start_pre":true,
             "guard_sample":{"schema":"jetstreamer-horizon-standalone-guard-sample-v1","producer_invocation_id":iid,"guard_invocation_id":gid,"guard_sha256":GUARD_SHA,"plan_sha256":gp["sha256"],"plan":gp["path"],"producer":{"pid":0,"active":"activating","sub":"start-pre"},"producer_stop_enabled":true,"workers":[],"maximum_root_physical_bytes":506_191_984_640u64,"maximum_worker_vmas":3500000,"minimum_free_bytes":1000,"available_bytes":2000,"recorded_unix_seconds":110,"root_physical_observation":null,"trip_reason":null,"worker_observation_error":null,"root_physical_observation_error":null,"target_handoff_error":null,"canary_target_error":null},
