@@ -62,6 +62,56 @@ fn order(c: &Value, p: &Value, producer: &[u8], guard: &[u8]) -> Result<()> {
     );
     Ok(())
 }
+// The production guard persists the initiating sample verbatim before it
+// rechecks the live owner and submits the stop job. Require this independently
+// of the later request and PID1 journals.
+fn incident_evidence(
+    sample: &Value,
+    request: &Value,
+    intent: &Value,
+    iid: &str,
+    gid: &str,
+    plan: &Bound,
+) -> Result<()> {
+    ensure!(
+        intent
+            == &json!({
+                "schema":"horizon257-native-guard-stop-intent-v1",
+                "producer_invocation_id":iid, "guard_invocation_id":gid,
+                "plan_sha256": plan.sha256, "reason":"filesystem-floor",
+                "sample":sample, "remote_mutations":false
+            })
+            && request
+                == &json!({
+                    "schema":STOP_REQUEST, "producer_invocation_id":iid,
+                    "guard_invocation_id":gid, "plan_sha256":plan.sha256,
+                    "drain_proven":false, "remote_mutations":false
+                }),
+        "stop intent or request differs from the original 257 floor trip"
+    );
+    Ok(())
+}
+
+fn stop_intent(c: &Value) -> Result<Bound> {
+    let dir = Path::new(text(c, "receipts")?);
+    let m = fs::symlink_metadata(dir)?;
+    ensure!(
+        dir.canonicalize()? == dir && m.is_dir() && m.uid() == 0 && m.mode() & 0o777 == 0o700,
+        "stop receipt directory custody"
+    );
+    let path = dir.join("stop-intent.json");
+    let m = fs::symlink_metadata(&path)?;
+    ensure!(
+        m.is_file()
+            && m.uid() == 0
+            && m.gid() == 0
+            && m.mode() & 0o777 == 0o600
+            && m.nlink() == 1
+            && m.len() <= 16 << 20,
+        "stop intent custody"
+    );
+    Ok(Bound::new(&path, hash(&path)?))
+}
 pub(super) fn validate_capture(c: &Value) -> Result<Value> {
     ensure!(
         c["schema"] == STOP_CAPTURE
@@ -132,14 +182,8 @@ pub(super) fn validate_capture(c: &Value) -> Result<Value> {
         "guard stop request path"
     );
     let req = req.json()?;
-    ensure!(
-        req["schema"] == STOP_REQUEST
-            && req["plan_sha256"] == gp.sha256
-            && req["producer_invocation_id"] == iid
-            && req["guard_invocation_id"] == gid
-            && req["drain_proven"] == false,
-        "wrong stop request"
-    );
+    let incident = stop_intent(c)?;
+    incident_evidence(&sample, &req, &incident.json()?, iid, gid, &gp)?;
     stop::killed(&c["producer_terminal"], iid)?;
     let gt = &c["guard_terminal"];
     ensure!(
@@ -294,7 +338,7 @@ pub(super) fn run(n: &mut Native, cr: &Bound, c: &Value) -> Result<()> {
     let after = collect_retired(n, &links)?;
     drained(c)?;
     let mut result = json!({"schema":STOP_RETIRED,"capture":cr,"before":before,"after":after,"sealed_packages_and_diagnostics_preserved":true,
-        "all_four_links_removed":true,"producer_restarted":false,"kernel_drained":true,"token_absent":true});
+        "stop_intent":stop_intent(c)?,"all_four_links_removed":true,"producer_restarted":false,"kernel_drained":true,"token_absent":true});
     deny_authority(&mut result);
     let out = save_json(&n.root, "retirement-complete.json", &result)?;
     println!("{}", serde_json::to_string(&out)?);
@@ -316,6 +360,50 @@ mod tests {
             .collect::<String>()
             .into_bytes()
     }
+    #[test]
+    fn original_stop_intent_and_request_bind_the_exact_triggering_sample() {
+        let plan = Bound::new("/fixed/guard-plan.json", "a".repeat(64));
+        let iid = "b".repeat(32);
+        let gid = "c".repeat(32);
+        let sample = json!({"trip_reason":"filesystem-floor","guard_invocation_id":gid,"producer_invocation_id":iid,"native_main":{"main_pid":42}});
+        let intent = json!({"schema":"horizon257-native-guard-stop-intent-v1","producer_invocation_id":iid,"guard_invocation_id":gid,"plan_sha256":plan.sha256,"reason":"filesystem-floor","sample":sample,"remote_mutations":false});
+        let request = json!({"schema":STOP_REQUEST,"producer_invocation_id":iid,"guard_invocation_id":gid,"plan_sha256":plan.sha256,"drain_proven":false,"remote_mutations":false});
+        let check = |i: &Value, r: &Value| incident_evidence(&sample, r, i, &iid, &gid, &plan);
+        check(&intent, &request).unwrap();
+        for key in [
+            "schema",
+            "sample",
+            "reason",
+            "guard_invocation_id",
+            "producer_invocation_id",
+            "plan_sha256",
+            "remote_mutations",
+        ] {
+            let mut changed = intent.clone();
+            changed[key] = Value::Null;
+            assert!(check(&changed, &request).is_err(), "{key}");
+        }
+        let mut other = intent.clone();
+        other["sample"]["native_main"]["main_pid"] = json!(43);
+        assert!(check(&other, &request).is_err());
+        let mut transition = intent.clone();
+        transition.as_object_mut().unwrap().remove("sample");
+        transition["transition"] = json!("transition-foreign.json");
+        assert!(check(&transition, &request).is_err());
+        for key in [
+            "schema",
+            "guard_invocation_id",
+            "producer_invocation_id",
+            "plan_sha256",
+            "drain_proven",
+            "remote_mutations",
+        ] {
+            let mut changed = request.clone();
+            changed[key] = Value::Null;
+            assert!(check(&intent, &changed).is_err(), "{key}");
+        }
+    }
+
     #[test]
     fn a_genuine_floor_stop_requires_both_original_pid1_histories_in_order() {
         let iid = "a".repeat(32);
