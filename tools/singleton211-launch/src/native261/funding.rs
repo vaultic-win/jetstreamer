@@ -177,7 +177,7 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
             HARNESS,
         )?;
     }
-    let host = native257_fit::booked_host_candidate(
+    let mut host = native257_fit::booked_host_candidate(
         n,
         r,
         path,
@@ -203,6 +203,11 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     );
     resources.1 = resources.1.min(host.resources.1);
     resources.2 = resources.2.min(host.resources.2);
+    let native265_memory = if EPOCH == 212 {
+        crate::native212::retired265::apply(n, r, &mut host)?
+    } else {
+        None
+    };
     let capacity = candidate_capacity(&host, resources, &envelope, &r["control_units"])?;
     ensure!(
         pristine(host.device)? == mount,
@@ -213,12 +218,14 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     live::finite_owner(&after, controller, &iid, CONTROLLER_MEMORY)?;
     own()?;
     n.check()?;
-    Ok(
-        json!({"capacity":capacity,"control_charges":envelope,"boot_id":host.boot,
+    let mut result = json!({"capacity":capacity,"control_charges":envelope,"boot_id":host.boot,
         "disk_filesystem":FILESYSTEM,"disk_device":host.device,"tmpfs":mount,"cpu":cpu,"controller":after,
         "actual_current_memory":host.currents,"native265_runtime_growth_release":host.release,
-        "native211_cold_growth_release":host.native211_growth,"full211_growth":host.full211_growth,"failed_boundary205206_memory_release":host.boundary_memory,"completed_boundary205206_retry_memory_release":host.retry_memory}),
-    )
+        "native211_cold_growth_release":host.native211_growth,"full211_growth":host.full211_growth,"failed_boundary205206_memory_release":host.boundary_memory,"completed_boundary205206_retry_memory_release":host.retry_memory});
+    if let Some(release) = native265_memory {
+        result["completed_native265_diagnostic_memory_release"] = release;
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
