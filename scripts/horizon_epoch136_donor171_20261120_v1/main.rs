@@ -2,6 +2,8 @@
 #![recursion_limit = "384"]
 mod fence;
 mod fit;
+mod session;
+mod topology;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -71,7 +73,7 @@ fn json_pin(p: &Path, h: &str) -> Result<Value> {
     Ok(serde_json::from_slice(&bytes)?)
 }
 fn show(u: &str) -> Result<Value> {
-    let fields = "Id,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Job,LoadState,FragmentPath,ControlGroup,Triggers,TriggeredBy,Result,ExecMainStatus";
+    let fields = "Id,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Job,LoadState,FragmentPath,ControlGroup,Triggers,TriggeredBy,Result,ExecMainStatus,Type,Unit,ExecStart,ExecMainStartTimestampMonotonic,TimeoutStartUSec";
     let out = Command::new("/usr/bin/systemctl")
         .args(["show", "--no-pager", "--property", fields, "--", u])
         .output()?;
@@ -315,6 +317,7 @@ fn generation(plan: &Value) -> Result<()> {
         plan["tools_seal"]["sha256"].as_str().context("seal sha")?,
     )?;
     ensure!(seal.is_object(), "tools seal");
+    session::native_denial_provenance(plan)?;
     Ok(())
 }
 fn writer(plan: &Value) -> Result<(Value, String)> {
@@ -554,7 +557,7 @@ fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root controller required");
     ensure!(
         !a.is_empty(),
-        "expected inventory|establish|prepare|post|release"
+        "expected inventory|establish|prepare|post|session|register-status|release"
     );
     if a == ["inventory"] {
         println!(
@@ -565,13 +568,22 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    // The session holds the admission lock while waiting for this metadata-only
+    // response. Registration creates no booking and never opens the node gate.
+    if a[0] == "register-status" {
+        ensure!(
+            a.len() == 7,
+            "register-status PLAN SHA STATUS SHA FLEET SHA"
+        );
+        return session::register_status(&a[1..]);
+    }
     let lock = fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
         .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(IL_PATH)?;
     let md = lock.metadata()?;
     ensure!(
@@ -599,6 +611,15 @@ fn run() -> Result<()> {
         fence::release()?;
         return Ok(());
     }
+    if a[0] == "session" {
+        ensure!(a.len() == 5, "session PLAN SHA FLEET SHA");
+        return session::run(&a[1..]);
+    }
+    println!("{}", phase(&a)?);
+    Ok(())
+}
+// Called in-process by session so every phase retains the same writer IID and flock.
+fn phase(a: &[String]) -> Result<Value> {
     ensure!(
         (matches!(a[0].as_str(), "establish" | "prepare") && a.len() == 5)
             || (a[0] == "post" && a.len() == 6),
@@ -613,14 +634,14 @@ fn run() -> Result<()> {
     let f = json_pin(fpath, &a[4])?;
     let fleet = binding(fpath, &a[4]);
     verify_fleet(&f)?;
+    topology::exclusive_post172(&f)?;
     let anc = fence::ancestry()?;
     no_older_136()?;
     if a[0] == "establish" {
         let native = fence::establish()?;
         let loan = json!({"schema":"horizon-exclusive-171-to136-v1","complete_fleet":fleet,"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":now()?,"ancestry":anc,"HOME":donor_disk()?,"native":native,"new_memory_credit_bytes":0,"replay_launched":false});
         let receipt = file_write(&base.join("donor171.json"), &loan)?;
-        println!("{receipt}");
-        return Ok(());
+        return Ok(receipt);
     }
     let donor_path = base.join("donor171.json");
     let bytes = root_file(&donor_path, 1 << 20)?;
@@ -659,8 +680,7 @@ fn run() -> Result<()> {
         let receipt = json!({"schema":"horizon-epoch136-actual-admission-v1","plan":plan_ref,"helper":plan["helper"],"node":plan["node"],"worker":plan["worker"],"tools_seal":plan["tools_seal"],"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":sec,"launch_expires_unix_seconds":sec+900,"protected_existing_free_bytes":protected,"required_initial_free_bytes":protected+CANDIDATE_DISK,"data_reservation_bytes":CANDIDATE_DISK,"memory_max_bytes":CANDIDATE_MEMORY,"cpu_quota_micros":3000000,"resource_accounting":cap,"bounded_reproduction_authorized":true,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"full_epoch_span_proven":false});
         file_write(&base.join("admission.json"), &receipt)?
     };
-    println!("{result}");
-    Ok(())
+    Ok(result)
 }
 fn main() -> Result<()> {
     run()
