@@ -228,6 +228,10 @@ fn cargo(cfg: &Config, source: &Path) -> Result<Command> {
     Ok(c)
 }
 pub fn fetch(cfg: &Config, attempt: &Path, seq: u64) -> Result<String> {
+    fetch_tracking(cfg, attempt, seq, &cfg.state_directory.join("child.json"))
+}
+
+fn fetch_tracking(cfg: &Config, attempt: &Path, seq: u64, heartbeat: &Path) -> Result<String> {
     let source = cfg.state_directory.join("source");
     let mut command = network_git(cfg)?;
     private_dir(&source)?;
@@ -259,12 +263,14 @@ pub fn fetch(cfg: &Config, attempt: &Path, seq: u64) -> Result<String> {
         "+refs/heads/account-updates:refs/remotes/origin/account-updates",
     ]);
     ensure!(
-        run_logged(
+        run_logged_observed(
             command,
             &attempt.join(format!("fetch-{seq}.log")),
             600,
             cfg.max_log_bytes,
-            cfg
+            cfg,
+            heartbeat,
+            |_| Ok(()),
         )?,
         "account-updates fetch failed"
     );
@@ -326,7 +332,11 @@ pub fn fingerprint_files(
     }
     Ok(files)
 }
-fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, String>> {
+fn source_closure(
+    cfg: &Config,
+    attempt: &Path,
+    heartbeat: &Path,
+) -> Result<BTreeMap<String, String>> {
     let source = cfg.state_directory.join("source");
     let mut command = cargo(cfg, &source)?;
     command.args([
@@ -340,12 +350,14 @@ fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, Strin
     ]);
     let metadata_path = attempt.join(format!("cargo-metadata-{}.json", nonce()));
     ensure!(
-        run_logged(
+        run_logged_observed(
             command,
             &metadata_path,
             600,
             MAX_SOURCE_METADATA_LOG_BYTES,
-            cfg
+            cfg,
+            heartbeat,
+            |_| Ok(()),
         )?,
         "Cargo metadata failed; inspect bounded metadata log"
     );
@@ -410,9 +422,18 @@ fn source_closure(cfg: &Config, attempt: &Path) -> Result<BTreeMap<String, Strin
     Ok(files)
 }
 
-pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
-    let commit = fetch(cfg, attempt, seq)?;
-    let source = cfg.state_directory.join("source");
+struct ReaderInputs {
+    files: BTreeMap<String, String>,
+    rustc_version: String,
+    cargo_version: String,
+    cargo_sha256: String,
+    rustc_sha256: String,
+    features: Vec<String>,
+    build_environment: Value,
+    fingerprint: String,
+}
+
+fn reader_inputs(cfg: &Config, attempt: &Path, heartbeat: &Path) -> Result<ReaderInputs> {
     // External Cargo configuration could replace sources or alter the build.
     // Require it absent, and use a fixed toolchain and cleared child environment.
     for name in ["config", "config.toml"] {
@@ -421,7 +442,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
             "external Cargo configuration is not admitted"
         );
     }
-    let files = source_closure(cfg, attempt)?;
+    let files = source_closure(cfg, attempt, heartbeat)?;
     let mut rustc = clean_command(&cfg.rustc);
     rustc.arg("-vV");
     let rustc_version = capture(rustc)?;
@@ -441,14 +462,66 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
         &rustc_sha256,
         &build_environment,
     ))?);
+    Ok(ReaderInputs {
+        files,
+        rustc_version,
+        cargo_version,
+        cargo_sha256,
+        rustc_sha256,
+        features,
+        build_environment,
+        fingerprint,
+    })
+}
+
+fn extend_reader_proof(
+    reader: &Reader,
+    fingerprint: &str,
+    commit: String,
+) -> Result<Option<Reader>> {
+    if reader.source_fingerprint != fingerprint {
+        return Ok(None);
+    }
+    check_sealed_reader(reader)?;
+    let mut next = reader.clone();
+    next.branch_commit = commit;
+    next.equivalence_reused = true;
+    next.fetched_at = now();
+    Ok(Some(next))
+}
+
+/// Check the fetched source against the artifact already playing this range.
+/// Source probes have their own heartbeat while the playback child is alive.
+pub fn refresh_running_reader(
+    cfg: &Config,
+    attempt: &Path,
+    reader: &Reader,
+    seq: u64,
+) -> Result<Option<Reader>> {
+    let heartbeat = attempt.join("branch-check-child.json");
+    let commit = fetch_tracking(cfg, attempt, seq, &heartbeat)?;
+    let inputs = reader_inputs(cfg, attempt, &heartbeat)?;
+    extend_reader_proof(reader, &inputs.fingerprint, commit)
+}
+
+pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
+    let commit = fetch(cfg, attempt, seq)?;
+    let source = cfg.state_directory.join("source");
+    let heartbeat = cfg.state_directory.join("child.json");
+    let ReaderInputs {
+        files,
+        rustc_version,
+        cargo_version,
+        cargo_sha256,
+        rustc_sha256,
+        features,
+        build_environment,
+        fingerprint,
+    } = reader_inputs(cfg, attempt, &heartbeat)?;
     let old = cfg.state_directory.join("reader.json");
     if old.try_exists()? {
-        let mut reader: Reader = read_json(&old)?;
-        if reader.source_fingerprint == fingerprint {
-            check_sealed_reader(&reader)?;
-            reader.branch_commit = commit;
-            reader.equivalence_reused = true;
-            reader.fetched_at = now();
+        let reader: Reader = read_json(&old)?;
+        if let Some(reader) = extend_reader_proof(&reader, &fingerprint, commit.clone())? {
             write_json(&old, &reader, true)?;
             return Ok(reader);
         }
@@ -465,7 +538,7 @@ pub fn qualify(cfg: &Config, attempt: &Path, seq: u64) -> Result<Reader> {
         "current account-updates reader build failed"
     );
     ensure!(
-        source_closure(cfg, attempt)? == files,
+        source_closure(cfg, attempt, &heartbeat)? == files,
         "reader inputs changed during compilation"
     );
     ensure!(
@@ -605,6 +678,35 @@ fn required_reader_build(cfg: &Config, source: &Path) -> Result<Command> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Uses a fresh private state directory and read-only production reader
+    /// evidence to exercise a real Git fetch, Cargo closure and sealed binary.
+    #[test]
+    #[ignore = "requires a networked campaign fixture and a sealed Horizon reader"]
+    fn extend_live_reader_across_equivalent_branch() {
+        let fixture = PathBuf::from(env::var("HORIZON_READER_EQUIVALENCE_FIXTURE").unwrap());
+        let cfg: Config = read_json(&fixture.join("config.json")).unwrap();
+        let original: Reader = read_json(&fixture.join("original-reader.json")).unwrap();
+        let attempt = cfg.state_directory.join("qualification");
+        private_dir(&attempt).unwrap();
+        let refreshed = refresh_running_reader(&cfg, &attempt, &original, 1)
+            .unwrap()
+            .expect("different reader closure");
+        assert_ne!(original.branch_commit, refreshed.branch_commit);
+        assert_eq!(original.source_files, refreshed.source_files);
+        assert_eq!(original.source_fingerprint, refreshed.source_fingerprint);
+        assert_eq!(original.built_from_commit, refreshed.built_from_commit);
+        assert_eq!(original.artifact_sha256, refreshed.artifact_sha256);
+        assert!(refreshed.equivalence_reused);
+        assert!(!cfg.state_directory.join("child.json").exists());
+        assert!(attempt.join("branch-check-child.json").exists());
+        let mut changed = original;
+        changed.source_fingerprint = "changed reader inputs".to_owned();
+        assert!(
+            refresh_running_reader(&cfg, &attempt, &changed, 2)
+                .unwrap()
+                .is_none()
+        );
+    }
     #[test]
     fn changed_reader_cannot_create_build_scratch_without_rebuild_capacity() {
         let state = tempfile::tempdir().unwrap();

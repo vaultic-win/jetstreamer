@@ -482,7 +482,15 @@ pub fn run_logged(
     max_log: u64,
     cfg: &Config,
 ) -> Result<bool> {
-    run_logged_observed(command, log, timeout, max_log, cfg, |_| Ok(()))
+    run_logged_observed(
+        command,
+        log,
+        timeout,
+        max_log,
+        cfg,
+        &cfg.state_directory.join("child.json"),
+        |_| Ok(()),
+    )
 }
 
 pub fn run_logged_observed(
@@ -491,6 +499,7 @@ pub fn run_logged_observed(
     timeout: u64,
     max_log: u64,
     cfg: &Config,
+    heartbeat: &Path,
     mut on_progress: impl FnMut(Option<bool>) -> Result<()>,
 ) -> Result<bool> {
     let state = &cfg.state_directory;
@@ -528,7 +537,7 @@ pub fn run_logged_observed(
             owned.reaped = true;
             file.sync_all()?;
             write_json(
-                &state.join("child.json"),
+                heartbeat,
                 &serde_json::json!({"pid":child_pid,"started_at":started_at,"updated_at":now(),
                 "log":log,"running":false,"exit_code":exit.code(),"success":exit.success(),"log_bytes":file.metadata()?.len()}),
                 true,
@@ -560,7 +569,7 @@ pub fn run_logged_observed(
                 );
                 last_allocation_check = Instant::now();
                 write_json(
-                    &state.join("child.json"),
+                    heartbeat,
                     &serde_json::json!({"pid":child_pid,"started_at":started_at,"updated_at":now(),
                     "log":log,"running":true,"elapsed_seconds":start.elapsed().as_secs(),"log_bytes":file.metadata()?.len()}),
                     true,
@@ -572,7 +581,7 @@ pub fn run_logged_observed(
             owned.stop();
             file.sync_all()?;
             write_json(
-                &state.join("child.json"),
+                heartbeat,
                 &serde_json::json!({"pid":child_pid,"started_at":started_at,"updated_at":now(),
                 "log":log,"running":false,"stopped_by_guard":true,"error":error.to_string(),"log_bytes":file.metadata()?.len()}),
                 true,

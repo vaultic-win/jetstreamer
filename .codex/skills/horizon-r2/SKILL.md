@@ -149,6 +149,9 @@ horizon_pipeline "$first:$last" "$public_origin" --verify-only --threads "$threa
 
 This reuses one verification plugin across the range and streams directly from R2.
 Keep a durable per-epoch receipt and report the first incomplete epoch on interruption.
+If the branch advances during playback, keep the range running when the freshly fetched
+source and build inputs qualify the same sealed reader. Bind subsequent receipts to the
+new proof. When those inputs change, resume the unaccepted epoch with the newly qualified reader.
 Resume from that epoch's beginning in a new attempt, preserving earlier receipts and
 rechecking object and reader identity. A methodology restart begins at the first epoch
 and keeps its receipts and counts separate from prior runs.

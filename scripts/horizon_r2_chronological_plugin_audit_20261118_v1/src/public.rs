@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
@@ -121,6 +121,7 @@ fn result_file(dir: &Path, epoch: u64) -> PathBuf {
 fn resume(dir: &Path, inventory: &Inventory, manifest_sha: &str) -> Result<(BTreeSet<u64>, usize)> {
     let mut done = BTreeSet::new();
     let mut failures = 0;
+    let mut proofs = BTreeMap::<PathBuf, (String, source::Reader)>::new();
     for obj in &inventory.objects {
         let path = result_file(dir, obj.epoch);
         if !path.try_exists()? {
@@ -142,6 +143,35 @@ fn resume(dir: &Path, inventory: &Inventory, manifest_sha: &str) -> Result<(BTre
                 ensure!(
                     native.starts_with(dir.join("attempts")) && hash_file(&native)? == expected,
                     "native report changed"
+                );
+                // Historical v1 receipts carry the same Reader proof without
+                // its file digest. All epochs sharing a proof validate its
+                // commit and executable against their own invocation.
+                let proof_path = PathBuf::from(
+                    result["reader_proof"]
+                        .as_str()
+                        .context("missing reader proof")?,
+                );
+                ensure!(
+                    proof_path.parent() == native.parent().and_then(Path::parent)
+                        && proof_path.starts_with(dir.join("attempts")),
+                    "reader proof belongs to another attempt"
+                );
+                let (actual_sha, proof) = match proofs.entry(proof_path) {
+                    std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
+                    std::collections::btree_map::Entry::Vacant(e) => {
+                        let metadata = (hash_file(e.key())?, read_json(e.key())?);
+                        e.insert(metadata)
+                    }
+                };
+                ensure!(
+                    result
+                        .get("reader_proof_sha256")
+                        .is_none_or(|v| v.as_str() == Some(actual_sha.as_str()))
+                        && result["reader_commit"] == proof.branch_commit
+                        && result["reader_sha256"] == proof.artifact_sha256
+                        && result["invocation"][0].as_str() == proof.artifact.to_str(),
+                    "public receipt reader binding changed"
                 );
                 let argv: Vec<String> = serde_json::from_value(result["invocation"].clone())?;
                 verify_report(
@@ -252,8 +282,10 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
             done.len() - failed,
             failed,
         )?;
-        let reader = source::qualify(cfg, &attempt, 0)?;
-        write_json(&attempt.join("reader.json"), &reader, false)?;
+        let mut reader = source::qualify(cfg, &attempt, 0)?;
+        let mut reader_proof = attempt.join("reader.json");
+        write_json(&reader_proof, &reader, false)?;
+        let mut reader_proof_sha = hash_file(&reader_proof)?;
         let args = vec![
             reader.artifact.display().to_string(),
             format!("{start}:{end}"),
@@ -291,6 +323,7 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
                 .saturating_mul(range.len() as u64),
             cfg.max_log_bytes,
             cfg,
+            &cfg.state_directory.join("child.json"),
             |completed| {
                 while let Some(obj) = range.get(cursor) {
                     // The terminal epoch also binds clean process exit. If a
@@ -304,8 +337,8 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
                         break;
                     }
                     let native = verify_report(&path, obj, &args, cfg.threads)?;
-                    // Re-fetch before accepting the epoch. On any branch transition
-                    // requalify (normal closure rules apply) and repeat from this epoch.
+                    // One proof per observed branch transition. Receipts from
+                    // earlier epochs retain their original accepted tip.
                     let tip = match source::branch_tip(cfg) {
                         Ok(tip) => tip,
                         Err(error) => {
@@ -314,14 +347,36 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
                         }
                     };
                     if tip != reader.branch_commit {
-                        expired = true;
-                        bail!("reader branch advanced");
+                        match source::refresh_running_reader(
+                            cfg,
+                            &attempt,
+                            &reader,
+                            cursor as u64 + 1,
+                        ) {
+                            Ok(Some(next)) => {
+                                reader_proof = attempt.join(format!(
+                                    "reader-epoch-{}-{}.json",
+                                    obj.epoch, next.branch_commit
+                                ));
+                                write_json(&reader_proof, &next, false)?;
+                                reader_proof_sha = hash_file(&reader_proof)?;
+                                reader = next;
+                            }
+                            Ok(None) => {
+                                expired = true;
+                                bail!("fetched branch changed reader inputs");
+                            }
+                            Err(error) => {
+                                branch_error = Some(format!("{error:#}"));
+                                bail!("could not establish reader equivalence on current branch");
+                            }
+                        }
                     }
                     let authenticated = readiness(remote, obj)
                         .context("authenticated archive identity/sidecar check")?;
                     write_json(
                         &result_file(&dir, obj.epoch),
-                        &json!({"schema":"horizon-r2-public-audit-result-v1","status":"passed","started_at":epoch_start,"finished_at":now(),"epoch":obj.epoch,"object":obj,"inventory_sha256":binding,"public_base":ORIGIN,"reader_commit":reader.branch_commit,"reader_sha256":reader.artifact_sha256,"reader_proof":attempt.join("reader.json"),"threads":cfg.threads,"invocation":args,"native_report":path,"native_report_sha256":hash_file(&path)?,"report":native["report"],"authenticated_readiness":authenticated,"epoch_plugin_completed":true,"range_attempt":attempt,"remote_mutations":false}),
+                        &json!({"schema":"horizon-r2-public-audit-result-v1","status":"passed","started_at":epoch_start,"finished_at":now(),"epoch":obj.epoch,"object":obj,"inventory_sha256":binding,"public_base":ORIGIN,"reader_commit":reader.branch_commit,"reader_sha256":reader.artifact_sha256,"reader_proof":reader_proof,"reader_proof_sha256":reader_proof_sha,"threads":cfg.threads,"invocation":args,"native_report":path,"native_report_sha256":hash_file(&path)?,"report":native["report"],"authenticated_readiness":authenticated,"epoch_plugin_completed":true,"range_attempt":attempt,"remote_mutations":false}),
                         false,
                     )?;
                     done.insert(obj.epoch);
