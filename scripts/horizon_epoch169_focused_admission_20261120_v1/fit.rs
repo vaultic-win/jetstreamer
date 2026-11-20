@@ -134,6 +134,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
     audit_budget::validate_fleet_obligation(&fleet["continuing_audit_obligation"])?;
     let audit = audit_budget::observe()?;
     let auxiliary = aux(&fleet, &e)?;
+    let temporary = crate::peers::temporary_workers()?;
     let roots = disk::measure()?;
     let own_growth = n(&roots, "remaining_standard_root_bytes")?;
     let growth = sum(n(&roots, "peer_remaining_growth_bytes")?, own_growth)?;
@@ -185,7 +186,26 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         "historical CPU/memory budget changed"
     );
     // Upper bound even if all old CPU commitments and candidate execution coincide.
-    let overlap_cpu = sum(n(prior, "complete_cpu_quota_micros")?, 13_000_000)?;
+    ensure!(
+        temporary == crate::peers::temporary_workers()?,
+        "temporary worker census changed"
+    );
+    let combined_memory = sum(
+        n(&resources, "complete_memory_plus_reserve_bytes")?,
+        temporary.0,
+    )?;
+    let required_available = sum(
+        n(&resources, "required_available_memory_bytes")?,
+        temporary.0,
+    )?;
+    ensure!(
+        combined_memory <= memory_before.0 && required_available <= available,
+        "temporary workers exceed host memory"
+    );
+    let overlap_cpu = sum(
+        sum(n(prior, "complete_cpu_quota_micros")?, 13_000_000)?,
+        temporary.1,
+    )?;
     ensure!(
         cpu * 1_000_000 >= overlap_cpu,
         "complete simultaneous CPU fit"
@@ -218,7 +238,7 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
         .min(n(&data["audit"], "conservative_available_DATA_bytes")?);
     ensure!(free >= required, "final HOME availability below full fit");
     Ok(
-        json!({"schema":"epoch169-complete-trace-host-fit-v1","fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth169,"root_cap_bytes":guard169::CAP,"epoch169_tree":own_root,"nominal_epoch169_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_169_booking_bytes":growth169,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
+        json!({"schema":"epoch169-complete-trace-host-fit-v1","fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth169,"root_cap_bytes":guard169::CAP,"epoch169_tree":own_root,"nominal_epoch169_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":combined_memory,"required_available_memory_with_temporary_workers_bytes":required_available,"temporary_workers":temporary.2,"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_169_booking_bytes":growth169,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
     )
 }
 fn retained_build_images(native: &Value) -> Result<Value> {

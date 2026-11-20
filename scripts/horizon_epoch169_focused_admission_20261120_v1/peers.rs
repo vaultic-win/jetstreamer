@@ -339,3 +339,66 @@ fn drained(u: &str) -> Result<()> {
     }
     Ok(())
 }
+
+/// Temporary workers outside the historical serial build and audit bookings.
+pub(super) fn temporary_workers() -> Result<(u64, u64, Vec<Value>)> {
+    let mut memory = 0;
+    let mut cpu = 0;
+    let mut workers = Vec::new();
+    for (unit, invocation, limit, quota, micros) in [
+        (
+            "horizon-audit90-after91-cleanup-20261120-v1.service",
+            "6914dc0d3ac74f8aa24766f7e3ad577a",
+            128u64 << 20,
+            "250ms",
+            250_000u64,
+        ),
+        (
+            "horizon-metered172-terminal-evidence-g3.service",
+            "0e23fb4e93e84f029fb77d338ff851d5",
+            48 << 20,
+            "100ms",
+            100_000,
+        ),
+        (
+            "horizon-169-index-comparison-20261120-v2.service",
+            "ab8c54edb5664e88b312aa53d3c32ef5",
+            64 << 20,
+            "250ms",
+            250_000,
+        ),
+    ] {
+        let state = show(unit)?;
+        if matches!(state["ActiveState"].as_str(), Some("inactive" | "failed")) {
+            drained(unit)?;
+            continue;
+        }
+        let limits = run(
+            "/usr/bin/systemctl",
+            &[
+                "show".into(),
+                unit.into(),
+                "--property=MemoryMax,CPUQuotaPerSecUSec".into(),
+            ],
+            bounded(),
+        )?;
+        ensure!(
+            state["ActiveState"] == "active"
+                && state["InvocationID"] == invocation
+                && state["Job"] == ""
+                && state["MainPID"]
+                    .as_str()
+                    .is_some_and(|s| s.parse::<u64>().is_ok_and(|p| p > 1))
+                && limits.lines().any(|l| l == format!("MemoryMax={limit}"))
+                && limits
+                    .lines()
+                    .any(|l| l == format!("CPUQuotaPerSecUSec={quota}"))
+                && show(unit)? == state,
+            "unexpected auxiliary owner or limits: {unit}"
+        );
+        memory += limit;
+        cpu += micros;
+        workers.push(json!({"unit":unit,"invocation_id":invocation,"memory_bytes":limit,"cpu_quota_micros":micros}));
+    }
+    Ok((memory, cpu, workers))
+}
