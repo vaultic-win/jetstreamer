@@ -24,7 +24,7 @@ const DEV: u64 = 66305;
 const LIMIT: u64 = 8 << 20;
 const FLOOR: u64 = 3_908_104_436_088;
 const IMAGE: &str =
-    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v2/duplicate-index-retire";
+    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v3/duplicate-index-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const PROTECTED: &str = "horizon-qualify-250-reboot-20261117-v1.service";
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -649,7 +649,21 @@ fn show(unit: &str) -> Result<BTreeMap<String, String>> {
                 .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b)),
         "unit name syntax"
     );
-    let mut child=Command::new("/usr/bin/timeout").args(["--signal=KILL","15s","/usr/bin/systemctl","show",unit,"--property=Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecStart,ControlGroup,FragmentPath,DropInPaths,Job,TriggeredBy,NRestarts,MemoryMax,MemorySwapMax,RuntimeMaxUSec,TasksMax,Type,User,ExecStartPre,ExecStartPost,ExecStop,ExecStopPost"]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()?;
+    let properties = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecStart,ControlGroup,FragmentPath,DropInPaths,Job,TriggeredBy,NRestarts,MemoryMax,MemorySwapMax,RuntimeMaxUSec,TasksMax,Type,User";
+    let mut child = Command::new("/usr/bin/timeout")
+        .args([
+            "--signal=KILL",
+            "15s",
+            "/usr/bin/systemctl",
+            "show",
+            "--all",
+            unit,
+            "--property",
+            properties,
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
     let mut raw = Vec::new();
     let got = child
         .stdout
@@ -743,12 +757,29 @@ fn controller(mode: &str, q: &Profile, b: &Value, args: &[String]) -> Result<(St
         fragment == Path::new(&format!("/run/systemd/transient/{unit}")),
         "helper fragment namespace"
     );
-    for key in ["ExecStartPre", "ExecStartPost", "ExecStop", "ExecStopPost"] {
-        ensure!(
-            m.get(key).is_some_and(String::is_empty),
-            "helper additional command {key}"
-        );
-    }
+    // PID1 omits empty Exec arrays from systemctl output even with --all.
+    // These fixed unit names contain only letters, digits, hyphens and a dot.
+    let object = format!(
+        "/org/freedesktop/systemd1/unit/{}",
+        unit.replace('-', "_2d").replace('.', "_2e")
+    );
+    let commands = Command::new("/usr/bin/busctl")
+        .args([
+            "--timeout=15s",
+            "get-property",
+            "org.freedesktop.systemd1",
+            &object,
+            "org.freedesktop.systemd1.Service",
+            "ExecStartPre",
+            "ExecStartPost",
+            "ExecStop",
+            "ExecStopPost",
+        ])
+        .output()?;
+    ensure!(
+        commands.status.success() && commands.stdout == b"a(sasbttttuii) 0\n".repeat(4),
+        "additional helper commands or incomplete native command properties"
+    );
     ensure!(b["controller_unit"] == unit, "booking controller differs");
     let raw = read_bounded(&fragment, 1 << 20)?;
     file_bytes(&fragment, &sha(&raw), 0, None, false)?;
