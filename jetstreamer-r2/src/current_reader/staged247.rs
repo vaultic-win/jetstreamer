@@ -1,6 +1,7 @@
 //! Reuse the original authenticated scratch inode only after its owner failed.
 //! A fresh ordered R2 stream must equal it byte for byte before plugin playback.
 use super::*;
+use jetstreamer_horizon_observe::staged247_rss as staged;
 use std::{
     io,
     sync::{
@@ -36,6 +37,15 @@ const CURRENT_VERIFIER: &str =
 const CURRENT_QUALIFICATION: &str =
     "/var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/main-acceptance.json";
 const CURRENT_READER: &str = "680e1173010ad9a12060b2de98f16ddbf36e8975";
+const BENCH_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/epoch-247-plan.json";
+const BENCH_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/horizon_pipeline";
+const BENCH_VERIFIER: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-99f30641-v1/verify_archive";
+const BENCH_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-99f30641-v1/main-acceptance.json";
+const BENCH_READER: &str = "99f306410aa59a41394e9c4bf379143fb2a4ada1";
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
     "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
@@ -127,7 +137,7 @@ fn saved_inputs() -> Result<()> {
     Ok(())
 }
 
-fn failed(rows: &[Value]) -> Result<&Value> {
+fn failed<'a>(rows: &'a [Value], unit: &str, iid: &str) -> Result<&'a Value> {
     let failures: Vec<_> = rows
         .iter()
         .filter(|r| r["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c")
@@ -136,7 +146,7 @@ fn failed(rows: &[Value]) -> Result<&Value> {
         failures.len() == 1
             && rows
                 .iter()
-                .all(|r| r["_PID"] == "1" && r["INVOCATION_ID"] == IID && r["UNIT"] == UNIT)
+                .all(|r| r["_PID"] == "1" && r["INVOCATION_ID"] == iid && r["UNIT"] == unit)
             && matches!(
                 failures[0]["UNIT_RESULT"].as_str(),
                 Some(
@@ -150,21 +160,46 @@ fn failed(rows: &[Value]) -> Result<&Value> {
                         | "protocol"
                 )
             ),
-        "missing exact unsuccessful original uploader result"
+        "missing exact unsuccessful uploader result for {unit} {iid}"
     );
     Ok(failures[0])
 }
-fn drained() -> Result<()> {
+fn failed_owner(unit: &str, iid: &str) -> Result<Value> {
+    let output = Command::new("/usr/bin/journalctl")
+        .args([
+            "--quiet",
+            "--no-pager",
+            "--output=json",
+            "--output-fields=_PID,UNIT,INVOCATION_ID,MESSAGE_ID,UNIT_RESULT",
+            "--lines=64",
+            "_PID=1",
+            &format!("UNIT={unit}"),
+            &format!("INVOCATION_ID={iid}"),
+        ])
+        .output()?;
+    ensure!(
+        output.status.success() && output.stdout.len() <= 256 * 1024,
+        "systemd result unavailable for {unit}"
+    );
+    let rows = std::str::from_utf8(&output.stdout)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<serde_json::Result<Vec<_>>>()?;
+    let result = failed(&rows, unit, iid)?.clone();
+    drained(unit, iid)?;
+    Ok(result)
+}
+fn drained(unit: &str, iid: &str) -> Result<()> {
     use std::collections::BTreeMap;
     let s = Command::new("/usr/bin/systemctl")
-        .args(["show", UNIT, "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Restart,Job"])
+        .args(["show", unit, "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Restart,Job"])
         .output()?;
     let state = std::str::from_utf8(&s.stdout)?
         .lines()
         .map(|l| l.split_once('=').context("invalid unit property"))
         .collect::<Result<BTreeMap<_, _>>>()?;
     ensure!(
-        state.get("Id") == Some(&UNIT)
+        state.get("Id") == Some(&unit)
             && matches!(
                 (state.get("ActiveState"), state.get("SubState")),
                 (Some(&"failed"), Some(&"failed")) | (Some(&"inactive"), Some(&"dead"))
@@ -176,20 +211,22 @@ fn drained() -> Result<()> {
                 .all(|k| state.get(k) == Some(&"0"))
             && state.get("Job") == Some(&"")
             && state.get("Restart") == Some(&"no")
-            && matches!(state.get("InvocationID").copied(), Some("") | Some(IID)),
-        "original uploader is not drained"
+            && state
+                .get("InvocationID")
+                .is_some_and(|value| value.is_empty() || *value == iid),
+        "uploader {unit} is not drained"
     );
     let p = Path::new("/sys/fs/cgroup/system.slice")
-        .join(UNIT)
+        .join(unit)
         .join("cgroup.events");
     match fs::read_to_string(&p) {
         Ok(s) => ensure!(
             s.lines().any(|l| l == "populated 0"),
-            "original uploader cgroup populated"
+            "uploader cgroup {unit} populated"
         ),
         Err(e) if e.kind() == io::ErrorKind::NotFound => ensure!(
             !p.parent().unwrap().try_exists()?,
-            "unreadable original cgroup"
+            "unreadable uploader cgroup {unit}"
         ),
         Err(e) => return Err(e.into()),
     }
@@ -207,17 +244,26 @@ fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
                 ("qualification", PUBLIC_QUALIFICATION),
             ],
         )
-    } else {
-        ensure!(
-            path == Path::new(CURRENT_PLAN),
-            "unregistered epoch 247 recovery plan"
-        );
+    } else if path == Path::new(CURRENT_PLAN) {
         (
             CURRENT_READER,
             &[
                 ("pipeline", CURRENT_PIPELINE),
                 ("full_verifier", CURRENT_VERIFIER),
                 ("qualification", CURRENT_QUALIFICATION),
+            ],
+        )
+    } else {
+        ensure!(
+            path == Path::new(BENCH_PLAN),
+            "unregistered epoch 247 recovery plan"
+        );
+        (
+            BENCH_READER,
+            &[
+                ("pipeline", BENCH_PIPELINE),
+                ("full_verifier", BENCH_VERIFIER),
+                ("qualification", BENCH_QUALIFICATION),
             ],
         )
     };
@@ -243,9 +289,13 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
             && c.epochs == std::collections::BTreeSet::from([247])
             && c.directory == Path::new(INPUT)
             && c.receipt_directory.as_deref() == Some(Path::new(STATE).join("receipts").as_path())
-            && c.current_reader_plan
-                .as_deref()
-                .is_some_and(|p| p == Path::new(PUBLIC_PLAN) || p == Path::new(CURRENT_PLAN))
+            && c.current_reader_plan.as_deref().is_some_and(|p| [
+                PUBLIC_PLAN,
+                CURRENT_PLAN,
+                BENCH_PLAN
+            ]
+            .iter()
+            .any(|registered| p == Path::new(registered)))
             && c.current_reader_plan_sha256
                 .as_deref()
                 .is_some_and(|sha| hex(sha, 64))
@@ -361,9 +411,10 @@ pub(crate) struct Retained {
     log: Stamp,
     log_sha256: String,
     failed_manager_event: Value,
+    staged_manager_event: Option<Value>,
 }
 impl Retained {
-    pub(crate) fn open() -> Result<Self> {
+    pub(crate) fn open(plan: &Path) -> Result<Self> {
         use std::os::fd::AsRawFd;
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -405,28 +456,18 @@ impl Retained {
             unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
             "concurrent staged 247 recovery"
         );
-        let output = Command::new("/usr/bin/journalctl")
-            .args([
-                "--quiet",
-                "--no-pager",
-                "--output=json",
-                "--output-fields=_PID,UNIT,INVOCATION_ID,MESSAGE_ID,UNIT_RESULT",
-                "--lines=64",
-                "_PID=1",
-                &format!("UNIT={UNIT}"),
-                &format!("INVOCATION_ID={IID}"),
-            ])
-            .output()?;
-        ensure!(
-            output.status.success() && output.stdout.len() <= 256 * 1024,
-            "original systemd result unavailable"
-        );
-        let rows = std::str::from_utf8(&output.stdout)?
-            .lines()
-            .map(serde_json::from_str)
-            .collect::<serde_json::Result<Vec<_>>>()?;
-        let failed_manager_event = failed(&rows)?.clone();
-        drained()?;
+        let failed_manager_event = failed_owner(UNIT, IID)?;
+        let staged_manager_event = if plan == Path::new(BENCH_PLAN) {
+            for (path, sha) in [staged::BOOKING, staged::CLAIM, staged::LAUNCH, staged::PLAN] {
+                bound_file(&Bound {
+                    path: path.into(),
+                    sha256: sha.into(),
+                })?;
+            }
+            Some(failed_owner(staged::UNIT, staged::IID)?)
+        } else {
+            None
+        };
         saved_inputs()?;
         let (bytes, log) = read_private(Path::new(LOG), 16 << 20)?;
         ensure!(
@@ -437,6 +478,7 @@ impl Retained {
         Ok(Self {
             log,
             failed_manager_event,
+            staged_manager_event,
             log_sha256: format!("{:x}", Sha256::digest(&bytes)),
             complete: Arc::new(AtomicBool::new(false)),
             _lock: Arc::new(file),
@@ -455,7 +497,7 @@ impl Retained {
         Ok(Sink::Compare {
             file: f,
             bytes: 0,
-            owner: self.clone(),
+            owner: Box::new(self.clone()),
         })
     }
     pub(super) fn verify_object(&self, remote: &RemoteObject) -> Result<()> {
@@ -474,10 +516,13 @@ impl Retained {
             self.complete.load(Ordering::Acquire),
             "fresh compared readback missing"
         );
-        drained()?;
+        drained(UNIT, IID)?;
+        if self.staged_manager_event.is_some() {
+            drained(staged::UNIT, staged::IID)?;
+        }
         saved_inputs()?;
         self.log.check(Path::new(LOG))?;
-        Ok(json!({
+        let mut proof = json!({
             "original_unit": UNIT, "original_invocation_id": IID,
             "original_systemd_failure":self.failed_manager_event,
             "preparation": {"path":PREPARATION, "sha256":PREP_SHA},
@@ -485,7 +530,12 @@ impl Retained {
             "readback_path":SCRATCH, "readback_identity":COPY,
             "source_identity":ARCHIVE, "source_sidecar_identity":SIDECAR,
             "fresh_authenticated_stream_compared_bytes":LENGTH, "byte_equality_from_zero":true
-        }))
+        });
+        if let Some(event) = &self.staged_manager_event {
+            proof["prior_staged_uploader"] =
+                json!({"unit":staged::UNIT, "invocation_id":staged::IID, "systemd_failure":event});
+        }
+        Ok(proof)
     }
 }
 pub(crate) enum Sink {
@@ -493,7 +543,7 @@ pub(crate) enum Sink {
     Compare {
         file: File,
         bytes: u64,
-        owner: Retained,
+        owner: Box<Retained>,
     },
 }
 fn compare<W: Read>(reader: &mut W, mut bytes: &[u8]) -> io::Result<()> {
@@ -617,6 +667,50 @@ mod tests {
         }
     }
     #[test]
+    fn benchmark_reader_requires_exact_source_images_and_original_epoch_layout() {
+        let original = json!({"reader_commit":CURRENT_READER, "threads":2, "epoch_expectations":{"247":"original"}});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(BENCH_READER);
+        for (key, path) in [
+            ("pipeline", BENCH_PIPELINE),
+            ("full_verifier", BENCH_VERIFIER),
+            ("qualification", BENCH_QUALIFICATION),
+        ] {
+            next[key] = json!({"path":path,"sha256":"a".repeat(64)});
+        }
+        let path = Path::new(BENCH_PLAN);
+        public_plan(path, &original, &next).unwrap();
+        assert!(public_plan(Path::new(CURRENT_PLAN), &original, &next).is_err());
+        for (pointer, wrong) in [
+            ("/pipeline/path", json!(CURRENT_PIPELINE)),
+            ("/full_verifier/path", json!(CURRENT_VERIFIER)),
+            ("/qualification/path", json!(CURRENT_QUALIFICATION)),
+            ("/reader_commit", json!(CURRENT_READER)),
+            ("/threads", json!(1)),
+            ("/epoch_expectations/247", json!("foreign")),
+        ] {
+            let mut other = next.clone();
+            *other.pointer_mut(pointer).unwrap() = wrong;
+            assert!(public_plan(path, &original, &other).is_err());
+        }
+        next["features"] = json!(["other"]);
+        assert!(public_plan(path, &original, &next).is_err());
+    }
+
+    #[test]
+    fn staged_failure_requires_its_own_unsuccessful_manager_invocation() {
+        let row = json!({"_PID":"1","UNIT":staged::UNIT,"INVOCATION_ID":staged::IID,"MESSAGE_ID":"d9b373ed55a64feb8242e02dbe79a49c","UNIT_RESULT":"exit-code"});
+        let rows = std::slice::from_ref(&row);
+        failed(rows, staged::UNIT, staged::IID).unwrap();
+        assert!(failed(rows, UNIT, IID).is_err());
+        assert!(failed(rows, staged::UNIT, IID).is_err());
+        for (key, value) in [("UNIT_RESULT", "success"), ("MESSAGE_ID", "started")] {
+            let mut other = row.clone();
+            other[key] = json!(value);
+            assert!(failed(&[other], staged::UNIT, staged::IID).is_err());
+        }
+    }
+    #[test]
     fn staged_remote_identity_requires_the_recorded_key_bucket_digest_length_and_etag() {
         let r = crate::RemoteArchive {
             length: LENGTH,
@@ -643,9 +737,9 @@ mod tests {
     #[test]
     fn failed_result_rejects_live_successful_reused_and_ambiguous_invocations() {
         let r = json!({"_PID":"1","UNIT":UNIT,"INVOCATION_ID":IID,"MESSAGE_ID":"d9b373ed55a64feb8242e02dbe79a49c","UNIT_RESULT":"exit-code"});
-        failed(std::slice::from_ref(&r)).unwrap();
-        assert!(failed(&[]).is_err());
-        assert!(failed(&[r.clone(), r.clone()]).is_err());
+        failed(std::slice::from_ref(&r), UNIT, IID).unwrap();
+        assert!(failed(&[], UNIT, IID).is_err());
+        assert!(failed(&[r.clone(), r.clone()], UNIT, IID).is_err());
         for (k, v) in [
             ("_PID", "4"),
             ("UNIT", "other.service"),
@@ -655,7 +749,7 @@ mod tests {
         ] {
             let mut bad = r.clone();
             bad[k] = json!(v);
-            assert!(failed(&[bad]).is_err());
+            assert!(failed(&[bad], UNIT, IID).is_err());
         }
     }
     #[test]

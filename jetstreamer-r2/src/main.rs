@@ -3251,7 +3251,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             epoch == 247 && existing_sidecar.is_none(),
             "staged 247 sidecar already exists"
         );
-        Some(current_reader::staged247::Retained::open()?)
+        Some(current_reader::staged247::Retained::open(
+            config
+                .current_reader_plan
+                .as_deref()
+                .context("missing staged 247 reader plan")?,
+        )?)
     } else {
         None
     };
