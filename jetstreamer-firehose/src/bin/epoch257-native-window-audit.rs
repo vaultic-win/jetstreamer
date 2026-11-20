@@ -1,27 +1,9 @@
 //! Compare every local CAR section against the normal Firehose NodeReader under its actual crate.
-use jetstreamer_firehose::node::{Node, NodeReader};
+mod native_window;
+use native_window::{Result, decode};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::{
-    cell::Cell,
-    error::Error,
-    fs,
-    io::{self, Read},
-    path::PathBuf,
-};
-
-type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
-struct Position<'a> {
-    source: &'a [u8],
-    position: &'a Cell<usize>,
-}
-impl Read for Position<'_> {
-    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
-        let count = self.source.read(out)?;
-        self.position.set(self.position.get() + count);
-        Ok(count)
-    }
-}
+use std::{fs, path::PathBuf};
 
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
@@ -77,59 +59,34 @@ fn main() -> Result<()> {
         {
             return Err("window bound".into());
         }
-        let mut data = prefix[..59].to_vec();
-        data.extend(body);
-        let pos = Cell::new(0);
-        let mut reader = NodeReader::new(Position {
-            source: &data,
-            position: &pos,
-        })?;
-        reader.read_raw_header()?;
-        let mut prior = start;
-        let mut blocks = 0usize;
-        let mut sections = 0u64;
-        while pos.get() < data.len() {
-            let raw = reader.next()?;
-            raw.verify_sha256_cid()?;
-            sections += 1;
-            let cid: String = raw
-                .get_cid()
-                .to_bytes()
-                .iter()
-                .map(|x| format!("{x:02x}"))
-                .collect();
-            if let Node::Block(b) = raw.parse()? {
-                let end = start + (pos.get() - 59) as u64;
-                let index_slot =
-                    usize::try_from(b.slot.checked_sub(111024000).ok_or("slot outside epoch")?)?;
-                let row_start = index_slot.checked_mul(12).ok_or("slot index overflow")?;
-                let record = index
-                    .get(row_start..row_start + 12)
-                    .ok_or("slot beyond epoch257")?;
-                let actual_offset = u64::from_le_bytes(record[..8].try_into()?);
-                let actual_length = u32::from_le_bytes(record[8..].try_into()?);
-                if (actual_offset, u64::from(actual_length)) != (prior, end - prior) {
-                    return Err("native terminal range differs from candidate row".into());
-                }
-                let row = expected.get(blocks).ok_or("extra terminal block")?;
-                if row["slot"] != b.slot
-                    || row["parent"] != b.meta.parent_slot
-                    || row["start"] != prior
-                    || row["end"] != end
-                    || row["block_cid_hex"] != cid
-                {
-                    return Err(format!(
-                        "native decoder disagreement at edge {id} slot {}",
-                        b.slot
-                    )
-                    .into());
-                }
-                prior = end;
-                blocks += 1;
-            }
-        }
-        if blocks != expected.len() || prior != end || pos.get() != data.len() {
+        let (native, sections) = decode(&prefix, &body, start)?;
+        let blocks = native.len();
+        if blocks != expected.len() {
             return Err("incomplete native window".into());
+        }
+        for (b, row) in native.iter().zip(expected) {
+            let (prior, end) = (b.start, b.end);
+            let index_slot =
+                usize::try_from(b.slot.checked_sub(111024000).ok_or("slot outside epoch")?)?;
+            let row_start = index_slot.checked_mul(12).ok_or("slot index overflow")?;
+            let record = index
+                .get(row_start..row_start + 12)
+                .ok_or("slot beyond epoch257")?;
+            let actual_offset = u64::from_le_bytes(record[..8].try_into()?);
+            let actual_length = u32::from_le_bytes(record[8..].try_into()?);
+            if (actual_offset, u64::from(actual_length)) != (prior, end - prior) {
+                return Err("native terminal range differs from candidate row".into());
+            }
+            if row["slot"] != b.slot
+                || row["parent"] != b.parent
+                || row["start"] != prior
+                || row["end"] != end
+                || row["block_cid_hex"] != b.cid
+            {
+                return Err(
+                    format!("native decoder disagreement at edge {id} slot {}", b.slot).into(),
+                );
+            }
         }
         total_sections += sections;
         total_blocks += blocks as u64;

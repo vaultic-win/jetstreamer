@@ -21,3 +21,14 @@ The repair verifies section CIDs and parses every terminal Block and parent. It 
 On the recorded windows, 225,181 CAR sections and 144 terminal blocks passed the native comparison. The candidate adds 28 previously omitted slots and moves the mislabeled slot 111226320 to 111226321 with offset 198347022188 and length 1155096. All 432,000 candidate records were scanned. The result has 385,300 present records and zero internal physical gaps or overlaps, with SHA256 `5810e796b7565404320544ebb5cd98055eb5cfaf60af64884c96481e5f75d126`. The repair receipt lists every changed record and every decoded block CID.
 
 Use the normal Rust sealer and the production firehose's digest-pinned local slot-ranges override manifest when binding this reviewed candidate to replay. Include both the manifest and its exact SHA in the selected node's environment. The current `--probe-local-slot-ranges=253-255` diagnostic uses 253–255 fixture slots. The ordinary `SlotOffsetIndex` loader selects an override by the manifest entry's epoch. This candidate covers epoch 257. It does not authenticate the full compact-index bodies, qualify native snapshot initialization or authorize replay or publication.
+
+## Epoch 261
+
+The epoch 261 repair reads the sealed original slot index, the singleton preflight and 16 bracketed CAR windows. Run both commands against the same fresh absolute output path.
+
+    cargo run --locked --offline --manifest-path tools/horizon257-source-profile/Cargo.toml -- repair-261 NEW_ABSOLUTE_OUTPUT_DIRECTORY
+    cargo run --locked --offline -p jetstreamer-firehose --bin epoch261-native-window-audit -- NEW_ABSOLUTE_OUTPUT_DIRECTORY/repair-candidate.json
+
+The repair emits a candidate index, a report listing every patched row, and a slot-ranges override manifest bound to that index's absolute path and SHA-256. The native comparator reconstructs all 432,000 rows from the original index and decoded Firehose blocks, checks both exterior anchor records in every window, and compares the reconstructed rows with the candidate file.
+
+On the sealed inputs, 150,120 CAR sections and 79 terminal blocks passed native comparison. The repair fills 15 omitted slots and corrects the existing range for slot 112846320. The candidate has 409,865 present rows, zero internal gaps or overlaps, and SHA-256 `adf684d1a7354b85ae477234877c23c7eaa046de7e8b6c73cc2015d3dca02f68`.
