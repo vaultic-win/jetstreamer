@@ -842,6 +842,17 @@ fn hash_and_etag_observed(
     part_size: u64,
     mut progress: impl FnMut(u64),
 ) -> Result<LocalProof> {
+    hash_and_etag_checked(path, expected, part_size, |n| {
+        progress(n);
+        Ok(())
+    })
+}
+fn hash_and_etag_checked(
+    path: &Path,
+    expected: FileIdentity,
+    part_size: u64,
+    mut progress: impl FnMut(u64) -> Result<()>,
+) -> Result<LocalProof> {
     ensure!(part_size > 0, "hash part size must be positive");
     let mut file = OpenOptions::new()
         .read(true)
@@ -870,7 +881,7 @@ fn hash_and_etag_observed(
             md5.update(&buffer[..take]);
             part_sha256.update(&buffer[..take]);
             part_remaining -= take as u64;
-            progress(expected.length - remaining + this_part - part_remaining);
+            progress(expected.length - remaining + this_part - part_remaining)?;
         }
         combined_md5.update(md5.finalize());
         combined_sha256.update(part_sha256.finalize());

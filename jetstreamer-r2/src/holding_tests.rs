@@ -265,6 +265,7 @@ fn restore_commit_and_floor_never_overwrite_or_consume_the_reserve() {
     assert_eq!(fs::read(&final_path).unwrap(), b"restored bytes");
     let mut file = File::create(dir.path().join("guarded")).unwrap();
     let mut guarded = FloorWriter {
+        check: &|| Ok(()),
         file: &mut file,
         directory: dir.path(),
         minimum_free_bytes: u64::MAX,
@@ -785,6 +786,49 @@ async fn foundation_genesis_real_readback_and_interrupted_restore() -> Result<()
         "object_etag":ETAG,"length":LENGTH,"sha256":GENESIS_PROBE_SHA,"original_custody":custody,"original_restore":restore,
         "authenticated_whole_readback":true,"download_complete_before_interruption":true,"same_inode_after_resume":true,"restored_device":staged.device,"restored_inode":staged.inode,"tmpfs_bytes":capacity,"floor_bytes":FLOOR,
         "completed_reentry_and_byte_comparison":true,"remote_mutations":false,"local_source_retirement":false})
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn restore_capacity_loss_interrupts_existing_body_verification_without_mutation() -> Result<()>
+{
+    let dir = tempfile::tempdir()?;
+    fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700))?;
+    let bytes = b"retained original fixture bytes";
+    let sha = hex_lower(&Sha256::digest(bytes));
+    let destination = dir.path().join(format!("{sha}.blob"));
+    fs::write(&destination, bytes)?;
+    fs::set_permissions(&destination, fs::Permissions::from_mode(0o400))?;
+    let before = regular_identity(&destination)?;
+    let client = s3_client(&R2Config {
+        endpoint: "http://127.0.0.1:1".into(),
+        bucket: "fixture".into(),
+        access_key: "fixture".into(),
+        secret_key: "fixture".into(),
+    });
+    let target = || BlobRestore {
+        key: "fixture",
+        etag: "unused",
+        sha: &sha,
+        length: bytes.len() as u64,
+        directory: dir.path(),
+        minimum: 0,
+    };
+    let error = restore_blob_guarded(
+        &client,
+        target(),
+        || bail!("capacity proof expired"),
+        || bail!("unexpected rename"),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.to_string(), "capacity proof expired");
+    assert_eq!(regular_identity(&destination)?, before);
+    assert_eq!(fs::read(&destination)?, bytes);
+    assert_eq!(
+        restore_blob_guarded(&client, target(), || Ok(()), || bail!("unexpected rename")).await?,
+        destination
     );
     Ok(())
 }

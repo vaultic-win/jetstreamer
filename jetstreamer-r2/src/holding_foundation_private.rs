@@ -779,7 +779,7 @@ fn remaining_allocation(length: u64, logical: u64, physical: u64) -> Result<u64>
     );
     Ok(length - logical.min(physical))
 }
-fn admitted(v: &Value, c: &Bound, a: Artifact, entry: u64) -> Result<u64> {
+fn admission_floor(v: &Value, c: &Bound, a: Artifact, entry: u64) -> Result<u64> {
     let at = v["recorded_unix_seconds"]
         .as_u64()
         .context("restore admission clock")?;
@@ -794,17 +794,9 @@ fn admitted(v: &Value, c: &Bound, a: Artifact, entry: u64) -> Result<u64> {
             && entry - at <= 900,
         "stale/foreign private restore admission"
     );
-    let current = horizon_singleton211_launch::foundation_holding_capacity::check(&v["resource_basis"], 0)?;
-    let floor = v["capacity"]["minimum_free_bytes"]
+    v["capacity"]["minimum_free_bytes"]
         .as_u64()
-        .context("restore floor")?;
-    ensure!(
-        current["minimum_free_bytes"]
-            .as_u64()
-            .is_some_and(|x| x <= floor),
-        "protected growth/floor increased"
-    );
-    Ok(floor)
+        .context("restore floor")
 }
 fn restore_metadata_at(directory: &Path, sha: &str, manifest: &Value) -> Result<()> {
     let (_, bound_sha) = validate_manifest(manifest)?;
@@ -841,14 +833,38 @@ fn restore_metadata_at(directory: &Path, sha: &str, manifest: &Value) -> Result<
     Ok(())
 }
 struct PreparedRestore {
+    lease: Option<horizon_singleton211_launch::foundation_holding_capacity::RestoreLease>,
     custody: Value,
     artifact: Artifact,
     sha: String,
     admission: Value,
-    entry: u64,
     floor: u64,
     key: String,
     directory: PathBuf,
+}
+impl PreparedRestore {
+    fn checkpoint(&self, force: bool) -> Result<()> {
+        let remaining = || {
+            restore_remaining(self.artifact, &self.sha)?
+                .checked_add(METADATA_RESERVE)
+                .context("restore reserve overflow")
+        };
+        if let Some(lease) = &self.lease {
+            lease.renew(force, remaining)?;
+        } else if force {
+            let capacity = horizon_singleton211_launch::foundation_holding_capacity::check(
+                &self.admission["resource_basis"],
+                remaining()?,
+            )?;
+            ensure!(
+                capacity["minimum_free_bytes"]
+                    .as_u64()
+                    .is_some_and(|n| n <= self.floor - METADATA_RESERVE),
+                "protected growth/floor increased"
+            );
+        }
+        Ok(())
+    }
 }
 struct NativeRestore<'a> {
     client: &'a Client,
@@ -872,16 +888,27 @@ impl runner::RestoreOperations for NativeRestore<'_> {
                 let (artifact, sha) = remote_custody(self.client, &custody).await?;
                 let admission = saved(&self.p.admission)?;
                 let entry = clock()?;
-                let floor = admitted(&admission, &self.p.custody, artifact, entry)?
+                let original_floor = admission_floor(&admission, &self.p.custody, artifact, entry)?;
+                let remaining = restore_remaining(artifact, &sha)?
+                    .checked_add(METADATA_RESERVE)
+                    .context("restore reserve overflow")?;
+                let lease =
+                    horizon_singleton211_launch::foundation_holding_capacity::RestoreLease::start(
+                        &admission["resource_basis"],
+                        &serde_json::to_value(&self.p.custody)?,
+                        remaining,
+                        original_floor,
+                    )?;
+                let floor = original_floor
                     .checked_add(METADATA_RESERVE)
                     .context("metadata floor overflow")?;
                 let key = key(&sha)?;
                 self.prepared = Some(PreparedRestore {
+                    lease,
                     custody,
                     artifact,
                     sha,
                     admission,
-                    entry,
                     floor,
                     key,
                     directory: Path::new(STATE).join("restores"),
@@ -889,7 +916,7 @@ impl runner::RestoreOperations for NativeRestore<'_> {
             }
             Download => {
                 let c = self.prepared.as_ref().context("restore is not prepared")?;
-                let destination = restore_blob(
+                let destination = restore_blob_guarded(
                     self.client,
                     BlobRestore {
                         key: &c.key,
@@ -899,7 +926,8 @@ impl runner::RestoreOperations for NativeRestore<'_> {
                         directory: &c.directory,
                         minimum: c.floor,
                     },
-                    || admitted(&c.admission, &self.p.custody, c.artifact, c.entry).map(|_| ()),
+                    || c.checkpoint(false),
+                    || c.checkpoint(true),
                 )
                 .await?;
                 self.destination = Some(destination);
@@ -914,7 +942,12 @@ impl runner::RestoreOperations for NativeRestore<'_> {
                     .destination
                     .as_ref()
                     .context("restore body is absent")?;
-                let proof = hash_and_etag(path, regular_identity(path)?, DEFAULT_PART_SIZE)?;
+                let proof = hash_and_etag_checked(
+                    path,
+                    regular_identity(path)?,
+                    DEFAULT_PART_SIZE,
+                    |_| c.checkpoint(false),
+                )?;
                 ensure!(
                     proof.sha256_hex == c.sha,
                     "restored private blob digest differs"
@@ -926,7 +959,7 @@ impl runner::RestoreOperations for NativeRestore<'_> {
             }
             VerifyCapacity => {
                 let c = self.prepared.as_ref().context("restore is not prepared")?;
-                admitted(&c.admission, &self.p.custody, c.artifact, c.entry)?;
+                c.checkpoint(true)?;
             }
             PersistReceipt => {
                 let c = self.prepared.as_ref().context("restore is not prepared")?;
@@ -934,10 +967,13 @@ impl runner::RestoreOperations for NativeRestore<'_> {
                     .destination
                     .as_ref()
                     .context("restore body is absent")?;
-                let value = json!({"schema":"jetstreamer-foundation-closed-private-restoration-v1","host":host::HOST,"artifact":c.artifact,"custody":self.p.custody,
+                let mut value = json!({"schema":"jetstreamer-foundation-closed-private-restoration-v1","host":host::HOST,"artifact":c.artifact,"custody":self.p.custody,
                     "spec":self.spec,"destination":destination,"sha256":c.sha,"length":c.artifact.expected().length,"original_metadata":c.custody["manifest"],
                     "staging_only":true,"complete_byte_restoration_verified":true,"canonical_archive":false,"canonical_publication_authorized":false,
                     "full_plugin_qualified":false,"boundary_qualified":false,"runtime_checkpoint_qualified":false,"job_resume_authorized":false,"replay_launch_authorized":false});
+                if let Some(lease) = &c.lease {
+                    value["capacity_renewal"] = lease.evidence();
+                }
                 self.output = Some(receipt(
                     &format!("restore-{}.json", self.spec.sha256),
                     &value,

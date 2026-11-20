@@ -95,6 +95,27 @@ pub(super) fn booked_host(
     path: &Path,
     native257_held: Option<bool>,
 ) -> Result<BookedHost> {
+    booked_host_for(n, review, path, native257_held, None)
+}
+
+pub(super) fn booked_host_for(
+    n: &mut Native,
+    review: &Value,
+    path: &Path,
+    native257_held: Option<bool>,
+    continuation: Option<&foundation_holding_capacity::RestoreLease>,
+) -> Result<BookedHost> {
+    // An initial admission always requires fresh authoritative inputs. Only an
+    // uninterrupted restore may use its frozen, exclusively booked baseline
+    // while this function repeats the complete live owner and resource census.
+    let current = |fleet: &Value| -> Result<()> {
+        if let Some(lease) = continuation {
+            lease.check_anchor(review)
+        } else {
+            fresh(num(fleet, "recorded_unix_seconds")?, now()?, 300)?;
+            fresh(num(review, "recorded_unix_seconds")?, now()?, 300)
+        }
+    };
     no_authority(review)?;
     ensure!(
         review["Main_accepted"] == true && review["single_campaign_controller_confirmed"] == true,
@@ -102,7 +123,6 @@ pub(super) fn booked_host(
     );
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     ensure!(review["boot_id"] == boot.trim(), "boot changed");
-    fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
     let fleet = binding(&review["fleet"])?.json()?;
     let observer = binding(&review["observer"])?.json()?;
     ensure!(
@@ -114,7 +134,7 @@ pub(super) fn booked_host(
             && fleet["memory_target"]["valid"] == true,
         "fleet and observer binding changed"
     );
-    fresh(num(&fleet, "recorded_unix_seconds")?, now()?, 300)?;
+    current(&fleet)?;
     let (rows, overhead, periodic) = admission::reservations(review)?;
     let previous = Bound::new(BASELINE, BASELINE_SHA).sealed()?;
     preserves_baseline(
@@ -177,8 +197,7 @@ pub(super) fn booked_host(
         Some(resources.0) == num(&observer["host_memory"], "total_kib")?.checked_mul(1024),
         "physical host changed"
     );
-    fresh(num(&fleet, "recorded_unix_seconds")?, now()?, 300)?;
-    fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
+    current(&fleet)?;
     ensure!(
         path.is_absolute() && path.canonicalize()? == path && fs::metadata(path)?.dev() == device,
         "capacity filesystem identity changed"
