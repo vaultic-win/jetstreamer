@@ -15,21 +15,114 @@ const WORKER: &str = "jetstreamer-historical-worker-v1-5-8";
 const GENESIS: &str =
     "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/output/genesis.tar.bz2";
 const SNAPSHOT: &str = "/home/sol/.jetstreamer-private/epoch169-standard-lane-20261109-v1/private/destination-d5071eb14bc459360668014134a7a0f1cec90ee78c9360cf175ef3cdd7fab573/work/root-cohort-169-169/run-50818-1794254430868327931/inputs/snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst";
-fn existing_names(names: &BTreeSet<String>, with_log: bool) -> bool {
-    let mut expected = BTreeSet::from([CHECK.to_string()]);
-    if with_log {
-        expected.insert("producer.log".into());
-    }
-    names == &expected
+fn existing_names(names: &BTreeSet<String>) -> bool {
+    let expected = PRESERVED
+        .into_iter()
+        .chain(["scratch"])
+        .map(str::to_owned)
+        .collect();
+    *names == expected
 }
-pub(super) fn existing_destination(p: &Path, log: bool) -> Result<()> {
+
+pub(super) fn failed_g1() -> Result<()> {
+    const ROOT: &str =
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v1";
+    let base = Path::new(ROOT);
+    let failure = json_pin(
+        &base.join("FAILED_SETUP.json"),
+        "2acc93c50c0ee00d85089d8cac64bd5772e5448b0c6fe00098f502dbd900c458",
+    )?;
+    let release = json_pin(
+        &base.join("AUTHORIZED_GATED_PAYLOAD.json"),
+        "8748590c473d685258dfc8fa9991774b5257687e96ccc90618a57917f3c8e11f",
+    )?;
+    ensure!(
+        failure["rolled_back"] == true
+            && failure["rollback_error"].is_null()
+            && failure["error"] == "producer lost during staging"
+            && release["producer_invocation_id"] == "d4e028308686417199a1d15698fb767e"
+            && !base
+                .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
+                .try_exists()?,
+        "first attempt lineage changed"
+    );
+    for unit in [
+        "horizon-qualify-169-focused-20261120-v1.service",
+        "horizon-guard-169-focused-20261120-v1.timer",
+        "horizon-guard-169-focused-20261120-v1.service",
+    ] {
+        crate::peers::idle(unit)?;
+        let cgroup = Path::new("/sys/fs/cgroup/system.slice").join(unit);
+        if cgroup.try_exists()? {
+            ensure!(
+                fs::read_to_string(cgroup.join("cgroup.events"))?
+                    .lines()
+                    .any(|s| s == "populated 0"),
+                "first attempt cgroup retains members"
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn existing_destination(p: &Path) -> Result<()> {
     let names = fs::read_dir(p)?
         .map(|e| e.map(|i| i.file_name().to_string_lossy().into_owned()))
         .collect::<std::io::Result<BTreeSet<_>>>()?;
-    ensure!(
-        existing_names(&names, log),
-        "foreign files in private destination"
-    );
+    ensure!(existing_names(&names), "generation-one destination changed");
+    for (name, inode, len, mode, sha) in [
+        (
+            "inputs.json",
+            111756801,
+            642,
+            0o400,
+            Some("1aea31cae3fa5221520de6a40fc84320ccb46549b825d3a319a894c7403e1058"),
+        ),
+        (
+            "producer.log",
+            111756797,
+            606,
+            0o600,
+            Some("d694ec8eb767fefc3222ec5af42c95cc4ad43b7a4e2254b8a7869ead11f3e119"),
+        ),
+        (SNAP, 111756798, 2_109_034_648, 0o400, None),
+        ("genesis.tar.bz2", 111756799, 20_144, 0o400, None),
+    ] {
+        let path = p.join(name);
+        let m = fs::symlink_metadata(&path)?;
+        ensure!(
+            path.canonicalize()? == path
+                && m.dev() == fs::metadata(p)?.dev()
+                && m.ino() == inode
+                && m.is_file()
+                && m.nlink() == 1
+                && m.len() == len
+                && m.uid() == 1001
+                && m.gid() == 1003
+                && m.mode() & 0o7777 == mode,
+            "first attempt member changed: {name}"
+        );
+        if let Some(sha) = sha {
+            ensure!(
+                digest(&fs::read(&path)?) == sha,
+                "first attempt evidence changed: {name}"
+            );
+        }
+    }
+    for (name, ino) in [
+        ("scratch", 114230961),
+        ("private", 114232794),
+        ("tmp", 114231594),
+    ] {
+        let child = p.join(name);
+        custody(&child, 1001, 1003, Some(ino), 0o700)?;
+        if name == "scratch" {
+            ensure!(
+                fs::read_dir(&child)?.next().is_none(),
+                "refuse used scratch"
+            );
+        }
+    }
     let path = p.join(CHECK);
     let mut f = OpenOptions::new()
         .read(true)
@@ -201,6 +294,25 @@ pub(super) fn sandbox(pid: u64) -> Result<()> {
         flags(mount(&mt, DEST)?, "rw") && !flags(mount(&mt, DEST)?, "noexec"),
         "private destination is not writable/executable"
     );
+    let attempt = mount(&mt, ATTEMPT)?;
+    ensure!(
+        flags(attempt, "rw")
+            && fs::metadata(root.join(ATTEMPT.trim_start_matches('/')))?.ino()
+                == fs::metadata(ATTEMPT)?.ino(),
+        "wrong attempt mount"
+    );
+    for name in PRESERVED {
+        let p = Path::new(DEST).join(name);
+        let host = fs::metadata(&p)?;
+        let view = fs::metadata(root.join(p.strip_prefix("/")?))?;
+        ensure!(
+            flags(
+                mount(&mt, p.to_str().context("private member path")?)?,
+                "ro"
+            ) && (host.dev(), host.ino()) == (view.dev(), view.ino()),
+            "first attempt member not protected: {name}"
+        );
+    }
     for (host, alias, executable) in [
         (
             format!("{NODE}/jetstreamer-node"),
@@ -250,14 +362,18 @@ pub(super) fn sandbox(pid: u64) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn destination_admits_exact_preexisting_checkpoint() {
-        let mut names = BTreeSet::from([CHECK.into()]);
-        assert!(existing_names(&names, false));
-        names.insert("producer.log".into());
-        assert!(existing_names(&names, true));
-        assert!(!existing_names(&names, false));
-        names.insert("scratch".into());
-        assert!(!existing_names(&names, true));
+    fn destination_requires_the_exact_closed_first_attempt() {
+        let mut names: BTreeSet<String> = PRESERVED
+            .into_iter()
+            .chain(["scratch"])
+            .map(str::to_owned)
+            .collect();
+        assert!(existing_names(&names));
+        names.remove("inputs.json");
+        assert!(!existing_names(&names));
+        names.insert("inputs.json".into());
+        names.insert("epoch-169-through-73245218.jet".into());
+        assert!(!existing_names(&names));
     }
     #[test]
     fn exact_mount_flags() {
@@ -274,7 +390,8 @@ mod sealed_inputs_test {
     #[ignore = "read-only fixture on the campaign host; requires root"]
     fn genuine_sealed_inputs_and_existing_epoch169_tree() {
         verify(&json!({"node_seal_sha256":NODE_SEAL,"worker_seal_sha256":INPUT_SEAL})).unwrap();
-        existing_destination(Path::new(DEST), false).unwrap();
+        failed_g1().unwrap();
+        existing_destination(Path::new(DEST)).unwrap();
         let result = crate::peers::root169().unwrap();
         assert_eq!(result["focused_root_cap"], CAP);
     }

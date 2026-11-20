@@ -20,7 +20,7 @@ use std::{
 };
 
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v1/admission-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-v1";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 mod inputs;
@@ -181,8 +181,12 @@ fn child_stage() -> Result<()> {
             && (|| -> Result<()> {
                 custody(parent, 1001, 1003, Some(111744585), 0o700)?;
                 custody(dest, 1001, 1003, Some(111744588), 0o700)?;
-                inputs::existing_destination(dest, false)?;
-                exclusive(&dest.join("producer.log"), &[], 0o600)?;
+                inputs::existing_destination(dest)?;
+                let attempt = Path::new(ATTEMPT);
+                fs::DirBuilder::new().mode(0o700).create(attempt)?;
+                custody(attempt, 1001, 1003, None, 0o700)?;
+                exclusive(&attempt.join("producer.log"), &[], 0o600)?;
+                File::open(attempt)?.sync_all()?;
                 File::open(parent)?.sync_all()?;
                 Ok(())
             })()
@@ -199,7 +203,7 @@ fn child_stage() -> Result<()> {
         "subtree or log already exists or failed staging"
     );
     custody(dest, 1001, 1003, None, 0o700)?;
-    let log = fs::symlink_metadata(dest.join("producer.log"))?;
+    let log = fs::symlink_metadata(Path::new(ATTEMPT).join("producer.log"))?;
     ensure!(
         log.is_file()
             && log.len() == 0
@@ -291,6 +295,12 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     ensure!(
         git(&["rev-parse", &format!("{source}^{{tree}}")])?.trim() == at(&proof, "source_tree")?,
         "controller source tree differs"
+    );
+    inputs::failed_g1()?;
+    inputs::existing_destination(Path::new(DEST))?;
+    ensure!(
+        !Path::new(ATTEMPT).try_exists()?,
+        "generation two already staged"
     );
     let extra = inputs::verify(&proof)?;
     pinned(Path::new(GUARD), GUARD_SHA)?;

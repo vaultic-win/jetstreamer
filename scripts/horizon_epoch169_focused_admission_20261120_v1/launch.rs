@@ -44,7 +44,7 @@ fn producer_argv(token: &str) -> Result<Vec<String>> {
     }
     ensure!(
         start
-            && args.contains(&format!("--property=ReadWritePaths={DEST}"))
+            && args.contains(&format!("--property=ReadWritePaths={DEST} {ATTEMPT}"))
             && args.contains(&"--property=MemoryMax=73014444032".to_owned())
             && args.contains(&"--property=CPUQuota=300%".to_owned()),
         "producer contract"
@@ -435,7 +435,12 @@ mod tests {
             .iter()
             .filter_map(|a| a.strip_prefix("--property=ReadWritePaths="))
             .collect();
-        assert_eq!(writable, vec![DEST]);
+        assert_eq!(writable, vec![format!("{DEST} {ATTEMPT}")]);
+        let ro = PRESERVED.map(|n| format!("{DEST}/{n}")).join(" ");
+        assert!(argv.contains(&format!("--property=ReadOnlyPaths={ro}")));
+        assert!(argv.contains(&format!(
+            "--property=StandardOutput=append:{ATTEMPT}/producer.log"
+        )));
         assert!(
             argv.iter()
                 .any(|a| a.contains(&format!("{PAYLOAD}:{PAYLOAD_ALIAS}")))

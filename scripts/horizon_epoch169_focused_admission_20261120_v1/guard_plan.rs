@@ -3,19 +3,31 @@
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
 
-pub const UNIT: &str = "horizon-qualify-169-focused-20261120-v1.service";
-pub const TIMER: &str = "horizon-guard-169-focused-20261120-v1.timer";
-pub const GUARD_SERVICE: &str = "horizon-guard-169-focused-20261120-v1.service";
+pub const UNIT: &str = "horizon-qualify-169-focused-20261120-v2.service";
+pub const TIMER: &str = "horizon-guard-169-focused-20261120-v2.timer";
+pub const GUARD_SERVICE: &str = "horizon-guard-169-focused-20261120-v2.service";
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1";
 pub const DEST: &str =
     "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/v158";
+pub const ATTEMPT: &str =
+    "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/attempt-g2";
+pub const SNAP: &str = "snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst";
+pub const PRESERVED: [&str; 7] = [
+    "epoch-hashes-169-focused.txt",
+    SNAP,
+    "genesis.tar.bz2",
+    "producer.log",
+    "inputs.json",
+    "private",
+    "tmp",
+];
 pub const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v1";
-pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v1/guard-receipts";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2";
+pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/guard-receipts";
 pub const GUARD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 pub const GUARD_SHA: &str = "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v1/admission-v1/focused169";
+pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-admission-20261120-v2/admission-v1/focused169";
 // The retained 288-GiB standard booking covers both roots. This diagnostic enforces a smaller
 // whole-tree ceiling to fit alongside 168's existing raw HOME floor.
 pub const CAP: u64 = 96 << 30;

@@ -107,7 +107,7 @@ pub(super) fn admission_interlock() -> Result<File> {
     );
     Ok(f)
 }
-fn idle(unit: &str) -> Result<()> {
+pub(super) fn idle(unit: &str) -> Result<()> {
     let s = show(unit)?;
     ensure!(
         matches!(s["ActiveState"].as_str(), Some("failed" | "inactive"))
