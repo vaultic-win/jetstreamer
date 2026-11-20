@@ -6,8 +6,8 @@ use std::{borrow::Cow, collections::BTreeSet};
 
 const SEALED: &str = "/usr/local/lib/jetstreamer";
 // The native host inventory contains 104,491 metadata files / 15,425,505,635
-// bytes, including a 66,027,261-byte historical frame. Execution requires a
-// separately admitted 32 GiB census envelope, not the 4 GiB compiler envelope.
+// bytes, including a 66,027,261-byte historical frame. This is a total I/O
+// bound. Bodies are hashed and released individually.
 const CENSUS_BYTES: u64 = 20 << 30;
 const METADATA_BYTES: u64 = 64 << 20;
 const ROOTS: [&str; 15] = [
@@ -81,9 +81,82 @@ struct Review {
 #[derive(Clone)]
 struct Artifact {
     sha256: String,
-    bytes: Vec<u8>,
+    body: Body,
     definition: bool,
 }
+// A pass may outlive edits to a staged definition. Bind both the original
+// namespace entry and its contents, including for an empty file or a mask.
+#[derive(Clone, Copy, Eq, PartialEq)]
+struct FileStamp {
+    identity: FileIdentity,
+    changed_seconds: i64,
+    changed_nanoseconds: i64,
+    mode: u32,
+    uid: u32,
+    gid: u32,
+    links: u64,
+}
+impl FileStamp {
+    fn new(md: &fs::Metadata) -> Self {
+        Self {
+            identity: identity(md),
+            changed_seconds: md.ctime(),
+            changed_nanoseconds: md.ctime_nsec(),
+            mode: md.mode(),
+            uid: md.uid(),
+            gid: md.gid(),
+            links: md.nlink(),
+        }
+    }
+    fn check(self, path: &Path) -> Result<()> {
+        ensure!(
+            FileStamp::new(&fs::symlink_metadata(path)?) == self,
+            "transitive metadata changed since inventory: {}",
+            path.display()
+        );
+        Ok(())
+    }
+}
+#[derive(Clone)]
+enum Body {
+    File(FileStamp),
+    Mask(FileStamp),
+    #[cfg(test)]
+    Fixture(Vec<u8>),
+}
+impl Artifact {
+    fn check_entry(&self, path: &Path) -> Result<()> {
+        match self.body {
+            Body::File(stamp) => stamp.check(path),
+            Body::Mask(stamp) => {
+                stamp.check(path)?;
+                ensure!(masked(path)?, "systemd mask changed: {}", path.display());
+                Ok(())
+            }
+            #[cfg(test)]
+            Body::Fixture(_) => Ok(()),
+        }
+    }
+    fn read(&self, path: &Path) -> Result<Cow<'_, [u8]>> {
+        self.check_entry(path)?;
+        match &self.body {
+            Body::File(_) => {
+                let bytes = read_stable_bounded(path, METADATA_BYTES, "transitive metadata")?;
+                self.check_entry(path)?;
+                ensure!(
+                    hex_lower(&Sha256::digest(&bytes)) == self.sha256,
+                    "transitive metadata digest changed: {}",
+                    path.display()
+                );
+                Ok(Cow::Owned(bytes))
+            }
+            Body::Mask(_) => Ok(Cow::Borrowed(&[])),
+            #[cfg(test)]
+            Body::Fixture(bytes) => Ok(Cow::Borrowed(bytes)),
+        }
+    }
+}
+
 fn literal_edges_raw(
     bytes: &[u8],
     corpus: &BTreeMap<PathBuf, Artifact>,
@@ -381,7 +454,7 @@ fn census_walk(
             path.to_owned(),
             Artifact {
                 sha256: hex_lower(&Sha256::digest(b"root-owned mask /dev/null")),
-                bytes: vec![],
+                body: Body::Mask(FileStamp::new(&link)),
                 definition,
             },
         );
@@ -429,7 +502,9 @@ fn census_walk(
                 "installed metadata must remain root-controlled"
             );
         }
+        let stamp = FileStamp::new(&md);
         let bytes = read_stable_bounded(&canonical, METADATA_BYTES, "transitive metadata")?;
+        stamp.check(&canonical)?;
         budget.1 = budget
             .1
             .checked_add(bytes.len() as u64)
@@ -442,12 +517,24 @@ fn census_walk(
             canonical,
             Artifact {
                 sha256: hex_lower(&Sha256::digest(&bytes)),
-                bytes,
+                body: Body::File(stamp),
                 definition,
             },
         );
     } else {
         bail!("unexpected transitive metadata type: {}", path.display());
+    }
+    Ok(())
+}
+fn revalidate_aliases(aliases: &BTreeMap<PathBuf, PathBuf>) -> Result<()> {
+    for (path, canonical) in aliases {
+        // The sole permitted unresolved generated unit alias is validated by
+        // canonical_metadata_path against the actual PID1 fragment and digest.
+        ensure!(
+            canonical_metadata_path(path, true)? == *canonical,
+            "consumer alias changed: {}",
+            path.display()
+        );
     }
     Ok(())
 }
@@ -467,53 +554,76 @@ fn reverse_graph(
         PathBuf::from(RUN),
         PathBuf::from(DESTINATION),
     ]);
-    // Parse each text body once. Repeated full-corpus substring searches for
-    // every newly discovered node are prohibitively expensive on this host.
-    let mut all_edges = BTreeMap::new();
-    let mut readers: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
-    let mut edge_count = 0usize;
-    for (path, item) in corpus {
-        let edges = literal_edges(&item.bytes, corpus, &targets, aliases);
-        edge_count = edge_count
+    // Keep one numeric reader ID per edge. A graph with two million edges
+    // must not retain two million copies of potentially long absolute paths.
+    // Targets get IDs even when their paths are absent from the metadata corpus.
+    let paths: Vec<&Path> = corpus.keys().map(PathBuf::as_path).collect();
+    let mut ids = BTreeMap::<&Path, usize>::new();
+    for (id, path) in paths.iter().enumerate() {
+        ids.insert(*path, id);
+    }
+    let mut target_ids = Vec::new();
+    for target in &targets {
+        let next_id = ids.len();
+        target_ids.push(*ids.entry(target.as_path()).or_insert(next_id));
+    }
+    let mut readers = vec![Vec::<usize>::new(); ids.len()];
+    let mut count = 0usize;
+    for (reader, (path, item)) in corpus.iter().enumerate() {
+        let body = item.read(path)?;
+        let edges = literal_edges(&body, corpus, &targets, aliases);
+        count = count
             .checked_add(edges.len())
             .context("reader edge overflow")?;
-        ensure!(
-            edge_count <= 2_000_000,
-            "literal reader graph exceeds bound"
-        );
-        for target in &edges {
-            readers
-                .entry(target.clone())
-                .or_default()
-                .insert(path.clone());
+        ensure!(count <= 2_000_000, "literal reader graph exceeds bound");
+        for edge in edges {
+            let target = *ids
+                .get(edge.as_path())
+                .context("edge outside census and targets")?;
+            readers[target].push(reader);
         }
-        all_edges.insert(path.clone(), edges);
     }
     let mut selected = BTreeSet::new();
-    let mut queue: Vec<_> = targets.iter().cloned().collect();
+    let mut queue = target_ids;
     while let Some(target) = queue.pop() {
-        if let Some(incoming) = readers.get(&target) {
-            for reader in incoming {
-                if selected.insert(reader.clone()) {
-                    queue.push(reader.clone());
-                }
+        for reader in &readers[target] {
+            if selected.insert(*reader) {
+                ensure!(
+                    selected.len() <= 4096,
+                    "transitive reader graph exceeds bound"
+                );
+                queue.push(*reader);
             }
         }
-        ensure!(
-            selected.len() <= 4096,
-            "transitive reader graph exceeds bound"
-        );
     }
+    drop(readers);
+    // Re-read only the selected bodies to emit the original path spellings.
+    // Looking up an edge ID alone would normalize equivalent spellings such
+    // as a double separator in a staged definition, changing the receipt bytes.
     let mut graph = BTreeMap::new();
-    for path in &selected {
-        graph.insert(
-            path.clone(),
-            all_edges[path]
-                .iter()
-                .filter(|target| targets.contains(*target) || selected.contains(*target))
-                .cloned()
-                .collect(),
+    let mut emitted_path_bytes = 0usize;
+    for &reader in &selected {
+        let path = paths[reader];
+        let body = corpus[path].read(path)?;
+        let mut edges = literal_edges(&body, corpus, &targets, aliases);
+        edges
+            .retain(|target| targets.contains(target) || selected.contains(&ids[target.as_path()]));
+        for target in &edges {
+            emitted_path_bytes = emitted_path_bytes
+                .checked_add(target.as_os_str().len())
+                .context("review edge lengths overflow")?;
+        }
+        // Every accepted review includes each path in its node edges, and
+        // the raw input review is bounded to 16 MiB by verify().
+        ensure!(
+            emitted_path_bytes <= 16 << 20,
+            "transitive reader edges exceed maximum review size"
         );
+        graph.insert(path.to_owned(), edges);
+    }
+    // Catch changes that occurred after a file's edge scan as well.
+    for (path, item) in corpus {
+        item.check_entry(path)?;
     }
     Ok(graph)
 }
@@ -725,7 +835,9 @@ fn collect() -> Result<Corpus> {
     }
     let mut corpus = sealed;
     corpus.extend(definitions);
+    revalidate_aliases(&aliases)?;
     let graph = reverse_graph(&corpus, &aliases)?;
+    revalidate_aliases(&aliases)?;
     // Stable-read every installed file to discover dependencies, including
     // old root-writable tools. Such a tool cannot enter an accepted relevant
     // closure unless its metadata is immutable; unrelated installed tools do
@@ -899,7 +1011,7 @@ mod tests {
     fn artifact(bytes: &str, definition: bool) -> Artifact {
         Artifact {
             sha256: hex_lower(&Sha256::digest(bytes.as_bytes())),
-            bytes: bytes.as_bytes().to_vec(),
+            body: Body::Fixture(bytes.as_bytes().to_vec()),
             definition,
         }
     }
@@ -1178,6 +1290,157 @@ mod tests {
                 "native_host_census_qualified":false
             })
         );
+    }
+    fn original_reverse_graph(
+        corpus: &BTreeMap<PathBuf, Artifact>,
+        aliases: &BTreeMap<PathBuf, PathBuf>,
+    ) -> Result<BTreeMap<PathBuf, BTreeSet<PathBuf>>> {
+        let targets = BTreeSet::from([
+            PathBuf::from(SOURCE),
+            PathBuf::from(RUN),
+            PathBuf::from(DESTINATION),
+        ]);
+        // Parse each text body once. Repeated full-corpus substring searches for
+        // every newly discovered node are prohibitively expensive on this host.
+        let mut all_edges = BTreeMap::new();
+        let mut readers: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
+        let mut edge_count = 0usize;
+        for (path, item) in corpus {
+            let edges = literal_edges(&item.read(path)?, corpus, &targets, aliases);
+            edge_count = edge_count
+                .checked_add(edges.len())
+                .context("reader edge overflow")?;
+            ensure!(
+                edge_count <= 2_000_000,
+                "literal reader graph exceeds bound"
+            );
+            for target in &edges {
+                readers
+                    .entry(target.clone())
+                    .or_default()
+                    .insert(path.clone());
+            }
+            all_edges.insert(path.clone(), edges);
+        }
+        let mut selected = BTreeSet::new();
+        let mut queue: Vec<_> = targets.iter().cloned().collect();
+        while let Some(target) = queue.pop() {
+            if let Some(incoming) = readers.get(&target) {
+                for reader in incoming {
+                    if selected.insert(reader.clone()) {
+                        queue.push(reader.clone());
+                    }
+                }
+            }
+            ensure!(
+                selected.len() <= 4096,
+                "transitive reader graph exceeds bound"
+            );
+        }
+        let mut graph = BTreeMap::new();
+        for path in &selected {
+            graph.insert(
+                path.clone(),
+                all_edges[path]
+                    .iter()
+                    .filter(|target| targets.contains(*target) || selected.contains(*target))
+                    .cloned()
+                    .collect(),
+            );
+        }
+        Ok(graph)
+    }
+    fn disk_artifact(path: &Path, definition: bool) -> Artifact {
+        let bytes = fs::read(path).unwrap();
+        Artifact {
+            definition,
+            sha256: hex_lower(&Sha256::digest(bytes)),
+            body: Body::File(FileStamp::new(&fs::symlink_metadata(path).unwrap())),
+        }
+    }
+    #[test]
+    fn streamed_disk_graph_matches_original_receipt_bytes_for_cycles_aliases_and_spelling() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        let p = dir.join("p.json");
+        let q = dir.join("q.service");
+        let mask = dir.join("masked.service");
+        let idle = dir.join("noise");
+        let alias = dir.join("alias");
+        fs::write(&p, format!("{} {}", SOURCE, q.display())).unwrap();
+        // Deliberately non-normalized path in the old output.
+        let repeated = format!("{}//p.json", dir.display());
+        fs::write(
+            &q,
+            format!(
+                "{repeated} {} {}",
+                alias.display(),
+                SOURCE.replace('/', "\\/")
+            ),
+        )
+        .unwrap();
+        fs::write(&idle, b"irrelevant").unwrap();
+        std::os::unix::fs::symlink("/dev/null", &mask).unwrap();
+        let mut corpus = BTreeMap::from([
+            (p.clone(), disk_artifact(&p, false)),
+            (q.clone(), disk_artifact(&q, true)),
+            (idle.clone(), disk_artifact(&idle, false)),
+        ]);
+        // Native staged masks require uid 0. Match the fixture oracle on any uid.
+        if fs::symlink_metadata(&mask).unwrap().uid() == 0 {
+            corpus.insert(
+                mask.clone(),
+                Artifact {
+                    definition: true,
+                    sha256: hex_lower(&Sha256::digest(b"root-owned mask /dev/null")),
+                    body: Body::Mask(FileStamp::new(&fs::symlink_metadata(&mask).unwrap())),
+                },
+            );
+        }
+        let aliases = BTreeMap::from([(alias, p.clone())]);
+        let expected = original_reverse_graph(&corpus, &aliases).unwrap();
+        let actual = reverse_graph(&corpus, &aliases).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&actual).unwrap(),
+            serde_json::to_vec(&expected).unwrap()
+        );
+        assert!(actual.contains_key(&p) && actual.contains_key(&q) && !actual.contains_key(&idle));
+        for definition in [false, true] {
+            let hash = |graph: &BTreeMap<PathBuf, BTreeSet<PathBuf>>| {
+                let rows = corpus
+                    .iter()
+                    .filter(|(k, a)| a.definition == definition && graph.contains_key(*k))
+                    .map(|(k, a)| (k.clone(), a.clone()))
+                    .collect();
+                corpus_digest(&rows).unwrap()
+            };
+            assert_eq!(hash(&actual), hash(&expected));
+        }
+    }
+    #[test]
+    fn streaming_refuses_rewritten_unrelated_metadata_replaced_inodes_and_retargeted_aliases() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = tmp.path().join("p.json");
+        fs::write(&p, b"one").unwrap();
+        let mut corpus = BTreeMap::from([(p.clone(), disk_artifact(&p, false))]);
+        fs::write(&p, b"two").unwrap();
+        assert!(reverse_graph(&corpus, &BTreeMap::new()).is_err());
+        corpus.insert(p.clone(), disk_artifact(&p, false));
+        let replacement = tmp.path().join("replacement");
+        fs::write(&replacement, b"two").unwrap();
+        fs::rename(&replacement, &p).unwrap();
+        assert!(reverse_graph(&corpus, &BTreeMap::new()).is_err());
+        let alias = tmp.path().join("link");
+        std::os::unix::fs::symlink(&p, &alias).unwrap();
+        let aliases = BTreeMap::from([(alias.clone(), p.clone())]);
+        revalidate_aliases(&aliases).unwrap();
+        fs::remove_file(&alias).unwrap();
+        fs::write(&replacement, b"two").unwrap();
+        std::os::unix::fs::symlink(&replacement, &alias).unwrap();
+        assert!(revalidate_aliases(&aliases).is_err());
+        let mut mismatched = disk_artifact(&p, false);
+        mismatched.sha256 = "a".repeat(64);
+        assert!(mismatched.read(&p).is_err());
     }
     #[test]
     fn reverse_graph_follows_definition_wrapper_and_plan_instead_of_only_direct_source_hits() {
