@@ -8,6 +8,10 @@
 //! state is loaded, and all protocol byte vectors are validated before they are
 //! exposed as fixed-size hashes, keys, or signatures.
 
+#[cfg(feature = "epoch136-actual-input-diagnostic")]
+#[path = "historical_epoch136_actual_gate.rs"]
+mod epoch136_actual_gate;
+
 use std::{
     env, fs,
     io::{self, BufReader, BufWriter, Read, Write},
@@ -1369,6 +1373,12 @@ impl HistoricalRuntimeClient {
         spawn: WorkerSpawn,
         timeouts: HistoricalRuntimeTimeouts,
     ) -> Result<Self, HistoricalRuntimeError> {
+        #[cfg(feature = "epoch136-actual-input-diagnostic")]
+        let (spawn, epoch136_actual) = {
+            let mut spawn = spawn;
+            let enabled = epoch136_actual_gate::bind_if_enabled(profile, &mut spawn.initialization)?;
+            (spawn, enabled)
+        };
         let executable = canonical_regular_file(&spawn.executable, true)?;
         let initialization = &spawn.initialization;
         let scratch_parent = match initialization {
@@ -1515,6 +1525,17 @@ impl HistoricalRuntimeClient {
             return client.abort_after_response(error);
         }
 
+        #[cfg(feature = "epoch136-actual-input-diagnostic")]
+        if epoch136_actual {
+            epoch136_actual_gate::before_initialize(
+                client
+                    .child
+                    .as_ref()
+                    .expect("worker before Initialize")
+                    .id(),
+                executable_sha256,
+            )?;
+        }
         let body = client.exchange(RequestBody::Initialize {
             ledger_path,
             initial_state,

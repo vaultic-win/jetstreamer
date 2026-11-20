@@ -10,6 +10,8 @@ keywords.workspace = true
 
 [features]
 default = []
+# Guard the historical worker before loading the epoch 136 diagnostic snapshot.
+epoch136-actual-input-diagnostic = []
 # Source-status differential only. Ordinary epoch 169 remains on v1.5.6.
 epoch169-v1-5-8-diagnostic = []
 # Exact private first-output slot163 diagnostic; no canonical terminal claim.
