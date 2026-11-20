@@ -36,7 +36,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v1/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v2/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
@@ -99,6 +99,16 @@ fn process_ticks(pid: u64) -> Result<u64> {
         .context("process start missing")?
         .parse()?)
 }
+pub(super) fn selected_scenario(r: &Value, fit: &Value) -> Result<&'static str> {
+    match (r["full211_capacity"].as_str(), fit.get("full211_handoff")) {
+        (Some("full211-booked"), Some(h)) if *h == json!(full211_peer::handoff()) => {
+            Ok("limited_native257_with_booked_full211")
+        }
+        (Some("preserve-full211"), None) => Ok("limited_native257_and_ordinary211"),
+        (Some("native257-first"), None) => Ok("limited_native257"),
+        _ => bail!("review must select the observed full211 booking disposition"),
+    }
+}
 fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
     let rf = binding(&r["resource_review"])?;
     let rr = rf.sealed()?;
@@ -114,11 +124,7 @@ fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
         ensure!(rr[key] == r[key], "fleet review binding changed: {key}");
     }
     let fit = native257_fit::evaluate(n, &rr, &rf, held)?;
-    let scenario = match r["full211_capacity"].as_str() {
-        Some("preserve-full211") => "limited_native257_and_ordinary211",
-        Some("native257-first") => "limited_native257",
-        _ => bail!("review must select an explicit 211 booking disposition"),
-    };
+    let scenario = selected_scenario(r, &fit)?;
     let selected = &fit["scenarios"][scenario];
     ensure!(
         fit["actual_scratch_present"] == true && selected["fits"] == true,
@@ -133,8 +139,11 @@ fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
         })
         .context("shared floor overflow")?;
     let cpu = units::cpu_sharing(n, r)?;
-    let cap = json!({"protected_existing_floor_bytes":floor,"cpu":cpu,"selected_scenario":scenario,"capacity":selected["capacity"],
+    let mut cap = json!({"protected_existing_floor_bytes":floor,"cpu":cpu,"selected_scenario":scenario,"capacity":selected["capacity"],
         "actual_current_memory":fit["actual_current_memory"],"resource_review":rf,"full211_capacity":r["full211_capacity"]});
+    if let Some(h) = fit.get("full211_handoff") {
+        cap["full211_handoff"] = h.clone();
+    }
     Ok((fit, cap))
 }
 fn admit(n: &mut Native, r: &Value, rf: &Bound) -> Result<Value> {

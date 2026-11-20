@@ -78,6 +78,9 @@ fn envelope(ledger: &Value, previous: &Value) -> Result<Vec<Control>> {
         "periodic envelope schema"
     );
     let mut expected = pins();
+    if e.controls.iter().any(|c| c.unit == GUARD_UNIT) {
+        expected.push(full211_peer::control());
+    }
     if e.controls.iter().any(|c| c.unit == full265::GUARD_UNIT) {
         expected.push(full265::control());
     }
@@ -116,7 +119,18 @@ fn directive<'a>(source: &'a str, key: &str) -> Result<&'a str> {
     );
     Ok(entries[0])
 }
+fn task_limit(c: &Control) -> &'static str {
+    if c.unit == GUARD_UNIT { "64" } else { "256" }
+}
 fn argv(c: &Control) -> String {
+    if c.unit == GUARD_UNIT {
+        return format!(
+            "{} {} --plan-sha256 ${{HORIZON211_GUARD_PLAN_SHA256}} --self-sha256 {}",
+            c.executable.path.display(),
+            c.guard_plan.path.display(),
+            c.executable.sha256
+        );
+    }
     if c.unit == full265::GUARD_UNIT {
         return full265::guard_argv(c, false);
     }
@@ -156,7 +170,11 @@ pub(super) fn booking(
                 && directive(&s, "ExecStart")? == argv(c)
                 && directive(&t, "Unit")? == c.unit
                 && directive(&t, "OnActiveSec")? == "1s"
-                && directive(&t, "OnUnitInactiveSec")? == "60s"
+                && if c.unit == GUARD_UNIT {
+                    directive(&t, "OnUnitActiveSec")? == "30s"
+                } else {
+                    directive(&t, "OnUnitInactiveSec")? == "60s"
+                }
                 && directive(&t, "AccuracySec")? == "1s"
                 && directive(&t, "RandomizedDelaySec")? == "0",
             "original periodic directives differ"
@@ -176,6 +194,11 @@ pub(super) fn booking(
     Ok(controls)
 }
 fn coverage(controls: &[Control], rows: &[capacity::Reservation]) -> Result<()> {
+    ensure!(
+        rows.iter().filter(|r| r.unit == UNIT).count()
+            == controls.iter().filter(|c| c.unit == GUARD_UNIT).count(),
+        "full211 producer and guard must both be booked"
+    );
     let original_producers = [
         "horizon-qualify-248-reboot-20261117-v1.service",
         "horizon-qualify-249-reboot-20261117-v1.service",
@@ -188,7 +211,7 @@ fn coverage(controls: &[Control], rows: &[capacity::Reservation]) -> Result<()> 
             .any(|r| original_producers.contains(&r.unit.as_str()))
             || controls
                 .iter()
-                .filter(|c| c.unit != full265::GUARD_UNIT)
+                .filter(|c| c.unit != full265::GUARD_UNIT && c.unit != GUARD_UNIT)
                 .count()
                 == 4,
         "original replay guards require complete v3 periodic booking even while inactive"
@@ -236,6 +259,9 @@ pub(super) fn stable_command(value: &str) -> Result<&str> {
 fn service_values(c: &Control, s: &Value) -> Result<bool> {
     if c.unit == full265::GUARD_UNIT {
         full265::guard_properties(s)?;
+    } else if c.unit == GUARD_UNIT {
+        prepare::verify_pair(&c.guard_plan, prepare::GUARD_ARG)?;
+        prepare::guard_properties(s, &c.executable, &c.guard_plan.path)?;
     }
     let expected = format!(
         "{{ path={} ; argv[]={} ; ignore_errors=no",
@@ -254,7 +280,7 @@ fn service_values(c: &Control, s: &Value) -> Result<bool> {
             && s["Delegate"] == "no"
             && text(s, "MemoryMax")?.parse::<u64>()? == c.maximum_memory_bytes
             && s["MemorySwapMax"] == "0"
-            && s["TasksMax"] == "256"
+            && s["TasksMax"] == task_limit(c)
             && s["CPUQuotaPerSecUSec"] == "1s"
             && s["TriggeredBy"] == c.timer
             && s["ControlPID"] == "0"
@@ -303,10 +329,19 @@ fn timer_values(c: &Control, t: &Value, dormant: bool) -> Result<()> {
 fn fragment(v: &Value, source: &Bound, unit: &str) -> Result<()> {
     let path = Path::new(text(v, "FragmentPath")?);
     ensure!(
-        path == Path::new("/run/systemd/system").join(unit),
+        path == Path::new(if unit == GUARD_UNIT || unit == TIMER {
+            "/etc/systemd/system"
+        } else {
+            "/run/systemd/system"
+        })
+        .join(unit),
         "periodic fragment path changed"
     );
     let m = fs::symlink_metadata(path)?;
+    ensure!(
+        ![GUARD_UNIT, TIMER].contains(&unit) || m.file_type().is_symlink(),
+        "full211 installed fragment link replaced"
+    );
     if m.file_type().is_symlink() {
         // This is an installed-unit adapter, not a relaxation of Bound::bytes.
         trusted_parents(path)?;
@@ -405,15 +440,16 @@ fn process_census(c: &Control, s: &Value, dormant: bool) -> Result<()> {
         );
         let image = fs::read_link(e.path().join("exe"))?;
         if pid == main {
-            if c.unit == full265::GUARD_UNIT {
-                let expected = full265::guard_argv(c, true)
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join("\0")
-                    + "\0";
+            if c.unit == full265::GUARD_UNIT || c.unit == GUARD_UNIT {
+                let expanded = if c.unit == GUARD_UNIT {
+                    argv(c).replace("${HORIZON211_GUARD_PLAN_SHA256}", &c.guard_plan.sha256)
+                } else {
+                    full265::guard_argv(c, true)
+                };
+                let expected = expanded.split_whitespace().collect::<Vec<_>>().join("\0") + "\0";
                 ensure!(
                     fs::read(e.path().join("cmdline"))? == expected.as_bytes(),
-                    "full265 executing guard digest argument differs"
+                    "executing guard digest argument differs"
                 );
             }
             ensure!(
@@ -502,7 +538,7 @@ pub(super) fn observe(n: &mut Native, c: &Control) -> Result<()> {
                     .parse::<u64>()?
                     == c.maximum_memory_bytes
                     && fs::read_to_string(root.join("memory.swap.max"))?.trim() == "0"
-                    && fs::read_to_string(root.join("pids.max"))?.trim() == "256"
+                    && fs::read_to_string(root.join("pids.max"))?.trim() == task_limit(c)
                     && fs::read_to_string(root.join("memory.current"))?
                         .trim()
                         .parse::<u64>()?

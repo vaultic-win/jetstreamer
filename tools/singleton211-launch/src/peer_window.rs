@@ -168,7 +168,9 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
         .context("actual owner census")?;
     let mut expected = BTreeSet::new();
     for active in fleet["active"].as_array().context("active fleet")? {
-        if matches!(active["phase"].as_str(), Some("replay" | "qualification")) {
+        if full211_peer::active(active)
+            || matches!(active["phase"].as_str(), Some("replay" | "qualification"))
+        {
             expected.insert((
                 text(&active["producer"], "Id")?.to_owned(),
                 text(&active["producer"], "InvocationID")?.to_owned(),

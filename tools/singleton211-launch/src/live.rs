@@ -277,6 +277,7 @@ pub(super) fn census(
         rows,
         periodic,
         candidate.then_some((UNIT, GUARD_UNIT, TIMER)),
+        false,
     )
 }
 pub(super) fn census_with_held(
@@ -286,6 +287,7 @@ pub(super) fn census_with_held(
     rows: &[capacity::Reservation],
     periodic: &[periodic::Control],
     held: Option<(&str, &str, &str)>,
+    booked_full211: bool,
 ) -> Result<BTreeMap<String, u64>> {
     let controls = review["control_units"]
         .as_array()
@@ -329,7 +331,7 @@ pub(super) fn census_with_held(
         ensure!(
             r.unit.ends_with(".service")
                 && !r.unit.contains('/')
-                && r.unit != UNIT
+                && (r.unit != UNIT || booked_full211)
                 && !control_names.contains(r.unit.as_str())
                 && !periodic_names.contains(r.unit.as_str()),
             "reservation unit scope"
