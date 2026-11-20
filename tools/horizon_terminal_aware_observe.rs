@@ -41,6 +41,7 @@ fn observer_image(qualified_native: bool) -> Result<(&'static str, &'static str)
     }
 }
 fn staged_delivery_selected(config: &Value) -> Result<bool> {
+    ensure!(config.get("successor247_claim").is_none() || config["staged247_resource_only"]==true,"successor claim requires staged resource collection");
     let Some(flag) = config.get("staged247_resource_only") else {
         return Ok(false);
     };
@@ -646,6 +647,7 @@ fn run(args: &[String]) -> Result<()> {
         p.native211_handoff.as_ref(),
         native_handoff.as_ref(),
     )?;
+    let successor = config.get("successor247_claim").cloned();
     let staged_delivery = config.get("staged247_resource_only").cloned();
     let staged = staged_delivery_selected(&config)?;
     let (observer, observer_sha) = observer_image(
@@ -725,7 +727,8 @@ fn run(args: &[String]) -> Result<()> {
     );
     ensure!(
         config.get("delivery247_resource_only") == original_delivery.as_ref()
-            && config.get("staged247_resource_only") == staged_delivery.as_ref(),
+            && config.get("staged247_resource_only") == staged_delivery.as_ref()
+            && config.get("successor247_claim")==successor.as_ref(),
         "delivery RSS selection changed during prescreen"
     );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;

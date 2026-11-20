@@ -1,5 +1,5 @@
 //! Identity shared by the staged delivery RSS observer and its fleet consumer.
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 
 pub const UNIT: &str = "horizon-upload-247-staged-680e1173-v1.service";
@@ -26,18 +26,16 @@ pub const PLAN: (&str, &str) = (
     "e9e7234224b04ab9ae03bfa7459344bec37a6bb241c84e98a7e8dbcaa29bdd1e",
 );
 
+pub struct Endpoint<'a> {
+    pub unit: &'a str,
+    pub iid: &'a str,
+    pub pid: u32,
+    pub ticks: u64,
+    pub image: &'a str,
+    pub image_sha: &'a str,
+    pub cap: u64,
+}
 pub fn validate(row: &Value) -> Result<()> {
-    ensure!(
-        row["range"] == "247-247"
-            && row["phase"] == "upload-readback"
-            && row["resource_only"] == true
-            && row["delivery_resource_only"] == true
-            && row["entry_replay"] == false
-            && row["ordinary_replay_claim"] == false
-            && row["invocation_binding_stable"] == true
-            && row["useful_work"]["sufficient_for_rates"] == false,
-        "unqualified staged 247 delivery telemetry"
-    );
     for (key, (path, sha)) in [
         ("booking", BOOKING),
         ("launch", LAUNCH),
@@ -49,20 +47,45 @@ pub fn validate(row: &Value) -> Result<()> {
             "staged 247 source differs: {key}"
         );
     }
+    validate_endpoints(
+        row,
+        &Endpoint {
+            unit: UNIT,
+            iid: IID,
+            pid: PID,
+            ticks: TICKS,
+            image: IMAGE,
+            image_sha: IMAGE_SHA,
+            cap: CAP,
+        },
+    )
+}
+pub fn validate_endpoints(row: &Value, owner: &Endpoint<'_>) -> Result<()> {
+    ensure!(
+        row["range"] == "247-247"
+            && row["phase"] == "upload-readback"
+            && row["resource_only"] == true
+            && row["delivery_resource_only"] == true
+            && row["entry_replay"] == false
+            && row["ordinary_replay_claim"] == false
+            && row["invocation_binding_stable"] == true
+            && row["useful_work"]["sufficient_for_rates"] == false,
+        "unqualified staged 247 delivery telemetry"
+    );
     let mut previous = None;
     for suffix in ["before", "after"] {
         let p = &row[format!("producer_{suffix}")];
         let image = &row[format!("mapped_image_{suffix}")];
         ensure!(
             p == &row[format!("controller_{suffix}")]
-                && p["unit"] == UNIT
-                && p["invocation_id"] == IID
-                && p["main_pid"] == PID
-                && p["control_group"] == format!("/system.slice/{UNIT}")
+                && p["unit"] == owner.unit
+                && p["invocation_id"] == owner.iid
+                && p["main_pid"] == owner.pid
+                && p["control_group"] == format!("/system.slice/{}", owner.unit)
                 && p["active_state"] == "active"
                 && p["sub_state"] == "running"
                 && p["restarts"] == 0
-                && p["cgroup"]["gauges"]["memory.max"] == CAP
+                && p["cgroup"]["gauges"]["memory.max"] == owner.cap
                 && p["cgroup"]["gauges"]["memory.swap.max"] == 0,
             "staged 247 endpoints differ"
         );
@@ -73,15 +96,15 @@ pub fn validate(row: &Value) -> Result<()> {
                 && rss["aggregate_rss_bytes"].as_u64().is_some_and(|v| v > 0)
                 && rss["processes"].as_array().is_some_and(|v| v
                     .iter()
-                    .filter(|item| item["pid"] == PID && item["start_ticks"] == TICKS)
+                    .filter(|item| item["pid"] == owner.pid && item["start_ticks"] == owner.ticks)
                     .count()
                     == 1),
             "staged 247 RSS census missing"
         );
         ensure!(
-            image["executable"] == IMAGE
-                && image["sha256"] == IMAGE_SHA
-                && image["pid"] == PID
+            image["executable"] == owner.image
+                && image["sha256"] == owner.image_sha
+                && image["pid"] == owner.pid
                 && image["mapped_inode"].as_u64().is_some_and(|v| v > 0)
                 && image["mapped_device"].as_u64().is_some_and(|v| v > 0),
             "staged 247 mapped image differs"
@@ -94,4 +117,32 @@ pub fn validate(row: &Value) -> Result<()> {
         previous = Some(ident);
     }
     Ok(())
+}
+
+pub fn validate_sample(row: &Value, owner: &super::successor247::Owner) -> Result<()> {
+    use super::successor247::{HARD, IMAGE, IMAGE_SHA, UNIT};
+    ensure!(
+        row["successor_owner"] == owner.proof,
+        "successor RSS proof differs"
+    );
+    let ticks = row["producer_before"]["rss"]["processes"]
+        .as_array()
+        .context("successor samples")?
+        .iter()
+        .find(|r| r["pid"] == owner.pid)
+        .and_then(|r| r["start_ticks"].as_u64())
+        .filter(|x| *x > 0)
+        .context("successor start ticks")?;
+    validate_endpoints(
+        row,
+        &Endpoint {
+            unit: UNIT,
+            iid: &owner.iid,
+            pid: owner.pid,
+            ticks,
+            image: IMAGE,
+            image_sha: IMAGE_SHA,
+            cap: HARD,
+        },
+    )
 }

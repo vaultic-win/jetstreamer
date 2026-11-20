@@ -125,6 +125,8 @@ struct Config {
     #[serde(default)]
     staged247_resource_only: bool,
     #[serde(default)]
+    successor247_claim: Option<serde_json::Value>,
+    #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
 }
 
@@ -387,6 +389,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "singleton247_finalization_resource_only":config.singleton247_finalization,
             "delivery247_resource_only":config.delivery247_resource_only,
             "staged247_resource_only":config.staged247_resource_only,
+            "successor247_claim":config.successor247_claim,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
@@ -1980,6 +1983,7 @@ fn run(config: Config) -> Result<()> {
     let delivery_resources = delivery247_resource::sample(
         config.delivery247_resource_only,
         config.staged247_resource_only,
+        config.successor247_claim.as_ref(),
         started_unix,
     );
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
@@ -2503,6 +2507,7 @@ mod tests {
             singleton247_finalization: false,
             delivery247_resource_only: false,
             staged247_resource_only: false,
+            successor247_claim: None,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
