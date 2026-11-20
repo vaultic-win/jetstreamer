@@ -1,0 +1,140 @@
+{
+  "archive_identity": {
+    "ctime": 1792747780,
+    "ctime_ns": 395798578,
+    "dev": 66305,
+    "gid": 0,
+    "ino": 230572721,
+    "len": 103802397352,
+    "links": 1,
+    "mode": 33024,
+    "mtime": 1792747778,
+    "mtime_ns": 90807701,
+    "uid": 0
+  },
+  "archive_path": "/var/lib/jetstreamer/horizon-203-private-scan-20261023-v1/epoch-203.jet",
+  "archive_sha256": "7efb3b28b2761cd646d20fa282d87c508249488fd0fb27ce8e033a1aed7d39ad",
+  "boundary_metadata": {
+    "path": "/var/lib/jetstreamer/horizon-203-boundary-metadata-collected-f597924c-v1/candidate.json",
+    "sha256": "67c39d1471cca1e831c3cf3b840e7de19aac2ede2bfc83146cc6f0b0ef603ff4"
+  },
+  "canonical_sidecar_authorized": false,
+  "copy_and_hash_millis": 159411,
+  "current_plugin_verification_passed": true,
+  "epoch": 203,
+  "expected_provenance_sha256": "84ec677139274d012a8d5d180e51cbe81d4f0843ca416956b8c1cfd45a9e4f03",
+  "full": {
+    "arguments": [
+      "/var/lib/jetstreamer/horizon-203-private-scan-20261023-v1/epoch-203.jet",
+      "--full",
+      "--anchor",
+      "87695999",
+      "4c9Zfnjqk9Ur8gLU6woi1wJEZePZN37MfjVFGVuKt5su",
+      "--expected-terminal",
+      "88127999",
+      "8eVbfSWY2UX4KW1ms9y7TJNmJEfc5DfFoXa5iF5W7XgR",
+      "--threads",
+      "8",
+      "--expected-provenance-sha256",
+      "84ec677139274d012a8d5d180e51cbe81d4f0843ca416956b8c1cfd45a9e4f03"
+    ],
+    "binary": {
+      "path": "/var/lib/jetstreamer/horizon-213-private-verifiers-e549653-v3/verify_archive",
+      "sha256": "067ca3124a47cdbff4545918c65ff070df80f96ee0caf648873036ed1f11fcb9"
+    },
+    "elapsed_millis": 2628015,
+    "exit_code": 0,
+    "log": {
+      "identity": {
+        "ctime": 1792750528,
+        "ctime_ns": 237134784,
+        "dev": 66305,
+        "gid": 0,
+        "ino": 230572727,
+        "len": 367887,
+        "links": 1,
+        "mode": 33152,
+        "mtime": 1792750528,
+        "mtime_ns": 237134784,
+        "uid": 0
+      },
+      "path": "/var/lib/jetstreamer/horizon-203-private-scan-20261023-v1/full.log",
+      "sha256": "720fb2d5d8e54591cebfbaacb23ea03f1b3070185629844ad1c7103e6331e833"
+    }
+  },
+  "independent_final_archive_verification_passed": true,
+  "plan": {
+    "path": "/var/lib/jetstreamer/horizon-private203-verify-scan-admission-v1/plan.json",
+    "sha256": "88695ac201cbd807ddf457dc5179b7fce5eb75724583b3ca7277ca98839152c9"
+  },
+  "plugin": {
+    "arguments": [
+      "203:203",
+      "/var/lib/jetstreamer/horizon-203-private-scan-20261023-v1",
+      "--threads",
+      "8",
+      "--verify-only"
+    ],
+    "binary": {
+      "path": "/var/lib/jetstreamer/horizon-213-private-verifiers-e549653-v3/horizon_pipeline",
+      "sha256": "167954ad8087a4214dbdd65c8f72690bd66d7aa6637179ddf85db85b9a03a547"
+    },
+    "elapsed_millis": 2777246,
+    "exit_code": 0,
+    "log": {
+      "identity": {
+        "ctime": 1792753358,
+        "ctime_ns": 94547824,
+        "dev": 66305,
+        "gid": 0,
+        "ino": 230572920,
+        "len": 806,
+        "links": 1,
+        "mode": 33152,
+        "mtime": 1792753358,
+        "mtime_ns": 94547824,
+        "uid": 0
+      },
+      "path": "/var/lib/jetstreamer/horizon-203-private-scan-20261023-v1/plugin.log",
+      "sha256": "15df626f5d51e3e79efcce09e40b2a2cead0d9727da87c719c42d5d0d24fbea5"
+    }
+  },
+  "producer_outcome": {
+    "path": "/var/lib/jetstreamer/horizon-private203-verify-scan-admission-v1/continuation.json",
+    "sha256": "54272a673df64a2facf4c571332c7a10130231fba8c22ab17e122a31d6be1545"
+  },
+  "producer_terminal": {
+    "journal": {
+      "completion_timestamp_us": 1792746850068997,
+      "deactivation_timestamp_us": 1792746850118936,
+      "invocation_id": "ddf3ed2de8b040758ee7a0d696159afd",
+      "journal_sha256": "664d8fc83201db41fd450c09715b2b9b12930df29d43d0d7da83e545a2b0e781",
+      "producer_records": 114
+    },
+    "systemctl": "LoadState=not-found\nActiveState=inactive\nSubState=dead\nInvocationID=\nRestart=no\nMainPID=0\nResult=success\nNRestarts=0\nExecMainCode=0\nExecMainStatus=0\n"
+  },
+  "provenance_expectation": {
+    "path": "/var/lib/jetstreamer/horizon-203-provenance-expectation-cbd682a4-v1/expectation.json",
+    "sha256": "f23cde383b60323e9c307a067b9ef998bcee3b9ab4f8ffa4358a411219068302"
+  },
+  "publication_authorized": false,
+  "r2_mutations": false,
+  "retirement_authorized": false,
+  "runner_sha256": "5ae7edd93d29636fd959b40698bff0897e4cb3b87245054b67636d61cc8f3be9",
+  "runtime_admission_authorized": false,
+  "schema": "jetstreamer-private-epoch203-verification-v1",
+  "source_identity": {
+    "ctime": 1792746849,
+    "ctime_ns": 936499204,
+    "dev": 66305,
+    "gid": 1000,
+    "ino": 1004455,
+    "len": 103802397352,
+    "links": 1,
+    "mode": 33152,
+    "mtime": 1792746849,
+    "mtime_ns": 936499204,
+    "uid": 1000
+  },
+  "source_path": "/home/ubuntu/.jetstreamer-private/checkpoint-continuation-203-ed66145-v1/output/epoch-203-checkpoint-restart-v4.jet"
+}

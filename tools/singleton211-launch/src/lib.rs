@@ -23,6 +23,7 @@ mod full265;
 pub mod full265_owner;
 mod gate;
 mod inputs;
+pub mod foundation_holding_capacity;
 mod launch;
 mod lifecycle;
 mod live;

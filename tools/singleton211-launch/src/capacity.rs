@@ -46,6 +46,26 @@ pub(super) fn candidate_arithmetic(
         candidate_memory > 0 && candidate_disk > 0,
         "empty candidate"
     );
+    booked_arithmetic(
+        (total, available, disk),
+        century,
+        rows,
+        currents,
+        (auxiliary_overhead, periodic_controls),
+        (candidate_memory, candidate_disk),
+    )
+}
+
+// The holding worker already has a hard memory booking. Its restore consumes
+// only the exact extra disk supplied by the closed-artifact restore plan.
+pub(super) fn booked_arithmetic(
+    (total, available, disk): (u64, u64, u64),
+    century: u64,
+    rows: &[Reservation],
+    currents: &BTreeMap<String, u64>,
+    (auxiliary_overhead, periodic_controls): (u64, u64),
+    (candidate_memory, candidate_disk): (u64, u64),
+) -> Result<Value> {
     ensure!(century > 0, "missing canonical century reserve");
     let mut hard = add(
         add(add(HOST, CONTROL)?, auxiliary_overhead)?,

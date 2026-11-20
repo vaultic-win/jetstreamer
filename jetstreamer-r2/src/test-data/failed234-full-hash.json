@@ -1,0 +1,75 @@
+{
+  "schema": "horizon976-failed234-closed-partial-whole-hash-success-v1",
+  "recorded_at_utc": "2026-11-07T18:02:08.493143+00:00",
+  "admission": {
+    "path": "/var/lib/jetstreamer/horizon976-failed234-cleanup-candidate-Main-v1/hash/readonly-hash-admission.json",
+    "sha256": "c812c4a1a703d666cee79d5b68cf7080d5cd34fe84a50ab1cafb45b138e8d171"
+  },
+  "file": {
+    "path": "/home/ubuntu/.jetstreamer-private/qualification-234-general-shrink-debt-budget506-e3f15eb2-v5/state/destination-2f534eff3635f52231b3a1a967176ba8ba026469fbf6dbcfc7904a70d9c3985e/work/root-cohort-234-234/run-3988871-1793884339127858642/archives/epoch-234.jet",
+    "logical_bytes": 53619759409,
+    "original_st_blocks_bytes": 53619838976,
+    "device": 66305,
+    "inode": 15061993,
+    "mtime_ns": 1793951476200348480,
+    "ctime_ns": 1793951476200348480,
+    "uid": 1000,
+    "nlink": 1
+  },
+  "mode": 384,
+  "gid": 1000,
+  "sha256": "7fced40e968d470828abbe474096df017d60750e811aa6258dfe447d1165a931",
+  "file_identity_unchanged": true,
+  "original_cohort_state": {
+    "path": "/home/ubuntu/.jetstreamer-private/qualification-234-general-shrink-debt-budget506-e3f15eb2-v5/state/destination-2f534eff3635f52231b3a1a967176ba8ba026469fbf6dbcfc7904a70d9c3985e/work/root-cohort-234-234/run-3988871-1793884339127858642/cohort-state.json",
+    "sha256": "69fbe6fd5187b975f55778cf8ff0819b3b212e787c4bb25aac1f8a3f48aaa865"
+  },
+  "native_running": {
+    "path": "/var/lib/jetstreamer/horizon976-failed234-cleanup-candidate-Main-v1/hash/native-running.json",
+    "sha256": "da32d3df57bffdd329ec5700be30fd41b54893b3f2c55b852af65f133054818b"
+  },
+  "native_terminal": {
+    "path": "/var/lib/jetstreamer/horizon976-failed234-cleanup-candidate-Main-v1/hash/native-terminal-properties.txt",
+    "sha256": "b9c07c4f6f982f293cd85efbf0b3cfd9f05ec29c2a34052f8cd61d1fa72c7ad6"
+  },
+  "actual_profile_verified": {
+    "User": "root",
+    "Group": "root",
+    "Type": "exec",
+    "Restart": "no",
+    "RemainAfterExit": "yes",
+    "RuntimeMaxUSec": "15min",
+    "MemoryMax": "268435456",
+    "MemorySwapMax": "0",
+    "TasksMax": "32",
+    "CPUQuotaPerSecUSec": "1s",
+    "IOWeight": "1",
+    "IOSchedulingClass": "3",
+    "Nice": "19",
+    "ProtectSystem": "strict",
+    "ProtectHome": "read-only",
+    "PrivateTmp": "yes",
+    "PrivateDevices": "yes",
+    "NoNewPrivileges": "yes",
+    "CapabilityBoundingSet": "cap_dac_override",
+    "AmbientCapabilities": "cap_dac_override",
+    "ReadWritePaths": ""
+  },
+  "actual_unit": "horizon-cleanup976-failed234-hash-v1.service",
+  "actual_invocation_id": "775e76268a894be89a02d56bc2b79156",
+  "actual_pid": 674832,
+  "journal": {
+    "path": "/var/lib/jetstreamer/horizon976-failed234-cleanup-candidate-Main-v1/hash/hash-journal.jsonl",
+    "sha256": "5c9650a538f486dada67e0fa732290ba4dbcf54a73bcc735fe93ccf18df77452"
+  },
+  "PID1_terminal": {
+    "path": "/var/lib/jetstreamer/horizon976-failed234-cleanup-candidate-Main-v1/hash/pid1-terminal.jsonl",
+    "sha256": "dbc241876d91c124442b44a5f4b68bd1149b746b741006d91cc8ee8e743ceec7"
+  },
+  "actual_terminal": "success0",
+  "hash_owner_stopped_and_cgroup_drained": true,
+  "native_properties_captured_while_running_and_retained_exited": true,
+  "purpose": "Byte identity for candidate-specific holding/retirement qualification only. Not independent content/checkpoint verification, canonical readiness, resume qualification, remote custody or local retirement.",
+  "no_R2_mutation_or_local_retirement": true,
+  "reservation_or_memory_credit_bytes": 0
+}

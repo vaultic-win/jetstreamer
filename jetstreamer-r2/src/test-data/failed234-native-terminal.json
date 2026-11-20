@@ -1,0 +1,14 @@
+{
+  "Id": "horizon-qualify-234-general-shrink-debt-budget506-e3f15eb2-v5.service",
+  "ActiveState": "failed",
+  "SubState": "failed",
+  "Job": "",
+  "InvocationID": "42cd9e2dba644e3093f5479da3a3c917",
+  "Restart": "no",
+  "MainPID": "0",
+  "ControlPID": "0",
+  "Result": "exit-code",
+  "NRestarts": "0",
+  "ExecMainStatus": "1",
+  "ControlGroup": ""
+}

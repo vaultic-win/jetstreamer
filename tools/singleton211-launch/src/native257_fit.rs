@@ -74,19 +74,27 @@ fn existing_scratch_filesystem() -> Result<(PathBuf, u64)> {
     Ok((used.to_owned(), m.dev()))
 }
 
-pub(super) fn evaluate(
+pub(super) struct BookedHost {
+    pub resources: (u64, u64, u64),
+    pub rows: Vec<capacity::Reservation>,
+    pub currents: BTreeMap<String, u64>,
+    pub overhead: (u64, u64),
+    pub century: u64,
+    pub release: Option<Value>,
+    pub boot: String,
+    pub device: u64,
+}
+
+pub(super) fn booked_host(
     n: &mut Native,
     review: &Value,
-    source: &Bound,
-    held: bool,
-) -> Result<Value> {
+    path: &Path,
+    native257_held: Option<bool>,
+) -> Result<BookedHost> {
     no_authority(review)?;
     ensure!(
-        review["schema"] == "horizon-native257-resource-review-v1"
-            && review["Main_accepted"] == true
-            && review["single_campaign_controller_confirmed"] == true
-            && review["epoch"] == 257,
-        "unaccepted capacity review"
+        review["Main_accepted"] == true && review["single_campaign_controller_confirmed"] == true,
+        "capacity review not accepted"
     );
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     ensure!(review["boot_id"] == boot.trim(), "boot changed");
@@ -114,15 +122,21 @@ pub(super) fn evaluate(
     finalization::verify_inputs(&fleet)?;
     // This is an original 211 preactivation census with *no* candidate exceptions.
     // A live full211, 257, or unknown peer must obtain its own complete booking.
-    let allowed = held.then_some((native257::UNIT, native257::GUARD_UNIT, native257::TIMER));
-    ensure!(
-        rows.iter().all(|r| r.unit != native257::UNIT),
-        "native257 already booked"
-    );
+    if native257_held.is_some() {
+        ensure!(
+            rows.iter().all(|r| r.unit != native257::UNIT),
+            "native257 already booked"
+        );
+    }
+    let allowed = (native257_held == Some(true)).then_some((
+        native257::UNIT,
+        native257::GUARD_UNIT,
+        native257::TIMER,
+    ));
     let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed)?;
     let (effective, release) = native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;
     let century = capacity::century(&binding(&review["century"])?.sealed()?, &fleet)?;
-    let (path, device) = existing_scratch_filesystem()?;
+    let device = fs::metadata(path)?.dev();
     // The original bookings have one shared filesystem floor. Compare its
     // authenticated observer path with the candidate's actual backing device.
     let ledger_fs = Path::new(text(&observer["filesystem"], "path")?);
@@ -132,39 +146,73 @@ pub(super) fn evaluate(
             && fs::metadata(ledger_fs)?.dev() == device,
         "existing disk reservations need a per-device transition"
     );
-    let resources = live::resources_at(&path)?;
+    let resources = live::resources_at(path)?;
     ensure!(
         Some(resources.0) == num(&observer["host_memory"], "total_kib")?.checked_mul(1024),
         "physical host changed"
     );
+    fresh(num(&fleet, "recorded_unix_seconds")?, now()?, 300)?;
+    fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
+    ensure!(
+        path.is_absolute() && path.canonicalize()? == path && fs::metadata(path)?.dev() == device,
+        "capacity filesystem identity changed"
+    );
+    n.check()?;
+    Ok(BookedHost {
+        resources,
+        rows: effective,
+        currents,
+        overhead: (overhead, periodic::total(&periodic)?),
+        century,
+        release,
+        boot: boot.trim().to_owned(),
+        device,
+    })
+}
+
+pub(super) fn evaluate(
+    n: &mut Native,
+    review: &Value,
+    source: &Bound,
+    held: bool,
+) -> Result<Value> {
+    no_authority(review)?;
+    ensure!(
+        review["schema"] == "horizon-native257-resource-review-v1"
+            && review["Main_accepted"] == true
+            && review["single_campaign_controller_confirmed"] == true
+            && review["epoch"] == 257,
+        "unaccepted capacity review"
+    );
+    let (path, device) = existing_scratch_filesystem()?;
     let control_bytes = review["control_units"]
         .as_array()
         .context("control units")?
         .iter()
-        .try_fold(0, |bytes, unit| {
-            capacity::add(bytes, num(unit, "maximum_memory_bytes")?)
+        .try_fold(0, |sum, unit| {
+            capacity::add(sum, num(unit, "maximum_memory_bytes")?)
         })?;
     let combined_control_excess =
         capacity::add(control_bytes, 2 * 268_435_456)?.saturating_sub(CONTROL);
+    let host = booked_host(n, review, &path, Some(held))?;
     let result = scenarios(
-        resources,
-        century,
-        &effective,
-        &currents,
-        (overhead, periodic::total(&periodic)?),
+        host.resources,
+        host.century,
+        &host.rows,
+        &host.currents,
+        host.overhead,
         combined_control_excess,
     );
     ensure!(
-        existing_scratch_filesystem()? == (path.clone(), device),
+        host.device == device && existing_scratch_filesystem()? == (path.clone(), device),
         "scratch backing changed during fit"
     );
-    fresh(num(&fleet, "recorded_unix_seconds")?, now()?, 300)?;
     n.check()?;
     Ok(
-        json!({"schema":"horizon-native257-current-fit-v1","epoch":257,"review":source,"boot_id":boot.trim(),
+        json!({"schema":"horizon-native257-current-fit-v1","epoch":257,"review":source,"boot_id":host.boot,
        "fleet":review["fleet"],"observer":review["observer"],"reservation_ledger":review["reservation_ledger"],
-       "v126_minimum":Bound::new(BASELINE,BASELINE_SHA),"native265_runtime_growth_release":release,
-       "scratch_filesystem":path,"scratch_st_dev":device,"actual_scratch_present":path==Path::new(SCRATCH257),"actual_current_memory":currents,
+       "v126_minimum":Bound::new(BASELINE,BASELINE_SHA),"native265_runtime_growth_release":host.release,
+       "scratch_filesystem":path,"scratch_st_dev":device,"actual_scratch_present":path==Path::new(SCRATCH257),"actual_current_memory":host.currents,
        "cpu_affinity_qualified":false,"scenarios":result,"recorded_unix_seconds":now()?,
        "admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false}),
     )

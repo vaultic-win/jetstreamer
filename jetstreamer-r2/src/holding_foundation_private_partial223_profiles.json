@@ -1,0 +1,116 @@
+[
+  {
+    "artifact": "adaptive-223",
+    "root": "/home/ubuntu/.jetstreamer-private/adaptive-220-223-current-9d8e964-v1",
+    "relative_source": "lane-a/private/destination-5af206ff1dc2bf937d80da0ea255ab459f3b370f67b1c83ed238da29f1de146e/work/root-cohort-220-223/run-2161856-1791998246210466037/archives/epoch-223.jet",
+    "source_identity": {
+      "device": 66305,
+      "inode": 2259432,
+      "length": 62342675996,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 384,
+      "links": 1,
+      "mtime_ns": 1792604861808461493,
+      "ctime_ns": 1792604861808461493
+    },
+    "allocated_bytes": 62342750208,
+    "producer": "jetstreamer-root-sweep-horizon-220-223-current-v1-e220-223-lane-a-1.service",
+    "invocation_id": "c2adebaad0cb42b385156631156813fe",
+    "lineage": {
+      "path": "/var/lib/jetstreamer/horizon-220-223-post-count-incident-1807-v1/incident.json",
+      "sha256": "28a298dd4821cdbb32aacb9840ceb85981d716d107e6f6b2ca9fba7affe53d55"
+    },
+    "raw_metadata": {
+      "path": "/home/ubuntu/.jetstreamer-private/adaptive-220-223-current-9d8e964-v1/lane-a/private/destination-5af206ff1dc2bf937d80da0ea255ab459f3b370f67b1c83ed238da29f1de146e/work/root-cohort-220-223/run-2161856-1791998246210466037/cohort-state.json",
+      "sha256": "7b74a2c7b752476c1c8d284f5f7b3fa15d43abce29c6b3f93075b568ca423274"
+    },
+    "metadata_identity": {
+      "device": 66305,
+      "inode": 2259390,
+      "length": 222,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 384,
+      "links": 1,
+      "mtime_ns": 1791998246209856354,
+      "ctime_ns": 1791998246209856354
+    }
+  },
+  {
+    "artifact": "full-root-223",
+    "root": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1",
+    "relative_source": "output/epoch-223.jet",
+    "source_identity": {
+      "device": 66305,
+      "inode": 2759928,
+      "length": 62978346422,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 384,
+      "links": 1,
+      "mtime_ns": 1792900535194701439,
+      "ctime_ns": 1792900535194701439
+    },
+    "allocated_bytes": 62978433024,
+    "producer": "horizon-qualify-223-v1620-root-prefix-resource-full-v1.service",
+    "invocation_id": "e70aaf097e7c4583b216aba454145910",
+    "lineage": {
+      "path": "/var/lib/jetstreamer/horizon-native223-prefix-failure-e70a-20261025-v1/open-repair.v2.json",
+      "sha256": "f1aa68c425b6bfad05417d196f20bae77de0f67c0bb61d19556f77946e2083ba"
+    },
+    "raw_metadata": {
+      "path": "/home/ubuntu/.jetstreamer-private/qualification-223-v1620-prefix-full-root-v1/receipts/failure.json",
+      "sha256": "b8e8950e4578996a5d52e903478b8bf533c15da7352b8b2243ff42495b5ee62a"
+    },
+    "metadata_identity": {
+      "device": 66305,
+      "inode": 2759805,
+      "length": 6968,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 256,
+      "links": 1,
+      "mtime_ns": 1792900575542545579,
+      "ctime_ns": 1792900575555545529
+    }
+  },
+  {
+    "artifact": "singleton-223",
+    "root": "/home/ubuntu/.jetstreamer-private/singleton-223-postcount-ad1d65a-v1",
+    "relative_source": "private/destination-cdf56414a2668d0cccbbcba1765002397973c1cfaeda2df3a4dee4df1f51fd38/work/root-cohort-223-223/run-2560162-1792612414816300237/archives/epoch-223.jet",
+    "source_identity": {
+      "device": 66305,
+      "inode": 25840814,
+      "length": 62532820208,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 384,
+      "links": 1,
+      "mtime_ns": 1792691722567004496,
+      "ctime_ns": 1792691722567004496
+    },
+    "allocated_bytes": 62532907008,
+    "producer": "horizon-qualify-223-singleton-postcount-ad1d65a-v1.service",
+    "invocation_id": "04ef9d97a36446d49b452d982cb0be46",
+    "lineage": {
+      "path": "/var/lib/jetstreamer/horizon-223-failure-20261022-v1/repair.json",
+      "sha256": "d2db6e1bff79c0a06aca955967154077be33981c2e83ff9d62f2e5be087b023f"
+    },
+    "raw_metadata": {
+      "path": "/home/ubuntu/.jetstreamer-private/singleton-223-postcount-ad1d65a-v1/private/destination-cdf56414a2668d0cccbbcba1765002397973c1cfaeda2df3a4dee4df1f51fd38/work/root-cohort-223-223/run-2560162-1792612414816300237/cohort-state.json",
+      "sha256": "6e1dad5cbfcdcfbd1b0953f22c840f60ff7cc1d6a6bbcb687ff9f514d120b444"
+    },
+    "metadata_identity": {
+      "device": 66305,
+      "inode": 25840790,
+      "length": 222,
+      "uid": 1000,
+      "gid": 1000,
+      "mode": 384,
+      "links": 1,
+      "mtime_ns": 1792612414815896878,
+      "ctime_ns": 1792612414815896878
+    }
+  }
+]

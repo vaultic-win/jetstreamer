@@ -58,6 +58,9 @@ pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result
             && v["MemorySwapMax"] == "0",
         "live envelope changed {unit}"
     );
+    kernel_memory(v, unit, cap)
+}
+pub(super) fn kernel_memory(v: &Value, unit: &str, cap: u64) -> Result<u64> {
     let root = cgroup_path(unit);
     ensure!(root.canonicalize()? == root, "cgroup symlink");
     ensure!(

@@ -3498,6 +3498,9 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("recover-reader205-finalization") {
         return recover_reader205::run().await;
     }
+    if env::args().nth(1).as_deref().is_some_and(holding::foundation_private_command) {
+        return holding::run().await;
+    }
     if matches!(
         env::args().nth(1).as_deref(),
         Some(

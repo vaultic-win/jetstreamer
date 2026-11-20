@@ -1,6 +1,11 @@
 //! Append-only custody and separately scoped backed partial 136 retirement. No
 //! canonical sidecar, runtime checkpoint or job-resume authority.
 use super::*;
+#[path = "holding_foundation_private.rs"]
+mod foundation_private;
+pub(super) fn foundation_private_command(action: &str) -> bool {
+    foundation_private::command(action)
+}
 use serde_json::json;
 use std::os::unix::fs::PermissionsExt;
 #[path = "holding_epoch136.rs"]
@@ -217,12 +222,15 @@ fn private(path: &Path) -> Result<()> {
     Ok(())
 }
 fn persist(path: &Path, v: &Value) -> Result<()> {
+    persist_with_limit(path, v, 1 << 20)
+}
+fn persist_with_limit(path: &Path, v: &Value, maximum: u64) -> Result<()> {
     let parent = path.parent().context("holding receipt parent")?;
     private(parent)?;
     if fs::symlink_metadata(path).is_ok() {
         let before = regular_identity(path)?;
         ensure!(
-            before.length <= 1 << 20,
+            before.length <= maximum,
             "oversized existing custody receipt"
         );
         let old: Value = serde_json::from_slice(&fs::read(path)?)?;
@@ -354,8 +362,14 @@ async fn small_create(client: &Client, key: &str, bytes: &[u8]) -> Result<()> {
 }
 async fn owner(client: &Client, m: &Mapping) -> Result<()> {
     mapping(m)?;
-    let key = format!("{}owner.json", m.prefix);
     let bytes = owner_bytes(m)?;
+    claim_owner(client, &m.prefix, &bytes).await
+}
+// Policy stays with each exact host adapter. Both callers use the same
+// conditional-create and independent readback transport, never a blind PUT.
+async fn claim_owner(client: &Client, key_prefix: &str, bytes: &[u8]) -> Result<()> {
+    ensure!(prefix(key_prefix), "ambiguous holding owner prefix");
+    let key = format!("{key_prefix}owner.json");
     if let Some(old) = get_mutable_object(client, BUCKET, &key).await? {
         ensure!(
             old.bytes == bytes,
@@ -366,7 +380,7 @@ async fn owner(client: &Client, m: &Mapping) -> Result<()> {
     let list = client
         .list_objects_v2()
         .bucket(BUCKET)
-        .prefix(&m.prefix)
+        .prefix(key_prefix)
         .max_keys(1)
         .send()
         .await?;
@@ -374,7 +388,7 @@ async fn owner(client: &Client, m: &Mapping) -> Result<()> {
         list.contents().is_empty() && list.is_truncated() != Some(true),
         "unmapped nonempty holding prefix; resolve ownership before any write"
     );
-    small_create(client, &key, &bytes).await
+    small_create(client, &key, bytes).await
 }
 fn remote_matches(
     r: &RemoteArchive,
@@ -433,38 +447,7 @@ async fn park(client: &Client, m: &Mapping, p: &Park) -> Result<()> {
     let md = fs::symlink_metadata(&p.source)?;
     let key = object_key(m, &p.sha256)?;
     owner(client, m).await?;
-    let existing = head_archive(client, BUCKET, &key).await?;
-    if let Some(r) = &existing {
-        remote_matches(r, &key, p.length, &p.sha256, None)?;
-    } else {
-        let (etag, _) = upload_object(
-            client,
-            BUCKET,
-            ObjectUpload {
-                key: &key,
-                epoch: None,
-                path: &p.source,
-                identity,
-                length: p.length,
-                sha256: &p.sha256,
-                format: "cold-holding-v2",
-            },
-            DEFAULT_PART_SIZE,
-            2,
-            false,
-        )
-        .await?;
-        ensure!(
-            etag == proof.multipart_etag,
-            "holding multipart ETag differs from local proof"
-        );
-    }
-    let remote = head_archive(client, BUCKET, &key)
-        .await?
-        .context("holding blob missing after upload")?;
-    remote_matches(&remote, &key, p.length, &p.sha256, None)?;
-    native_checksum(&remote, &proof, p.length)?;
-    verify_remote_sha256(client, BUCKET, &key, &remote.etag, p.length, &p.sha256, 2).await?;
+    let remote = verified_blob(client, &key, p, identity, &proof).await?;
     ensure!(
         source(p, &e)? == identity
             && hash_and_etag(&p.source, identity, DEFAULT_PART_SIZE)?.sha256_hex == p.sha256,
@@ -496,6 +479,47 @@ async fn park(client: &Client, m: &Mapping, p: &Park) -> Result<()> {
         &receipt,
     )?;
     Ok(())
+}
+async fn verified_blob(
+    client: &Client,
+    key: &str,
+    p: &Park,
+    identity: FileIdentity,
+    proof: &LocalProof,
+) -> Result<RemoteArchive> {
+    let existing = head_archive(client, BUCKET, key).await?;
+    if let Some(r) = &existing {
+        remote_matches(r, key, p.length, &p.sha256, None)?;
+    } else {
+        let (etag, _) = upload_object(
+            client,
+            BUCKET,
+            ObjectUpload {
+                key,
+                epoch: None,
+                path: &p.source,
+                identity,
+                length: p.length,
+                sha256: &p.sha256,
+                format: "cold-holding-v2",
+            },
+            DEFAULT_PART_SIZE,
+            2,
+            false,
+        )
+        .await?;
+        ensure!(
+            etag == proof.multipart_etag,
+            "holding multipart ETag differs from local proof"
+        );
+    }
+    let remote = head_archive(client, BUCKET, key)
+        .await?
+        .context("holding blob missing after upload")?;
+    remote_matches(&remote, key, p.length, &p.sha256, None)?;
+    native_checksum(&remote, proof, p.length)?;
+    verify_remote_sha256(client, BUCKET, key, &remote.etag, p.length, &p.sha256, 2).await?;
+    Ok(remote)
 }
 
 fn custody(c: &Value, m: &Mapping) -> Result<(String, String, String, u64)> {
@@ -1071,7 +1095,69 @@ async fn restore_into(client: &Client, m: &Mapping, target: RestoreTarget<'_>) -
         .await?
         .context("holding object missing")?;
     remote_matches(&remote, &key, length, &sha, Some(&etag))?;
-    private(&directory)?;
+    let destination = restore_blob(
+        client,
+        BlobRestore {
+            key: &key,
+            etag: &etag,
+            sha: &sha,
+            length,
+            directory: &directory,
+            minimum,
+        },
+        || restore_owners(a),
+    )
+    .await?;
+    let remote = head_archive(client, BUCKET, &key)
+        .await?
+        .context("holding object disappeared after restore")?;
+    remote_matches(&remote, &key, length, &sha, Some(&etag))?;
+    let proof = hash_and_etag(
+        &destination,
+        regular_identity(&destination)?,
+        DEFAULT_PART_SIZE,
+    )?;
+    ensure!(proof.sha256_hex == sha, "restored holding digest differs");
+    native_checksum(&remote, &proof, length)?;
+    persist(
+        &receipt_directory.join(format!("restore-{sha}.json")),
+        &json!({
+        "schema":if genesis_probe {"jetstreamer-horizon-holding-root-genesis-probe-v2"} else {"jetstreamer-horizon-holding-restore-v2"},"host":HOST,"custody":custody_binding,
+        "object_key":key,"object_etag":etag,"length":length,"sha256":sha,"destination":destination,
+        "remote_sha256_readback":true,"local_source_revalidated":true,
+        "staging_only":true,"original_file_metadata":c["manifest"],
+        "root_genesis_transport_probe_only":genesis_probe,"minimum_free_bytes":minimum,
+        "capacity_completion":a["capacity_completion"],"owners":a["owners"],
+        "local_retirement_authorized":false,"canonical_publication_authorized":false,
+        "runtime_checkpoint_qualified":false,"job_resume_authorized":false,"replay_launch_authorized":false}),
+    )?;
+    Ok(())
+}
+
+struct BlobRestore<'a> {
+    key: &'a str,
+    etag: &'a str,
+    sha: &'a str,
+    length: u64,
+    directory: &'a Path,
+    minimum: u64,
+}
+// Shared byte transport only. Each host caller authenticates its own custody,
+// owner, manifest and complete resource admission before entering this function.
+async fn restore_blob<F: Fn() -> Result<()>>(
+    client: &Client,
+    target: BlobRestore<'_>,
+    before_commit: F,
+) -> Result<PathBuf> {
+    let BlobRestore {
+        key,
+        etag,
+        sha,
+        length,
+        directory,
+        minimum,
+    } = target;
+    private(directory)?;
     let destination = directory.join(format!("{sha}.blob"));
     let partial = directory.join(format!(".{sha}.partial"));
     if destination.try_exists()? {
@@ -1113,7 +1199,7 @@ async fn restore_into(client: &Client, m: &Mapping, target: RestoreTarget<'_>) -
             .checked_mul(512)
             .context("partial block overflow")?;
         ensure!(
-            available(&directory)?
+            available(directory)?
                 >= minimum
                     .checked_add(length - existing.length.min(physical))
                     .context("restore space overflow")?,
@@ -1131,17 +1217,17 @@ async fn restore_into(client: &Client, m: &Mapping, target: RestoreTarget<'_>) -
             file.seek(SeekFrom::Start(0))?;
             let mut guarded = FloorWriter {
                 file: &mut file,
-                directory: &directory,
+                directory,
                 minimum_free_bytes: minimum,
             };
             read_remote_sha256_resumable(
                 client,
                 RemoteReadSpec {
                     bucket: BUCKET,
-                    key: &key,
-                    etag: &etag,
+                    key,
+                    etag,
                     expected_length: length,
-                    expected_sha256: &sha,
+                    expected_sha256: sha,
                     concurrency: 2,
                 },
                 &mut guarded,
@@ -1152,44 +1238,21 @@ async fn restore_into(client: &Client, m: &Mapping, target: RestoreTarget<'_>) -
             file.set_permissions(fs::Permissions::from_mode(0o400))?;
             file.sync_all()?;
         }
-        restore_owners(a)?;
+        before_commit()?;
         ensure!(
             regular_identity(&partial)? == identity(&file.metadata()?),
             "holding partial changed before commit"
         );
         rename_noreplace(&partial, &destination)?;
     }
-    let remote = head_archive(client, BUCKET, &key)
-        .await?
-        .context("holding object disappeared after restore")?;
-    remote_matches(&remote, &key, length, &sha, Some(&etag))?;
-    let proof = hash_and_etag(
-        &destination,
-        regular_identity(&destination)?,
-        DEFAULT_PART_SIZE,
-    )?;
-    ensure!(proof.sha256_hex == sha, "restored holding digest differs");
-    native_checksum(&remote, &proof, length)?;
-    persist(
-        &receipt_directory.join(format!("restore-{sha}.json")),
-        &json!({
-        "schema":if genesis_probe {"jetstreamer-horizon-holding-root-genesis-probe-v2"} else {"jetstreamer-horizon-holding-restore-v2"},"host":HOST,"custody":custody_binding,
-        "object_key":key,"object_etag":etag,"length":length,"sha256":sha,"destination":destination,
-        "remote_sha256_readback":true,"local_source_revalidated":true,
-        "staging_only":true,"original_file_metadata":c["manifest"],
-        "root_genesis_transport_probe_only":genesis_probe,"minimum_free_bytes":minimum,
-        "capacity_completion":a["capacity_completion"],"owners":a["owners"],
-        "local_retirement_authorized":false,"canonical_publication_authorized":false,
-        "runtime_checkpoint_qualified":false,"job_resume_authorized":false,"replay_launch_authorized":false}),
-    )?;
-    Ok(())
+    Ok(destination)
 }
 
 pub(super) async fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     ensure!(
         args.len() == 7 && args[3] == "--spec-sha256" && args[5] == "--self-sha256",
-        "usage: holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-census157-laned-consumers|holding-check-retire157-laned|holding-retire157-laned|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
+        "usage: holding-foundation-private-inspect|holding-foundation-private-inspect-old-v2-237|holding-foundation-private-inspect-partial223|holding-foundation-private-park|holding-foundation-private-admit-restore|holding-foundation-private-restore|holding-foundation-private-check-retire|holding-foundation-private-retire|holding-plan185-guard-handoff|holding-capture185-survivor-guards|holding-check185-attempt-growth|holding-close185-attempt-growth|holding-read185-attempt-growth|holding-park|holding-restore|holding-admit-restore|holding-restore-genesis-probe|holding-inspect136|holding-disable136-retry|holding-check-retire136|holding-retire136|holding-check-retire141|holding-retire141|holding-census157-laned-consumers|holding-check-retire157-laned|holding-retire157-laned|holding-check-retire169|holding-retire169|holding-diagnose185-references|holding-reconcile185-staged|holding-inspect185|holding-check-retire185|holding-retire185 SPEC --spec-sha256 HEX --self-sha256 HEX"
     );
     ensure!(
         unsafe { libc::geteuid() } == 0,
@@ -1209,6 +1272,9 @@ pub(super) async fn run() -> Result<()> {
         sha256: args[4].clone(),
     };
     let v = bound(&spec)?;
+    if foundation_private_command(&args[1]) {
+        return foundation_private::run(&args[1], v, &spec).await;
+    }
     let map: Bound = serde_json::from_value(v["mapping"].clone())?;
     let m: Mapping = serde_json::from_value(bound(&map)?)?;
     mapping(&m)?; // Must pass before credentials, listing or first remote write.
