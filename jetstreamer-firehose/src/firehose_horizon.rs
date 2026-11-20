@@ -196,6 +196,10 @@ where
     V: SlotVisitor + Send + 'static,
 {
     let threads = threads.max(1);
+    let mut src = src;
+    if let JetSource::HttpPinned(pins) = &mut src {
+        pins.set_worker_count(threads);
+    }
     let client = horizon_client(&src)?;
     let layout = load_layout(&src, epoch, &client).await?;
     if layout.index.is_empty() || slot_range.is_empty() {
@@ -230,6 +234,10 @@ where
     V: SlotVisitor + Send + 'static,
 {
     let threads = threads.max(1);
+    let mut src = src;
+    if let JetSource::HttpPinned(pins) = &mut src {
+        pins.set_worker_count(threads);
+    }
     if slots.start > slots.end {
         return Err(
             io::Error::new(io::ErrorKind::InvalidInput, "reversed Horizon slot range").into(),
@@ -376,6 +384,15 @@ async fn stream_chunk<V: SlotVisitor + Send + 'static>(
     // `tx` plus one in each task.
     let (recycle_tx, mut recycle_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(PREFETCH_DEPTH + 2);
 
+    // Wide pinned runs have one reusable compressed bucket per decoder. It
+    // returns immediately after decompression, so network I/O still overlaps
+    // slot decoding without multiplying each worker's largest buffer by four.
+    let compact = matches!(src, JetSource::HttpPinned(pins) if pins.compact());
+    if compact {
+        recycle_tx
+            .try_send(Vec::new())
+            .expect("new recycle channel");
+    }
     let fetch = async move {
         // In-memory source: hand the decoder shared slices of the one
         // preloaded buffer, with zero per-bucket buffers and zero copies.
@@ -405,7 +422,14 @@ async fn stream_chunk<V: SlotVisitor + Send + 'static>(
         let mut s = open_jet_stream(src, epoch, client, Some(span)).await?;
         for b in chunk {
             let e = index[b];
-            let mut buf = recycle_rx.try_recv().unwrap_or_default();
+            let mut buf = if compact {
+                let Some(returned) = recycle_rx.recv().await else {
+                    break;
+                };
+                returned
+            } else {
+                recycle_rx.try_recv().unwrap_or_default()
+            };
             read_range_into(&mut s, e.offset, e.len as usize, &mut buf).await?;
             if tx.send((e, RawBucket::Owned(buf))).await.is_err() {
                 break; // decoder finished early (reached end slot) or errored
@@ -415,7 +439,11 @@ async fn stream_chunk<V: SlotVisitor + Send + 'static>(
     };
     let decode = tokio::task::spawn_blocking(move || {
         let mut rx = rx;
-        let mut decoder = BucketDecoder::for_file_header(&decoder_header)?;
+        let mut decoder = if compact {
+            BucketDecoder::for_file_header_with_diff_capacity(&decoder_header, 0)?
+        } else {
+            BucketDecoder::for_file_header(&decoder_header)?
+        };
         decoder.verify_chain = false;
         // Honor the visitor's declared consumption: unconsumed
         // account-update data is skipped, not reconstructed.

@@ -364,6 +364,10 @@ impl BucketDecoder {
     /// Allocates a decoder configured for an already validated archive wire
     /// version.
     pub fn for_archive_version(version: ArchiveVersion) -> Self {
+        Self::with_diff_capacity(version, 64 * 1024)
+    }
+
+    fn with_diff_capacity(version: ArchiveVersion, reserved_keys: usize) -> Self {
         Self {
             verify_chain: false,
             chain_mismatch_policy: ChainMismatchPolicy::Reject,
@@ -384,7 +388,7 @@ impl BucketDecoder {
                 ArchiveVersion::V2 => DedupeIdCodec::UnsignedLeb128,
             }),
             diff: DiffDecoder::with_capacity_mode_and_cache_limits(
-                64 * 1024,
+                reserved_keys,
                 match version {
                     ArchiveVersion::V1 => 2,
                     ArchiveVersion::V2 => 3,
@@ -417,6 +421,16 @@ impl BucketDecoder {
     /// Allocates a decoder bound to a validated file header's version and
     /// slot geometry.
     pub fn for_file_header(header: &FileHeader) -> Result<Self, ArchiveFormatError> {
+        Self::for_file_header_with_diff_capacity(header, 64 * 1024)
+    }
+
+    /// Uses the same wire-format checks and diff-cache limits as
+    /// [`Self::for_file_header`], with an initial number of reserved diff keys.
+    /// A zero reservation grows on demand when many decoders run together.
+    pub fn for_file_header_with_diff_capacity(
+        header: &FileHeader,
+        reserved_keys: usize,
+    ) -> Result<Self, ArchiveFormatError> {
         let version = validate_archive_version(header.format_version, header.flags)?;
         if header.bucket_slots == 0 {
             return Err(ArchiveFormatError::InvalidContainerLayout(
@@ -426,7 +440,7 @@ impl BucketDecoder {
         let slot_end = header.slot_start.checked_add(header.slot_count).ok_or(
             ArchiveFormatError::InvalidContainerLayout("slot range overflows u64"),
         )?;
-        let mut decoder = Self::for_archive_version(version);
+        let mut decoder = Self::with_diff_capacity(version, reserved_keys);
         decoder.bucket_slots = Some(header.bucket_slots);
         decoder.archive_slot_range = Some((header.slot_start, slot_end));
         Ok(decoder)

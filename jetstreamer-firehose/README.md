@@ -86,3 +86,15 @@ Notes:
 - Sequential-mode ripget buffering is configured via the `buffer_window_bytes` parameter on
   `firehose::firehose(...)`. If you run through the top-level `jetstreamer` binary crate, that
   layer exposes `JETSTREAMER_BUFFER_WINDOW` and forwards it to firehose.
+
+Horizon verification with a pinned archive inventory shares 512 MiB of HTTP
+read-ahead across its workers, up to 8 MiB per reader. With 256 workers this
+gives each reader 2 MiB for coalescing adjacent small buckets. Larger
+reads go directly into the compressed bucket buffer in requests of at most
+8 MiB. At this concurrency each decoder returns its one compressed buffer
+as soon as decompression finishes, so the next fetch can overlap slot
+decoding. The account diff dictionary grows on demand under the same
+wire-format and cache limits. A shared 16-request HTTP limit allows all decoder
+workers to remain scheduled while respecting origin backpressure. A 429 or
+a 503 with a Retry-After header defers reads for the whole run. Every accepted HTTP response still requires the pinned
+strong ETag, HTTP 206, exact Content-Range, and exact body length.

@@ -1,8 +1,19 @@
 //! Anonymous HTTP range reads bound to the authenticated archive inventory.
-use std::{collections::BTreeMap, io, ops::Range, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeMap,
+    io,
+    ops::Range,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime},
+};
 
 use reqwest::{Client, StatusCode, Url, header};
 use serde::Deserialize;
+use tokio::{
+    sync::{Semaphore, SemaphorePermit},
+    time::Instant,
+};
 
 #[derive(Clone, Debug, Deserialize)]
 pub(super) struct Object {
@@ -12,11 +23,81 @@ pub(super) struct Object {
     bytes: u64,
 }
 
+// Cap cache bytes across the worker set. Probe reads use their exact requested
+// span and the same per-reader bound. Ordinary small audits keep 8 MiB reads.
+const MAX_READ: usize = 8 << 20;
+const TOTAL_READ_AHEAD: usize = 512 << 20;
+const MAX_HTTP_REQUESTS: usize = 16;
+
+/// Decoding uses one worker per partition. Bound simultaneous HTTP requests
+/// separately and honor an origin's Retry-After across every pinned reader.
+#[derive(Debug)]
+struct RequestBudget {
+    permits: Semaphore,
+    resume: Mutex<Instant>,
+}
+
+impl RequestBudget {
+    fn new() -> Self {
+        Self {
+            permits: Semaphore::new(MAX_HTTP_REQUESTS),
+            resume: Mutex::new(Instant::now()),
+        }
+    }
+
+    async fn acquire(&self) -> SemaphorePermit<'_> {
+        let permit = self
+            .permits
+            .acquire()
+            .await
+            .expect("request budget remains open");
+        loop {
+            let resume = *self.resume.lock().expect("request deadline");
+            if resume <= Instant::now() {
+                return permit;
+            }
+            tokio::time::sleep_until(resume).await;
+        }
+    }
+
+    fn defer(&self, retry_after: Option<&header::HeaderValue>, attempt: u32) -> io::Result<()> {
+        let delay = if let Some(value) = retry_after {
+            let text = value.to_str().map_err(io::Error::other)?;
+            if let Ok(seconds) = text.parse::<u64>() {
+                Duration::from_secs(seconds)
+            } else {
+                httpdate::parse_http_date(text)
+                    .map_err(io::Error::other)?
+                    .duration_since(SystemTime::now())
+                    .unwrap_or_default()
+            }
+        } else {
+            Duration::from_secs(15 << attempt)
+        };
+        if delay > Duration::from_secs(180) {
+            return Err(io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "public archive Retry-After exceeds request timeout",
+            ));
+        }
+        let deadline = Instant::now() + delay;
+        let mut resume = self.resume.lock().expect("request deadline");
+        *resume = (*resume).max(deadline);
+        Ok(())
+    }
+}
+
+fn read_ahead(workers: usize) -> usize {
+    (TOTAL_READ_AHEAD / workers.max(1)).clamp(1, MAX_READ)
+}
+
 /// The immutable public origin and canonical archive identities of one audit.
 #[derive(Clone, Debug)]
 pub struct PinnedArchives {
     base: Url,
     objects: Arc<BTreeMap<u64, Object>>,
+    budget: Arc<RequestBudget>,
+    read_ahead: usize,
 }
 
 impl PinnedArchives {
@@ -64,7 +145,17 @@ impl PinnedArchives {
         Ok(Self {
             base,
             objects: Arc::new(objects),
+            budget: Arc::new(RequestBudget::new()),
+            read_ahead: MAX_READ,
         })
+    }
+
+    pub(super) fn set_worker_count(&mut self, workers: usize) {
+        self.read_ahead = read_ahead(workers);
+    }
+
+    pub(super) fn compact(&self) -> bool {
+        self.read_ahead < MAX_READ
     }
 
     pub(super) fn open(
@@ -89,8 +180,10 @@ impl PinnedArchives {
             url: self.base.join(&object.key).map_err(io::Error::other)?,
             object: object.clone(),
             client: client.clone(),
+            budget: Arc::clone(&self.budget),
             worker_span,
-            start: 0,
+            cached: 0..0,
+            read_ahead: self.read_ahead,
             cache: Vec::new(),
         })
     }
@@ -100,8 +193,10 @@ pub(super) struct Reader {
     url: Url,
     object: Object,
     client: Client,
+    budget: Arc<RequestBudget>,
     worker_span: Option<Range<u64>>,
-    start: u64,
+    cached: Range<u64>,
+    read_ahead: usize,
     cache: Vec<u8>,
 }
 
@@ -116,26 +211,26 @@ impl Reader {
         self.object.bytes
     }
 
-    async fn fill(&mut self, start: u64, needed: u64) -> io::Result<()> {
-        // Coalesce neighboring small buckets; retrying a connection never needs
-        // a local archive and never changes the object identity.
-        const CHUNK: u64 = 8 << 20;
-        let count = self
-            .worker_span
-            .as_ref()
-            .map_or(needed, |span| span.end - start)
-            .min(CHUNK);
+    async fn fetch(
+        budget: &RequestBudget,
+        client: &Client,
+        url: &Url,
+        object: &Object,
+        start: u64,
+        dest: &mut [u8],
+    ) -> io::Result<()> {
+        let count = dest.len() as u64;
         let end = start + count - 1;
         let range = format!("bytes={start}-{end}");
-        let expected = format!("bytes {start}-{end}/{}", self.len());
+        let expected = format!("bytes {start}-{end}/{}", object.bytes);
         for attempt in 0..3 {
             if attempt > 0 {
                 tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
             }
-            let response = self
-                .client
-                .get(self.url.clone())
-                .header(header::IF_MATCH, &self.object.etag)
+            let _permit = budget.acquire().await;
+            let response = client
+                .get(url.clone())
+                .header(header::IF_MATCH, &object.etag)
                 .header(header::ACCEPT_ENCODING, "identity")
                 .header(header::RANGE, &range)
                 .timeout(Duration::from_secs(180))
@@ -149,19 +244,30 @@ impl Reader {
                     )));
                 }
                 Ok(response)
-                    if attempt < 2
-                        && (response.status().is_server_error()
-                            || response.status() == StatusCode::TOO_MANY_REQUESTS) =>
+                    if response.status() == StatusCode::TOO_MANY_REQUESTS
+                        || (response.status() == StatusCode::SERVICE_UNAVAILABLE
+                            && response.headers().contains_key(header::RETRY_AFTER)) =>
                 {
+                    budget.defer(response.headers().get(header::RETRY_AFTER), attempt)?;
+                    if attempt == 2 {
+                        return Err(io::Error::new(
+                            io::ErrorKind::WouldBlock,
+                            format!(
+                                "public archive temporarily unavailable: {} at {range}",
+                                response.status()
+                            ),
+                        ));
+                    }
                     continue;
                 }
+                Ok(response) if attempt < 2 && response.status().is_server_error() => continue,
                 Ok(response) => response,
             };
             let headers = response.headers();
-            if response.url() != &self.url
+            if response.url() != url
                 || response.status() != StatusCode::PARTIAL_CONTENT
                 || headers.get(header::ETAG).and_then(|v| v.to_str().ok())
-                    != Some(self.object.etag.as_str())
+                    != Some(object.etag.as_str())
                 || headers
                     .get(header::CONTENT_RANGE)
                     .and_then(|v| v.to_str().ok())
@@ -173,26 +279,25 @@ impl Reader {
                     response.status()
                 )));
             }
-            self.cache.clear();
+            let mut written = 0;
             loop {
-                let chunk = match response.chunk().await {
+                match response.chunk().await {
+                    Ok(Some(chunk)) => {
+                        if chunk.len() > dest.len() - written {
+                            return Err(io::Error::other("oversized public range"));
+                        }
+                        dest[written..written + chunk.len()].copy_from_slice(&chunk);
+                        written += chunk.len();
+                    }
+                    Ok(None) if written == dest.len() => return Ok(()),
+                    Ok(None) => break,
                     Err(_) if attempt < 2 => break,
                     Err(error) => {
                         return Err(io::Error::other(format!(
                             "public archive transport: {error}"
                         )));
                     }
-                    Ok(Some(chunk)) => chunk,
-                    Ok(None) => break,
-                };
-                if chunk.len() > count as usize - self.cache.len() {
-                    return Err(io::Error::other("oversized public range"));
                 }
-                self.cache.extend_from_slice(&chunk);
-            }
-            if self.cache.len() == count as usize {
-                self.start = start;
-                return Ok(());
             }
         }
         Err(io::Error::new(
@@ -213,10 +318,45 @@ impl Reader {
             ));
         }
         while !dest.is_empty() {
-            if !(self.start..self.start + self.cache.len() as u64).contains(&offset) {
-                self.fill(offset, dest.len() as u64).await?;
+            if !self.cached.contains(&offset) {
+                // A large bucket already owns its destination. Reading straight into
+                // it avoids a second cache allocation while keeping requests bounded.
+                if self.read_ahead < MAX_READ && dest.len() >= self.read_ahead {
+                    let count = dest.len().min(MAX_READ);
+                    let (part, remainder) = dest.split_at_mut(count);
+                    Self::fetch(
+                        &self.budget,
+                        &self.client,
+                        &self.url,
+                        &self.object,
+                        offset,
+                        part,
+                    )
+                    .await?;
+                    offset += count as u64;
+                    dest = remainder;
+                    continue;
+                }
+                let count = self
+                    .worker_span
+                    .as_ref()
+                    .map_or(dest.len() as u64, |span| span.end - offset)
+                    .min(self.read_ahead as u64) as usize;
+                // A cancelled or failed refill must never validate partially replaced bytes.
+                self.cached = 0..0;
+                super::try_resize_read_buffer(&mut self.cache, count)?;
+                Self::fetch(
+                    &self.budget,
+                    &self.client,
+                    &self.url,
+                    &self.object,
+                    offset,
+                    &mut self.cache,
+                )
+                .await?;
+                self.cached = offset..offset + count as u64;
             }
-            let cached = &self.cache[(offset - self.start) as usize..];
+            let cached = &self.cache[(offset - self.cached.start) as usize..];
             let n = cached.len().min(dest.len());
             dest[..n].copy_from_slice(&cached[..n]);
             offset += n as u64;
@@ -264,9 +404,11 @@ mod tests {
                     bytes: 8,
                 },
                 client: Client::new(),
+                budget: Arc::new(RequestBudget::new()),
                 worker_span: Some(0..8),
-                start: 0,
+                cached: 0..0,
                 cache: Vec::new(),
+                read_ahead: MAX_READ,
             },
             handle,
         )
@@ -284,6 +426,68 @@ mod tests {
         reader.read_at(3, &mut second).await.unwrap();
         assert_eq!(&first, b"abc");
         assert_eq!(&second, b"defgh");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn wide_audits_bound_aggregate_http_cache() {
+        assert_eq!(read_ahead(4), MAX_READ);
+        assert_eq!(read_ahead(256), 2 << 20);
+        assert!(read_ahead(256) * 256 <= TOTAL_READ_AHEAD);
+    }
+
+    #[test]
+    fn retry_after_applies_to_all_readers_without_shortening_existing_delay() {
+        let budget = RequestBudget::new();
+        let start = Instant::now();
+        budget
+            .defer(Some(&header::HeaderValue::from_static("30")), 0)
+            .unwrap();
+        let first = *budget.resume.lock().unwrap();
+        assert!(first >= start + Duration::from_secs(30));
+        budget
+            .defer(Some(&header::HeaderValue::from_static("0")), 0)
+            .unwrap();
+        assert_eq!(first, *budget.resume.lock().unwrap());
+        let date = httpdate::fmt_http_date(SystemTime::now() + Duration::from_secs(60));
+        budget
+            .defer(Some(&header::HeaderValue::from_str(&date).unwrap()), 0)
+            .unwrap();
+        assert!(*budget.resume.lock().unwrap() > first);
+        assert!(
+            budget
+                .defer(Some(&header::HeaderValue::from_static("500")), 0)
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn wide_reader_reads_large_bucket_directly_without_a_second_buffer() {
+        let (mut reader, server) = serve(
+            "HTTP/1.1 206 Partial Content\r\nContent-Length: 8\r\nContent-Range: bytes 0-7/8\r\nETag: \"original\"\r\n\r\nabcdefgh",
+            "bytes=0-7",
+        );
+        reader.read_ahead = 4;
+        let mut bytes = [0; 8];
+        reader.read_at(0, &mut bytes).await.unwrap();
+        assert_eq!(&bytes, b"abcdefgh");
+        assert_eq!(reader.cache.capacity(), 0);
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn compact_cache_coalesces_small_reads_to_its_worker_budget() {
+        let (mut reader, server) = serve(
+            "HTTP/1.1 206 Partial Content\r\nContent-Length: 4\r\nContent-Range: bytes 0-3/8\r\nETag: \"original\"\r\n\r\nabcd",
+            "bytes=0-3",
+        );
+        reader.read_ahead = 4;
+        let mut bytes = [0; 2];
+        reader.read_at(0, &mut bytes).await.unwrap();
+        assert_eq!(&bytes, b"ab");
+        reader.read_at(2, &mut bytes).await.unwrap();
+        assert_eq!(&bytes, b"cd");
+        assert_eq!(reader.cache.len(), 4);
         server.join().unwrap();
     }
 
