@@ -2,10 +2,6 @@
 use super::*;
 const EVIDENCE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch171-172-original-transaction-evidence-20261120-v1/evidence.json";
 const PROVENANCE: &str = "27dfe64d9136561ad691b690ce83a1a2d8a9a3d6d1d414b12785999077758323";
-pub(super) const SNAP: &str =
-    "snapshot-74379198-7sUN98jiB8FuSu3nkpCm1gLBbPbFH1HtfocPKPV7asPj.tar.zst";
-pub(super) const SNAP_SHA: &str =
-    "fa7936328f4a4898ce9f35fd2892d9ba8f8ba03df345f8bc282ee6e913b2cc5f";
 const SRC: &str = "/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work/171-172-incident-inputs-20261120-g1/download";
 const WORKER: &str = "jetstreamer-historical-worker-v1-5-6";
 const MERGED_WORKER: &str = "4ec0291d9bc3aa8164ff28e94eee46276cc0a624";
@@ -30,39 +26,46 @@ fn retained_input(p: &Path, expected: u64) -> Result<File> {
 }
 pub(super) fn verify(proof: &Value) -> Result<Value> {
     let e = json_pin(Path::new(EVIDENCE), PROVENANCE)?;
-    let row = &e["epochs"]["172"];
+    let row = &e["epochs"][EPOCH_KEY];
     let target = at(row, "signature")?;
     let terminal = &row["terminal"];
     ensure!(
-        terminal["sha256"] == "cc7b8ea179ba89efff7d96224941d591e13fa71f6b13e3efb7b4cdc1c716c0cf",
+        terminal["sha256"] == ORIGINAL_TERMINAL_SHA,
         "terminal generation"
     );
     let old = json_pin(Path::new(at(terminal, "path")?), at(terminal, "sha256")?)?;
     ensure!(
-        old["original_IID"] == "5359f45fc6df479ca62b17912f08e43d"
+        old["original_IID"] == ORIGINAL_IID
             && old["no_memory_DATA_or_slot_promise_ending"] == true
-            && row["slot"] == 74380784
-            && row["original_entry"] == 645
-            && row["ordinal"] == 984
-            && row["canonical_error"] == "ComputationalBudgetExceeded"
-            && row["local_error"] == "instruction2 ProgramFailedToComplete",
+            && target == SIGNATURE
+            && row["slot"] == TARGET
+            && row["original_entry"] == ENTRY
+            && row["ordinal"] == ORDINAL
+            && row["canonical_error"] == CANONICAL_ERROR
+            && row["local_error"] == format!("instruction2 {LOCAL_ERROR}"),
         "historical evidence"
     );
     let response = &row["artifacts"]["response.json"];
     ensure!(
-        response["sha256"] == "347700bb892006620a5d9d0a195cc13dce3725a6b6296f295ded5aeb498c24c6",
+        response["sha256"] == CANONICAL_RPC_SHA,
         "wrong signed response"
     );
     let rpc = json_pin(Path::new(at(response, "path")?), at(response, "sha256")?)?;
     ensure!(
         rpc["result"]["transaction"]["signatures"][0] == target
-            && rpc["result"]["meta"]["err"]
-                == json!({"InstructionError":[2,"ComputationalBudgetExceeded"]})
+            && rpc["result"]["meta"]["err"] == json!({"InstructionError":[2,CANONICAL_ERROR]})
             && rpc["result"]["meta"]["logMessages"]
-                == serde_json::from_slice::<Value>(include_bytes!("canonical-logs.json"))?,
+                == serde_json::from_slice::<Value>(CANONICAL_LOGS)?,
         "canonical transaction/logs"
     );
-    let input_dir = Path::new(BASE).join("inputs-v1");
+    let input_dir = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/inputs-v1",
+    );
+    ensure!(
+        proof["input_seal_sha256"]
+            == "1200fdaf53b5326f68e093cd2035fff9ec276c8e3031cb855ed7a179c46e38b8",
+        "wrong shared metered worker seal"
+    );
     let seal = json_pin(
         &input_dir.join("deployment-seal-receipt.json"),
         at(proof, "input_seal_sha256")?,
@@ -72,6 +75,32 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
         seal["destination"].as_str() == input_dir.to_str() && seal["remote_mutations"] == false,
         "wrong input package"
     );
+    if EPOCH == 171 {
+        let node_seal = json_pin(
+            Path::new(NODE_PACKAGE)
+                .join("deployment-seal-receipt.json")
+                .as_path(),
+            "a0b39e58bb539d03bcbbfd4835f926219f59186809b2106658836128410cc7e4",
+        )?;
+        ensure!(
+            node_seal["destination"] == NODE_PACKAGE
+                && node_seal["members"]
+                    .as_array()
+                    .context("node package")?
+                    .iter()
+                    .filter(|m| m["name"] == "jetstreamer-node"
+                        && m["sha256"]
+                            == "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+                        && m["mode"] == "0555")
+                    .count()
+                    == 1,
+            "171 node package seal"
+        );
+        pinned(
+            Path::new(NODE),
+            "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65",
+        )?;
+    }
     let worker_sha = WORKER_SHA;
     let worker_bytes = WORKER_BYTES;
     let member = |name: &str| -> Result<&Value> {
@@ -110,28 +139,27 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
     );
     // The whole digest was emitted after verification against GCS MD5 and CRC32C.
     // The payload rehashes every byte while copying the read-only bind, before exec.
-    let headers = Path::new(SRC).join("172.headers");
+    let headers = Path::new(SRC).join(format!("{EPOCH}.headers"));
     let mut h = String::new();
     retained_input(&headers, 832)?.read_to_string(&mut h)?;
     ensure!(
-        digest(h.as_bytes()) == "47f19b3e5ca44acf625f63cc7f6a4ef9b05b96fbc011f15ad884d85dca8a9005"
+        digest(h.as_bytes()) == HEADERS_SHA
             && h.lines()
-                .any(|l| l == "x-goog-generation: 1634786215364147")
-            && h.lines()
-                .any(|l| l == "x-goog-hash: crc32c=yysMog==,md5=rOc4FiXjMYrupror5w4K1w=="),
+                .any(|l| l == format!("x-goog-generation: {SNAP_GENERATION}"))
+            && h.lines().any(|l| l == CHECKSUM_HEADER),
         "hourly generation"
     );
     let p = Path::new(SRC).join(SNAP);
-    let f = retained_input(&p, 2_110_486_214)?;
+    let f = retained_input(&p, SNAP_BYTES)?;
     let hourly_dir = Path::new(
         "/var/lib/jetstreamer/horizon_runtime_data/epoch171-172-hourly-snapshots-20261120-g1",
     );
     let hourly_sha = "bac7a1feecbb5b47af46c7ecdaa76d1c8cf17b1c5aa2edb1283a193a791fcc80";
     let hourly = json_pin(&hourly_dir.join("inputs.json"), hourly_sha)?;
-    let auth = &hourly["epochs"]["172"];
+    let auth = &hourly["epochs"][EPOCH_KEY];
     let downloaded = &auth["download"];
     let metadata = f.metadata()?;
-    let route: Value = serde_json::from_slice(include_bytes!("hourly-route.json"))?;
+    let route: Value = serde_json::from_slice(HOURLY)?;
     ensure!(
         hourly["schema"] == "horizon-historical-diagnostic-snapshot-inputs-v1"
             && hourly["source_commit"] == MERGED_WORKER
@@ -155,16 +183,35 @@ pub(super) fn verify(proof: &Value) -> Result<Value> {
                     .mtime()
                     .checked_mul(1_000_000_000)
                     .and_then(|s| s.checked_add(metadata.mtime_nsec()))
-            && auth["archive_inventory"]["tar_members"] == 385702
-            && auth["archive_inventory"]["declared_member_bytes"] == 9_193_597_739u64,
+            && auth["archive_inventory"]["tar_members"] == TAR_MEMBERS
+            && auth["archive_inventory"]["declared_member_bytes"] == TAR_BYTES,
         "hourly published snapshot identity"
     );
     let mut written = String::new();
     let expected = format!("{SNAP_SHA}  {SNAP}\n");
-    retained_input(&Path::new(SRC).join("172.sha256"), expected.len() as u64)?
-        .read_to_string(&mut written)?;
+    retained_input(
+        &Path::new(SRC).join(format!("{EPOCH}.sha256")),
+        expected.len() as u64,
+    )?
+    .read_to_string(&mut written)?;
     ensure!(written == expected, "download digest");
     Ok(
-        json!({"download":binding(&p,SNAP_SHA),"download_device":f.metadata()?.dev(),"download_inode":f.metadata()?.ino(),"hourly_inputs":binding(&hourly_dir.join("inputs.json"),hourly_sha),"gcs_generation":"1634786215364147","canonical_response":response,"original_terminal":terminal,"worker_seal":proof["input_seal_sha256"],"worker_sha256":worker_sha}),
+        json!({"download":binding(&p,SNAP_SHA),"download_device":f.metadata()?.dev(),"download_inode":f.metadata()?.ino(),"hourly_inputs":binding(&hourly_dir.join("inputs.json"),hourly_sha),"gcs_generation":SNAP_GENERATION,"canonical_response":response,"original_terminal":terminal,"worker_seal":proof["input_seal_sha256"],"worker_sha256":worker_sha}),
     )
+}
+
+#[cfg(test)]
+mod matched_route_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires actual retained root-owned hourly and executable seals; read only"]
+    fn authenticate_worker_and_epoch_inputs() {
+        let r = verify(&json!({"input_seal_sha256":"1200fdaf53b5326f68e093cd2035fff9ec276c8e3031cb855ed7a179c46e38b8"})).unwrap();
+        assert_eq!(r["worker_sha256"], WORKER_SHA);
+        assert_eq!(r["download"]["sha256"], SNAP_SHA);
+        assert_eq!(r["canonical_response"]["sha256"], CANONICAL_RPC_SHA);
+        assert_eq!(r["original_terminal"]["sha256"], ORIGINAL_TERMINAL_SHA);
+        assert!(verify(&json!({"input_seal_sha256":"wrong"})).is_err());
+    }
 }

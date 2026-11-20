@@ -3,23 +3,21 @@
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
 
+#[cfg(feature = "epoch171")]
+#[path = "route171.rs"]
+pub mod route;
+#[cfg(not(feature = "epoch171"))]
+#[path = "route172.rs"]
+pub mod route;
+pub use route::*;
 pub const WORKER_SHA: &str = "b0219574172b54b251b4f2feda6285ca3b6bee5f2830a0d46e69ee8ea2275541";
 pub const WORKER_BYTES: u64 = 9_376_224;
 pub const WORKER_SOURCE: &str = "f07bab4fdcaeca7efcf189aa62a518eeda3f2f3b";
 pub const WORKER_TREE: &str = "dd0dda905451b27845a3c83989878e44ee98ee72";
 pub const WORKER_FEATURE: &str = "historical-per-byte-logging";
-pub const UNIT: &str = "horizon-qualify-172-metered-hourly-20261120-g2.service";
-pub const TIMER: &str = "horizon-guard-172-metered-hourly-20261120-g2.timer";
-pub const GUARD_SERVICE: &str = "horizon-guard-172-metered-hourly-20261120-g2.service";
-pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1";
-pub const DEST: &str = "/home/sol/.jetstreamer-private/epoch172-standard-lane-20261110-v1/metadata-probes/metered-hourly-20261120-g2";
-pub const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2";
-pub const RECEIPTS: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/guard-receipts";
 pub const GUARD: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 pub const GUARD_SHA: &str = "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016";
-pub const PAYLOAD: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2/trace172";
 // The retained 288-GiB booking survives. This diagnostic enforces a smaller
 // whole-tree ceiling to fit alongside 168's existing raw HOME floor.
 pub const CAP: u64 = 96 << 30;

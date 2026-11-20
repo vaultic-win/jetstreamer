@@ -127,7 +127,7 @@ pub(super) fn collect(admission_sha: &str, provenance: Value) -> Result<Value> {
     let iid = at(&a, "producer_invocation_id")?;
     let pid = a["producer_pid"].as_u64().context("producer pid")?;
     ensure!(
-        guard172::iid(iid) && a["producer_unit"] == UNIT && a["epoch"] == 172,
+        guard172::iid(iid) && a["producer_unit"] == UNIT && a["epoch"] == EPOCH,
         "wrong admission identity"
     );
     let stage = link(&a["snapshot_staging"], &base.join("VERIFIED_STAGING.json"))?;
@@ -167,8 +167,7 @@ pub(super) fn collect(admission_sha: &str, provenance: Value) -> Result<Value> {
             && token["protected_timer"]["Id"] == TIMER
             && stage["protected_timer"] == token["protected_timer"]
             && fit["resource_promise_ending_bytes"] == 0
-            && fit["closed_unpatched_predecessor"]["sha256"]
-                == "854539f0d9450b388e136092567438134efaab19f0570dee7bdeb4fcf53120c7",
+            && fit["closed_unpatched_predecessor"]["sha256"] == PREDECESSOR_SHA,
         "admission/guard evidence disagree"
     );
     let tid = at(&stage["protected_timer"], "InvocationID")?;
@@ -231,7 +230,7 @@ pub(super) fn collect(admission_sha: &str, provenance: Value) -> Result<Value> {
         None
     };
     let before = stable_log(&stage)?;
-    let out = Command::new(Path::new(PACKAGE).join("trace172"))
+    let out = Command::new(Path::new(PACKAGE).join(TRACE))
         .arg("progress")
         .output()?;
     ensure!(
@@ -248,7 +247,7 @@ pub(super) fn collect(admission_sha: &str, provenance: Value) -> Result<Value> {
         "terminal evidence changed"
     );
     let passed = comparison["focused_checks_passed"] == true && success && stop.is_none();
-    let result = json!({"schema":"epoch172-metered-diagnostic-closure-v2","producer_unit":UNIT,"producer_invocation_id":iid,
+    let result = json!({"schema":format!("epoch{EPOCH}-metered-diagnostic-closure-v2"),"producer_unit":UNIT,"producer_invocation_id":iid,
         "admission":ar,"provenance":provenance,"guard_stop":stop,"first_guard":a["first_guard"],"staging":a["snapshot_staging"],
         "post_guard_capacity":a["post_guard_capacity"],"previous_closure":fit["closed_unpatched_predecessor"],
         "native_terminal":native,"pid1_terminal_records":journal,"log":before,"comparison":comparison,"focused_diagnostic_passed":passed,

@@ -5,6 +5,9 @@ edition = "2024"
 
 [workspace]
 
+[features]
+epoch171 = []
+
 [dependencies]
 guard168 = { package = "horizon-epoch168-trace-admission", path = "../horizon_epoch168_trace_admission_20261120_v1" }
 anyhow = "1"

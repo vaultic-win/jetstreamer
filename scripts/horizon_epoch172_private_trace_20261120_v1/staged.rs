@@ -1,8 +1,6 @@
 //! Accept staged bytes only after the genuine payload verified the copy and exec'd the
 //! original node in the same guarded systemd invocation. No bank restoration is implied.
 use super::*;
-const NODE: &str = "/usr/local/lib/jetstreamer/horizon-independent172-singleton-package-20261110-v1/jetstreamer-node";
-const SNAP: &str = "snapshot-74379198-7sUN98jiB8FuSu3nkpCm1gLBbPbFH1HtfocPKPV7asPj.tar.zst";
 pub(super) fn capture(id: &str, pid: u64, timer_id: &str) -> Result<Value> {
     let deadline = Instant::now() + Duration::from_secs(240);
     let dir = Path::new(DEST);
@@ -52,25 +50,24 @@ pub(super) fn capture(id: &str, pid: u64, timer_id: &str) -> Result<Value> {
         input.read_to_end(&mut b)?;
         let v: Value = serde_json::from_slice(&b)?;
         ensure!(
-            v["schema"] == "epoch172-private-metered-inputs-v2"
+            v["schema"] == format!("epoch{EPOCH}-private-metered-inputs-v2")
                 && v["invocation_id"] == id
                 && v["node_sha256"]
                     == "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
                 && v["worker_sha256"] == WORKER_SHA
                 && v["worker_source_commit"] == WORKER_SOURCE
                 && v["worker_feature"] == WORKER_FEATURE
-                && v["bootstrap_sha256"]
-                    == "fa7936328f4a4898ce9f35fd2892d9ba8f8ba03df345f8bc282ee6e913b2cc5f"
-                && v["bootstrap_bytes"] == 2_110_486_214u64
-                && v["target_slot"] == 74_380_784
-                && v["target_entry"] == 645
-                && v["target_transaction"] == 984
-                && v["terminal_checkpoint"] == 74_382_131
+                && v["bootstrap_sha256"] == SNAP_SHA
+                && v["bootstrap_bytes"] == SNAP_BYTES
+                && v["target_slot"] == TARGET
+                && v["target_entry"] == ENTRY
+                && v["target_transaction"] == ORDINAL
+                && v["terminal_checkpoint"] == TERMINAL_SLOT
                 && v["publication_authorized"] == false,
             "wrong staging provenance"
         );
         let mut inputs = json!({});
-        for (n, len) in [(SNAP, 2_110_486_214u64), ("ledger/genesis.tar.bz2", 20_144)] {
+        for (n, len) in [(SNAP, SNAP_BYTES), ("ledger/genesis.tar.bz2", 20_144)] {
             let p = dir.join(n);
             let m = fs::symlink_metadata(&p)?;
             ensure!(

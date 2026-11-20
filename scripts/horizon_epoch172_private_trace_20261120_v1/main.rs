@@ -20,13 +20,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/admission-v2";
 const SEALER: &str = "/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment";
 const SEALER_SHA: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
-const RETIRED: &str =
-    "/var/lib/jetstreamer/local2-mismatch172-retirement-20261114-v1/epoch172/completion.json";
-const RETIRED_SHA: &str = "188fb4e9b1b79f508883affd3ec88a5a4fcd9361063a4ac74f077a9c666e901f";
 mod inputs;
 fn digest(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
@@ -183,8 +178,8 @@ fn custody(path: &Path, uid: u32, gid: u32, ino: Option<u64>, mode: u32) -> Resu
 fn child_stage() -> Result<()> {
     let dest = Path::new(DEST);
     let parent = dest.parent().context("nested parent")?;
-    custody(Path::new(LANE), 1001, 1003, Some(107282698), 0o700)?;
-    custody(parent, 1001, 1003, Some(107283290), 0o700)?;
+    custody(Path::new(LANE), 1001, 1003, Some(LANE_INO), 0o700)?;
+    custody(parent, 1001, 1003, Some(PARENT_INO), 0o700)?;
     let pid = unsafe { libc::fork() };
     ensure!(pid >= 0, "fork staging");
     if pid == 0 {
@@ -195,7 +190,7 @@ fn child_stage() -> Result<()> {
         };
         let created = ok
             && (|| -> Result<()> {
-                custody(parent, 1001, 1003, Some(107283290), 0o700)?;
+                custody(parent, 1001, 1003, Some(PARENT_INO), 0o700)?;
                 fs::DirBuilder::new().mode(0o700).create(dest)?;
                 exclusive(&dest.join("producer.log"), &[], 0o600)?;
                 File::open(parent)?.sync_all()?;
@@ -229,7 +224,7 @@ fn child_stage() -> Result<()> {
 fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     let pkg = Path::new(PACKAGE);
     ensure!(
-        std::env::current_exe()? == pkg.join("admit172"),
+        std::env::current_exe()? == pkg.join(ADMIT),
         "unsealed launcher path"
     );
     let seal = json_pin(&pkg.join("deployment-seal-receipt.json"), seal_sha)?;
@@ -239,7 +234,7 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     );
     let entries = seal["members"].as_array().context("members")?;
     let mut binaries = json!({});
-    for name in ["admit172", "gate172", "trace172", "artifact-proof.json"] {
+    for name in [ADMIT, GATE, TRACE, "artifact-proof.json"] {
         let matches: Vec<_> = entries.iter().filter(|e| e["name"] == name).collect();
         ensure!(matches.len() == 1, "missing or duplicate sealed {name}");
         let e = matches[0];
@@ -270,7 +265,13 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
         &pkg.join("artifact-proof.json"),
         at(&binaries, "artifact-proof.json")?,
     )?;
-    for key in ["admit172", "gate172", "trace172"] {
+    if EPOCH == 171 {
+        ensure!(
+            proof["controller_cargo_features"] == json!(["epoch171"]),
+            "controller not built for 171"
+        );
+    }
+    for key in [ADMIT, GATE, TRACE] {
         ensure!(
             proof["artifacts"][key] == binaries[key],
             "controller build/seal differs for {key}"
@@ -315,7 +316,7 @@ fn verify_inputs(seal_sha: &str, source: &str) -> Result<Value> {
     json_pin(Path::new(at(custody, "path")?), at(custody, "sha256")?)?;
     ensure!(
         retired["source_name_absent"] == true
-            && retired["scope"]["epoch"] == 172
+            && retired["scope"]["epoch"] == EPOCH
             && retired["hard_promises_released_bytes"] == 0
             && retired["resource_credit_bytes"] == 0,
         "retired local2 lineage"
@@ -333,7 +334,7 @@ fn main() -> Result<()> {
     if args.get(1).is_some_and(|a| a == "--close") {
         ensure!(
             unsafe { libc::geteuid() } == 0 && args.len() == 5,
-            "usage: admit172 --close ADMISSION_SHA CONTROLLER_SEAL_SHA SOURCE_COMMIT"
+            "usage: admit --close ADMISSION_SHA CONTROLLER_SEAL_SHA SOURCE_COMMIT"
         );
         let provenance = verify_inputs(&args[3], &args[4])?;
         println!("{}", closure::collect(&args[2], provenance)?);
@@ -343,7 +344,7 @@ fn main() -> Result<()> {
         unsafe { libc::geteuid() } == 0
             && args.len() == 6
             && matches!(&*args[1], "--preflight" | "--launch"),
-        "usage: admit172 --preflight|--launch FLEET FLEET_SHA CONTROLLER_SEAL_SHA SOURCE_COMMIT"
+        "usage: admit --preflight|--launch FLEET FLEET_SHA CONTROLLER_SEAL_SHA SOURCE_COMMIT"
     );
     ensure!(
         args[3].len() == 64

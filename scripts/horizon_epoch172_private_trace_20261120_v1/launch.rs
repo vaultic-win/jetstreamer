@@ -1,11 +1,11 @@
 use super::*;
 use std::os::fd::AsRawFd;
 
+#[cfg(not(feature = "epoch171"))]
 const TEMPLATE: &str = include_str!("producer.service");
+#[cfg(feature = "epoch171")]
+const TEMPLATE: &str = include_str!("producer171.service");
 const OLD_EXE: &str = PAYLOAD;
-const GATE_ALIAS: &str = "/run/horizon-172-trace-gate";
-const PAYLOAD_ALIAS: &str = "/run/horizon-172-trace-payload";
-const BARRIER_ALIAS: &str = "/run/horizon-172-trace-barrier";
 fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|s| (*s).into()).collect()
 }
@@ -35,7 +35,7 @@ fn producer_argv(token: &str) -> Result<Vec<String>> {
             v.replacen(OLD_EXE, &format!("{GATE_ALIAS} {PAYLOAD_ALIAS}"), 1)
         } else if k == "BindReadOnlyPaths" {
             format!(
-                "{v} {PACKAGE}/gate172:{GATE_ALIAS} {PAYLOAD}:{PAYLOAD_ALIAS} {BASE}/barrier:{BARRIER_ALIAS}"
+                "{v} {PACKAGE}/{GATE}:{GATE_ALIAS} {PAYLOAD}:{PAYLOAD_ALIAS} {BASE}/barrier:{BARRIER_ALIAS}"
             )
         } else {
             v.to_owned()
@@ -217,7 +217,7 @@ fn check_fit(v: &Value) -> Result<u64> {
             && v["root_cap_bytes"] == CAP
             && v["remaining_standard_root_bytes"]
                 .as_u64()
-                .is_some_and(|n| n >= 2_110_486_214 + 20_144)
+                .is_some_and(|n| n >= SNAP_BYTES + 20_144)
             && v["standard_root_allocated_bytes"]
                 .as_u64()
                 .and_then(|n| n.checked_add(v["remaining_standard_root_bytes"].as_u64()?))
@@ -281,7 +281,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
     }
     check_fit(&pre)?;
     let token = format!(
-        "epoch172-trace-{}",
+        "epoch{EPOCH}-trace-{}",
         fs::read_to_string("/proc/sys/kernel/random/uuid")?.trim()
     );
     let actor = producer_argv(&token)?;
@@ -385,7 +385,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         let entry = record(
             root,
             "AUTHORIZED_GATED_PAYLOAD.json",
-            &json!({"schema":"epoch172-trace-private-guarded-payload-release-v1","epoch":172,"producer_unit":UNIT,"producer_invocation_id":id,"actual_native":native,"fleet":binding(fleet,sha),"protected_timer":native_timer,"guard_sample":first_ref,"actual_guard_plan":binding(&sealed,plan_sha),"capacity":cap,"actor_memory_max_bytes":68u64<<30,"entire_root_cap":CAP,"retained_original_booking_bytes":288u64<<30,"diagnostic_remaining_HOME_growth_charged_bytes":after["remaining_standard_root_bytes"],"additional_historical_DATA_booking_bytes":0,"additional_actor_memory_bytes":0,"archive_publication_authorized":false,"transaction_replay_claimed":false,"private_payload_release_authorized":true,"recorded_at":now()?}),
+            &json!({"schema":format!("epoch{EPOCH}-trace-private-guarded-payload-release-v1"),"epoch":EPOCH,"producer_unit":UNIT,"producer_invocation_id":id,"actual_native":native,"fleet":binding(fleet,sha),"protected_timer":native_timer,"guard_sample":first_ref,"actual_guard_plan":binding(&sealed,plan_sha),"capacity":cap,"actor_memory_max_bytes":68u64<<30,"entire_root_cap":CAP,"retained_original_booking_bytes":288u64<<30,"diagnostic_remaining_HOME_growth_charged_bytes":after["remaining_standard_root_bytes"],"additional_historical_DATA_booking_bytes":0,"additional_actor_memory_bytes":0,"archive_publication_authorized":false,"transaction_replay_claimed":false,"private_payload_release_authorized":true,"recorded_at":now()?}),
         )?;
         // This final atomic action releases the waiting producer; all post-guard proofs already exist.
         let barrier = root.join("barrier");
@@ -401,7 +401,7 @@ pub(super) fn launch(fleet: &Path, sha: &str, provenance: Value, pre: Value) -> 
         record(
             root,
             "ACTUAL_ADMISSION_AND_PROTECTION.json",
-            &json!({"schema":"epoch172-trace-private-guarded-admission-v1","epoch":172,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
+            &json!({"schema":format!("epoch{EPOCH}-trace-private-guarded-admission-v1"),"epoch":EPOCH,"producer_unit":UNIT,"producer_invocation_id":id,"producer_pid":at(&producer,"MainPID")?.parse::<u64>()?,"gate_release":entry,"first_guard":first_ref,"post_guard_capacity":cap,"snapshot_staging":staged_ref,"bootstrap_only":true,"bank_restoration_proven":false,"transaction_replay_claimed":false,"archive_publication_authorized":false,"recorded_at":now()?}),
         )
     })();
     match attempt {
@@ -427,8 +427,18 @@ mod tests {
     use super::*;
     #[test]
     fn producer_uses_only_the_nested_home_tree_and_sealed_payload() {
-        let argv = producer_argv("epoch172-trace-test").unwrap();
+        let argv = producer_argv("metered-trace-test").unwrap();
         assert!(argv.ends_with(&strings(&["/usr/bin/env", GATE_ALIAS])));
+        let mounts = argv
+            .iter()
+            .find_map(|a| a.strip_prefix("--property=BindReadOnlyPaths="))
+            .unwrap();
+        assert!(
+            mounts
+                .split_whitespace()
+                .any(|b| b.ends_with(&format!("/{SNAP}:{SNAP_ALIAS}")))
+        );
+        assert!(mounts.split_whitespace().any(|b|b==format!("/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2/inputs-v1/jetstreamer-historical-worker-v1-5-6:{NODE_PACKAGE}/jetstreamer-historical-worker-v1-5-6")));
         let writable: Vec<_> = argv
             .iter()
             .filter_map(|a| a.strip_prefix("--property=ReadWritePaths="))
@@ -440,7 +450,7 @@ mod tests {
         );
         assert!(
             argv.iter()
-                .any(|a| a.contains(&format!("{PACKAGE}/gate172:{GATE_ALIAS}")))
+                .any(|a| a.contains(&format!("{PACKAGE}/{GATE}:{GATE_ALIAS}")))
         );
     }
     #[test]

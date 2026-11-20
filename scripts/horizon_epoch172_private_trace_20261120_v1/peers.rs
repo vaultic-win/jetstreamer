@@ -95,7 +95,7 @@ pub(super) fn admission_interlock() -> Result<File> {
             && m.nlink() == 1
             && m.mode() & 0o7777 == 0o600
             && unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "simultaneous 136/172 host admission"
+        "simultaneous exclusive candidate admission"
     );
     Ok(f)
 }
@@ -133,6 +133,33 @@ fn check_peer136() -> Result<()> {
 }
 pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     check_peer136()?;
+    if EPOCH == 171 {
+        ensure!(
+            !Path::new("/run/horizon-epoch171-exclusive-to136-g1").try_exists()?,
+            "active or partial epoch 171 donor fence"
+        );
+    }
+    if EPOCH == 171 {
+        idle("jetstreamer-epochs159-173-target1-controller-v1-r2.service")?;
+        let dynamic = run(
+            "/usr/bin/systemctl",
+            &[
+                "list-units".into(),
+                "--plain".into(),
+                "--no-legend".into(),
+                "--state=running,activating,deactivating,reloading".into(),
+                "jetstreamer-root-sweep-e159-173-*-e171-173-*".into(),
+                "jetstreamer-root-source-recovery-e159-173-*-e171-173-*".into(),
+                "horizon-local-replacement171-*".into(),
+                "horizon-replacement-171-*".into(),
+            ],
+            bounded(),
+        )?;
+        ensure!(
+            dynamic.trim().is_empty(),
+            "legacy 171 route still executing"
+        );
+    }
     let jobs = run(
         "/usr/bin/systemctl",
         &["list-jobs".into(), "--plain".into(), "--no-legend".into()],
@@ -142,9 +169,17 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
         let is_candidate = ["horizon-qualify-", "horizon-admit-", "horizon-guard-"]
             .iter()
             .any(|prefix| unit.starts_with(prefix))
-            && ["136", "169", "172"]
+            && ["136", "169", "171", "172"]
                 .iter()
                 .any(|epoch| unit.split('-').any(|field| field == *epoch));
+        let legacy = EPOCH == 171
+            && (unit == "jetstreamer-epochs159-173-target1-controller-v1-r2.service"
+                || unit.starts_with("horizon-local-replacement171-")
+                || unit.starts_with("horizon-replacement-171-")
+                || ((unit.starts_with("jetstreamer-root-sweep-e159-173-")
+                    || unit.starts_with("jetstreamer-root-source-recovery-e159-173-"))
+                    && unit.contains("-e171-173-")));
+        ensure!(!legacy, "legacy 171 work queued");
         ensure!(
             !is_candidate || own.is_some() && [UNIT, TIMER, GUARD_SERVICE].contains(&unit),
             "competing candidate queued {unit}"
@@ -158,6 +193,8 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
             "--plain".into(),
             "--no-legend".into(),
             "--state=active,activating,deactivating,reloading".into(),
+            "*171*.service".into(),
+            "*171*.timer".into(),
             "*169*.service".into(),
             "*169*.timer".into(),
             "*172*.service".into(),
@@ -176,7 +213,7 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     {
         ensure!(
             own.is_some() && [UNIT, TIMER, GUARD_SERVICE].contains(&name),
-            "foreign epoch172 controller {name}"
+            "competing candidate controller {name}"
         );
     }
     if let Some(id) = own {
@@ -192,7 +229,7 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
         let pid = at(&s, "MainPID")?.parse::<u64>()?;
         ensure!(pid > 1, "candidate PID");
         let exe = fs::metadata(format!("/proc/{pid}/exe"))?;
-        let expected = fs::metadata(Path::new(PACKAGE).join("gate172"))?;
+        let expected = fs::metadata(Path::new(PACKAGE).join(GATE))?;
         let c = fs::read_to_string(format!("/sys/fs/cgroup/system.slice/{UNIT}/cgroup.procs"))?;
         ensure!(
             (exe.dev(), exe.ino()) == (expected.dev(), expected.ino())
@@ -206,7 +243,7 @@ pub(super) fn candidate_state(own: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
-pub(super) fn root172() -> Result<Value> {
+pub(super) fn candidate_root() -> Result<Value> {
     let wit = "/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/witness-set.json";
     let w = json_pin(
         Path::new(wit),
@@ -216,34 +253,33 @@ pub(super) fn root172() -> Result<Value> {
         .as_array()
         .context("slots")?
         .iter()
-        .find(|v| v["epoch"] == 172)
-        .context("172 booking")?;
+        .find(|v| v["epoch"] == EPOCH)
+        .context("candidate booking")?;
     ensure!(
         r["lane_root"] == LANE
             && r["members"] == json!([])
             && r["physical_ledger"].is_null()
-            && r["original_booking"]["sha256"]
-                == "d0fa07c259fdb5dadc4ce564d3afc562b32180354db16788ba083fb670e96027",
-        "172 retained footprint"
+            && r["original_booking"]["sha256"] == BOOK_SHA,
+        "candidate retained footprint"
     );
     let book = &r["original_booking"];
     let b = fs::read(Path::new(at(book, "path")?))?;
-    ensure!(digest(&b) == at(book, "sha256")?, "172 booking");
+    ensure!(digest(&b) == at(book, "sha256")?, "candidate booking");
     let booked: Value = serde_json::from_slice(&b)?;
     ensure!(
         booked["candidate_own_DATA_bytes"] == (288u64 << 30)
             && booked["candidate_guard_metadata_DATA_bytes"] == (8u64 << 30)
-            && booked["complete_projected_memory_bytes"] == 708249923584u64
+            && booked["complete_projected_memory_bytes"] == BOOK_MEMORY
             && booked["all_existing_hard_memory_promises_retained"] == true,
-        "172 commitments"
+        "candidate commitments"
     );
     let p = Path::new(LANE);
-    custody(p, 1001, 1003, Some(107282698), 0o700)?;
+    custody(p, 1001, 1003, Some(LANE_INO), 0o700)?;
     custody(
         &p.join("metadata-probes"),
         1001,
         1003,
-        Some(107283290),
+        Some(PARENT_INO),
         0o700,
     )?;
     let mounts = fs::read_to_string("/proc/self/mountinfo")?;
@@ -252,7 +288,7 @@ pub(super) fn root172() -> Result<Value> {
             .lines()
             .filter_map(|l| l.split_whitespace().nth(4))
             .any(|s| Path::new(s).starts_with(p)),
-        "submount in 172 lane"
+        "submount in candidate lane"
     );
     let bytes = || -> Result<u64> {
         let out = run(
@@ -260,13 +296,16 @@ pub(super) fn root172() -> Result<Value> {
             &["-sxB1".into(), "--".into(), LANE.into()],
             bounded(),
         )?;
-        let (size, root) = out.trim_end().split_once('\t').context("whole 172 du")?;
-        ensure!(root == LANE, "172 root changed");
+        let (size, root) = out
+            .trim_end()
+            .split_once('\t')
+            .context("whole candidate du")?;
+        ensure!(root == LANE, "candidate root changed");
         Ok(size.parse()?)
     };
     let a = bytes()?;
     let b = bytes()?;
-    ensure!(a.max(b) <= CAP, "172 whole physical ceiling");
+    ensure!(a.max(b) <= CAP, "candidate whole physical ceiling");
     Ok(
         json!({"allocated_bytes":a.min(b),"whole_lane":LANE,"historical_allocated_credit_bytes":0,"original_booking":book}),
     )
@@ -276,7 +315,7 @@ const CLOSED: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch172-terminal-cadence-20261120-v1/CLOSURE.json";
 const CLOSED_SHA: &str = "854539f0d9450b388e136092567438134efaab19f0570dee7bdeb4fcf53120c7";
 
-pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
+fn closed172(fleet: &Value) -> Result<Value> {
     let receipt = binding(Path::new(CLOSED), CLOSED_SHA);
     let old = json_pin(Path::new(CLOSED), CLOSED_SHA)?;
     let cmp = &old["signed_target_comparison"];
@@ -313,6 +352,58 @@ pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
     Ok(receipt)
 }
 
+pub(super) fn closed_predecessor(fleet: &Value) -> Result<Value> {
+    if EPOCH == 172 {
+        return closed172(fleet);
+    }
+    let rows = fleet["actual_active_private_diagnostics"]
+        .as_array()
+        .context("private owners")?;
+    ensure!(
+        !rows
+            .iter()
+            .any(|r| matches!(r["epoch"].as_u64(), Some(136 | 169 | 171 | 172))),
+        "competing candidate still present in reconciled fleet"
+    );
+    let other = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch172-metered-admission-20261120-g2",
+    );
+    let ad = other.join("ACTUAL_ADMISSION_AND_PROTECTION.json");
+    if ad.try_exists()? {
+        let raw = read_root(&ad)?;
+        let admitted: Value = serde_json::from_slice(&raw)?;
+        let final_record: Value = serde_json::from_slice(&read_root(&other.join("CLOSURE.json"))?)?;
+        ensure!(
+            final_record["schema"] == "epoch172-metered-diagnostic-closure-v2"
+                && final_record["admission"] == binding(&ad, &digest(&raw))
+                && final_record["producer_invocation_id"] == admitted["producer_invocation_id"]
+                && final_record["producer_unit"] == admitted["producer_unit"]
+                && final_record["resource_promise_ending_bytes"] == 0
+                && final_record["archive_verified"] == false,
+            "172 g2 handoff incomplete"
+        );
+    }
+    let p = Path::new(
+        "/var/lib/jetstreamer/terminal171-historical-mismatch-20261111-v1/ROOT171_TERMINAL_CLASSIFICATION_AND_RECOVERY_OWNER.json",
+    );
+    let old = json_pin(p, ORIGINAL_TERMINAL_SHA)?;
+    ensure!(
+        old["epoch"] == EPOCH
+            && old["original_IID"] == ORIGINAL_IID
+            && old["failing_slot"] == TARGET
+            && old["failing_entry"] == ENTRY
+            && old["failing_transaction"] == ORDINAL
+            && old["signature"] == SIGNATURE
+            && old["expected_error"] == format!("instruction2 {CANONICAL_ERROR}")
+            && old["actual_error"] == format!("instruction2 {LOCAL_ERROR}")
+            && old["no_memory_DATA_or_slot_promise_ending"] == true
+            && old["resource_credit_bytes"] == 0,
+        "171 prior signed mismatch or retained booking differs"
+    );
+    idle("horizon-qualify-171-replacement-local2-20261110-v1.service")?;
+    Ok(binding(p, ORIGINAL_TERMINAL_SHA))
+}
+
 #[cfg(test)]
 mod metered_tests {
     use super::*;
@@ -323,9 +414,16 @@ mod metered_tests {
         let fleet_path = std::env::var("HORIZON172_TEST_CLOSED_FLEET").unwrap();
         let fleet: Value =
             serde_json::from_slice(&read_root(Path::new(&fleet_path)).unwrap()).unwrap();
-        assert_eq!(closed_predecessor(&fleet).unwrap()["sha256"], CLOSED_SHA);
+        assert_eq!(
+            closed_predecessor(&fleet).unwrap()["sha256"],
+            PREDECESSOR_SHA
+        );
         let mut stale = fleet;
-        stale["terminal172_closure"]["sha256"] = json!("wrong");
+        if EPOCH == 171 {
+            stale["actual_active_private_diagnostics"] = json!([{"epoch":172}]);
+        } else {
+            stale["terminal172_closure"]["sha256"] = json!("wrong");
+        }
         assert!(closed_predecessor(&stale).is_err());
     }
 }

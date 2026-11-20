@@ -202,19 +202,22 @@ pub fn inspect(fleet_path: &Path, fleet_sha: &str, own_iid: Option<&str>) -> Res
     );
     let protected = n(&data, "required_DATA_bytes")?
         .max(sum(n(&sealed168, "minimum_free_bytes")?, own_growth)?);
-    let own_root = crate::peers::root172()?;
+    let own_root = crate::peers::candidate_root()?;
     let own_bytes = n(&own_root, "allocated_bytes")?;
-    let growth172 = guard172::CAP
+    let candidate_growth = guard172::CAP
         .checked_sub(own_bytes)
-        .context("172 guard budget exceeded")?;
-    ensure!(growth172 >= 2_110_486_214u64 + 20_144, "bootstrap headroom");
-    let required = sum(protected, growth172)?;
+        .context("candidate guard budget exceeded")?;
+    ensure!(
+        candidate_growth >= guard172::SNAP_BYTES + 20_144,
+        "bootstrap headroom"
+    );
+    let required = sum(protected, candidate_growth)?;
     ensure!(
         free.min(disk::free()?) >= required,
         "final HOME availability below full fit"
     );
     Ok(
-        json!({"schema":"epoch172-complete-metered-host-fit-v2","closed_unpatched_predecessor":closed,"fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":growth172,"root_cap_bytes":guard172::CAP,"epoch172_tree":own_root,"nominal_epoch172_retained_entire_root_cap_bytes":288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_172_booking_bytes":growth172,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
+        json!({"schema":format!("epoch{}-complete-metered-host-fit-v2", guard172::EPOCH),"closed_unpatched_predecessor":closed,"fleet":{"path":fleet_path,"sha256":fleet_sha},"historical_capacity":peer::pair(BASE,BASE_SHA),"protected_raw_floor_bytes":protected,"standard_root_allocated_bytes":own_bytes,"remaining_standard_root_bytes":candidate_growth,"root_cap_bytes":guard172::CAP,(format!("epoch{}_tree", guard172::EPOCH)):own_root,(format!("nominal_epoch{}_retained_entire_root_cap_bytes",guard172::EPOCH)):288u64<<30,"roots":roots,"exact_audit_DATA":data,"complete_required_DATA_bytes":required,"available_HOME_bytes":free,"audit_owner":audit,"auxiliary":auxiliary,"total_memory_bytes":memory_before.0,"complete_memory_plus_reserve_bytes":resources["complete_memory_plus_reserve_bytes"],"available_memory_bytes":available,"resident_live_peer_bytes":realized,"resources":resources,"simultaneous_cpu_upper_bound_micros":overlap_cpu,"live_peer_bindings":owners,"resource_credit_bytes":0,"resource_promise_ending_bytes":0,"candidate_home_growth_within_retained_172_booking_bytes":candidate_growth,"candidate_additive_memory_bytes":0,"epoch168_current_identity":local168}),
     )
 }
 fn retained_build_images(native: &Value) -> Result<Value> {

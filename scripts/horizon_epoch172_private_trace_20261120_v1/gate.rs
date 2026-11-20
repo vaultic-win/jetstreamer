@@ -21,10 +21,10 @@ fn main() -> Result<()> {
                 == format!("0::/system.slice/{}", guard172::UNIT),
         "wrong producer cgroup"
     );
-    let token = Path::new("/run/horizon-172-trace-barrier/allow");
+    let token = Path::new(guard172::BARRIER_ALIAS).join("allow");
     let started = Instant::now();
     while started.elapsed() < Duration::from_secs(90) {
-        match fs::symlink_metadata(token) {
+        match fs::symlink_metadata(&token) {
             Ok(m) => {
                 ensure!(
                     m.is_file()
@@ -32,12 +32,10 @@ fn main() -> Result<()> {
                         && m.mode() & 0o7777 == 0o444
                         && m.nlink() == 1
                         && m.len() == 32
-                        && fs::read_to_string(token)? == id,
+                        && fs::read_to_string(&token)? == id,
                     "wrong replay gate token"
                 );
-                let error = Command::new("/run/horizon-172-trace-payload")
-                    .arg("run")
-                    .exec();
+                let error = Command::new(guard172::PAYLOAD_ALIAS).arg("run").exec();
                 return Err(error.into());
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
