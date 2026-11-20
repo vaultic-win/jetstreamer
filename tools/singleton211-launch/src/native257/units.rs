@@ -119,7 +119,7 @@ fn kernel_cpus(pid: u64) -> Result<BTreeSet<u64>> {
             .trim(),
     )
 }
-pub(super) fn cpu_sharing(n: &mut Native, r: &Value) -> Result<Value> {
+pub(crate) fn cpu_sharing(n: &mut Native, r: &Value) -> Result<Value> {
     let selected = affinity(r)?
         .split_whitespace()
         .map(str::parse::<u64>)

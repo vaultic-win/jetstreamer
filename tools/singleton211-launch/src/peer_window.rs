@@ -202,7 +202,7 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
         );
         if c.unit == GUARD_UNIT {
             ensure!(
-                a["epoch"] == 257
+                matches!(a["epoch"].as_u64(), Some(257 | 261))
                     && !expected.is_empty()
                     && current.contains_key(UNIT)
                     && full211.is_none(),
