@@ -40,6 +40,17 @@ fn observer_image(qualified_native: bool) -> Result<(&'static str, &'static str)
         _ => anyhow::bail!("missing or invalid qualified observer binding"),
     }
 }
+fn staged_delivery_selected(config: &Value) -> Result<bool> {
+    let Some(flag) = config.get("staged247_resource_only") else {
+        return Ok(false);
+    };
+    let on = flag.as_bool().context("invalid staged247_resource_only")?;
+    ensure!(
+        !on || config["delivery247_resource_only"] != true,
+        "duplicate delivery selections"
+    );
+    Ok(on)
+}
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -635,8 +646,11 @@ fn run(args: &[String]) -> Result<()> {
         p.native211_handoff.as_ref(),
         native_handoff.as_ref(),
     )?;
+    let staged_delivery = config.get("staged247_resource_only").cloned();
+    let staged = staged_delivery_selected(&config)?;
     let (observer, observer_sha) = observer_image(
-        p.native257_handoff.is_some()
+        staged
+            || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
             || p.native212_handoff.is_some(),
     )?;
@@ -710,7 +724,8 @@ fn run(args: &[String]) -> Result<()> {
         "native diagnostic altered during prescreen"
     );
     ensure!(
-        config.get("delivery247_resource_only") == original_delivery.as_ref(),
+        config.get("delivery247_resource_only") == original_delivery.as_ref()
+            && config.get("staged247_resource_only") == staged_delivery.as_ref(),
         "delivery RSS selection changed during prescreen"
     );
     let effective = save(&p.state_directory, "effective-config.json", &config)?;
@@ -754,6 +769,21 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn staged_delivery_prescreen_selects_paired_observer_without_changing_predecessor() {
+        let cfg = json!({"staged247_resource_only":true,"delivery247_resource_only":false,"previous_sample":"/sealed/v145.json","minimum_interval_seconds":1800});
+        let saved = cfg.clone();
+        assert!(staged_delivery_selected(&cfg).unwrap());
+        assert_eq!(cfg, saved);
+        assert!(!staged_delivery_selected(&json!({"delivery247_resource_only":true})).unwrap());
+        assert!(
+            staged_delivery_selected(
+                &json!({"delivery247_resource_only":true,"staged247_resource_only":true})
+            )
+            .is_err()
+        );
+        assert!(staged_delivery_selected(&json!({"staged247_resource_only":"next"})).is_err());
+    }
     #[test]
     fn cold_diagnostics_need_the_original_resource_tuple_and_exclusive_range() {
         for (epoch, root, overlap) in [
