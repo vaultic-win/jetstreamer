@@ -24,7 +24,7 @@ const DEV: u64 = 66305;
 const LIMIT: u64 = 8 << 20;
 const FLOOR: u64 = 3_908_104_436_088;
 const IMAGE: &str =
-    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v1/duplicate-index-retire";
+    "/var/lib/jetstreamer/horizon-duplicate-index-retirer-20261120-v2/duplicate-index-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const PROTECTED: &str = "horizon-qualify-250-reboot-20261117-v1.service";
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -458,6 +458,37 @@ fn hash_reader(
     );
     Ok(())
 }
+fn validate_sums(raw: &[u8], q: &Profile) -> Result<()> {
+    let mut expected = BTreeMap::from([(
+        "deployment-seal-receipt.json".to_string(),
+        q.seal_sha256.clone(),
+    )]);
+    for member in q.seal["members"].as_array().context("seal members")? {
+        let name = member["name"].as_str().context("member name")?;
+        ensure!(
+            expected
+                .insert(
+                    name.into(),
+                    member["sha256"].as_str().context("member hash")?.into()
+                )
+                .is_none(),
+            "duplicate sealed member"
+        );
+    }
+    let mut actual = BTreeMap::new();
+    for line in std::str::from_utf8(raw)?.lines() {
+        let (sum, name) = line.split_once("  ").context("SHA256SUMS framing")?;
+        ensure!(
+            digest(sum)
+                && !name.is_empty()
+                && !name.contains('/')
+                && actual.insert(name.into(), sum.into()).is_none(),
+            "invalid/duplicate checksum entry"
+        );
+    }
+    ensure!(actual == expected, "exact sealed sums set differs");
+    Ok(())
+}
 fn package(q: &Profile, tick: impl Fn() -> Result<()>) -> Result<Value> {
     let root = q.preserved.parent().context("package parent")?;
     ancestors(root)?;
@@ -484,6 +515,7 @@ fn package(q: &Profile, tick: impl Fn() -> Result<()>) -> Result<Value> {
     );
     let sums = file_bytes(&root.join("SHA256SUMS"), &q.sums_sha256, 0, None, true)?;
     let members = q.seal["members"].as_array().context("seal members")?;
+    validate_sums(&sums, q)?;
     let mut expected: BTreeSet<String> =
         ["SHA256SUMS".into(), "deployment-seal-receipt.json".into()]
             .into_iter()
@@ -535,10 +567,7 @@ fn package(q: &Profile, tick: impl Fn() -> Result<()>) -> Result<Value> {
             hash_file(&path, &stamp(&meta), sum, &[], &tick)?;
         }
     }
-    ensure!(
-        associated && std::str::from_utf8(&sums)?.lines().count() == members.len(),
-        "seal association or sums set"
-    );
+    ensure!(associated, "seal association or sums set");
     let actual: BTreeSet<_> = fs::read_dir(root)?
         .map(|e| {
             e?.file_name()
@@ -1671,5 +1700,32 @@ mod tests {
         changed = q.clone();
         changed.target_identity.nlink = 2;
         assert!(validate_plan(&plan, &review, &changed).is_err());
+    }
+    #[test]
+    fn genuine_seal_checksum_lists_include_exact_receipt_entry() {
+        for (epoch, raw) in [
+            (
+                249,
+                include_bytes!("fixtures/actual-249-SHA256SUMS").as_slice(),
+            ),
+            (
+                250,
+                include_bytes!("fixtures/actual-250-SHA256SUMS").as_slice(),
+            ),
+        ] {
+            let q = profile(epoch).unwrap();
+            assert_eq!(sha(raw), q.sums_sha256);
+            validate_sums(raw, &q).unwrap();
+            let text = std::str::from_utf8(raw).unwrap();
+            let absent = text.lines().skip(1).collect::<Vec<_>>().join("\n");
+            assert!(validate_sums(absent.as_bytes(), &q).is_err());
+            let duplicate = format!("{}{}\n", text, text.lines().next().unwrap());
+            assert!(validate_sums(duplicate.as_bytes(), &q).is_err());
+            let mut changed = q.clone();
+            changed.seal_sha256 = "0".repeat(64);
+            assert!(validate_sums(raw, &changed).is_err());
+            let extra = format!("{}{sha}  foreign.index\n", text, sha = "e".repeat(64));
+            assert!(validate_sums(extra.as_bytes(), &q).is_err());
+        }
     }
 }
