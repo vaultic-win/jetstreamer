@@ -154,7 +154,7 @@ mod tests {
     }
     #[test]
     fn complete_positive_graph_binds_the_measured_harness_to_the_original_first_fire() {
-        let (mut p, mut t, mut gp, mut g, j) = first_guard::tests::fixture();
+        let (mut p, seed, mut gp, mut g, j) = first_guard::tests::fixture();
         gp["main_start_ticks"] = json!(123);
         merge(
             &mut g,
@@ -188,10 +188,17 @@ mod tests {
         let mut a = json!({"schema":"horizon-native257-current-fleet-admission-v1","operation":"native-cold","admitted":true,
         "candidate_incremental_peak_bytes":RESERVATION,"maximum_memory_bytes":MEMORY,"harness":hreg,"guard":greg,"worker":w,"input_packet":i,
         "boot_id":p["boot_id"],"protected_existing_floor_bytes":p["minimum_free_bytes"],"issued_unix_seconds":60,"expires_unix_seconds":120});
-        merge(
-            &mut t,
-            json!({"schema":"horizon-native257-first-guard-token-v1","harness":hreg,"guard":greg,"unit":UNIT,"boot_id":p["boot_id"],
-        "startup_plan_sha256":pr["sha256"],"admission":ar,"guard_sample":sr,"guard_pid1_journal":jr}),
+        let t = startup::cold_input_token(
+            &p,
+            text(&pr, "sha256").unwrap(),
+            &gp,
+            text(&seed, "guard_invocation_id").unwrap(),
+            startup::FirstGuardProof {
+                plan: binding(&seed["guard_plan"]).unwrap(),
+                sample: binding(&sr).unwrap(),
+                journal: binding(&jr).unwrap(),
+            },
+            num(&seed, "recorded_monotonic_us").unwrap(),
         );
         let token = binding(&b("guard-admission")).unwrap();
         let iid = text(&t, "invocation_id").unwrap();
@@ -202,10 +209,13 @@ mod tests {
         "producer":{"Id":UNIT,"InvocationID":iid,"MainPID":"42","ActiveState":"active","SubState":"running","ControlGroup":format!("/system.slice/{UNIT}"),
         "NRestarts":"0","MemoryMax":MEMORY.to_string(),"MemorySwapMax":"0","TasksMax":"512",
         "ExecStart":format!("{{ path={HARNESS} ; argv[]={HARNESS} ; ignore_errors=no ; start_time=[x] ; stop_time=[n/a] ; pid=42 ; code=(null) ; status=0/0 }}")}});
-        for x in [&mut h, &mut a, &mut t] {
+        for x in [&mut h, &mut a] {
             deny_authority(x);
         }
         verify(&h, &p, &a, &t, &gp, &g, &j).unwrap();
+        let mut promoted = t.clone();
+        promoted["replay_launch_authorized"] = json!(true);
+        assert!(verify(&h, &p, &a, &promoted, &gp, &g, &j).is_err());
         for key in [
             "first_guard_token",
             "first_guard_sample",
