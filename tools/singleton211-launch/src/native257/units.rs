@@ -54,8 +54,13 @@ fn native_template(plan: &Bound, affinity: &str) -> String {
     )
 }
 fn guard_template(guard: &Bound, plan: &Path, receipts: &Path) -> String {
+    let guard_sandbox = if EPOCH == 212 {
+        "ProtectControlGroups=yes\nPrivateTmp=yes\n"
+    } else {
+        ""
+    };
     format!(
-        "[Unit]\nDescription=Epoch {EPOCH} native protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=60\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nEnvironmentFile={}\nExecStart={} {} --plan-sha256 ${{{GUARD_SHA_ENV}}} --self-sha256 {}\n",
+        "[Unit]\nDescription=Epoch {EPOCH} native protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=60\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\n{guard_sandbox}NoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nEnvironmentFile={}\nExecStart={} {} --plan-sha256 ${{{GUARD_SHA_ENV}}} --self-sha256 {}\n",
         receipts.display(),
         plan.with_file_name("guard.env").display(),
         guard.path.display(),
@@ -128,12 +133,9 @@ pub(crate) fn cpu_sharing(n: &mut Native, r: &Value) -> Result<Value> {
     let mut shared = BTreeMap::new();
     let mut rows = Vec::new();
     for row in fleet["active"].as_array().context("active fleet")? {
-        if !full211_peer::active(row)
-            && !matches!(row["phase"].as_str(), Some("replay" | "qualification"))
-        {
+        let Some(peer) = peer_window::protected_owner(EPOCH, row) else {
             continue;
-        }
-        let peer = &row["producer"];
+        };
         let name = text(peer, "Id")?;
         let current = n.show(name)?;
         live::same_owner(peer, &current)?;

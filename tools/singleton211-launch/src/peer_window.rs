@@ -172,6 +172,24 @@ impl Window {
         n.check()
     }
 }
+// A native cold peer is registered under the pipeline unit rather than the replay producer.
+pub(super) fn protected_owner(candidate: u64, row: &Value) -> Option<&Value> {
+    if full211_peer::active(row)
+        || matches!(row["phase"].as_str(), Some("replay" | "qualification"))
+    {
+        Some(&row["producer"])
+    } else if candidate == 212
+        && row["phase"] == "private-cold-snapshot-verification"
+        && matches!(
+            row["unit"]["Id"].as_str(),
+            Some(native257::UNIT | native261::UNIT)
+        )
+    {
+        Some(&row["unit"])
+    } else {
+        None
+    }
+}
 fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> {
     let fleet = binding(&review["fleet"])?.json()?;
     let (_, _, controls) = admission::reservations(review)?;
@@ -180,12 +198,10 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
         .context("actual owner census")?;
     let mut expected = BTreeSet::new();
     for active in fleet["active"].as_array().context("active fleet")? {
-        if full211_peer::active(active)
-            || matches!(active["phase"].as_str(), Some("replay" | "qualification"))
-        {
+        if let Some(owner) = protected_owner(a["epoch"].as_u64().unwrap_or_default(), active) {
             expected.insert((
-                text(&active["producer"], "Id")?.to_owned(),
-                text(&active["producer"], "InvocationID")?.to_owned(),
+                text(owner, "Id")?.to_owned(),
+                text(owner, "InvocationID")?.to_owned(),
             ));
         }
     }
@@ -204,7 +220,7 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
         );
         if c.unit == GUARD_UNIT {
             ensure!(
-                matches!(a["epoch"].as_u64(), Some(257 | 261))
+                matches!(a["epoch"].as_u64(), Some(212 | 257 | 261))
                     && !expected.is_empty()
                     && current.contains_key(UNIT),
                 "full211 rollover scope differs"
