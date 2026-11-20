@@ -1,6 +1,8 @@
 //! Capacity-only consumer for epoch 257 with the current epoch 211 booking.
 //! No systemd activation, resource release, token publication or remote writes.
 use super::*;
+#[path = "failed_boundary205206.rs"]
+mod failed_boundary205206;
 
 const SCRATCH257: &str = "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1";
 const BASELINE: &str =
@@ -85,6 +87,7 @@ pub(super) struct BookedHost {
     pub century: u64,
     pub release: Option<Value>,
     pub full211_growth: Option<Value>,
+    pub boundary_memory: Option<Value>,
     pub boot: String,
     pub device: u64,
 }
@@ -177,6 +180,8 @@ pub(super) fn booked_host_for(
             && fs::metadata(ledger_fs)?.dev() == device,
         "existing disk reservations need a per-device transition"
     );
+    let boundary_memory =
+        failed_boundary205206::apply(n, review, &fleet, &currents, &mut effective)?;
     let mut resources = live::resources_at(path)?;
     let full211_growth = if full211 {
         ensure!(
@@ -207,6 +212,7 @@ pub(super) fn booked_host_for(
         resources,
         rows: effective,
         full211_growth,
+        boundary_memory,
         currents,
         overhead: (overhead, periodic::total(&periodic)?),
         century,
@@ -270,6 +276,9 @@ pub(super) fn evaluate(
     if host.rows.iter().any(|r| r.unit == UNIT) {
         fit["full211_handoff"] = json!(full211_peer::handoff());
         fit["full211_growth"] = json!(host.full211_growth);
+    }
+    if let Some(proof) = host.boundary_memory {
+        fit["failed_boundary205206_memory_release"] = proof;
     }
     Ok(fit)
 }
