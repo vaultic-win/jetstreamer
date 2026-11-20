@@ -174,7 +174,7 @@ fn terminal_identity(current: &Value, receipt: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn same_terminal_census(before: &Value, after: &Value) -> Result<()> {
+pub(crate) fn same_terminal_census(before: &Value, after: &Value) -> Result<()> {
     ensure!(
         command_identity(text(before, "ExecStart")?)?
             == command_identity(text(after, "ExecStart")?)?,

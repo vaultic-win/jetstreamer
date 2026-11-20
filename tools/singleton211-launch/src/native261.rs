@@ -52,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v3/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v4/horizon-native261-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
