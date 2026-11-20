@@ -210,45 +210,6 @@ pub(super) fn staged_recipes(
     Ok(())
 }
 
-// PID 1 exposes unit dependencies as sets; their iteration order can change
-// across daemon-reload. Do not normalize argv, environment, paths or outcomes.
-fn unit_relations(field: &str) -> bool {
-    matches!(
-        field,
-        "After"
-            | "Before"
-            | "Requires"
-            | "RequiredBy"
-            | "Wants"
-            | "WantedBy"
-            | "BindsTo"
-            | "BoundBy"
-            | "Upholds"
-            | "UpheldBy"
-            | "PartOf"
-            | "ConsistsOf"
-            | "Requisite"
-            | "RequisiteOf"
-            | "Triggers"
-            | "TriggeredBy"
-            | "OnSuccess"
-            | "OnFailure"
-            | "OnSuccessOf"
-            | "OnFailureOf"
-    )
-}
-
-fn members(value: &str) -> Result<BTreeSet<&str>> {
-    let mut units = BTreeSet::new();
-    for name in value.split_ascii_whitespace() {
-        ensure!(
-            units.insert(name),
-            "duplicate native211 unit relation {name}"
-        );
-    }
-    Ok(units)
-}
-
 fn checked_manager(unit: &str, raw: &str, expected: &Value) -> Result<Value> {
     let mut actual = serde_json::Map::new();
     for l in raw.lines() {
@@ -263,25 +224,9 @@ fn checked_manager(unit: &str, raw: &str, expected: &Value) -> Result<Value> {
             "duplicate manager property"
         );
     }
-    let original = expected.as_object().context("expected manager fields")?;
-    ensure!(
-        actual.len() == original.len(),
-        "changed manager property count for {unit}"
-    );
-    for (key, prior) in original {
-        let current = actual.get(key).context("missing manager property")?;
-        let same = if unit_relations(key) {
-            members(current.as_str().context("actual relation")?)?
-                == members(prior.as_str().context("original relation")?)?
-        } else {
-            current == prior
-        };
-        ensure!(
-            same,
-            "native211 cold manager configuration changed: {unit} {key}"
-        );
-    }
-    Ok(Value::Object(actual))
+    let actual = Value::Object(actual);
+    live::same_manager_properties(unit, expected, &actual)?;
+    Ok(actual)
 }
 
 fn managers(n: &mut Native, pins: &Value, fleet: &Value) -> Result<()> {

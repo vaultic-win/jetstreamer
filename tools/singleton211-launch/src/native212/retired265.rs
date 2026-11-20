@@ -128,15 +128,16 @@ pub(crate) fn apply(
     let token = pin(TOKEN).sealed()?;
     expired(&plan, &token, &host.boot, mono()?)?;
     let mut states = BTreeMap::new();
+    let mut drained_states = BTreeMap::new();
     for unit in [OLD, GUARD, TIMER] {
         let before = n.show(unit)?;
         dormant(&before, unit)?;
         live::verify_drained_group(unit)?;
-        ensure!(
-            n.show(unit)? == before,
-            "old native265 owner/guard changed during drainage"
-        );
+        let after = n.show(unit)?;
+        dormant(&after, unit)?;
+        live::same_manager_properties(unit, &before, &after)?;
         states.insert(unit, before);
+        drained_states.insert(unit, after);
     }
     let closure = binding(&review["resource_review"])?;
     let signed = closure.sealed()?;
@@ -154,13 +155,105 @@ pub(crate) fn apply(
     Ok(Some(
         json!({"schema":"horizon-native212-completed-native265-memory-release-v1","unit":OLD,"invocation_id":IID,
         "review":closure,"growth_only":pin(OLD_GROWTH),"terminal":pin(TERMINAL),"expired_plan":pin(PLAN),"expired_token":pin(TOKEN),
-        "current_owners":states,"released_memory_bytes":CAP,"additional_disk_credit_bytes":0,"physical_allocation_credit_bytes":0,"inherited_floor_credit_bytes":0}),
+        "current_owners":states,"owners_after_drain":drained_states,"released_memory_bytes":CAP,"additional_disk_credit_bytes":0,"physical_allocation_credit_bytes":0,"inherited_floor_credit_bytes":0}),
     ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn guard_sample(raw: &str) -> Value {
+        let mut fields = serde_json::Map::new();
+        for line in raw.lines() {
+            let (key, value) = line.split_once('=').unwrap();
+            assert!(fields.insert(key.into(), json!(value)).is_none());
+        }
+        Value::Object(fields)
+    }
+
+    #[test]
+    fn v149_guard_drain_accepts_the_two_original_orderings() -> Result<()> {
+        let first = guard_sample(include_str!(
+            "../fixtures/native265-guard-v149-1077.properties"
+        ));
+        let second = guard_sample(include_str!(
+            "../fixtures/native265-guard-v149-1078.properties"
+        ));
+        assert_eq!(
+            first["After"],
+            "system.slice basic.target sysinit.target systemd-journald.socket"
+        );
+        assert_eq!(
+            second["After"],
+            "basic.target systemd-journald.socket sysinit.target system.slice"
+        );
+        assert_ne!(first, second);
+        dormant(&first, GUARD)?;
+        dormant(&second, GUARD)?;
+        live::same_manager_properties(GUARD, &first, &second)?;
+        live::same_manager_properties(GUARD, &second, &first)
+    }
+
+    #[test]
+    fn v149_guard_drain_rejects_relation_and_scalar_drift_from_either_sample() {
+        let before = guard_sample(include_str!(
+            "../fixtures/native265-guard-v149-1077.properties"
+        ));
+        let after = guard_sample(include_str!(
+            "../fixtures/native265-guard-v149-1078.properties"
+        ));
+        for (key, value) in [
+            (
+                "After",
+                "basic.target systemd-journald.socket sysinit.target",
+            ),
+            (
+                "After",
+                "system.slice basic.target sysinit.target rogue.socket",
+            ),
+            (
+                "After",
+                "system.slice basic.target sysinit.target systemd-journald.socket rogue.socket",
+            ),
+            (
+                "After",
+                "system.slice basic.target sysinit.target systemd-journald.socket system.slice",
+            ),
+            ("Requires", "system.slice sysinit.target sysinit.target"),
+            ("TriggeredBy", "unexpected.timer"),
+            ("Job", "42"),
+            ("ExecStart", "/bin/false"),
+            ("Environment", "OTHER=1"),
+            ("ReadWritePaths", "/other"),
+            ("ActiveState", "active"),
+            ("InvocationID", "ffffffffffffffffffffffffffffffff"),
+        ] {
+            let mut changed = after.clone();
+            changed[key] = json!(value);
+            assert!(
+                live::same_manager_properties(GUARD, &before, &changed).is_err(),
+                "{key}"
+            );
+            assert!(
+                live::same_manager_properties(GUARD, &changed, &before).is_err(),
+                "{key}"
+            );
+        }
+        let mut changed = after.clone();
+        changed["Requires"] = json!("system.slice sysinit.target sysinit.target");
+        assert!(live::same_manager_properties(GUARD, &changed, &changed).is_err());
+        changed = after.clone();
+        changed.as_object_mut().unwrap().remove("Result");
+        assert!(live::same_manager_properties(GUARD, &before, &changed).is_err());
+        changed["UnexpectedProperty"] = json!("");
+        assert!(live::same_manager_properties(GUARD, &before, &changed).is_err());
+        let mut left = before;
+        left["Environment"] = json!("A=1 B=2");
+        let mut right = after;
+        right["Environment"] = json!("B=2 A=1");
+        assert!(live::same_manager_properties(GUARD, &left, &right).is_err());
+    }
+
     #[test]
     fn only_original_completed_row_after_growth_can_release_memory() {
         let mut r = capacity::Reservation {
