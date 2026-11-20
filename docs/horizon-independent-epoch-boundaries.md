@@ -6,9 +6,9 @@ finalized metadata from `https://api.mainnet-beta.solana.com`; it never opens a
 local archive, launches replay, verifies archive contents or mutates R2.
 
 Run the sealed binary as root with `PLAN --plan-sha256 HEX --self-sha256 HEX`.
-The immutable plan schema is `horizon-independent-epoch-boundary-plan-v1`, with
-`epoch` in 201–300 and an existing, empty, canonical root-owned mode-0700
-`output_directory`. A no-clobber intent prevents concurrent attempts from sharing
+Use `horizon-independent-epoch-boundary-plan-v2` for epochs 101–300. The v1
+plan accepts epochs 201–300. Both require an existing, empty, canonical
+root-owned mode-0700 `output_directory`. A no-clobber intent prevents concurrent attempts from sharing
 that directory. Preserve failures and use a fresh directory for another attempt.
 
 The collector obtains the ordered block census for the first 1,024 epoch slots,
@@ -18,10 +18,8 @@ the independently fetched parent, and the terminal parent must lie inside the
 epoch. A skipped or unavailable terminal slot triggers a bounded tail and next-epoch
 block census. The collector fetches the last produced block and first successor,
 and requires that successor to name the exact last block as its parent with a
-matching previous blockhash. It retains this independent skipped-tail evidence,
-then still fails closed without emitting a v1 expectation. A missing RPC block
-alone never proves that a slot was skipped. The evidence can instead support the
-separately qualified v2 reader expectation described below.
+matching previous blockhash. Both plans retain the linked blocks and their RPC requests. A v2 plan emits a
+v2 expectation after verifying the link. A v1 plan stops after saving the evidence.
 Every blockhash must decode to 32 bytes. TLS validation remains enabled, redirects
 are disabled, each request has a 30-second timeout, and each response is limited
 to 1 MiB. The containing qualification service also needs a bounded runtime.
@@ -60,8 +58,8 @@ replace full local and remote plugin playback.
 Epoch 251 provides a concrete case: its last produced block is 108863995,
 followed by four skipped slots, and finalized successor 108864012 names that
 block and its hash as parent. The immutable request/response evidence was
-collected independently of the replay archive. The collector currently retains
-the diagnostic proof; it does not automatically emit a v2 expectation.
+collected independently of the replay archive. The v2 collector plan binds the retained successor request and response to the
+expectation. An exact terminal slot uses the v1 expectation format with either plan.
 
 Qualification covers a synthetic full 432,000-slot archive with a skipped tail,
 ordinary complete playback, and rejection of missing/wrong successors, partial

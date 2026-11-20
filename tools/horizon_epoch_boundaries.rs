@@ -111,10 +111,21 @@ fn expectation(
     a: &Value,
     parent: &Value,
     z: &Value,
+    skipped_tail: Option<(u64, Value)>,
     evidence: Value,
 ) -> Result<Value> {
     let start = epoch.checked_mul(432000).context("epoch overflow")?;
-    let terminal = start.checked_add(431999).context("terminal overflow")?;
+    let end = start.checked_add(431999).context("terminal overflow")?;
+    let terminal = match &skipped_tail {
+        Some((slot, successor)) => {
+            ensure!(
+                (first..end).contains(slot) && successor["slot"].as_u64().is_some_and(|s| s > end),
+                "invalid skipped tail interval"
+            );
+            *slot
+        }
+        None => end,
+    };
     let parent_slot = a["parentSlot"].as_u64().context("first parent slot")?;
     ensure!(
         (start..=start + 1023).contains(&first) && parent_slot < start,
@@ -133,9 +144,12 @@ fn expectation(
     );
     hash_text(z, "previousBlockhash")?;
     let terminal_hash = hash_text(z, "blockhash")?;
-    Ok(
-        json!({"schema":"horizon-current-reader-epoch-expectation-v1","epoch":epoch,"parent_slot":parent_slot,"parent_blockhash":parent_hash,"terminal_slot":terminal,"terminal_blockhash":terminal_hash,"provenance_sha256":null,"independent_evidence":evidence}),
-    )
+    let mut value = json!({"schema":"horizon-current-reader-epoch-expectation-v1","epoch":epoch,"parent_slot":parent_slot,"parent_blockhash":parent_hash,"terminal_slot":terminal,"terminal_blockhash":terminal_hash,"provenance_sha256":null,"independent_evidence":evidence});
+    if let Some((_, successor)) = skipped_tail {
+        value["schema"] = json!("horizon-current-reader-epoch-expectation-v2");
+        value["successor"] = successor;
+    }
+    Ok(value)
 }
 struct Rpc {
     client: reqwest::Client,
@@ -204,7 +218,11 @@ async fn run(args: Vec<String>) -> Result<()> {
     ensure!(digest(&raw) == args[2], "plan digest differs");
     let p: Plan = serde_json::from_slice(&raw)?;
     ensure!(
-        p.schema == "horizon-independent-epoch-boundary-plan-v1" && (201..=300).contains(&p.epoch),
+        match p.schema.as_str() {
+            "horizon-independent-epoch-boundary-plan-v1" => (201..=300).contains(&p.epoch),
+            "horizon-independent-epoch-boundary-plan-v2" => (101..=300).contains(&p.epoch),
+            _ => false,
+        },
         "foreign plan/epoch"
     );
     private_directory(&p.output_directory)?;
@@ -243,8 +261,8 @@ async fn run(args: Vec<String>) -> Result<()> {
         "first block does not establish epoch parent"
     );
     let parent = rpc.block("parent-block", parent_slot).await?;
-    let terminal = match rpc.block("terminal-block", start + 431999).await {
-        Ok(v) => v,
+    let (terminal, skipped_tail) = match rpc.block("terminal-block", start + 431999).await {
+        Ok(v) => (v, None),
         Err(original) => {
             // A failed exact-terminal lookup is not proof of a skipped tail.
             // Collect the ordered tail and successor, but do not emit a v1
@@ -279,10 +297,29 @@ async fn run(args: Vec<String>) -> Result<()> {
                     &json!({"schema":"horizon-independent-skipped-tail-evidence-v1","epoch":p.epoch,"epoch_end_slot":start+431999,"last_produced_slot":last,"last_produced_blockhash":hash_text(&last_block,"blockhash")?,"successor_slot":next_slot,"successor_parent_slot":successor["parentSlot"],"successor_previous_blockhash":hash_text(&successor,"previousBlockhash")?,"independent_evidence":rpc.evidence,"completed_unix_seconds":now()?,"current_reader_skipped_tail_support_required":true,"archive_verified":false,"publication_authorized":false}),
                 )?,
             )?;
-            return Err(original.context("independent successor proves skipped tail; current reader v1 expectation cannot represent it"));
+            if p.schema == "horizon-independent-epoch-boundary-plan-v1" {
+                return Err(original.context("independent successor proves skipped tail; current reader v1 expectation cannot represent it"));
+            }
+            let bound = |name: &str| -> Result<&Value> {
+                let path = p.output_directory.join(name);
+                rpc.evidence
+                    .iter()
+                    .find(|r| r["path"].as_str().map(Path::new) == Some(path.as_path()))
+                    .context("missing successor RPC binding")
+            };
+            let link = json!({"slot":next_slot,"response":bound("successor-block.json")?,"request":bound("successor-block-request.json")?});
+            (last_block, Some((last, link)))
         }
     };
-    let v = expectation(p.epoch, first, &a, &parent, &terminal, json!(rpc.evidence))?;
+    let v = expectation(
+        p.epoch,
+        first,
+        &a,
+        &parent,
+        &terminal,
+        skipped_tail,
+        json!(rpc.evidence),
+    )?;
     private_directory(&p.output_directory)?;
     ensure!(plan_bytes(Path::new(&args[0]))? == raw, "plan changed");
     let bytes = serde_json::to_vec_pretty(&v)?;
@@ -363,16 +400,57 @@ mod tests {
         let a = json!({"parentSlot":start-1,"previousBlockhash":hash,"blockhash":other});
         let parent = json!({"blockhash":hash});
         let z = json!({"parentSlot":start+431998,"previousBlockhash":other,"blockhash":hash});
-        assert!(expectation(247, start, &a, &parent, &z, json!([])).is_ok());
-        assert!(expectation(247, start, &a, &json!({"blockhash":other}), &z, json!([])).is_err());
+        assert!(expectation(247, start, &a, &parent, &z, None, json!([])).is_ok());
+        assert!(
+            expectation(
+                247,
+                start,
+                &a,
+                &json!({"blockhash":other}),
+                &z,
+                None,
+                json!([])
+            )
+            .is_err()
+        );
+        let link = json!({"slot": start + 432002, "request":{"path":"r"}, "response":{"path":"b"}});
+        let skipped = json!({"parentSlot":start+431990,"previousBlockhash":other,"blockhash":hash});
+        let value = expectation(
+            247,
+            start,
+            &a,
+            &parent,
+            &skipped,
+            Some((start + 431995, link.clone())),
+            json!([]),
+        )
+        .unwrap();
+        assert_eq!(
+            value["schema"],
+            "horizon-current-reader-epoch-expectation-v2"
+        );
+        assert_eq!(value["terminal_slot"], start + 431995);
+        assert_eq!(value["successor"], link);
+        assert!(
+            expectation(
+                247,
+                start,
+                &a,
+                &parent,
+                &skipped,
+                Some((start + 432000, link)),
+                json!([])
+            )
+            .is_err()
+        );
         let mut bad = a.clone();
         bad["parentSlot"] = json!(start);
-        assert!(expectation(247, start, &bad, &parent, &z, json!([])).is_err());
+        assert!(expectation(247, start, &bad, &parent, &z, None, json!([])).is_err());
         let mut bad = z.clone();
         bad["parentSlot"] = json!(start + 431999);
-        assert!(expectation(247, start, &a, &parent, &bad, json!([])).is_err());
+        assert!(expectation(247, start, &a, &parent, &bad, None, json!([])).is_err());
         let mut bad = z.clone();
         bad["blockhash"] = json!("invalid");
-        assert!(expectation(247, start, &a, &parent, &bad, json!([])).is_err());
+        assert!(expectation(247, start, &a, &parent, &bad, None, json!([])).is_err());
     }
 }
