@@ -116,41 +116,16 @@ mod tests {
     }
     #[test]
     fn failed_disconnected_and_late_scans_never_become_complete_measurements() {
-        let started = Instant::now();
-        let (sender, result) = mpsc::sync_channel(1);
-        sender
-            .send((Duration::ZERO, Err(anyhow::anyhow!("fixture scan error"))))
-            .unwrap();
-        let pending = Pending { started, result };
-        assert!(
-            pending
-                .poll_at(started)
-                .unwrap_err()
-                .to_string()
-                .contains("fixture scan error")
-        );
-        let (sender, result) = mpsc::sync_channel(1);
-        sender
-            .send((MAX_SCAN_TIME, Err(anyhow::anyhow!("not timely"))))
-            .unwrap();
-        let pending = Pending { started, result };
-        assert!(
-            pending
-                .poll_at(started)
-                .unwrap_err()
-                .to_string()
-                .contains("deadline")
-        );
-        let (sender, result) = mpsc::sync_channel(1);
-        drop(sender);
-        let pending = Pending { started, result };
-        assert!(
-            pending
-                .poll_at(started)
-                .unwrap_err()
-                .to_string()
-                .contains("disconnected")
-        );
+        for (kind, expected) in [
+            ("error", "fixture scan error"),
+            ("late", "completed after its deadline"),
+            ("disconnected", "disconnected"),
+            ("timeout", "asynchronous scan deadline exceeded"),
+        ] {
+            let pending = Pending::native_failure_fixture(kind);
+            let error = pending.poll().unwrap_err().to_string();
+            assert!(error.contains(expected), "{kind}: {error}");
+        }
     }
     #[test]
     fn complete_timely_measurement_is_the_only_result_released_to_the_guard() {
@@ -176,17 +151,13 @@ mod tests {
     fn blocked_scan_runs_off_the_supervisor_path_until_released() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().to_path_buf();
-        let (entered_tx, entered_rx) = mpsc::sync_channel(1);
-        let (release_tx, release_rx) = mpsc::sync_channel(1);
-        let pending = Pending::start(move || {
-            entered_tx.send(()).unwrap();
-            release_rx.recv().unwrap();
-            root_budget::observe(&root, 1 << 20)
-        })
-        .unwrap();
-        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (pending, release, entered, finished) =
+            Pending::native_blocked_fixture(root, 1 << 20).unwrap();
+        entered.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(pending.poll().unwrap().is_none());
-        release_tx.send(()).unwrap();
+        assert!(pending.elapsed() < MAX_SCAN_TIME);
+        release.send(()).unwrap();
+        finished.recv_timeout(Duration::from_secs(5)).unwrap();
         let (elapsed, result) = pending.result.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(elapsed < MAX_SCAN_TIME);
         assert!(!result.unwrap().exceeds_budget);

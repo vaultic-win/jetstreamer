@@ -299,27 +299,6 @@ pub fn ancestry() -> Result<Value> {
         json!({"donor":171,"borrower":136,"original_booking":row["original_booking"],"memory_point":pt,"witness_set":binding(Path::new(WIT),WIT_SHA),"exclusive_local2_mapping":binding(Path::new(MAP),MAP_SHA),"terminal_retirement":binding(Path::new(RET),RET_SHA),"complete_authority_to_donor":chain,"actor_cap_bytes":CANDIDATE_MEMORY,"guard_cap_bytes":1u64<<30}),
     )
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn mask_and_native_drain_are_both_required() {
-        let v = json!({"Id":"x.service","ActiveState":"inactive","MainPID":"0","ControlPID":"0","Job":"","LoadState":"masked"});
-        assert!(check_mask(&v, true).is_ok());
-        assert!(check_mask(&v, false).is_err());
-        for (field, val) in [
-            ("MainPID", "1"),
-            ("ControlPID", "5"),
-            ("Job", "1"),
-            ("ActiveState", "active"),
-            ("LoadState", "loaded"),
-        ] {
-            let mut bad = v.clone();
-            bad[field] = json!(val);
-            assert!(check_mask(&bad, true).is_err());
-        }
-    }
-}
 const FIXTURE: &str = "horizon-donor171-g1-pid1-interlock-qualification.service";
 const QREC: &str = "donor171-pid1-qualification.json";
 // Prove the same manager rejects a transient StartTransientUnit at a masked, previously unused name.
@@ -386,4 +365,26 @@ pub fn qualify_pid1() -> Result<()> {
     let receipt = file_write(&Path::new(BASE).join(QREC), &r)?;
     println!("{receipt}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn mask_and_native_drain_are_both_required() {
+        let v = json!({"Id":"x.service","ActiveState":"inactive","MainPID":"0","ControlPID":"0","Job":"","LoadState":"masked"});
+        assert!(check_mask(&v, true).is_ok());
+        assert!(check_mask(&v, false).is_err());
+        for (field, val) in [
+            ("MainPID", "1"),
+            ("ControlPID", "5"),
+            ("Job", "1"),
+            ("ActiveState", "active"),
+            ("LoadState", "loaded"),
+        ] {
+            let mut bad = v.clone();
+            bad[field] = json!(val);
+            assert!(check_mask(&bad, true).is_err());
+        }
+    }
 }
