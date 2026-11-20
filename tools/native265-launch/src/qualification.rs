@@ -128,10 +128,7 @@ pub(super) fn capture_stop(
         n.show(TIMER)?["ActiveState"] == "inactive",
         "qualification timer still active"
     );
-    ensure!(
-        n.show(UNIT)? == terminal,
-        "producer terminal changed during drainage"
-    );
+    live::same_terminal_census(&terminal, &n.show(UNIT)?)?;
     let journal = n.run(
         "/usr/bin/journalctl",
         &[
