@@ -110,6 +110,7 @@ struct Config {
     concurrency: usize,
     overwrite_existing: bool,
     repair_orphaned_archive: bool,
+    recover_staged247: bool,
     observer_receipt: Option<PathBuf>,
     observer_sha256: Option<String>,
     expected_controller_invocation_id: Option<String>,
@@ -269,7 +270,7 @@ fn usage() -> ! {
         "usage: horizon-r2 <inventory|public-verify|retire-local|sync|verify|restore|status-publish|status-delete> DIRECTORY [--epochs START-END] ",
         "[--receipt-directory DIRECTORY] [--public-receipt-directory DIRECTORY] [--delete-local] [--part-size-mib N] ",
         "[--legacy-part-size-mib N] [--legacy-etag-only] [--overwrite-existing] ",
-        "[--repair-orphaned-archive] ",
+        "[--repair-orphaned-archive] [--recover-staged-247] ",
         "[--current-reader-plan FILE --current-reader-plan-sha256 HEX] ",
         "[--concurrency N] [--observer-receipt FILE] [--observer-sha256 HEX] ",
         "[--expected-controller-invocation-id ID] [--expected-producer-invocation-id ID] ",
@@ -308,6 +309,7 @@ fn parse_args() -> Result<Config> {
     let mut legacy_etag_only = false;
     let mut overwrite_existing = false;
     let mut repair_orphaned_archive = false;
+    let mut recover_staged247 = false;
     let mut observer_receipt = None;
     let mut observer_sha256 = None;
     let mut expected_controller_invocation_id = None;
@@ -343,6 +345,7 @@ fn parse_args() -> Result<Config> {
             "--legacy-etag-only" => legacy_etag_only = true,
             "--current-reader-plan" => current_reader_plan = Some(PathBuf::from(value()?)),
             "--current-reader-plan-sha256" => current_reader_plan_sha256 = Some(value()?),
+            "--recover-staged-247" => recover_staged247 = true,
             "--overwrite-existing" => overwrite_existing = true,
             "--repair-orphaned-archive" => repair_orphaned_archive = true,
             "--observer-receipt" => observer_receipt = Some(PathBuf::from(value()?)),
@@ -589,7 +592,7 @@ fn parse_args() -> Result<Config> {
         !matches!(command, Command::StatusPublish | Command::StatusDelete) || epochs.len() == 1,
         "status-publish and status-delete require exactly one epoch"
     );
-    Ok(Config {
+    let config = Config {
         command,
         directory,
         epochs,
@@ -601,6 +604,7 @@ fn parse_args() -> Result<Config> {
         concurrency,
         overwrite_existing,
         repair_orphaned_archive,
+        recover_staged247,
         observer_receipt,
         observer_sha256,
         expected_controller_invocation_id,
@@ -614,7 +618,15 @@ fn parse_args() -> Result<Config> {
         latest_status_publication_receipt,
         current_reader_plan,
         current_reader_plan_sha256,
-    })
+    };
+    if config.recover_staged247 {
+        ensure!(
+            !legacy_etag_only,
+            "staged recovery requires whole SHA-256 comparison"
+        );
+        current_reader::staged247::config(&config)?;
+    }
+    Ok(config)
 }
 
 fn discover_local_epochs(directory: &Path) -> Result<BTreeSet<u64>> {
@@ -3224,6 +3236,16 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     let checksum_key = format!("epoch-{epoch}.jet.sha256");
     let existing = head_archive(client, &r2.bucket, &archive_key).await?;
     let existing_sidecar = remote_sidecar(client, &r2.bucket, &checksum_key).await?;
+    let retained = if config.recover_staged247 {
+        current_reader::staged247::object(&r2.bucket, &archive_key, existing.as_ref())?;
+        ensure!(
+            epoch == 247 && existing_sidecar.is_none(),
+            "staged 247 sidecar already exists"
+        );
+        Some(current_reader::staged247::Retained::open()?)
+    } else {
+        None
+    };
     let repairing_orphan = validate_remote_pair_state(
         existing.is_some(),
         existing_sidecar.as_deref(),
@@ -3270,6 +3292,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     let reader_archive = local.archive_path.clone();
     let reader_digest = local.sha256_hex.clone();
     let reader_length = local.length;
+    let reader_retained = retained.clone();
     let mut reader_gate = tokio::task::spawn_blocking(move || {
         current_reader::Gate::prepare(
             reader_binding,
@@ -3277,6 +3300,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             &reader_archive,
             reader_length,
             &reader_digest,
+            reader_retained,
         )
     })
     .await??;
@@ -3359,9 +3383,12 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             "remote composite SHA-256 changed after verification"
         );
     }
+    if retained.is_some() {
+        current_reader::staged247::object(&r2.bucket, &archive_key, Some(&remote))?;
+    }
     let native_sha256_proven = remote.composite_sha256.is_some();
-    // Always materialize actual authenticated R2 bytes, including when native
-    // checksums are present. A local archive or checksum-only proof is insufficient.
+    // Authenticate the entire object, including when native checksums are present.
+    // The 247 recovery sink also compares the ordered stream against its pinned inode.
     let mut readback_file = reader_gate.create_readback()?;
     read_remote_sha256_resumable(
         client,
@@ -3406,6 +3433,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         before_sidecar.length == local.length && before_sidecar.etag == etag,
         "remote archive changed during plugin playback"
     );
+    if retained.is_some() {
+        current_reader::staged247::object(&r2.bucket, &archive_key, Some(&before_sidecar))?;
+    }
     let playback_receipt =
         tokio::task::spawn_blocking(move || reader_gate.publication_receipt()).await??;
     eprintln!(
@@ -3420,6 +3450,7 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
     // canonical sidecar as meaning that the corresponding archive was fully
     // uploaded and verified by this publisher.
     match remote_sidecar(client, &r2.bucket, &checksum_key).await? {
+        Some(_) if retained.is_some() => anyhow::bail!("staged sidecar appeared during recovery"),
         Some(_) if config.overwrite_existing => {
             put_sidecar(client, &r2.bucket, &local, true).await?
         }
@@ -3428,6 +3459,11 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
             "remote sidecar mismatch for epoch {epoch}"
         ),
         None if config.command == Command::Sync => {
+            if let Some(prior) = &retained {
+                let final_staged = head_archive(client, &r2.bucket, &archive_key).await?;
+                current_reader::staged247::object(&r2.bucket, &archive_key, final_staged.as_ref())?;
+                prior.proof()?;
+            }
             put_sidecar(client, &r2.bucket, &local, false).await?
         }
         None => bail!("remote sidecar is missing for epoch {epoch}"),
@@ -3446,6 +3482,9 @@ async fn sync_epoch(client: &Client, r2: &R2Config, config: &Config, epoch: u64)
         final_remote.length == local.length && final_remote.etag == etag,
         "remote archive changed during sidecar publication"
     );
+    if retained.is_some() {
+        current_reader::staged247::object(&r2.bucket, &archive_key, Some(&final_remote))?;
+    }
     if final_remote.metadata_sha256.is_some() {
         ensure!(
             final_remote.metadata_sha256.as_deref() == Some(local.sha256_hex.as_str()),
@@ -4594,7 +4633,7 @@ mod tests {
     #[tokio::test]
     async fn instrumented_readback_preserves_digest_and_writer_failure_gates() {
         const BODY: &[u8] = b"readback-fixture";
-        for outcome in ["success", "digest-mismatch", "writer-failure"] {
+        for outcome in ["success", "digest-mismatch", "writer-failure", "etag-mismatch"] {
             let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
             let endpoint = format!("http://{}", listener.local_addr().unwrap());
             listener.set_nonblocking(true).unwrap();
@@ -4628,14 +4667,19 @@ mod tests {
                     Some("/fixture/epoch-144.jet")
                 );
                 assert!(headers.contains(&format!("range: bytes=0-{}\r\n", BODY.len() - 1)));
+                assert!(headers.contains("if-match: \"fixture\"\r\n"));
+                let etag = if outcome == "etag-mismatch" {
+                    "changed"
+                } else {
+                    "fixture"
+                };
                 let response = format!(
-                    "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nETag: \"fixture\"\r\nConnection: close\r\n\r\n",
+                    "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes 0-{}/{}\r\nETag: \"{etag}\"\r\nConnection: close\r\n\r\n",
                     BODY.len(),
                     BODY.len() - 1,
                     BODY.len()
                 );
-                connection.write_all(response.as_bytes()).unwrap();
-                connection.write_all(BODY).unwrap();
+                connection.write_all(&[response.as_bytes(), BODY].concat()).unwrap();
             });
             let client = Client::from_conf(
                 S3ConfigBuilder::new()
@@ -4691,6 +4735,9 @@ mod tests {
                         .unwrap_err()
                         .to_string()
                         .contains("remote SHA-256 mismatch")
+                ),
+                "etag-mismatch" => assert!(
+                    result.unwrap_err().to_string().contains("ETag mismatch")
                 ),
                 "writer-failure" => assert!(
                     result

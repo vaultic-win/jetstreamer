@@ -1,5 +1,6 @@
 //! Current-branch verification of staged archives and authenticated R2 readback.
 //! Transport remains in the uploader; this module never writes remote objects.
+pub(crate) mod staged247;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -223,6 +224,7 @@ pub struct Gate {
     digest: String,
     directory: PathBuf,
     readback: PathBuf,
+    retained: Option<staged247::Retained>,
     local_playback: Value,
     remote_playback: Option<Value>,
     minimum_thread_stack_bytes: Option<u64>,
@@ -517,6 +519,7 @@ impl Gate {
         archive: &Path,
         length: u64,
         digest: &str,
+        retained: Option<staged247::Retained>,
     ) -> Result<Self> {
         ensure!(
             unsafe { libc::geteuid() } == 0,
@@ -556,18 +559,29 @@ impl Gate {
         }
         private_directory(&plan.scratch_directory)?;
         let (current, source_equivalence) = current_branch(&plan)?;
-        check_readback_capacity(&plan, length)?;
+        check_readback_capacity(
+            &plan,
+            if retained.is_some() {
+                staged247::BUDGET
+            } else {
+                length
+            },
+        )?;
         let directory = plan.scratch_directory.join(format!(
             "epoch-{epoch}-{}-{}",
             std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::DirBuilder::new().mode(0o700).create(&directory)?;
-        let remote_directory = directory.join("readback");
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&remote_directory)?;
-        let readback = remote_directory.join(format!("epoch-{epoch}.jet"));
+        let readback = if let Some(prior) = &retained {
+            prior.path()
+        } else {
+            let remote_directory = directory.join("readback");
+            fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&remote_directory)?;
+            remote_directory.join(format!("epoch-{epoch}.jet"))
+        };
         let mut gate = Self {
             plan,
             plan_binding: binding,
@@ -576,6 +590,7 @@ impl Gate {
             digest: digest.into(),
             directory,
             readback,
+            retained,
             local_playback: Value::Null,
             remote_playback: None,
             minimum_thread_stack_bytes: qualification.minimum_thread_stack_bytes,
@@ -648,15 +663,21 @@ impl Gate {
         )
     }
 
-    /// The uploader must stream the authenticated, whole-object readback into
-    /// this newly created file, then fsync and close it before `verify_remote`.
-    pub fn create_readback(&self) -> Result<File> {
+    /// Accept every byte from the authenticated R2 stream, either writing a new
+    /// scratch archive or comparing against the original retained readback.
+    pub fn create_readback(&self) -> Result<staged247::Sink> {
+        if let Some(prior) = &self.retained {
+            check_readback_capacity(&self.plan, staged247::BUDGET)?;
+            return prior.stream();
+        }
         check_readback_capacity(&self.plan, self.length)?;
-        Ok(OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&self.readback)?)
+        Ok(staged247::Sink::New(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&self.readback)?,
+        ))
     }
 
     pub fn verify_remote(&mut self, remote: RemoteObject) -> Result<()> {
@@ -669,9 +690,14 @@ impl Gate {
                 && !remote.etag.is_empty(),
             "remote playback identity mismatch"
         );
-        fs::set_permissions(&self.readback, fs::Permissions::from_mode(0o400))?;
-        File::open(&self.readback)?.sync_all()?;
-        File::open(self.readback.parent().context("readback parent")?)?.sync_all()?;
+        if let Some(prior) = &self.retained {
+            prior.verify_object(&remote)?;
+            prior.proof()?;
+        } else {
+            fs::set_permissions(&self.readback, fs::Permissions::from_mode(0o400))?;
+            File::open(&self.readback)?.sync_all()?;
+            File::open(self.readback.parent().context("readback parent")?)?.sync_all()?;
+        }
         ensure!(
             hash_file(&self.readback)? == (self.digest.clone(), self.length),
             "readback differs before playback"
@@ -696,22 +722,27 @@ impl Gate {
             .remote_playback
             .as_ref()
             .context("full remote plugin playback is missing")?;
+        let reuse = self.retained.as_ref().map(|r| r.proof()).transpose()?;
         let (current, source_equivalence) = current_branch(&self.plan)?;
         bound_file(&self.plan.pipeline)?;
         bound_file(&self.plan.full_verifier)?;
+        let mut receipt = json!({
+            "schema":"horizon-r2-current-reader-playback-acceptance-v1",
+            "epoch":self.epoch,"reader_commit":self.plan.reader_commit,
+            "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":READER_PATHS,
+            "source_equivalence":source_equivalence,
+            "reader_plan":self.plan_binding,"qualification":self.plan.qualification,
+            "local_playback":self.local_playback,"remote_playback":remote,
+            "minimum_thread_stack_bytes":self.minimum_thread_stack_bytes,
+            "verified_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            "readiness_sidecar_committed":false
+        });
+        if let Some(proof) = reuse {
+            receipt["retained_staged_readback_verified"] = proof;
+        }
         write_json(
             &self.directory.join("remote-playback-acceptance.json"),
-            &json!({
-                "schema":"horizon-r2-current-reader-playback-acceptance-v1",
-                "epoch":self.epoch,"reader_commit":self.plan.reader_commit,
-                "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":READER_PATHS,
-                "source_equivalence":source_equivalence,
-                "reader_plan":self.plan_binding,"qualification":self.plan.qualification,
-                "local_playback":self.local_playback,"remote_playback":remote,
-                "minimum_thread_stack_bytes":self.minimum_thread_stack_bytes,
-                "verified_unix_seconds":SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-                "readiness_sidecar_committed":false
-            }),
+            &receipt,
         )
     }
 }
@@ -985,6 +1016,7 @@ mod tests {
             digest: "a".repeat(64),
             directory: dir.path().into(),
             readback: dir.path().join("readback"),
+            retained: None,
             local_playback: json!({}),
             remote_playback: None,
             minimum_thread_stack_bytes: None,

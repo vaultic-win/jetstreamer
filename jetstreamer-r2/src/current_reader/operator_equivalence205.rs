@@ -3,7 +3,8 @@
 use super::*;
 const BASE: &str = "db1c31fe4e6d462a8e45c18c61f6b331a9c1a1c6";
 const QUALIFICATION_SHA: &str = "1a29e8abf04c8fc411eecba67525be26e27227f1f5ae8dc34b4bbacfb04eaf21";
-const CHANGES: &[(&str, &str, &str)] = &[
+type TreeTransition = (&'static str, &'static str, &'static str);
+const CHANGES: &[TreeTransition] = &[
     (
         "Cargo.toml",
         "100644 blob 85d88dfd3df0b6bfa818b69678361d2447a4e44c\tCargo.toml",
@@ -37,6 +38,38 @@ const CHANGES: &[(&str, &str, &str)] = &[
         "100644 blob 8707032b5fd124a145779efc89c835078bb8862b\tjetstreamer-firehose/src/bin/epoch257-native-window-audit.rs",
     ),
 ];
+// The two standalone audit bins are the only targets declaring mod native_window.
+// Its mod.rs has no main.rs sibling and introduces no independent Cargo target.
+const AUDIT261_COMMIT: &str = "4284526370cf555901b205dce7e36f81f5a2c0c4";
+const AUDIT261: &[TreeTransition] = &[
+    (
+        "jetstreamer-firehose/src/bin/epoch257-native-window-audit.rs",
+        "",
+        "100644 blob 32a1c372ca5648a784f62cce3bd685707e639421\tjetstreamer-firehose/src/bin/epoch257-native-window-audit.rs",
+    ),
+    (
+        "jetstreamer-firehose/src/bin/epoch261-native-window-audit.rs",
+        "",
+        "100644 blob d84614dc5108746f00d0d5e5cd3a7dbc7e7fcaea\tjetstreamer-firehose/src/bin/epoch261-native-window-audit.rs",
+    ),
+    (
+        "jetstreamer-firehose/src/bin/native_window/mod.rs",
+        "",
+        "100644 blob 2593d41cfafd695885347437fe480311462458c6\tjetstreamer-firehose/src/bin/native_window/mod.rs",
+    ),
+];
+fn includes_261(changed: &str) -> bool {
+    changed
+        .lines()
+        .any(|path| AUDIT261[1..].iter().any(|(p, _, _)| *p == path))
+}
+fn reviewed_entries(changed: &str) -> impl Iterator<Item = &'static TreeTransition> {
+    let include_261 = includes_261(changed);
+    CHANGES
+        .iter()
+        .filter(move |(path, _, _)| !include_261 || *path != AUDIT261[0].0)
+        .chain(AUDIT261.iter().filter(move |_| include_261))
+}
 fn exact_changes(changed: &str, mut entry: impl FnMut(bool, &str) -> Result<String>) -> Result<()> {
     let mut seen = std::collections::BTreeSet::new();
     ensure!(
@@ -45,13 +78,18 @@ fn exact_changes(changed: &str, mut entry: impl FnMut(bool, &str) -> Result<Stri
     );
     for path in changed.lines() {
         ensure!(seen.insert(path), "duplicate reader change");
-        let (_, before, after) = CHANGES
-            .iter()
+        let (_, before, after) = reviewed_entries(changed)
             .find(|(p, _, _)| *p == path)
             .context("unreviewed reader source/dependency/build change")?;
         ensure!(
             entry(false, path)? == *before && entry(true, path)? == *after,
             "reviewed reader transition blob or mode changed: {path}"
+        );
+    }
+    if includes_261(changed) {
+        ensure!(
+            AUDIT261.iter().all(|(p, _, _)| seen.contains(p)),
+            "incomplete standalone audit transition"
         );
     }
     Ok(())
@@ -93,12 +131,17 @@ pub(super) fn validate(plan: &Plan, head: &str, changed: &str) -> Result<()> {
     })
 }
 pub(super) fn record(changed: &str) -> Value {
-    json!({"schema":"horizon-reader-exact-operator-equivalence205-v1",
+    let mut receipt = json!({"schema":"horizon-reader-exact-operator-equivalence205-v1",
         "original_reader_commit":BASE,"qualification_sha256":QUALIFICATION_SHA,
         "changed_paths":changed.lines().collect::<Vec<_>>(),
-        "reviewed_tree_entries":CHANGES.iter().filter(|(path,_,_)|changed.lines().any(|p|p==*path)).map(|(path,before,after)|
+        "reviewed_tree_entries":reviewed_entries(changed).filter(|(path,_,_)|changed.lines().any(|p|p==*path)).map(|(path,before,after)|
             json!({"path":path,"before":before,"after":after})).collect::<Vec<_>>(),
-        "reader_dependency_or_feature_change_authorized":false})
+        "reader_dependency_or_feature_change_authorized":false});
+    if includes_261(changed) {
+        receipt["schema"] = json!("horizon-reader-exact-operator-equivalence261-v1");
+        receipt["standalone_audit_source_commit"] = json!(AUDIT261_COMMIT);
+    }
+    receipt
 }
 
 #[cfg(test)]
@@ -128,6 +171,61 @@ mod tests {
         );
         assert!(exact_changes("Cargo.lock\nCargo.lock", original_entry).is_err());
         assert!(exact_changes("", original_entry).is_err());
+    }
+    #[test]
+    fn audit261_accepts_only_the_three_reviewed_entries_together() {
+        let changed = CHANGES
+            .iter()
+            .map(|e| e.0)
+            .chain(AUDIT261[1..].iter().map(|e| e.0))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let expected = |after, path: &str| -> Result<String> {
+            let (_, before, next) = AUDIT261
+                .iter()
+                .chain(CHANGES)
+                .find(|e| e.0 == path)
+                .context("fixture path")?;
+            Ok(if after { *next } else { *before }.into())
+        };
+        exact_changes(&changed, expected).unwrap();
+        assert_eq!(
+            record(&changed)["standalone_audit_source_commit"],
+            AUDIT261_COMMIT
+        );
+        for &(path, _, _) in AUDIT261 {
+            let incomplete = changed
+                .lines()
+                .filter(|p| *p != path)
+                .collect::<Vec<_>>()
+                .join("\n");
+            assert!(exact_changes(&incomplete, expected).is_err());
+            for before in [false, true] {
+                assert!(
+                    exact_changes(&changed, |after, p| if p == path && before == after {
+                        Ok("wrong mode or blob".into())
+                    } else {
+                        expected(after, p)
+                    })
+                    .is_err()
+                );
+            }
+        }
+        let old = CHANGES.iter().map(|e| e.0).collect::<Vec<_>>().join("\n");
+        exact_changes(&old, original_entry).unwrap();
+        assert!(exact_changes(&old, expected).is_err());
+        assert!(exact_changes(&changed, original_entry).is_err());
+        assert!(
+            exact_changes(
+                &format!("{changed}\njetstreamer-firehose/src/lib.rs"),
+                expected
+            )
+            .is_err()
+        );
+        assert_eq!(
+            record(&old)["schema"],
+            "horizon-reader-exact-operator-equivalence205-v1"
+        );
     }
     #[test]
     fn manifest_lock_guard_and_modes_are_exact_not_allowlisted_paths() {

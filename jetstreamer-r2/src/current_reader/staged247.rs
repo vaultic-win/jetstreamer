@@ -1,0 +1,591 @@
+//! Reuse the original authenticated scratch inode only after its owner failed.
+//! A fresh ordered R2 stream must equal it byte for byte before plugin playback.
+use super::*;
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
+
+const UNIT: &str = "horizon-upload-247-singleton-20261119-v1.service";
+const IID: &str = "69218e2e0924497ea595a1227a6c31db";
+const PREPARATION: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon247-staged-recovery-20261120-v1/preparation.json";
+const PREP_SHA: &str = "fb6f14b5fedac0aa306e4270f0ca8c65823cb863c1df21bccae82abba98072da";
+const INPUT: &str = "/home/ubuntu/.jetstreamer-private/qualification-247-reboot-20261117-v2/output";
+const STATE: &str = "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2";
+const SCRATCH: &str = "/home/ubuntu/.jetstreamer-private/current-reader-delivery-247-20261119-v2/playback/epoch-247-1439838-1795133811334956924/readback/epoch-247.jet";
+const PLAN: &str =
+    "/var/lib/jetstreamer/horizon-reader-delivery247-251-db1c31fe-20261119-v2/epoch-247-plan.json";
+const PLAN_SHA: &str = "cea94f810e84239475726eb49ad1bcd24d058ab91e96f10fb01def2fcbc7472d";
+pub(super) const BUDGET: u64 = 64 << 20;
+const LOG: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
+const BUCKET: &str = "solana-archive-with-accounts-data";
+const ETAG: &str = "c1be2474b6c9ba8d0ac11405a97ebee3-2688";
+const SHA: &str = "0533b69ef3377b59c485893fa1386cc632dd7489da6ec721eeb7dcfeaacd2116";
+const LENGTH: u64 = 180370916960;
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct Stamp {
+    device: u64,
+    inode: u64,
+    length: u64,
+    uid: u32,
+    gid: u32,
+    mode: u32,
+    links: u64,
+    mtime_ns: i128,
+    ctime_ns: i128,
+}
+impl Stamp {
+    fn from(m: &fs::Metadata) -> Self {
+        Self {
+            device: m.dev(),
+            inode: m.ino(),
+            length: m.len(),
+            uid: m.uid(),
+            gid: m.gid(),
+            mode: m.mode() & 0o7777,
+            links: m.nlink(),
+            mtime_ns: i128::from(m.mtime()) * 1_000_000_000 + i128::from(m.mtime_nsec()),
+            ctime_ns: i128::from(m.ctime()) * 1_000_000_000 + i128::from(m.ctime_nsec()),
+        }
+    }
+    fn check(&self, path: &Path) -> Result<()> {
+        let m = fs::symlink_metadata(path)?;
+        ensure!(
+            path.canonicalize()? == path && m.is_file() && Self::from(&m) == *self,
+            "retained file identity changed: {}",
+            path.display()
+        );
+        Ok(())
+    }
+}
+const COPY: Stamp = Stamp {
+    device: 66305,
+    inode: 87557157,
+    length: LENGTH,
+    uid: 0,
+    gid: 0,
+    mode: 0o400,
+    links: 1,
+    mtime_ns: 1795175215924973980,
+    ctime_ns: 1795175215984974184,
+};
+const ARCHIVE: Stamp = Stamp {
+    device: 66305,
+    inode: 508595,
+    length: LENGTH,
+    uid: 1000,
+    gid: 1000,
+    mode: 0o440,
+    links: 1,
+    mtime_ns: 1795100590357758381,
+    ctime_ns: 1795104378317034604,
+};
+const SIDECAR: Stamp = Stamp {
+    device: 66305,
+    inode: 5021874,
+    length: 80,
+    uid: 1000,
+    gid: 1000,
+    mode: 0o440,
+    links: 1,
+    mtime_ns: 1795104378316642995,
+    ctime_ns: 1795104378317479494,
+};
+
+fn saved_inputs() -> Result<()> {
+    ARCHIVE.check(&Path::new(INPUT).join("epoch-247.jet"))?;
+    SIDECAR.check(&Path::new(INPUT).join("epoch-247.jet.sha256"))?;
+    COPY.check(Path::new(SCRATCH))?;
+    let dir = Path::new(SCRATCH).parent().context("scratch parent")?;
+    private_directory(dir)?;
+    ensure!(
+        fs::read_dir(dir)?.collect::<io::Result<Vec<_>>>()?.len() == 1,
+        "unexpected playback sibling"
+    );
+    Ok(())
+}
+
+fn failed(rows: &[Value]) -> Result<&Value> {
+    let failures: Vec<_> = rows
+        .iter()
+        .filter(|r| r["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c")
+        .collect();
+    ensure!(
+        failures.len() == 1
+            && rows
+                .iter()
+                .all(|r| r["_PID"] == "1" && r["INVOCATION_ID"] == IID && r["UNIT"] == UNIT)
+            && matches!(
+                failures[0]["UNIT_RESULT"].as_str(),
+                Some(
+                    "exit-code"
+                        | "signal"
+                        | "core-dump"
+                        | "timeout"
+                        | "oom-kill"
+                        | "watchdog"
+                        | "resources"
+                        | "protocol"
+                )
+            ),
+        "missing exact unsuccessful original uploader result"
+    );
+    Ok(failures[0])
+}
+fn drained() -> Result<()> {
+    use std::collections::BTreeMap;
+    let s = Command::new("/usr/bin/systemctl")
+        .args(["show", UNIT, "--property=Id,LoadState,ActiveState,SubState,MainPID,ControlPID,InvocationID,NRestarts,Restart,Job"])
+        .output()?;
+    let state = std::str::from_utf8(&s.stdout)?
+        .lines()
+        .map(|l| l.split_once('=').context("invalid unit property"))
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    ensure!(
+        state.get("Id") == Some(&UNIT)
+            && matches!(
+                (state.get("ActiveState"), state.get("SubState")),
+                (Some(&"failed"), Some(&"failed")) | (Some(&"inactive"), Some(&"dead"))
+            )
+            && (s.status.success()
+                || (s.status.code() == Some(4) && state.get("LoadState") == Some(&"not-found")))
+            && ["MainPID", "ControlPID", "NRestarts"]
+                .iter()
+                .all(|k| state.get(k) == Some(&"0"))
+            && state.get("Job") == Some(&"")
+            && state.get("Restart") == Some(&"no")
+            && matches!(state.get("InvocationID").copied(), Some("") | Some(IID)),
+        "original uploader is not drained"
+    );
+    let p = Path::new("/sys/fs/cgroup/system.slice")
+        .join(UNIT)
+        .join("cgroup.events");
+    match fs::read_to_string(&p) {
+        Ok(s) => ensure!(
+            s.lines().any(|l| l == "populated 0"),
+            "original uploader cgroup populated"
+        ),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => ensure!(
+            !p.parent().unwrap().try_exists()?,
+            "unreadable original cgroup"
+        ),
+        Err(e) => return Err(e.into()),
+    }
+    Ok(())
+}
+pub(crate) fn config(c: &crate::Config) -> Result<()> {
+    ensure!(
+        c.command == crate::Command::Sync
+            && c.epochs == std::collections::BTreeSet::from([247])
+            && c.directory == Path::new(INPUT)
+            && c.receipt_directory.as_deref() == Some(Path::new(STATE).join("receipts").as_path())
+            && c.current_reader_plan.as_deref() == Some(Path::new(PLAN))
+            && c.current_reader_plan_sha256.as_deref() == Some(PLAN_SHA)
+            && c.concurrency == 2
+            && !c.overwrite_existing
+            && !c.delete_local
+            && !c.repair_orphaned_archive
+            && c.legacy_part_size.is_none()
+            && c.part_size == crate::DEFAULT_PART_SIZE,
+        "invalid epoch 247 staged recovery scope"
+    );
+    Ok(())
+}
+pub(crate) fn object(bucket: &str, key: &str, remote: Option<&crate::RemoteArchive>) -> Result<()> {
+    let r = remote.context("staged 247 object missing")?;
+    ensure!(
+        bucket == BUCKET
+            && key == "epoch-247.jet"
+            && r.etag == ETAG
+            && r.length == LENGTH
+            && r.metadata_sha256.as_deref() == Some(SHA),
+        "staged object differs from original authenticated identity"
+    );
+    Ok(())
+}
+// These original producer receipts are root-writable (0600). Their sealed
+// preparation pins the exact bytes. Recheck the path and descriptor on each read.
+fn read_private(path: &Path, limit: u64) -> Result<(Vec<u8>, Stamp)> {
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    let stamp = Stamp::from(&metadata);
+    ensure!(
+        metadata.is_file()
+            && stamp.uid == 0
+            && stamp.gid == 0
+            && stamp.mode == 0o600
+            && stamp.links == 1
+            && stamp.length > 0
+            && stamp.length <= limit,
+        "invalid private evidence file"
+    );
+    stamp.check(path)?;
+    let mut bytes = Vec::new();
+    (&file).take(limit + 1).read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == stamp.length && Stamp::from(&file.metadata()?) == stamp,
+        "private evidence changed while reading"
+    );
+    stamp.check(path)?;
+    Ok((bytes, stamp))
+}
+
+fn readback_events(raw: &[u8]) -> Result<()> {
+    let mut started = false;
+    let mut verified = false;
+    for line in raw.split(|&b| b == b'\n').filter(|l| l.starts_with(b"{")) {
+        let row: Value = serde_json::from_slice(line)?;
+        match row["event"].as_str() {
+            Some("r2-readback-start") => {
+                ensure!(
+                    !started
+                        && row["key"] == "epoch-247.jet"
+                        && row["expected_etag"] == ETAG
+                        && row["expected_sha256"] == SHA
+                        && row["hashed_bytes"] == 0
+                        && row["total_bytes"] == LENGTH
+                        && row["whole_file_sha256_verified"] == false,
+                    "invalid original readback start"
+                );
+                started = true;
+            }
+            Some("r2-readback-verified") => {
+                ensure!(
+                    started
+                        && !verified
+                        && row["key"] == "epoch-247.jet"
+                        && row["hashed_bytes"] == LENGTH
+                        && row["total_bytes"] == LENGTH
+                        && row["whole_file_sha256_verified"] == true,
+                    "invalid original readback verification"
+                );
+                verified = true;
+            }
+            _ => {}
+        }
+    }
+    ensure!(verified, "missing original whole readback");
+    Ok(())
+}
+
+#[derive(Clone)]
+pub(crate) struct Retained {
+    complete: Arc<AtomicBool>,
+    _lock: Arc<File>,
+    log: Stamp,
+    log_sha256: String,
+    failed_manager_event: Value,
+}
+impl Retained {
+    pub(crate) fn open() -> Result<Self> {
+        use std::os::fd::AsRawFd;
+        ensure!(
+            unsafe { libc::geteuid() } == 0,
+            "private recovery requires root"
+        );
+        let binding = Bound {
+            path: PREPARATION.into(),
+            sha256: PREP_SHA.into(),
+        };
+        let info = bound_json(&binding)?;
+        ensure!(
+            info["unit"]["InvocationID"] == IID
+                && info["unit"]["Id"] == UNIT
+                && info["readback_archive"] == SCRATCH
+                && info["original_native_log"] == LOG
+                && info["original_local_archive"]
+                    == Path::new(INPUT).join("epoch-247.jet").to_str().unwrap()
+                && info["remote_object_at_fleet_sample"]["archive_etag"] == ETAG
+                && info["remote_object_at_fleet_sample"]["archive_metadata_sha256"] == SHA,
+            "original 247 provenance differs"
+        );
+        for k in ["local_acceptance", "local_plugin", "reader_plan"] {
+            let b: Bound = serde_json::from_value(info[k].clone())?;
+            bound_file(&b)?;
+        }
+        for k in ["terminal", "drain"] {
+            let bound: Bound = serde_json::from_value(info[k].clone())?;
+            let (bytes, _) = read_private(&bound.path, 1024 * 1024)?;
+            ensure!(
+                format!("{:x}", Sha256::digest(&bytes)) == bound.sha256,
+                "original {k} digest mismatch"
+            );
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(PREPARATION)?;
+        ensure!(
+            unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+            "concurrent staged 247 recovery"
+        );
+        let output = Command::new("/usr/bin/journalctl")
+            .args([
+                "--quiet",
+                "--no-pager",
+                "--output=json",
+                "--output-fields=_PID,UNIT,INVOCATION_ID,MESSAGE_ID,UNIT_RESULT",
+                "--lines=64",
+                "_PID=1",
+                &format!("UNIT={UNIT}"),
+                &format!("INVOCATION_ID={IID}"),
+            ])
+            .output()?;
+        ensure!(
+            output.status.success() && output.stdout.len() <= 256 * 1024,
+            "original systemd result unavailable"
+        );
+        let rows = std::str::from_utf8(&output.stdout)?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<serde_json::Result<Vec<_>>>()?;
+        let failed_manager_event = failed(&rows)?.clone();
+        drained()?;
+        saved_inputs()?;
+        let (bytes, log) = read_private(Path::new(LOG), 16 << 20)?;
+        ensure!(
+            log.device == 66305 && log.inode == 14049358,
+            "replaced original native log"
+        );
+        readback_events(&bytes)?;
+        Ok(Self {
+            log,
+            failed_manager_event,
+            log_sha256: format!("{:x}", Sha256::digest(&bytes)),
+            complete: Arc::new(AtomicBool::new(false)),
+            _lock: Arc::new(file),
+        })
+    }
+    pub(super) fn path(&self) -> PathBuf {
+        PathBuf::from(SCRATCH)
+    }
+    pub(super) fn stream(&self) -> Result<Sink> {
+        saved_inputs()?;
+        let f = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(SCRATCH)?;
+        ensure!(
+            Stamp::from(&f.metadata()?) == COPY,
+            "retained descriptor changed"
+        );
+        Ok(Sink::Compare {
+            file: f,
+            bytes: 0,
+            owner: self.clone(),
+        })
+    }
+    pub(super) fn verify_object(&self, remote: &RemoteObject) -> Result<()> {
+        ensure!(
+            remote.bucket == BUCKET
+                && remote.key == "epoch-247.jet"
+                && remote.etag == ETAG
+                && remote.sha256 == SHA
+                && remote.length == LENGTH,
+            "wrong retained playback object"
+        );
+        Ok(())
+    }
+    pub(crate) fn proof(&self) -> Result<Value> {
+        ensure!(
+            self.complete.load(Ordering::Acquire),
+            "fresh compared readback missing"
+        );
+        drained()?;
+        saved_inputs()?;
+        self.log.check(Path::new(LOG))?;
+        Ok(json!({
+            "original_unit": UNIT, "original_invocation_id": IID,
+            "original_systemd_failure":self.failed_manager_event,
+            "preparation": {"path":PREPARATION, "sha256":PREP_SHA},
+            "original_verified_readback_log": {"path":LOG, "sha256":self.log_sha256, "identity":self.log},
+            "readback_path":SCRATCH, "readback_identity":COPY,
+            "source_identity":ARCHIVE, "source_sidecar_identity":SIDECAR,
+            "fresh_authenticated_stream_compared_bytes":LENGTH, "byte_equality_from_zero":true
+        }))
+    }
+}
+pub(crate) enum Sink {
+    New(File),
+    Compare {
+        file: File,
+        bytes: u64,
+        owner: Retained,
+    },
+}
+fn compare<W: Read>(reader: &mut W, mut bytes: &[u8]) -> io::Result<()> {
+    let mut buf = [0u8; 16 * 1024];
+    while !bytes.is_empty() {
+        let n = bytes.len().min(buf.len());
+        reader.read_exact(&mut buf[..n])?;
+        if bytes[..n] != buf[..n] {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "retained R2 readback byte mismatch",
+            ));
+        }
+        bytes = &bytes[n..];
+    }
+    Ok(())
+}
+impl Write for Sink {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::New(f) => f.write(buf),
+            Self::Compare { file, bytes, .. } => {
+                let next = bytes
+                    .checked_add(buf.len() as u64)
+                    .filter(|v| *v <= LENGTH)
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, "oversized 247 stream")
+                    })?;
+                compare(file, buf)?;
+                *bytes = next;
+                Ok(buf.len())
+            }
+        }
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::New(f) => f.flush(),
+            Self::Compare { .. } => Ok(()),
+        }
+    }
+}
+fn finish_stream(reader: &mut impl Read, received: u64, expected: u64) -> Result<()> {
+    ensure!(
+        received == expected && reader.read(&mut [0])? == 0,
+        "incomplete retained readback"
+    );
+    Ok(())
+}
+impl Sink {
+    pub(crate) fn sync_all(&mut self) -> Result<()> {
+        match self {
+            Self::New(f) => f.sync_all()?,
+            Self::Compare { file, bytes, owner } => {
+                finish_stream(file, *bytes, LENGTH)?;
+                ensure!(
+                    Stamp::from(&file.metadata()?) == COPY,
+                    "changed retained readback"
+                );
+                saved_inputs()?;
+                owner.complete.store(true, Ordering::Release);
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn staged_remote_identity_requires_the_recorded_key_bucket_digest_length_and_etag() {
+        let r = crate::RemoteArchive {
+            length: LENGTH,
+            etag: ETAG.into(),
+            metadata_sha256: Some(SHA.into()),
+            composite_sha256: None,
+            checksum_type: None,
+            multipart_part_size: Some(crate::DEFAULT_PART_SIZE),
+        };
+        object(BUCKET, "epoch-247.jet", Some(&r)).unwrap();
+        assert!(object(BUCKET, "epoch-247.jet", None).is_err());
+        assert!(object("foreign", "epoch-247.jet", Some(&r)).is_err());
+        assert!(object(BUCKET, "epoch-248.jet", Some(&r)).is_err());
+        let mut wrong = r;
+        wrong.length -= 1;
+        assert!(object(BUCKET, "epoch-247.jet", Some(&wrong)).is_err());
+        wrong.length = LENGTH;
+        wrong.etag = "changed".into();
+        assert!(object(BUCKET, "epoch-247.jet", Some(&wrong)).is_err());
+        wrong.etag = ETAG.into();
+        wrong.metadata_sha256 = None;
+        assert!(object(BUCKET, "epoch-247.jet", Some(&wrong)).is_err());
+    }
+    #[test]
+    fn failed_result_rejects_live_successful_reused_and_ambiguous_invocations() {
+        let r = json!({"_PID":"1","UNIT":UNIT,"INVOCATION_ID":IID,"MESSAGE_ID":"d9b373ed55a64feb8242e02dbe79a49c","UNIT_RESULT":"exit-code"});
+        failed(std::slice::from_ref(&r)).unwrap();
+        assert!(failed(&[]).is_err());
+        assert!(failed(&[r.clone(), r.clone()]).is_err());
+        for (k, v) in [
+            ("_PID", "4"),
+            ("UNIT", "other.service"),
+            ("INVOCATION_ID", "different"),
+            ("UNIT_RESULT", "success"),
+            ("MESSAGE_ID", "started"),
+        ] {
+            let mut bad = r.clone();
+            bad[k] = json!(v);
+            assert!(failed(&[bad]).is_err());
+        }
+    }
+    #[test]
+    fn comparison_requires_exact_order_and_fails_on_short_or_different_retained_bytes() {
+        let original = (0..50000).map(|i| (i % 251) as u8).collect::<Vec<_>>();
+        let mut reader = io::Cursor::new(&original);
+        for part in original.chunks(827) {
+            compare(&mut reader, part).unwrap();
+        }
+        assert_eq!(reader.position(), original.len() as u64);
+        let mut bad = original.clone();
+        bad[39999] ^= 1;
+        assert!(compare(&mut io::Cursor::new(&original), &bad).is_err());
+        assert!(compare(&mut io::Cursor::new(&original[..49000]), &original).is_err());
+        assert!(compare(&mut io::Cursor::new(&original), &original[827..]).is_err());
+    }
+    #[test]
+    fn final_comparison_requires_declared_length_and_eof() {
+        assert!(finish_stream(&mut io::empty(), 5, 5).is_ok());
+        assert!(finish_stream(&mut io::empty(), 4, 5).is_err());
+        assert!(finish_stream(&mut io::Cursor::new([0]), 5, 5).is_err());
+    }
+    #[test]
+    fn historical_readback_requires_exact_start_and_completed_hash_in_order() {
+        let start = json!({"event":"r2-readback-start","key":"epoch-247.jet","expected_etag":ETAG,
+            "expected_sha256":SHA,"hashed_bytes":0,"total_bytes":LENGTH,"whole_file_sha256_verified":false});
+        let end = json!({"event":"r2-readback-verified","key":"epoch-247.jet","hashed_bytes":LENGTH,
+            "total_bytes":LENGTH,"whole_file_sha256_verified":true});
+        assert!(readback_events(format!("{start}\n{end}").as_bytes()).is_ok());
+        for text in [
+            start.to_string(),
+            end.to_string(),
+            format!("{end}\n{start}"),
+            format!("{start}\n{end}\n{end}"),
+            format!("{start}\n{end}").replace(ETAG, "changed"),
+            format!("{start}\n{end}").replace(&LENGTH.to_string(), "8192"),
+        ] {
+            assert!(readback_events(text.as_bytes()).is_err());
+        }
+    }
+    #[test]
+    fn stamped_inode_rejects_alias_permission_mutation_and_replacement() -> Result<()> {
+        let d = tempfile::tempdir()?;
+        let p = d.path().join("body");
+        fs::write(&p, b"archive")?;
+        let stamp = Stamp::from(&fs::symlink_metadata(&p)?);
+        stamp.check(&p)?;
+        fs::hard_link(&p, d.path().join("alias"))?;
+        assert!(stamp.check(&p).is_err());
+        fs::remove_file(d.path().join("alias"))?;
+        let current = Stamp::from(&fs::symlink_metadata(&p)?);
+        fs::set_permissions(&p, fs::Permissions::from_mode(0o400))?;
+        assert!(current.check(&p).is_err());
+        fs::rename(&p, d.path().join("retained"))?;
+        fs::write(&p, b"archive")?;
+        assert!(stamp.check(&p).is_err());
+        Ok(())
+    }
+}
