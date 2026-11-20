@@ -1,4 +1,4 @@
-//! Exact reviewed operator-only transition that interrupted the completed epoch205 audit.
+//! Exact operator-only changes reviewed against the qualified db1c31fe reader.
 //! No general manifest/lockfile/path exception: every changed tree entry is pinned.
 use super::*;
 const BASE: &str = "db1c31fe4e6d462a8e45c18c61f6b331a9c1a1c6";
@@ -28,6 +28,13 @@ const CHANGES: &[(&str, &str, &str)] = &[
         "jetstreamer-utils/src/horizon_standalone_guard_native227.rs",
         "100644 blob a9de0b3ff8f45958bc3e54f12d8aeab6d57dae57\tjetstreamer-utils/src/horizon_standalone_guard_native227.rs",
         "100644 blob a2af30c4b67d60670a4ced6d61b8f41ddd3219e2\tjetstreamer-utils/src/horizon_standalone_guard_native227.rs",
+    ),
+    // A standalone Cargo bin target. Neither qualified reader target compiles this file.
+    // git ls-tree returns an empty string for its absence in the original reader tree.
+    (
+        "jetstreamer-firehose/src/bin/epoch257-native-window-audit.rs",
+        "",
+        "100644 blob 8707032b5fd124a145779efc89c835078bb8862b\tjetstreamer-firehose/src/bin/epoch257-native-window-audit.rs",
     ),
 ];
 fn exact_changes(changed: &str, mut entry: impl FnMut(bool, &str) -> Result<String>) -> Result<()> {
@@ -89,7 +96,7 @@ pub(super) fn record(changed: &str) -> Value {
     json!({"schema":"horizon-reader-exact-operator-equivalence205-v1",
         "original_reader_commit":BASE,"qualification_sha256":QUALIFICATION_SHA,
         "changed_paths":changed.lines().collect::<Vec<_>>(),
-        "reviewed_tree_entries":CHANGES.iter().map(|(path,before,after)|
+        "reviewed_tree_entries":CHANGES.iter().filter(|(path,_,_)|changed.lines().any(|p|p==*path)).map(|(path,before,after)|
             json!({"path":path,"before":before,"after":after})).collect::<Vec<_>>(),
         "reader_dependency_or_feature_change_authorized":false})
 }
@@ -131,7 +138,11 @@ mod tests {
                     exact_changes(path, |after, p| {
                         let value = original_entry(after, p)?;
                         Ok(if after == wrong_side {
-                            value.replacen("100644", "100755", 1)
+                            if value.is_empty() {
+                                format!("100644 blob {}\t{p}", "a".repeat(40))
+                            } else {
+                                value.replacen("100644", "100755", 1)
+                            }
                         } else {
                             value
                         })
