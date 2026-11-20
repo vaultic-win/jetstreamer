@@ -132,7 +132,7 @@ fn successor167() -> Result<Value> {
             && ticks > 0
             && n["Id"] == NEXT167
             && n["InvocationID"] == iid
-            && n["MainPID"] == pid.to_string()
+            && n["MainPID"].as_str() == Some(pid.to_string().as_str())
             && g["producer_unit"] == NEXT167
             && g["producer_invocation_id"] == iid
             && g["timer_unit"] == TIMER167

@@ -18,8 +18,8 @@
     },
     {
       "path": "scripts/horizon_170_join_independent166_20261120_v1/peer.rs",
-      "sha256": "f693ee18da30923b2838b562c562560182efc6df71e0e9e2668acbadeb0c2e8e",
-      "bytes": 13846
+      "sha256": "0f28642146455469b7cf5db57d3747389b26d7b0c77b4f4a51b870b9e41ee096",
+      "bytes": 13870
     },
     {
       "path": "scripts/horizon_170_join_independent166_20261120_v1/prepare/Cargo.lock",
