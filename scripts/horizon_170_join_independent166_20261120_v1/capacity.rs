@@ -1,10 +1,8 @@
 //! Preserve the old four-root allocation fit and fund the independent 166 root separately.
+use crate::audit_budget;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use std::{fs, os::unix::fs::MetadataExt, path::Path};
-#[allow(dead_code)]
-#[path = "../horizon_audit79_budget_v10_20261120_v1/audit_budget.rs"]
-mod audit_budget;
 #[path = "../horizon_independent_cold166_20261120_v1/prepare/auxiliary_phases.rs"]
 mod auxiliary_phases;
 fn n(v: &Value, k: &str) -> Result<u64> {

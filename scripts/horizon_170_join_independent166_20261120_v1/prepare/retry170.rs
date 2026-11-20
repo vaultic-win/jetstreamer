@@ -286,6 +286,42 @@ pub(super) fn authenticate(p: &Plan) -> Result<Value> {
         "raw_floor_bytes":RAW_FLOOR,"resource_credit_bytes":0,"replay_launch_authorized":false}),
     )
 }
+fn contract_path(path: &Path) -> bool {
+    if path.file_name().and_then(|name| name.to_str()) != Some("contract.json") {
+        return false;
+    }
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    // Retain the qualified legacy contracts used for measurement. Fresh HOME
+    // contracts have their own exact parent and the stage tool's generation tag.
+    // This path selector grants no seal, witness, freshness or resource credit.
+    let prefix = match parent.parent() {
+        Some(root) if root == Path::new("/usr/local/lib/jetstreamer") => {
+            "horizon-epoch170-retry6-live166retry8-data-contract-"
+        }
+        Some(root)
+            if root
+                == Path::new(
+                    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1",
+                ) =>
+        {
+            "data-contract-"
+        }
+        _ => return false,
+    };
+    parent
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix(prefix))
+        .is_some_and(|tag| {
+            (1..=32).contains(&tag.len())
+                && tag
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +518,9 @@ mod tests {
         assert_eq!(COMPLETE_DATA, 6_794_761_027_378);
         assert_eq!(RAW_FLOOR, 6_829_053_656_882);
     }
+    const HOME: &str =
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1";
+
     #[test]
     fn contract_generations_never_escape_exact_namespace() {
         for tag in ["20261119-v1", "retry2"] {
