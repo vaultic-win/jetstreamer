@@ -155,6 +155,9 @@ fn evaluate(
     if let Some(proof) = host.boundary_memory {
         result["failed_boundary205206_memory_release"] = proof;
     }
+    if let Some(proof) = host.retry_memory {
+        result["completed_boundary205206_retry_memory_release"] = proof;
+    }
     Ok(result)
 }
 
@@ -243,6 +246,7 @@ mod tests {
             century: 0,
             full211_growth: None,
             boundary_memory: None,
+            retry_memory: None,
             native211_growth: None,
             release: None,
             boot: String::new(),

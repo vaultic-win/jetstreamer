@@ -304,12 +304,7 @@ pub(super) fn validate_roster(
         "unsupported fleet diagnostic owner"
     );
     full265::validate(fleet, observer, rows, boot)?;
-    // Delivery has its own live owner and full reservation, not replay telemetry.
-    for e in fleet["pipelines"].as_array().context("pipeline census")? {
-        if delivery247::selected(e) {
-            delivery247::validate(e, fleet, rows)?;
-        }
-    }
+    delivery247::validate_roster(fleet, rows)?;
     // Admission independently authenticates both exact native terminal peers.
     let pipelines: Vec<_> = fleet["pipelines"]
         .as_array()
@@ -364,7 +359,6 @@ pub(super) fn validate_roster(
             continue;
         }
         if delivery247::selected(a) {
-            delivery247::validate(a, fleet, rows)?;
             continue;
         }
         if a["phase"] == "producer-finalization" {
@@ -389,7 +383,7 @@ pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
     full265::verify_inputs(fleet)?;
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
         if delivery247::selected(e) {
-            delivery247::verify_inputs()?;
+            delivery247::verify_inputs(e)?;
             continue;
         }
         if peers::selected(e) || full265::pipeline(e) {
