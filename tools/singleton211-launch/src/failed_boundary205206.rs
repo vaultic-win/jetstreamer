@@ -1,6 +1,8 @@
 //! Memory-only accounting after the exact failed v135 boundary. The v138
 //! retry has a separate booking and its own private tmpfs at the same pathname.
 use super::*;
+#[path = "failed_boundary205206/retry_memory.rs"]
+pub(super) mod retry_memory;
 
 const OLD: &str = "horizon205206-adjacent-boundary-v135-v1.service";
 const IID: &str = "c575c1f6415d4f82b9432473f2e94ed1";
