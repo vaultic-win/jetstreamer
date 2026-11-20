@@ -354,13 +354,7 @@ pub(super) fn capture(p: &Value, plan: &Bound, self_sha: &str) -> Result<()> {
     let iid = text(p, "invocation_id")?;
     let helper: Bound = serde_json::from_value(p["helper"].clone())?;
     ensure!(
-        (helper.sha256 == self_sha
-            || (helper.path
-                == Path::new(
-                    "/var/lib/jetstreamer/horizon265-capability-attempt3-20261120-v1/horizon265-capability"
-                )
-                && helper.sha256
-                    == "42ae5a68f01de38568d54a1cc1c9bff482f957a29af7cbfcd68f760fabf526fd"))
+        helper.sha256 == self_sha
             && digest(&read(&helper.path, 0, 64 << 20, true)?) == helper.sha256,
         "network helper identity"
     );
