@@ -16,6 +16,10 @@ use std::{
 mod admission;
 #[path = "current/capacity.rs"]
 mod capacity;
+#[path = "current/delivery247.rs"]
+mod delivery247;
+#[path = "current/failed_v1.rs"]
+mod failed_v1;
 #[path = "current/finalization.rs"]
 mod finalization;
 #[path = "current/live.rs"]

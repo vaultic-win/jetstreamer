@@ -293,12 +293,18 @@ pub(super) fn validate(
         fleet["diagnostics"] == json!([]) && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
+    // Delivery has its own live owner and full reservation, not replay telemetry.
+    for e in fleet["pipelines"].as_array().context("pipeline census")? {
+        if delivery247::selected(e) {
+            delivery247::validate(e, fleet, rows)?;
+        }
+    }
     // Admission independently authenticates both exact native terminal peers.
     let pipelines: Vec<_> = fleet["pipelines"]
         .as_array()
         .context("pipeline census")?
         .iter()
-        .filter(|e| !peers::selected(e))
+        .filter(|e| !peers::selected(e) && !delivery247::selected(e))
         .collect();
     let observed_diagnostics = observer["diagnostic_replays"]
         .as_array()
@@ -331,6 +337,10 @@ pub(super) fn validate(
         );
     }
     for a in fleet["active"].as_array().context("active census")? {
+        if delivery247::selected(a) {
+            delivery247::validate(a, fleet, rows)?;
+            continue;
+        }
         if a["phase"] == "producer-finalization" {
             ensure!(
                 pipelines.iter().filter(|p| **p == a).count() == 1,
@@ -351,6 +361,10 @@ pub(super) fn validate(
 }
 pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
     for e in fleet["pipelines"].as_array().context("pipeline census")? {
+        if delivery247::selected(e) {
+            delivery247::verify_inputs()?;
+            continue;
+        }
         if peers::selected(e) {
             continue;
         }

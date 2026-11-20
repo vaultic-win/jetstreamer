@@ -361,7 +361,7 @@ pub(super) fn census(
         }
     }
     for a in fleet["active"].as_array().context("fleet active")? {
-        if a["phase"] == "producer-finalization" {
+        if a["phase"] == "producer-finalization" || delivery247::selected(a) {
             let unit = text(&a["unit"], "Id")?;
             let v = before.get(unit).context("dropped finalization owner")?;
             same_owner(&a["unit"], v)?;

@@ -30,3 +30,18 @@ source and fresh complete admission. Retain the failed v1 attempt in the fleet
 history and prove its stopped, token-free, unused state before accepting any
 release of its obligations. A concurrently running delivery service must remain
 in the fleet and reservation ledger throughout replacement admission.
+
+The current admission validates the exact live epoch 247 uploader independently
+from replay and producer finalization. It retains its 7 GB memory ceiling,
+185,370,916,960 bytes of readback and temporary growth, and 3 TB free-space floor.
+The fleet's JSON owner evidence binds the original native manager capture;
+the mapped uploader image, command and invocation must still match.
+
+Transferring the failed v1 candidate reservation requires an explicit cancellation
+decision and a fresh native check. The original failed invocation must have no
+main-process execution history, an empty token directory, no successful startup
+handoff, inactive controls and drained kernel and process groups. Admission saves
+that evidence and preserves v1's inherited free-space floor while charging the
+full v2 candidate envelope. It cannot silently remove an existing retained
+reservation or treat the failed attempt as a completed replay. The root-only
+ignored custody test exercises these actual retained inputs without starting work.
