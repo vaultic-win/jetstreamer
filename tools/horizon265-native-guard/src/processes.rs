@@ -186,7 +186,7 @@ fn observe_one(
     ))
 }
 fn pin_envelope(p: &Plan, plan_sha: &str, kind: &str, pin: &Pin) -> Value {
-    json!({"schema":"horizon265-native-guard-process-pin-v1","kind":kind,"plan_sha256":plan_sha,"producer_invocation_id":p.invocation_id,"pin":pin,"remote_mutations":false})
+    json!({"schema":PROCESS_PIN,"kind":kind,"plan_sha256":plan_sha,"producer_invocation_id":p.invocation_id,"pin":pin,"remote_mutations":false})
 }
 fn retain(p: &Plan, plan_sha: &str, kind: &str, pin: &Pin) -> Result<()> {
     let path = p.receipt_directory.join(format!("{kind}-pin.json"));

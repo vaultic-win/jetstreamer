@@ -1,4 +1,4 @@
-//! Test-only, fail-closed permission to begin epoch265 snapshot work.
+//! First-guard proof required before the selected worker can read a snapshot.
 //! The root launcher must produce genuine admission/first-guard evidence.
 #![allow(clippy::unnecessary_map_or, clippy::too_many_arguments)]
 use serde_json::Value;
@@ -12,11 +12,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use super::profile::*;
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-const UNIT: &str = "horizon-265-native-input-20261119-v1.service";
-const GUARD_UNIT: &str = "horizon-native265-protective-v1.service";
-const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input265-selected-20261119-v1";
-const TOKENS: &str = "/var/lib/jetstreamer/horizon-native265-startup-tokens";
 fn require(ok: bool, message: &str) -> Result<()> {
     if ok { Ok(()) } else { Err(message.into()) }
 }
@@ -143,12 +140,12 @@ fn plan_valid(
     now: u64,
 ) -> Result<()> {
     require(
-        p["schema"] == "horizon-native265-startup-plan-v1"
-            && p["epoch"] == 265
+        p["schema"] == PLAN_SCHEMA
+            && p["epoch"] == EPOCH
             && p["unit"] == UNIT
             && p["guard_unit"] == GUARD_UNIT
             && p["worker_root"] == ROOT
-            && p["bootstrap_slot"] == 114_479_281u64
+            && p["bootstrap_slot"] == SLOT
             && p["snapshot_sha256"] == super::SNAPSHOT_SHA
             && p["worker"]["path"] == super::WORKER
             && p["worker"]["sha256"] == super::WORKER_SHA
@@ -159,6 +156,7 @@ fn plan_valid(
             && p["maximum_memory_bytes"] == 128_000_000_000u64
             && p["token_root"] == TOKENS
             && p["boot_id"] == boot
+            && harness_allowed(exe)
             && p["harness"]["path"].as_str() == exe.to_str()
             && p["harness"]["sha256"] == exe_sha
             && hex(iid, 32)
@@ -187,7 +185,7 @@ fn token_valid(
 ) -> Result<()> {
     clock(p, now)?;
     require(
-        t["schema"] == "horizon-native265-first-guard-token-v1"
+        t["schema"] == TOKEN_SCHEMA
             && t["startup_plan_sha256"] == plan_sha
             && t["unit"] == UNIT
             && t["invocation_id"] == iid
@@ -206,7 +204,7 @@ fn token_valid(
         gp["schema"] == "jetstreamer-horizon-standalone-guard-plan-v1"
             && gp["unit"] == UNIT
             && gp["invocation_id"] == iid
-            && gp["filesystem"] == "/"
+            && gp["filesystem"] == FILESYSTEM
             && gp["worker_root"] == ROOT
             && gp["minimum_free_bytes"] == p["minimum_free_bytes"]
             && gp["maximum_root_physical_bytes"] == 506_191_984_640u64
@@ -309,8 +307,8 @@ fn token_valid(
 }
 
 pub(super) fn admit() -> Result<Value> {
-    let plan_path = PathBuf::from(env::var("JETSTREAMER_EPOCH265_STARTUP_PLAN")?);
-    let plan_sha = env::var("JETSTREAMER_EPOCH265_STARTUP_PLAN_SHA256")?;
+    let plan_path = PathBuf::from(env::var(PLAN_ENV)?);
+    let plan_sha = env::var(PLAN_SHA_ENV)?;
     require(
         plan_path.file_name().and_then(|s| s.to_str()) == Some("plan.json")
             && plan_path.parent().and_then(Path::parent) == Some(Path::new("/var/lib/jetstreamer"))
@@ -318,7 +316,7 @@ pub(super) fn admit() -> Result<Value> {
                 .parent()
                 .and_then(Path::file_name)
                 .and_then(|s| s.to_str())
-                .map_or(false, |s| s.starts_with("horizon-native265-startup-plan-")),
+                .map_or(false, |s| s.starts_with(PLAN_PREFIX)),
         "startup plan namespace",
     )?;
     let original = fs::symlink_metadata(&plan_path)?;
@@ -340,8 +338,8 @@ pub(super) fn admit() -> Result<Value> {
     )?;
     let a = bound(&p["admission"])?;
     require(
-        a["schema"] == "horizon-native265-current-fleet-admission-v1"
-            && a["epoch"] == 265
+        a["schema"] == ADMISSION_SCHEMA
+            && a["epoch"] == EPOCH
             && a["mode"] == "native-cold"
             && a["unit"] == UNIT
             && a["maximum_memory_bytes"] == p["maximum_memory_bytes"]
@@ -382,7 +380,8 @@ pub(super) fn admit() -> Result<Value> {
     }
     let token_path = Path::new(TOKENS).join(&iid).join("guard-admission.json");
     println!(
-        "epoch265-startup-gate waiting invocation={} pid={} expires_monotonic_us={}",
+        "epoch{}-startup-gate waiting invocation={} pid={} expires_monotonic_us={}",
+        EPOCH,
         iid,
         pid,
         num(&p, "expires_monotonic_us")?
@@ -454,7 +453,8 @@ pub(super) fn admit() -> Result<Value> {
                     "original admission expired while waiting for first guard",
                 )?;
                 println!(
-                    "epoch265-startup-gate admitted invocation={} pid={} plan_sha256={} guard_invocation={}",
+                    "epoch{}-startup-gate admitted invocation={} pid={} plan_sha256={} guard_invocation={}",
+                    EPOCH,
                     iid,
                     pid,
                     plan_sha,
@@ -488,7 +488,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[test]
-    fn native265_gate_evidence_rejects_wrong_owner_changed_writable_or_linked_file() {
+    fn native_gate_evidence_rejects_wrong_owner_changed_writable_or_linked_file() {
         use std::os::unix::fs::{PermissionsExt, symlink};
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("proof");
@@ -513,10 +513,10 @@ mod tests {
     fn fixture() -> (Value, Value, Value, Value, Value) {
         let iid = "a".repeat(32);
         let gid = "b".repeat(32);
-        let harness = json!({"path":"/var/lib/jetstreamer/horizon-native265-test/native-input-test","sha256":"c".repeat(64)});
-        let guard = json!({"path":"/var/lib/jetstreamer/horizon-native265-guard/guard","sha256":"d".repeat(64)});
-        let p = json!({"schema":"horizon-native265-startup-plan-v1","epoch":265,"unit":UNIT,"guard_unit":GUARD_UNIT,
-            "worker_root":ROOT,"bootstrap_slot":114_479_281u64,"snapshot_sha256":super::super::SNAPSHOT_SHA,
+        let harness = json!({"path":HARNESS,"sha256":"c".repeat(64)});
+        let guard = json!({"path":"/var/lib/jetstreamer/guard-test/guard","sha256":"d".repeat(64)});
+        let p = json!({"schema":PLAN_SCHEMA,"epoch":EPOCH,"unit":UNIT,"guard_unit":GUARD_UNIT,
+            "worker_root":ROOT,"bootstrap_slot":SLOT,"snapshot_sha256":super::super::SNAPSHOT_SHA,
             "worker":{"path":super::super::WORKER,"sha256":super::super::WORKER_SHA},
             "genesis_sha256":super::super::GENESIS_SHA,
             "input_packet":{"path":super::super::PACKET,"sha256":super::super::PACKET_SHA},
@@ -525,9 +525,9 @@ mod tests {
             "minimum_free_bytes":10,"issued_monotonic_us":100,"expires_monotonic_us":200,
             "admission":{"path":"/admission","sha256":"e".repeat(64)}});
         let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,
-            "filesystem":"/","worker_root":ROOT,"minimum_free_bytes":10,"maximum_root_physical_bytes":506_191_984_640u64,
+            "filesystem":FILESYSTEM,"worker_root":ROOT,"minimum_free_bytes":10,"maximum_root_physical_bytes":506_191_984_640u64,
             "maximum_worker_vmas":3500000,"native_main":{"main_pid":42,"executable":harness["path"],"sha256":harness["sha256"]}});
-        let t = json!({"schema":"horizon-native265-first-guard-token-v1","startup_plan_sha256":"f".repeat(64),
+        let t = json!({"schema":TOKEN_SCHEMA,"startup_plan_sha256":"f".repeat(64),
             "unit":UNIT,"invocation_id":iid,"main_pid":42,"harness":harness,"guard":guard,"boot_id":"boot",
             "admission":p["admission"],"recorded_monotonic_us":180,"guard_invocation_id":gid,
             "guard_plan":{"path":"/guardplan","sha256":"9".repeat(64)}});
@@ -547,14 +547,14 @@ mod tests {
         (p, t, gp, g, j)
     }
     #[test]
-    fn native265_gate_binds_plan_to_actual_owner_image_boot_and_original_clock() {
+    fn native_gate_binds_plan_to_actual_owner_image_boot_and_original_clock() {
         let (p, _, _, _, _) = fixture();
         let check = |v: &Value| {
             plan_valid(
                 v,
                 &"a".repeat(32),
                 42,
-                Path::new("/var/lib/jetstreamer/horizon-native265-test/native-input-test"),
+                Path::new(HARNESS),
                 &"c".repeat(64),
                 "boot",
                 190,
@@ -585,7 +585,7 @@ mod tests {
         );
     }
     #[test]
-    fn native265_gate_rejects_token_rebinding_missing_proof_stale_or_failed_guard() {
+    fn native_gate_rejects_token_rebinding_missing_proof_stale_or_failed_guard() {
         let (p, t, gp, g, j) = fixture();
         let check = |token: &Value, plan: &Value, sample: &Value, journal: &Value| {
             token_valid(
@@ -641,7 +641,7 @@ mod tests {
         assert!(check(&t, &changed, &g, &j).is_err());
     }
     #[test]
-    fn native265_gate_refusal_precedes_snapshot_callback() {
+    fn native_gate_refusal_precedes_snapshot_callback() {
         let (p, t, gp, g, j) = fixture();
         let work = std::cell::Cell::new(false);
         let result = before_snapshot(
@@ -665,7 +665,7 @@ mod tests {
         assert!(!work.get());
     }
     #[test]
-    fn native265_gate_deadline_never_resets_or_accepts_unbounded_wait() {
+    fn native_gate_deadline_never_resets_or_accepts_unbounded_wait() {
         let p = serde_json::json!({"issued_monotonic_us":100,"expires_monotonic_us":200});
         assert!(clock(&p, 100).is_ok());
         assert!(clock(&p, 199).is_ok());

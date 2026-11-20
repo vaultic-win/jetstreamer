@@ -39,6 +39,12 @@ fn coverage(data: &[u8], header: usize, buckets: u32, width: u64, total: u64) ->
 
 pub fn run() -> Result<Value> {
     let capture = Path::new(CAPTURE);
+    read_checked(
+        capture,
+        "deployment-seal-receipt.json",
+        8192,
+        "07d0746970802110ec78db82e8c7985d372bafc29c69bab92142792fea10465e",
+    )?;
     let fetch: Value = serde_json::from_slice(&read_checked(
         capture,
         "compact-table-fetch.json",
