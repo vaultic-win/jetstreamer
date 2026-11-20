@@ -7,6 +7,7 @@ import json
 import os
 import re
 import stat
+import subprocess
 import sys
 import time
 import uuid
@@ -46,7 +47,12 @@ def provenance(seal_sha):
          "invalid tested release")
     need(proof["artifacts"] == {name:members[name]["sha256"] for name in ("gate","reservations")},
          "native build differs from sealed artifacts")
-    tip = git("ls-remote","origin","refs/heads/account-updates").split()[0]
+    remote = "https://github.com/vaultic-win/jetstreamer.git"
+    tip = git("-c","credential.helper=","ls-remote",remote,"refs/heads/account-updates").split()[0]
+    try:
+        git("cat-file","-e",tip+"^{commit}")
+    except subprocess.CalledProcessError:
+        git("-c","credential.helper=","fetch","--no-write-fetch-head","--no-tags",remote,tip)
     git("merge-base","--is-ancestor",source,tip)
     # Exclude Rust targets, deployment state and all external inputs from this source check.
     for rel, expected in proof["source_blobs"].items():
