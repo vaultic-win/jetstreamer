@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const LANE: &str = "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1";
+const RUN_PARENT: &str = "replacement-local1-20261110-v1";
 const RUN: &str = "trace-local3-20261120-v1";
 const PKG: &str = "/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-20261109-v1";
 const UNIT: &str = "horizon-qualify-168-trace-local3-20261120-v1.service";
@@ -30,7 +31,7 @@ const SIGNATURE: &str =
 const SNAP_BYTES: u64 = 2_029_219_745;
 
 fn run_dir() -> PathBuf {
-    Path::new(LANE).join(RUN)
+    Path::new(LANE).join(RUN_PARENT).join(RUN)
 }
 
 fn verify_actor() -> Result<String> {
@@ -213,6 +214,7 @@ fn stage_and_exec() -> Result<()> {
     let dir = run_dir();
     let package = Path::new(PKG);
     root_dir(lane)?;
+    root_dir(&lane.join(RUN_PARENT))?;
     root_dir(&dir)?;
     // The controller binds a fresh subtree and redirects stdout/stderr to its producer.log.
     let entries = fs::read_dir(&dir)?
