@@ -2,6 +2,8 @@
 //! This measurement has no side effects and returns no reusable capacity credits.
 #[allow(dead_code)]
 #[path = "../horizon_audit79_budget_v10_20261120_v1/audit_budget.rs"]
+mod previous_audit_budget;
+#[path = "../horizon_audit90_budget_v11_20261120_v1/fit.rs"]
 mod audit_budget;
 #[path = "../horizon_independent_cold166_20261120_v1/prepare/auxiliary_phases.rs"]
 mod auxiliary_phases;
