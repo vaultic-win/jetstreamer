@@ -27,6 +27,15 @@ const PUBLIC_PIPELINE: &str =
 const PUBLIC_QUALIFICATION: &str =
     "/var/lib/jetstreamer/horizon247-public-reader-6e644028-v1/main-acceptance.json";
 const PUBLIC_READER: &str = "6e644028374dc98f1b25dc82d774b67c3a31c736";
+const CURRENT_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/epoch-247-plan.json";
+const CURRENT_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/horizon_pipeline";
+const CURRENT_VERIFIER: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-680e1173-v1/verify_archive";
+const CURRENT_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-680e1173-v1/main-acceptance.json";
+const CURRENT_READER: &str = "680e1173010ad9a12060b2de98f16ddbf36e8975";
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
     "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
@@ -188,20 +197,39 @@ fn drained() -> Result<()> {
 }
 // Only the qualified public reader and its acceptance change. Keep the exact
 // original epoch evidence, retained verifier, repository, policy and disk bounds.
-fn public_plan(original: &Value, next: &Value) -> Result<()> {
+fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
     let mut expected = original.clone();
-    for (field, path) in [
-        ("pipeline", PUBLIC_PIPELINE),
-        ("qualification", PUBLIC_QUALIFICATION),
-    ] {
+    let (commit, files): (_, &[(&str, &str)]) = if path == Path::new(PUBLIC_PLAN) {
+        (
+            PUBLIC_READER,
+            &[
+                ("pipeline", PUBLIC_PIPELINE),
+                ("qualification", PUBLIC_QUALIFICATION),
+            ],
+        )
+    } else {
+        ensure!(
+            path == Path::new(CURRENT_PLAN),
+            "unregistered epoch 247 recovery plan"
+        );
+        (
+            CURRENT_READER,
+            &[
+                ("pipeline", CURRENT_PIPELINE),
+                ("full_verifier", CURRENT_VERIFIER),
+                ("qualification", CURRENT_QUALIFICATION),
+            ],
+        )
+    };
+    for &(field, registered_path) in files {
         let bound: Bound = serde_json::from_value(next[field].clone())?;
         ensure!(
-            bound.path == Path::new(path) && hex(&bound.sha256, 64),
+            bound.path == Path::new(registered_path) && hex(&bound.sha256, 64),
             "foreign public {field}"
         );
         expected[field] = serde_json::to_value(bound)?;
     }
-    expected["reader_commit"] = json!(PUBLIC_READER);
+    expected["reader_commit"] = json!(commit);
     ensure!(
         next == &expected,
         "epoch 247 public plan changed retained policy or evidence"
@@ -215,7 +243,9 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
             && c.epochs == std::collections::BTreeSet::from([247])
             && c.directory == Path::new(INPUT)
             && c.receipt_directory.as_deref() == Some(Path::new(STATE).join("receipts").as_path())
-            && c.current_reader_plan.as_deref() == Some(Path::new(PUBLIC_PLAN))
+            && c.current_reader_plan
+                .as_deref()
+                .is_some_and(|p| p == Path::new(PUBLIC_PLAN) || p == Path::new(CURRENT_PLAN))
             && c.current_reader_plan_sha256
                 .as_deref()
                 .is_some_and(|sha| hex(sha, 64))
@@ -231,14 +261,18 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
         path: PLAN.into(),
         sha256: PLAN_SHA.into(),
     })?;
+    let path = c
+        .current_reader_plan
+        .as_deref()
+        .context("missing public plan path")?;
     let next = bound_json(&Bound {
-        path: PUBLIC_PLAN.into(),
+        path: path.into(),
         sha256: c
             .current_reader_plan_sha256
             .clone()
             .context("missing public plan digest")?,
     })?;
-    public_plan(&original, &next)
+    public_plan(path, &original, &next)
 }
 pub(crate) fn object(bucket: &str, key: &str, remote: Option<&crate::RemoteArchive>) -> Result<()> {
     let r = remote.context("staged 247 object missing")?;
@@ -537,7 +571,7 @@ mod tests {
         next["reader_commit"] = json!(PUBLIC_READER);
         next["pipeline"] = json!({"path":PUBLIC_PIPELINE,"sha256":"a".repeat(64)});
         next["qualification"] = json!({"path":PUBLIC_QUALIFICATION,"sha256":"b".repeat(64)});
-        public_plan(&original, &next).unwrap();
+        public_plan(Path::new(PUBLIC_PLAN), &original, &next).unwrap();
         for path in [
             "/reader_commit",
             "/pipeline/path",
@@ -550,10 +584,37 @@ mod tests {
         ] {
             let mut other = next.clone();
             *other.pointer_mut(path).unwrap() = json!("foreign");
-            assert!(public_plan(&original, &other).is_err(), "{path}");
+            assert!(
+                public_plan(Path::new(PUBLIC_PLAN), &original, &other).is_err(),
+                "{path}"
+            );
         }
         next["unknown"] = json!(1);
-        assert!(public_plan(&original, &next).is_err());
+        assert!(public_plan(Path::new(PUBLIC_PLAN), &original, &next).is_err());
+    }
+    #[test]
+    fn current_successor_requires_both_rebuilt_readers_and_preserved_layout() {
+        let original = json!({"reader_commit":PUBLIC_READER,"threads":2,"epoch_expectations":{"247":"retained"}});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(CURRENT_READER);
+        for (k, path) in [
+            ("pipeline", CURRENT_PIPELINE),
+            ("qualification", CURRENT_QUALIFICATION),
+            ("full_verifier", CURRENT_VERIFIER),
+        ] {
+            next[k] = json!({"path":path,"sha256":"a".repeat(64)});
+        }
+        public_plan(Path::new(CURRENT_PLAN), &original, &next).unwrap();
+        assert!(public_plan(Path::new(PUBLIC_PLAN), &original, &next).is_err());
+        for (pointer, value) in [
+            ("/full_verifier/path", json!(PUBLIC_PIPELINE)),
+            ("/threads", json!(3)),
+            ("/epoch_expectations/247", json!("changed")),
+        ] {
+            let mut changed = next.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            assert!(public_plan(Path::new(CURRENT_PLAN), &original, &changed).is_err());
+        }
     }
     #[test]
     fn staged_remote_identity_requires_the_recorded_key_bucket_digest_length_and_etag() {
