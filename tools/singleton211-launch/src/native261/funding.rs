@@ -39,7 +39,7 @@ pub(super) fn charges(controls: &Value, controller: &str) -> Result<Value> {
     )
 }
 
-pub(super) fn current(n: &mut Native, r: &Value) -> Result<Value> {
+pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     let controller = text(r, "controller_unit")?;
     let envelope = charges(&r["control_units"], controller)?;
     let iid = std::env::var("INVOCATION_ID")?;
@@ -69,7 +69,24 @@ pub(super) fn current(n: &mut Native, r: &Value) -> Result<Value> {
         disk_info.f_type == libc::EXT4_SUPER_MAGIC,
         "261 receipt ledger is not on the admitted ext4 filesystem"
     );
-    let host = native257_fit::booked_host(n, r, path, None)?;
+    if held {
+        let producer = n.show(UNIT)?;
+        let held_iid = text(&producer, "InvocationID")?;
+        live::finite_owner(&producer, UNIT, held_iid, MEMORY)?;
+        gate::held_image(
+            text(&producer, "MainPID")?.parse()?,
+            held_iid,
+            UNIT,
+            HARNESS,
+        )?;
+    }
+    let host = native257_fit::booked_host_candidate(
+        n,
+        r,
+        path,
+        Some(((UNIT, GUARD_UNIT, TIMER), held)),
+        None,
+    )?;
     ensure!(
         host.rows
             .iter()
@@ -81,7 +98,7 @@ pub(super) fn current(n: &mut Native, r: &Value) -> Result<Value> {
         "ledger filesystem changed across census"
     );
     let mount = pristine(host.device)?;
-    let cpu = native257::cpu_sharing(n, r)?;
+    let cpu = units::cpu_sharing(n, r)?;
     let mut resources = live::resources_at(path)?;
     ensure!(
         resources.0 == host.resources.0 && fs::metadata(path)?.dev() == host.device,
@@ -110,7 +127,7 @@ pub(super) fn current(n: &mut Native, r: &Value) -> Result<Value> {
         json!({"capacity":capacity,"control_charges":envelope,"boot_id":host.boot,
         "disk_filesystem":FILESYSTEM,"disk_device":host.device,"tmpfs":mount,"cpu":cpu,"controller":after,
         "actual_current_memory":host.currents,"native265_runtime_growth_release":host.release,
-        "full211_growth":host.full211_growth,"failed_boundary205206_memory_release":host.boundary_memory}),
+        "native211_cold_growth_release":host.native211_growth,"full211_growth":host.full211_growth,"failed_boundary205206_memory_release":host.boundary_memory}),
     )
 }
 

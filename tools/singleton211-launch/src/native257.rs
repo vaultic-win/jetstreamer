@@ -3,10 +3,14 @@ use super::*;
 #[path = "../../native265-launch/src/first_guard.rs"]
 mod first_guard;
 mod handoff;
+mod legacy;
+use legacy::prepared_transition;
 mod retire;
 mod startup;
+#[cfg(test)]
+#[path = "native257/stop_sandbox.rs"]
+mod stop_sandbox;
 mod units;
-pub(super) use units::cpu_sharing;
 const EXPECTED_FILESYSTEM: &str = ROOT;
 #[path = "../../native265-launch/src/qualification.rs"]
 mod stop;
@@ -312,3 +316,33 @@ const STOP_ACCEPTED: &str = "horizon-native257-protective-stop-qualification-v1"
 const STOP_RETIRED: &str = "horizon-native257-qualification-unit-retirement-v1";
 
 const STOP_REQUEST: &str = "horizon257-native-guard-stop-request-v1";
+
+const EPOCH: u64 = 257;
+const TOKEN_SCHEMA: &str = "horizon-native257-first-guard-token-v1";
+const PLAN_SCHEMA: &str = "horizon-native257-startup-plan-v1";
+const HANDOFF_SCHEMA: &str = "horizon-native257-guarded-startup-v1";
+const ADMISSION_SCHEMA: &str = "horizon-native257-current-fleet-admission-v1";
+const STOP_INTENT: &str = "horizon257-native-guard-stop-intent-v1";
+const PREPARED_SCHEMA: &str = "horizon-native257-prepared-units-v1";
+const PLAN_PREFIX: &str = "horizon-native257-startup-plan-";
+const PLAN_SHA_ENV: &str = "JETSTREAMER_EPOCH257_STARTUP_PLAN_SHA256";
+const GUARD_SHA_ENV: &str = "HORIZON257_GUARD_PLAN_SHA256";
+const PLAN_ENV: &str = "JETSTREAMER_EPOCH257_STARTUP_PLAN";
+
+// Preserve the bytes of already sealed 257 definitions.
+const RETENTION_DESCRIPTION_EPOCH: u64 = 265;
+const PRODUCER_SANDBOX: &str = "PrivateTmp=yes\n";
+fn check_sandbox(_: &Value) -> Result<()> {
+    Ok(())
+}
+fn check_devices(_: &Value, _: &Value) -> Result<()> {
+    Ok(())
+}
+fn check_mount_sample(_: &Value, _: &Value) -> Result<()> {
+    Ok(())
+}
+#[cfg(test)]
+fn sample_fixture(_: &mut Value, _: &mut Value) {}
+fn refreshed_capacity(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
+    Ok(current(n, r, held)?.1)
+}

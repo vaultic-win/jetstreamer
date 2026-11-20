@@ -339,9 +339,12 @@ impl Native {
                     .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b)),
             "unit suffix"
         );
+        let properties = if unit == native261::UNIT {
+            format!("{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",live::PROPS)
+        } else { live::PROPS.to_owned() };
         let bytes = self.run(
             "/usr/bin/systemctl",
-            &["show", unit, "--no-pager", "--property", live::PROPS],
+            &["show", unit, "--no-pager", "--property", &properties],
         )?;
         let mut v = serde_json::Map::new();
         for line in std::str::from_utf8(&bytes)?.lines() {

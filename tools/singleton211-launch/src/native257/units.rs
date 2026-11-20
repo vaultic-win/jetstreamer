@@ -1,14 +1,14 @@
-//! Load inert definitions and a mandatory future EnvironmentFile before the admission clock.
+// Load inert definitions and a mandatory future EnvironmentFile before the admission clock.
 use super::*;
 use crate::prepare::{Argument, env_properties, seal_pair, verify_pair};
 
 pub(super) const STARTUP: Argument = Argument {
-    variable: "JETSTREAMER_EPOCH257_STARTUP_PLAN_SHA256",
+    variable: PLAN_SHA_ENV,
     env: "startup.env",
     plan: "plan.json",
 };
 pub(super) const GUARD_ARG: Argument = Argument {
-    variable: "HORIZON257_GUARD_PLAN_SHA256",
+    variable: GUARD_SHA_ENV,
     env: "guard.env",
     plan: "guard-plan.json",
 };
@@ -48,14 +48,14 @@ pub(super) fn affinity(review: &Value) -> Result<String> {
 }
 fn native_template(plan: &Bound, affinity: &str) -> String {
     format!(
-        "[Unit]\nDescription=Epoch 257 gated native cold input qualification\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=100000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=800%\nCPUAffinity={affinity}\nRuntimeMaxSec=2700\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=yes\nPrivateTmp=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nUMask=0077\nEnvironment=RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 JETSTREAMER_EPOCH257_STARTUP_PLAN={}\nEnvironmentFile={}\nExecStart={HARNESS}\n",
+        "[Unit]\nDescription=Epoch {EPOCH} gated native cold input qualification\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=100000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=800%\nCPUAffinity={affinity}\nRuntimeMaxSec=2700\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=yes\n{PRODUCER_SANDBOX}NoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nUMask=0077\nEnvironment=RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 {PLAN_ENV}={}\nEnvironmentFile={}\nExecStart={HARNESS}\n",
         plan.path.display(),
         plan.path.with_file_name("startup.env").display()
     )
 }
 fn guard_template(guard: &Bound, plan: &Path, receipts: &Path) -> String {
     format!(
-        "[Unit]\nDescription=Epoch 257 native protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=60\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nEnvironmentFile={}\nExecStart={} {} --plan-sha256 ${{HORIZON257_GUARD_PLAN_SHA256}} --self-sha256 {}\n",
+        "[Unit]\nDescription=Epoch {EPOCH} native protective guard\nStartLimitIntervalSec=0\n[Service]\nType=oneshot\nUser=root\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryMax=268435456\nMemorySwapMax=0\nTasksMax=64\nCPUQuota=100%\nTimeoutStartSec=60\nProtectSystem=strict\nProtectHome=read-only\nPrivateNetwork=yes\nNoNewPrivileges=yes\nCapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nAmbientCapabilities=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE\nReadWritePaths={}\nUMask=0077\nEnvironmentFile={}\nExecStart={} {} --plan-sha256 ${{{GUARD_SHA_ENV}}} --self-sha256 {}\n",
         receipts.display(),
         plan.with_file_name("guard.env").display(),
         guard.path.display(),
@@ -65,12 +65,12 @@ fn guard_template(guard: &Bound, plan: &Path, receipts: &Path) -> String {
 }
 fn timer_template() -> String {
     format!(
-        "[Unit]\nDescription=Epoch 257 native guard cadence\n[Timer]\nOnActiveSec=1s\nOnUnitActiveSec=30s\nAccuracySec=1s\nRandomizedDelaySec=0\nUnit={GUARD_UNIT}\n"
+        "[Unit]\nDescription=Epoch {EPOCH} native guard cadence\n[Timer]\nOnActiveSec=1s\nOnUnitActiveSec=30s\nAccuracySec=1s\nRandomizedDelaySec=0\nUnit={GUARD_UNIT}\n"
     )
 }
 fn retention_template() -> String {
     format!(
-        "[Unit]\nDescription=Retain epoch 265 native terminal evidence\nDefaultDependencies=no\nAfter={UNIT} {GUARD_UNIT} {TIMER}\nIgnoreOnIsolate=yes\n"
+        "[Unit]\nDescription=Retain epoch {RETENTION_DESCRIPTION_EPOCH} native terminal evidence\nDefaultDependencies=no\nAfter={UNIT} {GUARD_UNIT} {TIMER}\nIgnoreOnIsolate=yes\n"
     )
 }
 pub(super) fn retention(n: &mut Native, package: &Path) -> Result<Value> {
@@ -105,7 +105,7 @@ pub(super) fn pristine() -> Result<()> {
     );
     ensure!(
         fs::read_dir(root)?.next().is_none(),
-        "native257 root must remain empty before first gate"
+        "native root must remain empty before first gate"
     );
     Ok(())
 }
@@ -164,7 +164,7 @@ pub(super) fn producer(
         .parent()
         .and_then(Path::file_name)
         .and_then(|s| s.to_str())
-        .and_then(|s| s.strip_prefix("horizon-native257-startup-plan-"))
+        .and_then(|s| s.strip_prefix(PLAN_PREFIX))
         .context("producer plan namespace")?;
     let expected = package(attempt, "producer").join(UNIT);
     ensure!(
@@ -180,7 +180,7 @@ pub(super) fn producer(
         ("KillMode", "control-group"),
         ("Delegate", "no"),
         ("MemoryHigh", "100000000000"),
-        ("MemoryMax", "120000000000"),
+        ("MemoryMax", MEMORY.to_string().as_str()),
         ("MemorySwapMax", "0"),
         ("TasksMax", "512"),
         ("CPUQuotaPerSecUSec", "8s"),
@@ -199,6 +199,7 @@ pub(super) fn producer(
     ] {
         ensure!(v[key] == want, "native sandbox changed {key}");
     }
+    check_sandbox(&v)?;
     verify_pair(plan, STARTUP)?;
     super::super::prepare::env_properties(&v, &plan.path.with_file_name("startup.env"))?;
     let actual_cpus = text(&v, "CPUAffinity")?;
@@ -229,7 +230,7 @@ pub(super) fn producer(
         "RUST_MIN_STACK=134217728".into(),
         "SOLANA_RAYON_THREADS=8".into(),
         "JETSTREAMER_HISTORICAL_POH_THREADS=2".into(),
-        format!("JETSTREAMER_EPOCH257_STARTUP_PLAN={}", plan.path.display()),
+        format!("{PLAN_ENV}={}", plan.path.display()),
     ]
     .into_iter()
     .collect();
@@ -300,7 +301,7 @@ pub(super) fn guard_properties(v: &Value, guard: &Bound, plan: &Path, alias: &Pa
             && v["StartLimitIntervalUSec"] == "0"
             && periodic::stable_command(text(v, "ExecStart")?)?
                 == format!(
-                    "{{ path={} ; argv[]={} {} --plan-sha256 ${{HORIZON257_GUARD_PLAN_SHA256}} --self-sha256 {} ; ignore_errors=no",
+                    "{{ path={} ; argv[]={} {} --plan-sha256 ${{{GUARD_SHA_ENV}}} --self-sha256 {} ; ignore_errors=no",
                     guard.path.display(),
                     guard.path.display(),
                     plan.display(),
@@ -446,7 +447,7 @@ pub(super) fn prepare(
     }
     File::open("/etc/systemd/system")?.sync_all()?;
     let units = loaded(n, review)?;
-    let mut proof = json!({"schema":"horizon-native257-prepared-units-v1","review":review_ref,
+    let mut proof = json!({"schema":PREPARED_SCHEMA,"review":review_ref,
         "attempt":attempt,"operation":review["operation"],"cpu_affinity":review["cpu_affinity"],"gate":Bound::new(LAUNCHER,self_sha),
         "guard":review["guard"],"boot_id":review["boot_id"],"source_publication":review["source_publication"],
         "units":units,"recorded_unix_seconds":now()?,"recorded_monotonic_us":mono()?});
@@ -458,41 +459,6 @@ pub(super) fn prepare(
         "{}",
         serde_json::to_string(&Bound::new(dest.join("prepared.json"), b.sha256))?
     );
-    Ok(())
-}
-// The inert v1 package invokes only the pinned harness and guard. The new
-// launcher revalidates its four original definitions and the complete v2 publication.
-const PREPARED_V1: &str =
-    "/var/lib/jetstreamer/horizon-native257-prepared-takeover-guard-v1/prepared.json";
-const PREPARED_V1_SHA: &str = "4f1ed487e65e6f93e442672ee47df25c9dbc64e2b58a7593e35de88d199525d3";
-const LAUNCHER_V1: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-20261120-v1/horizon-native257-launch";
-const LAUNCHER_V1_SHA: &str = "34ba46673bd5898e0f9a728a6f0f6aa8d05b4a393165bd4b9a98435ca57e5b6c";
-fn prepared_transition(
-    reference: &Bound,
-    gate: &Bound,
-    current_gate: &Bound,
-    old_source: &Value,
-    current_source: &Value,
-) -> Result<()> {
-    let mut old = publication::prepared_artifacts(old_source)?;
-    let mut current = publication::prepared_artifacts(current_source)?;
-    ensure!(
-        old["launcher"]["artifact"] == json!(gate)
-            && current["launcher"]["artifact"] == json!(current_gate),
-        "launcher publication differs from prepared or running image"
-    );
-    if reference == &Bound::new(PREPARED_V1, PREPARED_V1_SHA) {
-        ensure!(
-            gate == &Bound::new(LAUNCHER_V1, LAUNCHER_V1_SHA)
-                && old["launcher"]["source_commit"] == "3a9d4e749c78893880c51f0ddd9aa28965fe16f9"
-                && current_gate.path == Path::new(LAUNCHER),
-            "unknown prepared launcher transition"
-        );
-        old.remove("launcher");
-        current.remove("launcher");
-    }
-    ensure!(old == current, "prepared executable or source changed");
     Ok(())
 }
 pub(super) fn accepted(n: &mut Native, review: &Value, self_sha: &str, a: &Value) -> Result<Bound> {
@@ -507,7 +473,7 @@ pub(super) fn accepted(n: &mut Native, review: &Value, self_sha: &str, a: &Value
     no_authority(&p)?;
     let old = binding(&p["review"])?.sealed()?;
     ensure!(
-        p["schema"] == "horizon-native257-prepared-units-v1"
+        p["schema"] == PREPARED_SCHEMA
             && p["review"] != a["review"]
             && p["units"] == loaded(n, review)?
             && num(&p, "recorded_monotonic_us")? < mono()?
@@ -539,29 +505,6 @@ pub(super) fn accepted(n: &mut Native, review: &Value, self_sha: &str, a: &Value
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn only_registered_inert_preparation_can_transfer_to_the_successor() {
-        let reference = Bound::new(PREPARED_V1, PREPARED_V1_SHA);
-        let old_gate = Bound::new(LAUNCHER_V1, LAUNCHER_V1_SHA);
-        let new_gate = Bound::new(LAUNCHER, "d".repeat(64));
-        let source = |gate: &Bound, commit: &str| {
-            json!({"artifacts":[
-            {"role":"launcher","artifact":gate,"source_commit":commit},
-            {"role":"guard","artifact":Bound::new(GUARD,GUARD_SHA),"source_commit":"b".repeat(40)},
-            {"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"b".repeat(40)}]})
-        };
-        let old = source(&old_gate, "3a9d4e749c78893880c51f0ddd9aa28965fe16f9");
-        let new = source(&new_gate, &"e".repeat(40));
-        prepared_transition(&reference, &old_gate, &new_gate, &old, &new).unwrap();
-        let other = Bound::new(PREPARED_V1, "a".repeat(64));
-        assert!(prepared_transition(&other, &old_gate, &new_gate, &old, &new).is_err());
-        prepared_transition(&other, &new_gate, &new_gate, &new, &new).unwrap();
-        for role in 0..3 {
-            let mut changed = old.clone();
-            changed["artifacts"][role]["source_commit"] = json!("f".repeat(40));
-            assert!(prepared_transition(&reference, &old_gate, &new_gate, &changed, &new).is_err());
-        }
-    }
     #[test]
     #[ignore = "requires systemd-analyze and the deployed epoch257 artifact paths"]
     fn deployed_command_paths_pass_offline_unit_syntax_verification() {
@@ -601,15 +544,27 @@ mod tests {
         let u = native_template(&p, "48 49 50 51 52 53 54 55");
         assert!(u.contains("EnvironmentFile=/tmp/test/startup.env\n"));
         assert!(!u.contains(&p.sha256));
-        assert!(u.contains("MemoryMax=120000000000\n"));
+        assert!(u.contains(&format!("MemoryMax={MEMORY}\n")));
         let g = guard_template(
             &Bound::new(GUARD, GUARD_SHA),
             Path::new("/tmp/guard/guard-plan.json"),
             Path::new("/tmp/receipt-mount"),
         );
         assert!(g.contains("EnvironmentFile=/tmp/guard/guard.env\n"));
-        assert!(g.contains("${HORIZON257_GUARD_PLAN_SHA256}"));
+        assert!(g.contains(&format!("${{{GUARD_SHA_ENV}}}")));
         assert!(g.contains("ReadWritePaths=/tmp/receipt-mount\n"));
+        // Preserve the four epoch 257 definitions already sealed by the v3 launcher.
+        if EPOCH == 257 {
+            assert_eq!(
+                [u, g, timer_template(), retention_template()].map(|text| digest(text.as_bytes())),
+                [
+                    "1fa3f168082793e306b98b91e95cad23cdedae3fb707dbe1d2eec05bb3f64130",
+                    "c8e3dd87247b9c9151a86a9f9d0dac094a60c55013bcbe2bee70cadcccf5b034",
+                    "1c9315b967275f8d674f83afb54b9b3af8704482b2bd54b5b20684aa95046457",
+                    "dc0d217f3918de4a79e0a5c7f8cf01e09b411f09299a1d608e01ea6b8d9ec821"
+                ]
+            );
+        }
         assert_eq!(
             parse_cpu_list("2,4-6").unwrap(),
             BTreeSet::from([2, 4, 5, 6])

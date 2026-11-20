@@ -1,4 +1,4 @@
-//! Real protective-stop experiment: no restore token, no worker, no fabricated success.
+// Real protective-stop experiment: no restore token, no worker, no fabricated success.
 use super::*;
 pub(super) fn check_sample(v: &Value, iid: &str, pid: u64, plan: &Bound) -> Result<()> {
     ensure!(

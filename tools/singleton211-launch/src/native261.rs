@@ -1,6 +1,29 @@
 //! Device-aware fleet admission for the bounded epoch 261 bootstrap.
 use super::*;
 mod funding;
+use native257::{process_ticks, publication};
+mod first_guard {
+    include!("../../native265-launch/src/first_guard.rs");
+}
+mod handoff {
+    include!("native257/handoff.rs");
+}
+mod mount_proof;
+mod retire {
+    include!("native257/retire.rs");
+}
+mod startup {
+    include!("native257/startup.rs");
+}
+mod stop {
+    include!("../../native265-launch/src/qualification.rs");
+}
+mod units {
+    include!("native257/units.rs");
+}
+#[cfg(test)]
+use mount_proof::sample_fixture;
+use mount_proof::{check_devices, check_mount_sample};
 mod profile {
     pub(super) const ROOT: &str = "/run/horizon261-native-cold-v1";
     pub(super) const FILESYSTEM: &str = "/var/lib/jetstreamer";
@@ -9,7 +32,7 @@ mod profile {
 mod tmpfs;
 use profile::{FILESYSTEM, ROOT};
 
-const UNIT: &str = "horizon-261-native-input-20261120-v1.service";
+pub(super) const UNIT: &str = "horizon-261-native-input-20261120-v1.service";
 const GUARD_UNIT: &str = "horizon-native261-protective-v1.service";
 const TIMER: &str = "horizon-native261-protective-v1.timer";
 const MEMORY: u64 = 192_000_000_000;
@@ -29,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v1/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v2/horizon-native261-launch";
 
 fn pristine(disk: u64) -> Result<Value> {
     let mount = tmpfs::observe(true)?;
@@ -48,7 +71,7 @@ fn pristine(disk: u64) -> Result<Value> {
     )
 }
 
-fn review_scope(n: &mut Native, r: &Value, self_sha: &str) -> Result<()> {
+fn review_scope(n: &mut Native, r: &Value, self_sha: &str, prepare_only: bool) -> Result<()> {
     no_authority(r)?;
     ensure!(
         r["schema"] == "horizon-native261-launch-review-v1"
@@ -63,18 +86,15 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str) -> Result<()> {
             && r["guard"] == json!(Bound::new(GUARD, GUARD_SHA)),
         "unaccepted 261 review"
     );
-    let pid = num(r, "main_controller_pid")?;
-    ensure!(
-        pid > 1 && r["main_controller_start_ticks"] == native257::process_ticks(pid)?,
-        "changed campaign controller"
-    );
+    native257::controller_scope(r)?;
+    units::affinity(r)?;
     let source = binding(&r["source_publication"])?.sealed()?;
     native257::publication::validate_native(
         n,
         &source,
         &Bound::new(GUARD, GUARD_SHA),
         self_sha,
-        false,
+        prepare_only,
         &native257::publication::SourceProfile {
             epoch: 261,
             harness: Bound::new(INPUT, INPUT_SHA),
@@ -94,13 +114,13 @@ fn review_scope(n: &mut Native, r: &Value, self_sha: &str) -> Result<()> {
     Ok(())
 }
 
-fn evaluate(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
-    let initial = funding::current(n, r)?;
+fn evaluate(n: &mut Native, r: &Value, source: &Bound) -> Result<(Value, peer_window::Window)> {
+    let initial = funding::current(n, r, false)?;
     let context = json!({"epoch":261,"boot_id":initial["boot_id"],"review":source,
         "actual_current_memory":initial["actual_current_memory"]});
     let mut peers = peer_window::capture(n, r, &context)?;
     n.deadline = Some(n.deadline.context("admission clock")?.min(peers.limit));
-    let current = funding::current(n, r)?;
+    let current = funding::current(n, r, false)?;
     ensure!(
         current["tmpfs"] == initial["tmpfs"]
             && current["disk_device"] == initial["disk_device"]
@@ -132,33 +152,173 @@ fn evaluate(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
         "issued_unix_seconds":issued,"expires_unix_seconds":issued.checked_add(valid).context("admission expiry")?,
         "guard_token_issued":false,"scratch_release_authorized":false});
     deny_authority(&mut value);
-    Ok(value)
+    Ok((value, peers))
 }
-/// Write a short-lived admission only after the original guarded owner census and
-/// both live devices agree. The controller still needs the candidate's actual first fire.
+const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
+const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
+const HANDOFF_SCHEMA: &str = "horizon-native261-guarded-startup-v1";
+const ADMISSION_SCHEMA: &str = "horizon-native261-current-fleet-admission-v1";
+const STOP_INTENT: &str = "horizon261-native-guard-stop-intent-v1";
+const PREPARED_SCHEMA: &str = "horizon-native261-prepared-units-v1";
+const PLAN_PREFIX: &str = "horizon-native261-startup-plan-";
+const PLAN_SHA_ENV: &str = "JETSTREAMER_EPOCH261_STARTUP_PLAN_SHA256";
+const GUARD_SHA_ENV: &str = "HORIZON261_GUARD_PLAN_SHA256";
+const PLAN_ENV: &str = "JETSTREAMER_EPOCH261_STARTUP_PLAN";
+
+const EPOCH: u64 = 261;
+const RETENTION_DESCRIPTION_EPOCH: u64 = EPOCH;
+const RETENTION: &str = "horizon-native261-terminal-retention.target";
+const TOKENS: &str = "/var/lib/jetstreamer/horizon-native261-startup-tokens";
+const SLOT: u64 = 112_751_208;
+const SNAPSHOT_SHA: &str = "5e84f74696d1f3100650e134fb91487d3e083c374a3262b05f67378b9b1c8256";
+const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
+const HARNESS: &str = INPUT;
+const HARNESS_SHA: &str = INPUT_SHA;
+const RESERVATION: u64 = DISK_RECEIPTS;
+const SCRATCH: u64 = ROOT_CAP;
+const EXPECTED_FILESYSTEM: &str = FILESYSTEM;
+const PRODUCER_SANDBOX: &str = "WorkingDirectory=/run/horizon261-native-cold-v1\nInaccessiblePaths=/tmp /var/tmp /dev/shm\nPrivateDevices=yes\nProtectControlGroups=yes\nRestrictAddressFamilies=AF_UNIX\nOOMPolicy=kill\nOOMScoreAdjust=1000\nAmbientCapabilities=\n";
+fn check_sandbox(v: &Value) -> Result<()> {
+    ensure!(
+        v["PrivateDevices"] == "yes"
+            && v["WorkingDirectory"] == ROOT
+            && v["ProtectControlGroups"] == "yes"
+            && v["RestrictAddressFamilies"] == "AF_UNIX"
+            && v["OOMPolicy"] == "kill"
+            && v["OOMScoreAdjust"] == "1000"
+            && v["AmbientCapabilities"] == ""
+            && text(v, "InaccessiblePaths")?
+                .split_whitespace()
+                .collect::<BTreeSet<_>>()
+                == BTreeSet::from(["/tmp", "/var/tmp", "/dev/shm"]),
+        "261 producer sandbox changed"
+    );
+    Ok(())
+}
+fn prepared_transition(
+    _: &Bound,
+    gate: &Bound,
+    current: &Bound,
+    old: &Value,
+    new: &Value,
+) -> Result<()> {
+    let prepared = publication::prepared_artifacts(old)?;
+    ensure!(
+        gate == current
+            && prepared["launcher"]["artifact"] == json!(gate)
+            && prepared == publication::prepared_artifacts(new)?,
+        "prepared 261 images or source changed"
+    );
+    Ok(())
+}
+fn refreshed_capacity(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
+    let mut latest = funding::current(n, r, held)?;
+    latest["protected_existing_floor_bytes"] =
+        latest["capacity"]["protected_existing_floor_bytes"].clone();
+    Ok(latest)
+}
+fn package(attempt: &str, kind: &str) -> PathBuf {
+    PathBuf::from(format!(
+        "/var/lib/jetstreamer/horizon-native261-{kind}-{attempt}"
+    ))
+}
+fn qualify(r: &Value) -> Result<bool> {
+    match r["operation"].as_str() {
+        Some("qualify-guard") => Ok(true),
+        Some("native-cold") => Ok(false),
+        _ => bail!("unknown native261 operation"),
+    }
+}
+fn prestart(r: &Value) -> Result<()> {
+    let qual = qualify(r)?;
+    let lifecycle = binding(&r["prestart_qualification"])?.sealed()?;
+    ensure!(
+        lifecycle["schema"] == "horizon-native261-prestart-qualification-v1"
+            && lifecycle["Main_accepted"] == true
+            && lifecycle["harness"] == json!(Bound::new(HARNESS, HARNESS_SHA))
+            && lifecycle["guard"] == r["guard"]
+            && lifecycle["source_publication"] == r["source_publication"]
+            && lifecycle["complete_live_terminal_and_inactive_consumers_accepted"] == true
+            && lifecycle["first_guard_required_before_snapshot"] == true
+            && lifecycle["native_runtime_qualified"] == false,
+        "native prestart lifecycle missing"
+    );
+    no_authority(&lifecycle)?;
+    for k in [
+        "fleet",
+        "observer",
+        "inactive_status",
+        "terminal_retention",
+        "startup_gate",
+    ] {
+        binding(&lifecycle["evidence"][k])?.sealed()?;
+    }
+    if !qual {
+        let qualification = binding(&r["protective_stop_qualification"])?.sealed()?;
+        stop::accepted(&qualification)?;
+        retire::validate_capture(&binding(&qualification["capture"])?.sealed()?)?;
+        let retirement = binding(&qualification["retirement"])?.sealed()?;
+        ensure!(
+            retirement["capture"] == qualification["capture"]
+                && retirement["all_four_links_removed"] == true
+                && retirement["kernel_drained"] == true
+                && retirement["token_absent"] == true
+                && retirement["after"]
+                    .as_object()
+                    .is_some_and(|v| v.len() == 4),
+            "incomplete qualification retirement"
+        );
+    }
+    Ok(())
+}
+/// Authenticate the original on-host startup graph without taking another resource sample.
+pub fn validate_saved_handoff(path: &Path, sha: &str) -> Result<Value> {
+    ensure!(
+        path.starts_with("/var/lib/jetstreamer"),
+        "handoff namespace"
+    );
+    trusted_parents(path)?;
+    let h = Bound::new(path, sha).json()?;
+    handoff::reopen(&h)?;
+    Ok(h)
+}
 pub fn run() -> Result<()> {
-    let args: Vec<_> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() == 4 && args[1] == "validate-handoff" {
+        let h = validate_saved_handoff(Path::new(&args[2]), &args[3])?;
+        println!(
+            "{}",
+            json!({"epoch":261,"invocation_id":h["invocation_id"],"historical_startup_accepted":true,"entry_replay":false,"admission_authorized":false})
+        );
+        return Ok(());
+    }
     ensure!(
-        args.len() == 6 && args[1] == "admit",
-        "usage: horizon-native261-launch admit REVIEW SHA256 SELF_SHA256 NEW_EVIDENCE_DIRECTORY"
+        args.len() == 6
+            && matches!(
+                args[1].as_str(),
+                "prepare" | "admit" | "launch" | "qualify-guard" | "retire-qualification"
+            ),
+        "usage: horizon-native261-launch prepare|admit|launch|qualify-guard|retire-qualification REVIEW_OR_CAPTURE SHA256 SELF_SHA256 NEW_EVIDENCE_DIRECTORY"
     );
-    let launcher = Bound::new(LAUNCHER, &args[4]);
     ensure!(
-        unsafe { libc::geteuid() } == 0 && fs::canonicalize("/proc/self/exe")? == launcher.path,
-        "sealed epoch 261 controller required"
+        unsafe { libc::geteuid() } == 0
+            && fs::canonicalize("/proc/self/exe")? == Path::new(LAUNCHER)
+            && hex(&args[4], 64)
+            && hash(Path::new("/proc/self/exe"))? == args[4],
+        "sealed launcher identity"
     );
-    launcher.artifact()?;
-    let source = Bound::new(&args[2], &args[3]);
-    let review = source.sealed()?;
+    let rf = Bound::new(&args[2], &args[3]);
+    let r = rf.sealed()?;
     let root = PathBuf::from(&args[5]);
     ensure!(
-        root.parent() == Some(Path::new(FILESYSTEM))
+        root.parent() == Some(Path::new("/var/lib/jetstreamer"))
             && root
                 .file_name()
-                .and_then(|x| x.to_str())
-                .is_some_and(|x| x.starts_with("horizon-native261-execution-")),
-        "261 evidence namespace"
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| s.starts_with("horizon-native261-execution-")),
+        "execution namespace"
     );
+    absent(&root)?;
     trusted_parents(&root)?;
     use std::os::unix::fs::DirBuilderExt;
     fs::DirBuilder::new().mode(0o700).create(&root)?;
@@ -171,19 +331,46 @@ pub fn run() -> Result<()> {
                 .context("controller deadline")?,
         ),
     };
-    let result = (|| -> Result<()> {
-        review_scope(&mut n, &review, &args[4])?;
-        let admission = evaluate(&mut n, &review, &source)?;
-        let b = save_json(&n.root, "admission.json", &admission)?;
-        println!("{}", serde_json::to_string(&b)?);
-        Ok(())
+    let result = (|| {
+        if args[1] == "retire-qualification" {
+            return retire::run(&mut n, &rf, &r);
+        }
+        review_scope(&mut n, &r, &args[4], args[1] == "prepare")?;
+        if args[1] == "prepare" {
+            return units::prepare(&mut n, &r, &rf, &args[4]);
+        }
+        ensure!(
+            args[1] == "admit" || (args[1] == "qualify-guard") == qualify(&r)?,
+            "operation mismatch"
+        );
+        if args[1] != "admit" {
+            prestart(&r)?;
+        }
+        let (a, peers) = evaluate(&mut n, &r, &rf)?;
+        if args[1] == "admit" {
+            println!(
+                "{}",
+                serde_json::to_string(&save_json(&n.root, "admission.json", &a)?)?
+            );
+            Ok(())
+        } else {
+            startup::run(&mut n, &r, &args[4], &a, Some(peers))
+        }
     })();
-    if let Err(ref err) = result {
-        save_json(
+    if let Err(ref e) = result {
+        let _ = save_json(
             &n.root,
             "failure.json",
-            &json!({"error":format!("{err:#}"),"guard_token_issued":false,"remote_mutations":false}),
-        )?;
+            &json!({"error":format!("{e:#}"),"automatic_retry":false,"remote_mutations":false}),
+        );
     }
     result
 }
+
+const STOP_CAPTURE: &str = "horizon-native261-protective-stop-capture-v1";
+
+const STOP_ACCEPTED: &str = "horizon-native261-protective-stop-qualification-v1";
+
+const STOP_RETIRED: &str = "horizon-native261-qualification-unit-retirement-v1";
+
+const STOP_REQUEST: &str = "horizon261-native-guard-stop-request-v1";

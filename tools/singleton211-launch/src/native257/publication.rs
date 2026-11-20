@@ -145,7 +145,7 @@ pub(crate) fn validate_native(
 
 /// A prepared unit binds its launcher, harness and guard. A later fetch can carry
 /// new consumer proof while these exact executable/source tuples remain identical.
-pub(super) fn prepared_artifacts(proof: &Value) -> Result<BTreeMap<String, Value>> {
+pub(crate) fn prepared_artifacts(proof: &Value) -> Result<BTreeMap<String, Value>> {
     let mut pins = BTreeMap::new();
     for row in proof["artifacts"]
         .as_array()

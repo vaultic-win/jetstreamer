@@ -1,5 +1,6 @@
 //! This ignored test runs only under a separate PID1, mount, cgroup and network
 //! namespace. Production snapshots, workers, tokens and manager sockets are absent.
+use super::retire::{incident_evidence, order, stop_intent};
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 

@@ -1,4 +1,4 @@
-//! Bind the real stop to both PID1 journals and retire only its four exact symlinks.
+// Bind the real stop to both PID1 journals and retire only its four exact symlinks.
 use super::*;
 use crate::qualification::{collect_retired, installed_link, same_terminal};
 
@@ -28,7 +28,7 @@ fn event(
     );
     Ok(found[0])
 }
-fn order(c: &Value, p: &Value, producer: &[u8], guard: &[u8]) -> Result<()> {
+pub(super) fn order(c: &Value, p: &Value, producer: &[u8], guard: &[u8]) -> Result<()> {
     let iid = text(c, "producer_invocation_id")?;
     let gid = text(c, "guard_invocation_id")?;
     let boot = text(c, "boot_id")?;
@@ -65,7 +65,7 @@ fn order(c: &Value, p: &Value, producer: &[u8], guard: &[u8]) -> Result<()> {
 // The production guard persists the initiating sample verbatim before it
 // rechecks the live owner and submits the stop job. Require this independently
 // of the later request and PID1 journals.
-fn incident_evidence(
+pub(super) fn incident_evidence(
     sample: &Value,
     request: &Value,
     intent: &Value,
@@ -76,7 +76,7 @@ fn incident_evidence(
     ensure!(
         intent
             == &json!({
-                "schema":"horizon257-native-guard-stop-intent-v1",
+                "schema":STOP_INTENT,
                 "producer_invocation_id":iid, "guard_invocation_id":gid,
                 "plan_sha256": plan.sha256, "reason":"filesystem-floor",
                 "sample":sample, "remote_mutations":false
@@ -87,12 +87,12 @@ fn incident_evidence(
                     "guard_invocation_id":gid, "plan_sha256":plan.sha256,
                     "drain_proven":false, "remote_mutations":false
                 }),
-        "stop intent or request differs from the original 257 floor trip"
+        "stop intent or request differs from the original qualification floor trip"
     );
     Ok(())
 }
 
-fn stop_intent(c: &Value) -> Result<Bound> {
+pub(super) fn stop_intent(c: &Value) -> Result<Bound> {
     let dir = Path::new(text(c, "receipts")?);
     let m = fs::symlink_metadata(dir)?;
     ensure!(
@@ -121,7 +121,7 @@ pub(super) fn validate_capture(c: &Value) -> Result<Value> {
             && c["token_absent"] == true
             && c["kernel_drained"] == true
             && c["worker_root_empty"] == true,
-        "foreign native257 stop"
+        "foreign native stop"
     );
     let startup = binding(&c["startup_plan"])?.sealed()?;
     let gp = binding(&c["guard_plan"])?;
@@ -135,7 +135,7 @@ pub(super) fn validate_capture(c: &Value) -> Result<Value> {
     ensure!(
         crate::launch::safe_attempt(attempt)
             && qualify(&r)?
-            && startup["schema"] == "horizon-native257-startup-plan-v1"
+            && startup["schema"] == PLAN_SCHEMA
             && startup["operation"] == "qualify-guard"
             && startup["harness"] == c["harness"]
             && startup["guard"] == c["guard"]
@@ -148,13 +148,13 @@ pub(super) fn validate_capture(c: &Value) -> Result<Value> {
             && plan["native_main"]["main_pid"] == pid
             && plan["native_main"]["sha256"] == HARNESS_SHA
             && plan["native_main"]["executable"] == HARNESS
-            && plan["filesystem"] == ROOT
+            && plan["filesystem"] == EXPECTED_FILESYSTEM
             && plan["worker_root"] == ROOT
             && plan["minimum_free_bytes"] == u64::MAX
             && plan["maximum_root_physical_bytes"] == SCRATCH
             && c["receipts"] == plan["receipt_directory"]
             && c["receipts"]
-                == format!("/var/lib/jetstreamer/horizon-native257-guard-receipts-{iid}")
+                == format!("/var/lib/jetstreamer/horizon-native{EPOCH}-guard-receipts-{iid}")
             && gp.path == package(attempt, "guard-binding").join("guard-plan.json")
             && binding(&c["startup_plan"])?.path
                 == package(attempt, "startup-plan").join("plan.json")
@@ -168,6 +168,7 @@ pub(super) fn validate_capture(c: &Value) -> Result<Value> {
         "guard sample path"
     );
     let sample = sample.json()?;
+    check_mount_sample(&a, &sample)?;
     handoff::limited_sample(&startup, &plan, &sample)?;
     stop::check_sample(&sample, iid, pid, &gp)?;
     ensure!(
@@ -366,7 +367,7 @@ mod tests {
         let iid = "b".repeat(32);
         let gid = "c".repeat(32);
         let sample = json!({"trip_reason":"filesystem-floor","guard_invocation_id":gid,"producer_invocation_id":iid,"native_main":{"main_pid":42}});
-        let intent = json!({"schema":"horizon257-native-guard-stop-intent-v1","producer_invocation_id":iid,"guard_invocation_id":gid,"plan_sha256":plan.sha256,"reason":"filesystem-floor","sample":sample,"remote_mutations":false});
+        let intent = json!({"schema":STOP_INTENT,"producer_invocation_id":iid,"guard_invocation_id":gid,"plan_sha256":plan.sha256,"reason":"filesystem-floor","sample":sample,"remote_mutations":false});
         let request = json!({"schema":STOP_REQUEST,"producer_invocation_id":iid,"guard_invocation_id":gid,"plan_sha256":plan.sha256,"drain_proven":false,"remote_mutations":false});
         let check = |i: &Value, r: &Value| incident_evidence(&sample, r, i, &iid, &gid, &plan);
         check(&intent, &request).unwrap();
@@ -433,7 +434,3 @@ mod tests {
         assert!(order(&c, &p, b"", &guard).is_err());
     }
 }
-
-#[cfg(test)]
-#[path = "stop_sandbox.rs"]
-mod stop_sandbox;

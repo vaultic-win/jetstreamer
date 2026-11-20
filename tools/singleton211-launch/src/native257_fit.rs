@@ -111,6 +111,24 @@ pub(super) fn booked_host_for(
     native257_held: Option<bool>,
     continuation: Option<&foundation_holding_capacity::RestoreLease>,
 ) -> Result<BookedHost> {
+    let candidate = native257_held.map(|held| {
+        (
+            (native257::UNIT, native257::GUARD_UNIT, native257::TIMER),
+            held,
+        )
+    });
+    booked_host_candidate(n, review, path, candidate, continuation)
+}
+
+pub(super) type Candidate = ((&'static str, &'static str, &'static str), bool);
+
+pub(super) fn booked_host_candidate(
+    n: &mut Native,
+    review: &Value,
+    path: &Path,
+    candidate: Option<Candidate>,
+    continuation: Option<&foundation_holding_capacity::RestoreLease>,
+) -> Result<BookedHost> {
     // An initial admission always requires fresh authoritative inputs. Only an
     // uninterrupted restore may use its frozen, exclusively booked baseline
     // while this function repeats the complete live owner and resource census.
@@ -158,17 +176,13 @@ pub(super) fn booked_host_for(
     );
     finalization::validate_roster(&fleet, &observer, &rows, boot.trim(), full211)?;
     finalization::verify_inputs(&fleet)?;
-    if native257_held.is_some() {
+    if let Some(((producer, guard, _), _)) = candidate {
         ensure!(
-            rows.iter().all(|r| r.unit != native257::UNIT),
-            "native257 already booked"
+            rows.iter().all(|r| r.unit != producer && r.unit != guard),
+            "candidate already booked"
         );
     }
-    let allowed = (native257_held == Some(true)).then_some((
-        native257::UNIT,
-        native257::GUARD_UNIT,
-        native257::TIMER,
-    ));
+    let allowed = candidate.and_then(|(units, held)| held.then_some(units));
     let currents = live::census_with_held(n, review, &fleet, &rows, &periodic, allowed, full211)?;
     let (mut effective, release) =
         native265_growth::arithmetic_view(n, review, &rows, boot.trim())?;

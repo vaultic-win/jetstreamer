@@ -1,4 +1,4 @@
-//! The first fire and token publish within the original owner and peer deadlines.
+// The first fire and token publish within the original owner and peer deadlines.
 use super::first_guard::first_guard;
 use super::*;
 use std::os::unix::fs::DirBuilderExt;
@@ -17,7 +17,7 @@ pub(super) fn cold_input_token(
     recorded_us: u64,
 ) -> Value {
     let mut token = json!({
-        "schema": "horizon-native257-first-guard-token-v1",
+        "schema": TOKEN_SCHEMA,
         "startup_plan_sha256": startup_sha,
         "unit": UNIT,
         "invocation_id": guard_plan["invocation_id"],
@@ -56,7 +56,7 @@ fn verify_mount(alias: &Path, actual: &Path) -> Result<()> {
 fn create_receipt_mount(alias: &Path, iid: &str) -> Result<PathBuf> {
     ensure!(hex(iid, 32), "invalid held owner");
     let actual = PathBuf::from(format!(
-        "/var/lib/jetstreamer/horizon-native257-guard-receipts-{iid}"
+        "/var/lib/jetstreamer/horizon-native{EPOCH}-guard-receipts-{iid}"
     ));
     trusted_parents(alias)?;
     trusted_parents(&actual)?;
@@ -146,7 +146,7 @@ pub(super) fn run(
     let expires = expires.min(peers.limit);
     n.deadline = Some(deadline.min(peers.limit));
     n.check()?;
-    let p = json!({"schema":"horizon-native257-startup-plan-v1","operation":review["operation"],"preparation":prepared,"peer_window":wr,"epoch":257,"unit":UNIT,"guard_unit":GUARD_UNIT,"worker_root":ROOT,"bootstrap_slot":SLOT,
+    let p = json!({"schema":PLAN_SCHEMA,"operation":review["operation"],"preparation":prepared,"peer_window":wr,"epoch":EPOCH,"unit":UNIT,"guard_unit":GUARD_UNIT,"worker_root":ROOT,"bootstrap_slot":SLOT,
         "snapshot_sha256":SNAPSHOT_SHA,"maximum_root_physical_bytes":SCRATCH,"maximum_memory_bytes":MEMORY,"token_root":TOKENS,"boot_id":a["boot_id"],
         "harness":Bound::new(HARNESS,HARNESS_SHA),"worker":Bound::new(WORKER,WORKER_SHA),"input_packet":Bound::new(PACKET,PACKET_SHA),"genesis_sha256":GENESIS_SHA,"guard":guard,"admission":ar,"minimum_free_bytes":a["protected_existing_floor_bytes"],"issued_monotonic_us":issued,"expires_monotonic_us":expires});
     let pr = save_json(&n.root, "plan.json", &p)?;
@@ -157,8 +157,9 @@ pub(super) fn run(
     units::producer(n, None, &pr, &affinity)?;
     // Recheck fresh capacity immediately before the first activation, without
     // rerunning Git/source hashing within the short first-fire clock.
-    let (_, latest) = current(n, review, false)?;
+    let latest = refreshed_capacity(n, review, false)?;
     preserves_admitted_space(&latest, a)?;
+    check_devices(&latest, a)?;
     units::producer(n, None, &pr, &affinity)?;
     peers.verify(n)?;
     n.run("/usr/bin/systemctl", &["start", "--no-block", UNIT])?;
@@ -188,7 +189,7 @@ pub(super) fn run(
         } else {
             num(a, "protected_existing_floor_bytes")?
         };
-        let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"filesystem":ROOT,"boot_id":a["boot_id"],"main_start_ticks":process_ticks(pid)?,"native_main":{"main_pid":pid,"executable":HARNESS,"sha256":HARNESS_SHA},"minimum_free_bytes":guard_floor,"worker_root":ROOT,"maximum_root_physical_bytes":SCRATCH,"maximum_worker_vmas":3500000,"receipt_directory":receipts});
+        let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"filesystem":EXPECTED_FILESYSTEM,"boot_id":a["boot_id"],"main_start_ticks":process_ticks(pid)?,"native_main":{"main_pid":pid,"executable":HARNESS,"sha256":HARNESS_SHA},"minimum_free_bytes":guard_floor,"worker_root":ROOT,"maximum_root_physical_bytes":SCRATCH,"maximum_worker_vmas":3500000,"receipt_directory":receipts});
         let gr = save_json(&n.root, "guard-plan.json", &gp)?;
         let deployed_gr = units::bind_plan(n, &guard_binding, &gr, units::GUARD_ARG)?;
         units::guard_properties(
@@ -320,9 +321,11 @@ pub(super) fn run(
             mono()?,
         );
         handoff::limited_sample(&p, &gp, &sample)?;
+        check_mount_sample(a, &sample)?;
         first_guard(&p, &token, &gp, &sample, &journal, now()?)?;
-        let (_, latest) = current(n, review, true)?;
+        let latest = refreshed_capacity(n, review, true)?;
         preserves_admitted_space(&latest, a)?;
+        check_devices(&latest, a)?;
         units::producer(n, Some(&iid), &pr, &affinity)?;
         gate::held_image(pid, &iid, UNIT, HARNESS)?;
         verify_mount(&receipt_mount, &receipts)?;
@@ -357,7 +360,7 @@ pub(super) fn run(
             producer_package.join(UNIT),
             hash(&producer_package.join(UNIT))?,
         );
-        let mut handoff = json!({"schema":"horizon-native257-guarded-startup-v1","unit":UNIT,"invocation_id":iid,"main_pid":pid,"producer":producer,"unit_file":unit_file,"retention":retain,"startup_plan":pr,"admission":ar,"guard_plan":deployed_gr,"first_guard_sample":token["guard_sample"],"first_guard_pid1_journal":token["guard_pid1_journal"],"first_guard_token":Bound::new(token_dest.join("guard-admission.json"),tr.sha256),"recorded_monotonic_us":mono()?,"recorded_unix_seconds":now()?,"native_input_qualified":false,"epoch":257,"harness":p["harness"],"worker":p["worker"],"input_packet":p["input_packet"],"launcher_sha256":self_sha,"peer_window":wr,"receipt_mount":receipt_mount,"cpu_affinity":review["cpu_affinity"]});
+        let mut handoff = json!({"schema":HANDOFF_SCHEMA,"unit":UNIT,"invocation_id":iid,"main_pid":pid,"producer":producer,"unit_file":unit_file,"retention":retain,"startup_plan":pr,"admission":ar,"guard_plan":deployed_gr,"first_guard_sample":token["guard_sample"],"first_guard_pid1_journal":token["guard_pid1_journal"],"first_guard_token":Bound::new(token_dest.join("guard-admission.json"),tr.sha256),"recorded_monotonic_us":mono()?,"recorded_unix_seconds":now()?,"native_input_qualified":false,"epoch":EPOCH,"harness":p["harness"],"worker":p["worker"],"input_packet":p["input_packet"],"launcher_sha256":self_sha,"peer_window":wr,"receipt_mount":receipt_mount,"cpu_affinity":review["cpu_affinity"]});
         ensure!(
             num(&handoff, "recorded_unix_seconds")? <= num(a, "expires_unix_seconds")?
                 && num(&handoff, "recorded_monotonic_us")? < expires,

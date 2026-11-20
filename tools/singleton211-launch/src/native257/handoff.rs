@@ -1,4 +1,4 @@
-//! Reopen the actual bootstrap startup graph for downstream resource consumers.
+// Reopen the actual bootstrap startup graph for downstream resource consumers.
 use super::*;
 pub(super) fn limited_sample(p: &Value, gp: &Value, g: &Value) -> Result<()> {
     let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
@@ -56,16 +56,16 @@ fn verify(
     let worker = json!(Bound::new(WORKER, WORKER_SHA));
     let packet = json!(Bound::new(PACKET, PACKET_SHA));
     ensure!(
-        h["schema"] == "horizon-native257-guarded-startup-v1"
-            && h["epoch"] == 257
+        h["schema"] == HANDOFF_SCHEMA
+            && h["epoch"] == EPOCH
             && h["unit"] == UNIT
             && h["native_input_qualified"] == false
             && h["harness"] == harness
             && h["worker"] == worker
             && h["input_packet"] == packet
-            && p["schema"] == "horizon-native257-startup-plan-v1"
+            && p["schema"] == PLAN_SCHEMA
             && p["operation"] == "native-cold"
-            && p["epoch"] == 257
+            && p["epoch"] == EPOCH
             && p["worker_root"] == ROOT
             && p["bootstrap_slot"] == SLOT
             && p["snapshot_sha256"] == SNAPSHOT_SHA
@@ -76,7 +76,7 @@ fn verify(
             && p["worker"] == worker
             && p["maximum_root_physical_bytes"] == SCRATCH
             && p["maximum_memory_bytes"] == MEMORY
-            && a["schema"] == "horizon-native257-current-fleet-admission-v1"
+            && a["schema"] == ADMISSION_SCHEMA
             && a["operation"] == "native-cold"
             && a["admitted"] == true
             && a["candidate_incremental_peak_bytes"] == RESERVATION
@@ -90,7 +90,7 @@ fn verify(
             && h["peer_window"] == p["peer_window"]
             && h["admission"] == p["admission"]
             && t["admission"] == p["admission"]
-            && t["schema"] == "horizon-native257-first-guard-token-v1"
+            && t["schema"] == TOKEN_SCHEMA
             && t["harness"] == harness
             && t["guard"] == guard
             && t["unit"] == UNIT
@@ -103,7 +103,7 @@ fn verify(
             && t["guard_pid1_journal"] == h["first_guard_pid1_journal"]
             && binding(&h["first_guard_token"])?.path
                 == Path::new(TOKENS).join(iid).join("guard-admission.json"),
-        "native257 startup graph mismatch"
+        "native startup graph mismatch"
     );
     let v = &h["producer"];
     ensure!(
@@ -130,6 +130,7 @@ fn verify(
             && wall <= num(a, "expires_unix_seconds")?,
         "handoff outside original admission"
     );
+    check_mount_sample(a, g)?;
     limited_sample(p, gp, g)?;
     first_guard::first_guard(p, t, gp, g, j, wall)
 }
@@ -181,11 +182,11 @@ mod tests {
         let jr = b("journal");
         merge(
             &mut p,
-            json!({"schema":"horizon-native257-startup-plan-v1","operation":"native-cold","epoch":257,"worker_root":ROOT,
+            json!({"schema":PLAN_SCHEMA,"operation":"native-cold","epoch":EPOCH,"worker_root":ROOT,
       "bootstrap_slot":SLOT,"snapshot_sha256":SNAPSHOT_SHA,"genesis_sha256":GENESIS_SHA,"input_packet":i,"harness":hreg,"guard":greg,
       "worker":w,"maximum_root_physical_bytes":SCRATCH,"maximum_memory_bytes":MEMORY,"admission":ar,"peer_window":peer}),
         );
-        let mut a = json!({"schema":"horizon-native257-current-fleet-admission-v1","operation":"native-cold","admitted":true,
+        let mut a = json!({"schema":ADMISSION_SCHEMA,"operation":"native-cold","admitted":true,
         "candidate_incremental_peak_bytes":RESERVATION,"maximum_memory_bytes":MEMORY,"harness":hreg,"guard":greg,"worker":w,"input_packet":i,
         "boot_id":p["boot_id"],"protected_existing_floor_bytes":p["minimum_free_bytes"],"issued_unix_seconds":60,"expires_unix_seconds":120});
         let t = startup::cold_input_token(
@@ -202,7 +203,7 @@ mod tests {
         );
         let token = binding(&b("guard-admission")).unwrap();
         let iid = text(&t, "invocation_id").unwrap();
-        let mut h = json!({"schema":"horizon-native257-guarded-startup-v1","epoch":257,"unit":UNIT,"native_input_qualified":false,"harness":hreg,
+        let mut h = json!({"schema":HANDOFF_SCHEMA,"epoch":EPOCH,"unit":UNIT,"native_input_qualified":false,"harness":hreg,
         "worker":w,"input_packet":i,"peer_window":peer,"admission":ar,"startup_plan":pr,"guard_plan":t["guard_plan"],
         "first_guard_sample":sr,"first_guard_pid1_journal":jr,"first_guard_token":Bound::new(Path::new(TOKENS).join(iid).join("guard-admission.json"),token.sha256),
         "invocation_id":iid,"main_pid":42,"recorded_monotonic_us":3001,"recorded_unix_seconds":100,
@@ -212,6 +213,7 @@ mod tests {
         for x in [&mut h, &mut a] {
             deny_authority(x);
         }
+        sample_fixture(&mut a, &mut g);
         verify(&h, &p, &a, &t, &gp, &g, &j).unwrap();
         let mut promoted = t.clone();
         promoted["replay_launch_authorized"] = json!(true);
