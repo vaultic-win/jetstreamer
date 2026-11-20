@@ -14,6 +14,9 @@ fn start_limit(next: u64, clock: u64) -> Result<u64> {
     Ok(next - MARGIN)
 }
 pub(super) fn deadline(n: &mut Native, timer: &str) -> Result<u64> {
+    timer_clock(n, timer, "NextElapseUSecMonotonic")
+}
+pub(super) fn timer_clock(n: &mut Native, timer: &str, property: &str) -> Result<u64> {
     let id: String = timer
         .bytes()
         .map(|b| {
@@ -31,7 +34,7 @@ pub(super) fn deadline(n: &mut Native, timer: &str) -> Result<u64> {
             "org.freedesktop.systemd1",
             &format!("/org/freedesktop/systemd1/unit/{id}"),
             "org.freedesktop.systemd1.Timer",
-            "NextElapseUSecMonotonic",
+            property,
         ],
     )?;
     let words: Vec<_> = std::str::from_utf8(&raw)?.split_whitespace().collect();
@@ -50,7 +53,7 @@ struct Peer {
     next: u64,
     sample: Bound,
 }
-fn peer_state(
+pub(super) fn peer_state(
     n: &mut Native,
     c: &periodic::Control,
     unit: &str,
@@ -95,7 +98,7 @@ fn peer_state(
     );
     Ok((gid.into(), tid.into(), next))
 }
-fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Result<Bound> {
+pub(super) fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Result<Bound> {
     let path = Path::new(text(p, "receipt_directory")?).join(format!("sample-{gid}.json"));
     trusted_parents(&path)?;
     let sample = Bound::new(&path, hash(&path)?);
@@ -134,6 +137,7 @@ fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Result<Bound> 
 }
 pub(super) struct Window {
     peers: Vec<Peer>,
+    full211: Option<full211_window::Window>,
     pub(super) limit: u64,
     pub(super) receipt: Bound,
 }
@@ -145,7 +149,10 @@ fn original_state(claimed: (&str, &str, u64), actual: (&str, &str, u64)) -> Resu
     Ok(())
 }
 impl Window {
-    pub(super) fn verify(&self, n: &mut Native) -> Result<()> {
+    pub(super) fn verify(&mut self, n: &mut Native) -> Result<()> {
+        if let Some(window) = &mut self.full211 {
+            window.verify(n)?;
+        }
         for p in &self.peers {
             let c = &p.control;
             periodic::observe(n, c)?;
@@ -181,6 +188,7 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
     let mut peers = Vec::new();
     let mut rows = Vec::new();
     let mut limit = u64::MAX;
+    let mut full211 = None;
     for c in controls {
         let p = c.guard_plan.sealed()?;
         let unit = text(&p, "unit")?;
@@ -192,6 +200,19 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
             seen.insert((unit.to_owned(), iid.to_owned())),
             "duplicate scheduled live peer"
         );
+        if c.unit == GUARD_UNIT {
+            ensure!(
+                a["epoch"] == 257
+                    && !expected.is_empty()
+                    && current.contains_key(UNIT)
+                    && full211.is_none(),
+                "full211 rollover scope differs"
+            );
+            let window = full211_window::Window::admitted(n, review)?;
+            rows.push(json!({"control":c,"producer":unit,"producer_iid":iid,"qualification":review["full211_window_qualification"],"completed_firing":window.receipt()}));
+            full211 = Some(window);
+            continue;
+        }
         periodic::observe(n, &c)?;
         let (gid, tid, next) = peer_state(n, &c, unit, iid)?;
         let sample = healthy_sample(&c, &p, &gid)?;
@@ -221,6 +242,7 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
     )?;
     Ok(Window {
         peers,
+        full211,
         limit,
         receipt,
     })

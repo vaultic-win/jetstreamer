@@ -5,9 +5,9 @@ const RECEIPT: &str = "/var/lib/jetstreamer/horizon-singleton211-execution-launc
 const RECEIPT_SHA: &str = "e020a85afd55cd04afdc9d1a3366c63723788993833ae01eb6c8b67e8d679487";
 const PLAN: &str =
     "/var/lib/jetstreamer/horizon-singleton211-guard-binding-full-v133-a/guard-plan.json";
-const ATTEMPT: &str = "full-v133-a";
+pub(super) const ATTEMPT: &str = "full-v133-a";
 const LAUNCHER_SHA: &str = "169a553cb0298a9ed2e29574767ad637fb765e9f0347f0432cbe3a077d5da72f";
-const IID: &str = "49ea83a3a5e94e99af51153d2fd79e92";
+pub(super) const IID: &str = "49ea83a3a5e94e99af51153d2fd79e92";
 pub(super) fn handoff() -> Bound {
     Bound::new(RECEIPT, RECEIPT_SHA)
 }
@@ -215,13 +215,16 @@ pub(super) fn authenticate(
     observer: &Value,
     rows: &[capacity::Reservation],
 ) -> Result<()> {
+    let (h, a) = original_owner(n)?;
+    validate(fleet, observer, rows, &h, &a)
+}
+pub(super) fn original_owner(n: &mut Native) -> Result<(Value, Value)> {
     let h = validate_saved_handoff(Path::new(RECEIPT), RECEIPT_SHA, LAUNCHER_SHA)?;
     let a = binding(&h["admission"])?.sealed()?;
     ensure!(
         text(&a, "boot_id")? == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
         "full211 handoff belongs to a different boot"
     );
-    validate(fleet, observer, rows, &h, &a)?;
     let plan = binding(&h["startup_plan"])?;
     let review = binding(&a["review"])?.sealed()?;
     let owner = launch::producer(
@@ -233,7 +236,14 @@ pub(super) fn authenticate(
         true,
     )?;
     live::same_owner(&owner, &h["producer"])?;
-    Ok(())
+    let mut argv = vec![NODE.to_owned()];
+    argv.extend(launch::node_args());
+    ensure!(
+        fs::read(format!("/proc/{}/cmdline", num(&h, "main_pid")?))?
+            == (argv.join("\0") + "\0").as_bytes(),
+        "full211 native replay arguments changed"
+    );
+    Ok((h, a))
 }
 
 #[cfg(test)]

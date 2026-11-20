@@ -467,7 +467,7 @@ pub(super) fn run(
     ] {
         absent(path)?;
     }
-    let peers = peer_window::capture(n, review, a)?;
+    let mut peers = peer_window::capture(n, review, a)?;
     let ar = save_json(&n.root, "admission.json", a)?;
     n.seal(
         &admitted,
@@ -567,7 +567,7 @@ pub(super) fn run(
         };
         n.run("/usr/bin/systemctl", &["start", TIMER])?;
         if let Some(held) = held {
-            return qualification::capture_stop(n, &held, &pr, &deployed_gr, attempt, &peers);
+            return qualification::capture_stop(n, &held, &pr, &deployed_gr, attempt, &mut peers);
         }
         let g = loop {
             n.check()?;

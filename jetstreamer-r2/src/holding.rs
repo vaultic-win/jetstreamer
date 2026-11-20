@@ -886,12 +886,14 @@ fn available(path: &Path) -> Result<u64> {
         .context("holding free-space overflow")
 }
 struct FloorWriter<'a> {
+    check: &'a dyn Fn() -> Result<()>,
     file: &'a mut File,
     directory: &'a Path,
     minimum_free_bytes: u64,
 }
 impl Write for FloorWriter<'_> {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        (self.check)().map_err(std::io::Error::other)?;
         let free = available(self.directory).map_err(std::io::Error::other)?;
         let required = self
             .minimum_free_bytes
@@ -1149,6 +1151,15 @@ async fn restore_blob<F: Fn() -> Result<()>>(
     target: BlobRestore<'_>,
     before_commit: F,
 ) -> Result<PathBuf> {
+    restore_blob_guarded(client, target, || Ok(()), before_commit).await
+}
+
+async fn restore_blob_guarded(
+    client: &Client,
+    target: BlobRestore<'_>,
+    check: impl Fn() -> Result<()>,
+    before_commit: impl Fn() -> Result<()>,
+) -> Result<PathBuf> {
     let BlobRestore {
         key,
         etag,
@@ -1164,7 +1175,9 @@ async fn restore_blob<F: Fn() -> Result<()>>(
         let id = regular_identity(&destination)?;
         ensure!(
             id.length == length
-                && hash_and_etag(&destination, id, DEFAULT_PART_SIZE)?.sha256_hex == sha,
+                && hash_and_etag_checked(&destination, id, DEFAULT_PART_SIZE, |_| check())?
+                    .sha256_hex
+                    == sha,
             "conflicting restored holding object"
         );
     } else {
@@ -1210,12 +1223,15 @@ async fn restore_blob<F: Fn() -> Result<()>>(
         if mode == 0o400 {
             ensure!(
                 existing.length == length
-                    && hash_and_etag(&partial, existing, DEFAULT_PART_SIZE)?.sha256_hex == sha,
+                    && hash_and_etag_checked(&partial, existing, DEFAULT_PART_SIZE, |_| check())?
+                        .sha256_hex
+                        == sha,
                 "incomplete/conflicting sealed partial restore"
             );
         } else {
             file.seek(SeekFrom::Start(0))?;
             let mut guarded = FloorWriter {
+                check: &check,
                 file: &mut file,
                 directory,
                 minimum_free_bytes: minimum,

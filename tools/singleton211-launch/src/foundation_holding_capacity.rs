@@ -73,7 +73,13 @@ fn booked_actor(
     Ok(())
 }
 
-fn evaluate(n: &mut Native, source: &Bound, review: &Value, additional: u64) -> Result<Value> {
+fn evaluate(
+    n: &mut Native,
+    source: &Bound,
+    review: &Value,
+    additional: u64,
+    lease: Option<&RestoreLease>,
+) -> Result<Value> {
     ensure!(
         review["schema"] == SCHEMA
             && review["host"] == "horizon-vaultic"
@@ -101,7 +107,11 @@ fn evaluate(n: &mut Native, source: &Bound, review: &Value, additional: u64) -> 
     let unit = actor_unit(&group)?;
     let iid = std::env::var("INVOCATION_ID")?;
     let before = n.show(unit)?;
-    let host = native257_fit::booked_host(n, review, &path, None)?;
+    let host = native257_fit::booked_host_for(n, review, &path, None, lease)?;
+    ensure!(
+        text(&before, "MainPID")?.parse::<u32>()? == std::process::id(),
+        "restore image must be the service MainPID"
+    );
     booked_actor(&host, review, unit, &before, &iid)?;
     let after = n.show(unit)?;
     booked_actor(&host, review, unit, &after, &iid)?;
@@ -109,7 +119,8 @@ fn evaluate(n: &mut Native, source: &Bound, review: &Value, additional: u64) -> 
     live::kernel_memory(&after, unit, text(&after, "MemoryMax")?.parse()?)?;
     // The worker's actual cap is already in the booked row or control envelope.
     // The outer restore path computes remaining unallocated body + metadata.
-    let resources = live::resources_at(&path)?;
+    let mut resources = live::resources_at(&path)?;
+    resources.2 = resources.2.min(host.resources.2);
     ensure!(resources.0 == host.resources.0, "physical host changed");
     let capacity = capacity::booked_arithmetic(
         resources,
@@ -124,13 +135,17 @@ fn evaluate(n: &mut Native, source: &Bound, review: &Value, additional: u64) -> 
             && fs::metadata(&path)?.dev() == host.device,
         "holding owner or filesystem changed"
     );
-    fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
+    if let Some(lease) = lease {
+        lease.check_anchor(review)?;
+    } else {
+        fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
+    }
     n.check()?;
     Ok(
         json!({"schema":"jetstreamer-foundation-holding-current-capacity-v1","host":"horizon-vaultic",
         "first_epoch":201,"last_epoch":300,"restore_only":true,"review":source,"fleet":review["fleet"],
         "observer":review["observer"],"reservation_ledger":review["reservation_ledger"],"century":review["century"],
-        "native265_runtime_growth_release":host.release,"boot_id":host.boot,"filesystem":path,"st_dev":host.device,
+        "native265_runtime_growth_release":host.release,"full211_growth":host.full211_growth,"boot_id":host.boot,"filesystem":path,"st_dev":host.device,
         "unit":unit,"invocation_id":iid,"holding_artifact":actor_artifact,"additional_bytes":additional,
         "minimum_free_bytes":capacity["protected_existing_floor_bytes"],"capacity":capacity,
         "all_live_growth_and_century_floor_protected":true,"local_retirement_authorized":false,
@@ -139,6 +154,10 @@ fn evaluate(n: &mut Native, source: &Bound, review: &Value, additional: u64) -> 
 }
 
 pub fn check(basis: &Value, additional: u64) -> Result<Value> {
+    checked(basis, additional, None)
+}
+
+fn checked(basis: &Value, additional: u64, lease: Option<&RestoreLease>) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0,
         "private native evidence requires privileged access"
@@ -158,10 +177,14 @@ pub fn check(basis: &Value, additional: u64) -> Result<Value> {
                 .context("capacity deadline overflow")?,
         ),
     };
-    let result = evaluate(&mut native, &source, &review, additional);
-    match &result {
+    let mut result = evaluate(&mut native, &source, &review, additional, lease);
+    match &mut result {
         Ok(v) => {
-            save_json(&root, "capacity.json", v)?;
+            if let Some(l) = lease {
+                v["continuing_restore"] = l.evidence();
+            }
+            let evidence = save_json(&root, "capacity.json", v)?;
+            v["evidence"] = serde_json::to_value(evidence)?;
         }
         Err(e) => {
             save_json(
@@ -174,6 +197,10 @@ pub fn check(basis: &Value, additional: u64) -> Result<Value> {
     }
     result
 }
+
+#[path = "foundation_holding_lease.rs"]
+mod lease;
+pub use lease::RestoreLease;
 
 #[cfg(test)]
 mod tests {
@@ -209,6 +236,7 @@ mod tests {
             currents: BTreeMap::new(),
             overhead: (0, 0),
             century: 0,
+            full211_growth: None,
             release: None,
             boot: String::new(),
             device: 0,

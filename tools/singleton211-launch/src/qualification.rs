@@ -643,7 +643,7 @@ pub(super) fn capture_stop(
     startup: &Bound,
     guard_plan: &Bound,
     attempt: &str,
-    peers: &peer_window::Window,
+    peers: &mut peer_window::Window,
 ) -> Result<()> {
     let producer_package = launch::package(attempt, "producer");
     let guard_package = launch::package(attempt, "guard-units");
