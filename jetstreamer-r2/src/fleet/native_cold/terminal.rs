@@ -114,6 +114,17 @@ fn decision(
         }
     }
     let (good, wall, end) = finished.context("native bootstrap missing original PID1 terminal")?;
+    let within_runtime = if EPOCH == 266 {
+        // The epoch 266 producer template sets RuntimeMaxSec=7200 and TimeoutStopSec=30.
+        let producer = &h["producer"];
+        let start = text(producer, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
+        producer["RuntimeMaxUSec"] == "2h"
+            && start >= issued
+            && start <= end
+            && end - start <= 7_230_000_000
+    } else {
+        end >= issued && end - issued <= 2_760_000_000
+    };
     ensure!(
         manager["Id"] == c::UNIT
             && manager["InvocationID"] == iid
@@ -127,8 +138,7 @@ fn decision(
             && manager["Job"] == ""
             && manager["TriggeredBy"] == ""
             && manager["LoadState"] == "loaded"
-            && end >= issued
-            && end - issued <= 2_760_000_000
+            && within_runtime
             && marker.is_none_or(|t| t < end)
             && failure.as_ref().is_none_or(|(_, t)| *t < end),
         "native bootstrap terminal manager/clock differs"
@@ -214,6 +224,14 @@ fn registered(s: &Spec) -> Result<(Value, Value, Value, Value)> {
         "native bootstrap terminal observer/fleet substituted"
     );
     let p = event::prior(&f)?;
+    let origin=sealed(&s.running_origin)?;
+    if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA && event::owner(&p)?.is_none(){
+        let claim: PipelineClaim=serde_json::from_value(json!({"epoch":EPOCH,"phase":c::PHASE,"unit":c::UNIT,"invocation_id":origin["invocation_id"],"expected_exec_start":origin["expected_exec_start"],"evidence":[private157::binding(&s.running_origin)]}))?;
+        c::claim(&claim)?;
+        let (h,a)=c::startup(&binding(&origin["startup_handoff"])?)?;
+        ensure!(s.fleet == binding(&a["fleet"])? && s.observer==binding(&a["observer"])? && p.observer==s.observer,"direct terminal must bind admitted original fleet");
+        return Ok((origin,h,a,f));
+    }
     let claim = event::owner(&p)?
         .context("native bootstrap terminal lacks original registered running claim")?;
     ensure!(
@@ -228,7 +246,9 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
     let sb = binding(&proof["capture_spec"])?;
     let s: Spec = serde_json::from_value(sealed(&sb)?)?;
     let (origin, h, a, f) = registered(&s)?;
-    c::helper(&a, text(proof, "capture_helper_sha256")?, false)?;
+    if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA {
+        native266_recovery::successor(&a,text(proof,"capture_helper_sha256")?,false)?;
+    } else { c::helper(&a, text(proof, "capture_helper_sha256")?, false)?; }
     ensure!(
         s.output == output
             && proof["schema"] == SCHEMA
@@ -350,8 +370,9 @@ fn actual_result() -> Result<Value> {
 pub(in crate::fleet) fn capture() -> Result<()> {
     let (b, actor) = publication203::parsed_args(epoch_name!("capture-native", "-terminal"))?;
     let s: Spec = serde_json::from_value(sealed(&b)?)?;
-    let (_, h, a, f) = registered(&s)?;
-    c::helper(&a, &actor, true)?;
+    let (origin,h,a,f)=registered(&s)?;
+    let recovered=EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA;
+    if recovered {native266_recovery::successor(&a,&actor,true)?;} else {c::helper(&a,&actor,true)?;}
     ensure!(
         a["boot_id"] == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
         "native bootstrap terminal boot changed"
@@ -372,7 +393,7 @@ pub(in crate::fleet) fn capture() -> Result<()> {
         .cloned()
         .collect();
     let before = census(&names, 201, 300)?;
-    native265_capture::peers(&f, &before, c::UNIT)?;
+    if recovered { native266_recovery::peers(&f,&before,c::UNIT)?; } else { native265_capture::peers(&f, &before, c::UNIT)?; }
     let m = c::properties()?;
     c::retention(&h)?;
     let gp = sealed(&binding(&h["guard_plan"])?)?;
@@ -415,13 +436,18 @@ mod tests {
     #[test]
     fn original_harness_pid1_and_failure_cause_determine_the_terminal_decision() {
         let iid = "a".repeat(32);
-        let h = json!({"invocation_id":iid,"main_pid":42});
+        let h = json!({"invocation_id":iid,"main_pid":42,"producer":{"ExecMainStartTimestampMonotonic":"120","RuntimeMaxUSec":"2h"}});
         let mut m = json!({"Id":c::UNIT,"InvocationID":iid,"ExecMainPID":"42","MainPID":"0","ControlPID":"0","NRestarts":"0","Restart":"no","KillMode":"control-group","Delegate":"no","Job":"","TriggeredBy":"","LoadState":"loaded","ActiveState":"inactive","SubState":"dead","Result":"success","ExecMainCode":"1","ExecMainStatus":"0"});
         let harness = json!({"_PID":"42","_UID":"1000","_EXE":c::TEST,"_BOOT_ID":"boot","_SYSTEMD_UNIT":c::UNIT,"_SYSTEMD_INVOCATION_ID":iid,"__MONOTONIC_TIMESTAMP":"150","__REALTIME_TIMESTAMP":"1000000","MESSAGE":epoch_name!("epoch", " exact cold input completed; native PID1 and complete guard-history acceptance remain required")});
         let pid1 = json!({"_PID":"1","_UID":"0","_BOOT_ID":"boot","UNIT":c::UNIT,"INVOCATION_ID":iid,"__MONOTONIC_TIMESTAMP":"200","__REALTIME_TIMESTAMP":"1000050","MESSAGE":format!("{}: Deactivated successfully.",c::UNIT)});
         let mut rows = vec![harness, pid1];
         assert!(decision(&rows, &m, &h, "boot", 100, None).unwrap().0);
         assert!(decision(&rows[1..], &m, &h, "boot", 100, None).is_err());
+        let mut late = rows.clone();
+        late[1]["__MONOTONIC_TIMESTAMP"] = json!("3600000120");
+        assert_eq!(decision(&late, &m, &h, "boot", 100, None).is_ok(), EPOCH == 266);
+        late[1]["__MONOTONIC_TIMESTAMP"] = json!("7230000121");
+        assert!(decision(&late, &m, &h, "boot", 100, None).is_err());
         for (idx, key) in [
             (0, "_EXE"),
             (0, "_PID"),
