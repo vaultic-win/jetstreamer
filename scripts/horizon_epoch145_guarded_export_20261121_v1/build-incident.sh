@@ -83,6 +83,15 @@ else
 fi
 exec > "$q/build.log" 2>&1
 cp -R "$old" "$out/source"
+if [[ $flavor == timeout-rejoin ]]; then
+  # The historical source layout also contains files from the epoch 166 fixture.
+  # Take the entire small staged source tree from the same current checkout.
+  revision=$(git -c safe.directory="$src" -C "$src" rev-parse --verify HEAD^{commit})
+  while IFS= read -r -d '' prior; do
+    rel=${prior#"$out/source/"}
+    git -c safe.directory="$src" -C "$src" show "$revision:$rel" > "$prior"
+  done < <(find "$out/source" -type f -print0)
+fi
 s=scripts/horizon_epoch145_guarded_export_20261121_v1
 cp "$src/$s"/*.rs "$src/$s/build-incident.sh" "$out/source/$s/"
 for file in "${sources[@]}"; do cp "$src/$s/$file" "$out/source/$s/"; done
