@@ -9561,11 +9561,95 @@ async fn resolve_compact_index_urls(
     Ok((slot_url, cid_url))
 }
 
+// ripget 0.1 treats HTTP 500 as fatal, including a single failed range.
+// Retry only that typed transport error; a complete attempt still owns a fresh
+// private tempfile and retains every original publication and shutdown gate.
+const COMPACT_INDEX_HTTP500_MAX_RETRIES: usize = 3;
+#[derive(Debug)]
+enum CompactIndexAttemptError {
+    Terminal(String),
+    Download(ripget::RipgetError),
+}
+impl From<String> for CompactIndexAttemptError {
+    fn from(value: String) -> Self {
+        Self::Terminal(value)
+    }
+}
+impl CompactIndexAttemptError {
+    fn is_http500(&self) -> bool {
+        matches!(self, Self::Download(ripget::RipgetError::HttpStatus { status, .. })
+            if status.as_u16() == 500)
+    }
+    fn message(&self, url: &Url) -> String {
+        match self {
+            Self::Terminal(message) => message.clone(),
+            Self::Download(error) => format!("ripget failed for {}: {error}", url.as_str()),
+        }
+    }
+}
+fn compact_index_http500_retry_delay(
+    error: &CompactIndexAttemptError,
+    attempts_retried: usize,
+) -> Option<Duration> {
+    (error.is_http500() && attempts_retried < COMPACT_INDEX_HTTP500_MAX_RETRIES)
+        .then(|| compact_index_retry_delay(attempts_retried, None))
+}
+async fn compact_index_retry_wait(
+    delay: Duration,
+    shutdown: Arc<AtomicBool>,
+) -> Result<(), String> {
+    if shutdown.load(Ordering::Relaxed) {
+        return Err("shutdown requested during compact index retry".to_string());
+    }
+    let interrupted = async {
+        while !shutdown.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    };
+    tokio::select! {
+        _ = interrupted => Err("shutdown requested during compact index retry".to_string()),
+        _ = tokio::time::sleep(delay) => {
+            if shutdown.load(Ordering::Relaxed) {
+                Err("shutdown requested during compact index retry".to_string())
+            } else { Ok(()) }
+        }
+    }
+}
 async fn download_with_ripget(
     url: &Url,
     dest: &Path,
     shutdown: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    let mut attempts_retried = 0usize;
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            return Err("shutdown requested during compact index download".to_string());
+        }
+        match download_with_ripget_once(url, dest, shutdown.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                let Some(delay) = compact_index_http500_retry_delay(&error, attempts_retried)
+                else {
+                    return Err(error.message(url));
+                };
+                attempts_retried += 1;
+                warn!(
+                    "HTTP 500 downloading compact index {}; retrying complete private attempt {}/{} in {:.1}s",
+                    url.as_str(),
+                    attempts_retried,
+                    COMPACT_INDEX_HTTP500_MAX_RETRIES,
+                    delay.as_secs_f64()
+                );
+                compact_index_retry_wait(delay, shutdown.clone()).await?;
+            }
+        }
+    }
+}
+async fn download_with_ripget_once(
+    url: &Url,
+    dest: &Path,
+    shutdown: Arc<AtomicBool>,
+) -> Result<(), CompactIndexAttemptError> {
     if let Ok(metadata) = fs::metadata(dest)
         && metadata.len() > 0
     {
@@ -9625,7 +9709,7 @@ async fn download_with_ripget(
     ));
     let result = tokio::select! {
         _ = shutdown_wait => {
-            return Err("shutdown requested during compact index download".to_string());
+            return Err("shutdown requested during compact index download".to_string().into());
         }
         result = ripget::download_url_with_progress(
             url.as_str(),
@@ -9637,7 +9721,7 @@ async fn download_with_ripget(
         ) => result,
     };
 
-    let report = result.map_err(|err| format!("ripget failed for {}: {err}", url.as_str()))?;
+    let report = result.map_err(CompactIndexAttemptError::Download)?;
     partial
         .as_file()
         .sync_all()
@@ -22854,6 +22938,68 @@ async fn main() {
 #[cfg(test)]
 mod early_snapshot_tests {
     use super::*;
+
+    fn index_http_error(status: u16) -> CompactIndexAttemptError {
+        CompactIndexAttemptError::Download(ripget::RipgetError::HttpStatus {
+            status: status.try_into().unwrap(),
+            url: "https://example.invalid/index".into(),
+        })
+    }
+    #[test]
+    fn compact_index_http500_retries_only_exact_typed_transient_status() {
+        assert!(index_http_error(500).is_http500());
+        for status in [400, 401, 403, 404, 408, 429, 502, 503] {
+            assert!(!index_http_error(status).is_http500(), "{status}");
+        }
+        assert!(
+            !CompactIndexAttemptError::Terminal("HTTP 500 text is not typed evidence".into())
+                .is_http500()
+        );
+    }
+    #[test]
+    fn compact_index_http500_retry_budget_is_finite_with_existing_backoff() {
+        let error = index_http_error(500);
+        assert_eq!(
+            compact_index_http500_retry_delay(&error, 0),
+            Some(Duration::from_secs(10))
+        );
+        assert_eq!(
+            compact_index_http500_retry_delay(&error, 1),
+            Some(Duration::from_secs(20))
+        );
+        assert_eq!(
+            compact_index_http500_retry_delay(&error, 2),
+            Some(Duration::from_secs(40))
+        );
+        for attempts in [3, 4, usize::MAX] {
+            assert_eq!(compact_index_http500_retry_delay(&error, attempts), None);
+        }
+    }
+    #[test]
+    fn compact_index_http500_retry_does_not_relabel_integrity_or_local_errors() {
+        let error = CompactIndexAttemptError::Terminal("local publication failed".into());
+        let url = Url::parse("https://example.invalid/index").unwrap();
+        assert_eq!(compact_index_http500_retry_delay(&error, 0), None);
+        assert_eq!(error.message(&url), "local publication failed");
+        assert!(index_http_error(500).message(&url).contains("500"));
+    }
+    #[tokio::test]
+    async fn compact_index_retry_wait_honors_already_requested_shutdown() {
+        let shutdown = Arc::new(AtomicBool::new(true));
+        assert!(
+            compact_index_retry_wait(Duration::from_secs(300), shutdown)
+                .await
+                .is_err()
+        );
+    }
+    #[tokio::test]
+    async fn compact_index_retry_wait_completes_only_without_shutdown() {
+        assert!(
+            compact_index_retry_wait(Duration::ZERO, Arc::new(AtomicBool::new(false)))
+                .await
+                .is_ok()
+        );
+    }
 
     #[test]
     fn successor_boundary_probe_accepts_only_nonzero_epoch_boundaries() {
