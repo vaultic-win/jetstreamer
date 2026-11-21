@@ -1,0 +1,343 @@
+--- a/cadence168.py
++++ b/cadence168.py
+@@ -43,6 +43,8 @@
+ 
+ 
+ def freeze(c):
++    if getattr(c,'metered168_commit',None):
++        return None
+     live = status168.inspect()
+     oldref = c.fleet.get(FIELD)
+     if oldref:
+@@ -76,6 +78,12 @@
+     configs = [r for r in c.cfg['replays'] if r['range'] == '168']
+     samples = [r for r in c.sample['replays'] if r['range'] == '168']
+     need(len(configs) == len(samples) <= 1, 'different normal 168 sample count')
++    if getattr(c,'metered168_commit',None):
++        if configs:
++            need(168 in c.histories and samples==[c.histories[168]['original_168_row']],
++                 'foreign historical metered 168 row')
++        c.next_cfg['replays'] = [r for r in c.next_cfg['replays'] if r['range']!='168']
++        return
+     if not capture or not capture['state']['ordinary_canonical']:
+         need(not configs, '168 sampled before guarded admission')
+         return
+--- a/capacity.py
++++ b/capacity.py
+@@ -137,6 +137,9 @@
+         if c.metered168_row:
+             cap['normal168_post_guard_capacity']=c.metered168_row['post_guard_capacity']
+             cap['normal168_resource_credit_bytes']=0
++    if getattr(c,'commits',None):
++        from paired_cadence import capacity as retained_capacity
++        cap['retained_local_commit_bookings']=retained_capacity(c)
+     if c.private136:
+         row=c.private136
+         cap["private136_observation"]=row["receipt"]
+--- a/consume
++++ b/consume
+@@ -41,16 +41,15 @@
+         if [[ -s "$sample" && "$state" == inactive ]]; then break; fi
+         [[ "$state" != failed ]] || exit 1
+         if (( $(date +%s) >= due + 300 )); then
+-            [[ "$state" == active && $(systemctl show "$service" -p ExecStart --value) == *"$pkg/race166.py "* ]] &&
++            [[ ( "$state" == active || "$state" == activating ) && $(systemctl show "$service" -p ExecStart --value) == *"$pkg/guard_stops.py "* ]] &&
+                 (( $(date +%s) < due + 2100 )) || exit 1
+         fi
+         sleep 3
+     done
+     read -r binding _ < <(sha256sum -- "$sample")
+-    if ! "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"; then
+-        /usr/bin/python3 -B "$pkg/recovered166.py" retry-cycle "$fleet" "$sha" "$binding"
+-        "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"
+-    fi
++    while ! "$pkg/run-cycle.sh" "$fleet" "$sha" "$binding"; do
++        /usr/bin/python3 -B "$pkg/paired_cadence.py" retry-cycle "$fleet" "$sha" "$binding"
++    done
+     fleet="$(jq -er .out <<<"$meta")/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+     [[ -s "$fleet" && $(stat -c %u "$fleet") == 0 ]]
+     read -r sha _ < <(sha256sum -- "$fleet")
+--- a/cycle.py
++++ b/cycle.py
+@@ -1,4 +1,5 @@
+ """Receipt-backed rolling input and sample interpretation, independent of the clock tag."""
++import paired_cadence
+ import cadence168
+ import full172
+ import recovered
+@@ -154,7 +155,7 @@
+             self.original_status_dir=self.paths["statuses"]
+             self.paths["statuses"]=self.original_status_dir/"after-166"
+         self.rows={r["epoch"]:r for r in self.owner_fleet["actual_executing_replays"] if r["epoch"] not in (168,172)}
+-        self.native,self.private,self.closures,self.focused=verified_owners(self.owner_fleet)
++        self.native,self.private,self.closures,self.focused=verified_owners(self.owner_fleet,self.metered168_commit)
+         self.interpret()
+     def interpret(self):
+         s=self.sample; cfg=self.cfg; cd=s["cadence"];self.stamp=s["recorded_at_utc"]
+@@ -213,11 +214,8 @@
+         selected=self.paths["out"]/"observer.json"
+         if selected.exists():
+             previous=checked(bound(selected))
+-            if previous!=self.next_cfg and self.recovered166_history:
+-                import recovered166
+-                first=checked(self.recovered166["first_worker"])["observer_row"]
+-                need(recovered166.projected(previous,first)==self.next_cfg,"different preselected next observation")
+-                self.next_cfg=previous
++            if previous!=self.next_cfg and self.histories:
++                self.next_cfg=paired_cadence.next_config(self,previous)
+             if previous!=self.next_cfg:
+                 need(Path(self.fleet_ref["path"])==focused169.OVERLAY,"foreign selected next observer")
+                 fallback=copy.deepcopy(self.next_cfg)
+@@ -225,9 +223,10 @@
+                 need(previous==fallback,"preexisting four-owner observer differs beyond original 169 row")
+                 self.next_cfg=previous
+     def unchanged(self):
++        paired_cadence.unchanged(self)
+         need(recovered.ownership(self.fleet)==self.recovered_owners,"replacement ownership changed during status publication")
+         need(full172.identity(self.fleet) == (self.full172["identity"] if self.full172 else None), "epoch 172 admission/owner changed during cycle")
+-        need(current_owners(self.owner_fleet,self.metered168 and self.metered168["state"])==(self.native,self.private,self.closures,self.focused),"guard/owner changed during cadence; consume terminal/admission event and reconcile")
++        need(current_owners(self.owner_fleet,self.metered168 and self.metered168["state"],self.metered168_commit)==(self.native,self.private,self.closures,self.focused),"guard/owner changed during cadence; consume terminal/admission event and reconcile")
+     def public_fresh(self):
+         elapsed=dt.datetime.now(dt.timezone.utc)-self.now
+         need(dt.timedelta()<=elapsed<dt.timedelta(minutes=30),"coordinated evidence is outside its live publication window; reconcile the next genuine sample")
+--- a/guard_stops.py
++++ b/guard_stops.py
+@@ -103,9 +103,9 @@
+     c.historical166 = None
+     refs = stops()
+     assert_drained(refs)
+-    import recovered166
++    import paired_cadence
+     base, path = select(c.cfg, c.fleet_ref, c.fleet)
+-    c.cfg = recovered166.select_cycle(c,base,path)
++    c.cfg = paired_cadence.select_cycle(c,base,path)
+     return dict(c.fleet, **{FIELD: EVENT}, actual_executing_replays=[
+         row for row in c.fleet["actual_executing_replays"] if row["epoch"] not in EPOCHS])
+ 
+@@ -143,8 +143,8 @@
+     effective,effective_path = select(cfg, fleet_ref, fleet)
+     assert_drained(stops())
+     need(bound(NATIVE)["sha256"] == NATIVE_SHA, "original native observer changed")
+-    import recovered166
+-    recovered166.dispatch(effective,effective_path,fleet_ref,fleet,NATIVE)
++    import paired_cadence
++    paired_cadence.dispatch(effective,effective_path,fleet_ref,fleet,NATIVE)
+ 
+ 
+ if __name__ == "__main__":
+--- a/owners.py
++++ b/owners.py
+@@ -61,12 +61,12 @@
+     assert f["latest_terminal170_observation"]["sha256"]==RETRY7_SHA
+     assert f["latest_terminal_retry8_170"]==pair(EVENT,EVENT_SHA)
+     return {"retry7":closed(old7["lane"]["producer_unit"],old7["lane"]["expected_producer_invocation_id"]),"retry8":closed(UNIT,IID)}
+-def replay_census(rows,focused,full=None,closed168_owner=False,previous_normal=None,restored=None):
++def replay_census(rows,focused,full=None,closed168_owner=False,previous_normal=None,restored=None,metered_commit=None):
+     import focused169 as active
+     expected={r["unit"]["Id"] for r in rows}|{active.UNIT}
+     if not closed168_owner: expected.add(DIAG_UNIT)
+     if full: expected.add(full172.UNIT)
+-    normal=cadence168.status168.inspect()
++    normal=None if metered_commit else cadence168.status168.inspect()
+     cadence168.advancing_state(previous_normal,normal)
+     actor=normal and normal.get('actor')
+     if actor: expected.add(cadence168.status168.U)
+@@ -122,7 +122,7 @@
+                 observer_config=cfg,coordinated_sample_observed_this_invocation=False,canonical_replay_claimed=False,
+                 transaction_replay_claimed=False,archive_publication_authorized=False,additional_candidate_booking_bytes=0)
+ 
+-def verified_owners(fleet):
++def verified_owners(fleet,metered_commit=None):
+     rows=[r for r in fleet["actual_executing_replays"] if r["epoch"] not in (168,172)]
+     expected = set(IDS) - guard_stops.closed_epochs(fleet)
+     need(len(rows)==len(expected) and {r["epoch"] for r in rows}==expected and all(r["epoch"] in (168,172) or str(r["epoch"]) in fleet.get("original_disk_guard_recovery_workers",{}) for r in fleet["actual_active_bootstraps"]),"canonical owner set changed; reconcile its guarded admission or terminal event")
+@@ -136,8 +136,8 @@
+         need(row["native_identity_source"]==ad["actual_producer_native"] and ad["epoch"]==e and ad["producer_unit"]==row["unit"]["Id"]==native["Id"]
+              and ad["producer_invocation_id"]==iid and int(native["MainPID"])==ad["producer_pid"]==pid and native["MainStartTicks"]==tick
+              and ad["fresh_admission_passed"] and ad["all_prior_promises_retained"] and checked(g["first_guard_sample"])["producer_invocation_id"]==iid,"admission/first sample changed for "+str(e))
+-    return current_owners(fleet)
+-def current_owners(fleet, previous_normal=None):
++    return current_owners(fleet,metered_commit=metered_commit)
++def current_owners(fleet, previous_normal=None, metered_commit=None):
+     rows=[r for r in fleet["actual_executing_replays"] if r["epoch"] not in (168,172)]
+     from terminal import drained
+     drained()
+@@ -150,7 +150,7 @@
+         need(focused[key]==expected[key],"epoch 169 changed its bound "+key)
+     ended=closed168.FIELD in fleet
+     import recovered
+-    replay_census(rows,focused,full172.identity(fleet),ended,previous_normal,recovered.ownership(fleet))
++    replay_census(rows,focused,full172.identity(fleet),ended,previous_normal,recovered.ownership(fleet),metered_commit)
+     return {str(r["epoch"]):live(r) for r in rows},closed168.native() if ended else diagnostic(),closure(fleet),focused
+ def diagnostic_worker(private):
+     unit=private["unit"]["Id"];group=Path("/sys/fs/cgroup/system.slice")/unit
+--- a/reconcile.py
++++ b/reconcile.py
+@@ -1,4 +1,5 @@
+ """Derive the next observer and publish the validated local fleet after its sole timer is armed."""
++import paired_cadence
+ import cadence168
+ import full172
+ import recovered
+@@ -31,6 +32,11 @@
+     claims(r)
+     need(r["metered172_closure"]==c.fleet["metered172_closure"] and r["terminal169_transfer"]==c.fleet["terminal169_transfer"],"foreign metered closure or prior transfer")
+     need(r["observer"]==c.sample_ref and r["fleet_predecessor"]==status_predecessor(c) and r["effective_status_predecessor"]==c.fleet["authenticated_status_audit"] and r["current_retry9_replay_event"]==c.fleet["current_retry9_replay_event"],"incorrect coordinated status lineage")
++    for e,p in getattr(c,'commits',{}).items():
++        entry=checked(r['receipts'][str(e)])
++        need(entry.get(paired_cadence.FIELDS[e])==p['terminal'] and entry['observer']==c.sample_ref
++             and entry['producer_invocation_id'] is None and entry['archive_sample']==checked(p['terminal'])['local_archive']
++             and entry['after_status']['phase']=='verification', 'missing terminal status readback')
+     old_complete=not getattr(c,"retired168",False) and (r["active_producer_count"],r["active_private_diagnostic_count"])==(4,1)
+     if old_complete:
+         need(Path(c.fleet_ref["path"])==OVERLAY and r["terminal172_closure"]==c.fleet["terminal172_closure"] and "coordinated_private_diagnostic_169" not in r,"foreign five-owner completed status pass")
+@@ -114,6 +120,9 @@
+     private136.install(c,f)
+     guard_stops.install(f,c)
+     recovered.install(f,c)
++    paired_cadence.install168(c,f)
++    if getattr(c,'commits',None):
++        need(capacity.get('retained_local_commit_bookings')==paired_cadence.capacity(c),'lost retained local archive capacity')
+     return f
+ def run(c,operation):
+     out=c.paths["out"];ensure_dir(out);fd=lock(out/"fleet-cycle.lock")
+@@ -139,8 +148,11 @@
+         # Keep existing five-owner local evidence intact if closure occurred mid-finish.
+         old_ob=out/"CYCLE_OBSERVATION.json"
+         prefix="POST_FOCUSED169_" if (old_ob.exists() and content(old_ob).get("fleet_predecessor")!=c.fleet_ref) else ""
++        if getattr(c,'commits',None):
++            prefix="POST_LOCAL_"+"_".join(str(e) for e in c.commits)+"_"
+         ob=out/(prefix+"CYCLE_OBSERVATION.json")
+-        if not ob.exists():durable(ob,observe(c))
++        if not ob.exists():
++            durable(ob,paired_cadence.observation(c,out,observe) if getattr(c,'commits',None) else observe(c))
+         recorded=content(ob)
+         need(recorded["observer"]==c.sample_ref and recorded["fleet_predecessor"]==c.fleet_ref,"wrong prior capacity observation")
+         for name,k in (("AUDIT.json","audit"),("HOME_CAPACITY.json","capacity")):durable(out/(prefix+name),recorded[k])
+--- a/recovered.py
++++ b/recovered.py
+@@ -169,8 +169,8 @@
+         state=native(epoch)
+         if state is None:
+             if epoch==166:
+-                from recovered166 import transition
+-                if transition(fleet):
++                from paired_cadence import transition
++                if transition(fleet,166):
+                     continue
+             need(str(epoch) not in old and not (root/'ACTUAL_ADMISSION_AND_PROTECTION.json').exists(),
+                  'replacement stopped; reconcile the actual terminal')
+@@ -207,6 +207,18 @@
+     live=ownership(c.fleet)
+     path=c.paths['out']/('RECOVERED_WORKERS_AFTER_166.json' if getattr(c,'recovered166',None) else 'RECOVERED_WORKERS.json')
+     ensure_dir(path.parent)
++    prior_path=c.paths['out']/'RECOVERED_WORKERS.json'
++    if not path.exists() and prior_path!=path and prior_path.exists():
++        prior_ref=bound(prior_path)
++        saved=checked(prior_ref)
++        need(saved['fleet']==c.fleet_ref and saved['sample']==c.sample_ref
++             and {k:v for k,v in saved['owners'].items() if k!='166'}==live
++             and saved['owners']['166']['first_worker']==c.recovered166['first_worker']
++             and saved['owners']['166']['admission']==c.recovered166['admission'],
++             'foreign pre-terminal recovery capture')
++        durable(path,dict(fleet=c.fleet_ref,sample=c.sample_ref,owners=live,
++                          measured={k:v for k,v in saved['measured'].items() if k!='166'},
++                          prior_same_sample_capture=prior_ref))
+     if not path.exists():
+         sampled={}
+         for key, entry in live.items():
+@@ -465,11 +477,21 @@
+         epoch = int(row['range'])
+         if epoch == 168:
+             from status168 import inspect
+-            normal = inspect()
+-            need(normal and normal['ordinary_canonical'] and normal['first_worker']
+-                 and row == normal['observer_row'], 'foreign normal 168 worker')
++            from paired_cadence import transition, original as original_row
++            terminal = transition(fleet,168)
++            if terminal:
++                need(original_row(terminal)==row, 'foreign historical metered worker')
++            else:
++                normal = inspect()
++                need(normal and normal['ordinary_canonical'] and normal['first_worker']
++                     and row == normal['observer_row'], 'foreign normal 168 worker')
+             continue
+         need(epoch in ROUTES, 'unknown added worker')
++        if epoch==166 and '166' not in current:
++            from paired_cadence import transition, original as original_row
++            terminal = transition(fleet,166)
++            need(terminal and original_row(terminal)==row, 'foreign historical recovered worker')
++            continue
+         candidate = current[row['range']]
+         actor = candidate['actor']
+         first = checked(candidate['first_worker'])
+--- a/run-cycle.sh
++++ b/run-cycle.sh
+@@ -28,7 +28,7 @@
+     systemd-run --quiet --collect --wait --unit="$status_unit" -p UMask=0077 \
+         -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env \
+         /usr/bin/python3 -B "$pkg/status.py" "$fleet" "$fleet_sha" "$sample_sha"
+-    [[ -s $statuses/COMPLETED.json || -s $statuses/after-166/COMPLETED.json || -s $statuses/after-recovered166/COMPLETED.json ]]
++    [[ -s $statuses/COMPLETED.json || -s $statuses/after-166/COMPLETED.json || -s $statuses/after-recovered166/COMPLETED.json || -s $statuses/after-metered168/COMPLETED.json || -s $statuses/after-166-168/COMPLETED.json ]]
+     next=$(/usr/bin/python3 -B "$pkg/reconcile.py" next-config "$fleet" "$fleet_sha" "$sample_sha")
+     due=$(jq -er .due <<<"$next")
+     timer=$(jq -er .timer <<<"$next")
+--- a/status.py
++++ b/status.py
+@@ -1,4 +1,5 @@
+ """Authenticate the complete status range then conditionally refresh each status only."""
++import paired_cadence
+ import cadence168
+ import full172
+ import delivery_eta
+@@ -92,9 +93,8 @@
+     need(age>=0,"newer report must be retained separately")
+     after=dict(old,sampled_at_utc=c.stamp,estimated_remaining_millis=old["estimated_remaining_millis"]-age)
+     archive=None
+-    if e==166 and getattr(c,"recovered166",None):
+-        from recovered166 import forecast as committed_forecast
+-        return committed_forecast(c,old,prior)
++    if e in getattr(c,"commits",{}):
++        return paired_cadence.forecast(c,e,old,prior)
+     if e in getattr(c,"new_rows",{}):
+         return recovered.forecast(c,e,old,prior)
+     if e==166 and getattr(c,"terminal166",None):
+@@ -209,10 +209,12 @@
+         result["delivery_forecast"]=quote
+         if e!=167:
+             result["estimate_model"]=("Committed local archive and unfinished verification and delivery." if e==166 and c.terminal166 else delivery_eta.DESCRIPTION)
+-    if e==166 and getattr(c,"recovered166",None):
+-        result.update(recovered166_local_commit=c.recovered166["terminal"],recovered166_guard_retirement=c.recovered166["guard_retirement"],
+-                      historical_recovered166_observation=c.recovered166_history,producer_invocation_id=None,native_identity=None,
+-                      epoch_useful_work=None,current_repair_owner="/root",estimate_model="Committed local archive and unfinished verification and delivery.")
++    if e in getattr(c,"commits",{}):
++        label=paired_cadence.LABELS[e]
++        result.update({paired_cadence.FIELDS[e]:c.commits[e]["terminal"],label+"_guard_retirement":c.commits[e]["guard_retirement"],
++                       "historical_"+label+"_observation":c.histories.get(e)})
++        result.update(producer_invocation_id=None,native_identity=None,epoch_useful_work=None,current_repair_owner="/root",
++                      estimate_model="Committed local archive and unfinished verification and delivery.")
+     return result
+ def receipt_identity(v,c,e):
+     need(v["epoch"]==e and v["key"]==key(e) and v["observer"]==c.sample_ref and v["fleet_predecessor"]==status_predecessor(c) and v["after_sha256"]==digest(body(v["after_status"])) and v["conditional_header"]=="If-Match","existing cycle evidence is foreign")
+@@ -235,7 +237,10 @@
+     for e in EPOCHS:
+         ip=out/f"epoch-{e}.intent.json";rp=out/f"epoch-{e}.receipt.json"
+         original=getattr(c,"original_status_dir",None)
+-        if original is not None and e!=166 and (original/ip.name).exists():
++        ancestor=None
++        if getattr(c,"histories",None):
++            ip,rp,ancestor=paired_cadence.partial_status(c,e,ip,rp)
++        elif original is not None and e!=166 and (original/ip.name).exists():
+             ip,rp=original/ip.name,original/rp.name
+         etag,data=storage.get(e)
+         if rp.exists():
+@@ -247,7 +252,8 @@
+             need((etag==r["before_etag"] and digest(data)==r["before_sha256"]) or (data==body(r["after_status"]) and digest(data)==r["after_sha256"]),"partial conditional outcome changed on R2")
+         else:
+             from race166 import inherited_status
+-            inherited=inherited_status(c,e,etag,data)
++            inherited=(paired_cadence.inherited(c,e,ancestor,etag,data) if getattr(c,"histories",None)
++                       else inherited_status(c,e,etag,data))
+             if inherited:
+                 ref,prior=inherited,checked(inherited)
+             else:
