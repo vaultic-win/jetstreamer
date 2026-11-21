@@ -6,8 +6,15 @@ use std::process::Stdio;
 use generation::*;
 const POST: &str = "epoch145-publication-20261121-v1";
 const FLEET: &str = "ROOT_COMPLETE_OPERATIONAL_FLEET.json";
+#[cfg(not(feature = "cadence-rejoin"))]
+const FLEET_DIRECTORY: &str = "root131959-live166167170-20261121-v1";
+#[cfg(feature = "cadence-rejoin")]
+const FLEET_DIRECTORY: &str = "root213922-live166167170-20261121-v1";
+#[cfg(feature = "cadence-rejoin")]
+const HEAD: &str = "bc403aec3d9546b6ed39b58174c18c40606756722a3163044c6a704282a2b15e";
+#[cfg(not(feature = "cadence-rejoin"))]
 const HEAD: &str = "973b1d0d30142d26d524386c50429a5d121103dfce3190d476a6eb23fe1feadd";
-#[cfg(not(feature = "timeout-rejoin"))]
+#[cfg(not(any(feature = "timeout-rejoin", feature = "cadence-rejoin")))]
 mod generation {
     pub(super) const SOURCE: &str = "dc043eb78c4a4349b0098760dc764a1f";
     pub(super) const START: &str =
@@ -32,7 +39,7 @@ mod generation {
     pub(super) const FOLLOW: &str = "follow-v5b";
 }
 
-#[cfg(feature = "timeout-rejoin")]
+#[cfg(all(feature = "timeout-rejoin", not(feature = "cadence-rejoin")))]
 mod generation {
     pub(super) const SOURCE: &str = "d37f36f898a44932a19fd50d7014a6fe";
     pub(super) const START: &str =
@@ -40,10 +47,12 @@ mod generation {
     pub(super) const ADVANCING: &str =
         "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76";
     pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v8";
-    pub(super) const SEAL: &str = "972bb0747591e741b761671a272e536694d6039b870d627f5fac8f87cbab0e0f";
+    pub(super) const SEAL: &str =
+        "972bb0747591e741b761671a272e536694d6039b870d627f5fac8f87cbab0e0f";
     pub(super) const STATE_PATH: &str = "epoch145-v5c-delivery-handoff-20261121-v1/state";
     pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v11";
-    pub(super) const FIT_SEAL: &str = "50a46e9010b448f2e038300c7aa5ffcdf38bf36ff4caf9bd783fe76ae513f4dc";
+    pub(super) const FIT_SEAL: &str =
+        "50a46e9010b448f2e038300c7aa5ffcdf38bf36ff4caf9bd783fe76ae513f4dc";
     pub(super) const PRIOR: &str = "dc043eb78c4a4349b0098760dc764a1f";
     pub(super) const IMAGE: &str =
         "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d";
@@ -55,12 +64,37 @@ mod generation {
     pub(super) const FOLLOW: &str = "follow-v5c";
 }
 
+#[cfg(feature = "cadence-rejoin")]
+mod generation {
+    pub(super) const SOURCE: &str = "e6551a0bb8a14b989902e15c9ecc0751";
+    pub(super) const START: &str =
+        "epoch145-semantic-continuity-20261121-v1/V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json";
+    pub(super) const ADVANCING: &str =
+        "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0";
+    pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v10";
+    pub(super) const SEAL: &str =
+        "1dd8bea17cc568ae34d7cc60b80e1ffd4486840527a16c85a6de6386e98f6391";
+    pub(super) const STATE_PATH: &str = "epoch145-v5d-retry1-delivery-handoff-20261121-v1/state";
+    pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v15";
+    pub(super) const FIT_SEAL: &str =
+        "7f887c933698d424cd69244dede860f62cea2759a83f9edacc96f09c60c75eb6";
+    pub(super) const PRIOR: &str = "500c8d717a4147b087ff302b5afa7fc0";
+    pub(super) const IMAGE: &str =
+        "3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066";
+    pub(super) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5d/export145";
+    pub(super) const PIPELINE: &str =
+        "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
+    pub(super) const INSPECT: &str = "inspect-v5d";
+    pub(super) const FOLLOW: &str = "follow-v5d";
+}
+
 pub fn handles(mode: &str) -> bool {
     mode == INSPECT || mode == FOLLOW
 }
 
 fn fleet() -> Result<Value> {
-    let mut dir = rt("root131959-live166167170-20261121-v1");
+    let mut dir = rt(FLEET_DIRECTORY);
     let mut at = json!({"path":dir.join(FLEET),"sha256":HEAD});
     loop {
         let body = from_ref(&at)?;

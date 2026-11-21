@@ -5,6 +5,7 @@ edition = "2024"
 
 [features]
 timeout-rejoin = []
+cadence-rejoin = []
 
 [workspace]
 
