@@ -56,7 +56,7 @@ def main():
     fit=F['bound'](event,dict(path=str(B/'old166-census-6c327d0174a1466c833c84a00dd45164/FIT.json'),sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233'),0o400)
     ledger=F['bound'](event,fit['registered_host_equation']['source'],0o444)
     fleet=F['bound'](event,fit['fleet'],0o600)
-    ram=int(Path('/proc/meminfo').read_text().splitlines()[0].split()[1])*1024
+    ram=F['bound'](event,fleet['observer'],0o644)['host_memory']['total_kib']*1024
     prior=8499707994704
     def project(f,handoffs,closed):
         return T['calculate'](f,ledger,fleet,prior,handoffs,closed,ram,64)
@@ -106,7 +106,7 @@ def main():
     live,fr=F['head'](event)
     assert fr==F['head'](event)[1] and live['owner']=='/root'
     qualification='82672869ba90c9e63cf327929bb28172b8866b8c329849d184295155cc3f1e0d'
-    five=json.loads(F['pin'](F['NATIVE']/'qualification.json',qualification).read_bytes())
+    five=json.loads(F['pin'](F['NATIVE'].parent/'tools-v13/qualification.json',qualification).read_bytes())
     full=F['bound'](event,five['native'],0o400)
     mat=F['bound'](event,five['qualified_matrix'],0o400)['matrix']
     assert five['counts']==mat['counts']==dict(populations=64,publisher_prices=160,transfer_combinations=486,adverse=160)
@@ -115,6 +115,40 @@ def main():
     assert five['source_commit']=='c777aed01c50c69725adb60d0341a278c495e593' and full['fits'] and full['closed_full172'] is None
     current=T['scenarios'](full,ledger,five_fleet,prior,ram,64,set())
     assert len(current)==32 and current[0]['complete_protected_HOME_bytes']==full['complete_required_HOME_bytes'] and current[0]['gaps']['disk']>0
-    return dict(schema='horizon-199-phase-transition-qa-v2',focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
+    bridge=F['NATIVE'].parent/'tools-v14'
+    bridge_sha='4cf6d3ba5f3891bd950fdf9feda3915c2a3c199d813402b8aef50fbf2adb6435'
+    bridge_seal=dict(path=str(bridge/'deployment-seal-receipt.json'),sha256='86fdbaec0d37065e568f1aec19474f116162d94c161982479f1a96401b700500')
+    eight=json.loads(F['pin'](bridge/'qualification.json',bridge_sha).read_bytes())
+    predecessor=F['bound'](event,eight['predecessor'],0o444,bridge.parent/'tools-v13/deployment-seal-receipt.json')
+    assert eight['predecessor']['sha256']=='ad9409085ca6e2d73f532b81a889cc0ffadbcbdede649f1d02de663ca4c44bd2'
+    assert eight['source_commit']=='fd3180c7867ef17a0c4249d38bb5e7fb47efe14f'
+    assert {row['sha256'] for row in predecessor['members'] if row['name']=='publication-fit'}=={eight['members']['publication-fit']}
+    assert len(eight['registrations'])==8 and eight['refused_crossed_modes']==9 and eight['resource_credit_bytes']==0
+    for mode in ('semantic','post'):
+        registration=eight['registrations']['focused-'+mode]
+        assert registration['seal']==eight['phase_seals'][mode]
+        F['bound'](event,registration['seal'],0o444)
+        F['bound'](event,registration['build'],0o444)
+    actual_ref=dict(path=str(F['R']/'epoch145-guarded-export-20261121-v1/state/e6551a0bb8a14b989902e15c9ecc0751/recovery-started.json'),sha256='55d2a0504271e8a1eea2ca8c105a288be9497f1a2b80177279481692d06e041f')
+    actual=F['bound'](event,actual_ref,0o600)
+    assert actual['image']==eight['registrations']['focused-semantic']['image'] and actual['fresh_fit']['phase145']['window']['continuity_seal']==eight['phase_seals']['semantic']
+    assert actual['fresh_fit']['provider_seal']==bridge_seal and actual['iid']==actual['fresh_fit']['phase145']['invocation_id']
+    assert eight['fit']['phase145']['failure']['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
+    routes=runpy.run_path(str(HERE/'forecast_routes.py'))
+    def price_capture(native):
+        roster=F['bound'](event,native['fleet'],0o600)
+        assert native['fits'] and native['resource_credit_bytes']==0 and not native['replay_launch_authorized']
+        assert F['bound'](event,native['registered_host_equation']['source'],0o444)==ledger
+        prices=routes['price_rows'](native,roster,ledger,prior,ram,T)
+        assert len(prices)==486 and prices[0]['complete_protected_HOME_bytes']==native['complete_required_HOME_bytes']
+        assert all(set(row['transferred'])<=set(row['closed']) for row in prices)
+        exact=T['scenarios'](native,ledger,roster,prior,ram,64,set())
+        comparable=[{k:v for k,v in row.items() if k!='private169_closed'} for row in prices
+                    if not row['private169_closed'] and row['transferred']==row['closed']]
+        order=lambda row:(len(row['closed']),row['closed'])
+        assert len(exact)==32 and sorted(exact,key=order)==sorted(comparable,key=order)
+        return dict(fleet=native['fleet'],phase=native['phase145'],populations=64,transfers=len(prices),checkpoint_scenarios=len(exact))
+    captures=dict(stopped=price_capture(eight['fit']),resumed=price_capture(actual['fresh_fit']))
+    return dict(schema='horizon-199-phase-transition-qa-v3',eight_phase_qualification=bridge_sha,v14_retry_start=actual_ref,provider_captures=captures,focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
 if __name__=='__main__':
     print(json.dumps(main(),sort_keys=True))
