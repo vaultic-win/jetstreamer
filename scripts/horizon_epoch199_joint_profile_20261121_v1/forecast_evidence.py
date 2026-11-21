@@ -47,7 +47,15 @@ def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_e
     assert {e:identities(head)[e] for e in replay_end} == budget['GENERATIONS']
     assert all(head.get(k) is None for k in ('focused169_terminal','full172_local_commit'))
     assert head['all_reservation_ending_bytes'] == native['resource_credit_bytes'] == 0
-    assert native['phase145']['invocation_id'] == 'd37f36f898a44932a19fd50d7014a6fe'
+    phase=native['phase145']
+    predecessor='d37f36f898a44932a19fd50d7014a6fe'
+    if phase.get('ActiveState')=='failed':
+        assert phase['InvocationID']==predecessor and phase['MainPID']=='0'
+        assert not phase['source_checkpoint_exists'] and phase['resource_credit_bytes']==0
+        assert phase['failure']['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
+        assert checked(phase['failure'])['iid']==predecessor and checked(phase['recovery'])['iid']==predecessor
+    else:
+        assert phase['invocation_id']==predecessor
     sample = checked(head['observer'])
     host_ram = sample['host_memory']['total_kib']*1024
     free_home = min(native['available_HOME_bytes'], head['same_sample_conservative_free_DATA_bytes'])
