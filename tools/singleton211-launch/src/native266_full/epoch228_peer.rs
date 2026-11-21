@@ -211,6 +211,66 @@ fn terminal(n: &mut Native, m: &Value, root: &Path) -> Result<Bound> {
     );
     Ok(bound)
 }
+// Only the original, preserved loop's future growth is discharged. The
+// inherited free-space floor and every auxiliary disk charge still apply.
+fn readonly_loop(root: &Path, img: &Path) -> Result<Bound> {
+    let receipt = Bound::new(
+        "/home/ubuntu/.codex/diagnostics/horizon266-closed-storage-v167-a1/completion.json",
+        "f0312d5f559dd2adca57c89e5a01f1d66d1ea72512248e4635b0dd252aef3f76",
+    );
+    let completed = receipt.json()?;
+    let kept = binding(&completed["readonly"])?.json()?;
+    let saved = binding(&completed["before"])?.json()?;
+    let image = fs::symlink_metadata(img)?;
+    let guest = fs::symlink_metadata(root)?;
+    let id = json!([
+        guest.dev(),
+        guest.ino(),
+        image.dev(),
+        image.ino(),
+        image.len()
+    ]);
+    ensure!(
+        completed["epoch"] == 266
+            && completed["partial"]["inode"] == 4194330
+            && kept["identity"] == id
+            && id == json!([1795, 2, 66305, 18314256, 112u64 << 30])
+            && saved["contents"] == kept["contents"]
+            && kept["block_readonly"] == true
+            && kept["guest_write_errno"] == libc::EROFS
+            && image.is_file()
+            && image.uid() == 0
+            && image.nlink() == 1
+            && image.mode() & 0o777 == 0o600
+            && img.canonicalize()? == img
+            && root.canonicalize()? == root
+            && fs::read_to_string("/sys/block/loop3/loop/backing_file")?.trim()
+                == img.to_str().context("266 backing path")?
+            && fs::read_to_string("/sys/block/loop3/ro")?.trim() == "1",
+        "original epoch 266 retained read-only loop"
+    );
+    let mountinfo = fs::read_to_string("/proc/self/mountinfo")?;
+    ensure!(
+        mountinfo.lines().any(|line| {
+            let Some((left, right)) = line.split_once(" - ") else {
+                return false;
+            };
+            let fields: Vec<_> = left.split_whitespace().collect();
+            let fs: Vec<_> = right.split_whitespace().collect();
+            fields.len() >= 6
+                && fields[2] == "7:3"
+                && fields[3] == "/"
+                && Some(fields[4]) == root.to_str()
+                && fields[5].split(',').any(|f| f == "ro")
+                && fs.len() == 3
+                && fs[0] == "ext4"
+                && fs[1] == "/dev/loop3"
+                && fs[2].split(',').any(|f| f == "ro")
+        }),
+        "266 guest must remain read-only at both filesystem and mount"
+    );
+    Ok(receipt)
+}
 pub(super) fn verify(n: &mut Native, r: &Value) -> Result<Value> {
     ensure!(
         r["bounded266_handoff"] == json!(handoff()),
@@ -280,6 +340,16 @@ pub(super) fn verify(n: &mut Native, r: &Value) -> Result<Value> {
                 == img.to_str().context("266 image")?,
         "266 live loop"
     );
+    let closed = if failure.is_some() {
+        Some(readonly_loop(&prof.root, &img)?)
+    } else {
+        None
+    };
+    let additional_disk = if closed.is_some() {
+        EXCLUSIVE_DISK - (112 << 30)
+    } else {
+        EXCLUSIVE_DISK
+    };
     for qa in ["qa-disk", "qa-memory"] {
         let p = Profile::new(Lane::Epoch266, qa)?;
         ensure!(
@@ -299,7 +369,7 @@ pub(super) fn verify(n: &mut Native, r: &Value) -> Result<Value> {
         "266 changed during booking"
     );
     Ok(
-        json!({"handoff":handoff(),"cold_discharge_for_266_only":proof,"held_fit":h["held_fit"],"unit":UNIT,"iid":IID,"main_pid":text(&m,"MainPID")?.parse::<u64>()?,"original_main_pid":PID,"terminal_failure":failure,"memory_max":CAP,"cpu_mask":"32-39","additional_disk_above_shared_qa":EXCLUSIVE_DISK,"original_floor":num(&fit,"protected_floor")?-RECEIPTS,"memory_credit_for_228":0}),
+        json!({"handoff":handoff(),"cold_discharge_for_266_only":proof,"held_fit":h["held_fit"],"unit":UNIT,"iid":IID,"main_pid":text(&m,"MainPID")?.parse::<u64>()?,"original_main_pid":PID,"terminal_failure":failure,"memory_max":CAP,"cpu_mask":"32-39","readonly_loop":closed,"additional_disk_above_shared_qa":additional_disk,"original_floor":num(&fit,"protected_floor")?-RECEIPTS,"memory_credit_for_228":0}),
     )
 }
 #[cfg(test)]
@@ -324,6 +394,15 @@ mod tests {
         let mut ev = rows(&d, "pid1").unwrap().clone();
         ev.retain(|e| e["EXIT_CODE"] != "exited");
         assert!(terminal_events(&d, &ev).is_err());
+    }
+    #[test]
+    #[ignore = "requires the retained read-only epoch 266 guest"]
+    fn original_closed_image_preserves_evidence_and_rejects_substitution() {
+        let profile = Profile::new(Lane::Epoch266, "pilot").unwrap();
+        let image = profile.state.join("private.ext4");
+        readonly_loop(&profile.root, &image).unwrap();
+        assert!(readonly_loop(&profile.root, &profile.state.join("mount.json")).is_err());
+        assert!(readonly_loop(&profile.root.join("output"), &image).is_err());
     }
     #[test]
     #[ignore = "requires original 266 held fit, timer receipt and private guard sample"]
