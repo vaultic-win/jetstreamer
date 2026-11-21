@@ -96,6 +96,36 @@ def main():
     subprocess.run(["/usr/bin/sha256sum","--check","--status","SHA256SUMS"],cwd=controller,check=True)
     for p in seal_plan["members"]:
         producer.need(sha(controller/p["name"])==p["sha256"],"sealed gate differs")
+    gate_spec=importlib.util.spec_from_file_location("qualified_gate",controller/"gate.py")
+    gated=importlib.util.module_from_spec(gate_spec)
+    gate_spec.loader.exec_module(gated)
+    permit_probe=STATE/"private-permit-control"
+    permit_probe.mkdir(mode=0o700,exist_ok=True)
+    positive=permit_probe/"allow"
+    test_iid="0123456789abcdef0123456789abcdef"
+    store(positive,test_iid.encode())
+    producer.need(not gated.permit_matches(permit_probe/"absent",test_iid),"missing permit accepted")
+    try:
+        gated.permit_matches(positive,test_iid)
+    except RuntimeError:
+        pass
+    else:
+        raise ValueError("writable mount accepted for root permit")
+    # The transient helper has its own mount namespace. The production barrier stays empty.
+    need_private_mount=(Path("/proc/self/ns/mnt").stat().st_ino != Path("/proc/1/ns/mnt").stat().st_ino)
+    producer.need(need_private_mount,"permit control requires a private mount namespace")
+    subprocess.run(["/usr/bin/mount","--bind",permit_probe,permit_probe],check=True)
+    try:
+        subprocess.run(["/usr/bin/mount","-o","remount,bind,ro",permit_probe],check=True)
+        producer.need(gated.permit_matches(positive,test_iid),"genuine root-controlled permit rejected")
+        try:
+            gated.permit_matches(positive,"f"*32)
+        except RuntimeError:
+            pass
+        else:
+            raise ValueError("wrong-invocation permit accepted")
+    finally:
+        subprocess.run(["/usr/bin/umount",permit_probe],check=True)
     store(STATE/"PRODUCER_ARGV.json",raw(argv))
     synthetic="0123456789abcdef0123456789abcdef"
     plan,native=producer.guard(j,synthetic,producer.MINIMUM_FLOOR)
@@ -113,6 +143,7 @@ def main():
           ready_entries=empty,production_path=str(producer.RUN),producer_argv_sha256=sha(STATE/"PRODUCER_ARGV.json"),
           native_input_seal=sha(producer.PKG/"deployment-seal-receipt.json"),controller_seal=sha(controller/"deployment-seal-receipt.json"),
           private_native_controls_sha256=sha(Path(producer.complete_offline())),guard_static=checked,
+          permit_controls=["absent","writable-mount","correct-original-iid","foreign-iid"],
           current_producer_started=False,barrier_released=False,resource_credits=0)
     store(STATE/"PREPARED.json",raw(info))
     print(json.dumps(info,sort_keys=True))

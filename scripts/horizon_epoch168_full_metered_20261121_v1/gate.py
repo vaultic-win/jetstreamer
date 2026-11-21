@@ -29,6 +29,19 @@ def pinned(path, expected):
              and hashlib.file_digest(f, "sha256").hexdigest() == expected, f"wrong sealed file: {path}")
 
 
+def permit_matches(path, iid):
+    try:
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    except FileNotFoundError:
+        return False
+    with os.fdopen(fd,"rb") as f:
+        m=os.fstat(f.fileno())
+        need(stat.S_ISREG(m.st_mode) and m.st_uid==0 and stat.S_IMODE(m.st_mode)==0o444
+             and m.st_nlink==1 and m.st_size==32 and f.read(33)==iid.encode()
+             and os.fstatvfs(f.fileno()).f_flag & os.ST_RDONLY, "wrong root permit")
+    return True
+
+
 def main():
     iid = os.environ["INVOCATION_ID"]
     args = sys.argv[1:]
@@ -57,17 +70,9 @@ def main():
     deadline=time.monotonic()+180
     permit=ALIAS/"barrier/allow"
     while time.monotonic()<deadline:
-        try:
-            fd=os.open(permit, os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-        except FileNotFoundError:
-            time.sleep(0.2)
-            continue
-        with os.fdopen(fd,"rb") as f:
-            m=os.fstat(f.fileno())
-            need(stat.S_ISREG(m.st_mode) and m.st_uid==0 and stat.S_IMODE(m.st_mode)==0o444
-                 and m.st_nlink==1 and m.st_size==32 and f.read(33)==iid.encode()
-                 and os.statvfs(permit).f_flag & os.ST_RDONLY, "wrong root permit")
-        os.execve(ALIAS/NODE,args,os.environ)
+        if permit_matches(permit,iid):
+            os.execve(ALIAS/NODE,args,os.environ)
+        time.sleep(0.2)
     raise TimeoutError("matching first guard and post-fit permit did not arrive")
 
 
