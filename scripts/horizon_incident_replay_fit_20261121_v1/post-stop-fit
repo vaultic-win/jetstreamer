@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import runpy
 import stat
 import subprocess
@@ -109,6 +110,28 @@ def tree_size(root,cap):
     return size
 
 
+class WorkerFork(Exception):
+    """The authenticated child exists, but the last completed native sample predates it."""
+    def __init__(self,epoch,anchor):
+        self.epoch=epoch
+        self.anchor=anchor
+        super().__init__("waiting for the native guard to observe the worker fork")
+
+class Reprice(Exception):
+    def __init__(self,epoch,before,after):
+        self.epoch=epoch
+        self.before=before
+        self.after=after
+        super().__init__("confirmed worker fork requires a complete second capacity capture")
+
+def same_fork(before,after,observed):
+    for field in ("producer_unit","producer_invocation_id","producer_pid","start_ticks","processes","timer",
+                  "timer_invocation_id","plan","first_guard","actor","admission"):
+        s.need(before[field]==after[field],"worker fork changed "+field)
+    if observed:
+        s.need(after["guard"]!=before["guard"] and after["guard_time"]>=before["guard_time"],
+               "worker lacks a subsequent completed native guard")
+
 def native_actor(e,own,tree,run,stop):
     d=R/DIRS[e];unit="horizon-qualify-"+UNITS[e]+".service";timer="horizon-guard-"+UNITS[e]+".timer"
     manager=s.show(unit);ps=fit.members(unit)
@@ -170,13 +193,17 @@ def native_actor(e,own,tree,run,stop):
            sample["producer"]["active"]=="active" and sample["trip_reason"] is None and sample["worker_observation_error"] is None and sample["DATA_fulfillment_observation_error"] is None
            and isinstance(sample["DATA_fulfillment"],dict) and
            sample["root_physical_observation_error"] is None and 0<=time.time()-sample["recorded_unix_seconds"]<=90,"foreign or stale native guard sample")
+    ps=fit.members(unit)
+    s.need(pid in ps and len(ps) in (1,2),"unexpected native actor members")
     actual=[p for p in ps if p!=pid];guarded=[w[0] for w in sample["workers"]]
-    s.need(actual==guarded and all(0 < w[1] < 3500000 for w in sample["workers"]),"native worker transition or guard mismatch")
+    s.need(all(0 < w[1] < 3500000 for w in sample["workers"]),"worker VMA cap exceeded")
+
     processes=[]
     for p in [pid,*actual]:
         exe=Path(f"/proc/{p}/exe");st=exe.stat();parent,start,cg=s.process(p)
         if p!=pid:
-            s.need(parent==pid and cg=="0::"+group and exe.readlink().is_relative_to(run/"private") and exe.readlink().name=="historical-worker"
+            s.need(parent==pid and cg=="0::"+group and exe.readlink().is_relative_to(run/"private")
+                   and "scratch" in exe.readlink().relative_to(run/"private").parts and exe.readlink().name=="historical-worker"
                    and s.same_file(exe,exe.readlink()),"foreign guarded worker")
             with exe.open("rb") as f:s.need(hashlib.file_digest(f,"sha256").hexdigest()=="cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819","different worker image")
         processes.append([p,start,st.st_dev,st.st_ino])
@@ -184,10 +211,45 @@ def native_actor(e,own,tree,run,stop):
     s.need(obs["maximum_physical_bytes"]==CAPS[e] and not obs["exceeds_budget"] and
            all(obs[k]["vanished_entries"]==0 for k in ("first","second")),"unstable guarded whole tree")
     physical=min(obs[k]["physical_bytes"] for k in ("first","second"))
-    events=fit.command("/usr/bin/journalctl","--no-pager","-ojson","--output-fields=JOB_RESULT","_PID=1","UNIT="+guard["Id"],"INVOCATION_ID="+gid,"-n12")
-    s.need(any(json.loads(l).get("JOB_RESULT")=="done" for l in events.splitlines()),"native guard never completed")
-    return dict(**identity,actor=aref,admission=admission,first_guard=fr,guard=sr,plan=pref,physical=physical,prestart_remaining=pre["bookings"][str(e)]["remaining_bytes"],
-                timer=timer,timer_invocation_id=timerrow["InvocationID"],processes=processes,floor=plan["minimum_free_bytes"])
+    # PID1 can still be recording completion after the guard has appended its sample.
+    # Only wait for that exact invocation while its originally authenticated timer owns it.
+    until=time.monotonic()+5
+    while True:
+        events=fit.command("/usr/bin/journalctl","--no-pager","-ojson","--output-fields=UNIT,INVOCATION_ID,JOB_RESULT",
+                           "_PID=1","UNIT="+guard["Id"],"INVOCATION_ID="+gid,"-n12")
+        if any(json.loads(l).get("JOB_RESULT")=="done" and json.loads(l).get("UNIT")==guard["Id"] and
+               json.loads(l).get("INVOCATION_ID")==gid for l in events.splitlines()):break
+        active=s.show(guard["Id"])
+        s.need(time.monotonic()<until and active["InvocationID"]==gid and active["ActiveState"] in ("active","activating","deactivating"),
+               "native guard never completed")
+        time.sleep(.15)
+    s.need(s.show(unit)==manager and s.show(timer)["InvocationID"]==timerrow["InvocationID"] and
+           not any((d/"guard-receipts").glob("stop-*.json")),"native producer/timer changed")
+    for p,tick,device,inode in processes:
+        exe=Path(f"/proc/{p}/exe");m=exe.stat();par,start,cg=s.process(p)
+        s.need(start==tick and (m.st_dev,m.st_ino)==(device,inode) and cg=="0::"+group and (p==pid or par==pid),"native child changed during sampling")
+    row=dict(**identity,actor=aref,admission=admission,first_guard=fr,guard=sr,guard_time=sample["recorded_unix_seconds"],
+             plan=pref,physical=physical,prestart_remaining=pre["bookings"][str(e)]["remaining_bytes"],
+             timer=timer,timer_invocation_id=timerrow["InvocationID"],processes=processes,floor=plan["minimum_free_bytes"])
+    if actual!=guarded:
+        s.need(len(actual)==1 and guarded==[] and fit.members(unit)==ps,"foreign worker or disappearing child")
+        raise WorkerFork(e,row)
+    return row
+
+def confirm_fork(epoch,own,baseline,stop):
+    plan=bound(baseline["plan"]);tree=Path(plan["worker_root"]);run=stable_root(epoch)
+    deadline=time.monotonic()+55
+    while True:
+        try:
+            current=native_actor(epoch,own,tree,run,stop)
+            s.need(current is not None and len(current["processes"])==2,"expected child disappeared")
+            same_fork(baseline,current,True)
+            return current
+        except WorkerFork as exc:
+            same_fork(baseline,exc.anchor,False)
+        s.need(time.monotonic()<deadline,"guard did not capture expected child")
+        time.sleep(.6)
+
 
 def phase145():
     m=s.show(fit.A145);ps=fit.members(fit.A145)
@@ -211,7 +273,7 @@ def trace168():
            (st.st_dev,st.st_ino,st.st_size)==(v["device"],v["inode"],v["length"]) and st.st_blocks*512>=v["allocated"]
            and t["resource_credit_bytes"]==0,"lost original 168 trace")
 
-def census(peers,replacements,extra,c136):
+def census(peers,replacements,extra,c136,own,stops):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
     if extra and extra["actor"]:
@@ -221,7 +283,20 @@ def census(peers,replacements,extra,c136):
     if c136["occupied"]:expect[fit.N136]=c136["identity"]["processes"]
     s.need(fit.units()==set(expect),"foreign qualifier unit")
     for u,prs in expect.items():
-        s.need(fit.members(u)==tuple(sorted(p[0] for p in prs)),"unexpected cgroup processes "+u)
+        members=fit.members(u);expected=tuple(sorted(p[0] for p in prs))
+        if members!=expected:
+            item=next(((int(k),v) for k,v in replacements.items() if v["producer_unit"]==u),None)
+            s.need(item and len(expected)==1 and len(members)==2 and expected[0] in members,"unexpected cgroup processes "+u)
+            e,prior=item
+            try:
+                now=native_actor(e,own,Path(bound(prior["plan"])["worker_root"]),stable_root(e),stops[str(e)])
+            except WorkerFork as fork:
+                same_fork(dict(prior,processes=fork.anchor["processes"]),fork.anchor,False)
+                raise
+            s.need(now and len(now["processes"])==2 and now["processes"][:1]==prior["processes"],"changed bootstrap")
+            before=dict(prior,processes=now["processes"])
+            same_fork(before,now,True)
+            raise Reprice(e,before,now)
         for p,ticks,*inode in prs:
             st=Path(f"/proc/{p}/exe").stat()
             s.need(s.process(p)[1:]==(ticks,"0::/system.slice/"+u) and (not inode or [st.st_dev,st.st_ino]==inode),"process generation changed")
@@ -230,7 +305,23 @@ def census(peers,replacements,extra,c136):
         if not p.name.isdigit() or int(p.name) in monitored:continue
         try:comm=(p/"comm").read_text().strip()
         except (FileNotFoundError,ProcessLookupError):continue
-        s.need(not comm.startswith(("historical-work","jetstreamer-nod")),"unregistered replay process "+p.name)
+        if comm.startswith(("historical-work","jetstreamer-nod")):
+            # A child may appear after the cgroup leg. Recheck only the previously
+            # attested one-process replacement; any other executable is foreign.
+            parent,_,group=s.process(int(p.name))
+            item=next(((int(k),v) for k,v in replacements.items() if len(v["processes"])==1 and
+                       v["producer_pid"]==parent and group=="0::/system.slice/"+v["producer_unit"]),None)
+            s.need(item and comm.startswith("historical-work"),"unregistered replay process "+p.name)
+            e,prior=item
+            try:
+                now=native_actor(e,own,Path(bound(prior["plan"])["worker_root"]),stable_root(e),stops[str(e)])
+            except WorkerFork as fork:
+                same_fork(dict(prior,processes=fork.anchor["processes"]),fork.anchor,False)
+                raise
+            s.need(now is not None and len(now["processes"])==2 and now["processes"][1][0]==int(p.name),"unexpected native child")
+            before=dict(prior,processes=now["processes"])
+            same_fork(before,now,True)
+            raise Reprice(e,before,now)
     return {u:[p[:2] for p in prs] for u,prs in expect.items()}
 
 def registered_status():
@@ -264,7 +355,7 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements):
     protected=max(required-allowance,absolute)
     return protected+allowance,protected,deficit
 
-def capture(epoch,ref):
+def capture_once(epoch,ref):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
@@ -315,13 +406,13 @@ def capture(epoch,ref):
     if 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
-    population=census(peers,rep,extra,c136)
+    population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
     need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep)
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145()==phase and registered_status()==status and census(peers,rep,extra,c136)==population,
+    s.need(fleet_head(ref)[1]==rows and phase145()==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
     for v in peers.values():
         m=s.show(v["unit"]);t=s.show(v["timer"])
@@ -338,8 +429,28 @@ def capture(epoch,ref):
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,
         population=population,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
+def capture(epoch,ref):
+    try:
+        return capture_once(epoch,ref)
+    except WorkerFork as fork:
+        e,before=fork.epoch,fork.anchor
+        after=confirm_fork(e,epoch,before,proof_stops()[str(e)])
+    except Reprice as confirmed:
+        e,before,after=confirmed.epoch,confirmed.before,confirmed.after
+    # Discard every earlier resource measurement. A second fork or a change of child
+    # fails the capture instead of chaining unbounded retries.
+    result=capture_once(epoch,ref)
+    row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
+    s.need(row is not None,"replacement disappeared during complete reprice")
+    same_fork(after,row,False)
+    s.need(row["guard_time"]>=after["guard_time"] and row["guard"]!=before["guard"],"older guard after full reprice")
+    result["confirmed_worker_fork"]=dict(epoch=e,before=before["guard"],first_worker=after["guard"],
+                                         final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
+    return result
+
 if __name__=="__main__":
     s.need(len(sys.argv)==4,"usage: post-stop-fit EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
+    signal.alarm(142)
     result=capture(int(sys.argv[1]),s.ref(Path(sys.argv[2]),sys.argv[3]))
     print(json.dumps(result,sort_keys=True))
     sys.exit(0 if result["fits"] else 1)
