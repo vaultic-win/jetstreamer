@@ -15,6 +15,8 @@ mode = sys.argv[1] if len(sys.argv)>1 else ''
 DEPLOYMENTS = {
     '--ready-audit-retirement': ('resident-observer-20261121-v1', 'ready-audit-cadence-20261121-v1',
                                  'zzzz-ready-audit-retirement.conf', 'qualified-ready-audit-handoff-v1'),
+    '--ready-audit-idle-clock': ('ready-audit-growth-20261121-v1', 'ready-idle-cpu-20261121-v1',
+                                'zzzzzz-ready-idle-clock.conf', 'qualified-ready-idle-clock-handoff-v1'),
     '--ready-audit-growth': ('ready-audit-cadence-20261121-v1', 'ready-audit-growth-20261121-v1',
                              'zzzzz-ready-audit-growth.conf', 'qualified-ready-audit-growth-handoff-v1'),
 }
@@ -97,7 +99,11 @@ def main():
     qref=bound(Path(qp));assert qref['sha256']==expected
     q=checked(qref);assert checked(q['package_seal'])['destination']==str(NEW)
     head=bound(Path(head_path));f=checked(head)
-    cfg=checked(f['sole_next_observer'])
+    if mode=='--ready-audit-idle-clock':
+        from cycle import load_fleet
+        f,cfg,_=load_fleet(head)
+    else:
+        cfg=checked(f['sole_next_observer'])
     assert f['all_active_status_reports_authenticated_readback'] and f['authenticated_status_count']==19
     for pkg in (OLD,NEW):
         sp.run(['sha256sum','--check','--status','SHA256SUMS'],cwd=pkg,check=True)
