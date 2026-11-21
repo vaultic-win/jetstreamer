@@ -273,7 +273,9 @@ fn dispatch() -> Result<Value> {
     ensure!(unsafe { libc::geteuid() } == 0, "root needed");
     let a: Vec<_> = env::args().collect();
     if a.get(1).map(String::as_str) == Some("prepare") {
-        return source::prepare();
+        let prep = source::prepare()?;
+        source::prepare_log()?;
+        return Ok(prep);
     }
     ensure!(
         env::current_exe()? == base().join("tools/recover167"),

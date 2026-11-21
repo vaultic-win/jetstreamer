@@ -164,6 +164,54 @@ pub fn prepare() -> Result<Value> {
     )
 }
 
+pub fn prepare_log() -> Result<Value> {
+    let (_, prep) = doc(&base().join("PREPARED.json"), None)?;
+    let p = run().join("producer.log");
+    ensure!(
+        native(UNIT)?["LoadState"] == "not-found"
+            && members(UNIT)?.is_empty()
+            && !base().join("START_INTENT.json").try_exists()?
+            && p.canonicalize()? == p,
+        "new producer log occupied"
+    );
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&p)?;
+    let m = f.metadata()?;
+    ensure!(
+        m.is_file()
+            && (m.dev(), m.ino(), m.nlink(), m.len(), m.mode() & 0o7777)
+                == (64512, 107675655, 1, 0, 0o600)
+            && [(1001, 1003), (0, 0)].contains(&(m.uid(), m.gid())),
+        "unexpected new empty log"
+    );
+    ensure!(
+        unsafe { libc::fcntl(f.as_raw_fd(), libc::F_SETLEASE, libc::F_WRLCK) } == 0,
+        "new log already opened"
+    );
+    std::os::unix::fs::fchown(&f, Some(0), Some(0))?;
+    f.sync_all()?;
+    ensure!(
+        unsafe { libc::fcntl(f.as_raw_fd(), libc::F_SETLEASE, libc::F_UNLCK) } == 0,
+        "log lease"
+    );
+    ensure!(
+        same(
+            &p,
+            &Path::new("/proc/self/fd").join(f.as_raw_fd().to_string())
+        )?,
+        "log pathname replaced"
+    );
+    let proof = json!({"schema":"horizon-167-observer-append-file-before-launch-v1","prepared":prep,"path":p,"device":m.dev(),"inode":m.ino(),"uid":0,"gid":0,"mode":384,"initial_bytes":0});
+    if base().join("OBSERVER_LOG.json").try_exists()? {
+        let (v, b) = doc(&base().join("OBSERVER_LOG.json"), None)?;
+        ensure!(v == proof, "foreign observer anchor");
+        return Ok(b);
+    }
+    record("OBSERVER_LOG.json", &proof)
+}
 pub fn ready() -> Result<Value> {
     let (v, b) = doc(&base().join("PREPARED.json"), None)?;
     ensure!(
@@ -183,12 +231,13 @@ pub fn ready() -> Result<Value> {
     );
     let log = fs::symlink_metadata(run().join("producer.log"))?;
     ensure!(
-        log.is_file()
-            && log.uid() == 1001
-            && log.gid() == 1003
-            && log.nlink() == 1
-            && log.len() == 0,
+        log.is_file() && log.uid() == 0 && log.gid() == 0 && log.nlink() == 1 && log.len() == 0,
         "changed staged append log"
+    );
+    let (o, _) = doc(&base().join("OBSERVER_LOG.json"), None)?;
+    ensure!(
+        o["inode"] == log.ino() && o["device"] == log.dev() && o["prepared"] == b,
+        "observer log anchor changed"
     );
     Ok(b)
 }
@@ -198,7 +247,7 @@ pub fn index_selected() -> Result<()> {
     let m = f.metadata()?;
     ensure!(
         m.is_file()
-            && m.uid() == 1001
+            && m.uid() == 0
             && m.nlink() == 1
             && same(
                 &p,
