@@ -404,6 +404,8 @@ impl Transitions {
         json!(*self.closed.borrow())
     }
     pub fn rapid_check(&self) -> Result<()> {
+        #[cfg(early145_only)]
+        crate::early166::rapid(self.closed(166))?;
         for p in &PEERS {
             if !self.closed(p.epoch) && original_processes(p) != [true, true] {
                 return Err(Pending(p.epoch).into());
@@ -415,6 +417,10 @@ impl Transitions {
     /// reading its service or timer. Retry only under that original manager
     /// identity, and run the complete census again before thawing.
     pub fn check_crossing(&self) -> Result<()> {
+        #[cfg(early145_only)]
+        if !self.closed(166) && crate::early166::inspect()?.is_some() {
+            return Err(Pending(166).into());
+        }
         self.rapid_check()?;
         for p in PEERS.iter().filter(|p| !self.closed(p.epoch)) {
             let manager = joint_candidate::show(p.unit, "Id,InvocationID,ActiveState")?;
@@ -431,6 +437,12 @@ impl Transitions {
         Ok(())
     }
     pub fn reconcile(&self) -> Result<()> {
+        #[cfg(early145_only)]
+        if !self.closed(166)
+            && let Some(proof) = crate::early166::inspect()?
+        {
+            self.closed.borrow_mut().insert(166, proof);
+        }
         for p in &PEERS {
             let alive = original_processes(p);
             if alive == [true, true] {
@@ -488,7 +500,8 @@ impl Transitions {
             .collect()
     }
     pub fn unit_closed(&self, u: &str) -> bool {
-        PEERS.iter().any(|p| p.unit == u && self.closed(p.epoch))
+        (cfg!(early145_only) && u == closed166::NODE && self.closed(166))
+            || PEERS.iter().any(|p| p.unit == u && self.closed(p.epoch))
     }
 }
 use sha2::Digest;

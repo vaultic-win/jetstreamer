@@ -3,7 +3,10 @@ use super::*;
 use std::{collections::BTreeSet, os::unix::fs::PermissionsExt};
 
 pub const PREVIOUS: &str = "5dfb817906f74b73a27f61a386751d75";
+#[cfg(not(early145_only))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v3/export145";
+#[cfg(early145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v4/export145";
 pub const REPLACEMENT: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
 const METERED: &str = "epoch168-full-metered-20261121-v1";
 const ORIGINAL_TRACE: &str = "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2";
@@ -75,7 +78,10 @@ pub fn predecessor() -> Result<Value> {
     Ok(json!({"verified_predecessor_failure":failed,"append":p}))
 }
 pub fn roster(epochs: &BTreeSet<u64>) -> bool {
-    epochs.contains(&172) && epochs.is_subset(&BTreeSet::from([167, 168, 169, 170, 172]))
+    epochs.contains(&172)
+        && epochs
+            .iter()
+            .all(|e| matches!(e, 167 | 168 | 169 | 170 | 172) || cfg!(early145_only) && *e == 166)
 }
 fn fixed_ref(v: &Value, p: &Path) -> Result<Value> {
     let b: Bound = serde_json::from_value(v.clone())?;
@@ -366,18 +372,22 @@ mod tests {
     fn closed_roster_only_accepts_the_four_originals_and_optional_new_168() {
         assert!(roster(&BTreeSet::from([167, 169, 170, 172])));
         assert!(roster(&BTreeSet::from([167, 168, 169, 170, 172])));
-        for other in [
-            [166, 167, 169, 170, 172],
-            [136, 167, 169, 170, 172],
-            [167, 168, 169, 170, 173],
-        ] {
+        assert_eq!(
+            roster(&BTreeSet::from([166, 167, 169, 170, 172])),
+            cfg!(early145_only)
+        );
+        for other in [[136, 167, 169, 170, 172], [167, 168, 169, 170, 173]] {
             assert!(!roster(&BTreeSet::from(other)));
         }
     }
     #[test]
     #[ignore = "root-private native atomic checkpoint and predecessor fixtures"]
     fn native_source_checkpoint_and_live_denials() {
-        assert!(predecessor().is_err());
+        if cfg!(early145_only) {
+            predecessor().unwrap();
+        } else {
+            assert!(predecessor().is_err());
+        }
         assert!(closed166::drained().is_err());
         assert!(partial::closed168().is_ok());
         assert!(metered(&json!({})).unwrap().is_none());

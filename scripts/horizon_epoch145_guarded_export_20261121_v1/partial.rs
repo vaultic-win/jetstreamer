@@ -4,6 +4,10 @@ use super::*;
 use std::io::{self, Read, Seek};
 
 pub const NODE: &str = "horizon-qualify-168-trace-local3-20261120-v1.service";
+pub(super) const GUARD: &str = "horizon-guard-168-trace-local3-20261120-v1.timer";
+pub(super) const NODE_PROPERTIES: &str =
+    "Id,InvocationID,ActiveState,MainPID,ControlGroup,Job,NRestarts,ExecMainStatus,Result";
+pub(super) const GUARD_PROPERTIES: &str = "Id,ActiveState,Job,LoadState";
 const TERMINAL: &str = "epoch168-terminal-trace-20261121-v1/TERMINAL.json";
 const ORIGINAL: u64 = 40_871_330_316;
 pub const CUSTODY: &str = "epoch145-partial-recovery-20261121-v1/TERMINAL_PARTIAL.json";
@@ -15,10 +19,7 @@ fn receipt(path: &str, sha256: &str) -> Result<Value> {
     })
 }
 pub fn drained() -> Result<()> {
-    let row = joint_candidate::show(
-        NODE,
-        "Id,InvocationID,ActiveState,MainPID,ControlGroup,Job,NRestarts,ExecMainStatus,Result",
-    )?;
+    let row = joint_candidate::show(NODE, NODE_PROPERTIES)?;
     ensure!(
         row["Id"] == NODE
             && row["InvocationID"] == "c081016844dd40c5a78b594bf7ede73a"
@@ -31,10 +32,7 @@ pub fn drained() -> Result<()> {
             && row["NRestarts"] == "0",
         "168 original native terminal changed"
     );
-    let timer = joint_candidate::show(
-        "horizon-guard-168-trace-local3-20261120-v1.timer",
-        "Id,ActiveState,Job,LoadState",
-    )?;
+    let timer = joint_candidate::show(GUARD, GUARD_PROPERTIES)?;
     ensure!(
         timer["ActiveState"] == "inactive" && timer["Job"] == "",
         "168 guard reactivated"

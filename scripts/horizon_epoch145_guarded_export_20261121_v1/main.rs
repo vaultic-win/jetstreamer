@@ -13,10 +13,10 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
-#[cfg(any(publication166_only, test))]
-mod publication_fit166;
 mod closed166;
 mod continuity;
+#[cfg(early145_only)]
+mod early166;
 mod joint;
 mod joint_candidate;
 mod joint_worker;
@@ -25,6 +25,8 @@ mod partial;
 mod peer_terminal;
 mod post;
 mod publication;
+#[cfg(any(publication166_only, test))]
+mod publication_fit166;
 mod publication_tree;
 mod recover;
 mod source_lease;
@@ -604,9 +606,14 @@ fn main() {
 fn run() -> Result<()> {
     privilege()?;
     let args: Vec<_> = std::env::args().skip(1).collect();
-    let [path, digest] = args.as_slice() else { anyhow::bail!("usage: publication-fit ROOT_FLEET SHA256") };
-    let result = publication_fit166::measure(&Bound { path:path.into(), sha256:digest.clone() })?;
-    println!("{}",serde_json::to_string(&result)?);
+    let [path, digest] = args.as_slice() else {
+        anyhow::bail!("usage: publication-fit ROOT_FLEET SHA256")
+    };
+    let result = publication_fit166::measure(&Bound {
+        path: path.into(),
+        sha256: digest.clone(),
+    })?;
+    println!("{}", serde_json::to_string(&result)?);
     Ok(())
 }
 #[cfg(not(publication166_only))]

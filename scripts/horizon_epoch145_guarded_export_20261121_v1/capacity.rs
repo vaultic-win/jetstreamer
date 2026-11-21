@@ -53,10 +53,23 @@ impl std::fmt::Display for TopologyTimeout {
 }
 impl std::error::Error for TopologyTimeout {}
 fn census_timeout(program: &str, args: &[&str], code: Option<i32>) -> bool {
-    program == "/usr/bin/systemctl"
-        && args.first() == Some(&"list-units")
-        && args.last() == Some(&"horizon-qualify*.service")
-        && code == Some(124)
+    if program != "/usr/bin/systemctl" || code != Some(124) {
+        return false;
+    }
+    match args {
+        ["show", unit, properties] => {
+            let Some(fields) = properties.strip_prefix("--property=") else {
+                return false;
+            };
+            matches!(
+                (*unit, fields),
+                (crate::partial::NODE, crate::partial::NODE_PROPERTIES)
+                    | (crate::partial::GUARD, crate::partial::GUARD_PROPERTIES)
+            )
+        }
+        ["list-units", .., "horizon-qualify*.service"] => true,
+        _ => false,
+    }
 }
 pub fn run(program: &str, args: &[&str], seconds: &str) -> Result<String> {
     let o = Command::new("/usr/bin/timeout")
@@ -531,7 +544,7 @@ impl Fit {
             } else {
                 crate::closed166::drained()?;
             }
-            if cfg!(continuity145_only) {
+            if cfg!(continuity145_only) && (!cfg!(early145_only) || self.transitions.closed(166)) {
                 crate::closed166::drained()?;
             }
             let initial = self
@@ -717,7 +730,7 @@ fn capture_host(b: &Bound, joint: bool, publication: bool, live_fixture: bool) -
         "fleet source namespace"
     );
     let mut fleet: Value = serde_json::from_slice(&f::bytes(b, 32 << 20, false)?)?;
-    let after166 = if cfg!(continuity145_only) && !live_fixture {
+    let after166 = if cfg!(continuity145_only) && !cfg!(early145_only) && !live_fixture {
         Some(crate::closed166::evidence()?)
     } else {
         None
@@ -757,9 +770,11 @@ fn capture_host(b: &Bound, joint: bool, publication: bool, live_fixture: bool) -
     );
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
-    let transitions = crate::peer_terminal::Transitions::new(publication);
+    let transitions = crate::peer_terminal::Transitions::new(publication || cfg!(test));
     if cfg!(continuity145_only) {
         transitions.reconcile()?;
+        #[cfg(early145_only)]
+        crate::early166::bind_initial(&fleet, transitions.receipts().get("166"))?;
     }
     if cfg!(continuity145_only) {
         fleet = transitions.projected(&fleet)?;
@@ -1012,6 +1027,32 @@ mod clock_tests {
 #[cfg(test)]
 mod census_tests {
     use super::*;
+    #[test]
+    fn failed_original_trace_read_can_retry_only_its_native_observation() {
+        use crate::partial::{GUARD, GUARD_PROPERTIES, NODE, NODE_PROPERTIES};
+        for (unit, fields) in [(NODE, NODE_PROPERTIES), (GUARD, GUARD_PROPERTIES)] {
+            let property = format!("--property={fields}");
+            let args = ["show", unit, property.as_str()];
+            assert!(census_timeout("/usr/bin/systemctl", &args, Some(124)));
+            assert!(!census_timeout("/usr/bin/systemctl", &args, Some(1)));
+            assert!(!census_timeout("/usr/bin/journalctl", &args, Some(124)));
+            assert!(!census_timeout(
+                "/usr/bin/systemctl",
+                &["stop", unit, property.as_str()],
+                Some(124)
+            ));
+            assert!(!census_timeout(
+                "/usr/bin/systemctl",
+                &["show", "unrelated.service", property.as_str()],
+                Some(124)
+            ));
+            assert!(!census_timeout(
+                "/usr/bin/systemctl",
+                &["show", unit, "--property=MainPID"],
+                Some(124)
+            ));
+        }
+    }
     #[test]
     fn retry_only_the_specific_native_census_timeout() {
         let args = &["list-units", "--output=json", "horizon-qualify*.service"];
