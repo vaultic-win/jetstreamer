@@ -476,7 +476,11 @@ fn main() -> Result<()> {
     let receiver = rt.join(RECEIVER_PATH);
     let native = receiver_dir.join("native");
     let base = rt.join(DELIVERY);
-    let publisher = base.join(PUBLISHER_PATH);
+    let publisher = if cfg!(feature = "bounded_reader") {
+        base.join("publisher-tools-bounded/publisher")
+    } else {
+        base.join(PUBLISHER_PATH)
+    };
     program(&receiver, RECEIVER)?;
     program(&native, NATIVE)?;
     program(&publisher, PUBLISHER)?;

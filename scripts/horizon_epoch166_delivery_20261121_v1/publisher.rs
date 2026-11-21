@@ -115,6 +115,10 @@ const UPLOADER: &str = "epoch145-publication-20261121-v1/uploader-tools/jetstrea
 const ELF: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 const PAIR: &str = "producer-paired-publication-qa-20261121-v1/QUALIFIED.json";
 const PAIR_SHA: &str = "4c1bb7a950f2cd9803b2ecc116a3f88d3d8d4ce250057c11e3b046b8dea8d4b6";
+const BOUNDED_READER_SHA: &str = "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a";
+const BOUNDED_PAIR: &str =
+    "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json";
+const BOUNDED_PAIR_SHA: &str = "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Handoff {
@@ -523,7 +527,18 @@ fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
             && q["full_and_plugin_capabilities_accepted"] == true,
         "reader proof or independent epoch expectation mismatch"
     );
-    let paired = document(&rt(PAIR), PAIR_SHA, true)?;
+    let paired = if qualification_sha == BOUNDED_READER_SHA {
+        let pair = document(&rt(BOUNDED_PAIR), BOUNDED_PAIR_SHA, false)?;
+        ensure!(
+            pair["reader"] == json!({"path":qpath, "sha256":qualification_sha})
+                && pair["uploader"] == json!({"path":rt(UPLOADER), "sha256":ELF})
+                && pair["threads"] == 1,
+            "qualified archive reader and one-worker uploader pairing changed"
+        );
+        pair
+    } else {
+        document(&rt(PAIR), PAIR_SHA, true)?
+    };
     ensure!(
         paired["schema"]
             == "horizon-ordinary-uploader-and-current-reader-loopback-qualification-v1"

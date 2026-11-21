@@ -72,6 +72,7 @@ os.execv(elf, [elf, *args])
             ("positive", None)]
     pre_cut = "258560f902d07e217c96a042b7e78d5c2cb105a9"
     post_cut = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef"
+    bounded = "58709604dfa4c97336c2e1f6fac53b862ed6f17f"
     reader_cases = {}
     if epoch in receiver.PEERS or os.environ.get("HORIZON_QA_TRANSITION_READER") == "1":
         reader_cases = {
@@ -80,6 +81,12 @@ os.execv(elf, [elf, *args])
             "premature-candidate": (pre_cut, "candidate", None, "reader revision is outside the publication branch"),
             "stale-reader": (post_cut, "previous", None, "qualified reader inputs differ"),
         }
+        if os.environ.get("HORIZON_QA_BOUNDED_READER") == "1":
+            reader_cases.update({
+                "bounded-branch": (bounded, None, bounded, None),
+                "premature-bounded": (post_cut, "bounded", None, "reader revision is outside the publication branch"),
+                "stale-reconnect": (bounded, "candidate", None, "qualified reader inputs differ"),
+            })
         cases.extend((name, test[3]) for name, test in reader_cases.items())
 
     for fault, expected in cases:

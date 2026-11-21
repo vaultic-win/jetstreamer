@@ -1,4 +1,4 @@
-//! Select the branch-qualified release at the original epoch-75 reader transition.
+//! Select a qualified archive reader from the fetched publication branch.
 use super::*;
 use std::process::{Output, Stdio};
 
@@ -10,7 +10,8 @@ pub(super) const PREVIOUS_PATH: &str =
 pub(super) const PREVIOUS_SHA: &str =
     "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486";
 const PREVIOUS: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
-const CANDIDATE: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
+const RECONNECT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
+const BOUNDED: &str = "58709604dfa4c97336c2e1f6fac53b862ed6f17f";
 
 fn git(args: &[&str]) -> Result<Output> {
     let owner = fs::metadata(REPO)?;
@@ -65,28 +66,38 @@ pub(super) fn current() -> Result<(PathBuf, &'static str, Value)> {
         PROFILE.reader == PREVIOUS_PATH && PROFILE.reader_sha == PREVIOUS_SHA,
         "unqualified previous reader binding"
     );
-    let merged = ancestor(CANDIDATE, &head)?;
+    let release = if ancestor(BOUNDED, &head)? {
+        BOUNDED
+    } else if ancestor(RECONNECT, &head)? {
+        RECONNECT
+    } else {
+        PREVIOUS
+    };
     #[cfg(publisher_fixture)]
-    let merged = match env::var("FIXTURE_QUALIFIED_READER").as_deref() {
-        Ok("previous") => false,
-        Ok("candidate") => true,
-        Err(_) => merged,
+    let release = match env::var("FIXTURE_QUALIFIED_READER").as_deref() {
+        Ok("previous") => PREVIOUS,
+        Ok("candidate") => RECONNECT,
+        Ok("bounded") => BOUNDED,
+        Err(_) => release,
         _ => anyhow::bail!("unknown qualification fixture"),
     };
-    let (revision, path, digest, manifest) = if merged {
-        (
-            CANDIDATE,
+    let (path, digest, manifest) = match release {
+        BOUNDED => (
+            "fast-range-residency-20261121-v1/production-reader-v1/qualification.json",
+            BOUNDED_READER_SHA,
+            "sources.json",
+        ),
+        RECONNECT => (
             "public-rseek-reconnect-20261121-v1/production-reader-v1/qualification.json",
             "432f57f077e6b82632d3bae94b000bd9a42751c9a3bab7ee20cb69c3b73fd471",
             "source-members.json",
-        )
-    } else {
-        (PREVIOUS, PROFILE.reader, PROFILE.reader_sha, "sources.json")
+        ),
+        _ => (PROFILE.reader, PROFILE.reader_sha, "sources.json"),
     };
     let path = rt(path);
     let qual = document(&path, digest, false)?;
     ensure!(
-        qual["reader_commit"] == revision && ancestor(revision, &head)?,
+        qual["reader_commit"] == release && ancestor(release, &head)?,
         "reader revision is outside the publication branch"
     );
     let evidence = qual["source_build_evidence"]
@@ -113,7 +124,15 @@ pub(super) fn current() -> Result<(PathBuf, &'static str, Value)> {
                 && digest.as_str().is_some_and(|s| hex(s, 64))),
         "invalid qualified reader inputs"
     );
-    let mut diff = vec!["diff", "--quiet", "--no-ext-diff", revision, &head, "--"];
+    let mut diff = vec![
+        "diff",
+        "--quiet",
+        "--no-ext-diff",
+        release,
+        &head,
+        "--",
+        "historical-runtime/v1_0_8/worker/src/poh_backend.rs",
+    ];
     diff.extend(members.keys().map(String::as_str));
     ensure!(
         git(&diff)?.status.success(),
