@@ -71,7 +71,9 @@ def args(profile,pref):
         elif str(p.OLD_RUN) in item:replacement=item.replace(str(p.OLD_RUN),str(p.RUN))
         if replacement!=item:changed+=1
         out.append(replacement)
-    p.need(changed==6 and out[0]=="/usr/bin/systemd-run" and not any(str(p.OLD_RUN) in a for a in out),"original mount or cgroup profile changed")
+    ro="--property=BindReadOnlyPaths="+" ".join(binds)
+    p.need(changed==6 and out[0]=="/usr/bin/systemd-run" and out.count(ro)==1 and
+           not any(str(p.OLD_RUN) in a for a in out if a!=ro),"original mount or cgroup profile changed")
     return [*out,"--setenv=HORIZON_REPLAY170_PROFILE_SHA256="+pref["sha256"],"/usr/bin/python3","-IB",str(ALIAS/"gate.py"),*profile["normal_argv"]]
 
 def observe(gated,iid=None):
@@ -99,6 +101,18 @@ def wait_actor(gated,iid=None,seconds=15):
             if time.monotonic()>=cutoff:raise
             time.sleep(.15)
 
+def guard_args(cmd):
+    old,_=p.read(p.OLD/"ORIGINAL_GUARD_ARGV.json",p.GARGSHA)
+    at=next(i for i,a in enumerate(old) if a.endswith("/guard-v1/guard"))
+    translated=[]
+    for arg in old[:at]:
+        if arg.startswith("--unit="):arg="--unit="+p.TIMER.removesuffix(".timer")
+        elif arg.startswith("--property=ReadWritePaths="):arg="--property=ReadWritePaths="+str(D/"guard-receipts")
+        elif arg.startswith("--property=StandardOutput="):arg="--property=StandardOutput=append:"+str(D/"guard.stdout")
+        elif arg.startswith("--property=StandardError="):arg="--property=StandardError=append:"+str(D/"guard.stderr")
+        translated.append(arg)
+    return [str(a) for a in [*translated,*cmd]]
+
 def configure_guard(actor,floor,binding,sha):
     gq,_=p.read(p.GUARD/"GUARD_QUALIFIED.json")
     p.need(binding==gq["contract"] and gq["guard"]["sha256"]==sha,"different qualified protection")
@@ -110,17 +124,9 @@ def configure_guard(actor,floor,binding,sha):
     cmd=[GUARD,pr["path"],"--plan-sha256",pr["sha256"],"--self-sha256",sha]
     value=json.loads(run([*cmd,"--validate-plan-only"]))
     p.need(value["validated"] and value["unit"]==p.UNIT and value["producer_signaled"] is False,"static guard validation failed")
-    old,_=p.read(p.OLD/"ORIGINAL_GUARD_ARGV.json",p.GARGSHA)
-    at=next(i for i,a in enumerate(old) if a.endswith("/guard-v1/guard"))
-    translated=[]
-    for arg in old[:at]:
-        if arg.startswith("--unit="):arg="--unit="+p.TIMER.removesuffix(".timer")
-        elif arg.startswith("--property=ReadWritePaths="):arg="--property=ReadWritePaths="+str(D/"guard-receipts")
-        elif arg.startswith("--property=StandardOutput="):arg="--property=StandardOutput=append:"+str(D/"guard.stdout")
-        elif arg.startswith("--property=StandardError="):arg="--property=StandardError=append:"+str(D/"guard.stderr")
-        translated.append(arg)
-    p.record(D/"GUARD_ARGV.json",[str(a) for a in [*translated,*cmd]])
-    run([*translated,*cmd])
+    argv=guard_args(cmd)
+    p.record(D/"GUARD_ARGV.json",argv)
+    run(argv)
     return pr
 
 def latest(actor,pr,require_worker,after=None):
