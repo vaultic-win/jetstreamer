@@ -61,6 +61,7 @@ terminal = {"schema":"terminal166-success-v1","epoch":166,"live":{"path":str(liv
     "INVOCATION_ID":r.IID,"MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448"},
     "local_archive":{**d(archive),"size":archive.stat().st_size,"sha256":actual["sha256"]},
     "transaction_id":actual["transaction_id"],"committed_receipt":{"path":str(batch),"sha256":r.sha(batch.read_bytes())},
+    "resource_credit_bytes":0,"reservation_ending_bytes":0,
     "archive_publication_authorized":False,"new_producer_authorized":False,"canonical_r2_verified":False}
 term_path=authority/"TERMINAL_SUCCESS.json"
 put(term_path,terminal,0o400)
@@ -105,7 +106,10 @@ assert observed["sha256"]==success["sha256"] and observed["epoch_lock_held"]
 result.unlink()
 assert run()==success and json.loads(result.read_bytes())==observed
 result.unlink()
-if len(sys.argv) > 5:
+if len(sys.argv) == 7 and sys.argv[5] == "--controller-test":
+    # Qualify the controller while the generated cohort still has its original inode identities.
+    subprocess.run([sys.argv[6], "--include-ignored", "--nocapture"], check=True)
+elif len(sys.argv) > 5:
     import runpy
     runpy.run_path(str(here / "qualify_publisher.py"))["qualify"](
         r, Path(sys.argv[5]), work, authority, live_hash, terminal, out, lock,
