@@ -352,6 +352,7 @@ pub(super) fn census_with_held(
     let controls = review["control_units"]
         .as_array()
         .context("control units")?;
+    native266_peer::guard(n, review, rows)?;
     let mut control_names = BTreeSet::new();
     // The candidate's new protective guard is not yet installed in the old fleet.
     let mut control_cap = 268_435_456;

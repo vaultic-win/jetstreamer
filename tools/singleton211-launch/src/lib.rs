@@ -38,6 +38,7 @@ pub mod native261;
 mod native265_growth;
 mod peer_window;
 mod peers;
+mod native266_peer;
 mod periodic;
 mod prepare;
 mod publication;
