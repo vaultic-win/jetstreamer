@@ -151,9 +151,14 @@ This reuses one verification plugin across the range and streams directly from R
 Keep a durable per-epoch receipt and report the first incomplete epoch on interruption.
 If the branch advances during playback, keep the range running when the freshly fetched
 source and build inputs qualify the same sealed reader. Bind subsequent receipts to the
-new proof. When those inputs change, resume the unaccepted epoch with the newly qualified reader.
-Resume from that epoch's beginning in a new attempt, preserving earlier receipts and
-rechecking object and reader identity. A methodology restart begins at the first epoch
+new proof. When inputs change, qualify a build from the current branch. If the plugin
+already finalized the epoch before the branch change, the chronological controller can
+recover its report under the audit lock when both sealed executables have the same SHA-256.
+Let the controller validate the original invocation, frozen inventory and complete report,
+recheck the live branch and authenticated R2 identity, and bind both reader proofs in the
+receipt. The last epoch of a range also requires evidence of a clean process exit.
+If the executable differs or the report cannot be recovered, replay that epoch from its
+beginning with the current reader. Keep earlier accepted receipts. A methodology restart begins at the first epoch
 and keeps its receipts and counts separate from prior runs.
 
 For a throughput run over a continuous range, add `--slot-ranges` to the pinned
