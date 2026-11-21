@@ -76,7 +76,7 @@ fn verify_cgroup() -> Result<String> {
 }
 fn check_self(sha: &str) -> Result<()> {
     privilege()?;
-    let path = Path::new(BASE).join("deployment-v3/export145");
+    let path = Path::new(BASE).join("deployment-v4/export145");
     let this = fs::metadata("/proc/self/exe")?;
     let disk = fs::metadata(&path)?;
     ensure!(
@@ -228,6 +228,48 @@ fn freeze(pid: u32) -> Result<()> {
             "private worker did not stop"
         );
         thread::sleep(Duration::from_millis(10));
+    }
+}
+// A slow PID1 census may block during unit reload. Only retry its explicit
+// timeout (or pending fresh disk measurement) after the isolated worker has
+// reached a kernel stop. Never accept a changed topology, resource deficit
+// or any other command failure as an observation.
+fn while_stopped(
+    pid: u32,
+    ticks: u64,
+    deadline: Instant,
+    mut observe: impl FnMut() -> Result<Value>,
+) -> Result<Value> {
+    loop {
+        // Leave room for the complete 10s census and timeout's 2s kill bound.
+        ensure!(
+            deadline.saturating_duration_since(Instant::now()) >= Duration::from_secs(12),
+            "stopped worker fresh-census deadline"
+        );
+        let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
+        ensure!(
+            native::ticks(pid)? == ticks
+                && status.lines().any(|line| line.starts_with("State:")
+                    && line.split_whitespace().nth(1) == Some("T"))
+                && status.lines().any(|line| line.starts_with("PPid:")
+                    && line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|p| p.parse::<u32>().ok())
+                        == Some(std::process::id())),
+            "stopped child identity or state changed"
+        );
+        match observe() {
+            Ok(sample) => {
+                ensure!(Instant::now() < deadline, "late stopped-worker observation");
+                return Ok(sample);
+            }
+            Err(e) if e.is::<capacity::TopologyTimeout>() || e.is::<capacity::GuardInFlight>() => {
+                eprintln!("epoch145 waiting with worker {pid} stopped: {e:#}");
+                thread::sleep(Duration::from_secs(1));
+            }
+            Err(e) => return Err(e),
+        }
     }
 }
 fn allocate(root: &Path, bytes: u64, minimum: u64) -> Result<tempfile::NamedTempFile> {
@@ -429,7 +471,8 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
     let guard = (|| -> Result<()> {
         let sample = fit.await_current(needed)?;
         pending()?;
-        let release = json!({"iid":iid,"parent":x,"pid":pid,"start_ticks":native::ticks(pid)?,"bytes":BYTES,"reused":predecessor,"protected":sample["protected_bytes"]});
+        let ticks = native::ticks(pid)?;
+        let release = json!({"iid":iid,"parent":x,"pid":pid,"start_ticks":ticks,"bytes":BYTES,"reused":predecessor,"protected":sample["protected_bytes"]});
         custody::write_new(
             &state.join("first-guard.json"),
             &json!({"time":custody::now()?,"fit":fit.evidence,"sample":sample,"barrier":release}),
@@ -463,8 +506,8 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
                 && allocation["iid"] == iid,
             "wrong allocated inode"
         );
-        let a = fit.await_current(0)?;
         fit.topology()?;
+        let a = fit.await_current(0)?;
         let post = json!({"iid":iid,"pid":pid,"inode":m.ino(),"sample":a,"at":custody::now()?});
         custody::write_new(&state.join("post-allocation-guard.json"), &post)?;
         writeln!(input, "{post}")?;
@@ -480,21 +523,26 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
                 start.elapsed() < Duration::from_secs(72 * 3600),
                 "export execution deadline expired"
             );
-            let sample = match fit.current(0) {
-                Err(e) if e.is::<capacity::GuardInFlight>() => {
-                    freeze(pid)?;
-                    let current = fit.await_current(0)?;
-                    fit.topology()?;
-                    ensure!(
-                        unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
-                        "resume private worker"
-                    );
-                    current
-                }
-                result => result?,
+            let guard_wait = match fit.current(0) {
+                Ok(_) => false,
+                Err(e) if e.is::<capacity::GuardInFlight>() => true,
+                Err(e) => return Err(e),
             };
-            if last.elapsed() >= Duration::from_secs(30) {
-                fit.topology()?;
+            if guard_wait || last.elapsed() >= Duration::from_secs(30) {
+                if let Err(e) = freeze(pid) {
+                    if worker.try_wait()?.is_some_and(|s| s.success()) {
+                        break;
+                    }
+                    return Err(e);
+                }
+                let sample =
+                    while_stopped(pid, ticks, Instant::now() + Duration::from_secs(90), || {
+                        fit.topology().and_then(|_| fit.current(0))
+                    })?;
+                ensure!(
+                    unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
+                    "resume private worker"
+                );
                 println!("{} epoch145 guard {}", custody::now()?, sample);
                 last = Instant::now();
             }
@@ -557,6 +605,43 @@ mod tests {
         child.kill().unwrap();
         child.wait().unwrap();
         r.unwrap();
+    }
+    #[test]
+    fn stopped_child_retries_only_proved_transients_and_obeys_its_deadline() {
+        let mut child = Command::new("/bin/sleep").arg("30").spawn().unwrap();
+        let pid = child.id();
+        let ticks = native::ticks(pid).unwrap();
+        freeze(pid).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut calls = 0;
+        let sample = while_stopped(pid, ticks, deadline, || {
+            calls += 1;
+            if calls == 1 {
+                return Err(capacity::TopologyTimeout.into());
+            }
+            Ok(json!({"positive_fit":true}))
+        })
+        .unwrap();
+        assert_eq!(calls, 2);
+        assert_eq!(sample["positive_fit"], true);
+        let mut failures = 0;
+        assert!(
+            while_stopped(pid, ticks, deadline, || {
+                failures += 1;
+                anyhow::bail!("distinct replay owner")
+            })
+            .is_err()
+        );
+        assert_eq!(failures, 1);
+        assert!(while_stopped(pid, ticks, Instant::now(), || panic!("expired")).is_err());
+        assert!(while_stopped(pid, ticks + 1, deadline, || panic!("wrong child")).is_err());
+        assert!(
+            fs::read_to_string(format!("/proc/{pid}/status"))
+                .unwrap()
+                .contains("State:\tT")
+        );
+        child.kill().unwrap();
+        child.wait().unwrap();
     }
     #[test]
     fn reservation_is_physical_without_extending_logical_eof() {

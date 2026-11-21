@@ -44,15 +44,33 @@ fn session172() -> Result<Value> {
 fn jsonref(v: &Value) -> Result<Value> {
     f::evidence(&serde_json::from_value::<Bound>(v.clone())?)
 }
+#[derive(Debug)]
+pub struct TopologyTimeout;
+impl std::fmt::Display for TopologyTimeout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("systemctl replay census exceeded its native deadline")
+    }
+}
+impl std::error::Error for TopologyTimeout {}
+fn census_timeout(program: &str, args: &[&str], code: Option<i32>) -> bool {
+    program == "/usr/bin/systemctl"
+        && args.first() == Some(&"list-units")
+        && args.last() == Some(&"horizon-qualify*.service")
+        && code == Some(124)
+}
 pub fn run(program: &str, args: &[&str], seconds: &str) -> Result<String> {
     let o = Command::new("/usr/bin/timeout")
         .args(["--kill-after=2s", seconds, program])
         .args(args)
         .env_remove("SYSTEMD_HOST")
         .output()?;
+    if census_timeout(program, args, o.status.code()) {
+        return Err(TopologyTimeout.into());
+    }
     ensure!(
         o.status.success(),
-        "{program} failed: {}",
+        "{program} {args:?} failed with {}: {}",
+        o.status,
         String::from_utf8_lossy(&o.stderr)
     );
     Ok(String::from_utf8(o.stdout)?)
@@ -318,6 +336,7 @@ fn newest_sample(plan_ref: &Value) -> Result<(u64, u64, Option<Value>)> {
 pub struct Fit {
     pub evidence: Value,
     pub names: BTreeSet<String>,
+    owners: Vec<(u32, u64, String)>,
     pub base: u64,
     pub memfloor: u64,
     pub g169: Value,
@@ -370,6 +389,14 @@ impl Fit {
             active(&["horizon-qualify*.service"])? == self.names,
             "replay topology changed"
         );
+        for (pid, ticks, unit) in &self.owners {
+            ensure!(
+                crate::native::ticks(*pid)? == *ticks
+                    && fs::read_to_string(format!("/proc/{pid}/cgroup"))?.trim()
+                        == format!("0::/system.slice/{unit}"),
+                "replay owner generation changed"
+            );
+        }
         Ok(())
     }
 }
@@ -516,10 +543,32 @@ pub fn capture(b: &Bound) -> Result<Fit> {
         );
         subset_samples.push(sample);
     }
+    let mut owners = Vec::new();
+    for row in post["owners"]
+        .as_object()
+        .context("native peer owners")?
+        .values()
+    {
+        let unit = row["unit"].as_str().context("owner name")?;
+        for process in row["processes"].as_array().context("owner processes")? {
+            owners.push((
+                u32::try_from(process[0].as_u64().context("owner PID")?)?,
+                process[1].as_u64().context("owner start ticks")?,
+                unit.to_owned(),
+            ));
+        }
+    }
+    let pid = u32::try_from(n(&ad, "producer_pid")?)?;
+    owners.push((
+        pid,
+        crate::native::ticks(pid)?,
+        ad["producer_unit"].as_str().context("172 unit")?.to_owned(),
+    ));
     let evidence = json!({"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
         evidence,
         names,
+        owners,
         base,
         memfloor: HOST_MEMORY - rss,
         g169,
@@ -541,5 +590,24 @@ mod clock_tests {
         assert!(!temporal(100, 120, 170).unwrap_err().is::<GuardInFlight>());
         assert!(temporal(100, 90, 110).is_err());
         assert!(temporal(100, 120, 110).is_err());
+    }
+}
+
+#[cfg(test)]
+mod census_tests {
+    use super::*;
+    #[test]
+    fn retry_only_the_specific_native_census_timeout() {
+        let args = &["list-units", "--output=json", "horizon-qualify*.service"];
+        assert!(census_timeout("/usr/bin/systemctl", args, Some(124)));
+        for code in [None, Some(0), Some(1), Some(125), Some(137)] {
+            assert!(!census_timeout("/usr/bin/systemctl", args, code));
+        }
+        assert!(!census_timeout(
+            "/usr/bin/systemctl",
+            &["show", "worker"],
+            Some(124)
+        ));
+        assert!(!census_timeout("/usr/bin/journalctl", args, Some(124)));
     }
 }
