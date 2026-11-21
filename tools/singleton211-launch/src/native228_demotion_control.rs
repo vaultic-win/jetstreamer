@@ -709,6 +709,7 @@ fn exercise(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
     let terminal = manager_journal(n, COLD, iid)?;
     ensure!(
         manager_observed(&terminal, "7ad2d189f7e94e70a38c781354912448")
+            && !manager_observed(&terminal, "de5b426a63be47a7b6ac3eaac82e2f6f")
             && terminal
                 .iter()
                 .all(|r| r.get("UNIT_RESULT").is_none_or(|v| v == "success"))
