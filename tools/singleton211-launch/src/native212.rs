@@ -101,4 +101,12 @@ const PRIOR_LAUNCHER: (&str, &str) = (
 );
 const PRIOR_LAUNCHER_COMMIT: &str = "febf1909551c7dc9a14961404dfafa186a592fd8";
 
+fn permits_predecessor(reference: &Bound, gate: &Bound, source: &Value) -> bool {
+    reference == &Bound::new(PRIOR_PREPARATION.0, PRIOR_PREPARATION.1)
+        && gate == &Bound::new(PRIOR_LAUNCHER.0, PRIOR_LAUNCHER.1)
+        && *source == PRIOR_LAUNCHER_COMMIT
+}
+
 include!("native261/controller.rs");
+
+include!("native261/preparation_tests.rs");

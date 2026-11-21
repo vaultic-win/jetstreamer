@@ -79,6 +79,8 @@ struct Plan {
     #[serde(default)]
     native257_handoff: Option<Bound>,
     #[serde(default)]
+    native266_handoff: Option<Bound>,
+    #[serde(default)]
     native212_handoff: Option<Bound>,
     #[serde(default)]
     native261_handoff: Option<Bound>,
@@ -441,6 +443,10 @@ fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Res
         257 => {
             horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
         }
+        266 => {
+            horizon_singleton211_launch::native266::validate_saved_handoff(&b.path, &b.sha256)?;
+        }
+
         212 => {
             horizon_singleton211_launch::native212::validate_saved_handoff(&b.path, &b.sha256)?;
         }
@@ -462,6 +468,7 @@ fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Res
 fn cold_owner(config: &Value, row: &Value, handoff: &Value, epoch: u64) -> Result<()> {
     let root = Path::new(match epoch {
         257 => "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+        266 => "/run/horizon266-native-cold-v1",
         212 => "/run/horizon212-native-cold-v1",
         261 => "/run/horizon261-native-cold-v1",
         _ => anyhow::bail!("unregistered cold input"),
@@ -551,7 +558,7 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
         (!rows.is_empty()
             || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
-            || p.native212_handoff.is_some())
+            || p.native212_handoff.is_some() || p.native266_handoff.is_some())
             && rows.len() == handoffs.len(),
         "handoff census differs"
     );
@@ -640,8 +647,9 @@ fn run(args: &[String]) -> Result<()> {
     let without257 = cold_pass_through(&config, p.native257_handoff.as_ref(), 257)?;
     let without261 = cold_pass_through(&without257, p.native261_handoff.as_ref(), 261)?;
     let without212 = cold_pass_through(&without261, p.native212_handoff.as_ref(), 212)?;
+    let without266 = cold_pass_through(&without212, p.native266_handoff.as_ref(), 266)?;
     let other_native = native265_pass_through(
-        &without212,
+        &without266,
         p.native265_handoff.as_ref(),
         native265_handoff.as_ref(),
     )?;
@@ -657,7 +665,7 @@ fn run(args: &[String]) -> Result<()> {
         staged
             || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
-            || p.native212_handoff.is_some(),
+            || p.native212_handoff.is_some() || p.native266_handoff.is_some(),
     )?;
     ensure!(
         sha(&raw(Path::new(observer), 64 << 20)?) == observer_sha
@@ -703,7 +711,7 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty()
@@ -711,7 +719,7 @@ fn run(args: &[String]) -> Result<()> {
             || p.singleton211_handoff.is_some()
             || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
-            || p.native212_handoff.is_some(),
+            || p.native212_handoff.is_some() || p.native266_handoff.is_some(),
         "all configured owners are terminal; prescreen retained, use the full terminal fleet transition"
     );
     let original_delivery = config.get("delivery247_resource_only").cloned();
@@ -757,7 +765,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -802,6 +810,7 @@ mod tests {
             ),
             (261, "/run/horizon261-native-cold-v1", "/run"),
             (212, "/run/horizon212-native-cold-v1", "/run"),
+            (266, "/run/horizon266-native-cold-v1", "/run"),
         ] {
             let h = json!({"unit":"native.service","invocation_id":"a".repeat(32),"main_pid":42,
             "harness":{"path":"/harness","sha256":"b".repeat(64)}});
@@ -1151,6 +1160,7 @@ mod full211_offline_integration {
             native257_handoff: None,
             native261_handoff: None,
             native212_handoff: None,
+            native266_handoff: None,
             singleton211_handoff: Some(serde_json::from_value(a["handoff"].clone()).unwrap()),
             state_directory: state.path().into(),
             deployment: "/var/lib/jetstreamer/horizon-terminal-aware-cycle-offline-fixture".into(),

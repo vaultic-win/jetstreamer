@@ -287,7 +287,7 @@ mod paired_tests {
         let e = json!({"total_control_charged_bytes":CONTROL});
         let ctl = json!([]);
         let both = candidate_capacity(&h, h.resources, &e, &ctl).unwrap();
-        let (extra_memory, extra_disk) = if EPOCH == 212 {
+        let (extra_memory, extra_disk) = if matches!(EPOCH, 212 | 266) {
             (
                 crate::native261::MEMORY + crate::native261::CONTROLLER_MEMORY + GUARD_MEMORY,
                 crate::native261::DISK_RECEIPTS,

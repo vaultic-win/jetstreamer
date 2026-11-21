@@ -171,6 +171,14 @@ fn decision(
     Ok((false, cause, wall, end))
 }
 pub(super) fn native_result(v: &Value, origin: &Value, h: &Value) -> Result<u64> {
+    if EPOCH == 266 {
+        ensure!(v["handshake"]["solana_tag"] == "v1.8.11"
+            && v["handshake"]["rust_toolchain"] == "rustc 1.52.1 (9bc8c42bb 2021-05-09)"
+            && v["handshake"]["target"] == "x86_64-unknown-linux-gnu"
+            && v["initialized"]["ticks_per_slot"] == 64
+            && v["checkpoint"]["last_blockhash"] == v["initialized"]["last_blockhash"],
+            "epoch 266 worker fingerprint, tick rate or blockhash changed");
+    }
     native265_history::result_for(
         v,
         origin,

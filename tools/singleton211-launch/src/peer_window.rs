@@ -180,12 +180,11 @@ pub(super) fn protected_owner(candidate: u64, row: &Value) -> Option<&Value> {
         || matches!(row["phase"].as_str(), Some("replay" | "qualification"))
     {
         Some(&row["producer"])
-    } else if candidate == 212
-        && row["phase"] == "private-cold-snapshot-verification"
-        && matches!(
+    } else if row["phase"] == "private-cold-snapshot-verification"
+        && (candidate == 266 || candidate == 212 && matches!(
             row["unit"]["Id"].as_str(),
             Some(native257::UNIT | native261::UNIT)
-        )
+        ))
     {
         Some(&row["unit"])
     } else {
@@ -222,7 +221,7 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
         );
         if c.unit == GUARD_UNIT {
             ensure!(
-                matches!(a["epoch"].as_u64(), Some(212 | 257 | 261))
+                matches!(a["epoch"].as_u64(), Some(212 | 257 | 261 | 266))
                     && !expected.is_empty()
                     && current.contains_key(UNIT),
                 "full211 rollover scope differs"

@@ -136,6 +136,13 @@ pub(super) fn stop_window(census_us: u64) -> Result<u64> {
         .max(30_000_000))
 }
 
+fn permits_predecessor(reference: &Bound, gate: &Bound, source: &Value) -> bool {
+    reference == &Bound::new(PRIOR_PREPARATION.0, PRIOR_PREPARATION.1)
+        && gate == &Bound::new(PRIOR_LAUNCHER.0, PRIOR_LAUNCHER.1)
+        && *source == PRIOR_LAUNCHER_COMMIT
+        || registered_preparation(reference, gate, source)
+}
+
 include!("native261/controller.rs");
 
 #[cfg(test)]
@@ -198,3 +205,5 @@ mod v151_window_tests {
         assert!(stop_window(u64::MAX).is_err());
     }
 }
+
+include!("native261/preparation_tests.rs");

@@ -47,14 +47,15 @@ pub(super) fn affinity(review: &Value) -> Result<String> {
         .join(" "))
 }
 fn native_template(plan: &Bound, affinity: &str) -> String {
+    let timeout = if EPOCH == 266 { 7200 } else { 2700 };
     format!(
-        "[Unit]\nDescription=Epoch {EPOCH} gated native cold input qualification\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=100000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=800%\nCPUAffinity={affinity}\nRuntimeMaxSec=2700\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=yes\n{PRODUCER_SANDBOX}NoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nUMask=0077\nEnvironment=RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 {PLAN_ENV}={}\nEnvironmentFile={}\nExecStart={HARNESS}\n",
+        "[Unit]\nDescription=Epoch {EPOCH} gated native cold input qualification\n[Service]\nType=exec\nRemainAfterExit=no\nUser=ubuntu\nGroup=ubuntu\nRestart=no\nKillMode=control-group\nDelegate=no\nMemoryHigh=100000000000\nMemoryMax={MEMORY}\nMemorySwapMax=0\nTasksMax=512\nCPUQuota=800%\nCPUAffinity={affinity}\nRuntimeMaxSec={timeout}\nTimeoutStopSec=30\nProtectHome=read-only\nProtectSystem=strict\nPrivateNetwork=yes\n{PRODUCER_SANDBOX}NoNewPrivileges=yes\nCapabilityBoundingSet=\nReadWritePaths={ROOT}\nUMask=0077\nEnvironment=RUST_MIN_STACK=134217728 SOLANA_RAYON_THREADS=8 JETSTREAMER_HISTORICAL_POH_THREADS=2 {PLAN_ENV}={}\nEnvironmentFile={}\nExecStart={HARNESS}\n",
         plan.path.display(),
         plan.path.with_file_name("startup.env").display()
     )
 }
 fn guard_template(guard: &Bound, plan: &Path, receipts: &Path) -> String {
-    let guard_sandbox = if EPOCH == 212 {
+    let guard_sandbox = if matches!(EPOCH, 212 | 266) {
         "ProtectControlGroups=yes\nPrivateTmp=yes\n"
     } else {
         ""
@@ -186,7 +187,7 @@ pub(super) fn producer(
         ("MemorySwapMax", "0"),
         ("TasksMax", "512"),
         ("CPUQuotaPerSecUSec", "8s"),
-        ("RuntimeMaxUSec", "45min"),
+        ("RuntimeMaxUSec", if EPOCH == 266 { "2h" } else { "45min" }),
         ("ProtectHome", "read-only"),
         ("ProtectSystem", "strict"),
         ("PrivateNetwork", "yes"),

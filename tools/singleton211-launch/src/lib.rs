@@ -32,6 +32,7 @@ mod live;
 pub mod native257;
 pub mod native257_fit;
 pub mod native212;
+pub mod native266;
 pub mod native261;
 mod native265_growth;
 mod peer_window;
@@ -360,7 +361,7 @@ impl Native {
                     .all(|b| b.is_ascii_alphanumeric() || b"-_.@".contains(&b)),
             "unit suffix"
         );
-        let properties = if matches!(unit, native212::UNIT | native261::UNIT) {
+        let properties = if matches!(unit, native212::UNIT | native261::UNIT | native266::UNIT) {
             format!(
                 "{},PrivateDevices,WorkingDirectory,ProtectControlGroups,RestrictAddressFamilies,OOMPolicy,OOMScoreAdjust,AmbientCapabilities,InaccessiblePaths",
                 live::PROPS
