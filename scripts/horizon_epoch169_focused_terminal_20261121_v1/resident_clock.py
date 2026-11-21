@@ -139,8 +139,21 @@ def scheduled(path):
     return cfg,ref,bound(path)
 
 
-def ensure_timer(fleet,cfg):
+def existing_timer(unit,timers,cmd):
     from race166 import properties
+    pending=properties(unit+'.service','LoadState','ActiveState','Job')
+    if pending['LoadState']=='not-found':
+        need(not timers and not pending['Job'] and pending['ActiveState']=='inactive',
+             'competing observer during new timer registration')
+    elif timers or pending['Job'] or pending['ActiveState'] in ('active','activating'):
+        actual=properties(unit+'.service','ExecStart')
+        need((not timers or timers==[unit+'.timer']) and ' '.join(cmd) in actual['ExecStart'],
+             'competing observer schedule')
+        return True
+    return False
+
+
+def ensure_timer(fleet,cfg):
     path=Path(fleet['sole_next_observer']['path'])
     if path.parent.parent.parent.name!='resident-census-recovery' or Path(cfg['output']).exists():
         return
@@ -148,10 +161,7 @@ def ensure_timer(fleet,cfg):
     cmd=['/usr/bin/python3','-B',str(Path(__file__).with_name('guard_stops.py')),str(path)]
     timers=[l.split()[0] for l in subprocess.check_output(['systemctl','list-units','--type=timer','--state=waiting',
             '--no-legend','--plain','horizon-observer-*.timer'],text=True).splitlines()]
-    pending=properties(unit+'.service','ActiveState','ExecStart','Job')
-    if timers or pending['Job'] or pending['ActiveState'] in ('active','activating'):
-        need((not timers or timers==[unit+'.timer']) and ' '.join(cmd) in pending['ExecStart'],'competing observer schedule')
-        return
+    if existing_timer(unit,timers,cmd):return
     due=utc(cfg['not_before_utc'])
     clock=(['--on-calendar='+due.strftime('%F %T UTC')] if due>dt.datetime.now(dt.timezone.utc)
            else ['--on-active=1s'])
