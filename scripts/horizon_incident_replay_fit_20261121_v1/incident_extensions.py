@@ -85,6 +85,7 @@ def held(s,unit,run,pid,proc,intent):
 FAILED_VERIFIER = "5e0e20bc974149f096ea4bab10b15e1b"
 FAILED_REJOIN = "dc043eb78c4a4349b0098760dc764a1f"
 FAILED_CADENCE = "d37f36f898a44932a19fd50d7014a6fe"
+FAILED_QUALIFIER = "500c8d717a4147b087ff302b5afa7fc0"
 VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
 
 
@@ -94,7 +95,7 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     import subprocess
 
     iid = manager["InvocationID"]
-    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE) and iid == expected and manager["Id"] == VERIFIER_UNIT
+    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE, FAILED_QUALIFIER) and iid == expected and manager["Id"] == VERIFIER_UNIT
            and manager["ActiveState"] == manager["SubState"] == "failed"
            and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
            and manager["NRestarts"] == "0" and not manager["Job"]
@@ -105,6 +106,10 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         failure_sha = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
         start_sha = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
         image_sha = "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    elif expected == FAILED_QUALIFIER:
+        failure_sha = "04c96683252ad3815d906d43dbbfb2f80d3ebcf542d7e671f28119f74767b107"
+        start_sha = "0a82bc0b2666ec668a3d235ed3e24f7ec39900e2ca53649a9c01a47b024fa890"
+        image_sha = "3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066"
     elif expected == FAILED_CADENCE:
         failure_sha = "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29"
         start_sha = "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81"
@@ -115,7 +120,29 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         image_sha = "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
     failed, failure = s.read(state / "failed.json", failure_sha)
     started, recovery = s.read(state / "recovery-started.json", start_sha)
-    if expected == FAILED_CADENCE:
+    if expected == FAILED_QUALIFIER:
+        prior = started["prior_frozen_recovery"]["failed_status_owner"]["current_boot_failure"]["failure"]
+        progress = R / "epoch145-semantic-continuity-20261121-v1/V5D_ACTUAL_ADVANCING_WORKER.json"
+        observed, _ = s.read(progress, "619fb2e8063399d3501d06bcd89a6a6ac999b2ac2f087c08531a6bd319247e3d")
+        compiler = "horizon-qualify-native-observer-resident-20261121-a.service"
+        compiler_iid = "3548aa49b01c40c6b4d70aaeb6bd75ab"
+        boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
+        raw = subprocess.check_output(["/usr/bin/journalctl", "--no-pager", "-ojson",
+            "--output-fields=UNIT,INVOCATION_ID,MESSAGE_ID,EXIT_CODE,EXIT_STATUS", "_BOOT_ID=" + boot,
+            "_PID=1", "UNIT=" + compiler, "INVOCATION_ID=" + compiler_iid], text=True, timeout=10)
+        events = [json.loads(line) for line in raw.splitlines()]
+        a = [row for row in events if row["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"]
+        b = [row for row in events if row["MESSAGE_ID"] == "98e322203f7a4ed290d09fe03c09fe15"]
+        s.need(len(a) == len(b) == 1 and b[0]["EXIT_CODE"] == "exited" and b[0]["EXIT_STATUS"] == "1"
+               and int(a[0]["__REALTIME_TIMESTAMP"]) // 1000000 <= failed["at"] <= int(b[0]["__REALTIME_TIMESTAMP"]) // 1000000
+               and not (Path("/sys/fs/cgroup/system.slice") / compiler).exists()
+               and failed["error"].rstrip().endswith("ValueError: foreign qualifier unit")
+               and prior["sha256"] == "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29"
+               and observed["invocation_id"] == iid and observed["start"] == recovery and len(observed["observations"]) == 2
+               and set(p.name for p in state.iterdir()) == {"recovery-started.json", "failed.json"}
+               and manager["Result"] == "exit-code" and not manager["ControlGroup"],
+               "unregistered observer compiler or foreign failed verifier")
+    elif expected == FAILED_CADENCE:
         s.need(failed["error"].startswith("complete 145 capacity observation failed exit status: 1: Traceback") and
                failed["error"].rstrip().endswith("ValueError: cadence publisher absent") and
                'tools-v10/post-stop-fit", line 456, in registered_status' in failed["error"] and
