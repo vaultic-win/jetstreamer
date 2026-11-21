@@ -1,0 +1,83 @@
+--- a/guard_stops.py
++++ b/guard_stops.py
+@@ -78,10 +78,14 @@
+                      and row["producer_unit"] == registered[e]["unit"]["Id"], "foreign original producer")
+         return dict(cfg, replays=[r for r in rows if int(r["range"]) not in EPOCHS])
+     registry = fleet.get("original_disk_guard_recovery_workers", {})
++    from paired_cadence import LABELS, FIELDS
++    def preselected(row):
++        epoch = int(row["range"])
++        label = LABELS[epoch]
++        return (fleet.get(FIELDS[epoch]) and fleet.get(label+"_preselected_config")==fleet["sole_next_observer"]
++                and checked(fleet["historical_"+label+"_worker"]["first_worker"])["observer_row"]==row)
+     need(closed_epochs(fleet) == EPOCHS and all(
+-         (r["range"]=="166" and fleet.get("recovered166_local_commit") and
+-          fleet.get("recovered166_preselected_config")==fleet["sole_next_observer"] and
+-          checked(fleet["historical_recovered166_worker"]["first_worker"])["observer_row"]==r) or
++         preselected(r) or
+          r["range"] in registry and registry[r["range"]]["first_worker"] and
+          checked(registry[r["range"]]["first_worker"])["observer_row"]==r and
+          registry[r["range"]]["actor"]["producer_invocation_id"]==r["expected_producer_invocation_id"]
+--- a/recovered.py
++++ b/recovered.py
+@@ -168,10 +168,9 @@
+         root=BASE/subdir
+         state=native(epoch)
+         if state is None:
+-            if epoch==166:
+-                from paired_cadence import transition
+-                if transition(fleet,166):
+-                    continue
++            from paired_cadence import transition
++            if transition(fleet,epoch):
++                continue
+             need(str(epoch) not in old and not (root/'ACTUAL_ADMISSION_AND_PROTECTION.json').exists(),
+                  'replacement stopped; reconcile the actual terminal')
+             continue
+@@ -205,20 +204,9 @@
+     from evidence import durable,ensure_dir
+ 
+     live=ownership(c.fleet)
+-    path=c.paths['out']/('RECOVERED_WORKERS_AFTER_166.json' if getattr(c,'recovered166',None) else 'RECOVERED_WORKERS.json')
+-    ensure_dir(path.parent)
+-    prior_path=c.paths['out']/'RECOVERED_WORKERS.json'
+-    if not path.exists() and prior_path!=path and prior_path.exists():
+-        prior_ref=bound(prior_path)
+-        saved=checked(prior_ref)
+-        need(saved['fleet']==c.fleet_ref and saved['sample']==c.sample_ref
+-             and {k:v for k,v in saved['owners'].items() if k!='166'}==live
+-             and saved['owners']['166']['first_worker']==c.recovered166['first_worker']
+-             and saved['owners']['166']['admission']==c.recovered166['admission'],
+-             'foreign pre-terminal recovery capture')
+-        durable(path,dict(fleet=c.fleet_ref,sample=c.sample_ref,owners=live,
+-                          measured={k:v for k,v in saved['measured'].items() if k!='166'},
+-                          prior_same_sample_capture=prior_ref))
++    from paired_cadence import recover_capture
++    ensure_dir(c.paths['out'])
++    path=recover_capture(c,live)
+     if not path.exists():
+         sampled={}
+         for key, entry in live.items():
+@@ -357,8 +345,8 @@
+         fleet['live_replay_count']+=int(not boot);fleet['bootstrap_count']+=int(boot);fleet['guarded_bootstrap_owner_count']+=int(boot)
+ 
+ 
+-    import recovered166
+-    recovered166.install(fleet,c)
++    from paired_cadence import install_recovered
++    install_recovered(fleet,c)
+ 
+ 
+ def forecast(c,epoch,old,prior):
+@@ -487,9 +475,9 @@
+                      and row == normal['observer_row'], 'foreign normal 168 worker')
+             continue
+         need(epoch in ROUTES, 'unknown added worker')
+-        if epoch==166 and '166' not in current:
++        if str(epoch) not in current:
+             from paired_cadence import transition, original as original_row
+-            terminal = transition(fleet,166)
++            terminal = transition(fleet,epoch)
+             need(terminal and original_row(terminal)==row, 'foreign historical recovered worker')
+             continue
+         candidate = current[row['range']]

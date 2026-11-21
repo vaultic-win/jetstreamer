@@ -2,6 +2,7 @@
 from contextlib import ExitStack
 import copy
 import json
+from itertools import combinations
 from pathlib import Path
 import shutil
 from types import SimpleNamespace
@@ -59,9 +60,17 @@ def run(work):
     actual = {e:checked(report['receipts'][str(e)]) for e in EPOCHS}
     records = {}
     simulator = {}
-    for e,dirname in AUTH.items():
+    sources={e:BASE/subdir for e,subdir in AUTH.items()}
+    for e,digest_value in {167:'57c6ff2ccaee8fa8207c2f78fb9c7bb42c7de524d60c983e855376d7eba59582',
+                           170:'2322cb695d658f79acd50aa9a2b6d60b4e16e6b7cba5d5037268bbad7c3876c1'}.items():
+        reference=dict(path=str(pair.ROUTES[e].T/'HELD_PUBLICATION_QUALIFIED.json'),sha256=digest_value)
+        package=checked(reference)
+        qualified=checked(package['qualification'])
+        need(package['epoch']==e and package['r2_writes']==0 and qualified,'foreign held archive qualification')
+        sources[e]=Path(package['qualification']['path']).parent
+    for e,source in sorted(sources.items()):
         route = pair.ROUTES[e]
-        directory = BASE/dirname/'test-publisher/authority'
+        directory = source/'test-publisher/authority'
         tr = bound(directory/'TERMINAL_SUCCESS.json')
         term = checked(tr)
         lr = bound(directory/'LIVE.json')
@@ -75,6 +84,7 @@ def run(work):
         terminal = save(work/('terminal-clock-'+str(e)+'.json'),term)
         drained = save(work/('drained-'+str(e)+'.json'),dict(fixture=tr,timer=g.guard_timer))
         simulator[e] = dict(terminal=terminal,first_worker=w,admission=ad,live=lr,guard_retirement=drained)
+    all_epochs=tuple(sorted(simulator))
     rejections = {}
     def reject(key,call):
         try:call()
@@ -84,7 +94,7 @@ def run(work):
         bad = copy.deepcopy(cfg)
         next(r for r in bad['replays'] if r['range']==str(e))['producer_unit']='foreign.service'
         reject('foreign-registered-'+str(e),lambda:pair.remove(bad,e,p))
-        reject('other-generation-'+str(e),lambda:pair.remove(cfg,e,simulator[334-e]))
+        reject('other-generation-'+str(e),lambda:pair.remove(cfg,e,simulator[next(other for other in all_epochs if other!=e)]))
         need(pair.preceding(f,e)['first_worker']==p['first_worker'],'wrong actual lineage')
     def bind_context(active,folder):
         c = SimpleNamespace(fleet=f,fleet_ref=prev,cfg=cfg,sample=sample,sample_ref=sp,
@@ -111,7 +121,7 @@ def run(work):
 
     # Before the sample, seal and reuse exactly one survivor config for every nonempty set.
     projections={}
-    for active in ((166,),(168,),(166,168)):
+    for active in (g for size in range(1,5) for g in combinations(all_epochs,size)):
         folder=work/('pre-'+'-'.join(map(str,active)))
         ensure_dir(folder)
         ref=save(folder/'fixture_fleet.json',dict(source=prev))
@@ -140,7 +150,7 @@ def run(work):
     def forbid(*args,**kwargs):
         raise AssertionError('unexpected native, remote or guard mutation in offline fixture')
     dispatches=[]
-    for order in ((166,168),(168,166)):
+    for order in ((166,168),(167,170),all_epochs,tuple(reversed(all_epochs))):
         outer=work/('dispatch-'+'-'.join(map(str,order)))
         ensure_dir(outer)
         ph=outer/'unwritten-sample.json'
@@ -153,6 +163,8 @@ def run(work):
             actual_config=sealed(bound(Path(cmd[1]))) if Path(cmd[1]).parent.name=='sealed-next' else checked(up)
             keys=[int(r['range']) for r in actual_config['replays']]
             calls.append(keys)
+            if len(closed)==len(order):
+                return SimpleNamespace(returncode=0,stderr=b'')
             pending=order[len(closed)]
             return SimpleNamespace(returncode=1,stderr=pair.ROUTES[pending].UNIT.encode())
         def observe_exit(e,w,deadline):
@@ -169,16 +181,16 @@ def run(work):
         with patch.object(pair,'proofs',side_effect=lambda f:dict(closed)),patch.object(pair,'transition',side_effect=lambda f,e:closed[e]),patch.object(pair,'wait_terminal',side_effect=observe_exit),patch.object(pair.subprocess,'run',side_effect=wrapped),patch.object(pair.os,'execv',side_effect=finish):
             try:pair.dispatch(arr,Path(up['path']),frozen,f,'/fixture/native')
             except Exec:pass
-        need(calls==[[166,167,168,170,172],[e for e in [166,167,168,170,172] if e!=order[0]],[167,170,172]],'duplicate or omitted native retry')
+        need(calls==[[e for e in (*all_epochs,172) if e not in order[:count]] for count in range(len(order)+1)],'duplicate or omitted native retry')
         dispatches.append(calls)
         mixed=copy.deepcopy(sample)
         mixed['replays']=[r for r in mixed['replays'] if int(r['range'])!=order[0]]
         mr=save(outer/'mixed-sample.json',mixed)
         mcfg=dict(cfg,output=mr['path'])
         c=SimpleNamespace(fleet=f,fleet_ref=prev,sample=mixed,sample_ref=mr,paths={'statuses':outer})
-        with patch.object(pair,'proofs',return_value=simulator):
+        with patch.object(pair,'proofs',return_value={e:simulator[e] for e in order}):
             selected=pair.select_cycle(c,mcfg,Path(up['path']))
-        need(set(c.histories)=={order[1]} and [r['range'] for r in selected['replays']]==[r['range'] for r in mixed['replays']],
+        need(set(c.histories)==set(order[1:]) and [r['range'] for r in selected['replays']]==[r['range'] for r in mixed['replays']],
              'closure on either side of native sample lost lineage')
     for e,p in simulator.items():
         dr=work/('guard-'+str(e))
@@ -189,13 +201,36 @@ def run(work):
         with patch.dict(pair.ROUTES,{e:route}):
             need(pair.transition(f,e)==p,'qualified terminal did not join registered fleet')
             wrong=copy.deepcopy(f)
-            if e==166:wrong[pair.REGISTRY]['166']['actor']['producer_invocation_id']='0'*32
+            if e!=168:wrong[pair.REGISTRY][str(e)]['actor']['producer_invocation_id']='0'*32
             else:next(r for r in wrong['actual_executing_replays'] if r['epoch']==168)['first_worker']={}
             with patch.object(route,'retire',side_effect=forbid) as unused:
                 reject('wrong-lineage-before-guard-'+str(e),lambda:pair.transition(wrong,e));need(not unused.called,'drained a foreign guard')
+    captures=[]
+    frozen=checked(head['recovered_workers_observation'])
+    for order in ((166,167,170),(170,166,167)):
+        folder=work/('capture-'+'-'.join(map(str,order)))
+        ensure_dir(folder)
+        predecessor=save(folder/'RECOVERED_WORKERS.json',frozen)
+        for stop in range(1,len(order)+1):
+            active=order[:stop]
+            c=bind_context(active,folder)
+            c.paths['out']=folder
+            live={k:v for k,v in frozen['owners'].items() if int(k) not in active}
+            path=pair.recover_capture(c,live)
+            projected=checked(bound(path))
+            need(projected['owners']==live and projected['prior_same_sample_capture']==predecessor and
+                 projected['measured']=={k:v for k,v in frozen['measured'].items() if int(k) not in active},
+                 'frozen replays changed outside the original completions')
+            captures.append(bound(path))
+            predecessor=bound(path)
+        # A second sibling history cannot be an ancestor of the same sample.
+        save(pair.recovered_capture_path(folder,(order[1],)),frozen)
+        reject('crossed-captures-'+str(order[0]),lambda:pair.prior_paths(order,lambda group:pair.recovered_capture_path(folder,group)))
     passes=[]
-    for order in ((166,168),(168,166),(166,168,'landed'),(168,166,'unsent')):
-        base=work/('post-'+'-'.join(map(str,order)))
+    episodes=[((166,168),None),((168,166),None),((167,170),'landed'),((170,167),'unsent'),
+              (all_epochs,'landed'),(tuple(reversed(all_epochs)),'unsent'),((168,170,167,166),None)]
+    for order,partial in episodes:
+        base=work/('post-'+'-'.join(map(str,order))+'-'+str(partial))
         ensure_dir(base)
         store=Storage(previous)
         # Retain the actual same-window If-Match intents, some of which predate closure.
@@ -204,13 +239,14 @@ def run(work):
             ip=source.with_name('epoch-'+str(e)+'.intent.json')
             need(ip.exists(),'fixture intent unavailable')
             shutil.copyfile(ip,base/ip.name)
-            if len(order)==3 and e==order[0]:
-                if order[2]=='landed':
+            if partial and e==order[0]:
+                if partial=='landed':
                     store.values[e]=row['after_etag'],status.body(row['after_status'])
                 continue
             shutil.copyfile(source,base/source.name)
             store.values[e]=row['after_etag'],status.body(row['after_status'])
-        for active in ([order[0]],order[:2]):
+        for count in range(1,len(order)+1):
+            active=order[:count]
             c=bind_context(active,base)
             out=c.paths['statuses'];ensure_dir(out)
             sr=status._publish(c,store,out,report['ready_epochs'])
@@ -246,16 +282,19 @@ def run(work):
                  and accepted['sole_next_timer']==head['sole_next_timer'],'peer owner or clock lost')
             need(pair.projected(preselected,Path(head['sole_next_observer']['path']),accepted,{e:simulator[e] for e in active})==survivor,
                  'accepted successor cannot project historical workers')
+            import guard_stops
+            need(guard_stops.project(preselected,bound(HEAD),accepted)==preselected,
+                 'original projected next worker rejected by scheduled guard')
             for e in active:
                 need(accepted[pair.FIELDS[e]]==simulator[e]['terminal'] and pair.preceding(accepted,e) is None
-                     and caps['retained_local_commit_bookings'][str(e)]['retained_cap_bytes']==288<<30,
+                     and caps['retained_local_commit_bookings'][str(e)]['retained_cap_bytes']=={166:288,167:512,168:288,170:384}[e]<<30,
                      'registered a retired owner or lost its booking')
             passes.append(dict(order=list(order),closed=list(active),report=sr,survivors=sorted(rows.keys()-set(active)),
                                conditional_puts=list(store.writes),retained=hr))
-        need(store.writes==list(order[:2]),'duplicate or unrelated conditional put')
+        need(store.writes==list(order),'duplicate or unrelated conditional put')
     base=work/'fresh-both'
     ensure_dir(base)
-    c=bind_context((166,168),base)
+    c=bind_context(all_epochs,base)
     c.histories={}
     c.recovered166_history=None
     c.paths['statuses']=base
@@ -269,7 +308,7 @@ def run(work):
         store.values[e]=actual[e]['after_etag'],status.body(actual[e]['after_status'])
     fresh=status._publish(c,store,base,report['ready_epochs'])
     reconcile.validate_status(c,checked(fresh))
-    need(store.writes==[166,168] and all(checked(checked(fresh)['receipts'][str(e)])['previous_receipt']==previous['receipts'][str(e)]
+    need(store.writes==list(all_epochs) and all(checked(checked(fresh)['receipts'][str(e)])['previous_receipt']==previous['receipts'][str(e)]
          for e in simulator),'fresh projection did not use original authenticated predecessors')
-    return dict(base_fleet=bound(HEAD),native_sample=sp,singleton_fixtures=records,projections=projections,fresh_both=fresh,
+    return dict(base_fleet=bound(HEAD),native_sample=sp,singleton_fixtures=records,projections=projections,frozen_captures=captures,fresh_all=fresh,
                 fixture_status_and_fleet_passes=passes,failed_native_observer_retries=dispatches,refusals=rejections,real_archive_or_status_writes=0)

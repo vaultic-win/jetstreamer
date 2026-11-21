@@ -1,5 +1,7 @@
-"""Reconcile the original recovered 166 and metered 168 independently in one native cadence."""
+"""Reconcile the four original producers in one scheduled native observation."""
 import os
+from itertools import combinations
+from terminal_event import COMPLETION_LABELS, completion_report_dir
 from pathlib import Path
 import select
 import runpy
@@ -27,16 +29,44 @@ def metered_authority():
     return SimpleNamespace(**{k:authority[k] for k in ('T','DONE','FIELD','UNIT','IID','committed','inspect','retire','guard')})
 
 
-ROUTES = {166: closure, 168: metered_authority()}
+def recovered_authorities():
+    root = closure.R / 'epoch167170-original-terminal-20261121-v1/closure-tools'
+    receipt = checked(dict(path=str(root/'deployment-seal-receipt.json'),
+                           sha256='490a3992bac903fcf2e0660d05c4d518679c6e0685283bce1f98103868556167'))
+    members = {m['name']:m['sha256'] for m in receipt['members']}
+    need(receipt['destination']==str(root) and all(
+        members[name]==bound(root/name)['sha256'] for name in ('closure.py','peer_closures.py')),
+        'foreign recovered guard closure package')
+    authority = runpy.run_path(str(root/'peer_closures.py'))['authority']
+    return {e:authority(e) for e in (167,170)}
+
+
+ROUTES = dict(sorted({166:closure,168:metered_authority(),**recovered_authorities()}.items()))
 FIELDS = {epoch: route.FIELD for epoch, route in ROUTES.items()}
-LABELS = {166: 'recovered166', 168: 'metered168'}
+LABELS = COMPLETION_LABELS
 REGISTRY = recovered166.REGISTRY
+need(FIELDS=={e:label+'_local_commit' for e,label in LABELS.items()},'closure field differs from report route')
 
 
 def preceding(fleet, epoch):
-    if epoch == 166:
-        return fleet.get(REGISTRY, {}).get('166')
-    return cadence168.previous(fleet)
+    if epoch == 168:
+        return cadence168.previous(fleet)
+    return fleet.get(REGISTRY, {}).get(str(epoch))
+
+
+def prior_paths(epochs, location):
+    """Return existing strict predecessor paths in the sole observed order."""
+    ordered = sorted(epochs)
+    previous = set()
+    paths = []
+    for size in range(len(ordered)):
+        for subset in combinations(ordered, size):
+            path = location(subset)
+            if path.exists():
+                need(not paths or previous < set(subset), 'incomparable local-completion histories')
+                previous = set(subset)
+                paths.append((subset, path))
+    return paths
 
 
 def transition(fleet, epoch):
@@ -55,7 +85,7 @@ def transition(fleet, epoch):
     else:
         need(old and old['admission'] == proof['admission'] and old['first_worker'] == proof['first_worker'],
              'foreign predecessor admission or worker')
-        actor = old['actor'] if epoch == 166 else checked(fleet[cadence168.FIELD])['state']['actor']
+        actor = checked(fleet[cadence168.FIELD])['state']['actor'] if epoch == 168 else old['actor']
         need(actor['producer_unit'] == route.UNIT and actor['producer_invocation_id'] == route.IID,
              'foreign predecessor native generation')
     if not already_drained:
@@ -170,8 +200,7 @@ def select_cycle(c,cfg,path):
     c.metered168_commit = c.commits.get(168)
     if c.histories:
         c.original_status_dir = c.paths['statuses']
-        suffix = '166-168' if len(c.histories)==2 else LABELS[next(iter(c.histories))]
-        c.paths['statuses'] = c.original_status_dir / ('after-'+suffix)
+        c.paths['statuses'] = completion_report_dir(c.original_status_dir, c.histories)
     # Leave the sample intact. Suppress live interpretations only for proven ended rows.
     return dict(cfg,replays=expected)
 
@@ -293,21 +322,80 @@ def install168(c,fleet):
                current_status_scope='Metered epoch 168 committed locally and awaits verification and public delivery.')
 
 
+def install_recovered(fleet,c):
+    for epoch in sorted(c.commits.keys()-{168}):
+        proof = c.commits[epoch]
+        label = LABELS[epoch]
+        need(str(epoch) not in fleet[REGISTRY] and not any(
+            r['epoch']==epoch for k in ('actual_executing_replays','actual_active_bootstraps') for r in fleet[k]),
+            'closed recovered producer still owns a lane')
+        fleet[FIELDS[epoch]] = proof['terminal']
+        fleet[label+'_guard_retirement'] = proof['guard_retirement']
+        previous = preceding(c.fleet,epoch)
+        if previous:
+            fleet['historical_'+label+'_worker'] = previous
+        if epoch in c.histories:
+            fleet['historical_'+label+'_observation'] = c.histories[epoch]
+        if any(r['range']==str(epoch) for r in c.next_cfg['replays']):
+            need(epoch in c.histories and sealed(fleet['sole_next_observer'])==c.next_cfg,
+                 'unexpected preselected next observation')
+            fleet[label+'_preselected_config'] = fleet['sole_next_observer']
+        else:
+            fleet.pop(label+'_preselected_config',None)
+        row = next(r for r in fleet['epochs'] if r['epoch']==epoch)
+        row.pop('current_replay', None)
+        row.pop('current_bootstrap', None)
+        row.update(current_repair_owner='/root',no_live_producer_claimed=True,state='verification',repair_open=True,
+                   next_action=f'Verify and publish the committed epoch {epoch} archive.',
+                   current_status_scope=f'Epoch {epoch} committed locally and awaits verification and public delivery.')
+        row[FIELDS[epoch]] = proof['terminal']
+
+
+def recovered_capture_path(out, group):
+    suffix = '_AFTER_'+'_'.join(map(str,sorted(group))) if group else ''
+    return out / ('RECOVERED_WORKERS'+suffix+'.json')
+
+
+def recover_capture(c, live):
+    closed = c.commits.keys()-{168}
+    out = c.paths['out']
+    target = recovered_capture_path(out,closed)
+    if closed and not target.exists():
+        parents = prior_paths(closed,lambda group:recovered_capture_path(out,group))
+        if parents:
+            previous, prior = parents[-1]
+            ref = bound(prior)
+            saved = checked(ref)
+            removed = {str(e) for e in closed-set(previous) if str(e) in saved['owners']}
+            need(saved['fleet']==c.fleet_ref and saved['sample']==c.sample_ref and
+                 set(saved['measured'])<=set(saved['owners']) and
+                 {k:v for k,v in saved['owners'].items() if k not in removed}==live and
+                 all(saved['owners'][k][f]==c.commits[int(k)][f] for k in removed
+                     for f in ('first_worker','admission')) and
+                 all(str(e) in removed or c.fleet.get(FIELDS[e])==c.commits[e]['terminal']
+                     for e in closed-set(previous)),
+                 'foreign pre-terminal recovered worker capture')
+            durable(target,dict(fleet=c.fleet_ref,sample=c.sample_ref,owners=live,
+                                measured={k:v for k,v in saved['measured'].items() if k not in removed},
+                                prior_same_sample_capture=ref))
+    return target
+
+
 def capacity(c):
     result = {}
     for e,proof in c.commits.items():
         ad = checked(proof['admission'])
         post = ad['post_guard_capacity']
         fit = checked(post)
-        if e==166:
-            booking = fit['bookings']['166']
-            need(booking['cap_bytes']==288<<30, 'recovered 166 retained cap changed')
-        else:
-            booking = fit['native_incident_fit']['bookings']['168']
-            need(booking['cap_bytes']==288<<30 and booking['root']==checked(ad['actual_guard_plan'])['worker_root'],
-                 'metered 168 retained cap changed')
+        bookings = fit['native_incident_fit']['bookings'] if e==168 else fit['bookings']
+        booking = bookings[str(e)]
+        plan = checked(ad['actual_guard_plan'])
+        expected = {166:288,167:512,168:288,170:384}[e] << 30
+        need(booking['root']==plan['worker_root'] and
+             booking['cap_bytes']==plan['maximum_root_physical_bytes']==expected,
+             'changed retained root or cap for '+str(e))
         result[str(e)] = dict(terminal=proof['terminal'],guard_retirement=proof['guard_retirement'],
-                              admission=proof['admission'],post_guard_capacity=post,retained_cap_bytes=288<<30,
+                              admission=proof['admission'],post_guard_capacity=post,retained_cap_bytes=expected,
                               resource_credit_bytes=0,reservation_ending_bytes=0)
     return result
 
@@ -315,22 +403,21 @@ def capacity(c):
 def observation(c,out,probe):
     # A closure can arrive after the ordinary capacity pass has already committed.
     # Retain the same witness, native sample and audit interval.
-    candidates = [out/'CYCLE_OBSERVATION.json']
-    if len(c.commits)==2:
-        singles = [out/('POST_LOCAL_'+str(e)+'_CYCLE_OBSERVATION.json') for e in c.commits]
-        available = [p for p in singles if p.exists()]
-        need(len(available)<=1,'incomparable capacity snapshots for the same native sample')
-        candidates += available
-    for path in reversed(candidates):
-        if not path.exists():
-            continue
+    def filename(group):
+        prefix = 'POST_LOCAL_'+'_'.join(map(str,group))+'_' if group else ''
+        return out / (prefix+'CYCLE_OBSERVATION.json')
+    ancestors = prior_paths(c.commits,filename)
+    if ancestors:
+        previous, path = ancestors[-1]
         ref = bound(path)
         record = checked(ref)
         need(record['observer']==c.sample_ref and record['fleet_predecessor']==c.fleet_ref,
              'foreign prior capacity observation')
         retained = capacity(c)
         old = record['capacity']
-        need(all(retained.get(k)==v for k,v in old.get('retained_local_commit_bookings',{}).items()),
+        prior_bookings = old.get('retained_local_commit_bookings',{})
+        need(set(prior_bookings)=={str(e) for e in previous} and
+             all(retained[k]==v for k,v in prior_bookings.items()),
              'retained source booking changed')
         cap = dict(old,retained_local_commit_bookings=retained,prior_same_sample_capacity_observation=ref)
         if 168 in c.commits:
@@ -340,16 +427,11 @@ def observation(c,out,probe):
 
 
 def partial_status(c,e,ip,rp):
-    """Keep applied ancestor intents across either order of the two terminal events."""
+    """Keep the last applied ancestor intent for this epoch across successive completions."""
     from evidence import content
     from status import receipt_identity
-    parents = [c.original_status_dir]
-    if len(c.histories)==2:
-        singles = [parents[0]/('after-'+LABELS[k]) for k in c.histories]
-        occupied = [p for p in singles if p.is_dir()]
-        need(len(occupied)<=1, 'incomparable single-terminal status branches')
-        parents += occupied
-    for d in reversed(parents):
+    parents = prior_paths(c.histories, lambda group:completion_report_dir(c.original_status_dir,group))
+    for _,d in reversed(parents):
         a,b = d/ip.name,d/rp.name
         need(not b.exists() or a.exists(),'receipt without original intent')
         if a.exists():
