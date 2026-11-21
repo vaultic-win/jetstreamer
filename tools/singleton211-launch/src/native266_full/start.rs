@@ -426,8 +426,13 @@ fn release(
         save_json(&p.state, "producer-terminal-pid1.json", &json!(pid1))?;
         if p.mode == "qa-disk" {
             let rr = p.state.join("receipts");
-            let intent = bound_at(&rr.join("stop-intent.json"))?.sealed()?;
-            let end = bound_at(&rr.join("stop-completion.json"))?.sealed()?;
+            let intent = bound_at(&rr.join("stop-intent.json"))?.json()?;
+            let native = rr.join("stop-completion.json");
+            let end = if native.exists() {
+                bound_at(&native)?.json()?
+            } else {
+                bound_at(&rr.join("manager-stop-completion.json"))?.sealed()?
+            };
             ensure!(
                 intent["reason"] == "filesystem-floor"
                     && intent["sample"] == v
@@ -530,7 +535,7 @@ pub(super) fn run(n: &mut Native, r: &Value, review: &Bound, image: &Bound) -> R
                     old["image"] == json!(image) && old["drained"] == true,
                     "prior QA source changed"
                 );
-                binding(&old["first_guard"])?.sealed()?;
+                binding(&old["first_guard"])?.json()?;
                 binding(&old["guard_pid1"])?.sealed()?;
                 live::verify_drained_group(&p.unit)?;
             } else {

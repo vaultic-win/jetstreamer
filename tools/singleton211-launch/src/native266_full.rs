@@ -5,10 +5,11 @@ mod entries;
 mod funding;
 mod gate;
 mod start;
+mod stopped;
 
 const V: &str = "/var/lib/jetstreamer";
-const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a1";
-const CTRL: &str = "horizon266-native-full-v165-a1.service";
+const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a2";
+const CTRL: &str = "horizon266-native-full-v165-a2.service";
 const SNAPROOT: &str = "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1";
 const INPUT: &str =
     "/var/lib/jetstreamer/horizon266-bootstrap-measure-067e29e0-v155-v1/inputs.json";
@@ -17,7 +18,7 @@ const GUARD: &str =
     "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const GUARD_SHA: &str = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d";
 const BOOT: &str = "3b17d005-5c3a-4a0e-8841-da097e0957b5";
-const RECEIPTS: u64 = 768 << 20; // Two retained 256 MiB QA images and 256 MiB controls.
+const RECEIPTS: u64 = 1024 << 20; // Three retained 256 MiB QA images and 256 MiB controls.
 const GUARD_MEM: u64 = 1 << 30;
 const CONTROL_MEM: u64 = 256 << 20;
 const MAIN: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
@@ -38,7 +39,7 @@ impl Profile {
         let suffix = if mode == "pilot" {
             String::new()
         } else {
-            format!("-{mode}")
+            format!("-{mode}{}", if mode == "qa-disk" { "-a2" } else { "" })
         };
         let g = format!("horizon-266-general-protective{suffix}-v1");
         Ok(Self {

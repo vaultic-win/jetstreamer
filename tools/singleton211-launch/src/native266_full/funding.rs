@@ -234,6 +234,7 @@ pub(super) fn elect(
         "original 247/228 funding"
     );
     let discharged = discharge()?;
+    let first_disk_qa = stopped::original(n)?;
     let mut allowed = OWNERS
         .iter()
         .map(|(u, _, _)| u.to_string())
@@ -335,6 +336,7 @@ pub(super) fn elect(
         );
     }
     result["schema"] = json!("horizon266-native-full-capacity-election-v1");
+    result["retained_attempt_one"] = first_disk_qa;
     result["fleet"] = json!(fleet);
     result["peer_envelopes"] = json!(peer_rows);
     result["cold_discharge"] = json!(discharged);

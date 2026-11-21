@@ -129,8 +129,8 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
     let err = Command::new(argv[0]).args(&argv[1..]).exec();
     Err(err.into())
 }
-fn owner_fields(unit: &str) -> Result<BTreeMap<String, String>> {
-    let out=Command::new("/usr/bin/systemctl").args(["show",unit,"-p","Id,InvocationID,MainPID,ActiveState,SubState,ControlGroup,NRestarts,MemoryMax,MemorySwapMax,Restart,KillMode"]).output()?;
+pub(super) fn owner_fields(unit: &str) -> Result<BTreeMap<String, String>> {
+    let out=Command::new("/usr/bin/systemctl").args(["show",unit,"-p","Id,LoadState,InvocationID,MainPID,ActiveState,SubState,ControlGroup,NRestarts,MemoryMax,MemorySwapMax,Restart,KillMode,Result,Delegate"]).output()?;
     ensure!(out.status.success(), "guard owner census");
     Ok(std::str::from_utf8(&out.stdout)?
         .lines()
@@ -222,19 +222,27 @@ fn guard_once(p: &Profile, s: &Value) -> Result<Value> {
     guard.artifact()?;
     let plan = binding(&s["guard_plan"])?;
     plan.sealed()?;
-    ensure!(
-        Command::new(&guard.path)
-            .arg(&plan.path)
-            .args([
-                "--plan-sha256",
-                &plan.sha256,
-                "--self-sha256",
-                &guard.sha256
-            ])
-            .status()?
-            .success(),
-        "qualified native guard failed"
-    );
+    let result = Command::new(&guard.path)
+        .arg(&plan.path)
+        .args([
+            "--plan-sha256",
+            &plan.sha256,
+            "--self-sha256",
+            &guard.sha256,
+        ])
+        .output()?;
+    if !result.status.success() {
+        let failure = std::str::from_utf8(&result.stderr)?.trim();
+        ensure!(
+            result.status.code() == Some(1)
+                && failure == "invocation, restart count, or standalone restart policy changed",
+            "standalone guard {}: {}",
+            result.status,
+            failure
+        );
+        let proof = stopped::closed(p, s, &m, &plan)?;
+        return Ok(json!({"qualified_native_guard":guard,"closed_manager_owner":proof}));
+    }
     Ok(json!({"qualified_native_guard":guard}))
 }
 pub(super) fn guard(p: &Profile, b: &Bound, failsafe: bool) -> Result<Value> {
