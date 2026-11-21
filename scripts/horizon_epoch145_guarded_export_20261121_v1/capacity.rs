@@ -664,10 +664,51 @@ fn skip_original(epoch: &str) -> bool {
             && epoch == "166")
 }
 
+pub fn holding_owners() -> Result<BTreeSet<String>> {
+    active(&[
+        "horizon-*holding*.service",
+        "horizon-*park*.service",
+        "horizon-*census*.service",
+        "horizon-held141-custody*.service",
+        "horizon-extract145-prefix*.service",
+    ])
+}
+pub fn holding_budget(names: &BTreeSet<String>) -> Result<()> {
+    ensure!(names.len() <= 1, "concurrent serial holding owners");
+    for unit in names {
+        let cg = Path::new("/sys/fs/cgroup/system.slice").join(unit);
+        let cpu = fs::read_to_string(cg.join("cpu.max"))?;
+        let limits = cpu
+            .split_whitespace()
+            .map(str::parse::<u64>)
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        ensure!(
+            limits.len() == 2
+                && limits[1] > 0
+                && limits[0] > 0
+                && limits[0] <= limits[1].checked_mul(2).context("holding CPU")?
+                && number_file(&cg.join("memory.max"))? <= 2 * G
+                && number_file(&cg.join("memory.swap.max"))? == 0,
+            "holding exceeds retained allowance"
+        );
+    }
+    Ok(())
+}
 pub fn capture(b: &Bound) -> Result<Fit> {
     capture_phase(b, false)
 }
 pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
+    capture_host(b, joint, false, false)
+}
+#[cfg(any(publication166_only, test))]
+pub fn capture_publication(b: &Bound) -> Result<Fit> {
+    capture_host(b, true, true, false)
+}
+#[cfg(test)]
+pub fn project_publication(b: &Bound) -> Result<Fit> {
+    capture_host(b, true, true, true)
+}
+fn capture_host(b: &Bound, joint: bool, publication: bool, live_fixture: bool) -> Result<Fit> {
     ensure!(
         b.path
             .file_name()
@@ -675,7 +716,36 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
             && b.path.parent().and_then(Path::parent) == Some(Path::new(RUNTIME)),
         "fleet source namespace"
     );
-    let fleet: Value = serde_json::from_slice(&f::bytes(b, 32 << 20, false)?)?;
+    let mut fleet: Value = serde_json::from_slice(&f::bytes(b, 32 << 20, false)?)?;
+    let after166 = if cfg!(continuity145_only) && !live_fixture {
+        Some(crate::closed166::evidence()?)
+    } else {
+        None
+    };
+    if publication {
+        if !live_fixture {
+            ensure!(
+                after166.as_ref().context("166 terminal")?["terminal"]
+                    == fleet["terminal166_local_commit"],
+                "fleet carries another 166 terminal"
+            );
+        }
+        for key in [
+            "actual_executing_replays",
+            "actual_active_bootstraps",
+            "actual_active_private_diagnostics",
+        ] {
+            let records = fleet[key].as_array_mut().context("fleet rows")?;
+            for row in records.iter().filter(|r| r["epoch"] == 166) {
+                ensure!(
+                    row["unit"]["Id"] == crate::closed166::NODE
+                        && row["unit"]["InvocationID"] == "fa16ee2f14fe44ecbc37c59e197553ac",
+                    "foreign 166 in observation"
+                );
+            }
+            records.retain(|r| r["epoch"] != 166);
+        }
+    }
     let now = f::now()?;
     ensure!(
         now.checked_sub(n(&fleet, "recorded_unix_seconds")?)
@@ -687,9 +757,26 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     );
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
-    let transitions = crate::peer_terminal::Transitions::default();
+    let transitions = crate::peer_terminal::Transitions::new(publication);
     if cfg!(continuity145_only) {
         transitions.reconcile()?;
+    }
+    if cfg!(continuity145_only) {
+        fleet = transitions.projected(&fleet)?;
+        let had = crate::peer_terminal::rows(&fleet)?.any(|r| r["epoch"] == 168);
+        let row = crate::continuity::replacement_row()?;
+        ensure!(
+            !had || row.is_some(),
+            "registered metered 168 disappeared at capture"
+        );
+        if let Some(row) = row
+            && !had
+        {
+            fleet["actual_active_bootstraps"]
+                .as_array_mut()
+                .context("bootstrap census")?
+                .push(row);
+        }
     }
     let names = peer_names(&fleet, &ad, joint)?;
     let retired = if cfg!(partial145_only) {
@@ -699,9 +786,13 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     } else {
         None
     };
+    let mut at_capture = names.clone();
+    if live_fixture {
+        at_capture.insert(crate::closed166::NODE.to_owned());
+    }
     let start = std::time::Instant::now();
     loop {
-        match validate_roster(&names, joint) {
+        match validate_roster(&at_capture, joint) {
             Err(e) if joint && e.is::<GuardInFlight>() && start.elapsed().as_secs() < 60 => {
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
@@ -711,23 +802,23 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
             }
         }
     }
-    let holding = active(&[
-        "horizon-*holding*.service",
-        "horizon-*park*.service",
-        "horizon-*census*.service",
-        "horizon-held141-custody*.service",
-        "horizon-extract145-prefix*.service",
-    ])?;
-    ensure!(
-        holding.iter().all(|u| u == UNIT),
-        "conflicting holding or exporter owner {holding:?}"
-    );
-    ensure!(
-        fleet["actual_active_holding_transfers"]
-            .as_array()
-            .is_some_and(Vec::is_empty),
-        "holding transfer in fleet"
-    );
+    let holding = holding_owners()?;
+    if publication {
+        // The entire serial holding allowance is retained independently of 166.
+        // Its current occupant can stay in place on either side of this check.
+        holding_budget(&holding)?;
+    } else {
+        ensure!(
+            holding.iter().all(|u| u == UNIT),
+            "conflicting holding or exporter owner {holding:?}"
+        );
+        ensure!(
+            fleet["actual_active_holding_transfers"]
+                .as_array()
+                .is_some_and(Vec::is_empty),
+            "holding transfer in fleet"
+        );
+    }
     let allowance = &fleet["retry9_auxiliary_commitments"];
     ensure!(
         allowance["holding_serial"] == true
@@ -814,10 +905,14 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         }
     }
     if cfg!(continuity145_only) {
-        let row = json!({"unit":"horizon-qualify-172-full-half-core-20261120-v1.service","iid":"0e17b745938546608b0bdc52815151d0",
-            "processes":[[3454288,357194400],[3455054,357199661]]});
-        let bytes = resident(&row, 172)?.min(resident(&row, 172)?);
-        rss += bytes;
+        let first = checked(
+            &format!("{E172}/FIRST_PROTECTED_HISTORICAL_WORKER_20261121.json"),
+            "165d1600fb91aebef3903532ed997db46658f8901d765c49e3550fb548c39148",
+        )?;
+        let row = json!({"unit":ad["producer_unit"],"iid":ad["producer_invocation_id"],
+            "processes":[[ad["producer_pid"],ad["start_ticks"],64512,101134947],
+                         [first["worker_pid"],first["worker_start_ticks"],64512,115672187]]});
+        rss += resident(&row, 172)?.min(resident(&row, 172)?);
     }
     let live172 = native_values(ad["producer_unit"].as_str().context("172 native unit")?)?;
     ensure!(
@@ -872,11 +967,6 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     ));
     let guarded = if cfg!(materialized145_only) {
         Some(crate::joint::incumbents(&fleet)?)
-    } else {
-        None
-    };
-    let after166 = if cfg!(continuity145_only) {
-        Some(crate::closed166::evidence()?)
     } else {
         None
     };

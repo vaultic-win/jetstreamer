@@ -81,6 +81,7 @@ impl std::error::Error for Pending {}
 #[derive(Default)]
 pub struct Transitions {
     closed: RefCell<BTreeMap<u64, Value>>,
+    read_only: bool,
 }
 pub fn rows(fleet: &Value) -> Result<impl Iterator<Item = &Value>> {
     let mut rows = Vec::new();
@@ -390,6 +391,12 @@ fn retained(p: &Peer, manager: &Value) -> Result<Value> {
     Ok(json!(bound))
 }
 impl Transitions {
+    pub fn new(read_only: bool) -> Self {
+        Self {
+            read_only,
+            ..Self::default()
+        }
+    }
     pub fn closed(&self, epoch: u64) -> bool {
         self.closed.borrow().contains_key(&epoch)
     }
@@ -453,9 +460,12 @@ impl Transitions {
                 return Err(Pending(p.epoch).into());
             }
             if !self.closed(p.epoch) {
-                self.closed
-                    .borrow_mut()
-                    .insert(p.epoch, retained(p, &manager)?);
+                let proof = if self.read_only {
+                    terminal(p, &manager)?
+                } else {
+                    retained(p, &manager)?
+                };
+                self.closed.borrow_mut().insert(p.epoch, proof);
             }
         }
         Ok(())

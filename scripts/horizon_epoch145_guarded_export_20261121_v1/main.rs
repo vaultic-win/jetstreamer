@@ -13,6 +13,8 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
+#[cfg(any(publication166_only, test))]
+mod publication_fit166;
 mod closed166;
 mod continuity;
 mod joint;
@@ -598,6 +600,16 @@ fn main() {
         std::process::exit(1);
     }
 }
+#[cfg(publication166_only)]
+fn run() -> Result<()> {
+    privilege()?;
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let [path, digest] = args.as_slice() else { anyhow::bail!("usage: publication-fit ROOT_FLEET SHA256") };
+    let result = publication_fit166::measure(&Bound { path:path.into(), sha256:digest.clone() })?;
+    println!("{}",serde_json::to_string(&result)?);
+    Ok(())
+}
+#[cfg(not(publication166_only))]
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
