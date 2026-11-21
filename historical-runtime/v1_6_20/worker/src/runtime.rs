@@ -1555,9 +1555,10 @@ mod tests {
             .any(|i| i.program_id_index == 6));
         assert!(transaction.message.is_key_passed_to_program(6));
         assert!(transaction.message.is_non_loader_key(&key, 6));
-        assert_eq!(transaction.message.is_writable(6, true), true);
+        let expected = !cfg!(feature = "epoch228-called-program-demotion");
+        assert_eq!(transaction.message.is_writable(6, true), expected);
         let attribution = writable_key_attribution(&[transaction], true).unwrap();
-        assert_eq!(attribution.contains_key(key.as_ref()), true);
+        assert_eq!(attribution.contains_key(key.as_ref()), expected);
     }
 
     use solana_runtime::{
@@ -2978,3 +2979,7 @@ mod tests {
         assert_eq!(checkpoint.accounts_hash, expected_accounts_hash);
     }
 }
+
+#[cfg(all(test, feature = "epoch228-called-program-demotion"))]
+#[path = "epoch228_bank.rs"]
+mod epoch228_bank;

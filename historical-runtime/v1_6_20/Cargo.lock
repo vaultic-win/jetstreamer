@@ -1211,6 +1211,7 @@ dependencies = [
  "solana-bpf-loader-program",
  "solana-config-program",
  "solana-merkle-tree",
+ "solana-program",
  "solana-rayon-threadlimit",
  "solana-runtime",
  "solana-sdk",
@@ -2309,7 +2310,6 @@ dependencies = [
 [[package]]
 name = "solana-program"
 version = "1.6.20"
-source = "git+https://github.com/solana-labs/solana.git?rev=77bdb45d4af61fc687161ec06cc0178ff79726d5#77bdb45d4af61fc687161ec06cc0178ff79726d5"
 dependencies = [
  "bincode",
  "blake3",

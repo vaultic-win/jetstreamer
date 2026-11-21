@@ -37,7 +37,12 @@ fn worker_remains_alive_across_framed_requests() -> io::Result<()> {
     let response: Response = read_frame(&mut input)?.unwrap();
     match response.body {
         ResponseBody::Handshake(handshake) => {
-            assert_eq!(handshake.backend_id, "solana-v1.6.20");
+            let expected = if cfg!(feature = "epoch228-called-program-demotion") {
+                "solana-v1.6.20-epoch228-called-program-demotion-candidate"
+            } else {
+                "solana-v1.6.20"
+            };
+            assert_eq!(handshake.backend_id, expected);
             assert_eq!(handshake.qualification, BackendQualification::Candidate);
         }
         other => panic!("unexpected handshake response: {:?}", other),
