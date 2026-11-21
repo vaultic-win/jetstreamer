@@ -8963,11 +8963,85 @@ async fn resolve_compact_index_urls(
     Ok((slot_url, cid_url))
 }
 
+// ripget 0.1 treats HTTP 500 as fatal, including a single failed range.
+// Retry only that typed transport error; a complete attempt still owns a fresh
+// private tempfile and retains every original publication and shutdown gate.
+const COMPACT_INDEX_HTTP500_MAX_RETRIES: usize = 3;
+#[derive(Debug)]
+enum CompactIndexAttemptError {
+    Terminal(String),
+    Download(ripget::RipgetError),
+}
+impl From<String> for CompactIndexAttemptError {
+    fn from(value: String) -> Self { Self::Terminal(value) }
+}
+impl CompactIndexAttemptError {
+    fn is_http500(&self) -> bool {
+        matches!(self, Self::Download(ripget::RipgetError::HttpStatus { status, .. })
+            if status.as_u16() == 500)
+    }
+    fn message(&self, url: &Url) -> String {
+        match self {
+            Self::Terminal(message) => message.clone(),
+            Self::Download(error) => format!("ripget failed for {}: {error}", url.as_str()),
+        }
+    }
+}
+fn compact_index_http500_retry_delay(
+    error: &CompactIndexAttemptError, attempts_retried: usize,
+) -> Option<Duration> {
+    (error.is_http500() && attempts_retried < COMPACT_INDEX_HTTP500_MAX_RETRIES)
+        .then(|| compact_index_retry_delay(attempts_retried, None))
+}
+async fn compact_index_retry_wait(
+    delay: Duration, shutdown: Arc<AtomicBool>,
+) -> Result<(), String> {
+    if shutdown.load(Ordering::Relaxed) {
+        return Err("shutdown requested during compact index retry".to_string());
+    }
+    let interrupted = async {
+        while !shutdown.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    };
+    tokio::select! {
+        _ = interrupted => Err("shutdown requested during compact index retry".to_string()),
+        _ = tokio::time::sleep(delay) => {
+            if shutdown.load(Ordering::Relaxed) {
+                Err("shutdown requested during compact index retry".to_string())
+            } else { Ok(()) }
+        }
+    }
+}
 async fn download_with_ripget(
     url: &Url,
     dest: &Path,
     shutdown: Arc<AtomicBool>,
 ) -> Result<(), String> {
+    let mut attempts_retried = 0usize;
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            return Err("shutdown requested during compact index download".to_string());
+        }
+        match download_with_ripget_once(url, dest, shutdown.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                let Some(delay) = compact_index_http500_retry_delay(&error, attempts_retried) else {
+                    return Err(error.message(url));
+                };
+                attempts_retried += 1;
+                warn!("HTTP 500 downloading compact index {}; retrying complete private attempt {}/{} in {:.1}s",
+                    url.as_str(), attempts_retried, COMPACT_INDEX_HTTP500_MAX_RETRIES, delay.as_secs_f64());
+                compact_index_retry_wait(delay, shutdown.clone()).await?;
+            }
+        }
+    }
+}
+async fn download_with_ripget_once(
+    url: &Url,
+    dest: &Path,
+    shutdown: Arc<AtomicBool>,
+) -> Result<(), CompactIndexAttemptError> {
     if let Ok(metadata) = fs::metadata(dest)
         && metadata.len() > 0
     {
@@ -9027,7 +9101,7 @@ async fn download_with_ripget(
     ));
     let result = tokio::select! {
         _ = shutdown_wait => {
-            return Err("shutdown requested during compact index download".to_string());
+            return Err("shutdown requested during compact index download".to_string().into());
         }
         result = ripget::download_url_with_progress(
             url.as_str(),
@@ -9039,7 +9113,7 @@ async fn download_with_ripget(
         ) => result,
     };
 
-    let report = result.map_err(|err| format!("ripget failed for {}: {err}", url.as_str()))?;
+    let report = result.map_err(CompactIndexAttemptError::Download)?;
     partial
         .as_file()
         .sync_all()
@@ -20802,6 +20876,162 @@ async fn main() {
 #[cfg(test)]
 mod early_snapshot_tests {
     use super::*;
+    fn index_http_error(status: u16) -> CompactIndexAttemptError {
+        CompactIndexAttemptError::Download(ripget::RipgetError::HttpStatus {
+            status: status.try_into().unwrap(), url: "https://example.invalid/index".into(),
+        })
+    }
+    #[test]
+    fn compact_index_http500_retries_only_exact_typed_transient_status() {
+        assert!(index_http_error(500).is_http500());
+        for status in [400, 401, 403, 404, 408, 429, 502, 503] {
+            assert!(!index_http_error(status).is_http500(), "{status}");
+        }
+        assert!(!CompactIndexAttemptError::Terminal("HTTP 500 text is not typed evidence".into()).is_http500());
+    }
+    #[test]
+    fn compact_index_http500_retry_budget_is_finite_with_existing_backoff() {
+        let error = index_http_error(500);
+        assert_eq!(compact_index_http500_retry_delay(&error, 0), Some(Duration::from_secs(10)));
+        assert_eq!(compact_index_http500_retry_delay(&error, 1), Some(Duration::from_secs(20)));
+        assert_eq!(compact_index_http500_retry_delay(&error, 2), Some(Duration::from_secs(40)));
+        for attempts in [3, 4, usize::MAX] {
+            assert_eq!(compact_index_http500_retry_delay(&error, attempts), None);
+        }
+    }
+    #[test]
+    fn compact_index_http500_retry_does_not_relabel_integrity_or_local_errors() {
+        let error = CompactIndexAttemptError::Terminal("local publication failed".into());
+        let url = Url::parse("https://example.invalid/index").unwrap();
+        assert_eq!(compact_index_http500_retry_delay(&error, 0), None);
+        assert_eq!(error.message(&url), "local publication failed");
+        assert!(index_http_error(500).message(&url).contains("500"));
+    }
+    #[tokio::test]
+    async fn compact_index_retry_wait_honors_already_requested_shutdown() {
+        let shutdown = Arc::new(AtomicBool::new(true));
+        assert!(compact_index_retry_wait(Duration::from_secs(300), shutdown).await.is_err());
+    }
+    #[tokio::test]
+    async fn compact_index_retry_wait_completes_only_without_shutdown() {
+        assert!(compact_index_retry_wait(Duration::ZERO, Arc::new(AtomicBool::new(false))).await.is_ok());
+    }
+
+
+    struct MockIndexServer {
+        address: std::net::SocketAddr,
+        stop: Arc<AtomicBool>,
+        requests: Arc<AtomicUsize>,
+        thread: Option<std::thread::JoinHandle<()>>,
+        body: Vec<u8>,
+    }
+    impl MockIndexServer {
+        fn start(mode: u8) -> Self {
+            use std::io::{Read, Write};
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let address = listener.local_addr().unwrap();
+            let stop = Arc::new(AtomicBool::new(false));
+            let requests = Arc::new(AtomicUsize::new(0));
+            let body = (0..8192).map(|i| (i % 251) as u8).collect::<Vec<_>>();
+            let bytes = body.clone(); let stopped = stop.clone(); let count = requests.clone();
+            let thread = std::thread::spawn(move || {
+                while !stopped.load(Ordering::Relaxed) {
+                    let (mut socket, _) = match listener.accept() {
+                        Ok(v) => v,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(2)); continue;
+                        }
+                        Err(e) => panic!("mock accept failed: {e}"),
+                    };
+                    socket.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+                    socket.set_write_timeout(Some(Duration::from_secs(2))).unwrap();
+                    let mut raw = Vec::new(); let mut buf = [0u8; 1024];
+                    loop {
+                        let n = match socket.read(&mut buf) { Ok(0) | Err(_) => break, Ok(n) => n };
+                        raw.extend_from_slice(&buf[..n]);
+                        if raw.windows(4).any(|w| w == b"\r\n\r\n") { break; }
+                        assert!(raw.len() <= 8192, "unbounded mock request");
+                    }
+                    if raw.is_empty() { continue; }
+                    let request = count.fetch_add(1, Ordering::Relaxed) + 1;
+                    let fail500 = mode == 2 || (mode == 1 && request == 2);
+                    if fail500 || mode == 3 {
+                        let status = if mode == 3 { "404 Not Found" } else { "500 Internal Server Error" };
+                        let _ = write!(socket, "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                        continue;
+                    }
+                    let request_text = String::from_utf8(raw).unwrap();
+                    let range = request_text.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("range").then_some(value.trim())
+                    }).expect("ripget request must preserve Range");
+                    let (start, end) = range.strip_prefix("bytes=").unwrap().split_once('-').unwrap();
+                    let start = start.parse::<usize>().unwrap();
+                    let end = end.parse::<usize>().unwrap().min(bytes.len() - 1);
+                    assert!(start <= end);
+                    let header = format!("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{end}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", bytes.len(), end - start + 1);
+                    if socket.write_all(header.as_bytes()).is_ok() { let _ = socket.write_all(&bytes[start..=end]); }
+                }
+            });
+            Self { address, stop, requests, thread: Some(thread), body }
+        }
+        fn url(&self) -> Url { Url::parse(&format!("http://{}/index", self.address)).unwrap() }
+    }
+    impl Drop for MockIndexServer {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::Relaxed);
+            self.thread.take().unwrap().join().unwrap();
+        }
+    }
+    #[tokio::test]
+    async fn real_download_retries_one_range500_then_publishes_exact_bytes_without_partials() {
+        let server = MockIndexServer::start(1); let scratch = tempfile::tempdir().unwrap();
+        let output = scratch.path().join("index");
+        tokio::time::timeout(Duration::from_secs(45),
+            download_with_ripget(&server.url(), &output, Arc::new(AtomicBool::new(false))))
+            .await.expect("bounded real retry").unwrap();
+        assert_eq!(fs::read(&output).unwrap(), server.body);
+        assert!(server.requests.load(Ordering::Relaxed) > 2);
+        assert_eq!(fs::read_dir(scratch.path()).unwrap().count(), 1);
+    }
+    #[tokio::test]
+    async fn real_download_exhausts_three500_retries_without_publishing_or_retaining_partials() {
+        let server = MockIndexServer::start(2); let scratch = tempfile::tempdir().unwrap();
+        let output = scratch.path().join("index");
+        let failure = tokio::time::timeout(Duration::from_secs(100),
+            download_with_ripget(&server.url(), &output, Arc::new(AtomicBool::new(false))))
+            .await.expect("finite HTTP500 budget").unwrap_err();
+        assert!(failure.contains("500")); assert_eq!(server.requests.load(Ordering::Relaxed), 4);
+        assert!(!output.exists()); assert_eq!(fs::read_dir(scratch.path()).unwrap().count(), 0);
+    }
+    #[tokio::test]
+    async fn real_download_404_is_fatal_without_retry_or_cached_partial() {
+        let server = MockIndexServer::start(3); let scratch = tempfile::tempdir().unwrap();
+        let output = scratch.path().join("index");
+        let failure = tokio::time::timeout(Duration::from_secs(10),
+            download_with_ripget(&server.url(), &output, Arc::new(AtomicBool::new(false))))
+            .await.expect("404 must be immediate").unwrap_err();
+        assert!(failure.contains("404")); assert_eq!(server.requests.load(Ordering::Relaxed), 1);
+        assert!(!output.exists()); assert_eq!(fs::read_dir(scratch.path()).unwrap().count(), 0);
+    }
+    #[tokio::test]
+    async fn real_download_shutdown_interrupts500_backoff_and_preserves_existing_artifacts() {
+        let server = MockIndexServer::start(2); let scratch = tempfile::tempdir().unwrap();
+        let retained = scratch.path().join("epoch-199.retained"); fs::write(&retained, b"preserve").unwrap();
+        let output = scratch.path().join("index"); let shutdown = Arc::new(AtomicBool::new(false));
+        let signal = shutdown.clone(); let requests = server.requests.clone();
+        let cancellation = tokio::spawn(async move {
+            while requests.load(Ordering::Relaxed) == 0 { tokio::time::sleep(Duration::from_millis(10)).await; }
+            tokio::time::sleep(Duration::from_millis(100)).await; signal.store(true, Ordering::Relaxed);
+        });
+        let failure = tokio::time::timeout(Duration::from_secs(5),
+            download_with_ripget(&server.url(), &output, shutdown))
+            .await.expect("shutdown must interrupt backoff").unwrap_err();
+        cancellation.await.unwrap(); assert!(failure.contains("shutdown"));
+        assert!(!output.exists()); assert_eq!(fs::read(&retained).unwrap(), b"preserve");
+        assert_eq!(fs::read_dir(scratch.path()).unwrap().count(), 1);
+    }
 
     #[test]
     fn compact_index_retry_delay_honors_retry_after_and_caps_backoff() {
