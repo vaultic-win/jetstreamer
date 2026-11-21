@@ -1,0 +1,22 @@
+[Unit]
+Description=Publish the original epoch %i archive after its authenticated fleet status
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/epoch%i-current-delivery-20261121-v1/event-tools-current/retry10_event.py --current-reader %i
+TimeoutStartSec=infinity
+Restart=on-failure
+RestartSec=180s
+CPUQuota=50%
+CPUWeight=10
+Nice=15
+MemoryMax=268435456
+MemorySwapMax=0
+TasksMax=32
+UMask=0077
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/jetstreamer/horizon_runtime_data/epoch%i-current-delivery-20261121-v1
+NoNewPrivileges=yes
