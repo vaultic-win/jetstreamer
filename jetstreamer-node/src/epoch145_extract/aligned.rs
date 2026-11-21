@@ -19,11 +19,60 @@ use xxhash_rust::xxh64::xxh64;
 /// Every slot is still decoded in strict chain mode before its bucket is written.
 /// The independent candidate reread compares against the resulting event digest.
 pub(super) fn copy_aligned_prefix<R: Read + Seek, W: Write>(
+    source: R,
+    output: W,
+    count: u64,
+    expected_provenance: &ArchiveProvenance,
+) -> Result<[u8; 32]> {
+    let mut visitor = Visitor::default();
+    let mut decoder = None;
+    write_frames(
+        source,
+        output,
+        count,
+        expected_provenance,
+        |header, first, bucket, frame, entry| {
+            if decoder.is_none() {
+                let mut d = BucketDecoder::for_file_header(header)?;
+                d.verify_chain = true;
+                decoder = Some(d);
+            }
+            if first {
+                visitor.previous = bucket.poh_start_hash;
+            }
+            ensure!(
+                bucket.poh_start_hash == visitor.previous,
+                "discontinuous bucket anchor"
+            );
+            let d = decoder.as_mut().context("missing decoder")?;
+            d.load_indexed_bucket_bytes(frame, entry)?;
+            for _ in 0..bucket.slot_count {
+                ensure!(
+                    d.decode_slot_frame(entry.first_slot, &mut visitor)?,
+                    "missing slot frame"
+                );
+                ensure!(visitor.epoch_count <= 1, "duplicate epoch notification");
+                ensure!(
+                    !visitor.discontinuous_parent,
+                    "discontinuous stored parent hash"
+                );
+            }
+            Ok(())
+        },
+    )?;
+    ensure!(visitor.epoch_count == 1, "missing epoch notification");
+    Ok(visitor.digest.finish()?)
+}
+
+/// Assemble encoded bytes from the authenticated source. The caller can supply
+/// strict semantic verification, or run the independent existing-candidate verifier later.
+pub(super) fn write_frames<R: Read + Seek, W: Write>(
     mut source: R,
     mut output: W,
     count: u64,
     expected_provenance: &ArchiveProvenance,
-) -> Result<[u8; 32]> {
+    mut inspect: impl FnMut(&FileHeader, bool, &BucketHeader, &[u8], BucketIndexEntry) -> Result<()>,
+) -> Result<()> {
     let (mut header, entries) = {
         let mut reader = ArchiveReader::open(&mut source)?;
         let header = reader.header().clone();
@@ -56,9 +105,6 @@ pub(super) fn copy_aligned_prefix<R: Read + Seek, W: Write>(
     output.write_all(&prefix)?;
     output.write_all(&frame)?;
     let mut offset = (prefix.len() + frame.len()) as u64;
-    let mut decoder = BucketDecoder::for_file_header(&header)?;
-    decoder.verify_chain = true;
-    let mut visitor = Visitor::default();
     let mut index = Vec::with_capacity(entries.len());
     for (i, entry) in entries.iter().enumerate() {
         source.seek(SeekFrom::Start(entry.offset))?;
@@ -76,37 +122,20 @@ pub(super) fn copy_aligned_prefix<R: Read + Seek, W: Write>(
                 bucket.poh_start_hash != Hash::default(),
                 "initial anchor is zero"
             );
-            visitor.previous = bucket.poh_start_hash;
             frame = narrow_epoch(&header, original_count, &bucket, &frame[bytes.position()..])?;
         }
-        ensure!(
-            bucket.poh_start_hash == visitor.previous,
-            "discontinuous bucket anchor"
-        );
         let relocated = BucketIndexEntry {
             first_slot: entry.first_slot,
             offset,
             len: frame.len() as u64,
         };
-        decoder.load_indexed_bucket_bytes(&frame, relocated)?;
-        for _ in 0..bucket.slot_count {
-            ensure!(
-                decoder.decode_slot_frame(entry.first_slot, &mut visitor)?,
-                "missing slot frame"
-            );
-            ensure!(visitor.epoch_count <= 1, "duplicate epoch notification");
-            ensure!(
-                !visitor.discontinuous_parent,
-                "discontinuous stored parent hash"
-            );
-        }
+        inspect(&header, i == 0, &bucket, &frame, relocated)?;
         output.write_all(&frame)?;
         offset = offset
             .checked_add(relocated.len)
             .context("output offset overflow")?;
         index.push(relocated);
     }
-    ensure!(visitor.epoch_count == 1, "missing epoch notification");
     frame.clear();
     (index.len() as u64).encode_ext(&mut frame, None)?;
     for entry in &index {
@@ -121,7 +150,7 @@ pub(super) fn copy_aligned_prefix<R: Read + Seek, W: Write>(
     output.write_all(&frame)?;
     output.write_all(&footer.to_bytes())?;
     output.flush()?;
-    Ok(visitor.digest.finish()?)
+    Ok(())
 }
 
 fn narrow_epoch(

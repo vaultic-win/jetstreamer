@@ -136,7 +136,9 @@ fn peer_names(fleet: &Value, ad: &Value, joint: bool) -> Result<BTreeSet<String>
     }
     ensure!(
         epochs
-            == if cfg!(materialized145_only) {
+            == if cfg!(partial145_only) {
+                BTreeSet::from([166, 167, 169, 170, 172])
+            } else if cfg!(materialized145_only) {
                 BTreeSet::from([167, 168, 169, 170, 172])
             } else {
                 BTreeSet::from([166, 167, 168, 169, 170, 172])
@@ -449,7 +451,11 @@ impl Fit {
     pub fn topology(&self) -> Result<()> {
         validate_roster(&self.names, self.joint)?;
         if cfg!(materialized145_only) {
-            crate::closed166::drained()?;
+            if cfg!(partial145_only) {
+                crate::partial::drained()?;
+            } else {
+                crate::closed166::drained()?;
+            }
             let fresh = crate::joint::incumbents(
                 self.successor_fleet
                     .as_ref()
@@ -518,7 +524,9 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
     let names = peer_names(&fleet, &ad, joint)?;
-    let retired = if cfg!(materialized145_only) {
+    let retired = if cfg!(partial145_only) {
+        Some(crate::partial::closed168()?)
+    } else if cfg!(materialized145_only) {
         Some(crate::closed166::evidence()?)
     } else {
         None
@@ -627,7 +635,7 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     let before = meminfo("MemAvailable:")?;
     let mut rss = 0;
     for (k, row) in post["owners"].as_object().context("172 native owners")? {
-        if !(cfg!(materialized145_only) && k == "166") {
+        if !(cfg!(materialized145_only) && k == if cfg!(partial145_only) { "168" } else { "166" }) {
             rss += resident(row, k.parse()?)?.min(resident(row, k.parse()?)?);
         }
     }
@@ -661,7 +669,14 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         .values()
     {
         let unit = row["unit"].as_str().context("owner name")?;
-        if cfg!(materialized145_only) && unit == crate::closed166::NODE {
+        if cfg!(materialized145_only)
+            && unit
+                == if cfg!(partial145_only) {
+                    crate::partial::NODE
+                } else {
+                    crate::closed166::NODE
+                }
+        {
             continue;
         }
         for process in row["processes"].as_array().context("owner processes")? {
@@ -683,7 +698,7 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     } else {
         None
     };
-    let evidence = json!({"remaining_native_owners":guarded,"completed166":retired,"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    let evidence = json!({"remaining_native_owners":guarded,"completed166":if cfg!(partial145_only){None}else{retired.as_ref()},"terminal168":if cfg!(partial145_only){retired.as_ref()}else{None},"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
         successor_fleet: cfg!(materialized145_only).then_some(fleet),
         evidence,

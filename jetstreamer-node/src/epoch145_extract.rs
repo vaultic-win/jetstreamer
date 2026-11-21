@@ -293,6 +293,28 @@ impl PinnedSource {
         Ok(stats.output_semantic_sha256)
     }
 
+    /// Reconstruct only the encoded bytes of the exact aligned, authenticated
+    /// checkpoint source. This yields no extraction or verification receipt.
+    pub fn write_authenticated_prefix(&self, output: impl Write) -> Result<()> {
+        ensure!(
+            sha256_hex_string(&self.manifest.archive_sha256)
+                == "cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353",
+            "unqualified aligned source"
+        );
+        let provenance = ArchiveReader::open(self.source_reader()?)?
+            .provenance()?
+            .ok_or_else(|| anyhow::anyhow!("missing source provenance"))?;
+        let (expected, _) = canonical_prefix_provenance(provenance)?;
+        aligned::write_frames(
+            self.source_reader()?,
+            output,
+            CANONICAL_SLOTS,
+            &expected,
+            |_, _, _, _, _| Ok(()),
+        )?;
+        self.unchanged()
+    }
+
     /// Creates a private, canonical-width candidate with strict source-link
     /// validation. The caller's guard runs before every output write and
     /// must enforce its fresh admission/floor. No checksum/segment sidecar is

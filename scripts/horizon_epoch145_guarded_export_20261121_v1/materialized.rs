@@ -10,6 +10,9 @@ const ORIGINAL: &str = "de6780b860b3467bae21fbd19176ca14";
 const LEAF: &str = ".tmp36MvkN";
 const VIEW: &str =
     "/home/sol/.jetstreamer-private/epoch145-prefix-extract-materialized-view-20261121-v1";
+#[cfg(partial145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-partial-recovery-20261121-v1/tools/export145";
+#[cfg(not(partial145_only))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-materialized-recovery-20261121-v1/tools-v2/export145";
 const ALLOC: &str = "95b714939cf8837d26ce612d7ddd37fe99e32273c9afb86aa2952e397cd601bd";
 const POST_ALLOC: &str = "bb66d17aa06f51157fc90d6f6258086640b51dc42a388c7c7e2cccfd648192f8";
@@ -93,7 +96,7 @@ fn check_file(m: &fs::Metadata) -> Result<()> {
         105611071488 + (128 << 20),
     )
 }
-fn check_geometry(
+pub(super) fn check_geometry(
     m: &fs::Metadata,
     device: u64,
     inode: u64,
@@ -115,7 +118,7 @@ fn check_geometry(
     );
     Ok(())
 }
-fn leaf() -> Result<PathBuf> {
+pub(super) fn leaf() -> Result<PathBuf> {
     let root = Path::new(OUTPUT);
     custody::private_directory(root)?;
     let files = fs::read_dir(root)?
@@ -127,15 +130,22 @@ fn leaf() -> Result<PathBuf> {
     );
     let path = &files[0];
     ensure!(path.canonicalize()? == *path, "candidate alias");
-    check_file(&fs::symlink_metadata(path)?)?;
+    inspect_leaf(&fs::symlink_metadata(path)?)?;
     Ok(path.clone())
 }
-fn prove_view(file: &Path) -> Result<()> {
+fn inspect_leaf(m: &fs::Metadata) -> Result<()> {
+    if cfg!(partial145_only) {
+        partial::check(m)
+    } else {
+        check_file(m)
+    }
+}
+pub(super) fn prove_view(file: &Path) -> Result<()> {
     let projected = view();
     let p = fs::symlink_metadata(&projected)?;
     let m = fs::symlink_metadata(file)?;
-    check_file(&m)?;
-    check_file(&p)?;
+    inspect_leaf(&m)?;
+    inspect_leaf(&p)?;
     ensure!(
         projected.canonicalize()? == projected && p.ino() == m.ino() && p.dev() == m.dev(),
         "private verifier projection changed"
@@ -176,13 +186,13 @@ fn freeze_inode(path: &Path, check: impl Fn(&fs::Metadata) -> Result<()>) -> Res
     f.sync_all()?;
     Ok(())
 }
-fn lease(path: &Path) -> Result<source_lease::ReadLease> {
+pub(super) fn lease(path: &Path) -> Result<source_lease::ReadLease> {
     source_lease::ReadLease::acquire(
         path,
         source_lease::FileIdentity::from(&fs::symlink_metadata(path)?),
     )
 }
-fn guard_parent(parent: u32) -> Result<()> {
+pub(super) fn guard_parent(parent: u32) -> Result<()> {
     ensure!(
         parent > 1 && unsafe { libc::getppid() } as u32 == parent,
         "recovery verifier lacks native parent"
@@ -298,6 +308,13 @@ pub fn run(fleet: Bound, sha: &str) -> Result<()> {
         source_lease::arm_break_signal()?;
         let original = lease(Path::new(SOURCE))?;
         let manifest = lease(Path::new(MANIFEST))?;
+        if cfg!(partial145_only) && fs::symlink_metadata(&file)?.len() < BYTES {
+            post::run_child(
+                Command::new(IMAGE).args(["recover-append", &std::process::id().to_string(), sha]),
+                &fit,
+                &original,
+            )?;
+        }
         seal_candidate(&file)?;
         let candidate = lease(&file)?;
         let id = custody::frozen_identity(&file)?;

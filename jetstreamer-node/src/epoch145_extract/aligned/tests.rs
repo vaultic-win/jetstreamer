@@ -174,3 +174,20 @@ fn rejects_invalid_evidence_and_incomplete_writes() {
         src[byte] ^= 1;
     }
 }
+
+#[test]
+fn assembly_for_recovery_matches_the_strict_export_byte_for_byte() {
+    let source = fixture(ALL, false);
+    let mut strict = Vec::new();
+    copy_aligned_prefix(Cursor::new(&source), &mut strict, KEEP, &provenance(KEEP)).unwrap();
+    let mut output = Vec::new();
+    write_frames(
+        Cursor::new(source),
+        &mut output,
+        KEEP,
+        &provenance(KEEP),
+        |_, _, _, _, _| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(output, strict);
+}

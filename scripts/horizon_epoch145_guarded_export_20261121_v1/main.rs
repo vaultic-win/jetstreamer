@@ -18,6 +18,7 @@ mod joint;
 mod joint_candidate;
 mod joint_worker;
 mod materialized;
+mod partial;
 mod post;
 mod publication;
 mod publication_tree;
@@ -589,6 +590,8 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        #[cfg(partial145_only)]
+        [_, mode, parent, sha] if mode == "recover-append" => partial::append(parent.parse()?, sha),
         #[cfg(materialized145_only)]
         [_, mode, fleet, digest, sha] if mode == "recover-full-output" => materialized::run(
             Bound {
