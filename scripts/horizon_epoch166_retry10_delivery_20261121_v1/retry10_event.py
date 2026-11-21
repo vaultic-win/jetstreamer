@@ -91,6 +91,21 @@ def paid145_reader(epoch):
                           fit=prior.delivery/"capacity-tools-paid145/publication-fit")
 
 
+def bounded_reader(epoch):
+    prior = paid145_reader(epoch)
+    return prior._replace(launch=prior.delivery/"controller-tools-bounded/run-committed.sh",
+                          fit=prior.delivery/"capacity-tools-bounded/publication-fit")
+
+
+def bounded_predecessors(epoch):
+    previous = paid145_predecessors(epoch)
+    paid = paid145_reader(epoch)
+    # Some installations sealed the paid controller without installing its event handler.
+    if (paid.delivery/"event-tools-paid145/programs.json").exists():
+        previous.append((paid, "event-tools-paid145"))
+    return previous
+
+
 def status_evidence(fleet, report, terminal, archive, profile=RECOVERED):
     key = str(profile.epoch)
     ref = report["receipts"][key]
@@ -194,10 +209,13 @@ if __name__ == "__main__":
         epoch = int(sys.argv[2])
         main(focused169_reader(epoch), recover=True,
              predecessors=[(current_reader(epoch), "event-tools-current"), (five_source_reader(epoch), "event-tools-five-v1")])
+    elif len(sys.argv) == 3 and sys.argv[1] == "--bounded-reader" and sys.argv[2] in ("166", "167", "168", "170", "172"):
+        epoch = int(sys.argv[2])
+        main(bounded_reader(epoch), recover=True, predecessors=bounded_predecessors(epoch))
     elif len(sys.argv) == 3 and sys.argv[1] == "--paid145-reader" and sys.argv[2] in ("166", "167", "168", "170", "172"):
         epoch = int(sys.argv[2])
         main(paid145_reader(epoch), recover=True, predecessors=paid145_predecessors(epoch))
     elif len(sys.argv) == 1:
         main()
     else:
-        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader | --focused169-reader) {166,167,168,170} | --paid145-reader {166,167,168,170,172}]")
+        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader | --focused169-reader) {166,167,168,170} | (--paid145-reader | --bounded-reader) {166,167,168,170,172}]")
