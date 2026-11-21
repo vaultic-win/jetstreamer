@@ -75,10 +75,13 @@ fn id(path: &Path) -> Result<(u64, u64)> {
     Ok((m.dev(), m.ino()))
 }
 fn own_link(path: &Path) -> Result<bool> {
+    linked_to(path, &anchor())
+}
+fn linked_to(path: &Path, anchor: &Path) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(m) => Ok(m.file_type().is_symlink()
             && m.uid() == 0
-            && id(path)? == id(&anchor())?
+            && id(path)? == id(anchor)?
             && fs::read_link(path)? == Path::new("/dev/null")),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e.into()),
@@ -150,7 +153,103 @@ fn current(units: &BTreeSet<String>) -> Result<Value> {
         json!({"boot_id":fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),"device":dev,"mask_inode":ino,"mask_directory":HIGH,"masked_and_physically_drained_units":units,"sealed_donor_recipe":binding(Path::new(RECIPE),RECIPE_SHA),"original_route_plan":binding(Path::new(OLD),OLD_SHA)}),
     )
 }
-pub fn establish() -> Result<Value> {
+fn cpu_registry() -> PathBuf {
+    Path::new(REG).join("standard169-cpu.json")
+}
+
+fn recorded_cpu_routes() -> Result<Option<BTreeSet<String>>> {
+    let path = cpu_registry();
+    match fs::symlink_metadata(&path) {
+        Ok(_) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    }
+    let record: Value = serde_json::from_slice(&root_file(&path, 1 << 20)?)?;
+    let routes: BTreeSet<String> = serde_json::from_value(record["standard_routes"].clone())?;
+    let (dev, ino) = id(&anchor())?;
+    ensure!(
+        record["schema"] == "epoch136-standard169-cpu-mask-v1"
+            && record["boot"] == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim()
+            && record["device"] == dev
+            && record["mask_inode"] == ino
+            && !routes.is_empty()
+            && routes.iter().all(|s| standard169::valid_name(s)),
+        "invalid standard 169 mask registry"
+    );
+    Ok(Some(routes))
+}
+
+fn combined(legacy: &BTreeSet<String>, cpu: Option<&BTreeSet<String>>) -> BTreeSet<String> {
+    let mut result = legacy.clone();
+    if let Some(cpu) = cpu {
+        result.extend(cpu.iter().cloned());
+    }
+    result
+}
+
+fn preserve_recorded(
+    discovered: Option<BTreeSet<String>>,
+    recorded: Option<&BTreeSet<String>>,
+) -> Result<Option<BTreeSet<String>>> {
+    match (discovered, recorded) {
+        (current, None) => Ok(current),
+        (Some(current), Some(retained)) if current.is_subset(retained) => {
+            Ok(Some(retained.clone()))
+        }
+        _ => anyhow::bail!("different CPU mask registry"),
+    }
+}
+
+fn verified_masks(cpu: bool) -> Result<Value> {
+    let recorded = recorded_cpu_routes()?;
+    ensure!(
+        recorded.is_some() == cpu,
+        "different donor generation already holds this registry"
+    );
+    if let Some(units) = &recorded {
+        ensure!(
+            standard169::routes()?.is_subset(units),
+            "new standard 169 launch route is outside the CPU fence"
+        );
+    }
+    let mut result = current(&combined(&paths()?, recorded.as_ref()))?;
+    if let Some(units) = recorded {
+        let path = cpu_registry();
+        result["standard169_cpu_lease"] = json!({"registry":binding(&path,&format!("{:x}",Sha256::digest(root_file(&path,1<<20)?))),
+            "masked_standard_routes":units,"cpu_quota_micros":4_250_000,"unassigned_standard169_cpu_micros":4_750_000,
+            "additional_host_cpu_micros":0});
+    }
+    Ok(result)
+}
+
+fn check_destinations(dir: &Path, anchor: &Path, units: &BTreeSet<String>) -> Result<()> {
+    for u in units {
+        let dst = dir.join(u);
+        match fs::symlink_metadata(&dst) {
+            Ok(_) => ensure!(
+                linked_to(&dst, anchor)?,
+                "existing foreign unit fragment at {u}"
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
+
+fn install_links(dir: &Path, anchor: &Path, units: &BTreeSet<String>) -> Result<()> {
+    for u in units {
+        let dst = dir.join(u);
+        if !linked_to(&dst, anchor)? {
+            fs::hard_link(anchor, &dst)
+                .with_context(|| format!("preexisting foreign mask/fragment for {u}"))?;
+        }
+    }
+    fs::File::open(dir)?.sync_all()?;
+    Ok(())
+}
+
+pub fn establish(cpu: bool) -> Result<Value> {
     let q: Value = serde_json::from_slice(&root_file(&Path::new(BASE).join(QREC), 1 << 20)?)?;
     ensure!(
         q["schema"] == "epoch171-native-mask-qualification-v1"
@@ -164,7 +263,16 @@ pub fn establish() -> Result<Value> {
     candidate_state(None)?;
     safe_dir(Path::new("/run"))?;
     safe_dir(Path::new(HIGH))?;
-    let units = paths()?;
+    let previous = recorded_cpu_routes()?;
+    let cpu_routes = preserve_recorded(
+        if cpu {
+            Some(standard169::routes()?)
+        } else {
+            None
+        },
+        previous.as_ref(),
+    )?;
+    let units = combined(&paths()?, cpu_routes.as_ref());
     list_dynamic()?;
     for u in &units {
         ensure!(closed(&show(u)?), "queued/live donor {u}");
@@ -188,20 +296,35 @@ pub fn establish() -> Result<Value> {
             && fs::read_link(anchor())? == Path::new("/dev/null"),
         "foreign mask anchor"
     );
-    for u in &units {
-        let dst = Path::new(HIGH).join(u);
-        if !own_link(&dst)? {
-            fs::hard_link(anchor(), &dst)
-                .with_context(|| format!("preexisting foreign mask/fragment for {u}"))?;
-        }
+    let prior = recorded_cpu_routes()?;
+    ensure!(
+        prior == previous,
+        "donor mask registry changed during preflight"
+    );
+    // Inspect the whole name set for collisions before adding the first mask.
+    // A previously interrupted transaction can resume with its original inode.
+    check_destinations(Path::new(HIGH), &anchor(), &units)?;
+    if let Some(routes) = &cpu_routes {
+        ensure!(
+            routes.iter().all(|s| standard169::valid_name(s))
+                && (prior.is_some() || m.nlink() == 1),
+            "mixed donor generations or unexpected standard unit name"
+        );
+        let (dev, ino) = id(&anchor())?;
+        file_write(
+            &cpu_registry(),
+            &json!({"schema":"epoch136-standard169-cpu-mask-v1",
+            "boot":fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
+            "device":dev,"mask_inode":ino,"standard_routes":routes}),
+        )?;
     }
-    fs::File::open(HIGH)?.sync_all()?;
+    install_links(Path::new(HIGH), &anchor(), &units)?;
     reload()?;
     // A start during mask installation is detected here; keep the fence, refuse admission.
-    current(&units)
+    verified_masks(cpu)
 }
-pub fn check() -> Result<Value> {
-    current(&paths()?)
+pub fn check(cpu: bool) -> Result<Value> {
+    verified_masks(cpu)
 }
 pub fn release() -> Result<()> {
     candidate_state(None)?;
@@ -210,8 +333,10 @@ pub fn release() -> Result<()> {
         ensure!(closed(&show(&u)?), "candidate guard still live");
         cgroup_empty(&u)?;
     }
-    let us = paths()?;
+    let recorded = recorded_cpu_routes()?;
+    let us = combined(&paths()?, recorded.as_ref());
     safe_dir(Path::new(REG))?;
+    check_destinations(Path::new(HIGH), &anchor(), &us)?;
     for u in &us {
         let p = Path::new(HIGH).join(u);
         match fs::symlink_metadata(&p) {
@@ -227,6 +352,9 @@ pub fn release() -> Result<()> {
     reload()?;
     for u in &us {
         ensure!(closed(&show(u)?), "unexpected donor activation on return");
+    }
+    if recorded.is_some() {
+        fs::remove_file(cpu_registry())?;
     }
     fs::remove_file(anchor())?;
     fs::remove_dir(REG)?;
@@ -370,6 +498,53 @@ pub fn qualify_pid1() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires root and the current host's immutable epoch 169 launch history"]
+    fn actual_standard_routes_install_and_resume_with_one_private_anchor() {
+        assert_eq!(unsafe { libc::geteuid() }, 0);
+        let scratch = tempfile::tempdir().unwrap();
+        let root = scratch.path();
+        let anchor = root.join("anchor");
+        let dir = root.join("control");
+        fs::create_dir(&dir).unwrap();
+        symlink("/dev/null", &anchor).unwrap();
+        let units = standard169::routes().unwrap();
+        assert!(units.len() >= 34 && units.iter().all(|s| standard169::valid_name(s)));
+        let first = dir.join(units.first().unwrap());
+        let last = dir.join(units.last().unwrap());
+        symlink("/dev/null", &last).unwrap();
+        assert!(check_destinations(&dir, &anchor, &units).is_err());
+        assert!(fs::symlink_metadata(&first).is_err());
+        fs::remove_file(&last).unwrap();
+        fs::hard_link(&anchor, &first).unwrap();
+        check_destinations(&dir, &anchor, &units).unwrap();
+        install_links(&dir, &anchor, &units).unwrap();
+        check_destinations(&dir, &anchor, &units).unwrap();
+        install_links(&dir, &anchor, &units).unwrap();
+        assert_eq!(
+            fs::symlink_metadata(&anchor).unwrap().nlink() as usize,
+            units.len() + 1
+        );
+        for u in &units {
+            assert!(linked_to(&dir.join(u), &anchor).unwrap());
+            fs::remove_file(dir.join(u)).unwrap();
+        }
+        assert!(fs::read_dir(&dir).unwrap().next().is_none());
+        assert_eq!(fs::symlink_metadata(&anchor).unwrap().nlink(), 1);
+    }
+    #[test]
+    fn cpu_loan_keeps_collected_names_and_rejects_unfenced_launch_routes() {
+        let legacy = BTreeSet::from(["common.service".to_owned()]);
+        let full = BTreeSet::from(["common.service".to_owned(), "old169.service".to_owned()]);
+        assert_eq!(combined(&legacy, Some(&full)), full);
+        assert_eq!(
+            preserve_recorded(Some(legacy.clone()), Some(&full)).unwrap(),
+            Some(full.clone())
+        );
+        assert!(preserve_recorded(Some(full), Some(&legacy)).is_err());
+        assert!(preserve_recorded(None, Some(&legacy)).is_err());
+        assert_eq!(preserve_recorded(None, None).unwrap(), None);
+    }
     #[test]
     fn mask_and_native_drain_are_both_required() {
         let v = json!({"Id":"x.service","ActiveState":"inactive","MainPID":"0","ControlPID":"0","Job":"","LoadState":"masked"});

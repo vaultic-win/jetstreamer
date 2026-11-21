@@ -321,6 +321,62 @@ fn generation(plan: &Value) -> Result<()> {
     session::native_denial_provenance(plan)?;
     Ok(())
 }
+// The installed payload has a closed Plan schema. Operational metadata stays
+// under the writer's full plan digest, independently of the payload's argv.
+fn payload_plan(plan: &Value) -> Result<Value> {
+    let fields = [
+        "schema",
+        "node",
+        "helper",
+        "worker",
+        "tools_seal",
+        "qualification",
+        "source_proof",
+        "source_commit",
+        "history",
+        "controller",
+        "barrier_version",
+    ];
+    let mut payload = serde_json::Map::new();
+    for key in fields {
+        let member = plan
+            .get(key)
+            .with_context(|| format!("missing payload plan member {key}"))?;
+        payload.insert(key.to_owned(), member.clone());
+    }
+    Ok(Value::Object(payload))
+}
+
+fn check_plan_bindings(
+    plan: &Value,
+    writer_plan: &Value,
+    admitted: &Value,
+    capacity: &Value,
+) -> Result<()> {
+    let payload = payload_plan(plan)?;
+    ensure!(
+        capacity["writer_plan"] == *writer_plan && capacity["payload_plan"] == *admitted,
+        "capacity bound to another writer or payload plan"
+    );
+    if payload == *plan {
+        ensure!(
+            admitted == writer_plan,
+            "original payload plan binding changed"
+        );
+    } else {
+        let path = Path::new(BASE).join("payload-plan.json");
+        ensure!(
+            admitted["path"] == path.to_str().unwrap()
+                && json_pin(
+                    &path,
+                    admitted["sha256"].as_str().context("payload plan digest")?
+                )? == payload,
+            "wrong payload plan projection"
+        );
+    }
+    Ok(())
+}
+
 fn installed_controller(plan: &Value) -> Result<Value> {
     let exe = Path::new(BASE).join("controller/admit136");
     let own = fs::metadata("/proc/self/exe")?;
@@ -571,6 +627,12 @@ fn run() -> Result<()> {
         !a.is_empty(),
         "expected inventory|preflight|establish|prepare|post|session|register-status|release"
     );
+    if a[0] == "payload-plan" {
+        ensure!(a.len() == 3, "payload-plan PLAN SHA");
+        let plan = json_pin(Path::new(&a[1]), &a[2])?;
+        println!("{}", serde_json::to_string_pretty(&payload_plan(&plan)?)?);
+        return Ok(());
+    }
     if a[0] == "cpu-preflight" {
         ensure!(a.len() == 3, "cpu-preflight FLEET SHA");
         println!("{}", standard169::inspect(Path::new(&a[1]), &a[2])?);
@@ -579,7 +641,10 @@ fn run() -> Result<()> {
     if a.first().is_some_and(|mode| mode == "audit-owner") {
         ensure!(a.len() == 3, "audit-owner FLEET SHA");
         let fleet = json_pin(Path::new(&a[1]), &a[2])?;
-        println!("{}", fit::observe_audit(&fleet["continuing_audit_obligation"])?);
+        println!(
+            "{}",
+            fit::observe_audit(&fleet["continuing_audit_obligation"])?
+        );
         return Ok(());
     }
     if a[0] == "preflight" {
@@ -592,7 +657,10 @@ fn run() -> Result<()> {
         let ancestry = fence::ancestry()?;
         let disk = donor_disk()?;
         let fit = initial_fit(fleet_path, &a[4], &fleet)?;
-        println!("{}", json!({"controller":controller,"plan":binding(Path::new(&a[1]),&a[2]),"donor_ancestry":ancestry,"donor_disk":disk,"fit":fit,"donor_fenced":false,"admission_granted":false}));
+        println!(
+            "{}",
+            json!({"controller":controller,"plan":binding(Path::new(&a[1]),&a[2]),"donor_ancestry":ancestry,"donor_disk":disk,"fit":fit,"donor_fenced":false,"admission_granted":false})
+        );
         return Ok(());
     }
     if a == ["inventory"] {
@@ -674,7 +742,11 @@ fn phase(a: &[String]) -> Result<Value> {
     if a[0] == "establish" {
         initial_fit(fpath, &a[4], &f)?;
 
-        let native = fence::establish()?;
+        let cpu = standard169::requested(&plan)?;
+        if cpu {
+            standard169::inspect(fpath, &a[4])?;
+        }
+        let native = fence::establish(cpu)?;
         let loan = json!({"schema":"horizon-exclusive-171-to136-v1","complete_fleet":fleet,"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":now()?,"ancestry":anc,"HOME":donor_disk()?,"native":native,"new_memory_credit_bytes":0,"replay_launched":false});
         let receipt = file_write(&base.join("donor171.json"), &loan)?;
         return Ok(receipt);
@@ -684,7 +756,8 @@ fn phase(a: &[String]) -> Result<Value> {
     no_older_136()?;
     let donor_path = base.join("donor171.json");
     let bytes = root_file(&donor_path, 1 << 20)?;
-    let native = fence::check()?;
+    let cpu = standard169::requested(&plan)?;
+    let native = fence::check(cpu)?;
     let loan: Value = serde_json::from_slice(&bytes)?;
     ensure!(
         loan["writer"] == author
@@ -697,7 +770,7 @@ fn phase(a: &[String]) -> Result<Value> {
     let dref = binding(&donor_path, &format!("{:x}", Sha256::digest(bytes)));
     let own = a.get(5).map(String::as_str);
     let fit = fit::inspect(fpath, &a[4], own)?;
-    ensure!(fence::check()? == native, "fence changed during fit");
+    ensure!(fence::check(cpu)? == native, "fence changed during fit");
     no_older_136()?;
     let cap_path = base.join("capacity.json");
     let protected = if own.is_some() {
@@ -710,13 +783,24 @@ fn phase(a: &[String]) -> Result<Value> {
     } else {
         n(&fit, "protected_raw_floor_bytes")?
     };
-    let full = capacity(&fit, protected, &dref, &fleet, &author, &iid)?;
+    let projected = payload_plan(&plan)?;
+    let payload_ref = if plan == projected {
+        plan_ref.clone()
+    } else if own.is_none() {
+        file_write(&base.join("payload-plan.json"), &projected)?
+    } else {
+        session::load_admission_for_post(&plan_ref, &dref, &iid)?["plan"].clone()
+    };
+    let mut full = capacity(&fit, protected, &dref, &fleet, &author, &iid)?;
+    full["writer_plan"] = plan_ref.clone();
+    full["payload_plan"] = payload_ref.clone();
+    check_plan_bindings(&plan, &plan_ref, &payload_ref, &full)?;
     let result = if own.is_some() {
         file_write(&base.join("capacity-post-prefire.json"), &full)?
     } else {
         let cap = file_write(&cap_path, &full)?;
         let sec = now()?;
-        let receipt = json!({"schema":"horizon-epoch136-actual-admission-v1","plan":plan_ref,"helper":plan["helper"],"node":plan["node"],"worker":plan["worker"],"tools_seal":plan["tools_seal"],"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":sec,"launch_expires_unix_seconds":sec+900,"protected_existing_free_bytes":protected,"required_initial_free_bytes":protected+CANDIDATE_DISK,"data_reservation_bytes":CANDIDATE_DISK,"memory_max_bytes":CANDIDATE_MEMORY,"cpu_quota_micros":3000000,"resource_accounting":cap,"bounded_reproduction_authorized":true,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"full_epoch_span_proven":false});
+        let receipt = json!({"schema":"horizon-epoch136-actual-admission-v1","plan":payload_ref,"helper":plan["helper"],"node":plan["node"],"worker":plan["worker"],"tools_seal":plan["tools_seal"],"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":sec,"launch_expires_unix_seconds":sec+900,"protected_existing_free_bytes":protected,"required_initial_free_bytes":protected+CANDIDATE_DISK,"data_reservation_bytes":CANDIDATE_DISK,"memory_max_bytes":CANDIDATE_MEMORY,"cpu_quota_micros":3000000,"resource_accounting":cap,"bounded_reproduction_authorized":true,"publication_authorized":false,"remote_mutations":false,"r2_mutations":false,"full_epoch_span_proven":false});
         file_write(&base.join("admission.json"), &receipt)?
     };
     Ok(result)

@@ -51,6 +51,22 @@ fn load(bound: &Value) -> Result<Value> {
     ensure!(b == *bound, "changed immutable handoff evidence");
     Ok(v)
 }
+pub(super) fn load_admission_for_post(plan: &Value, donor: &Value, iid: &str) -> Result<Value> {
+    let base = Path::new(BASE);
+    let (admission, _) = immutable(&base.join("admission.json"))?;
+    let (capacity, capacity_ref) = immutable(&base.join("capacity.json"))?;
+    ensure!(
+        admission["resource_accounting"] == capacity_ref
+            && capacity["writer_plan"] == *plan
+            && capacity["exclusive_handoff_receipt"] == *donor
+            && capacity["writer_invocation_id"] == iid
+            && admission["writer_invocation_id"] == iid
+            && capacity["payload_plan"] == admission["plan"],
+        "admission or initial capacity belongs to another writer session"
+    );
+    Ok(admission)
+}
+
 pub(super) fn native_denial_provenance(plan: &Value) -> Result<()> {
     contract::denial(plan, &json_pin(Path::new(PASS), PASS_SHA)?)
 }
@@ -74,12 +90,20 @@ pub(super) fn register_status(args: &[String]) -> Result<()> {
     let (request, request_ref) = immutable(&receipts.join("parent-status-request.json"))?;
     let (ready, ready_ref) = immutable(&receipts.join("ready.json"))?;
     let admission = load(&request["admission"])?;
+    let writer_plan = binding(Path::new(&args[0]), &args[1]);
+    check_plan_bindings(
+        &plan,
+        &writer_plan,
+        &admission["plan"],
+        &load(&admission["resource_accounting"])?,
+    )?;
     ensure!(
         request["schema"] == "horizon-epoch136-parent-status-request-v1"
             && request["ready"] == ready_ref
             && request["helper"] == plan["helper"]
             && request["invocation_id"] == ready["invocation_id"]
-            && admission["plan"] == binding(Path::new(&args[0]), &args[1])
+            && request["writer_plan"] == writer_plan
+            && request["payload_plan"] == admission["plan"]
             && request["writer"] == admission["writer"]
             && request["writer_invocation_id"] == admission["writer_invocation_id"]
             && now()? < n(&request, "handoff_deadline_unix_seconds")?,
@@ -108,7 +132,7 @@ pub(super) fn register_status(args: &[String]) -> Result<()> {
     let owner = contract::pending_owner(&plan, &ready, &ready_ref, &request_ref);
     let registration = json!({"schema":"horizon-epoch136-current-owner-registration-v1",
         "epoch":136,"unit":UNIT,"invocation_id":ready["invocation_id"],"helper":plan["helper"],
-        "request":request_ref,"repair_open":true,"ordinary_replay_claim":false,
+        "request":request_ref,"writer_plan":writer_plan,"payload_plan":admission["plan"],"repair_open":true,"ordinary_replay_claim":false,
         "authenticated_readback":true,"recorded_unix_seconds":status["epoch136_registration_unix_seconds"],
         "status_receipt":status_ref,"fleet_receipt":fleet_ref,
         "node_spawn_authorized":false,"initialize_authorized":false,"r2_mutations":false});
@@ -282,6 +306,13 @@ pub(super) fn run(args: &[String]) -> Result<()> {
     let donor = phase(&phase_args("establish", args, None))?;
     let admission_ref = phase(&phase_args("prepare", args, None))?;
     let admission = load(&admission_ref)?;
+    let writer_plan = binding(Path::new(&args[0]), &args[1]);
+    check_plan_bindings(
+        &plan,
+        &writer_plan,
+        &admission["plan"],
+        &load(&admission["resource_accounting"])?,
+    )?;
     let deadline = n(&admission, "launch_expires_unix_seconds")?;
     // A durable notification to the already-authorized parent, not an actor launch.
     file_write(
@@ -289,7 +320,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         &json!({
             "schema":"horizon-epoch136-parent-launch-request-v1","admission":admission_ref,
             "donor":donor,"writer":admission["writer"],"writer_invocation_id":admission["writer_invocation_id"],
-            "unit":UNIT,"plan":admission["plan"],"helper":plan["helper"],
+            "unit":UNIT,"plan":admission["plan"],"writer_plan":writer_plan,"helper":plan["helper"],
             "launch_expires_unix_seconds":deadline,"native_denial":binding(Path::new(PASS),PASS_SHA),
             "actor_launch_performed":false,"r2_mutations":false,"initialize_authorized":false
         }),
@@ -319,7 +350,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
             "schema":"horizon-epoch136-parent-status-request-v1","epoch":136,"unit":UNIT,
             "invocation_id":ready["invocation_id"],"helper":plan["helper"],"ready":ready_ref,
             "launch":ready["launch"],"admission":admission_ref,"guard_prefire":prefire,
-            "complete_fleet":binding(Path::new(&args[2]),&args[3]),
+            "complete_fleet":binding(Path::new(&args[2]),&args[3]),"writer_plan":writer_plan,"payload_plan":admission["plan"],
             "writer":admission["writer"],"writer_invocation_id":admission["writer_invocation_id"],
             "recorded_unix_seconds":now()?,"handoff_deadline_unix_seconds":handoff_deadline,
             "status_registration_path":receipts.join("parent-status-registration.json"),
@@ -335,6 +366,11 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         Duration::from_secs(90),
     )?;
     let status = load(&registration["status_receipt"])?;
+    ensure!(
+        registration["writer_plan"] == writer_plan
+            && registration["payload_plan"] == admission["plan"],
+        "registration plan bindings changed"
+    );
     let registered_fleet = load(&registration["fleet_receipt"])?;
     contract::registration(
         &registration,

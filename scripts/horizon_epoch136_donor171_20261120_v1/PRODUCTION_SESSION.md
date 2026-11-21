@@ -171,3 +171,23 @@ Also run the already-existing production payload test
 production-worker gate, restoration and original target comparison remain native
 work after source tests, publication, normal sealing, exclusive admission and
 current status registration. No affirmative production execution is claimed here.
+
+## Writer and payload plans
+
+Pass the complete controller plan to `session` and `register-status`. The parent
+launches the sealed worker helper with the plan path and digest in
+`parent-launch-request.json`. The helper accepts exactly eleven plan fields.
+For an extended controller plan, the writer emits the corresponding immutable
+`BASE/payload-plan.json`. An existing eleven-field plan retains its original
+path and digest. The capacity receipt binds both plans. The admission and the
+payload's launch receipt bind the actual payload plan, and status registration
+checks both bindings against the same writer session.
+
+To inspect the exact projection from a root-owned plan, run
+`admit136 payload-plan PLAN SHA`. This prints the payload JSON without taking
+a lease. Before activation, exercise the installed helper with the planned
+mounts. Its input checks require root-owned files with no write mode bits.
+The live fleet and historical snapshot download receipt may be mode 0600.
+Bind root-owned, byte-identical immutable copies at those exact paths inside
+the helper's read-only mount namespace and retain their digests and custody
+evidence. Expose the same sealed controller image at its canonical path.

@@ -106,6 +106,42 @@ fn focused_family(name: &str) -> bool {
         || name.starts_with("horizon-guard-169-focused-")
 }
 
+pub(super) fn requested(plan: &Value) -> Result<bool> {
+    match plan.get("standard169_cpu_loan") {
+        None => Ok(false),
+        Some(loan) => {
+            ensure!(
+                loan == &json!({"standard_route":binding(&Path::new(ROOT).join(STANDARD.0), STANDARD.1),
+                "cpu_quota_micros":BORROW}),
+                "unrecognized standard 169 CPU loan"
+            );
+            Ok(true)
+        }
+    }
+}
+
+/// A retained, collected transient still needs its mask. Discover new names
+/// as well, so a branch or unit change cannot silently extend an existing loan.
+pub(super) fn routes() -> Result<BTreeSet<String>> {
+    standard_names(&standard_source()?, &current_family()?)
+}
+
+pub(super) fn valid_name(name: &str) -> bool {
+    let simple = name
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b));
+    let extension = name.ends_with(".service") || name.ends_with(".timer");
+    simple
+        && extension
+        && (name == "jetstreamer-epochs159-173-target1-controller-v1-r2.service"
+            || (!focused_family(name)
+                && FAMILIES.iter().any(|pattern| {
+                    let (prefix, tail) = pattern.split_once('*').unwrap();
+                    let infix = tail.trim_end_matches('*');
+                    name.strip_prefix(prefix).is_some_and(|s| s.contains(infix))
+                })))
+}
+
 fn standard_names(route: &Value, discovered: &BTreeSet<String>) -> Result<BTreeSet<String>> {
     let mut fixed: BTreeSet<String> = serde_json::from_value(route["closed_units"].clone())?;
     let actor = route["producer_unit"]
@@ -321,6 +357,31 @@ pub(super) fn inspect(fleet_path: &Path, fleet_sha: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opt_in_requires_the_exact_historical_route_and_quota() {
+        assert!(!requested(&json!({})).unwrap());
+        let plan = json!({"standard169_cpu_loan":{"standard_route":binding(&Path::new(ROOT).join(STANDARD.0), STANDARD.1),"cpu_quota_micros":BORROW}});
+        assert!(requested(&plan).unwrap());
+        let mut wrong = plan;
+        wrong["standard169_cpu_loan"]["cpu_quota_micros"] = json!(STANDARD_CPU);
+        assert!(requested(&wrong).is_err());
+        for bad in [
+            "../../other.service",
+            "horizon-retry3-peer167-operation.service",
+            FOCUSED_UNIT,
+            "horizon-guard-169-focused-20261120-v4.timer",
+            "other/169.service",
+        ] {
+            assert!(!valid_name(bad));
+        }
+        for name in [
+            "horizon-retry3-peer169-native-operation-20261113-v1.service",
+            "jetstreamer-root-sweep-e159-173-t1-20261016-v1-r2-e169-173-r3.service",
+        ] {
+            assert!(valid_name(name));
+        }
+    }
 
     #[test]
     fn retained_cpu_and_residual_are_conserved() {
