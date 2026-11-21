@@ -1,5 +1,6 @@
 """Start the qualified held-source uploader after the accepted recovered-166 status."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -21,15 +22,24 @@ UNIT="horizon-publish-166-retry10-committed.service"
 STATE=D/"event-state"
 
 def status(fleet,report,terminal):
+    archive=closure.document(closure.T/"TERMINAL_SUCCESS.json",0o400)[0]["local_archive"]
+    return status_evidence(fleet,report,terminal,archive)
+
+def status_evidence(fleet,report,terminal,archive):
     ref=report["receipts"]["166"]
     row,actual=event.document(Path(ref["path"]),0o600)
     observed=fleet["observer"]
+    predecessor,prior=event.document(Path(row["previous_receipt"]["path"]),0o600)
+    raw=(json.dumps(row["after_status"],sort_keys=True,separators=(",",":"))+"\n").encode()
     event.need(actual==ref==fleet["effective_status_receipts"]["166"] and row["epoch"]==166 and
                row["key"]=="epoch-166.epoch-status.json" and row["observer"]==observed and
+               row["previous_receipt"]==prior and predecessor["authenticated_readback"] and
+               row["before_etag"]==predecessor["after_etag"] and row["before_sha256"]==predecessor["after_sha256"] and
+               row["before_status"]==predecessor["after_status"] and row["after_sha256"]==hashlib.sha256(raw).hexdigest() and
                row["authenticated_readback"] is True and row["conditional_header"]=="If-Match" and
                row["current_repair_owner"]=="/root" and row["producer_invocation_id"] is None and
                row[closure.FIELD]==terminal and row["after_status"]["phase"]=="verification" and
-               row["archive_sample"]==closure.document(closure.T/"TERMINAL_SUCCESS.json",0o400)[0]["local_archive"] and
+               row["archive_sample"]==archive and
                row["after_status"]["jet_size_bytes"]==row["archive_sample"]["size"] and row["after_etag"],
                "cadence did not read back the committed local source")
     return ref
