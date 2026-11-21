@@ -16,16 +16,16 @@ need=T['need']
 R=Path('/var/lib/jetstreamer/horizon_runtime_data')
 B=R/'epoch199-delivery-recovery-20261121-v1'
 REG=B/'phase-handoffs'
-V11=R/'incident-replay-fit-20261121-v1/tools-v11'
-SEAL='50a46e9010b448f2e038300c7aa5ffcdf38bf36ff4caf9bd783fe76ae513f4dc'
-PUB='7c7cd5c883f768b0f374f63952eefa1efb5f0e08fe74269d939f8d1e98eca1b4'
-PROVIDER='f6583caf06127010d2a3209f1a173df78264766f70bc869067bed10adf3b0349'
+NATIVE=R/'incident-replay-fit-20261121-v1/tools-v12'
+SEAL='121a3b184d8f0326e8b4aa4ca15cc39014eac39d485f3681a6e774d2524d9b84'
+PUB='3c30f24d37e4848c65a59f6feccc46bd0430ee3e4082816e983129d9ae2ba5b6'
+PROVIDER='08ae74eb92b63c51873bdd8e08ab50f2ea9edd3dcf0948a9b11433e2d77bdaf5'
 EVENT=R/'epoch166-retry10-delivery-20261121-v1/event-tools-current/terminal_event.py'
 EVENT_SHA='2f04ec0a5825d98d39add39ad961d2dc71ea8aa94df8261adb6a3782bd737e43'
 PATTERN=re.compile(r'root(\d{6})-live166167170-(\d{8})-v1')
 FLEET='ROOT_COMPLETE_OPERATIONAL_FLEET.json'
-FIELD={166:'recovered166_local_commit',167:'indexed167_local_commit',168:'metered168_local_commit',170:'recovered170_local_commit'}
-UNITS={166:'horizon-publish-166-retry10-committed.service',167:'horizon-publish-167-source-index-committed.service',168:'horizon-publish-168-metered-committed.service',170:'horizon-publish-170-retry10-committed.service'}
+FIELD={166:'recovered166_local_commit',167:'indexed167_local_commit',168:'metered168_local_commit',170:'recovered170_local_commit',172:'full172_local_commit'}
+UNITS={166:'horizon-publish-166-retry10-committed.service',167:'horizon-publish-167-source-index-committed.service',168:'horizon-publish-168-metered-committed.service',170:'horizon-publish-170-retry10-committed.service',172:'horizon-publish-172-full-committed.service'}
 
 def pin(path,digest):
     meta=path.lstat()
@@ -33,11 +33,11 @@ def pin(path,digest):
     return path
 
 def helpers():
-    seal=json.loads(pin(V11/'deployment-seal-receipt.json',SEAL).read_bytes())
+    seal=json.loads(pin(NATIVE/'deployment-seal-receipt.json',SEAL).read_bytes())
     members={r['name']:r['sha256'] for r in seal['members']}
-    need(seal['destination']==str(V11) and members['post-stop-fit']==PROVIDER and members['publication-fit']==PUB,'different complete provider')
-    pin(V11/'post-stop-fit',PROVIDER)
-    return runpy.run_path(str(pin(V11/'publication-fit',PUB))),runpy.run_path(str(pin(EVENT,EVENT_SHA)))
+    need(seal['destination']==str(NATIVE) and members['post-stop-fit']==PROVIDER and members['publication-fit']==PUB,'different complete provider')
+    pin(NATIVE/'post-stop-fit',PROVIDER)
+    return runpy.run_path(str(pin(NATIVE/'publication-fit',PUB))),runpy.run_path(str(pin(EVENT,EVENT_SHA)))
 
 def bound(event,ref,mode,where=None):
     p=Path(ref['path'])
@@ -75,8 +75,8 @@ def transfer(event,epoch,ref,closure,book,fleet):
     # reservation assigned to our recipient by the controlling fleet can be spent.
     record=bound(event,ref,0o400,REG/f'{epoch}.json')
     gen=T['GENERATIONS'][epoch]
-    need(record['schema']=='horizon-root-exclusive-phase-transfer-v1' and record['owner']=='/root' and record['origin_epoch']==epoch and record['origin_generation']==gen and record['recipient']=='epoch199200-measured-through-import' and record['terminal']==closure['terminal'] and record['booked_root']==book['root'] and record['original_cap_bytes']==book['cap_bytes']==T['CAP'][epoch] and record['exclusive_until_joint_import_reconciliation'] is True and record['replay_restart_claim_ended'] is True,'unassigned or non-exclusive old producer budget')
-    need(record['retained_memory_bytes']==2*T['G'] and record['retained_cpu_quota_micros']==1000000 and record['published_archive_retained_local'] is True and record['separate_historical_repair_promises_retained'] is True,'uncounted delivery or repair custody')
+    need(record['schema']=='horizon-root-exclusive-phase-transfer-v1' and record['owner']=='/root' and record['origin_epoch']==epoch and record['origin_generation']==gen and record['recipient']=='epoch199200-measured-through-import' and record['terminal']==closure['terminal'] and record['booked_root']==book['root'] and record['original_cap_bytes']==book['cap_bytes']==T['ALL_CAP'][epoch] and record['exclusive_until_joint_import_reconciliation'] is True and record['replay_restart_claim_ended'] is True,'unassigned or non-exclusive old producer budget')
+    need(record['retained_memory_bytes']==2*T['G'] and record['retained_cpu_quota_micros']==(500000 if epoch==172 else 1000000) and record['published_archive_retained_local'] is True and record['separate_historical_repair_promises_retained'] is True,'uncounted delivery or repair custody')
     # The fleet owner registers the exact terminal, budget, and restoration
     # assessment. A public sync receipt does not retire a local archive.
     rr=record['repair_assessment']
@@ -90,7 +90,7 @@ def transfer(event,epoch,ref,closure,book,fleet):
     receipt=bound(event,sync,0o600)
     adm,_=event['document'](run/'admission.json',0o400)
     need(adm['publication_authorized'] is True and adm['terminal_sha256']==closure['terminal']['sha256'] and adm['transaction_id']==terminal['transaction_id'] and adm['operation']=='current-reader-sync-retain-local' and adm['invocation_id']==run.name[4:] and adm['unit']==UNITS[epoch] and adm['archive_inode']==archive['inode'] and adm['archive_device']==archive['device'],'different publisher or local source')
-    need(receipt['schema']=='jetstreamer-horizon-r2-receipt-v1' and receipt['epoch']==epoch and receipt['archive_key']==f'epoch-{epoch}.jet' and receipt['checksum_key']==f'epoch-{epoch}.jet.sha256' and receipt['archive_length']==archive['size'] and receipt['archive_sha256']==archive['sha256'] and receipt['remote_sha256_readback'] is True and receipt['archive_etag'],'incomplete published pair')
+    need(receipt['schema']=='jetstreamer-horizon-r2-receipt-v1' and receipt['bucket']=='solana-archive-with-accounts-data' and receipt['epoch']==epoch and receipt['archive_key']==f'epoch-{epoch}.jet' and receipt['checksum_key']==f'epoch-{epoch}.jet.sha256' and receipt['archive_length']==archive['size'] and receipt['archive_sha256']==archive['sha256'] and receipt['remote_sha256_readback'] is True and receipt['archive_etag'],'incomplete published pair')
     playback=receipt['current_reader_playback']
     p=Path(playback['path'])
     need(p.name=='remote-playback-acceptance.json' and p.parent.parent==run/'scratch','foreign playback path')
@@ -111,7 +111,7 @@ def capture(required_head=None):
     cpus=os.sysconf('SC_NPROCESSORS_ONLN')
     records=[]
     for _ in range(2):
-        raw=pub['capture_provider'](V11/'post-stop-fit',fr['path'],fr['sha256'])
+        raw=pub['capture_provider'](NATIVE/'post-stop-fit',fr['path'],fr['sha256'])
         fit=json.loads(raw)
         need(fit['fits'] and fit['fleet']==fr and 0<=time.time()-fit['recorded_unix_seconds']<120,'unfunded native fleet')
         closed=pub['closing'](fit,fleet)

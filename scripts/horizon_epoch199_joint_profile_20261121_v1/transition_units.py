@@ -10,7 +10,7 @@ REG=B/'phase-handoffs'
 ENTRY=B/'phase-transition-v1/transition_event.py'
 CHECK='horizon-199200-phase-checkpoint.service'
 PATH=CHECK.replace('.service','.path')
-DELIVERY={e:B.parent/(f'epoch{e}-current-delivery-20261121-v1' if e!=166 else 'epoch166-retry10-delivery-20261121-v1') for e in (166,167,168,170)}
+DELIVERY={e:B.parent/(f'epoch{e}-current-delivery-20261121-v1' if e!=166 else 'epoch166-retry10-delivery-20261121-v1') for e in (166,167,168,170,172)}
 
 def units():
     common='Type=exec\nRestart=no\nUMask=0077\nMemorySwapMax=0\nNoNewPrivileges=yes\nPrivateNetwork=yes\n'
