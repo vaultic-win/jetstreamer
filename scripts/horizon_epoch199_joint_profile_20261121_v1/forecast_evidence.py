@@ -10,7 +10,7 @@ PROFILE_SHA = '31744ff6348112e83adeaca1dac44f3c6ef3f706a888f1ad1365a893a2066445'
 
 
 def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_end, ready,
-                        fit_path=PROFILE, fit_hash=PROFILE_SHA):
+                        fit_path=PROFILE, fit_hash=PROFILE_SHA, worker_ref=None):
     refs = {}
 
     def receipt(name, path, sha):
@@ -55,7 +55,11 @@ def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_e
         assert phase['failure']['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
         assert checked(phase['failure'])['iid']==predecessor and checked(phase['recovery'])['iid']==predecessor
     else:
-        assert phase['invocation_id']==predecessor
+        if phase['invocation_id']!=predecessor:
+            expected=checked(worker_ref)
+            assert expected['schema']=='horizon-145-v5d-actual-advancing-original-semantic-recovery-v1'
+            assert expected['invocation_id']==phase['invocation_id'] and phase['stage']=='leased-worker'
+            assert checked(expected['start'])['image']=='3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066'
     sample = checked(head['observer'])
     host_ram = sample['host_memory']['total_kib']*1024
     free_home = min(native['available_HOME_bytes'], head['same_sample_conservative_free_DATA_bytes'])

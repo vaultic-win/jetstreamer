@@ -70,7 +70,19 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
     head, prior = checked(head_ref), checked(paid_ref)
     assert head['all_active_status_reports_authenticated_readback'] and prior['authenticated_existing_statuses'] == 19
     previous_model = checked(prior['reconciliation'])
-    assert previous_model['actual_145_worker']['sha256'] == '6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76'
+    semantic=ROOT/'epoch145-semantic-continuity-20261121-v1'
+    original=semantic/'V5C_ACTUAL_ADVANCING_WORKER.json'
+    successor=semantic/'V5D_ACTUAL_ADVANCING_WORKER.json'
+    old_worker=previous_model['actual_145_worker']
+    assert old_worker==bound(original) or (successor.exists() and old_worker==bound(successor))
+    if fit_path is None:
+        inherited=previous_model.get('conditional_transition',{}).get('sources',{}).get('native_capacity')
+        if inherited:
+            fit_path,fit_hash=Path(inherited['path']),inherited['sha256']
+        else:
+            fit_path=ROOT/'epoch172-current-delivery-20261121-v1/event172-run-c077680a3b774395a639ee769f5c400b/fit.json'
+            fit_hash='31744ff6348112e83adeaca1dac44f3c6ef3f706a888f1ad1365a893a2066445'
+    assert bound(fit_path)['sha256']==fit_hash
     matched = previous_model['native_fleet'] == head_ref
     if mode == 'next':
         assert matched
@@ -98,11 +110,12 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
     closed_window = utc(stamp)+dt.timedelta(seconds=1800) <= dt.datetime.now(dt.timezone.utc)
     cadence, controller_hash = (CADENCE, SEAL) if closed_window else active_controller()
     terminal = ROOT/'epoch145-guarded-export-20261121-v1/state/d37f36f898a44932a19fd50d7014a6fe/failed.json'
+    successor_ref=bound(successor) if not closed_window and successor.exists() else None
     names_to_copy=('forecast_routes.py','forecast_evidence.py')
     source_hashes={name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                    for name in (*names_to_copy,'prepare_forecast.py')}
     generation_inputs=dict(previous=predecessor, paid=paid_ref, fit=str(fit_path), fit_hash=fit_hash,
-                           controller=controller_hash, source=source_hashes, same_window=same_window,
+                           controller=controller_hash, source=source_hashes, same_window=same_window, successor=successor_ref,
                            worker_terminal=bound(terminal) if terminal.exists() else None)
     generation=hashlib.sha256(json.dumps(generation_inputs,sort_keys=True).encode()).hexdigest()[:16]
     suffix = f'{day}-{tag}-transfer-{generation}'
@@ -132,7 +145,22 @@ for key,item in paid['conditional_statuses_verified'].items():
     assert found==item['receipt']
     basis[key]=found""")
     historical = False
-    if terminal.exists():
+    if successor_ref:
+        proof=checked(successor_ref)
+        actual=checked(proof['start'])
+        assert proof['schema']=='horizon-145-v5d-actual-advancing-original-semantic-recovery-v1'
+        authentic_failure=bound(terminal)
+        assert authentic_failure['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
+        assert actual['prior_frozen_recovery']['failed_status_owner']['current_boot_failure']['failure']==authentic_failure
+        build=checked(bound(semantic/'tools-v5d/build-proof.json'))
+        assert build['old_failure']==authentic_failure and actual['image']==build['verifier_sha256']
+        assert bound(semantic/'tools-v5d/deployment-seal-receipt.json')['sha256']=='8d24b10c8df29a469ae0bb26a3605618289a8feae23565d28d792791bba58bfb'
+        assert actual['image']=='3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066'
+        plan=replace(plan,original.name,successor.name)
+        plan=replace(plan,'6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76',successor_ref['sha256'])
+        plan=replace(plan,'34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d',actual['image'])
+        plan=replace(plan,"failure_ref=last['terminal_145']",f"failure_ref={authentic_failure!r}")
+    elif terminal.exists():
         terminal_ref = bound(terminal)
         stopped = checked(terminal_ref)
         assert terminal_ref['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
@@ -180,7 +208,7 @@ def sealed_model(name, checksum):
 routes=sealed_model('forecast_routes.py',{pin['forecast_routes.py']!r})
 evidence=sealed_model('forecast_evidence.py',{pin['forecast_evidence.py']!r})
 transfer=evidence['forecast_transition'](routes,checked,bound,fref,prior,deadlines,replay_end,ready,
-    Path({str(fit_path)!r}),{fit_hash!r})
+    Path({str(fit_path)!r}),{fit_hash!r},worker_ref)
 chosen=transfer['selected']
 for n in (199,200):
     after(n,chosen['start_ms'],transfer['conditions'])
@@ -249,7 +277,7 @@ after(141,max(ready,donor_available(167,replay_end[167]),"""
   durable(q/'FINAL_READBACK.json',dict(statuses=readbacks,native_fleet=fref,ready_epochs=sorted(ready)))
   durable(q/'RESULT.json'""")
     apply=replace(apply,'conditional_statuses_verified=result)',"conditional_statuses_verified=result,full_readback=bound(q/'FINAL_READBACK.json'))")
-    if terminal.exists() and not historical:
+    if terminal.exists() and not historical and not successor_ref:
         apply=replace(apply,'actual_145_start=sref,semantics_start_ms=repair_gate',
                       "actual_145_start=sref,projected_retry_start_ms=repair_gate,actual_145_failed=failure_ref")
     compile(plan,str(dest/'plan.py'),'exec')
@@ -264,9 +292,10 @@ if __name__ == '__main__':
     ap.add_argument('mode',choices=['current','next'])
     ap.add_argument('fleet',type=Path)
     ap.add_argument('paid',type=Path)
-    ap.add_argument('--fit',type=Path, default=ROOT/'epoch172-current-delivery-20261121-v1/event172-run-c077680a3b774395a639ee769f5c400b/fit.json')
-    ap.add_argument('--fit-sha256',default='31744ff6348112e83adeaca1dac44f3c6ef3f706a888f1ad1365a893a2066445')
+    ap.add_argument('--fit',type=Path)
+    ap.add_argument('--fit-sha256')
     args = ap.parse_args()
+    assert bool(args.fit)==bool(args.fit_sha256)
     directory=prepare(args.mode,args.fleet,args.paid,args.fit,args.fit_sha256)
     from evidence import bound,checked,sealed
     ref=bound(args.fleet)
