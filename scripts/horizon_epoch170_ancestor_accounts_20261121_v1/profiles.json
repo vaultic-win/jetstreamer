@@ -1,0 +1,174 @@
+{
+  "profiles": {
+    "local3retry5": {
+      "attempt": "local3retry5",
+      "target": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-8a0de4a05c46b0e57fb9cc618c274de71b9b99e5475ba3f784e9776aa2251096/work/root-cohort-170-170/run-1180759-1794988283652601860/scratch/.historical-runtime/jetstreamer-historical-parent-lz2u6C/jetstreamer-historical-v1.5.6-Y9V8fv/accounts-state",
+      "inode": 107413510,
+      "unit": "horizon-qualify-170-replacement-local3retry5-20261110-v1.service",
+      "guard": "horizon-guard-replacement-170-local3retry5-20261110-v1.service",
+      "timer": "horizon-guard-replacement-170-local3retry5-20261110-v1.timer",
+      "iid": "aab865eb4cee44d69f536944e4c5f722",
+      "intent": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch170/local3retry5/guard-state/receipts/stop-intent.json",
+        "sha256": "3fadd006f888a072f4743031e0413375210f9bd4ad4b1b986682289b43d1400d"
+      },
+      "stop": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch170/local3retry5/guard-state/receipts/stop-completion.json",
+        "sha256": "1751d0ad7c16e58b7dec251908120275f8ea0bb1fc6fe85073e3d812a1618168"
+      },
+      "admission": {
+        "path": "/var/lib/jetstreamer/epoch170-retry5-recovery-20261117-v1/launch0750-v1/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "1add1a568dea299d4a11dfe7b38719fca1d475da5235545c3a720081047e6e46"
+      },
+      "protection": {
+        "path": "/var/lib/jetstreamer/epoch170-retry5-recovery-20261117-v1/launch0750-v1/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "2aacb2ed8ac7c19b631a36f8523f8217c2f457e08b8abf3e553e5c54ffd06898"
+      },
+      "original_admission": {
+        "path": "/var/lib/jetstreamer/epoch170-retry5-recovery-20261117-v1/launch0750-v1/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "1add1a568dea299d4a11dfe7b38719fca1d475da5235545c3a720081047e6e46"
+      },
+      "stop_reason": "DATA-fulfillment-observation-failed",
+      "plan_sha256": "d348dc434adc78b0924d008fede3fea40d46624605c59d414c2b4f8004ac2178",
+      "preserved": [
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-8a0de4a05c46b0e57fb9cc618c274de71b9b99e5475ba3f784e9776aa2251096/work/root-cohort-170-170/run-1180759-1794988283652601860/archives/epoch-170.jet",
+          "device": 64512,
+          "inode": 106954781,
+          "size": 9021900700,
+          "mtime_ns": 1795004042377005239,
+          "mode": 33152
+        },
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-8a0de4a05c46b0e57fb9cc618c274de71b9b99e5475ba3f784e9776aa2251096/work/root-cohort-170-170/run-1180759-1794988283652601860/scratch/.historical-runtime/jetstreamer-historical-parent-lz2u6C/bound-bootstrap/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst",
+          "device": 64512,
+          "inode": 106954775,
+          "size": 2151049662,
+          "mtime_ns": 1794988295816957374,
+          "mode": 33152
+        }
+      ],
+      "expected_bytes": 36379099136
+    },
+    "local3retry6": {
+      "attempt": "local3retry6",
+      "target": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-29ce1579b6ce29079d44dfe920d5f75d64486b4d8efe4df1a0b9d6ef00ec82f2/work/root-cohort-170-170/run-2295526-1795129996043270445/scratch/.historical-runtime/jetstreamer-historical-parent-txQG6N/jetstreamer-historical-v1.5.6-pi4xvD/accounts-state",
+      "inode": 109772806,
+      "unit": "horizon-qualify-170-replacement-local3retry6-20261110-v1.service",
+      "guard": "horizon-guard-replacement-170-local3retry6-20261110-v1.service",
+      "timer": "horizon-guard-replacement-170-local3retry6-20261110-v1.timer",
+      "iid": "ebd212d2045145259449d1d5c3d65353",
+      "intent": {
+        "path": "/var/lib/jetstreamer/retry6-170-preparation-20261118-v1/epoch170/local3retry6/guard-state/receipts/stop-intent.json",
+        "sha256": "22344407c7f7f034eae858791636fc0275c7b12c2bee1a5326e18dd1560700fb"
+      },
+      "stop": {
+        "path": "/var/lib/jetstreamer/retry6-170-preparation-20261118-v1/epoch170/local3retry6/guard-state/receipts/stop-completion.json",
+        "sha256": "3601e2dabb55f7c3ca9ed8f91c253588f301b51a87c42ba9ece18f73fab48264"
+      },
+      "admission": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-state/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "6faebfb5fdaf09e0253e1463eacfaf266f0099c71be951d196a18a3e5cadb42b"
+      },
+      "protection": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-home-audit-v8-20261119-v1/launch-state/epoch170/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "f9e3b89b529d6244eeac96ffe18536282587dc8d2075edbdea1a35e0ef0d8558"
+      },
+      "original_admission": {
+        "path": "/var/lib/jetstreamer/retry6-single170-guarded-launch-20261119-v1/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "6faebfb5fdaf09e0253e1463eacfaf266f0099c71be951d196a18a3e5cadb42b"
+      },
+      "stop_reason": "DATA-fulfillment-observation-failed",
+      "plan_sha256": "6f689ea9a9ab92bf0ab4b3d6fe1a0a585282f0bad7be7bbb975f583dccea217f",
+      "preserved": [
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-29ce1579b6ce29079d44dfe920d5f75d64486b4d8efe4df1a0b9d6ef00ec82f2/work/root-cohort-170-170/run-2295526-1795129996043270445/archives/epoch-170.jet",
+          "device": 64512,
+          "inode": 109314595,
+          "size": 1403037571,
+          "mtime_ns": 1795132595850355108,
+          "mode": 33152
+        },
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry6-20261110-v1/private/destination-29ce1579b6ce29079d44dfe920d5f75d64486b4d8efe4df1a0b9d6ef00ec82f2/work/root-cohort-170-170/run-2295526-1795129996043270445/scratch/.historical-runtime/jetstreamer-historical-parent-txQG6N/bound-bootstrap/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst",
+          "device": 64512,
+          "inode": 109327876,
+          "size": 2151049662,
+          "mtime_ns": 1795130008188806836,
+          "mode": 33152
+        }
+      ],
+      "expected_bytes": 32506998784
+    },
+    "local3retry7": {
+      "attempt": "local3retry7",
+      "target": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-99b52c88d0efd3bde5ebb0f67d8b99eb4fe19f8c5a098eb8522ada9c44285217/work/root-cohort-170-170/run-2485831-1795151164346347843/scratch/.historical-runtime/jetstreamer-historical-parent-Gru5cK/jetstreamer-historical-v1.5.6-ZDgTsS/accounts-state",
+      "inode": 110902340,
+      "unit": "horizon-qualify-170-replacement-local3retry7-20261110-v1.service",
+      "guard": "horizon-guard-replacement-170-local3retry7-20261110-v1.service",
+      "timer": "horizon-guard-replacement-170-local3retry7-20261110-v1.timer",
+      "iid": "c7765764ff52450ba71e8105439b9197",
+      "intent": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/preparation/epoch170/local3retry7/guard-state/receipts/stop-intent.json",
+        "sha256": "bdec2f5f6aefb0eb863ce6b9486ecf2e110fb16e9c4d00262126b4632a9425bf"
+      },
+      "stop": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/preparation/epoch170/local3retry7/guard-state/receipts/stop-completion.json",
+        "sha256": "a7b35a191ec0e07863aa0357b2e48e37ca18e3b3a1d49e2ea51fa8a53f0d5a28"
+      },
+      "admission": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/launch-state/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "fc1da9c8f4a58f7faff6ea9cb56e8946512f4aa85d1121c15eda4f6834828960"
+      },
+      "protection": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/launch-state/epoch170/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "0ffe4067fb364b027019696f3071427b9aa0540c8952c58c6bbf5d6e8d5752f3"
+      },
+      "original_admission": {
+        "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry7-recovery-20261120-v1/launch-state/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "fc1da9c8f4a58f7faff6ea9cb56e8946512f4aa85d1121c15eda4f6834828960"
+      },
+      "stop_reason": "DATA-fulfillment-observation-failed",
+      "plan_sha256": "8ec877d2d8c2dcf664ecb747f9177843abb6d7312957b39f8d9ea5a2b28aef5d",
+      "preserved": [
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-99b52c88d0efd3bde5ebb0f67d8b99eb4fe19f8c5a098eb8522ada9c44285217/work/root-cohort-170-170/run-2485831-1795151164346347843/archives/epoch-170.jet",
+          "device": 64512,
+          "inode": 110231608,
+          "size": 2387282842,
+          "mtime_ns": 1795155307180137154,
+          "mode": 33152
+        },
+        {
+          "path": "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-99b52c88d0efd3bde5ebb0f67d8b99eb4fe19f8c5a098eb8522ada9c44285217/work/root-cohort-170-170/run-2485831-1795151164346347843/scratch/.historical-runtime/jetstreamer-historical-parent-Gru5cK/bound-bootstrap/snapshot-73439777-AAfuW4HhAkKNYunC4zf6ipDSCUYsnVfoLMFrmBeb5Sbs.tar.zst",
+          "device": 64512,
+          "inode": 110231601,
+          "size": 2151049662,
+          "mtime_ns": 1795151176449345801,
+          "mode": 33152
+        }
+      ],
+      "expected_bytes": 33112289280
+    }
+  },
+  "protected": {
+    "fresh": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/preparation/epoch170/local3retry9/prepared.json",
+      "sha256": "1d4f020357d70f043ef5a576179b32b5c15de9e06edac8a053619ae2fbab164f"
+    },
+    "guard_plan": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-live-state-20261120-v1/guard-plans/guard-8d120ed88adc4afb9485fb3f61dfa29c/guard-plan.json",
+      "sha256": "898c637a692e43942164e2d0ff90f390d7d0c2a12a96c3d239d564762f8e3746"
+    },
+    "admission": {
+      "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/launch-state/epoch170/ACTUAL_REPLACEMENT_ADMISSION.json",
+      "sha256": "1dd1394c641e5dd0869dc780cc42e46a0cfbe9b84a781b4d38e9f8db5d6b273c"
+    },
+    "witness": {
+      "path": "/usr/local/lib/jetstreamer/horizon-original-slot-data-witness-set-20261118-v6/witness-set.json",
+      "sha256": "8eb041519cba5c3f6368cb1432be9e289489ce1acdc28aa8b49f3d6ec7f382ee"
+    },
+    "worker_source": "historical-runtime/v1_5_6/worker/src/snapshot.rs",
+    "node_source": "jetstreamer-node/src/historical.rs"
+  }
+}
