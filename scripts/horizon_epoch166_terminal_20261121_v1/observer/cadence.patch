@@ -1,0 +1,216 @@
+--- a/cycle.py
++++ b/cycle.py
+@@ -1,5 +1,6 @@
+ """Receipt-backed rolling input and sample interpretation, independent of the clock tag."""
+ import full172
++import closed166
+ import private136
+ import copy
+ import private168
+@@ -123,7 +124,7 @@
+         need(f["focused169_cadence_anchor"]==seed and (prevref==seed or prev["focused169_cadence_anchor"]==seed) and f["stable_cadence_anchor"]==ANCHOR and f["terminal172_cadence_anchor"]==prev["terminal172_cadence_anchor"] and f["observer"]!=prev["observer"],"invalid five-owner successor")
+         before=checked(f["observer"])
+         need(utc(f["sampled_at_utc"])>=utc(prev["sampled_at_utc"])+dt.timedelta(seconds=1800) and before["cadence"]["previous_sample_sha256"]==prev["observer"]["sha256"] and before["cadence"]["previous_sample"]==prev["observer"]["path"],"previous sample chain broken")
+-    extra=int(full172.owned(f) is not None)
++    extra=int(full172.owned(f) is not None) - int(closed166.FIELD in f)
+     bounded136=private136.previous(f)
+     need(f["owner"]=="/root" and f["active_producer_count"]==5+extra+bounded136 and f["canonical_producer_count"]==3+extra and f["active_private_diagnostic_count"]==2+bounded136,"changed producer counts")
+     prevs=checked(f["authenticated_status_audit"]);claims(prevs)
+@@ -141,8 +142,10 @@
+         self.fleet,self.cfg,self.prior=load_fleet(self.fleet_ref)
+         self.paths=names(self.cfg["not_before_utc"]);self.sample_ref=pair(self.paths["sample"],sample_sha)
+         self.sample=checked(self.sample_ref)
+-        self.rows={r["epoch"]:r for r in self.fleet["actual_executing_replays"] if r["epoch"] != 172}
+-        self.native,self.private,self.closures,self.focused=verified_owners(self.fleet)
++        self.terminal166=closed166.native_config(self)
++        self.owner_fleet=closed166.owner_view(self.fleet,self.terminal166)
++        self.rows={r["epoch"]:r for r in self.owner_fleet["actual_executing_replays"] if r["epoch"] != 172}
++        self.native,self.private,self.closures,self.focused=verified_owners(self.owner_fleet)
+         self.interpret()
+     def interpret(self):
+         s=self.sample; cfg=self.cfg; cd=s["cadence"];self.stamp=s["recorded_at_utc"]
+@@ -156,7 +159,7 @@
+         self.full172=full172.freeze(self)
+         config={int(r["range"]):r for r in cfg["replays"] if r["range"] != "172"}
+         self.lanes={int(r["range"]):r for r in s["replays"] if r["range"] != "172"}
+-        need(len(cfg["replays"]) == len(s["replays"]) == len(config)+sum(r["range"]=="172" for r in cfg["replays"]) and set(config)==set(self.lanes)==set(self.rows)==set(IDS),"changed canonical replay list")
++        need(len(cfg["replays"]) == len(s["replays"]) == len(config)+sum(r["range"]=="172" for r in cfg["replays"]) and set(config)==set(self.lanes)==set(self.rows)==set(IDS)-({166} if self.terminal166 else set()),"changed canonical replay list")
+         self.advancing={}
+         for epoch,l in self.lanes.items():
+             iid,pid,ticks=IDS[epoch];r=config[epoch];owner=self.rows[epoch]
+@@ -192,7 +195,7 @@
+                 self.next_cfg=previous
+     def unchanged(self):
+         need(full172.identity(self.fleet) == (self.full172["identity"] if self.full172 else None), "epoch 172 admission/owner changed during cycle")
+-        need(current_owners(self.fleet)==(self.native,self.private,self.closures,self.focused),"guard/owner changed during cadence; consume terminal/admission event and reconcile")
++        need(current_owners(self.owner_fleet)==(self.native,self.private,self.closures,self.focused),"guard/owner changed during cadence; consume terminal/admission event and reconcile")
+     def public_fresh(self):
+         elapsed=dt.datetime.now(dt.timezone.utc)-self.now
+         need(dt.timedelta()<=elapsed<dt.timedelta(minutes=30),"coordinated evidence is outside its live publication window; reconcile the next genuine sample")
+--- a/full172.py
++++ b/full172.py
+@@ -222,8 +222,8 @@
+     f['actual_active_bootstraps'] = [row] if boot else []
+     if not boot:
+         f['actual_executing_replays'].append(row)
+-    f.update(bootstrap_count=int(boot),guarded_bootstrap_owner_count=int(boot),live_replay_count=4-int(boot),
+-             canonical_producer_count=4,active_producer_count=6,current_full172_admission=row['admission'],
++    f.update(bootstrap_count=int(boot),guarded_bootstrap_owner_count=int(boot),live_replay_count=f["live_replay_count"]+1-int(boot),
++             canonical_producer_count=f["canonical_producer_count"]+1,active_producer_count=f["active_producer_count"]+1,current_full172_admission=row['admission'],
+              current_full172_post_guard_fit=row['post_guard_capacity'])
+     item = next(r for r in f['epochs'] if r['epoch']==172)
+     item.update(current_repair_owner=None,no_live_producer_claimed=False,repair_open=False,
+--- a/owners.py
++++ b/owners.py
+@@ -104,7 +104,8 @@
+ 
+ def verified_owners(fleet):
+     rows=[r for r in fleet["actual_executing_replays"] if r["epoch"] != 172]
+-    need(len(rows)==3 and {r["epoch"] for r in rows}==set(IDS) and all(r["epoch"] == 172 for r in fleet["actual_active_bootstraps"]),"canonical owner set changed; reconcile its guarded admission or terminal event")
++    expected = set(IDS) - ({166} if fleet.get("terminal166_local_commit") else set())
++    need(len(rows)==len(expected) and {r["epoch"] for r in rows}==expected and all(r["epoch"] == 172 for r in fleet["actual_active_bootstraps"]),"canonical owner set changed; reconcile its guarded admission or terminal event")
+     priv=[r for r in fleet["actual_active_private_diagnostics"] if r["epoch"]!=136]
+     need(len(priv)==2 and {r["epoch"]:r["admission"] for r in priv}=={168:DIAG_REF,169:fleet["focused169_admission"]},"private owner lineage changed")
+     for row in rows:
+--- a/reconcile.py
++++ b/reconcile.py
+@@ -1,5 +1,6 @@
+ """Derive the next observer and publish the validated local fleet after its sole timer is armed."""
+ import full172
++import closed166
+ import private136
+ import copy
+ import datetime as dt
+@@ -30,8 +31,8 @@
+     if old_complete:
+         need(Path(c.fleet_ref["path"])==OVERLAY and r["terminal172_closure"]==c.fleet["terminal172_closure"] and "coordinated_private_diagnostic_169" not in r,"foreign five-owner completed status pass")
+     else:
+-        need(r["active_producer_count"]==5+bool(c.full172)+private136.active(c.private136) and r["active_private_diagnostic_count"]==2+private136.active(c.private136) and r.get(private136.FIELD)==(c.private136["receipt"] if c.private136 else None) and r["coordinated_private_diagnostic_169"]==c.diagnostic169 and r["terminal172_closure"]==c.fleet["terminal172_closure"],"terminal status count/evidence changed")
+-    need(r["canonical_producer_count"]==3+bool(c.full172) and r["active_bootstraps"]==int(bool(c.full172) and c.full172_row["stage"]=="bootstrap") and r["replay_lanes"]==sum(c.advancing.values()),"status count differs from sample")
++        need(r["active_producer_count"]==len(c.rows)+2+bool(c.full172)+private136.active(c.private136) and r["active_private_diagnostic_count"]==2+private136.active(c.private136) and r.get(private136.FIELD)==(c.private136["receipt"] if c.private136 else None) and r["coordinated_private_diagnostic_169"]==c.diagnostic169 and r["terminal172_closure"]==c.fleet["terminal172_closure"],"terminal status count/evidence changed")
++    need(r["canonical_producer_count"]==len(c.rows)+bool(c.full172) and r["active_bootstraps"]==int(bool(c.full172) and c.full172_row["stage"]=="bootstrap") and r["replay_lanes"]==sum(c.advancing.values()),"status count differs from sample")
+     need(r["coordinated_private_diagnostic_168"]["admission"]==DIAG_REF and r["coordinated_private_diagnostic_168"]["observer_diagnostic_result"]==c.diagnostic["observer_diagnostic_result"],"private diagnostic sample mismatch")
+     need(len(r["ready_epochs"])==r["authenticated_ready_pairs"]==c.fleet["ready_pairs"] and set(r["remaining_epochs"])==set(range(101,201))-set(r["ready_epochs"]),"ready-inventory mismatch")
+ def assemble(c,statusref,ar,hr,nextref):
+@@ -44,7 +45,7 @@
+     if "service_owned_progress_receipt" in private:
+         need(private["service_owned_progress_receipt"]==c.diagnostic.get("service_owned_progress_receipt"),"capacity references different private 168 measurement")
+     private=c.diagnostic
+-    known={r["epoch"]:r for r in f["actual_executing_replays"] if r["epoch"] != 172}
++    known={r["epoch"]:r for r in f["actual_executing_replays"] if r["epoch"] in c.rows}
+     for e,r in known.items():
+         r.update(phase="replay",progress=c.lanes[e]["useful_work"],measured_progress=c.advancing[e],observer=c.sample_ref,
+                  current_identity_from_same_observation=True,in_current_observer=True)
+@@ -81,7 +82,7 @@
+     f.update(focused169_cadence_anchor=anchor,terminal172_historical_observer_result=c.terminal_sample or f.get("terminal172_historical_observer_result"),stable_cadence_anchor=ANCHOR,previous_Root_operational_review=c.fleet_ref,observer=c.sample_ref,sampled_at_utc=c.stamp,
+         recorded_unix_seconds=audit["observed_at"],sole_next_timer=c.next["timer"],sole_next_observer=nextref,
+         actual_executing_replays=list(known.values()),actual_active_private_diagnostics=[private,focused],actual_active_bootstraps=[],bootstrap_count=0,
+-        useful_replay_count=sum(c.advancing.values()),live_replay_count=3,active_producer_count=5,canonical_producer_count=3,active_private_diagnostic_count=2,
++        useful_replay_count=sum(c.advancing.values()),live_replay_count=len(known),active_producer_count=len(known)+2,canonical_producer_count=len(known),active_private_diagnostic_count=2,
+         authenticated_status_audit=statusref,effective_status_receipts=status["receipts"],
+         current_private_168_observer_result=dict(observation=c.sample_ref,section="diagnostic_replays",epoch=168,invocation_id=private["unit"]["InvocationID"]),
+         complete_DATA_with_remaining_audit_growth_bytes=f["complete_DATA_bytes"]+growth,current_home_cycle_capacity=hr,
+@@ -97,6 +98,7 @@
+     if c.private136:
+         need(capacity["private136_observation"]==c.private136["receipt"],"136 private capacity belongs to another cycle")
+     private136.install(c,f)
++    closed166.attach(f,c)
+     return f
+ def run(c,operation):
+     out=c.paths["out"];ensure_dir(out);fd=lock(out/"fleet-cycle.lock")
+--- a/run-cycle.sh
++++ b/run-cycle.sh
+@@ -44,7 +44,7 @@
+         [[ $(date -u -d "$due" +%s) -gt $(date -u +%s) ]] || { echo 'observer due passed; reconcile actual cadence' >&2; exit 1; }
+         systemd-run --unit="${timer%.timer}" --on-calendar="$(date -u -d "$due" '+%F %T UTC')" \
+           --timer-property=AccuracySec=1s --timer-property=RemainAfterElapse=no \
+-          /usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe "$config"
++          /var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1/cadence-tools/terminal166 dispatch-cadence "$config"
+     else
+         [[ $waiting == "$timer" ]] || { echo 'another observer timer already owns this cadence' >&2; exit 1; }
+     fi
+--- a/status.py
++++ b/status.py
+@@ -1,5 +1,6 @@
+ """Authenticate the complete status range then conditionally refresh each status only."""
+ import full172
++import closed166
+ import private136
+ import datetime as dt
+ import json
+@@ -87,6 +88,8 @@
+     need(age>=0,"newer report must be retained separately")
+     after=dict(old,sampled_at_utc=c.stamp,estimated_remaining_millis=old["estimated_remaining_millis"]-age)
+     archive=None
++    if e==166 and getattr(c,"terminal166",None):
++        return closed166.status_after(c,old,age)
+     if e == 172 and c.full172:
+         if c.full172_row["scratch_path"]:
+             archive = observed_archive(c,e)
+@@ -121,18 +124,19 @@
+         after["elapsed_execution_millis"]=old["elapsed_execution_millis"]+age
+     need(after["estimated_remaining_millis"]>0,f"epoch {e} forecast expired; publish a corrected evidence-backed event")
+     return after,archive
+-def follow_event(e,ref,etag,raw):
++def follow_event(e,ref,etag,raw,terminal166=None):
+     prior=checked(ref)
+     if prior["after_etag"]==etag and prior["after_sha256"]==digest(raw) and prior["after_status"]==json.loads(raw):return ref,prior
+     if e == replay167_rate.EPOCH:
+         return replay167_event.follow(ref,etag,raw)
+-    need(e not in IDS,"canonical remote status changed; reconcile current owner's event")
++    need(e not in IDS or (e==166 and terminal166),"canonical remote status changed; reconcile current owner's event")
+     # Follow a finite, hash-and-ETag-linked chain of root-owned corrections.
+     events=[]
+     for p in STATUS_ROOT.glob("event-*/RECEIPT.json"):
+         if p.lstat().st_uid!=0:continue
+         v=content(p)
+-        if v.get("epoch")==e and v.get("authenticated_readback") and v.get("current_repair_owner")=="/root":events.append((p,v))
++        if v.get("epoch")==e and v.get("authenticated_readback") and v.get("current_repair_owner")=="/root":
++            if e!=166 or v.get(closed166.FIELD)==terminal166:events.append((p,v))
+     seen=set()
+     while ref["sha256"] not in seen:
+         seen.add(ref["sha256"])
+@@ -145,16 +149,19 @@
+     old=prior["after_status"];after,archive=forecast(c,e,old)
+     result = dict(schema="horizon-status-only-range-refresh-v1",epoch=e,key=key(e),sampled_at_utc=c.stamp,
+         before_status=old,before_etag=etag,before_sha256=digest(raw),after_status=after,after_sha256=digest(body(after)),
+-        previous_receipt=ref,conditional_header="If-Match",current_repair_owner=None if e in IDS or (c.full172 and e==172) else "/root",
+-        current_replay_lanes=sum(c.advancing.values()),canonical_producer_count=3+bool(c.full172),active_bootstraps=int(bool(c.full172) and c.full172_row["stage"]=="bootstrap"),
++        previous_receipt=ref,conditional_header="If-Match",current_repair_owner=None if e in c.rows or (c.full172 and e==172) else "/root",
++        current_replay_lanes=sum(c.advancing.values()),canonical_producer_count=len(c.rows)+bool(c.full172),active_bootstraps=int(bool(c.full172) and c.full172_row["stage"]=="bootstrap"),
+         full172_observation=bound(c.paths["out"]/"FULL172_OBSERVATION.json") if c.full172 else None,
+-        producer_invocation_id=c.full172_row["unit"]["InvocationID"] if e==172 and c.full172 else IDS[e][0] if e in IDS else None,epoch_useful_work=c.lanes[e]["useful_work"] if e in c.lanes else None,
++        producer_invocation_id=c.full172_row["unit"]["InvocationID"] if e==172 and c.full172 else IDS[e][0] if e in c.rows else None,epoch_useful_work=c.lanes[e]["useful_work"] if e in c.lanes else None,
+         native_identity=c.native.get(str(e)),archive_sample=archive,observer=c.sample_ref,fleet_predecessor=status_predecessor(c),terminal172_closure=c.fleet["terminal172_closure"],metered172_closure=c.fleet["metered172_closure"],terminal169_transfer=c.fleet["terminal169_transfer"],
+         current_retry9_replay_event=c.fleet["current_retry9_replay_event"],historical_epoch170_closures=c.closures,
+         latest_terminal_retry8_170=c.fleet["latest_terminal_retry8_170"],private_diagnostic_admission=DIAG_REF,
+         coordinated_private_diagnostic_168=c.diagnostic if e==168 else None,coordinated_private_diagnostic_169=c.diagnostic169 if e==169 else None,measured_canonical_progress=c.advancing.get(e,False),
+         estimate_model="Clean positive slot growth over at least 60 seconds plus 10 percent and 12 hours. Otherwise retain the authenticated absolute forecast.",
+         archive_publication_authorized=False,replay_launch_authorized=False)
++    if e==166 and c.terminal166:
++        result.update(terminal166_local_commit=c.terminal166,
++                      estimate_model="Local cohort commit, confirmed archive size and outstanding delivery allowance.")
+     result.update(private136.status_fields(c,e))
+     if e == replay167_rate.EPOCH:
+         result.update(estimate_model=replay167_rate.MODEL, rolling_rate_evidence=c.rolling167)
+@@ -187,9 +194,9 @@
+             r=content(ip);receipt_identity(r,c,e)
+             need((etag==r["before_etag"] and digest(data)==r["before_sha256"]) or (data==body(r["after_status"]) and digest(data)==r["after_sha256"]),"partial conditional outcome changed on R2")
+         else:
+-            ref,prior=follow_event(e,c.prior["receipts"][str(e)],etag,data)
++            ref,prior=follow_event(e,c.prior["receipts"][str(e)],etag,data,c.terminal166)
+             if utc(prior["after_status"]["sampled_at_utc"])>c.now:
+-                need(e not in IDS and not (e==172 and c.full172) and prior["current_repair_owner"]=="/root","newer canonical status would be overwritten")
++                need(e not in c.rows and not (e==172 and c.full172) and prior["current_repair_owner"]=="/root","newer canonical status would be overwritten")
+                 receipts[str(e)]=newer[str(e)]=ref;continue
+             r=proof(c,e,ref,prior,etag,data)
+         plan.append((e,ip,rp,r))
+@@ -212,7 +219,7 @@
+         authenticated_status_count=19,all_nineteen_existing_statuses_authenticated=True,active_report_keys=list(EPOCHS),status_epochs=list(EPOCHS),
+         authenticated_ready_pairs=len(ready),ready_epochs=ready,remaining_epochs=sorted(set(range(101,201))-set(ready)),authenticated_readback=True,
+         receipts=receipts,newer_events_read_back_without_overwrite=newer,replay_lanes=sum(c.advancing.values()),active_bootstraps=int(bool(c.full172) and c.full172_row["stage"]=="bootstrap"),
+-        active_producer_count=5+bool(c.full172)+private136.active(c.private136),canonical_producer_count=3+bool(c.full172),active_private_diagnostic_count=2+private136.active(c.private136),**private136.status_fields(c),archive_or_sidecar_mutations=False,
++        active_producer_count=len(c.rows)+2+bool(c.full172)+private136.active(c.private136),canonical_producer_count=len(c.rows)+bool(c.full172),active_private_diagnostic_count=2+private136.active(c.private136),**private136.status_fields(c),archive_or_sidecar_mutations=False,
+         current_retry9_replay_event=c.fleet["current_retry9_replay_event"],latest_terminal_retry8_170=c.fleet["latest_terminal_retry8_170"],
+         coordinated_private_diagnostic_168=c.diagnostic,coordinated_private_diagnostic_169=c.diagnostic169,effective_status_predecessor=c.fleet["authenticated_status_audit"]))
+     return bound(complete)
