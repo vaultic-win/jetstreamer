@@ -11,7 +11,7 @@ parent136 inspect "$writer_plan" "$writer_sha" "$controller_seal" "$seal_sha"
 
 `prepare-inputs` pins the fixed historical snapshot download receipt and the exact fleet selected for this writer. It creates root-owned, immutable content-addressed copies and verifies their bytes on reuse. The actor receives these files read-only at their original paths along with the sealed controller at its canonical path. `inspect` checks the actual sealed writer and reports the host controller, current request/reproduction presence and prospective base unit arguments. The final command acquires its fleet-specific mounts after admission.
 
-After the 145 post-full owner qualifies for seven producers and a current full fit succeeds, the parent metadata service can drive both events from the same execution. Run this pair in its existing charged, R2-enabled service immediately after preparing the immutable input mirrors. Supply the tested root-owned writer launcher and the verified parent image.
+After the 145 owner qualifies for the complete current fleet plus the bounded 136 diagnostic and a current full fit succeeds, the parent metadata service can drive both events from the same execution. Run this pair in its existing charged, R2-enabled service immediately after preparing the immutable input mirrors. Supply the tested root-owned writer launcher and the verified parent image.
 
 ```sh
 "$writer_launcher" session "$writer_plan" "$writer_sha" "$fleet" "$fleet_sha"

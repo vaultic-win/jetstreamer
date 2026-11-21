@@ -17,15 +17,15 @@ parser.add_argument("fleet", type=Path)
 parser.add_argument("digest")
 parser.add_argument("fixture_parent", type=Path)
 a = parser.parse_args()
-pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/active-delivery-eta-20261121-v1/publisher-v1")
-assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest() == "d7bb6adb2390bcc534915cb4e78b0e3743ca5de62f481302dac226207bb44e33"
+pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1")
+assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest() == "76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53"
 sys.path.insert(0,str(pkg))
 import status
 from cycle import load_fleet
 from evidence import bound, checked, durable, lock, names, utc
 
 f, cfg, cohort = load_fleet({"path":str(a.fleet),"sha256":a.digest})
-assert f["active_producer_count"] == 6 and f["all_active_status_reports_authenticated_readback"]
+assert f["active_producer_count"] == 5 and f["terminal168_trace_mismatch"]["sha256"] == "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2" and f["all_active_status_reports_authenticated_readback"]
 oldref = cohort["receipts"]["136"]
 original = checked(oldref)
 assert oldref==f["effective_status_receipts"]["136"] and original["current_repair_owner"]=="/root"

@@ -6,8 +6,8 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::process::{Command, Stdio};
 
 const BRIDGE_PKG: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/active-delivery-eta-20261121-v1/publisher-v1";
-const BRIDGE_SEAL: &str = "d7bb6adb2390bcc534915cb4e78b0e3743ca5de62f481302dac226207bb44e33";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1";
+const BRIDGE_SEAL: &str = "76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53";
 pub fn take_lock(path: &Path, create: bool) -> Result<File> {
     let file = OpenOptions::new()
         .read(true)
