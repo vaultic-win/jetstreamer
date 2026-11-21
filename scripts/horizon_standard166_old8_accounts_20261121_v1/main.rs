@@ -119,16 +119,20 @@ fn only_appendvecs(ledger: &stopped_tree::Ledger) -> bool {
     let shard = |v: &str| matches!(v, "0" | "1" | "2" | "3");
     let number = |v: &str| !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit());
     ["0", "1", "2", "3"].iter().all(|k| ledger.contains_key(*k))
-        && ledger.keys().all(|key| {
+        && ledger.iter().all(|(key, entry)| {
+            let directory = serde_json::to_value(entry)
+                .ok()
+                .and_then(|e| e["directory"].as_bool());
             if shard(key) {
-                return true;
+                return directory == Some(true);
             }
-            key.split_once('/').is_some_and(|(dir, name)| {
-                shard(dir)
-                    && name
-                        .split_once('.')
-                        .is_some_and(|(slot, index)| number(slot) && number(index))
-            })
+            directory == Some(false)
+                && key.split_once('/').is_some_and(|(dir, name)| {
+                    shard(dir)
+                        && name
+                            .split_once('.')
+                            .is_some_and(|(slot, index)| number(slot) && number(index))
+                })
         })
 }
 
@@ -276,5 +280,33 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("{e:#}");
         std::process::exit(1)
+    }
+}
+
+#[cfg(test)]
+mod appendvec_tests {
+    use super::*;
+
+    #[test]
+    fn only_four_directories_and_regular_numeric_appendvecs() {
+        let temp = tempfile::tempdir().unwrap();
+        for n in ["0", "1", "2", "3"] {
+            fs::create_dir(temp.path().join(n)).unwrap();
+        }
+        let root = File::open(temp.path()).unwrap();
+        let m = root.metadata().unwrap();
+        let accepts =
+            || only_appendvecs(&stopped_tree::capture(&root, m.dev(), m.uid(), m.gid()).unwrap());
+        fs::write(temp.path().join("1/71500000.412"), b"appendvec").unwrap();
+        assert!(accepts());
+        fs::create_dir(temp.path().join("2/71501000.508")).unwrap();
+        assert!(!accepts());
+        fs::remove_dir(temp.path().join("2/71501000.508")).unwrap();
+        fs::write(temp.path().join("2/bank"), b"retain").unwrap();
+        assert!(!accepts());
+        fs::remove_file(temp.path().join("2/bank")).unwrap();
+        fs::remove_dir(temp.path().join("3")).unwrap();
+        fs::write(temp.path().join("3"), b"regular").unwrap();
+        assert!(!accepts());
     }
 }
