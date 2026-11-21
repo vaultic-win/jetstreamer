@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_post145_only)]
+#[cfg(incident_timeout_post145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v11/post-stop-fit";
+#[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v7/post-stop-fit";
 #[cfg(incident_timeout145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit";
@@ -367,7 +369,7 @@ fn pending_join(error: &str) -> Result<Option<u64>> {
 }
 
 /// Only the sealed fleet provider's exact, read-only PID1 probe can defer the child.
-#[cfg(incident_timeout145_only)]
+#[cfg(any(incident_timeout145_only, incident_timeout_post145_only))]
 pub fn manager_timeout<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
     let trace = stderr.trim_end();
     let entry = format!("Traceback (most recent call last):\n  File \"{provider}\", line ");
@@ -421,7 +423,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             )
             .into());
         }
-        #[cfg(incident_timeout145_only)]
+        #[cfg(any(incident_timeout145_only, incident_timeout_post145_only))]
         if out.status.code() == Some(1)
             && out.stdout.is_empty()
             && let Some(unit) = manager_timeout(&err, PROVIDER)
@@ -625,7 +627,10 @@ fn current_guard(
 fn observe_idle<T>(mut observe: impl FnMut() -> Result<T>) -> Result<T> {
     loop {
         match observe() {
-            Err(e) if cfg!(incident_timeout145_only) && e.is::<capacity::TopologyTimeout>() => {
+            Err(e)
+                if cfg!(any(incident_timeout145_only, incident_timeout_post145_only))
+                    && e.is::<capacity::TopologyTimeout>() =>
+            {
                 eprintln!("epoch145 waiting for a complete PID1 census: {e:#}");
                 thread::sleep(if cfg!(test) {
                     Duration::from_millis(20)

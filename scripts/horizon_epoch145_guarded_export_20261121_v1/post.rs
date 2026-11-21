@@ -4,7 +4,10 @@
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 
+#[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
+#[cfg(incident_timeout_post145_only)]
+pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v8/export145";
 const EXPORT: &str = "de6780b860b3467bae21fbd19176ca14";
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
 #[cfg(not(incident_post145_only))]
@@ -16,12 +19,17 @@ pub(super) const VERIFIER: &str =
 #[cfg(not(incident_post145_only))]
 pub(super) const PIPELINE: &str =
     "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51";
-#[cfg(incident_post145_only)]
+#[cfg(incident_timeout_post145_only)]
+pub(super) const PIPELINE: &str =
+    "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
+#[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 pub(super) const PIPELINE: &str =
     "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e";
 #[cfg(not(incident_post145_only))]
 const READER_COMMIT: &str = "ee55f614012585bc99e4ed7398a56758bde2664e";
-#[cfg(incident_post145_only)]
+#[cfg(incident_timeout_post145_only)]
+const READER_COMMIT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
+#[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
 const ANCHORS: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1";
@@ -322,23 +330,46 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
             &root.join("current-reader-tools-v2/build-proof.json"),
             "5a28798a19f694028b748fec0f222cf654b3e2de464706d24e7c106259cccbd4",
         ),
-        bound(
-            &root.join("current-reader-tools-v2/native-results.json"),
-            "eff17d9c60a6a2fdfacd750841a78f4f7eeddde7c3687b961bfb5b862b6a7019",
-        ),
-        bound(
-            &root.join("current-reader-tools-v2/reader-equivalence.json"),
-            "bf45b73e14acd383d23ac4088b28c94db98c0fee095d83d9be06c766bbbe1f61",
-        ),
+        if cfg!(incident_timeout_post145_only) {
+            bound(&Path::new(capacity::RUNTIME).join("public-rseek-reconnect-20261121-v1/archive-reader-1d1c4ea175b049c8a6487bc2cb3d1bde/fixtures/native-results.json"),"2e4f273f8fa04cf3438af5fdc23c19c1e3032c2619493e0e318d2ad21d83157a")
+        } else {
+            bound(
+                &root.join("current-reader-tools-v2/native-results.json"),
+                "eff17d9c60a6a2fdfacd750841a78f4f7eeddde7c3687b961bfb5b862b6a7019",
+            )
+        },
+        if cfg!(incident_timeout_post145_only) {
+            bound(&Path::new(capacity::RUNTIME).join("public-rseek-reconnect-20261121-v1/archive-reader-1d1c4ea175b049c8a6487bc2cb3d1bde/ARCHIVE_QUALIFIED.json"),"433a9607c0e8d56461709caecf2a112aa75048ca5ac085bb2923af842e15115b")
+        } else {
+            bound(
+                &root.join("current-reader-tools-v2/reader-equivalence.json"),
+                "bf45b73e14acd383d23ac4088b28c94db98c0fee095d83d9be06c766bbbe1f61",
+            )
+        },
     );
     let proof = custody::json(&current, true)?;
+    let (commit, build_key, seal_key) = if cfg!(incident_timeout_post145_only) {
+        (
+            "source_commit",
+            "new_pipeline_evidence",
+            "new_pipeline_seal",
+        )
+    } else {
+        ("branch_commit", "actual_current_build", "seal")
+    };
+    ensure!(proof[commit] == READER_COMMIT, "current pipeline build");
+    #[cfg(incident_timeout_post145_only)]
     ensure!(
-        proof["branch_commit"] == READER_COMMIT,
-        "current pipeline build"
+        proof["schema"] == "horizon-shared-current-archive-reader-transition-v1"
+            && proof["remote_mutations"] == false
+            && proof["full_verifier"] == json!(full)
+            && proof["complete_build_evidence"] == json!(built)
+            && proof["native_fixture"] == json!(test),
+        "current release and full verifier artifacts changed"
     );
     let pipe: Bound = serde_json::from_value(proof["pipeline"].clone())?;
     ensure!(pipe.sha256 == PIPELINE, "unqualified plugin");
-    for key in ["actual_current_build", "seal"] {
+    for key in [build_key, seal_key] {
         custody::json(&serde_json::from_value(proof[key].clone())?, true)?;
     }
     ensure!(
@@ -375,16 +406,22 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     );
     #[cfg(incident_post145_only)]
     let qualified = {
-        let directory = Path::new(capacity::RUNTIME)
-            .join("epoch166-retry10-delivery-20261121-v1/qualified-reader");
-        let seal = bound(
-            &directory.join("deployment-seal-receipt.json"),
-            "25106ce6590af4022c0d0c4e25a50762c178215bd797973b719b68059cd8e3e0",
-        );
-        let item = bound(
-            &directory.join("qualification.json"),
-            "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486",
-        );
+        let (directory, package, proof) = if cfg!(incident_timeout_post145_only) {
+            (
+                "public-rseek-reconnect-20261121-v1/production-reader-v1",
+                "b76a3860a7c7d890e7405417a0848cc62575d7b501bdc5789502ef29b570af07",
+                "432f57f077e6b82632d3bae94b000bd9a42751c9a3bab7ee20cb69c3b73fd471",
+            )
+        } else {
+            (
+                "epoch166-retry10-delivery-20261121-v1/qualified-reader",
+                "25106ce6590af4022c0d0c4e25a50762c178215bd797973b719b68059cd8e3e0",
+                "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486",
+            )
+        };
+        let directory = Path::new(capacity::RUNTIME).join(directory);
+        let seal = bound(&directory.join("deployment-seal-receipt.json"), package);
+        let item = bound(&directory.join("qualification.json"), proof);
         let deployment = custody::json(&seal, true)?;
         let accepted = custody::json(&item, true)?;
         ensure!(
@@ -677,7 +714,11 @@ mod tests {
         assert_eq!(plugin.sha256, PIPELINE);
         assert_eq!(
             plan.sha256,
-            "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486"
+            if cfg!(incident_timeout_post145_only) {
+                "432f57f077e6b82632d3bae94b000bd9a42751c9a3bab7ee20cb69c3b73fd471"
+            } else {
+                "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486"
+            }
         );
     }
     #[test]

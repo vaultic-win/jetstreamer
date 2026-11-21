@@ -7,6 +7,9 @@ import sys
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
+TIMEOUT_SUCCESSOR = Path(__file__).resolve().parent.name == "tools-v8"
+if TIMEOUT_SUCCESSOR:
+    PKG = PKG.parent / "tools-v8"
 IMAGE = PKG / "export145"
 STATE = ROOT / "epoch145-guarded-export-20261121-v1/state"
 PUBLICATION = ROOT / "epoch145-publication-20261121-v1"
@@ -22,6 +25,12 @@ VERIFIER = PUBLICATION / "current-reader-tools-v2/verify_archive"
 UPLOADER = PUBLICATION / "uploader-tools/jetstreamer-r2"
 BOOTSTRAP = "dc043eb78c4a4349b0098760dc764a1f"
 ADVANCING = "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199"
+ADVANCING_NAME = "V5B_ACTUAL_ADVANCING_WORKER.json"
+if TIMEOUT_SUCCESSOR:
+    PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/public-rseek-reconnect-56bf2bf0937f/horizon_pipeline")
+    BOOTSTRAP = "d37f36f898a44932a19fd50d7014a6fe"
+    ADVANCING = "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76"
+    ADVANCING_NAME = "V5C_ACTUAL_ADVANCING_WORKER.json"
 
 
 def argv(pid):
@@ -62,7 +71,7 @@ def generation(s, parent, mode, args, fleet, m, profile):
 
 def completion(s):
     old = STATE / BOOTSTRAP
-    advancing, _ = s.read(PKG.parent / "V5B_ACTUAL_ADVANCING_WORKER.json", ADVANCING)
+    advancing, _ = s.read(PKG.parent / ADVANCING_NAME, ADVANCING)
     start, start_ref = s.read(old / "recovery-started.json", advancing["start"]["sha256"])
     verified, vr = s.read(old / "verified-frozen.json")
     done, dr = s.read(old / "complete.json")

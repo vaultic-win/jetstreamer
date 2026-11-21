@@ -9,7 +9,7 @@ import tempfile
 import time
 import unittest
 
-phase = runpy.run_path(str(Path(__file__).with_name("incident-post-phase.py")))
+phase = runpy.run_path(os.environ.get("POST_PHASE_UNDER_TEST", str(Path(__file__).with_name("incident-post-phase.py"))))
 class Status:
     @staticmethod
     def need(value, message):
@@ -34,6 +34,13 @@ class Status:
         return int(row[1]), int(row[19]), (p / "cgroup").read_text().strip()
 
 class PostPhaseTest(unittest.TestCase):
+    def test_expected_reader_and_semantic_predecessor(self):
+        if "POST_PHASE_UNDER_TEST" in os.environ:
+            self.assertTrue(phase["TIMEOUT_SUCCESSOR"])
+            self.assertEqual(phase["BOOTSTRAP"], "d37f36f898a44932a19fd50d7014a6fe")
+            self.assertEqual(phase["ADVANCING"], "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76")
+            self.assertEqual(phase["PIPE"].parent.name, "public-rseek-reconnect-56bf2bf0937f")
+
     def test_full_native_read_and_foreign_command(self):
         fn = phase["ordinary_full"]
         s = Status()
@@ -75,7 +82,7 @@ class PostPhaseTest(unittest.TestCase):
                 def record(label, doc):
                     return save(folder / (label + ".json"), doc)
                 started = record("recovery-started", {"iid": gen, "r2_mutations": False})
-                proof = save(base / "V5B_ACTUAL_ADVANCING_WORKER.json",
+                proof = save(base / phase["ADVANCING_NAME"],
                              {"invocation_id": gen, "start": started})
                 frozen = record("verified-frozen", {"iid": gen, "r2_mutations": False})
                 original = "de6780b860b3467bae21fbd19176ca14"
@@ -86,7 +93,7 @@ class PostPhaseTest(unittest.TestCase):
                     "archive_publication_authorized": False, "extraction": e})
                 done = record("complete", {"iid": gen, "receipt": extracted,
                               "recovered_from": original, "r2_mutations": False})
-                fn.__globals__.update(STATE=folder.parent, PKG=base / "tools-v7", ADVANCING=proof["sha256"],
+                fn.__globals__.update(STATE=folder.parent, PKG=base / phase["PKG"].name, ADVANCING=proof["sha256"],
                                       ARCHIVE=pub, OUTPUT=base)
                 self.assertEqual(fn(Status()), (done, e))
                 (base / ".tmp36MvkN").touch()
