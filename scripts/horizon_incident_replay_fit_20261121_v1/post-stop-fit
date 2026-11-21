@@ -268,14 +268,17 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def profile145(here):
-    cfg,ref=s.read(here/"profile145.json")
-    v5=R/"epoch145-semantic-continuity-20261121-v1/tools-v5"
-    seal,sr=s.read(v5/"deployment-seal-receipt.json",cfg["seal_sha256"])
-    build,br=s.read(v5/"build-proof.json",cfg["build_sha256"])
+def profile145(here, post=False):
+    profile="profile145-post.json" if post else "profile145.json"
+    directory="tools-v6" if post else "tools-v5"
+    name="incident-post-phase.py" if post else "incident-phase.py"
+    cfg,ref=s.read(here/profile)
+    package=R/"epoch145-semantic-continuity-20261121-v1"/directory
+    seal,sr=s.read(package/"deployment-seal-receipt.json",cfg["seal_sha256"])
+    build,br=s.read(package/"build-proof.json",cfg["build_sha256"])
     rows={x["name"]:x["sha256"] for x in seal["members"]}
-    adapter=v5/"incident-phase.py";image=v5/"export145"
-    s.need(seal["destination"]==str(v5) and rows[adapter.name]==cfg["adapter_sha256"] and
+    adapter=package/name;image=package/"export145"
+    s.need(seal["destination"]==str(package) and rows[adapter.name]==cfg["adapter_sha256"] and
            rows[image.name]==build["verifier_sha256"]==cfg["image_sha256"] and rows["build-proof.json"]==br["sha256"],
            "different native 145 adapter, verifier or build")
     fit.binary(adapter,cfg["adapter_sha256"]);fit.binary(image,cfg["image_sha256"])
@@ -292,11 +295,17 @@ def phase145(epoch):
             s.need(m["InvocationID"]==failure["iid"] and m["ExecMainStatus"]=="1" and
                    "exit status: 124" in failure["error"],"unbound failed 145")
             v["failure"]=fr
+        elif any((R/"epoch145-publication-20261121-v1").glob("network-*/complete.json")):
+            result,settled=fit.phase145()
+            s.need(settled and result.get("publication"),"145 final authenticated publication not proven")
+            v["publication"]=result["publication"]
         return v
     current=Path(__file__).resolve()
-    fp=R/"epoch145-semantic-continuity-20261121-v1/tools-v5/export145"
-    if fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent)
+    base=R/"epoch145-semantic-continuity-20261121-v1"
+    post=(base/"tools-v6/export145").exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",base/"tools-v6/export145")
+    fp=base/"tools-v5/export145"
+    if post or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,adapter,_=profile145(current.parent,post)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")

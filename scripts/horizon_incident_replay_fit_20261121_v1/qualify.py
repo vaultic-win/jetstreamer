@@ -66,7 +66,8 @@ def main():
         p=here/name;b=p.read_bytes()
         s.need(b==git("show",commit+":scripts/horizon_incident_replay_fit_20261121_v1/"+name),"unpublished qualification source")
         src[name]=digest(b)
-    cfg,adapter,binding=m["profile145"](here)
+    _,_,binding=m["profile145"](here)
+    _,_,post_binding=m["profile145"](here,True)
     rejected(lambda:m["fleet_head"](dict(fleet,sha256="0"*64)))
     if fleet!=m["PREV"]:rejected(lambda:m["fleet_head"](m["PREV"]))
     rejected(lambda:m["capture"](171,fleet))
@@ -93,7 +94,7 @@ def main():
     realized=floor(raw,optional,grown,170,peer,{"170":dict(prestart_remaining=older["remaining_bytes"],floor=baseline[1])})
     s.need(realized[0]+amount==baseline[0] and realized[1]==baseline[1],"own growth changes protected unrelated claims")
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork)
     target=D/name
     with target.open("xb") as f:
