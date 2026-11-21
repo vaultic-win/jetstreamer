@@ -104,6 +104,34 @@ def raise_ceiling(change=set_property, inspect=profile, marker=lambda:(GROUP/'cp
         restore(change, inspect)
         raise
 
+def event_fence(epoch, delivery, service_name):
+    registration = bound(R/'incident-replay-fit-20261121-v1/BOUNDED_FIVE_PUBLICATION_EVENT_FENCE.json')
+    need(registration['sha256']=='69d3ee179a4d562e748b645cec9cff3b7075261b2173678986a022c779d83440', 'foreign event fence')
+    recorded = checked(registration)
+    marker_ref = recorded['marker']
+    marker = Path(marker_ref['path'])
+    policy = checked(marker_ref)
+    need(policy['epochs']==[166,167,168,170,172] and policy['publication_permitted'] is False and marker.stat().st_mode&0o777==0o400,
+         'unregistered terminal hold marker')
+    row = recorded['after'][str(epoch)]
+    prior_service = row['event_service']
+    before_path = row['path_watcher']
+    need(prior_service['Id']==service_name and before_path['Id']==service_name.removesuffix('.service')+'.path', 'different event owner')
+    path = show(before_path['Id'], tuple(before_path))
+    service = show(service_name, tuple(k for k in prior_service if k!='Conditions'))
+    need(path==before_path and all(prior_service[k]==v for k,v in service.items()), 'changed original terminal watcher or service')
+    drop = recorded['dropins'][str(epoch)]
+    props = show(service_name, ('DropInPaths','NeedDaemonReload','ControlPID'))
+    need(props['NeedDaemonReload']=='no' and props['ControlPID']=='0' and drop['path'] in props['DropInPaths'].split() and bound(Path(drop['path']))==drop,
+         'original event fence is absent in PID1')
+    bus = ['busctl','--system','--json=short']
+    object_path = json.loads(subprocess.check_output(bus+['call','org.freedesktop.systemd1','/org/freedesktop/systemd1','org.freedesktop.systemd1.Manager','GetUnit','s',service_name]))['data'][0]
+    conditions = json.loads(subprocess.check_output(bus+['get-property','org.freedesktop.systemd1',object_path,'org.freedesktop.systemd1.Unit','Conditions']))
+    need(conditions=={'type':'a(sbbsi)','data':[['ConditionPathExists',False,True,str(marker),0]]}, 'effective inverted event condition differs')
+    need(path['Paths']==row['terminal']+' (PathExists)' and not Path(row['terminal']).exists()
+         and Path(row['event_state'])==delivery/'event-state' and not any((delivery/'event-state').iterdir()), 'actual terminal or delivery intent pending')
+    return dict(registration=registration, marker=marker_ref, path=path, service=service, dropin=drop, conditions=conditions)
+
 def checked_prices():
     root = R/'incident-replay-fit-20261121-v1'
     registration = bound(root/'BOUNDED_FIVE_PUBLICATION_CAPACITY.json')
@@ -126,8 +154,10 @@ def checked_prices():
         service = show(unit+'.service', ('MainPID','ActiveState','ExecStart','Job'))
         need(path['ActiveState']=='active' and unit+'.service' in path['Triggers'].split()
              and service['ActiveState']=='inactive' and service['MainPID']=='0' and not service['Job'], 'event in flight or unarmed')
-        need(str(delivery/'event-tools-bounded')+'/' in service['ExecStart'], 'old terminal event selector remains armed')
-        bindings[str(epoch)] = dict(path=path,service=service,adapter=value)
+        fence = None
+        if str(delivery/'event-tools-bounded')+'/' not in service['ExecStart']:
+            fence = event_fence(epoch, delivery, unit+'.service')
+        bindings[str(epoch)] = dict(path=path,service=service,adapter=value,active_fence=fence)
     return dict(registration=registration,provider=body['provider'],epochs=bindings)
 
 def apply(head, handoff_refs):
