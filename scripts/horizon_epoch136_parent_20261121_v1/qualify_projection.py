@@ -16,9 +16,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument("fleet", type=Path)
 parser.add_argument("digest")
 parser.add_argument("fixture_parent", type=Path)
+parser.add_argument("--combined",action="store_true")
 a = parser.parse_args()
 pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1")
-assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest() == "76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53"
+seal="76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53"
+if a.combined:
+    pkg=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch166-post168-cadence-20261121-v1/publisher-v1")
+    seal="923519c0d6f031594b9b5b34195af8b37772c25553c5cb7d195f8ec66e7c276c"
+assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest()==seal
 sys.path.insert(0,str(pkg))
 import status
 from cycle import load_fleet
@@ -54,7 +59,7 @@ candidate={"epoch":136,"key":"epoch-136.epoch-status.json","previous_receipt":ol
 
 with tempfile.TemporaryDirectory(dir=a.fixture_parent) as temp:
     root=Path(temp)
-    head = json.loads(subprocess.check_output([sys.executable,"-IB",str(Path(__file__).with_name("transport.py")),"head"],
+    head = json.loads(subprocess.check_output([sys.executable,"-IB",str(Path(__file__).with_name("transport.py")),"head",str(pkg)],
                           input=json.dumps({"fleet":{"path":str(a.fleet),"sha256":a.digest}}).encode(),timeout=25))
     upcoming = names(head["due"])
     assert head["next_lock"] == str(upcoming["statuses"]/"cycle.lock") and head["timer"]==upcoming["timer"]

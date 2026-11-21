@@ -8,6 +8,18 @@ use std::process::{Command, Stdio};
 const BRIDGE_PKG: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1";
 const BRIDGE_SEAL: &str = "76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53";
+const NEXT_PKG: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch166-post168-cadence-20261121-v1/publisher-v1";
+const NEXT_SEAL: &str = "923519c0d6f031594b9b5b34195af8b37772c25553c5cb7d195f8ec66e7c276c";
+static SELECTED: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+fn bridge_package(consumer: &Path) -> Result<(&'static str, &'static str)> {
+    for (pkg, seal) in [(BRIDGE_PKG, BRIDGE_SEAL), (NEXT_PKG, NEXT_SEAL)] {
+        if Path::new(pkg).join("consume") == consumer {
+            return Ok((pkg, seal));
+        }
+    }
+    anyhow::bail!("unregistered status consumer {}", consumer.display())
+}
 pub fn take_lock(path: &Path, create: bool) -> Result<File> {
     let file = OpenOptions::new()
         .read(true)
@@ -34,17 +46,20 @@ pub fn take_lock(path: &Path, create: bool) -> Result<File> {
     Ok(file)
 }
 fn verify_bridge() -> Result<()> {
-    let pkg = Path::new(BRIDGE_PKG);
-    let s = pinned(&pkg.join("deployment-seal-receipt.json"), BRIDGE_SEAL)?;
-    ensure!(
-        s["destination"] == BRIDGE_PKG
-            && s["sealer_sha256"] == SEALER
-            && s["remote_mutations"] == false,
-        "status adapter seal"
-    );
     let publisher = "horizon-archive-status-cadence-after172-20261120-v1.service";
     let unit = native(publisher)?;
     let pid: i32 = text(&unit["MainPID"])?.parse()?;
+    let consumer = fs::read_link(proc_path(pid, "fd/255"))?;
+    let (folder, seal) = bridge_package(&consumer)?;
+    if folder == BRIDGE_PKG {
+        let intent = Path::new(
+            "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/START_INTENT.json",
+        );
+        ensure!(
+            !intent.try_exists()?,
+            "previous publisher cannot register an arriving normal 168"
+        );
+    }
     let lock = Path::new(
         "/var/lib/jetstreamer/horizon_runtime_data/stable-cadence-controller-20261120-v1/consumer.lock",
     );
@@ -54,7 +69,28 @@ fn verify_bridge() -> Result<()> {
             && unit["SubState"] == "running"
             && unit["NRestarts"] == "0"
             && unit["Job"] == ""
-            && fs::read_link(proc_path(pid, "fd/255"))? == pkg.join("consume")
+            && fs::read_to_string(proc_path(pid, "cgroup"))?.trim()
+                == format!("0::/system.slice/{publisher}"),
+        "active status publisher changed"
+    );
+    verify_consumer(folder, seal, pid, lock)?;
+    ensure!(
+        SELECTED.get_or_init(|| folder) == &folder,
+        "publisher changed during registration"
+    );
+    Ok(())
+}
+fn verify_consumer(folder: &str, seal: &str, pid: i32, lock: &Path) -> Result<()> {
+    let pkg = Path::new(folder);
+    let s = pinned(&pkg.join("deployment-seal-receipt.json"), seal)?;
+    ensure!(
+        s["destination"] == folder
+            && s["sealer_sha256"] == SEALER
+            && s["remote_mutations"] == false,
+        "status adapter seal"
+    );
+    ensure!(
+        fs::read_link(proc_path(pid, "fd/255"))? == pkg.join("consume")
             && same_inode(&proc_path(pid, "fd/255"), &pkg.join("consume"))?
             && same_inode(&proc_path(pid, "fd/9"), lock)?
             && fs::read_to_string(proc_path(pid, "fdinfo/9"))?
@@ -62,16 +98,16 @@ fn verify_bridge() -> Result<()> {
                 .any(|line| line.starts_with("lock:")
                     && line.contains("FLOCK")
                     && line.contains("WRITE")),
-        "active status publisher does not own this bridge and the cadence lock"
+        "consumer does not own the admitted image and kernel lock"
     );
     for m in s["members"].as_array().context("sealed modules")? {
         let name = text(&m["name"])?;
-        if name.ends_with(".py") {
+        if name.ends_with(".py") || name == "consume" {
             ensure!(
                 name.bytes()
                     .all(|v| v.is_ascii_alphanumeric() || b"-._".contains(&v))
                     && bound(&pkg.join(name))?["sha256"] == m["sha256"],
-                "changed bridge module"
+                "changed status reader"
             );
         }
     }
@@ -103,6 +139,9 @@ fn bridge_timeout(op: &str, body: &Value, seconds: u64) -> Result<Value> {
             "-c",
             include_str!("transport.py"),
             op,
+            SELECTED
+                .get()
+                .context("status publisher has not been verified")?,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -571,6 +610,29 @@ pub fn reconcile() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires a private kernel lock and both sealed normal status packages"]
+    fn combined_consumer_owns_exact_fds_and_lock() -> Result<()> {
+        let lock = PathBuf::from(std::env::var("NORMAL168_BRIDGE_FIXTURE_LOCK")?);
+        let pid = std::env::var("NORMAL168_BRIDGE_FIXTURE_PID")?.parse()?;
+        let candidate = Path::new(NEXT_PKG).join("consume");
+        let (folder, seal) = bridge_package(&candidate)?;
+        verify_consumer(folder, seal, pid, &lock)?;
+        ensure!(
+            verify_consumer(BRIDGE_PKG, BRIDGE_SEAL, pid, &lock).is_err(),
+            "crossed publisher"
+        );
+        ensure!(
+            verify_consumer(folder, BRIDGE_SEAL, pid, &lock).is_err(),
+            "crossed seal"
+        );
+        ensure!(
+            verify_consumer(folder, seal, pid, &lock.with_extension("other")).is_err(),
+            "crossed lock"
+        );
+        ensure!(bridge_package(&lock).is_err(), "unknown package");
+        Ok(())
+    }
     #[test]
     fn waiting_owner_never_changes_active_arrays_or_resource_claims() {
         let mut initial = json!({"actual_executing_replays":[{"epoch":167}],"actual_active_bootstraps":[],"actual_active_private_diagnostics":[{"epoch":169}],

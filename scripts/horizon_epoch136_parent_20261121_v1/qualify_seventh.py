@@ -8,9 +8,14 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-parent, current, scratch = map(Path, sys.argv[1:])
+parent, current, scratch = map(Path, sys.argv[1:4])
 base = Path('/var/lib/jetstreamer/horizon_runtime_data')
 package = base/'epoch168-terminal-status-20261121-v1/publisher-v1'
+active = package
+if sys.argv[4:]==['--combined']:
+    package=base/'epoch166-post168-cadence-20261121-v1/publisher-v1'
+elif sys.argv[4:]:
+    raise ValueError("unknown qualification mode")
 legacy = base/'public-audit73-observer-20261121-v1/observer-package'
 following = base/'public-audit73-observer-20261121-v1/following-package-v2'
 sys.path.insert(0, str(package))
@@ -51,7 +56,7 @@ watch=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(watch)
 assert bound(package/'public_witness.py')['sha256']==bound(following/'public_witness.py')['sha256']
 existing=watch.publisher()
-assert Path(existing['package']['path']).parent==package
+assert Path(existing['package']['path']).parent in (active,package)
 assert watch.current_fleet(existing)[0]==actual_ref
 peers=watch.peers(original)
 assert {r["epoch"] for r in original["actual_active_private_diagnostics"]}=={169}
