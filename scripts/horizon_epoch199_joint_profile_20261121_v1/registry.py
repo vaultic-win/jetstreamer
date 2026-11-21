@@ -10,14 +10,14 @@ import subprocess
 import sys
 
 B=Path('/var/lib/jetstreamer/horizon_runtime_data/epoch199-delivery-recovery-20261121-v1')
-P=B/'phase-transition-v2'
+P=B/'phase-transition-v3'
 REG=B/'phase-handoffs'
 KEY='epoch199200_exclusive_phase_transfers'
 ROOTS={166:'epoch166-independent-cold-20261120-v1',167:'epoch167-standard-lane-20261109-v1',168:'epoch168-standard-lane-20261109-v1',170:'epoch170-standard-lane-20261109-v1',172:'epoch172-standard-lane-20261110-v1'}
 
 def service():
     seal=(P/'deployment-seal-receipt.json').read_bytes()
-    if hashlib.sha256(seal).hexdigest()!='5001ac6360926ad5278879a3783e13f299bec132d4d1c6f6bbfe27d432693fdd':
+    if hashlib.sha256(seal).hexdigest()!='c7a2e2d183a3213ad1bec65ac883946f7a4bd558f0da10d2363af3693eb19fb2':
         raise ValueError('unqualified 199/200 recipient')
     for row in json.loads(seal)['members']:
         path=P/row['name']
@@ -46,7 +46,7 @@ def apply(fleet):
         # can call this hook without changing imports or its execution image.
         keys=('owner','schema','all_active_status_reports_authenticated_readback','all_reservation_ending_bytes',KEY,'recovered166_local_commit','indexed167_local_commit','metered168_local_commit','recovered170_local_commit','full172_local_commit')
         small={k:fleet[k] for k in keys if k in fleet}
-        original=B/'phase-registry-v2/registry.py'
+        original=B/'phase-registry-v3/registry.py'
         if Path(__file__).resolve(strict=True)!=original:
             raise ValueError('unsealed normal-cadence grant hook')
         out=subprocess.run(['/usr/bin/python3','-IB',str(original),'register-stdin'],input=json.dumps(small).encode(),capture_output=True,check=True,timeout=30)
