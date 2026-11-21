@@ -143,10 +143,15 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
     if same_window:
         plan = replace(plan,'paid=checked(paid_ref)',"""paid=checked(paid_ref)
 assert checked(paid['reconciliation'])['native_fleet']==fref
-for key,item in paid['conditional_statuses_verified'].items():
+previous_statuses=paid['conditional_statuses_verified']
+if 'full_readback' in paid:
+    receipt=checked(paid['full_readback'])
+    assert receipt['native_fleet']==fref and set(receipt['statuses'])==set(basis)
+    previous_statuses=receipt['statuses']
+for key,item in previous_statuses.items():
     row=checked(item['receipt'])
     found,_=follow_event(int(key),basis[key],row['after_etag'],body(row['after_status']))
-    assert found==item['receipt']
+    assert found==item['receipt'] and row['after_etag']==item.get('etag',row['after_etag']) and row['after_sha256']==item.get('sha256',row['after_sha256'])
     basis[key]=found""")
     historical = False
     if successor_ref:
@@ -268,7 +273,7 @@ after(141,max(ready,donor_available(167,replay_end[167]),"""
     check_controller = inspect.getsource(active_controller)
     apply=replace(apply,"def window():",check_controller+"\ndef window():\n    assert active_controller()==(pkg,sha(seal))")
     apply=replace(apply,"window();remote=storage.put(n,tag,tar);tag,raw=storage.get(n)",
-        """window();remote=storage.put(n,tag,tar)
+        """window();verify_live();remote=storage.put(n,tag,tar)
     durable(dest/'CONDITIONAL_RESPONSE.json',dict(intent=bound(ip),if_match=tag,returned_etag=remote))
     tag,raw=storage.get(n)""")
     apply=replace(apply,"   if not rp.exists():durable", """   response=dest/'CONDITIONAL_RESPONSE.json'
