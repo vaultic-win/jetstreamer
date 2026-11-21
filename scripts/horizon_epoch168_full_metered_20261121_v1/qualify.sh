@@ -67,6 +67,11 @@ root=Path(sys.argv[1]);p=json.loads(Path(sys.argv[2]).read_bytes())
 def bind(source,target):
     if source!=target:
         target.parent.mkdir(parents=True,exist_ok=True)
+        for ancestor in target.parents:
+            if ancestor == root/'ledger':
+                break
+            os.chown(ancestor,1001,1003)
+            os.chmod(ancestor,0o700)
         target.touch(exist_ok=False)
     subprocess.run(['mount','--bind',source,target],check=True)
     subprocess.run(['mount','-o','remount,bind,ro,noatime',target],check=True)
