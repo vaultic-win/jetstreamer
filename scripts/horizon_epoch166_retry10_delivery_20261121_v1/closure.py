@@ -96,6 +96,7 @@ class GuardClosure(NamedTuple):
     admission_mode: int
     worker_hash: str
     terminal_program_hash: str
+    worker_mode: int = 0o444
 
     @property
     def guard_service(self):
@@ -126,7 +127,7 @@ class GuardClosure(NamedTuple):
         term,tr=document(self.terminal_root/"TERMINAL_SUCCESS.json",0o400)
         live,lr=document(self.terminal_root/"LIVE.json",0o600,self.witness_hash)
         a,ar=document(self.admission_root/"ACTUAL_ADMISSION_AND_PROTECTION.json",self.admission_mode,self.admission_hash)
-        w,wr=document(self.admission_root/"FIRST_PROTECTED_WORKER.json",0o444,self.worker_hash)
+        w,wr=document(self.admission_root/"FIRST_PROTECTED_WORKER.json",self.worker_mode,self.worker_hash)
         self.validate_terminal(term,live,lr,ar,wr)
         need(a["producer_unit"]==self.producer_unit and a["producer_invocation_id"]==self.producer_id and a["timer_unit"]==self.guard_timer and
              a["timer_invocation_id"]==self.guard_timer_id and w["admission"]==ar,"foreign admitted guard")
