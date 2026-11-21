@@ -57,6 +57,11 @@ epoch225-v1-6-25-diagnostic = []
 epoch225-v1-6-25-qualification = []
 
 [[bin]]
+name = "jetstreamer-epoch228-demotion-cold-protocol"
+path = "src/bin/epoch228-demotion-cold/protocol.rs"
+required-features = ["epoch228-called-program-demotion-qualification"]
+
+[[bin]]
 name = "jetstreamer-epoch163-native-input"
 path = "src/bin/epoch163-native-input/source/native.rs"
 required-features = ["epoch163-first-output128-diagnostic"]
