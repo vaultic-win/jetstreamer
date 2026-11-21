@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+mod cadence;
 mod receipt;
 
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1";
@@ -229,21 +230,29 @@ fn record(value: &Value) -> Result<()> {
     let path = root.join("TERMINAL_SUCCESS.json");
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
+    publish_exact(&path, &bytes)
+}
+fn publish_exact(path: &Path, bytes: &[u8]) -> Result<()> {
+    let root = path.parent().context("receipt directory")?;
     if path.try_exists()? {
         ensure!(
-            small(&path, 1 << 20)? == bytes,
+            small(path, 1 << 20)? == bytes,
             "conflicting terminal evidence"
         );
         return Ok(());
     }
-    let tmp = root.join(format!(".terminal-{}.partial", std::process::id()));
+    let tmp = root.join(format!(
+        ".{}-{}.partial",
+        path.file_name().context("receipt name")?.to_string_lossy(),
+        std::process::id()
+    ));
     let mut f = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
         .mode(0o400)
         .open(&tmp)?;
     let result = (|| -> Result<()> {
-        f.write_all(&bytes)?;
+        f.write_all(bytes)?;
         f.sync_all()?;
         // Publish without replacing an existing receipt.
         let old = std::ffi::CString::new(tmp.as_os_str().as_encoded_bytes())?;
@@ -260,7 +269,7 @@ fn record(value: &Value) -> Result<()> {
         {
             let e = std::io::Error::last_os_error();
             ensure!(
-                e.kind() == std::io::ErrorKind::AlreadyExists && small(&path, 1 << 20)? == bytes,
+                e.kind() == std::io::ErrorKind::AlreadyExists && small(path, 1 << 20)? == bytes,
                 "terminal publish: {e}"
             );
         }
@@ -274,6 +283,15 @@ fn record(value: &Value) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if let [mode, path] = args.as_slice()
+        && matches!(mode.as_str(), "inspect-cadence" | "dispatch-cadence")
+    {
+        println!(
+            "{}",
+            cadence::select(Path::new(path), mode == "dispatch-cadence")?
+        );
+        return Ok(());
+    }
     ensure!(
         args.len() == 1 && matches!(args[0].as_str(), "inspect" | "record"),
         "usage: terminal166 inspect|record"
