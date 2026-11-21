@@ -14,11 +14,14 @@ pub(super) fn publish(
     checkpoint: [u8; 32],
     last: [u8; 32],
 ) -> Result<()> {
-    ensure!(
-        matches!(epoch, 166 | 167 | 170),
-        "unsupported native fixture"
-    );
-    let shift = (epoch - 166) * 432000;
+    let (bootstrap_slot, checkpoint_slot, slot) = match epoch {
+        168 => (72_575_704, 73_007_829, 73_007_999),
+        166 | 167 | 170 => {
+            let shift = (epoch - 166) * 432_000;
+            (71_711_708 + shift, 72_143_703 + shift, 72_143_999 + shift)
+        }
+        _ => anyhow::bail!("unsupported native fixture"),
+    };
     let private = |path: &Path| {
         fs::DirBuilder::new()
             .recursive(true)
@@ -40,7 +43,6 @@ pub(super) fn publish(
     let staging = dir.join("staged");
     private(&staging)?;
     let staged = staging.join(format!("epoch-{epoch}.jet"));
-    let slot = 72_143_999 + shift;
     let mut writer = ArchiveWriter::new(
         fs::File::create(&staged)?,
         epoch,
@@ -78,12 +80,12 @@ pub(super) fn publish(
         kind: cohort::ROOT_CHECKPOINT_GATE_KIND.into(),
         version: 1,
         verified_manifest_checkpoints: vec![cohort::VerifiedManifestCheckpoint {
-            slot: 72_143_703 + shift,
+            slot: checkpoint_slot,
             accounts_hash: checkpoint,
         }],
         members: vec![cohort::RootCheckpointGateMember {
             epoch,
-            bootstrap: summary(71_711_708 + shift, bootstrap, [2; 32]),
+            bootstrap: summary(bootstrap_slot, bootstrap, [2; 32]),
             terminal: summary(slot, [3; 32], last),
         }],
     };

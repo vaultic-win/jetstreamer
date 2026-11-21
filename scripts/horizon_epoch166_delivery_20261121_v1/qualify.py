@@ -17,7 +17,12 @@ spec = importlib.util.spec_from_file_location("receiver", here / "receiver.py")
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 retry10 = "--retry10" in sys.argv[5:]
-if retry10:
+metered168 = "--metered168" in sys.argv[5:]
+if metered168:
+    sys.argv.remove("--metered168")
+    live_root, original_sha, producer = r.METERED_ROOT, r.METERED_LIVE, r.METERED
+    publication_unit = "horizon-publish-168-metered-committed.service"
+elif retry10:
     sys.argv.remove("--retry10")
     binding = runpy.run_path(str(here / "receive.py"))
     live_root, original_sha = binding["BASE"], binding["LIVE"]
@@ -44,17 +49,26 @@ def put(path, value, mode):
 raw_live = (live_root/"LIVE.json").read_bytes()
 assert r.sha(raw_live) == original_sha
 live = json.loads(raw_live)
+epoch = producer.epoch
 real_fingerprint = live["manifest_fingerprint"].split(":")[1]
+terminal_hash = "0297738fbe936f2a420f581164a059a3212707b53c02218279601c14501b7723"
+fixture_cmd = ["fixture"]
+if metered168:
+    fixture_cmd = ["fixture-epoch", str(epoch)]
+    witness = live["independent_boundary"]
+    data = Path(witness["path"]).read_bytes()
+    assert r.sha(data) == witness["sha256"]
+    terminal_hash = decoded_hash(json.loads(data)["terminal_blockhash"])
 with generator.open("rb") as gen:
     gen_path = f"/proc/self/fd/{gen.fileno()}"
-    actual = json.loads(subprocess.check_output([gen_path, "fixture", str(fixture), real_fingerprint,
+    actual = json.loads(subprocess.check_output([gen_path, *fixture_cmd, str(fixture), real_fingerprint,
              decoded_hash(live["bootstrap"]["accounts_hash"]), decoded_hash(live["checkpoint"]["accounts_hash"]),
-             "0297738fbe936f2a420f581164a059a3212707b53c02218279601c14501b7723"],
+             terminal_hash],
              **who, pass_fds=(gen.fileno(),)))
 batch = Path(actual["path"])
 out = fixture/"output"
-archive = out/"epoch-166.jet"
-sidecar = out/"epoch-166.jet.sha256"
+archive = out/f"epoch-{epoch}.jet"
+sidecar = out/f"epoch-{epoch}.jet.sha256"
 watched = fixture/"watched"
 watched.mkdir(mode=0o700)
 os.chown(watched,*r.OWNER)
@@ -67,8 +81,8 @@ authority.mkdir(mode=0o700)
 live_path = authority/"LIVE.json"
 put(live_path, live, 0o600)
 live_hash = r.sha(live_path.read_bytes())
-terminal = {"schema":"terminal166-success-v1","epoch":166,"live":{"path":str(live_path),"sha256":live_hash},
-    "source_admission":live["admission"],"terminal_166_disposition":"node-published-local-cohort",
+terminal = {"schema":f"terminal{epoch}-success-v1","epoch":epoch,"live":{"path":str(live_path),"sha256":live_hash},
+    "source_admission":live["admission"],f"terminal_{epoch}_disposition":"node-published-local-cohort",
     "producer_invocation_id":producer.invocation_id, "producer_unit":producer.unit,
     "manager_terminal":{"_PID":"1","_BOOT_ID":live["boot_id"].replace("-",""),"UNIT":producer.unit,
     "INVOCATION_ID":producer.invocation_id,"MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448"},
@@ -78,7 +92,7 @@ terminal = {"schema":"terminal166-success-v1","epoch":166,"live":{"path":str(liv
     "archive_publication_authorized":False,"new_producer_authorized":False,"canonical_r2_verified":False}
 term_path=authority/"TERMINAL_SUCCESS.json"
 put(term_path,terminal,0o400)
-lock=batch.parents[3]/"locks/epoch-166.lock"
+lock=batch.parents[3]/f"locks/epoch-{epoch}.lock"
 probe=here/"probe.py"
 result=work/"consumer.json"
 native_sha=r.sha(native.read_bytes()); probe_sha=r.sha(probe.read_bytes())
@@ -105,7 +119,7 @@ wrong=copy.deepcopy(terminal);wrong["committed_receipt"]["sha256"]="ff"*32
 put(term_path,wrong,0o400);denied("wrong-receipt-digest",run,"terminal archive, sidecar or receipt changed")
 wrong=copy.deepcopy(terminal);wrong["producer_invocation_id"]="ff"*16
 put(term_path,wrong,0o400);denied("wrong-producer",run,"terminal authority or original producer differs")
-if retry10:
+if retry10 or metered168:
     wrong=copy.deepcopy(terminal)
     wrong.update(producer_invocation_id=r.ORIGINAL.invocation_id, producer_unit=r.ORIGINAL.unit)
     wrong["manager_terminal"].update(INVOCATION_ID=r.ORIGINAL.invocation_id,UNIT=r.ORIGINAL.unit)
@@ -133,12 +147,12 @@ elif len(sys.argv) > 5:
         watched, native, native_sha, producer, publication_unit)
 with contextlib.ExitStack() as stack:
     nf=r.inherited_program(stack,native,native_sha)
-    deny=subprocess.run([f"/proc/self/fd/{nf}","admit","166",str(batch),"ff"*32,str(watched)],
+    deny=subprocess.run([f"/proc/self/fd/{nf}","admit",str(epoch),str(batch),"ff"*32,str(watched)],
                        **who,pass_fds=(nf,),capture_output=True)
     assert deny.returncode and b"fingerprint" in deny.stderr,deny.stderr
     negatives["wrong-native-fingerprint"]=deny.stderr.decode().strip()
 sidecar.rename(out/"held-sidecar")
-denied("partial-pair",run,"epoch-166.jet.sha256")
+denied("partial-pair",run,f"epoch-{epoch}.jet.sha256")
 (out/"held-sidecar").rename(sidecar)
 os.chown(sidecar,0,0)
 denied("wrong-file-owner",run,"wrong source owner")

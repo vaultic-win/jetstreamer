@@ -1,4 +1,4 @@
-//! Admit one synchronous publication from the committed epoch 166 singleton.
+//! Admit one synchronous publication from the committed singleton.
 //! The fleet capacity provider and receiver are deployed, digest-bound programs.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -16,7 +16,7 @@ use std::{
 };
 
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 mod deployment {
     pub(super) const DELIVERY: &str = "epoch166-committed-delivery-20261121-v1";
     pub(super) const WITNESS: &str = "epoch166-terminal-20261121-v1";
@@ -56,6 +56,29 @@ mod deployment {
         "epoch166-retry10-delivery-20261121-v1/publisher-tools/receive.py";
     pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
 }
+#[cfg(feature = "metered168")]
+mod deployment {
+    pub(super) const DELIVERY: &str = "epoch168-current-delivery-20261121-v1";
+    pub(super) const WITNESS: &str = DELIVERY;
+    pub(super) const UNIT: &str = "horizon-publish-168-metered-committed.service";
+    pub(super) const ORIGIN: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
+    pub(super) const GENERATION: &str = "9cebb1d022124fb08588e93e055d5446";
+    pub(super) const LIVE: &str =
+        "11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7";
+    pub(super) const RECEIVER: &str = env!("HORIZON_HELD_RECEIVER_SHA256");
+    pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
+    pub(super) const FLEET_FIELD: &str = "metered168_local_commit";
+    pub(super) const FIT_PATH: &str =
+        "epoch168-current-delivery-20261121-v1/capacity-tools/publication-fit";
+    pub(super) const RECEIVER_PATH: &str =
+        "epoch168-current-delivery-20261121-v1/publisher-tools/receiver.py";
+    pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
+}
+
+#[cfg(feature = "metered168")]
+const EPOCH: u64 = 168;
+#[cfg(not(feature = "metered168"))]
+const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
 const MEMORY: u64 = 2 << 30;
@@ -154,17 +177,17 @@ fn put(path: &Path, doc: &Value) -> Result<Value> {
 fn validate_terminal(live: &Value, live_ref: &Value, t: &Value, boot: &str) -> Result<()> {
     let event = &t["manager_terminal"];
     ensure!(
-        live["epoch"] == 166
+        live["epoch"] == EPOCH
             && live["boot_id"] == boot
             && live["native"]["manager"]["Id"] == ORIGIN
             && live["native"]["manager"]["InvocationID"] == GENERATION
-            && t["schema"] == "terminal166-success-v1"
-            && t["epoch"] == 166
+            && t["schema"] == format!("terminal{EPOCH}-success-v1")
+            && t["epoch"] == EPOCH
             && t["live"] == *live_ref
             && t["source_admission"] == live["admission"]
             && t["producer_unit"] == ORIGIN
             && t["producer_invocation_id"] == GENERATION
-            && t["terminal_166_disposition"] == "node-published-local-cohort"
+            && t[format!("terminal_{EPOCH}_disposition")] == "node-published-local-cohort"
             && t["resource_credit_bytes"] == 0
             && t["reservation_ending_bytes"] == 0
             && t["canonical_r2_verified"] == false
@@ -180,7 +203,7 @@ fn validate_terminal(live: &Value, live_ref: &Value, t: &Value, boot: &str) -> R
 }
 fn source(live: &Value, t: &Value) -> Result<PathBuf> {
     let output = PathBuf::from(field(&live["output"], "path")?);
-    let archive = output.join("epoch-166.jet");
+    let archive = output.join(format!("epoch-{EPOCH}.jet"));
     let d = fs::symlink_metadata(&output)?;
     let m = fs::symlink_metadata(&archive)?;
     let a = &t["local_archive"];
@@ -219,7 +242,7 @@ fn capacity(
     let avail = number(f, "available_bytes")?;
     let floor = number(f, "protected_bytes")?;
     ensure!(
-        f["schema"] == "horizon-166-publication-fit-v1"
+        f["schema"] == format!("horizon-{EPOCH}-publication-fit-v1")
             && f["boot_id"] == boot
             && f["fleet"] == *fleet
             && f["terminal"] == *terminal
@@ -290,9 +313,9 @@ fn write_admission(
     let c = put(&run.join("capacity.json"), cap)?;
     let observed = number(cap, "observed_unix_seconds")?;
     let a = &terminal["local_archive"];
-    let admission = json!({"schema":"horizon-epoch166-committed-publication-admission-v1",
+    let admission = json!({"schema":format!("horizon-epoch{EPOCH}-committed-publication-admission-v1"),
         "operation":"current-reader-sync-retain-local","publication_authorized":mode=="sync","boot_id":boot,"unit":UNIT,
-        "invocation_id":iid,"epoch":166,"source_directory":output,"transaction_id":terminal["transaction_id"],
+        "invocation_id":iid,"epoch":EPOCH,"source_directory":output,"transaction_id":terminal["transaction_id"],
         "terminal_sha256":term_ref["sha256"],"archive_bytes":a["size"],"archive_sha256":a["sha256"],
         "archive_device":a["device"],"archive_inode":a["inode"],"recorded_unix_seconds":observed,
         "valid_until_unix_seconds":observed.checked_add(180).context("fit expiration overflow")?,
@@ -368,9 +391,11 @@ fn main() -> Result<()> {
     )?;
     cap["provider"] = binding(&provider, fit_sha);
     let receipt = write_admission(&base, mode, &output, &terminal, &cap)?;
-    Err(Command::new("/usr/bin/python3")
-        .arg("-IB")
-        .arg(receiver)
+    let mut dispatch = Command::new("/usr/bin/python3");
+    dispatch.arg("-IB").arg(receiver);
+    #[cfg(feature = "metered168")]
+    dispatch.arg("--metered168");
+    Err(dispatch
         .arg(native)
         .arg(NATIVE)
         .arg(publisher)
@@ -441,7 +466,7 @@ mod tests {
     fn only_a_current_fitting_original_terminal_can_dispatch() {
         let fleet = binding(Path::new("/fleet"), &"a".repeat(64));
         let terminal = binding(Path::new("/terminal"), &"b".repeat(64));
-        let good = json!({"schema":"horizon-166-publication-fit-v1","boot_id":"boot","observed_unix_seconds":100,
+        let good = json!({"schema":format!("horizon-{EPOCH}-publication-fit-v1"),"boot_id":"boot","observed_unix_seconds":100,
             "fleet":fleet,"terminal":terminal,"available_bytes":1000,"protected_bytes":1000,
             "complete_cpu_quota_micros":64000000,"complete_memory_plus_reserve_bytes":810658050048u64,
             "publication_cpu_quota_micros":1000000,"publication_memory_bytes":MEMORY,"available_memory_bytes":800,

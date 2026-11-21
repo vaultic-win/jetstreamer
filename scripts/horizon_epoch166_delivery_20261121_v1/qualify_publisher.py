@@ -30,7 +30,8 @@ def qualify(receiver, fixture_consumer, work, authority, live_hash, terminal,
         path.chmod(0o400)
         return receiver.sha(data)
 
-    archive = source / "epoch-166.jet"
+    epoch = producer.epoch
+    archive = source / f"epoch-{epoch}.jet"
     current = read(work / "fit.json")
     floor = current["protected_home"]
     os.environ.update({
@@ -85,8 +86,8 @@ os.execv(elf, [elf, *args])
             "all_existing_commitments_retained": True,
         })
         admission_sha = put(run / "admission.json", {
-            "schema": "horizon-epoch166-committed-publication-admission-v1",
-            "epoch": 166,
+            "schema": f"horizon-epoch{epoch}-committed-publication-admission-v1",
+            "epoch": epoch,
             "operation": "current-reader-sync-retain-local",
             "publication_authorized": False,
             "unit": publication_unit,
@@ -136,9 +137,9 @@ os.execv(elf, [elf, *args])
         attempt()
         assert read(run / "stdout") == result and receiver.inode(plan_path.stat()) == plan_inode
         assert result["archive_bytes"] == archive.stat().st_size == plan["maximum_archive_bytes"]
-        assert plan["epoch_expectations"].keys() == {"166"} and plan["minimum_free_bytes"] == floor
+        assert plan["epoch_expectations"].keys() == {str(epoch)} and plan["minimum_free_bytes"] == floor
         assert result["arguments"] == [
-            "sync", str(source), "--epochs", "166-166",
+            "sync", str(source), "--epochs", f"{epoch}-{epoch}",
             "--receipt-directory", str(run / "receipts"),
             "--current-reader-plan", str(plan_path),
             "--current-reader-plan-sha256", receiver.sha(plan_path.read_bytes()),

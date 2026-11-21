@@ -37,7 +37,7 @@ struct PublicationProfile {
     boundaries_sha: &'static str,
 }
 
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 const PROFILE: PublicationProfile = PublicationProfile {
     epoch: 166,
     producer: "horizon-qualify-independent-cold166-20261120-v1.service",
@@ -71,6 +71,21 @@ const PROFILE: PublicationProfile = PublicationProfile {
     reader_sha: env!("HORIZON_READER_QUALIFICATION_SHA256"),
     boundaries: "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json",
     boundaries_sha: "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0",
+};
+#[cfg(feature = "metered168")]
+const PROFILE: PublicationProfile = PublicationProfile {
+    epoch: 168,
+    producer: "horizon-qualify-168-full-metered-20261121-v1.service",
+    producer_iid: "9cebb1d022124fb08588e93e055d5446",
+    unit: "horizon-publish-168-metered-committed.service",
+    terminal: "epoch168-current-delivery-20261121-v1",
+    live_sha: "11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7",
+    lock: (64512, 109323419),
+    delivery: "epoch168-current-delivery-20261121-v1",
+    reader: "epoch166-retry10-delivery-20261121-v1/qualified-reader/qualification.json",
+    reader_sha: env!("HORIZON_READER_QUALIFICATION_SHA256"),
+    boundaries: "epoch168-current-delivery-20261121-v1/epoch-expectations/bindings.json",
+    boundaries_sha: "b31b09549161b515da4d254662545ed11dbd2b0d33cb9263072485cbd6985488",
 };
 const UPLOADER: &str = "epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2";
 const ELF: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";

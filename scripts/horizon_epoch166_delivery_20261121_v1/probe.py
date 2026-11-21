@@ -10,7 +10,8 @@ import sys
 result, source = map(Path, sys.argv[1:])
 h = json.loads(os.environ["HORIZON_SOURCE_HANDOFF"])
 assert str(source) == h["directory"] and source.resolve(strict=True) == source
-for name, key in [("epoch-166.jet", "archive_fd"), ("epoch-166.jet.sha256","sidecar_fd")]:
+epoch = h["epoch"]
+for name, key in [(f"epoch-{epoch}.jet", "archive_fd"), (f"epoch-{epoch}.jet.sha256", "sidecar_fd")]:
     expected = (source / name).lstat()
     observed = os.fstat(h[key])
     assert (expected.st_dev, expected.st_ino) == (observed.st_dev, observed.st_ino)

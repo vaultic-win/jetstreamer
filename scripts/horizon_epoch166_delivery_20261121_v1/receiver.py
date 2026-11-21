@@ -34,6 +34,11 @@ class Producer(NamedTuple):
 
 
 ORIGINAL = Producer(166, UNIT, IID)
+METERED = Producer(168, "horizon-qualify-168-full-metered-20261121-v1.service",
+                   "9cebb1d022124fb08588e93e055d5446")
+METERED_ROOT = ROOT.parent / "epoch168-current-delivery-20261121-v1"
+METERED_LIVE = "11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7"
+METERED_LOCK = (64512, 109323419)
 
 
 def require(condition, message):
@@ -216,6 +221,7 @@ def receive(root, expected_digest, lock_id, watched, native, native_hash, consum
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--metered168", action="store_true")
     parser.add_argument("native", type=Path)
     parser.add_argument("native_sha256")
     parser.add_argument("consumer", type=Path)
@@ -225,7 +231,11 @@ if __name__ == "__main__":
     signal.signal(signal.SIGIO, signal.SIG_DFL)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGIO})
     try:
-        print(json.dumps(receive(ROOT, LIVE_SHA, LOCK_ID, watcher(), a.native,
-              a.native_sha256, a.consumer, a.consumer_sha256, a.args), sort_keys=True))
+        if a.metered168:
+            root, live_sha, lock_id, producer = METERED_ROOT, METERED_LIVE, METERED_LOCK, METERED
+        else:
+            root, live_sha, lock_id, producer = ROOT, LIVE_SHA, LOCK_ID, ORIGINAL
+        print(json.dumps(receive(root, live_sha, lock_id, watcher(), a.native,
+              a.native_sha256, a.consumer, a.consumer_sha256, a.args, producer), sort_keys=True))
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
         sys.exit(str(e))
