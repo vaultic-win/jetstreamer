@@ -33,10 +33,11 @@ def fixture(root):
     return profile, state, terminal, archive
 
 
-def make_admission(profile, terminal, archive, iid):
+def make_admission(profile, terminal, archive, iid, intent):
     run = profile.delivery / ("run-"+iid)
     run.mkdir(mode=0o700)
-    cap = put(run/"capacity.json", dict(terminal=terminal, boot_id=recovery.boot(), invocation_id=iid))
+    cap = put(run/"capacity.json", dict(terminal=terminal, boot_id=recovery.boot(), invocation_id=iid,
+        fleet=intent["fleet"],provider={"sha256":intent["provider_sha256"]}))
     return put(run/"admission.json", dict(epoch=166, invocation_id=iid, unit=profile.unit,
         schema="horizon-epoch166-committed-publication-admission-v1", operation="current-reader-sync-retain-local",
         boot_id=recovery.boot(), transaction_id="local", terminal_sha256=terminal["sha256"],
@@ -149,15 +150,18 @@ def suite(root):
             self.changed=True
     changes=Fresh()
     calls=[]
+    new=p._replace(launch=p.delivery/"v2/run-committed.sh")
+    previous={str(p.launch):fit}
+    new_fit="9"*64
     def fake_launch(pr, intent, _):
-        assert pr==p and intent["fleet"]==fresh["fleet"] and recovery.unoccupied(recovery.manager(p.unit))
+        assert pr==new and intent["controller"]==str(new.launch) and intent["provider_sha256"]==new_fit and intent["fleet"]==fresh["fleet"] and recovery.unoccupied(recovery.manager(p.unit))
         calls.append(intent["fleet"])
-        make_admission(p,term,a,"2"*32)
+        make_admission(p,term,a,"2"*32,intent)
         return dict(returncode=0,pre_manager_refusal=False)
     with patch.object(recovery.event,"agents",lambda:sock), patch.object(recovery,"launch",fake_launch):
         get=lambda:fresh if changes.changed else earlier
-        ans=recovery.service(p,state,term,fit,get,changes)
-        assert ans==recovery.service(p,state,term,fit,get,changes) and len(calls)==1 and changes.changed
+        ans=recovery.service(new,state,term,new_fit,get,changes,previous)
+        assert ans==recovery.service(new,state,term,new_fit,get,changes,previous) and len(calls)==1 and changes.changed
     assert recovery.checked(state/"INTENT.json")[1]==native_ref and recovery.checked(state/"SUBMISSION.json")[1]==submitted
     # A launcher or event crash without attributable evidence cannot silently submit again.
     p2,s2,t2,a2=fixture(root/"uncertain")
@@ -176,7 +180,7 @@ def suite(root):
         calls3.append(intent["fleet"])
         if len(calls3)==1:
             return dict(returncode=1,pre_manager_refusal=True)
-        make_admission(profile,t3,a3,"3"*32)
+        make_admission(profile,t3,a3,"3"*32,intent)
         return dict(returncode=0,pre_manager_refusal=False)
     class Updated:
         changed=False
@@ -189,6 +193,8 @@ def suite(root):
         get=lambda:fresh if changed.changed else earlier
         res=recovery.service(p3,s3,t3,fit,get,changed)
         assert recovery.service(p3,s3,t3,fit,get,changed)==res and calls3==[earlier["fleet"],fresh["fleet"]]
+        done=recovery.checked(s3/"SUBMISSION.json")[0]
+        assert done["admission"]==res["admission"] and done["fleet"]==fresh["fleet"] and done["admitted_invocation_id"]=="3"*32
     # Exercise the real sealed launchers at a named, missing socket before PID1.
     preflight={}
     assert not sock.exists()
@@ -199,7 +205,57 @@ def suite(root):
         result=recovery.launch(profile,dict(old,fleet=fresh["fleet"]),sock)
         assert result["pre_manager_refusal"] and recovery.manager(profile.unit)==before
         preflight[str(epoch)]=dict(launcher=event.member(profile.launch,0o555)[1],result=result)
-    return dict(delayed_cadence=delayed_cadence(root),native_active=native,native_fit_refusal=failed,fixture_admission=ans,refutations=rejection_count,
+    five_price = {}
+    receipt = event.R / "incident-replay-fit-20261121-v1/FIVE_TERMINAL_PUBLICATION_CAPACITY.json"
+    prices, price_ref = recovery.checked(receipt)
+    assert price_ref["sha256"] == "c6188c635e858d17c4d5cbf41f8985fbb0f6fabe01c9f637a879f54e087aea51"
+    manifest, manifests_ref=recovery.checked(receipt.parent/"FOUR_V12_PUBLICATION_CONTROLLERS.json")
+    assert manifests_ref["sha256"]=="94bc663185a268b2999b78eb9242d0322836cffa7033eedc01f213cee166a47b"
+    assert manifest["capacity"]==price_ref and manifest["canonical_writes"]==0 and manifest["unit_changes"]==0
+    for epoch in event.PUBLICATION_EPOCHS:
+        profile=pub.five_source_reader(epoch)
+        prior=pub.current_reader(epoch)
+        prior_manifest=event.document(profile.delivery/"event-tools-current/programs.json",0o444)[0]
+        assert prior.unit==profile.unit and prior.delivery==profile.delivery and pub.bound_fit(prior,prior_manifest)
+        authority=prices["epochs"][str(epoch)]
+        launcher=event.member(profile.launch,0o555)[1]
+        programs={"run-committed.sh":launcher,"publication-fit":authority["executable"]}
+        assert pub.bound_fit(profile,programs)==authority["executable"]["sha256"]
+        ctrl_seal,seal_ref=event.document(profile.launch.parent/"deployment-seal-receipt.json",0o444)
+        assert ctrl_seal["destination"]==str(profile.launch.parent)
+        qualified=manifest["epochs"][str(epoch)]
+        assert qualified["controller"]==seal_ref and qualified["launcher"]==launcher and qualified["provider"]==authority["executable"]
+        controller=event.member(profile.launch.with_name("controller"),0o555)[1]
+        for member in (controller,launcher):
+            assert any(m["name"]==Path(member["path"]).name and m["sha256"]==member["sha256"] for m in ctrl_seal["members"])
+        before=recovery.manager(profile.unit)
+        assert recovery.unoccupied(before)
+        out=recovery.launch(profile,dict(old,fleet=fresh["fleet"],provider_sha256=authority["executable"]["sha256"]),sock)
+        assert out["pre_manager_refusal"] and recovery.manager(profile.unit)==before
+        five_price[str(epoch)]=dict(programs=programs,controller=controller,controller_seal=seal_ref,
+                                   prior_manifest=prior_manifest,capacity=authority)
+    cadence_path = (event.R/"epoch172-current-delivery-20261121-v1/five-cadence-fixture-stage-v3"
+                    /"1ba1bbbfba8843d2bbcc8bed82552a9f/QUALIFIED.json")
+    cadence, cadence_ref = event.document(cadence_path,0o600)
+    assert cadence_ref["sha256"]=="e7a2c9d3e3e2b7ebc4403aab75e8f11d32fb4db1aa6189bc006b131b26b33f79"
+    original, fr=event.document(Path(cadence["base_fleet"]["path"]),0o600)
+    assert fr==cadence["base_fleet"]
+    joined=[]
+    for case in cadence["fixture_status_and_fleet_passes"]:
+        report, rr=event.document(Path(case["report"]["path"]),0o600)
+        assert rr==case["report"] and set(report["status_epochs"])==event.EPOCHS and report["authenticated_readback"]
+        candidate=dict(original,effective_status_receipts=report["receipts"])
+        for epoch in (e for e in case["closed"] if e in event.PUBLICATION_EPOCHS):
+            profile=pub.five_source_reader(epoch)
+            receipt, sr=event.document(Path(report["receipts"][str(epoch)]["path"]),0o600)
+            term_ref=receipt[profile.authority.FIELD]
+            term_body, actual=event.document(Path(term_ref["path"]),0o600)
+            assert actual==term_ref and pub.status_evidence(candidate,report,term_ref,term_body["local_archive"],profile)==sr
+            joined.append(dict(epoch=epoch,group=case["closed"],programs=five_price[str(epoch)]["programs"],report=rr,status=sr))
+    assert len(cadence["fixture_status_and_fleet_passes"])==28 and {j["epoch"] for j in joined}==set(event.PUBLICATION_EPOCHS)
+    return dict(registered_controllers=manifests_ref,registered_cadence=cadence_ref,joined_terminal_status=joined,
+                five_price=five_price,price_authority=price_ref,legacy_to_successor_retried=True,
+                delayed_cadence=delayed_cadence(root),native_active=native,native_fit_refusal=failed,fixture_admission=ans,refutations=rejection_count,
                 stale_fleet_waited=True,prior_intent=native_ref,prior_submission=submitted,admitted_once=len(calls),
                 unknown_held=True,pre_manager_retried_once=True,actual_pre_manager_refusals=preflight,production_dispatches=0,r2_writes=0)
 

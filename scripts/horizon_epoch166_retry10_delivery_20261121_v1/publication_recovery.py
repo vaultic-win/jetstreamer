@@ -92,7 +92,7 @@ def classify(profile, intent, known, native, command, history, fit_errors):
     if (native["Transient"] != "yes" or not IID.fullmatch(iid) or not intent or
             iid in known or set(history) - known - {iid}):
         return "uncertain"
-    binary = str(profile.launch.with_name("controller"))
+    binary = str(Path(intent["controller"]).with_name("controller"))
     argv = [binary, "sync", intent["fleet"]["path"], intent["fleet"]["sha256"], intent["provider_sha256"]]
     if command is None or command[:3] != [binary, argv, False] or len(command) != 10:
         return "uncertain"
@@ -136,7 +136,7 @@ def observe(profile, terminal, intent, known):
         return "admitted", {"admission": authorized[0]}
     if native["ActiveState"] == "active" and native["MainPID"].isdigit() and int(native["MainPID"]) > 1:
         proc = Path("/proc") / native["MainPID"]
-        if (os.readlink(proc / "exe") != str(profile.launch.with_name("controller")) or
+        if (not intent or os.readlink(proc / "exe") != str(Path(intent["controller"]).with_name("controller")) or
                 (proc / "cgroup").read_text().strip() != "0::" + native["ControlGroup"] or
                 native["ControlGroup"] != "/system.slice/" + profile.unit):
             return "uncertain", dict(manager=native)
@@ -176,13 +176,13 @@ def path_for(state, seq, kind):
     return state / f"recovery-{seq:06d}-{kind}.json"
 
 
-def chain(state, terminal, profile, fit):
+def chain(state, terminal, profile, allowed):
     attempts, known = [], set()
     seq = 0
     while (p := path_for(state, seq, "intent")).exists():
         intent, ref = checked(p)
         event.need(intent["terminal"] == terminal and intent["unit"] == profile.unit and
-                   intent.get("controller") == str(profile.launch) and intent.get("provider_sha256") == fit
+                   intent.get("controller") in allowed and intent.get("provider_sha256") == allowed[intent["controller"]]
                    and not intent.get("existing"), "foreign or previously occupied publication intent")
         legacy = seq == 0 and "recovery_schema" not in intent
         if legacy:
@@ -207,18 +207,44 @@ def chain(state, terminal, profile, fit):
     if submitted.exists():
         old, _ = checked(submitted)
         event.need(attempts and old["unit"] == profile.unit and old["terminal"] == terminal and
-                   old["fleet"] == attempts[0][0]["fleet"] and old["manager"]["Id"] == profile.unit,
-                   "different immutable prior submission")
+                   old["manager"]["Id"] == profile.unit, "different immutable prior submission")
+        if old.get("recovery_schema") == VERSION:
+            event.need(any(old["attempt"] == ref and old["fleet"] == intent["fleet"]
+                           for intent, ref, _, _ in attempts), "submission belongs to a different attempt")
+        else:
+            event.need(old["fleet"] == attempts[0][0]["fleet"], "different original submission fleet")
     return attempts, known
 
 
-def service(profile, state, terminal, fit, accepted, changes):
+def service(profile, state, terminal, fit, accepted, changes, predecessors=None):
+    allowed = dict(predecessors or {})
+    allowed[str(profile.launch)] = fit
+    result = reconcile(profile, state, terminal, fit, accepted, changes, allowed)
+    submission = state / "SUBMISSION.json"
+    first = state / "INTENT.json"
+    if submission.exists() or not first.exists() or checked(first)[0].get("existing"):
+        return result
+    body, ref = checked(Path(result["admission"]["path"]))
+    cap, cap_ref = checked(Path(body["capacity"]["path"]))
+    event.need(ref == result["admission"] and cap_ref == body["capacity"], "admission changed before recording")
+    attempts, _ = chain(state, terminal, profile, allowed)
+    matching = [(intent, attempt) for intent, attempt, _, _ in attempts if intent["fleet"] == cap["fleet"]
+                and intent["provider_sha256"] == cap["provider"]["sha256"]]
+    if matching:
+        event.need(len(matching) == 1, "multiple intents for one native sync admission")
+        intent, attempt = matching[0]
+        event.once(submission, dict(intent, recovery_schema=VERSION, attempt=attempt, manager=manager(profile.unit),
+                                    admitted_invocation_id=body["invocation_id"], admission=ref))
+    return result
+
+
+def reconcile(profile, state, terminal, fit, accepted, changes, allowed):
     while True:
         # Native sync side effects begin strictly after write_admission() fsyncs this exact record.
         _, admitted = admissions(profile, terminal)
         if admitted:
             return dict(disposition="native-sync-admission", admission=admitted[0])
-        attempts, known = chain(state, terminal, profile, fit)
+        attempts, known = chain(state, terminal, profile, allowed)
         current = attempts[-1] if attempts else None
         if current and not current[2]:
             intent, ref = current[:2]

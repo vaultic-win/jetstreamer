@@ -59,6 +59,14 @@ def current_reader(epoch):
                        authority.T / "capacity-tools/publication-fit", units[epoch], authority)
 
 
+def five_source_reader(epoch):
+    prior = current_reader(epoch)
+    launcher = "controller-tools-v3" if epoch in (166, 168) else "controller-tools-v2"
+    capacity = {166: "capacity-tools-v4", 168: "capacity-tools-v3", 167: "capacity-tools-v2", 170: "capacity-tools-v2"}
+    return prior._replace(launch=prior.delivery / launcher / "run-committed.sh",
+                          fit=prior.delivery / capacity[epoch] / "publication-fit")
+
+
 def status_evidence(fleet, report, terminal, archive, profile=RECOVERED):
     key = str(profile.epoch)
     ref = report["receipts"][key]
@@ -93,7 +101,7 @@ def bound_fit(profile, bindings):
     return programs[profile.fit.name]["sha256"]
 
 
-def main(profile=RECOVERED, recover=False):
+def main(profile=RECOVERED, recover=False, predecessor=None):
     authority = profile.authority
     state = profile.delivery / "event-state"
     def status(fleet, report, terminal):
@@ -114,7 +122,11 @@ def main(profile=RECOVERED, recover=False):
             try:
                 def accepted():
                     return event.accepted(event.R, event.REPORTS, original, changes, head, time.time(), authority.FIELD, status)
-                result = publication_recovery.service(profile, state, original, fit_sha, accepted, changes)
+                allowed = {}
+                if predecessor:
+                    previous, _ = event.document(profile.delivery / "event-tools-current/programs.json", 0o444)
+                    allowed[str(predecessor.launch)] = bound_fit(predecessor, previous)
+                result = publication_recovery.service(profile, state, original, fit_sha, accepted, changes, allowed)
                 print(json.dumps(result), flush=True)
             finally:
                 changes.close()
@@ -148,7 +160,10 @@ if __name__ == "__main__":
         main(metered())
     elif len(sys.argv) == 3 and sys.argv[1] == "--current-reader" and sys.argv[2] in ("166", "167", "168", "170"):
         main(current_reader(int(sys.argv[2])), recover=True)
+    elif len(sys.argv) == 3 and sys.argv[1] == "--five-source-reader" and sys.argv[2] in ("166", "167", "168", "170"):
+        epoch = int(sys.argv[2])
+        main(five_source_reader(epoch), recover=True, predecessor=current_reader(epoch))
     elif len(sys.argv) == 1:
         main()
     else:
-        sys.exit("usage: retry10_event.py [--metered168 | --current-reader {166,167,168,170}]")
+        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader) {166,167,168,170}]")
