@@ -644,6 +644,20 @@ fn handoff_pin_matches(pin: &Value, plan_sha: &str, invocation: &str, handoff: &
 }
 
 fn supported_unit(plan: &Plan) -> bool {
+    if plan.unit.starts_with("horizon-qualify-228-demotion-") {
+        return cfg!(feature = "epoch228-native-main-guard")
+            && plan.unit == "horizon-qualify-228-demotion-root-tail-16d4b158-v1.service"
+            && plan.filesystem == Path::new("/")
+            && plan.worker_root
+                == Path::new(
+                    "/home/ubuntu/.jetstreamer-private/qualification-228-demotion-root-tail-v1",
+                )
+            && plan.maximum_root_physical_bytes == Some(585_388_447_855)
+            && plan.maximum_worker_vmas == 3_500_000
+            && plan.native_main.is_none()
+            && plan.bounded_measurement.is_none()
+            && plan.bounded_canary.is_none();
+    }
     if plan.unit == "horizon-import-244-current-20261117-v1.service" {
         return cfg!(feature = "epoch244-native-import-guard")
             && plan.filesystem == Path::new("/")
@@ -1208,6 +1222,13 @@ mod tests {
                 cfg!(feature = "epoch228-native-main-guard"),
             ),
             (
+                "horizon-native-input-228-demotion-16d4b158-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input228-v1620-demotion-v1",
+                "/var/lib/jetstreamer/horizon228-demotion-bank-9d2fd8d4-v158-v2-qualified/worker",
+                "16d4b15881979bb7d65a0f49408580d4508b451a5953f35cbb60505d2e3cee00",
+                cfg!(feature = "epoch228-native-main-guard"),
+            ),
+            (
                 "archive-209-v1616-native-input-actual-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input209-v1616-capped-v1",
                 "/var/lib/jetstreamer/horizon-209-native-input-optimized-v1/native-input-test",
@@ -1256,6 +1277,47 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn epoch228_demotion_full_guard_preserves_disjoint_root_and_snapshot_copy_budget() {
+        let base = json!({
+            "schema":"jetstreamer-horizon-standalone-guard-plan-v1",
+            "unit":"horizon-qualify-228-demotion-root-tail-16d4b158-v1.service",
+            "invocation_id":"a".repeat(32),
+            "filesystem":"/",
+            "minimum_free_bytes":1,
+            "worker_root":"/home/ubuntu/.jetstreamer-private/qualification-228-demotion-root-tail-v1",
+            "maximum_worker_vmas":3_500_000,
+            "maximum_root_physical_bytes":585_388_447_855u64,
+            "receipt_directory":"/sealed/receipts",
+        });
+        let check = |value: Value| validate_plan(&serde_json::from_value(value).unwrap()).is_ok();
+        assert_eq!(
+            check(base.clone()),
+            cfg!(feature = "epoch228-native-main-guard")
+        );
+        for (key, val) in [
+            (
+                "unit",
+                json!("horizon-qualify-228-demotion-another.service"),
+            ),
+            ("filesystem", json!("/other")),
+            (
+                "worker_root",
+                json!("/home/ubuntu/.jetstreamer-private/qualification-228-v1620-root-tail-v2"),
+            ),
+            ("maximum_worker_vmas", json!(1)),
+            ("maximum_root_physical_bytes", json!(574_877_906_944u64)),
+            (
+                "native_main",
+                json!({"executable":"/old","sha256":"0".repeat(64),"main_pid":10}),
+            ),
+        ] {
+            let mut bad = base.clone();
+            bad[key] = val;
+            assert!(!check(bad), "{key}");
+        }
+    }
+
     #[test]
     fn epoch244_import_guard_requires_exact_unit_root_and_budget() {
         let value = json!({
