@@ -44,6 +44,14 @@ pub fn sample() -> Result<Value> {
     )
 }
 pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
+    let actual = bound(plan, &base().join("ACTUAL_GUARD_PLAN.json"))?;
+    ensure!(
+        actual["invocation_id"] == actor["producer_invocation_id"]
+            && actual["unit"] == UNIT
+            && actual["worker_root"] == LANE
+            && actual["maximum_root_physical_bytes"] == 512u64 << 30,
+        "different native guard plan"
+    );
     let timer = native(TIMER)?;
     let unit = TIMER.replace(".timer", ".service");
     let ctl = native(&unit)?;
@@ -85,6 +93,7 @@ pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
             && v["producer_stop_enabled"] == true
             && v["producer"]["active"] == "active"
             && v["plan_sha256"] == plan["sha256"]
+            && v["guard_sha256"] == GUARD_SHA
             && v["trip_reason"].is_null()
             && v["worker_observation_error"].is_null()
             && v["root_physical_observation_error"].is_null()
