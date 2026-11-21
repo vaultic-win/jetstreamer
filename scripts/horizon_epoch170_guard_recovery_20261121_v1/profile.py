@@ -147,7 +147,13 @@ def prepare():
              (m.st_uid,m.st_gid) in ((1001,1003),(0,0)) and os.path.samestat(m,p.stat()),"wrong new append inode")
         fcntl.fcntl(f,fcntl.F_SETLEASE,fcntl.F_WRLCK);os.fchown(f.fileno(),0,0);os.fsync(f.fileno());fcntl.fcntl(f,fcntl.F_SETLEASE,fcntl.F_UNLCK)
     for v in src["projections"]:
-        t=Path(v["target"]);t.parent.mkdir(parents=True,exist_ok=True)
+        t=Path(v["target"])
+        # The service runs as sol and traverses these root-owned empty bind targets.
+        for directory in reversed(t.parents):
+            if directory.is_relative_to(RUN/"output") and directory!=RUN/"output":
+                directory.mkdir(mode=0o755,exist_ok=True)
+                need(directory.resolve(strict=True)==directory and directory.stat().st_uid==0,"foreign cache target directory")
+                os.chmod(directory,0o755)
         need(t.parent.resolve(strict=True)==t.parent and t.is_relative_to(RUN/"output"),"noncanonical projection target")
         if not t.exists():
             fd=os.open(t,os.O_CREAT|os.O_EXCL|os.O_RDWR|os.O_NOFOLLOW,0o444);os.fchmod(fd,0o444);os.fsync(fd);os.close(fd);fsyncdir(t.parent)

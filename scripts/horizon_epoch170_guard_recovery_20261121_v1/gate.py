@@ -22,14 +22,24 @@ def trusted(path,sha=None):
         if sha is not None:need(hashlib.file_digest(f,"sha256").hexdigest()==sha,"gate input changed")
         return m
 
-def permit(iid):
-    try:fd=os.open(ALIAS/"barrier/allow",os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+def permit(iid, path=ALIAS/"barrier/allow"):
+    try:fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
     except FileNotFoundError:return False
     with os.fdopen(fd,"rb") as f:
         m=os.fstat(f.fileno())
         need(stat.S_ISREG(m.st_mode) and m.st_uid==0 and stat.S_IMODE(m.st_mode)==0o444 and m.st_nlink==1 and
              m.st_size==32 and f.read(33)==iid.encode() and os.fstatvfs(f.fileno()).f_flag&os.ST_RDONLY,"wrong gate permit")
     return True
+
+def payload(arguments):
+    profile=ALIAS/"profile.json";trusted(profile,os.environ["HORIZON_REPLAY170_PROFILE_SHA256"]);p=json.loads(profile.read_bytes())
+    need(p["epoch"]==170 and arguments==p["normal_argv"] and all(os.environ.get(k)==v for k,v in p["environment"].items()),"foreign normal payload")
+    trusted(Path(p["normal_argv"][0]),p["node"]["sha256"])
+    for v in p["projections"]:
+        path=Path(v["target"]);m=path.stat()
+        need(os.statvfs(path).f_flag&os.ST_RDONLY and [m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns]==v["identity"],
+             "source projection changed")
+    return p
 
 def main():
     need(sys.flags.isolated and __debug__ and os.getuid()==1001 and os.getgid()==1003,"unexpected service owner")
@@ -40,13 +50,7 @@ def main():
     quota,period=map(int,(cg/"cpu.max").read_text().split())
     need(quota==9*period and int((cg/"memory.max").read_text())==68<<30 and (cg/"memory.swap.max").read_text().strip()=="0",
          "changed cgroup limits")
-    profile=ALIAS/"profile.json";trusted(profile,os.environ["HORIZON_REPLAY170_PROFILE_SHA256"]);p=json.loads(profile.read_bytes())
-    need(p["epoch"]==170 and sys.argv[1:]==p["normal_argv"] and all(os.environ.get(k)==v for k,v in p["environment"].items()),"foreign normal payload")
-    trusted(Path(p["normal_argv"][0]),p["node"]["sha256"])
-    for v in p["projections"]:
-        path=Path(v["target"]);m=path.stat()
-        need(os.statvfs(path).f_flag&os.ST_RDONLY and [m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns]==v["identity"],
-             "source projection changed")
+    p=payload(sys.argv[1:])
     end=time.monotonic()+360
     while time.monotonic()<end:
         if permit(iid):os.execv(p["normal_argv"][0],p["normal_argv"])
