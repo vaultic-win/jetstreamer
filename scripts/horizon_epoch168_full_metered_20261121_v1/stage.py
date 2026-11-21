@@ -83,11 +83,11 @@ def main():
     producer.need(not (STATE/"barrier/allow").exists(),"stale release permit")
     source=STATE/"controller-source"
     source.mkdir(mode=0o700,exist_ok=True)
-    for name in ("gate.py","production.py"):
+    for name in ("gate.py","production.py","registration.py"):
         store(source/name,(HERE/name).read_bytes())
     controller=STATE/"controller"
     seal_plan={"schema":"jetstreamer-sealed-deployment-plan-v1","destination":str(controller),
-               "members":[dict(name=n,source=str(source/n),sha256=sha(source/n),mode=0o444) for n in ("gate.py","production.py")]}
+               "members":[dict(name=n,source=str(source/n),sha256=sha(source/n),mode=0o444) for n in ("gate.py","production.py","registration.py")]}
     plan_path=STATE/"controller-seal-plan.json"
     store(plan_path,raw(seal_plan))
     producer.need(sha(SEALER)==SEALER_SHA,"wrong normal deployment sealer")
@@ -126,6 +126,28 @@ def main():
             raise ValueError("wrong-invocation permit accepted")
     finally:
         subprocess.run(["/usr/bin/umount",permit_probe],check=True)
+    registration_spec=importlib.util.spec_from_file_location("qualified_registration",controller/"registration.py")
+    registration=importlib.util.module_from_spec(registration_spec)
+    registration_spec.loader.exec_module(registration)
+    prior=producer.verified(registration.TRACE,registration.TRACE_SHA)
+    original_sample=registration.bound(prior["last_guard"])
+    original_plan={"sha256":original_sample["plan_sha256"]}
+    registration.guard_sample(original_sample,original_plan,prior["invocation"],prior["original_pid"])
+    for attr,value in (("trip_reason","guard trip"),("producer_stop_enabled",False),("plan_sha256","0"*64),
+                       ("producer_invocation_id","0"*32)):
+        changed={**original_sample,attr:value}
+        try:
+            registration.guard_sample(changed,original_plan,prior["invocation"],prior["original_pid"])
+        except ValueError:
+            pass
+        else:
+            raise ValueError("registration accepted altered guard evidence: "+attr)
+    try:
+        registration.main()
+    except ValueError as error:
+        producer.need(str(error)=="original producer PID or budget differs",str(error))
+    else:
+        raise ValueError("unlaunched synthetic producer registered")
     store(STATE/"PRODUCER_ARGV.json",raw(argv))
     synthetic="0123456789abcdef0123456789abcdef"
     plan,native=producer.guard(j,synthetic,producer.MINIMUM_FLOOR)
@@ -144,6 +166,7 @@ def main():
           native_input_seal=sha(producer.PKG/"deployment-seal-receipt.json"),controller_seal=sha(controller/"deployment-seal-receipt.json"),
           private_native_controls_sha256=sha(Path(producer.complete_offline())),guard_static=checked,
           permit_controls=["absent","writable-mount","correct-original-iid","foreign-iid"],
+          registration_controls=["previous-sample-structure","trip","disabled-protection","wrong-plan","wrong-invocation","absent-producer"],
           current_producer_started=False,barrier_released=False,resource_credits=0)
     store(STATE/"PREPARED.json",raw(info))
     print(json.dumps(info,sort_keys=True))
