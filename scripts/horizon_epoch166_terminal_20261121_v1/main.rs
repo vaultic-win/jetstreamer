@@ -14,7 +14,8 @@ use std::{
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 mod cadence;
 mod receipt;
@@ -22,7 +23,8 @@ mod receipt;
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 ))]
 #[path = "../horizon_epoch166_retry10_delivery_20261121_v1/wait.rs"]
 mod wait;
@@ -33,16 +35,22 @@ mod generation;
 #[cfg(any(
     all(
         feature = "retry10",
-        any(feature = "metered168", feature = "source167", feature = "retry170")
+        any(
+            feature = "metered168",
+            feature = "source167",
+            feature = "retry170",
+            feature = "full172"
+        )
     ),
     all(
         feature = "metered168",
-        any(feature = "source167", feature = "retry170")
+        any(feature = "source167", feature = "retry170", feature = "full172")
     ),
-    all(feature = "source167", feature = "retry170")
+    all(feature = "source167", any(feature = "retry170", feature = "full172")),
+    all(feature = "retry170", feature = "full172")
 ))]
 compile_error!("select a single terminal producer generation");
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 #[path = "peers.rs"]
 mod generation;
 #[cfg(all(feature = "metered168", not(feature = "retry10")))]
@@ -52,7 +60,8 @@ mod generation;
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 ))]
 use generation::{LIVE_SHA, PRODUCER_IID as IID, PRODUCER_UNIT as UNIT, TERMINAL_ROOT as ROOT};
 
@@ -60,35 +69,44 @@ use generation::{LIVE_SHA, PRODUCER_IID as IID, PRODUCER_UNIT as UNIT, TERMINAL_
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1";
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 const LIVE_SHA: &str = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 const UNIT: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 const IID: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
-#[cfg(not(any(feature = "metered168", feature = "source167", feature = "retry170")))]
+#[cfg(not(any(
+    feature = "metered168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+)))]
 const EPOCH: u64 = 166;
 #[cfg(feature = "metered168")]
 const EPOCH: u64 = 168;
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 use generation::EPOCH;
 const SUCCEEDED: &str = "7ad2d189f7e94e70a38c781354912448";
 const STARTED: &str = "39f53479d3a045ac8e11786248231fbf";
@@ -276,9 +294,19 @@ fn complete(live: &Value) -> Result<Value> {
         .map(serde_json::from_str)
         .collect::<Result<Vec<Value>, _>>()?;
     let event = exit_events(&records, &boot)?;
-    #[cfg(not(any(feature = "metered168", feature = "source167", feature = "retry170")))]
+    #[cfg(not(any(
+        feature = "metered168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    )))]
     let evidence = receipt::inspect(live)?;
-    #[cfg(any(feature = "metered168", feature = "source167", feature = "retry170"))]
+    #[cfg(any(
+        feature = "metered168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     let evidence = receipt::inspect_with_boundary(live, &generation::boundary(live)?)?;
     ensure!(
         closed(live)? == state,
@@ -359,7 +387,7 @@ fn publish_exact(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    #[cfg(any(feature = "source167", feature = "retry170"))]
+    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     if args == ["inspect-live-namespace"] {
         println!("{}", generation::live_namespace(&checked_live()?)?);
         return Ok(());
@@ -368,7 +396,8 @@ fn main() -> Result<()> {
         feature = "retry10",
         feature = "metered168",
         feature = "source167",
-        feature = "retry170"
+        feature = "retry170",
+        feature = "full172"
     )))]
     if let [mode, path] = args.as_slice()
         && matches!(mode.as_str(), "inspect-cadence" | "dispatch-cadence")
@@ -383,7 +412,8 @@ fn main() -> Result<()> {
         feature = "retry10",
         feature = "metered168",
         feature = "source167",
-        feature = "retry170"
+        feature = "retry170",
+        feature = "full172"
     ))]
     if args == ["wait-record"] {
         let value = wait::committed(&checked_live()?)?;

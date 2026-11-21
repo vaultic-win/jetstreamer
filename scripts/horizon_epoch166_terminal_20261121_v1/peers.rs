@@ -28,6 +28,19 @@ pub(super) const TERMINAL_ROOT: &str =
 pub(super) const TERMINAL_ROOT: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-current-delivery-20261121-v1";
 
+#[cfg(feature = "full172")]
+pub(super) const EPOCH: u64 = 172;
+#[cfg(feature = "full172")]
+pub(super) const PRODUCER_UNIT: &str = "horizon-qualify-172-full-half-core-20261120-v1.service";
+#[cfg(feature = "full172")]
+pub(super) const PRODUCER_IID: &str = "0e17b745938546608b0bdc52815151d0";
+#[cfg(feature = "full172")]
+pub(super) const LIVE_SHA: &str =
+    "4d4e760ba2d4cb53368cfc7c616044f789f82f66934499ad91e5797f41cf6dc2";
+#[cfg(feature = "full172")]
+pub(super) const TERMINAL_ROOT: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch172-current-delivery-20261121-v1";
+
 fn document(reference: &Value, path: &Path) -> Result<Value> {
     ensure!(
         reference["path"] == json!(path) && path.canonicalize()? == path,
@@ -73,8 +86,19 @@ fn rpc(record: &Value, root: &Path, name: &str, method: &str, slot: u64) -> Resu
 }
 
 pub(super) fn boundary(live: &Value) -> Result<receipt::TerminalBoundary> {
+    #[cfg(not(feature = "full172"))]
     let root=Path::new("/home/sol/.jetstreamer-private/epoch166167170-current-publication-20261120-v1/finalized-boundaries").join(format!("epoch-{EPOCH}"));
+    #[cfg(not(feature = "full172"))]
     let p = root.join(format!("epoch-{EPOCH}.json"));
+    #[cfg(feature = "full172")]
+    let inputs = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/producer-publication-inputs-20261121-v1",
+    );
+    #[cfg(feature = "full172")]
+    let (root, p) = (
+        inputs.join("epoch172-rpc-evidence"),
+        inputs.join("epoch-expectations/epoch-172.json"),
+    );
     let bindings = Path::new(
         "/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-delivery-20261121-v1/epoch-expectations/bindings.json",
     );

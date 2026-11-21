@@ -310,14 +310,24 @@ mod tests {
         generation_inode_fixture()
     }
 
-    #[cfg(any(feature = "metered168", feature = "source167", feature = "retry170"))]
+    #[cfg(any(
+        feature = "metered168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     #[test]
     #[ignore = "requires the anchored RPC proof and original producer witness"]
     fn finalized_generation_committed_inode_fixture() -> Result<()> {
         generation_inode_fixture()
     }
 
-    #[cfg(any(feature = "metered168", feature = "source167", feature = "retry170"))]
+    #[cfg(any(
+        feature = "metered168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     fn generation_inode_fixture() -> Result<()> {
         let live = checked_live()?;
         let expected = generation::boundary(&live)?;
