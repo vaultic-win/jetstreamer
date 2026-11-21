@@ -31,6 +31,10 @@ LOCK=BASE/"stable-cadence-controller-20261120-v1/consumer.lock"
 ORIGIN="https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev"
 PARENT_PID=3224192
 PARENT_TICKS=354111936
+EQUIVALENT_BUILD={
+    "path":str(BASE/"public-reader-refresh-20261121-v1/build-2be87499054e4f3690ecabfb6faa7152/CURRENT_BRANCH_BUILD.json"),
+    "sha256":"97c769f5f32522c9974f79536dfe565674fe37da4c57a16c84b067b647b90d1e",
+}
 
 def require(ok, reason):
     if not ok: raise ValueError(reason)
@@ -260,11 +264,38 @@ def must_idle():
     require(len(all_pids)==2 and int(u["MainPID"]) in all_pids and
             all(Path(f"/proc/{p}/exe").readlink()==Path("/usr/bin/sleep") for p in all_pids if p!=int(u["MainPID"])),"cadence is consuming")
 
+def scoped_tree(repo, revision, paths):
+    data = subprocess.check_output([
+        "/usr/bin/git", "--no-replace-objects", "--literal-pathspecs", "-c", "safe.directory=" + str(repo),
+        "-C", str(repo), "ls-tree", "-rz", "--full-tree", revision, "--", *paths,
+    ], timeout=30)
+    rows = (entry.split(b"\t", 1) for entry in data.split(b"\0") if entry)
+    return {os.fsdecode(name): descriptor for descriptor, name in rows}
+
+def reader_changes(repo, tip):
+    """The shallow audit checkout and the build checkout can have disjoint Git history."""
+    build = doc(EQUIVALENT_BUILD)
+    require(re.fullmatch("[0-9a-f]{40}", tip) and build["byte_identical_to_sealed_reader"] is True,
+            "invalid reader comparison")
+    paths = sorted({".cargo", *build["resolved_local_packages"], *build["current_source_files"]})
+    original = scoped_tree(Path("/home/sol/workspace/jetstreamer"), build["branch_commit"], paths)
+    require(set(build["current_source_files"]) <= original.keys(), "qualified build tree is incomplete")
+    current = scoped_tree(repo, tip, paths)
+    return sorted(path for path in original.keys() | current.keys() if original.get(path) != current.get(path))
+
 def cut(reader,reader_ref,at):
     """Return while a new real reader or build owns the cgroup. Never signal it."""
     proof=durable_native(reader)
     if proof is None and str(reader["range_start"]) not in accepted():return False
     if any(exe not in AUX for _,exe in roster()):return False
+    repo = STATE.parent / "source"
+    tip = command("/usr/bin/git", "--no-replace-objects", "-c", "safe.directory=" + str(repo),
+                  "-C", str(repo), "rev-parse", "--verify", "refs/remotes/origin/account-updates")
+    changes = reader_changes(repo, tip)
+    if changes:
+        print(json.dumps({"branch":tip, "changed_reader_paths":changes, "parent_continues":True,
+                          "reader_pid":reader["pid"]}), flush=True)
+        return False
     root,iid=events()
     # Only a successfully opened native pidfd, fresh natural exit and a role
     # census permit suspension of the *original* parent for the metadata cut.

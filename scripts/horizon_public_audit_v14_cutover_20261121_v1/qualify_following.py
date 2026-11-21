@@ -90,8 +90,11 @@ if __name__=="__main__":
             fixed("current_fleet",(r["inventory"],{"continuing_audit_obligation":{"current_observation":r["inventory"]}},
                                    {"timer":"fixture.timer","sample":str(a.scratch/"missing"),"due":"unused"}))
             fixed("unit",{"ActiveState":"active"})
+            real_changes=s.reader_changes
+            substitute("reader_changes",lambda repo,tip:real_changes(Path("/home/sol/workspace/jetstreamer"),tip))
             renamed=[]
             def run(*args,**options):
+                if args[0]=="/usr/bin/git":return s.doc(s.EQUIVALENT_BUILD)["branch_commit"]
                 if args[0]=="/usr/bin/date":return str(now+1000)
                 if args[-1]=="recovery-facts":
                     return json.dumps(dict(old_row={"MainPID":str(native_parent.pid)},
