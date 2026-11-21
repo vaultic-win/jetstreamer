@@ -1034,7 +1034,7 @@ class CommandTests(unittest.TestCase):
             command_properties(command)["BindReadOnlyPaths"],
             (
                 f"{self.deploy}:{self.deploy}:rbind "
-                f"{bootstrap}:{bootstrap}"
+                f"{bootstrap}:{bootstrap}:rbind"
             ),
         )
         self.assertNotIn(
@@ -1382,6 +1382,25 @@ class AdoptionHardeningTests(unittest.TestCase):
                     **identity,
                 )
             )
+
+    def test_adoption_checks_the_exact_external_bootstrap_mount(self) -> None:
+        snapshot = Path("/sealed/bootstrap-source/snapshot-123-Hash.tar.zst")
+        base = f"{self.deploy}:{self.deploy}:rbind"
+        expected = f"{base} {snapshot}:{snapshot}:rbind"
+        directory = f"{base} {snapshot.parent}:{snapshot.parent}:rbind"
+        for binding in (expected, base, directory, f"{expected} /extra:/extra:rbind"):
+            properties = self.hardened_properties(cohort_bootstrap=snapshot)
+            properties["BindReadOnlyPaths"] = binding
+            with self.subTest(binding=binding), mock.patch.object(
+                sweep, "systemd_properties", return_value=properties
+            ):
+                self.assertEqual(
+                    sweep.unit_is_hardened_for_adoption(
+                        self.unit, self.process, self.cohort, self.lane, self.deploy,
+                        cohort_bootstrap=snapshot,
+                    ),
+                    binding == expected,
+                )
 
     def test_exact_hardened_unit_is_accepted(self) -> None:
         with mock.patch.object(

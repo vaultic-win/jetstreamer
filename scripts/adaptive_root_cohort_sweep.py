@@ -1027,6 +1027,13 @@ def producer_environment(
     )
 
 
+def producer_read_only_bindings(deploy: Path, cohort_bootstrap: Path | None) -> str:
+    bindings = [f"{deploy}:{deploy}:rbind"]
+    if cohort_bootstrap is not None and cohort_bootstrap.parent != deploy:
+        bindings.append(f"{cohort_bootstrap}:{cohort_bootstrap}:rbind")
+    return " ".join(bindings)
+
+
 def build_producer_command(
     *,
     cohort: Cohort,
@@ -1051,9 +1058,6 @@ def build_producer_command(
     node = deploy / "jetstreamer-node"
     workers = tuple(deploy / name for _, name in runtime_workers(cohort))
     whole_lane_paths = f"{lane.root}"
-    read_only_bindings = [f"{deploy}:{deploy}:rbind"]
-    if cohort_bootstrap is not None and cohort_bootstrap.parent != deploy:
-        read_only_bindings.append(f"{cohort_bootstrap}:{cohort_bootstrap}")
     properties = (
         "Type=exec",
         "KillMode=control-group",
@@ -1094,7 +1098,7 @@ def build_producer_command(
         f"NoExecPaths={producer_home}",
         f"ExecPaths={node} {' '.join(map(str, workers))} {whole_lane_paths}",
         f"ReadWritePaths={whole_lane_paths}",
-        f"BindReadOnlyPaths={' '.join(read_only_bindings)}",
+        f"BindReadOnlyPaths={producer_read_only_bindings(deploy, cohort_bootstrap)}",
         "InaccessiblePaths="
         + " ".join(f"-{item}" for item in sensitive_paths(producer_home)),
         f"User={producer_user}",
@@ -1634,6 +1638,7 @@ def unit_is_hardened_for_adoption(
     gcloud_bin: Path | None = None,
     solana_rayon_threads: int | None = None,
     historical_trace: bool = False,
+    cohort_bootstrap: Path | None = None,
 ) -> bool:
     properties = systemd_properties(
         unit,
@@ -1742,7 +1747,7 @@ def unit_is_hardened_for_adoption(
         "SystemCallArchitectures": "native",
         "CapabilityBoundingSet": "",
         "AmbientCapabilities": "",
-        "BindReadOnlyPaths": f"{deploy}:{deploy}:rbind",
+        "BindReadOnlyPaths": producer_read_only_bindings(deploy, cohort_bootstrap),
     }
     namespace_policy = properties.get("RestrictNamespaces")
     if namespace_policy == "yes":
@@ -3506,6 +3511,7 @@ class Controller:
             self.args.gcloud_bin,
             self.args.solana_rayon_threads,
             self.args.historical_trace,
+            cohort_bootstrap,
         ):
             raise SweepError(
                 f"matching producer PID {process.pid} for cohort {cohort.label} "
