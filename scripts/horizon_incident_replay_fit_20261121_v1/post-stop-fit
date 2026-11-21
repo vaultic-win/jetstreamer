@@ -95,14 +95,19 @@ def stable_root(e):
            (dev,ino,1001,1003,0o700),"different successor namespace")
     return path
 
-def tree_size(root,cap):
+def tree_size(root,cap,exclude=None):
     start=root.stat()
     s.need(root.resolve(strict=True)==root and start.st_dev==HOME.stat().st_dev and root.parent==H,"wrong booking root")
     # GNU du deduplicates hard links without storing a Python object for every shard.
     for line in Path("/proc/self/mountinfo").read_text().splitlines():
         point=Path(line.split()[4])
         s.need(not point.is_relative_to(root),"unexpected mount inside replay tree")
-    output=subprocess.check_output(["/usr/bin/du","--summarize","--one-file-system","--block-size=1","--",root],
+    args=["/usr/bin/du","--summarize","--one-file-system","--block-size=1"]
+    if exclude is not None:
+        s.need(exclude!=root and exclude.is_relative_to(root) and exclude.resolve(strict=True)==exclude and
+               not any(c in str(exclude) for c in "*?[]"),"foreign active exclusion")
+        args.append("--exclude="+str(exclude))
+    output=subprocess.check_output([*args,"--",root],
                                    text=True,timeout=50)
     amount,path=output.rstrip("\n").split("\t")
     size=int(amount)
@@ -208,9 +213,12 @@ def native_actor(e,own,tree,run,stop):
             with exe.open("rb") as f:s.need(hashlib.file_digest(f,"sha256").hexdigest()=="cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819","different worker image")
         processes.append([p,start,st.st_dev,st.st_ino])
     obs=sample["root_physical_observation"]
-    s.need(obs["maximum_physical_bytes"]==CAPS[e] and not obs["exceeds_budget"] and
-           all(obs[k]["vanished_entries"]==0 for k in ("first","second")),"unstable guarded whole tree")
-    physical=min(obs[k]["physical_bytes"] for k in ("first","second"))
+    s.need(obs["maximum_physical_bytes"]==CAPS[e] and obs["exceeds_budget"] is False and
+           all(0<=obs[k]["physical_bytes"]<=CAPS[e] for k in ("first","second")),"guarded whole tree exceeds its cap")
+    # Disappearing appendvecs can invalidate disk credit, while the guard still
+    # enforces the complete live tree. Measure the fixed, disjoint part separately.
+    exact=all(obs[k]["vanished_entries"]==0 for k in ("first","second"))
+    physical=min(obs[k]["physical_bytes"] for k in ("first","second")) if exact else None
     # PID1 can still be recording completion after the guard has appended its sample.
     # Only wait for that exact invocation while its originally authenticated timer owns it.
     until=time.monotonic()+5
@@ -324,6 +332,24 @@ def census(peers,replacements,extra,c136,own,stops):
             raise Reprice(e,before,now)
     return {u:[p[:2] for p in prs] for u,prs in expect.items()}
 
+def joined_resident(active):
+    if not active["admission"]:return 0
+    unit=active["producer_unit"];ps=active["processes"]
+    def lower():
+        total=0
+        for pid,ticks,device,inode in ps:
+            p=Path(f"/proc/{pid}")
+            st=(p/"exe").stat()
+            s.need(s.process(pid)[1:]==(ticks,"0::/system.slice/"+unit) and
+                   (st.st_dev,st.st_ino)==(device,inode),"resident owner changed")
+            total+=1024*int(next(l.split()[1] for l in (p/"smaps_rollup").read_text().splitlines() if l.startswith("Pss:")))
+        mem=dict(l.split() for l in (Path("/sys/fs/cgroup/system.slice")/unit/"memory.stat").read_text().splitlines())
+        return min(total,int(mem["anon"])+int(mem["file_mapped"]),68*G)
+    charged=min(lower(),lower())
+    s.need(s.show(unit)["InvocationID"]==active["producer_invocation_id"] and
+           fit.members(unit)==tuple(sorted(p[0] for p in ps)),"joined memory generation changed")
+    return charged
+
 def registered_status():
     registration=s.read(fit.READY,"02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")[1]
     m=s.show(fit.PUBLISHER);pid=int(m["MainPID"])
@@ -376,17 +402,21 @@ def capture_once(epoch,ref):
         s.need(run.is_relative_to(root) and plan["maximum_root_physical_bytes"]==CAPS[e] and
                plan["invocation_id"]==original["iid"],"different original booked tree")
         a=native_actor(e,epoch,root,run,row)
-        if a:rep[str(e)]=a;physical=a["physical"]
+        if a:rep[str(e)]=a
+        if a and a["physical"] is not None:
+            physical=a["physical"];measurement="two complete native whole-tree walks"
         else:
-            first=tree_size(root,CAPS[e]);second=tree_size(root,CAPS[e])
-            s.need(first==second,"stopped allocation changed during walk")
+            exclude=run if a else None
+            first=tree_size(root,CAPS[e],exclude);second=tree_size(root,CAPS[e],exclude)
+            s.need(first==second,"retained allocation changed during walk")
             physical=first
+            measurement="two retained-tree walks excluding active run" if a else "two complete stopped-tree walks"
         if e in rows:
             allowed=(ref==PREV and rows[e]["unit"]["InvocationID"]==original["iid"]) or (
                 a and a["admission"] and rows[e]["unit"]["InvocationID"]==a["producer_invocation_id"] and rows[e]["unit"]["Id"]==a["producer_unit"])
             s.need(allowed,"stale or foreign fleet generation")
         hist=0 if e==166 else ledger["native_inputs"]["roots"]["standard_peer_realized_bytes"][str(e)]
-        books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=CAPS[e],physical_bytes=physical,
+        books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=CAPS[e],physical_bytes=physical,measurement=measurement,
                             remaining_bytes=CAPS[e]-physical,historical_realized_bytes=hist)
     extra=s.inspect()
     if extra:
@@ -409,7 +439,8 @@ def capture_once(epoch,ref):
     population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
     need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep)
-    needmem=fit.MEM-sum(v["resident"] for v in peers.values())
+    resident={e:joined_resident(v) for e,v in rep.items()}
+    needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145()==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
@@ -427,7 +458,7 @@ def capture_once(epoch,ref):
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,
-        population=population,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+        population=population,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
 def capture(epoch,ref):
     try:

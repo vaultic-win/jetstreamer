@@ -51,7 +51,7 @@ def fork_control(m,fleet):
     rejected(lambda:m["same_fork"](before,before,True))
     return observed,dict(first_no_worker=first["receipt"],first_with_worker=w["worker_guard"]["receipt"],before=before,after=after,
                          complete_native_fit=True,changed_identities_rejected=True)
- 
+
 def main():
     if os.geteuid() or not sys.flags.isolated or not __debug__:raise ValueError("native isolated root session required")
     here=Path(__file__).resolve().parent;repo=here.parent.parent
