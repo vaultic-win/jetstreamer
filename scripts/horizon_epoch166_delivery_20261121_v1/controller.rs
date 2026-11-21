@@ -389,6 +389,20 @@ fn write_admission(
     put(&run.join("admission.json"), &admission)
 }
 
+fn provider_path(runtime: &Path) -> PathBuf {
+    if cfg!(feature = "five_source_fit") {
+        let package = match EPOCH {
+            166 => "capacity-tools-v4",
+            167 | 170 => "capacity-tools-v2",
+            168 => "capacity-tools-v3",
+            172 => "capacity-tools",
+            _ => unreachable!("no publication capacity profile for this epoch"),
+        };
+        return runtime.join(DELIVERY).join(package).join("publication-fit");
+    }
+    runtime.join(FIT_PATH)
+}
+
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let [mode, fleet_path, fleet_sha, fit_sha] = args.as_slice() else {
@@ -441,7 +455,7 @@ fn main() -> Result<()> {
             && fleet[FLEET_FIELD] == term_ref,
         "fleet has not adopted the original terminal"
     );
-    let provider = rt.join(FIT_PATH);
+    let provider = provider_path(rt);
     program(&provider, fit_sha)?;
     let receiver_dir = rt.join("epoch166-receiver-20261121-v1/receiver-v1");
     let receiver = rt.join(RECEIVER_PATH);
@@ -492,6 +506,17 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "five_source_fit")]
+    #[test]
+    #[ignore = "requires the sealed five-source capacity package"]
+    fn selects_the_installed_five_source_fit() -> Result<()> {
+        let path = provider_path(Path::new(RT));
+        let reported = std::env::var("HORIZON_FIVE_FIT_QUALIFIED_PATH")?;
+        let digest = std::env::var("HORIZON_FIVE_FIT_QUALIFIED_SHA256")?;
+        ensure!(path == Path::new(&reported), "crossed publication fit");
+        program(&path, &digest)
+    }
+
     #[test]
     #[ignore = "requires the root-owned, private-network native receiver fixture"]
     fn committed_source_prepares_under_the_original_receiver() -> Result<()> {

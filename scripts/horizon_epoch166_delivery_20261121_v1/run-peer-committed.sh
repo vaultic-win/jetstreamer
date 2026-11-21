@@ -13,7 +13,8 @@ fit_sha=$5
 [[ $mode == prepare || $mode == sync ]]
 [[ $fleet_sha =~ ^[0-9a-f]{64}$ && $fit_sha =~ ^[0-9a-f]{64}$ ]]
 rt=/var/lib/jetstreamer/horizon_runtime_data
-delivery=$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")
+pkg=$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")
+delivery=$(dirname "$pkg")
 quota=100%
 case "$delivery" in
     "$rt/epoch167-current-delivery-20261121-v1")
@@ -28,7 +29,7 @@ case "$delivery" in
         unit=horizon-publish-172-full-committed.service ;;
     *) echo "unrecognized committed-source package location" >&2; exit 2 ;;
 esac
-pkg="$delivery/controller-tools"
+[[ $pkg == "$delivery/controller-tools" || $pkg == "$delivery/controller-tools-v2" ]]
 repo=/home/sol/workspace/jetstreamer
 test -f "$delivery/TERMINAL_SUCCESS.json"
 test -S "$socket"
