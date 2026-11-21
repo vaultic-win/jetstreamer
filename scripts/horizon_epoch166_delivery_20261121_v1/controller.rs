@@ -390,6 +390,16 @@ fn write_admission(
 }
 
 fn provider_path(runtime: &Path) -> PathBuf {
+    if cfg!(feature = "focused169_fit") {
+        let package = match EPOCH {
+            166 => "capacity-tools-v5",
+            167 | 170 => "capacity-tools-v3",
+            168 => "capacity-tools-v4",
+            172 => "capacity-tools-v2",
+            _ => unreachable!("no publication capacity profile for this epoch"),
+        };
+        return runtime.join(DELIVERY).join(package).join("publication-fit");
+    }
     if cfg!(feature = "five_source_fit") {
         let package = match EPOCH {
             166 => "capacity-tools-v4",
@@ -506,7 +516,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "five_source_fit")]
+    #[cfg(any(feature = "five_source_fit", feature = "focused169_fit"))]
     #[test]
     #[ignore = "requires the sealed five-source capacity package"]
     fn selects_the_installed_five_source_fit() -> Result<()> {
