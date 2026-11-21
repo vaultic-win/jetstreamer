@@ -73,7 +73,7 @@ os.execv(elf, [elf, *args])
     pre_cut = "258560f902d07e217c96a042b7e78d5c2cb105a9"
     post_cut = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef"
     reader_cases = {}
-    if epoch in receiver.PEERS:
+    if epoch in receiver.PEERS or os.environ.get("HORIZON_QA_TRANSITION_READER") == "1":
         reader_cases = {
             "original-branch": (pre_cut, None, "907c5b3c26837c75c5c62f76bb124ff4fd8fe642", None),
             "candidate-branch": (post_cut, None, post_cut, None),

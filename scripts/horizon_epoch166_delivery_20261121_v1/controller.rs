@@ -44,6 +44,26 @@ mod deployment {
     pub(super) const PUBLISHER_PATH: &str = "publisher-v1/publisher";
 }
 
+// Both generations remain reachable from their own sealed event packages.
+#[cfg(all(
+    any(feature = "retry10", feature = "metered168"),
+    feature = "transition_reader"
+))]
+macro_rules! reader_package {
+    ($original:literal, $successor:literal) => {
+        $successor
+    };
+}
+#[cfg(all(
+    any(feature = "retry10", feature = "metered168"),
+    not(feature = "transition_reader")
+))]
+macro_rules! reader_package {
+    ($original:literal, $successor:literal) => {
+        $original
+    };
+}
+
 #[cfg(feature = "retry10")]
 #[path = "../horizon_epoch166_retry10_delivery_20261121_v1/generation.rs"]
 mod generation;
@@ -58,11 +78,16 @@ mod deployment {
     pub(super) const RECEIVER: &str = env!("HORIZON_HELD_RECEIVER_SHA256");
     pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
     pub(super) const FLEET_FIELD: &str = "recovered166_local_commit";
-    pub(super) const FIT_PATH: &str =
-        "epoch166-retry10-delivery-20261121-v1/capacity-tools/publication-fit";
-    pub(super) const RECEIVER_PATH: &str =
-        "epoch166-retry10-delivery-20261121-v1/publisher-tools/receive.py";
-    pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
+    pub(super) const FIT_PATH: &str = reader_package!(
+        "epoch166-retry10-delivery-20261121-v1/capacity-tools/publication-fit",
+        "epoch166-retry10-delivery-20261121-v1/capacity-tools-v3/publication-fit"
+    );
+    pub(super) const RECEIVER_PATH: &str = reader_package!(
+        "epoch166-retry10-delivery-20261121-v1/publisher-tools/receive.py",
+        "epoch166-retry10-delivery-20261121-v1/publisher-tools-v2/receive.py"
+    );
+    pub(super) const PUBLISHER_PATH: &str =
+        reader_package!("publisher-tools/publisher", "publisher-tools-v2/publisher");
 }
 #[cfg(feature = "metered168")]
 mod deployment {
@@ -76,11 +101,16 @@ mod deployment {
     pub(super) const RECEIVER: &str = env!("HORIZON_HELD_RECEIVER_SHA256");
     pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
     pub(super) const FLEET_FIELD: &str = "metered168_local_commit";
-    pub(super) const FIT_PATH: &str =
-        "epoch168-current-delivery-20261121-v1/capacity-tools/publication-fit";
-    pub(super) const RECEIVER_PATH: &str =
-        "epoch168-current-delivery-20261121-v1/publisher-tools/receiver.py";
-    pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
+    pub(super) const FIT_PATH: &str = reader_package!(
+        "epoch168-current-delivery-20261121-v1/capacity-tools/publication-fit",
+        "epoch168-current-delivery-20261121-v1/capacity-tools-v2/publication-fit"
+    );
+    pub(super) const RECEIVER_PATH: &str = reader_package!(
+        "epoch168-current-delivery-20261121-v1/publisher-tools/receiver.py",
+        "epoch168-current-delivery-20261121-v1/publisher-tools-v2/receiver.py"
+    );
+    pub(super) const PUBLISHER_PATH: &str =
+        reader_package!("publisher-tools/publisher", "publisher-tools-v2/publisher");
 }
 
 #[cfg(any(feature = "source167", feature = "retry170"))]
