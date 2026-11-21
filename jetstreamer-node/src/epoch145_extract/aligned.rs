@@ -230,4 +230,5 @@ impl SlotVisitor for Visitor {
 }
 
 #[cfg(test)]
+#[path = "aligned/tests.rs"]
 mod tests;

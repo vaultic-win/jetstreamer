@@ -4,6 +4,7 @@
 //! source retirement. A separately admitted controller must bind the completed
 //! producer and the exact worker pin, retain the full checkpoint-bearing source,
 //! supply a live output-budget guard, and persist the returned evidence.
+#[path = "epoch145_extract/aligned.rs"]
 mod aligned;
 
 use crate::{
@@ -300,6 +301,22 @@ impl PinnedSource {
         &mut self,
         root: &Path,
         maximum_bytes: u64,
+        guard: G,
+    ) -> Result<ExtractionEvidence>
+    where
+        G: FnMut(u64) -> io::Result<()>,
+    {
+        self.extract_private_with_temporary(root, maximum_bytes, None, guard)
+    }
+
+    /// Accepts a caller's already physically reserved, still empty temporary.
+    /// It must refer to the same private directory and is published only after
+    /// completing the normal strict reread and no-clobber checks.
+    pub fn extract_private_with_temporary<G>(
+        &mut self,
+        root: &Path,
+        maximum_bytes: u64,
+        prepared: Option<tempfile::NamedTempFile>,
         mut guard: G,
     ) -> Result<ExtractionEvidence>
     where
@@ -327,10 +344,29 @@ impl PinnedSource {
             .ok_or_else(|| anyhow::anyhow!("145 source lost V2 provenance"))?;
         let (expected, expected_output_provenance_sha256) =
             canonical_prefix_provenance(source_provenance)?;
-        let mut temporary = if original_output.is_none() {
-            Some(tempfile::NamedTempFile::new_in(root)?)
-        } else {
-            None
+        let mut temporary = match (prepared, original_output) {
+            (Some(t), None) => {
+                let m = t.as_file().metadata()?;
+                ensure!(
+                    t.path().parent() == Some(root)
+                        && t.path().canonicalize()? == t.path()
+                        && m.is_file()
+                        && m.uid() == directory_identity.uid()
+                        && m.dev() == directory_identity.dev()
+                        && m.nlink() == 1
+                        && m.mode() & 0o077 == 0
+                        && m.len() == 0
+                        && path_matches_archive_identity(
+                            t.path(),
+                            archive_file_identity(t.as_file())?
+                        )?,
+                    "145 prepared temporary is outside the selected empty output inode"
+                );
+                Some(t)
+            }
+            (Some(_), Some(_)) => anyhow::bail!("145 preallocated output target already exists"),
+            (None, None) => Some(tempfile::NamedTempFile::new_in(root)?),
+            (None, Some(_)) => None,
         };
         let expected_semantic = if let Some(t) = temporary.as_mut() {
             let output = Limited {

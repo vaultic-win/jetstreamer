@@ -1,0 +1,459 @@
+//! Reuse the accepted native reservation collector and the armed 169/172
+//! guard plans. The transfer consumes the locked holding phase of the existing
+//! auxiliary envelope. It never ends a promise or charges the same CPU twice.
+use crate::{custody as f, model::Bound};
+use anyhow::{Context, Result, ensure};
+use serde_json::{Value, json};
+use std::{
+    collections::BTreeSet,
+    fs,
+    io::{Read, Seek, SeekFrom},
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+pub const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
+pub const UNIT: &str = "horizon-holding-export145-20261121-v1.service";
+pub const BYTES: u64 = 105_610_995_833;
+const G: u64 = 1 << 30;
+const META: u64 = 128 << 20;
+const E172: &str = "epoch172-full-half-core-20261120-v1";
+const E169: &str = "epoch169-focused-admission-20261120-v4";
+const HOST_MEMORY: u64 = 810_658_050_048;
+const E172_ADMISSION: &str = "c1dc591288eca1a2f6e2ab37888c57f108d2d25e6639d292d612def83ff2f2df";
+
+pub fn n(v: &Value, key: &str) -> Result<u64> {
+    v[key].as_u64().with_context(|| format!("missing {key}"))
+}
+fn bound(path: impl Into<PathBuf>, sha: &str) -> Bound {
+    Bound {
+        path: path.into(),
+        sha256: sha.into(),
+    }
+}
+fn checked(path: &str, sha: &str) -> Result<Value> {
+    f::evidence(&bound(Path::new(RUNTIME).join(path), sha))
+}
+fn session172() -> Result<Value> {
+    checked(
+        &format!("{E172}/ACTUAL_ADMISSION_AND_PROTECTION.json"),
+        E172_ADMISSION,
+    )
+}
+fn jsonref(v: &Value) -> Result<Value> {
+    f::evidence(&serde_json::from_value::<Bound>(v.clone())?)
+}
+pub fn run(program: &str, args: &[&str], seconds: &str) -> Result<String> {
+    let o = Command::new("/usr/bin/timeout")
+        .args(["--kill-after=2s", seconds, program])
+        .args(args)
+        .env_remove("SYSTEMD_HOST")
+        .output()?;
+    ensure!(
+        o.status.success(),
+        "{program} failed: {}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    Ok(String::from_utf8(o.stdout)?)
+}
+fn number_file(path: &Path) -> Result<u64> {
+    Ok(fs::read_to_string(path)?.trim().parse()?)
+}
+fn meminfo(key: &str) -> Result<u64> {
+    let s = fs::read_to_string("/proc/meminfo")?;
+    let mut w = s
+        .lines()
+        .find_map(|l| l.strip_prefix(key))
+        .context("meminfo field")?
+        .split_whitespace();
+    let x: u64 = w.next().context("meminfo value")?.parse()?;
+    ensure!(w.next() == Some("kB"), "meminfo units");
+    Ok(x * 1024)
+}
+pub fn home() -> Result<(u64, u64)> {
+    let mut v = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    ensure!(
+        unsafe { libc::statvfs(c"/home/sol".as_ptr(), v.as_mut_ptr()) } == 0,
+        "statvfs HOME"
+    );
+    let v = unsafe { v.assume_init() };
+    ensure!(v.f_frsize == 4096, "unexpected HOME geometry");
+    Ok((
+        v.f_bavail
+            .checked_mul(v.f_frsize)
+            .context("free bytes overflow")?,
+        v.f_frsize,
+    ))
+}
+fn peer_names(fleet: &Value, ad: &Value) -> Result<BTreeSet<String>> {
+    let mut names = BTreeSet::new();
+    let mut epochs = BTreeSet::new();
+    for field in [
+        "actual_executing_replays",
+        "actual_active_bootstraps",
+        "actual_active_private_diagnostics",
+    ] {
+        for v in fleet[field].as_array().context("fleet census")? {
+            let epoch = n(v, "epoch")?;
+            let name = v["unit"]["Id"].as_str().context("native owner")?;
+            if epoch == 172 {
+                ensure!(
+                    v["unit"]["InvocationID"] == ad["producer_invocation_id"],
+                    "172 owner changed"
+                );
+            }
+            ensure!(
+                epochs.insert(epoch) && names.insert(name.to_string()),
+                "duplicate fleet owner"
+            );
+        }
+    }
+    ensure!(
+        epochs == BTreeSet::from([166, 167, 168, 169, 170, 172]),
+        "authoritative fleet does not have the six admitted epochs"
+    );
+    Ok(names)
+}
+fn active(patterns: &[&str]) -> Result<BTreeSet<String>> {
+    let mut args = vec![
+        "list-units",
+        "--state=running,activating,reloading,deactivating",
+        "--no-pager",
+        "--no-legend",
+        "--output=json",
+    ];
+    args.extend(patterns);
+    let rows: Vec<Value> = serde_json::from_str(&run("/usr/bin/systemctl", &args, "10")?)?;
+    rows.into_iter()
+        .map(|v| Ok(v["unit"].as_str().context("unit census row")?.to_string()))
+        .collect()
+}
+fn native_values(unit: &str) -> Result<Value> {
+    ensure!(
+        unit.starts_with("horizon-")
+            && unit.ends_with(".service")
+            && unit
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"-._".contains(&c)),
+        "unit name"
+    );
+    let s = run(
+        "/usr/bin/systemctl",
+        &[
+            "show",
+            unit,
+            "--property=Id,InvocationID,ActiveState,SubState,MainPID,ControlGroup,Job,NRestarts,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec",
+        ],
+        "8",
+    )?;
+    let mut v = json!({});
+    for l in s.lines() {
+        let (k, w) = l.split_once('=').context("native state")?;
+        ensure!(v[k].is_null(), "duplicate native state");
+        v[k] = json!(w);
+    }
+    ensure!(
+        v["Id"] == unit
+            && v["Job"] == ""
+            && v["ActiveState"] == "active"
+            && v["SubState"] == "running"
+            && v["NRestarts"] == "0"
+            && v["MemorySwapMax"] == "0",
+        "native {unit} changed"
+    );
+    Ok(v)
+}
+fn resident(entry: &Value, epoch: u64) -> Result<u64> {
+    let name = entry["unit"].as_str().context("owner unit")?;
+    let s = native_values(name)?;
+    let cpu = match epoch {
+        169 => "3s",
+        172 => "500ms",
+        _ => "9s",
+    };
+    ensure!(
+        s["InvocationID"] == entry["iid"]
+            && s["CPUQuotaPerSecUSec"] == cpu
+            && s["MemoryMax"] == (68 * G).to_string(),
+        "owner {epoch} limits or generation changed"
+    );
+    let group = Path::new("/sys/fs/cgroup/system.slice").join(name);
+    let own = format!("/system.slice/{name}");
+    ensure!(s["ControlGroup"] == own, "foreign cgroup");
+    let contents = fs::read_to_string(group.join("cgroup.procs"))?;
+    let members: BTreeSet<u32> = contents
+        .lines()
+        .map(str::parse)
+        .collect::<std::result::Result<_, _>>()?;
+    let pids = entry["processes"].as_array().context("owner processes")?;
+    let mut recorded = BTreeSet::new();
+    let mut pss = 0u64;
+    for row in pids {
+        let pid = u32::try_from(row[0].as_u64().context("pid")?)?;
+        ensure!(
+            members.contains(&pid)
+                && recorded.insert(pid)
+                && crate::native::ticks(pid)? == row[1].as_u64().context("ticks")?,
+            "peer process changed"
+        );
+        let meta = fs::metadata(format!("/proc/{pid}/exe"))?;
+        ensure!(
+            row[2] == meta.dev() && row[3] == meta.ino(),
+            "peer executable changed"
+        );
+        let m = fs::read_to_string(format!("/proc/{pid}/smaps_rollup"))?;
+        let k: u64 = m
+            .lines()
+            .find_map(|x| x.strip_prefix("Pss:"))
+            .context("peer PSS")?
+            .split_whitespace()
+            .next()
+            .context("PSS value")?
+            .parse()?;
+        pss = pss.checked_add(k * 1024).context("PSS sum")?;
+    }
+    ensure!(recorded == members, "unexpected peer process");
+    let stat = fs::read_to_string(group.join("memory.stat"))?;
+    let get = |k: &str| -> Result<u64> {
+        Ok(stat
+            .lines()
+            .find_map(|l| l.strip_prefix(k))
+            .context("cgroup memory field")?
+            .parse()?)
+    };
+    Ok(pss.min(get("anon ")? + get("file_mapped ")?).min(68 * G))
+}
+fn newest_sample(plan_ref: &Value) -> Result<(u64, u64)> {
+    let plan = jsonref(plan_ref)?;
+    let dir = Path::new(
+        plan["receipt_directory"]
+            .as_str()
+            .context("guard directory")?,
+    );
+    let mut log = fs::File::open(dir.parent().context("guard root")?.join("guard.stdout"))?;
+    let end = log.metadata()?.len();
+    log.seek(SeekFrom::Start(end.saturating_sub(64 << 10)))?;
+    let mut tail = String::new();
+    log.take(64 << 10).read_to_string(&mut tail)?;
+    let observed = tail
+        .lines()
+        .rev()
+        .find_map(|line| serde_json::from_str::<Value>(line).ok())
+        .context("complete guard sample")?;
+    let iid = observed["guard_invocation_id"]
+        .as_str()
+        .context("native guard invocation")?;
+    ensure!(f::hex(iid, 32), "guard invocation syntax");
+    let p = dir.join(format!("sample-{iid}.json"));
+    let s = f::evidence(&f::binding(&p)?)?;
+    ensure!(s == observed, "guard receipt differs from native stdout");
+    let o = &s["root_physical_observation"];
+    ensure!(
+        s["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && s["plan_sha256"] == plan_ref["sha256"]
+            && s["producer_invocation_id"] == plan["invocation_id"]
+            && s["trip_reason"].is_null()
+            && s["root_physical_observation_error"].is_null()
+            && o["exceeds_budget"] == false
+            && s["producer"]["active"] == "active"
+            && s["producer_stop_enabled"] == true
+            && f::now()?
+                .checked_sub(n(&s, "recorded_unix_seconds")?)
+                .is_some_and(|age| age <= 45),
+        "stale or invalid native guard sample {}",
+        p.display()
+    );
+    let cap = n(&plan, "maximum_root_physical_bytes")?;
+    let min = n(&o["first"], "physical_bytes")?.min(n(&o["second"], "physical_bytes")?);
+    let realized = if o["first"]["vanished_entries"] == 0 && o["second"]["vanished_entries"] == 0 {
+        min
+    } else {
+        0
+    };
+    Ok((
+        n(&plan, "minimum_free_bytes")?,
+        cap.checked_sub(realized).context("root exceeds cap")?,
+    ))
+}
+
+pub struct Fit {
+    pub evidence: Value,
+    pub names: BTreeSet<String>,
+    pub base: u64,
+    pub memfloor: u64,
+    pub g169: Value,
+    pub g172: Value,
+}
+impl Fit {
+    pub fn current(&self, needed: u64) -> Result<Value> {
+        let (a, ra) = newest_sample(&self.g169)?;
+        let (b, rb) = newest_sample(&self.g172)?;
+        let protected = (self.base.max(a) + ra + 16 * G).max(b) + rb + META;
+        let free = home()?.0;
+        let available = meminfo("MemAvailable:")?;
+        ensure!(
+            available >= self.memfloor
+                && free >= protected.checked_add(needed).context("disk sum")?,
+            "resource gate: HOME {free} needs {} (protected {protected}, new bytes {needed}); RAM {available} needs {}",
+            protected + needed,
+            self.memfloor
+        );
+        Ok(
+            json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":self.memfloor,"169_unspent":ra,"172_unspent":rb}),
+        )
+    }
+    pub fn topology(&self) -> Result<()> {
+        ensure!(
+            active(&["horizon-qualify*.service"])? == self.names,
+            "replay topology changed"
+        );
+        Ok(())
+    }
+}
+
+pub fn capture(b: &Bound) -> Result<Fit> {
+    ensure!(
+        b.path
+            .file_name()
+            .is_some_and(|x| x == "ROOT_COMPLETE_OPERATIONAL_FLEET.json")
+            && b.path.parent().and_then(Path::parent) == Some(Path::new(RUNTIME)),
+        "fleet source namespace"
+    );
+    let fleet: Value = serde_json::from_slice(&f::bytes(b, 32 << 20, false)?)?;
+    let now = f::now()?;
+    ensure!(
+        now.checked_sub(n(&fleet, "recorded_unix_seconds")?)
+            .is_some_and(|s| s <= 40 * 60)
+            && fleet["owner"] == "/root"
+            && fleet["all_reservation_ending_bytes"] == 0
+            && fleet["all_existing_memory_DATA_OS_native_transport_promises_retained"] == true,
+        "stale or incomplete fleet"
+    );
+    let ad = session172()?;
+    let post = jsonref(&ad["post_guard_capacity"])?;
+    let names = peer_names(&fleet, &ad)?;
+    ensure!(
+        names == active(&["horizon-qualify*.service"])?,
+        "unexpected native replay census"
+    );
+    let holding = active(&[
+        "horizon-*holding*.service",
+        "horizon-*park*.service",
+        "horizon-*census*.service",
+        "horizon-held141-custody*.service",
+        "horizon-extract145-prefix*.service",
+    ])?;
+    ensure!(
+        holding.iter().all(|u| u == UNIT),
+        "conflicting holding or exporter owner {holding:?}"
+    );
+    ensure!(
+        fleet["actual_active_holding_transfers"]
+            .as_array()
+            .is_some_and(Vec::is_empty),
+        "holding transfer in fleet"
+    );
+    let allowance = &fleet["retry9_auxiliary_commitments"];
+    ensure!(
+        allowance["holding_serial"] == true
+            && allowance["holding_cpu_quota_micros"] == 2_000_000
+            && allowance["holding_memory_bytes"] == 2 * G,
+        "holding phase funding changed"
+    );
+    let p = Path::new(RUNTIME)
+        .join(E172)
+        .join("controller/reservations");
+    let sha = "316998786367d07ad76fec0c29841d52d84bfa489dd4d8ac0c91f4fa3351a3b7";
+    f::bytes(&bound(p.clone(), sha), 8 << 20, true)?;
+    let inputs: Value = serde_json::from_str(&run(
+        p.to_str().context("reservations path")?,
+        &[
+            "--measure-replay-reservations",
+            b.path.to_str().context("fleet name")?,
+            &b.sha256,
+        ],
+        "145",
+    )?)?;
+    let aux = &inputs["auxiliary"];
+    let roots = &inputs["roots"];
+    let audit = &fleet["continuing_audit_obligation"];
+    ensure!(
+        inputs["temporary_cpu_micros"] == 0
+            && inputs["temporary_memory"] == 0
+            && aux["cpu_quota_micros"] == 3_250_000
+            && aux["memory_bytes"] == 6_576_668_672u64
+            && post["complete_cpu_quota_micros"] == 64_000_000
+            && post["complete_memory_plus_reserve_bytes"] == HOST_MEMORY
+            && audit["additional_cpu_quota_micros"] == 4_000_000
+            && audit["additional_memory_bytes"] == 24 * G
+            && audit["current_storage"]["remaining_archive_growth_bytes"] == 0
+            && audit["current_storage"]["remaining_DATA_growth_bytes"] == 18 * G
+            && n(&fleet, "complete_projected_memory_bytes")?
+                + 16 * G
+                + n(aux, "memory_bytes")?
+                + 24 * G
+                == HOST_MEMORY,
+        "full-fleet CPU, memory or audit changed"
+    );
+    let slice = Path::new("/sys/fs/cgroup/horizonaudit.slice");
+    ensure!(
+        fs::read_to_string(slice.join("cpu.max"))?
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<std::result::Result<Vec<u64>, _>>()?
+            .as_slice()
+            == [400000, 100000]
+            && number_file(&slice.join("memory.max"))? == 24 * G
+            && number_file(&slice.join("memory.swap.max"))? == 0,
+        "audit envelope"
+    );
+    let prior = checked(
+        &format!("{E169}/POST_GUARD_CAPACITY.json"),
+        "803bb540a6601238e8754c733a8cf900a9b6d103116ad6dac50bdcc2a081defc",
+    )?;
+    let g169 = json!(bound(
+        Path::new(RUNTIME).join(E169).join("ACTUAL_GUARD_PLAN.json"),
+        "3ddbafe25e1b5df2498d86b629ce6411e47c116b4377035f3a6690a504e1aa58"
+    ));
+    let fixed = n(&inputs, "historical_floor_bytes")?.max(n(audit, "configured_free_floor_bytes")?);
+    let extra = n(roots, "peer_remaining_growth_bytes")?
+        + n(roots, "remaining_standard_root_bytes")?
+        + 10 * G
+        + n(aux, "remaining_growth_bytes")?
+        + (64 << 20)
+        + n(&inputs, "independent166_whole_cap_bytes")?;
+    let base = (fixed + extra + 18 * G)
+        .max(n(&prior, "protected_raw_floor_bytes")?)
+        .max(8_297_502_499_408 + n(roots, "remaining_standard_root_bytes")?);
+    let before = meminfo("MemAvailable:")?;
+    let mut rss = 0;
+    for (k, row) in post["owners"].as_object().context("172 native owners")? {
+        rss += resident(row, k.parse()?)?.min(resident(row, k.parse()?)?);
+    }
+    let live172 = native_values(ad["producer_unit"].as_str().context("172 native unit")?)?;
+    ensure!(
+        live172["InvocationID"] == ad["producer_invocation_id"]
+            && live172["MainPID"] == n(&ad, "producer_pid")?.to_string()
+            && live172["CPUQuotaPerSecUSec"] == "500ms"
+            && live172["MemoryMax"] == (68 * G).to_string(),
+        "172 native bounds"
+    );
+    ensure!(
+        meminfo("MemTotal:")? >= HOST_MEMORY && before >= HOST_MEMORY - rss,
+        "full memory does not fit"
+    );
+    let evidence = json!({"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    Ok(Fit {
+        evidence,
+        names,
+        base,
+        memfloor: HOST_MEMORY - rss,
+        g169,
+        g172: ad["actual_guard_plan"].clone(),
+    })
+}
+
+pub fn output_allocation() -> u64 {
+    BYTES.div_ceil(4096) * 4096
+}
