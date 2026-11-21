@@ -26,7 +26,9 @@ pub(crate) const PACKET: &str =
 pub(crate) const PACKET_SHA: &str =
     "f7dbb6eedd4f47c940c959639d399ea3af68343f18fc894c736170f6dc089153";
 pub(crate) const INPUT_SCHEMA: &str = "horizon265-input-packet-v1";
-pub(crate) const INPUT_VERIFIED: &str = "sealed_file_bytes_and_index_structure_accepted";
+pub(crate) fn measurement_verified(value: &serde_json::Value) -> bool {
+    value["sealed_file_bytes_and_index_structure_accepted"] == true
+}
 pub(crate) fn validate_extra(_: &serde_json::Value) -> anyhow::Result<()> {
     Ok(())
 }

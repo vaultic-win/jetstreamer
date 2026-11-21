@@ -26,7 +26,9 @@ pub(crate) const PACKET: &str =
 pub(crate) const PACKET_SHA: &str =
     "d325e670fecbd4073ca86bd52afefd99ac992c7d0392de1a3e82c9dcb3e1d40f";
 pub(crate) const INPUT_SCHEMA: &str = "horizon257-bootstrap-inputs-v1";
-pub(crate) const INPUT_VERIFIED: &str = "all_native_input_bytes_verified";
+pub(crate) fn measurement_verified(value: &serde_json::Value) -> bool {
+    value["all_native_input_bytes_verified"] == true
+}
 const NODE: &str = "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node";
 const NODE_SHA: &str = "2789f8211dafc4230a084910867db99699e6470b4a08a6fd8cc6dc00bf080f32";
 pub(crate) const HARNESS: &str =

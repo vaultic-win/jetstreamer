@@ -7,3 +7,9 @@ const WORKER_BYTES: u64 = 6_519_904;
 const BACKEND: &str = "solana-v1.7.15";
 const SOLANA_COMMIT: &str = "4892eb4e1ad278d5249b6cda8983f88effb3e98b";
 include!("session.rs");
+
+struct Checks;
+impl RuntimeChecks for Checks {}
+fn run() -> Result<()> {
+    run_with::<Checks>()
+}

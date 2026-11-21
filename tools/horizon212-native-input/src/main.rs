@@ -38,3 +38,9 @@ const BACKEND: &str = "solana-v1.6.16";
 const SOLANA_COMMIT: &str = "86c26f843276581509c3434acc2efbf4202c44e0";
 const WORKER_BYTES: u64 = 9_050_240;
 include!("../../horizon265-native-input/src/session.rs");
+
+struct Checks;
+impl RuntimeChecks for Checks {}
+fn run() -> Result<()> {
+    run_with::<Checks>()
+}

@@ -70,7 +70,7 @@ fn read_small(path: &Path, sha: &str, limit: u64) -> Result<Vec<u8>> {
 fn inputs() -> Result<Value> {
     let p: Value = serde_json::from_slice(&read_small(Path::new(PACKET), PACKET_SHA, 2 << 20)?)?;
     ensure!(
-        p["schema"] == INPUT_SCHEMA && p["epoch"] == EPOCH && p[INPUT_VERIFIED] == true,
+        p["schema"] == INPUT_SCHEMA && p["epoch"] == EPOCH && profile::measurement_verified(&p),
         "foreign input packet"
     );
     profile::validate_extra(&p)?;
@@ -404,14 +404,27 @@ impl Drop for Session {
         }
     }
 }
-fn run() -> Result<()> {
+/// Additional historical checks run before the next worker request.
+trait RuntimeChecks {
+    const DEADLINE_SECS: u64 = 2700;
+    fn fingerprint(_: &Handshake) -> Result<()> {
+        Ok(())
+    }
+    fn initialized(_: &Initialized) -> Result<()> {
+        Ok(())
+    }
+    fn frozen(_: &Initialized, _: &Checkpoint) -> Result<()> {
+        Ok(())
+    }
+}
+fn run_with<C: RuntimeChecks>() -> Result<()> {
     ensure!(
         std::env::args().len() == 1,
         "no runtime override arguments accepted"
     );
     pristine()?;
     let start = Instant::now();
-    let end = start + Duration::from_secs(2700);
+    let end = start + Duration::from_secs(C::DEADLINE_SECS);
     // No worker spawn, input hash, ledger copy or snapshot work before this gate.
     let gate = gate::admit().map_err(|e| anyhow::anyhow!("first guard gate: {e}"))?;
     let packet = inputs()?;
@@ -433,6 +446,7 @@ fn run() -> Result<()> {
         _ => bail!("expected handshake"),
     };
     handshake(&h)?;
+    C::fingerprint(&h)?;
     let i = match session.exchange(RequestBody::Initialize {
         ledger_path: format!("{ROOT}/ledger"),
         initial_state: InitialState::SnapshotArchive {
@@ -444,11 +458,13 @@ fn run() -> Result<()> {
         _ => bail!("expected initialized response"),
     };
     initialized(&i)?;
+    C::initialized(&i)?;
     let c = match session.exchange(RequestBody::FreezeCheckpoint { slot: SLOT })? {
         ResponseBody::Checkpoint(c) => c,
         _ => bail!("expected canonical checkpoint"),
     };
     checkpoint(&c, i.next_write_version)?;
+    C::frozen(&i, &c)?;
     let log_bytes = session.shutdown()?;
     ensure!(
         inputs()? == packet,
