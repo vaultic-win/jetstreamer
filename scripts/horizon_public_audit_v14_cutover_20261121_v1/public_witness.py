@@ -25,6 +25,34 @@ ATTEMPT = PUBLIC / "attempts" / "range-70-135-1795211361251901223"
 INVENTORY_SHA = "c4dbc4bc2413377f6c77922730be26e77640a182bf5ac53038aa4856e72983f7"
 
 
+REVIEW = {"path":str(V14/"ORIGINAL_73_CLOSED_REPORT_REVIEW.json"),
+          "sha256":"a39e2af5dacf83186fc72ccc52b51ad112f4614992980becf37297c70d7c9834"}
+
+def recovery_boundary(boundary, previous, report):
+    need(boundary["schema"]=="horizon-public-audit-natural-successor-v2" and boundary["original_73_review"]==REVIEW,
+         "unknown original 73 review")
+    review=checked(REVIEW)
+    need(review["native_report"]==boundary["native_report"] and review["branch_event"]==boundary["event"]
+         and review["full_epoch_verified"] and review["report"]==report["report"],"incorrect closed 73 playback")
+    inventory=checked(boundary["inventory"])["objects"]
+    accepted=boundary["accepted_epochs"]
+    manifest=boundary["accepted_result_sha256"]
+    need(len(accepted)>=73 and accepted==[entry["epoch"] for entry in inventory[:len(accepted)]]
+         and set(manifest)=={str(n) for n in accepted},"incomplete preserved inventory prefix")
+    for epoch in accepted:
+        need(bound(PUBLIC/"results"/f"epoch-{epoch}.json")["sha256"]==manifest[str(epoch)],"accepted result changed")
+    trigger=checked(boundary["quiescent_reader"])
+    native_reader=checked(trigger["reader_proof"])
+    need(trigger["schema"]=="horizon-previous-public-reader-v2" and trigger["parent"]==previous
+         and trigger["pid"]==boundary["previous_child_pid"] and trigger["start_ticks"]>0
+         and trigger["argv"][0]==native_reader["artifact"] and trigger["reader_sha256"]==native_reader["artifact_sha256"]
+         and trigger["range_start"]<=trigger["range_end"] and trigger["range_start"]>=73,
+         "foreign naturally closed reader")
+    need(boundary["fresh_quiescence_unix_seconds"]>=trigger["observed_at"] and
+         boundary["at"]>=boundary["fresh_quiescence_unix_seconds"] and boundary["sole_quiescent_parent"] is True
+         and boundary["recovery_activated_live_reader"] is False,"invalid successor boundary evidence")
+
+
 def v14_chain(previous, launch, closure, boundary, branch, report, reference_report):
     """Accept a new invocation only after the incumbent's natural report boundary."""
     need(previous == {"path": str(SUCCESSOR / "PUBLIC_OWNER.json"), "sha256": V13_OWNER_SHA},
@@ -55,17 +83,19 @@ def v14_chain(previous, launch, closure, boundary, branch, report, reference_rep
          "v13 controller still owns audit work")
     result = boundary["native_report"]
     need(boundary["previous_owner"] == previous and boundary["epoch"] == 73
-         and boundary["previous_child_pid"] == 3376515
+         and (boundary.get("schema")=="horizon-public-audit-natural-successor-v2" or boundary["previous_child_pid"]==3376515)
          and boundary["previous_child_drained"] is True
          and boundary["new_playback_started"] is False
          and boundary["inventory"] == {"path": str(PUBLIC/"inventory.json"), "sha256": INVENTORY_SHA}
          and boundary["event"]["path"] == str(ATTEMPT / "branch-change.json")
          and result["path"] == str(ATTEMPT/"reports"/"epoch-73.json")
-         and boundary["accepted_epochs"] == list(range(73))
+         and (boundary.get("schema")=="horizon-public-audit-natural-successor-v2" or boundary["accepted_epochs"]==list(range(73)))
          and type(branch["completed"]) is int and branch["completed"] == 3
          and branch["reader_commit"] == "5bb2637754782ad3f03f5b780a5024fa89602adc"
          and report["full_epoch_verified"] is True and report["report"]["epoch"] == 73,
          "wrong natural epoch-73 boundary")
+    if "schema" in boundary:
+        recovery_boundary(boundary,previous,report)
     decoded = report["report"]
     need(report["schema"] == reference_report["schema"] == "jetstreamer-horizon-plugin-playback-v1"
          and report["source"] == reference_report["source"] == "https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev"
