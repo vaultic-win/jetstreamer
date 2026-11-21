@@ -160,6 +160,43 @@ def checked_prices():
         bindings[str(epoch)] = dict(path=path,service=service,adapter=value,active_fence=fence)
     return dict(registration=registration,provider=body['provider'],epochs=bindings)
 
+def child_limits(snapshot):
+    need(snapshot['readers'], 'no active native audit readers')
+    for name, child in snapshot['children'].items():
+        if name in UNITS:
+            need(child['cpu_max']=='400000 100000', 'audit child CPU ceiling changed')
+            continue
+        need(name=='horizon-bounded-five-after-145-20261121-v1.service', 'unregistered concurrent audit child')
+        unit=child['unit']
+        qa=R/'incident-replay-fit-20261121-v1/paid145-five-controller-qa-bounded-d859e5380946/run-native-qa.sh'
+        need(child['cpu_max']=='50000 100000' and unit['CPUQuotaPerSecUSec']=='500ms' and unit['MemoryMax']==str(768<<20)
+             and unit['MemorySwapMax']=='0' and unit['TasksMax']=='96' and unit['InvocationID']=='808558e26a87432ba4f8f96d377dd951',
+             'unexpected resources or invocation on the paid native publisher qualification')
+        need(bound(qa)['sha256']=='ceda87b5df92a0ec731a0cc1b14074078d08da0aa7f2f37bf582be5232031b11'
+             and str(qa) in show(name,('ExecStart',))['ExecStart'], 'concurrent qualification is not the registered V16 reader')
+
+def paid_semantic(head, manager):
+    root=R/'epoch145-semantic-continuity-20261121-v1'
+    ref=bound(root/'V5E_ACTUAL_ADVANCING_WORKER.json')
+    proof=checked(ref)
+    previous, current=proof['observations']
+    accepted=checked(proof['manager'])
+    need(proof['invocation_id']==manager['InvocationID']==accepted['new']['InvocationID']
+         and current['parent_pid']==int(manager['MainPID']) and previous['child_pid']==current['child_pid']
+         and previous['child_ticks']==current['child_ticks'] and current['source_offset']>previous['source_offset']
+         and current['worker_cpu_ticks']>previous['worker_cpu_ticks'], 'paid verifier owner or progression changed')
+    intent=checked(accepted['intent'])
+    need(intent['fleet']==head and checked(intent['fit'])['fits'] and intent['provider']==intent['semantic_provider']
+         and intent['provider']['sha256']=='b11e6366a6fc0cf3ed91d2584314851b628f2589d60b70d41b922cb1170d0cb5', 'unexpected paid admission price')
+    checked(intent['provider'])
+    child=Path('/proc')/str(current['child_pid'])
+    need(int((child/'stat').read_text().rsplit(')',1)[1].split()[19])==current['child_ticks'], 'paid semantic PID changed')
+    expected={tuple(row) for row in current['native_leases']}
+    observed={tuple(line.split()[1:]) for line in Path('/proc/locks').read_text().splitlines() if len(line.split())>4 and line.split()[4] in (str(current['child_pid']),manager['MainPID'])}
+    need(expected==observed and sum(row[:3]==('LEASE','ACTIVE','READ') for row in observed)==6
+         and sum(row[:3]==('FLOCK','ADVISORY','WRITE') for row in observed)==1, 'paid worker leases or parent lock changed')
+    return dict(advancement=ref, manager=proof['manager'], native_leases=sorted(observed), prestart=intent['fit'], native_price=intent['provider'])
+
 def apply(head, handoff_refs):
     need(handoff_refs, 'accepted price and event handoffs required for this CPU transition')
     for ref in handoff_refs:
@@ -167,11 +204,13 @@ def apply(head, handoff_refs):
     dependencies = checked_prices()
     before = snapshot(head)
     need(before['profile']=='paid-four' and before['raw_idle']=='0' and before['manager_weight']=='[not set]', 'unexpected starting CPU service policy')
-    need(before['readers'] and set(before['children']).issubset(UNITS), 'no active audit readers or another job is sharing the slice')
-    need(all(v['cpu_max']=='400000 100000' for v in before['children'].values()), 'audit child CPU ceiling changed')
+    child_limits(before)
+    semantic=None
     paid = before['paid']
     if paid['ActiveState']=='active':
         expected = R/'epoch145-semantic-continuity-20261121-v1'
+        if str(expected/'tools-v5e/export145') in paid['ExecStart']:
+            semantic=paid_semantic(head,paid)
         need(any(str(expected/version)+'/export145' in paid['ExecStart'] for version in ('tools-v5e','tools-v11')), 'old paid guard remains selected')
     else:
         need(paid['ActiveState'] in ('failed','inactive') and paid['MainPID']=='0', 'paid worker is transitioning')
@@ -182,13 +221,20 @@ def apply(head, handoff_refs):
         raised = True
         after = snapshot(head)
         need(dependencies==checked_prices(), 'selected publication guards changed during cutover')
-        for key in ('boot','scope','readers','children','producers','guards','paid'):
+        child_limits(after)
+        for name, row in before['children'].items():
+            if name in UNITS or name in after['children']:
+                need(after['children'].get(name)==row, 'protected audit child changed during CPU transition')
+        need(set(after['children']).issubset(before['children']), 'new audit child during CPU transition')
+        if semantic:
+            need(semantic==paid_semantic(head,after['paid']), 'paid worker changed during CPU transition')
+        for key in ('boot','scope','readers','producers','guards','paid'):
             need(before[key]==after[key], 'live identity or protection changed during cutover: '+key)
         need(before['slice_limits']==dict(after['slice_limits'],CPUQuotaPerSecUSec='4s'), 'non-CPU slice setting changed')
         need(after['profile']=='idle-twelve' and after['raw_idle']=='1', 'idle CPU profile readback failed')
         receipt = ROOT/'IN_PLACE_CPU_ACTIVE.json'
         durable(receipt, dict(schema='horizon-existing-audit-slice-idle-ceiling-v1', before=before, after=after,
-                               live_handoffs=handoff_refs, terminal_prices=dependencies, assignment=bound(ASSIGNMENT), observer=bound(ROOT/'ACTIVE.json')))
+                               live_handoffs=handoff_refs, terminal_prices=dependencies, paid_worker=semantic, assignment=bound(ASSIGNMENT), observer=bound(ROOT/'ACTIVE.json')))
         print(json.dumps(bound(receipt)))
     except BaseException:
         if raised:
