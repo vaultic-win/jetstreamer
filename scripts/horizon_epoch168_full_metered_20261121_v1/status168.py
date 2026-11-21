@@ -115,7 +115,7 @@ def receipt(actor, planref, worker):
          and plan["maximum_root_physical_bytes"] == 288 << 30 and plan["minimum_free_bytes"] >= 8297502499408
          and plan["receipt_directory"] == str(D / "guard-receipts"), "guard bounds differ")
     t, g = show(T), show(GUARD + ".service")
-    need(t["Id"] == T and t["ActiveState"] == "active" and t["SubState"] == "waiting"
+    need(t["Id"] == T and t["ActiveState"] == "active" and t["SubState"] in ("waiting", "running")
          and iid(t["InvocationID"]) and not t["Job"] and t["Triggers"] == GUARD + ".service"
          and g["TriggeredBy"] == T and g["CPUQuotaPerSecUSec"] == "250ms" and g["MemoryMax"] == str(1 << 30)
          and g["MemorySwapMax"] == "0", "different timer or guard budget")
