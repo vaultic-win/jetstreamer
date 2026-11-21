@@ -40,6 +40,48 @@ const READER_PATHS: &[&str] = &[
     "rust-toolchain.toml",
 ];
 
+// The staged publication build checks these scopes against the actual pipeline
+// and full verifier depfiles, including their external PoH source and the
+// existing utility library. Standalone utility binaries do not enter either
+// reader. Cargo resolution, features, build scripts and vendor trees do.
+const PUBLISHED_READER_PATHS: &[&str] = &[
+    "Cargo.toml",
+    "Cargo.lock",
+    ".cargo",
+    "build.rs",
+    "rust-toolchain",
+    "rust-toolchain.toml",
+    "vendor",
+    "src",
+    "jetstreamer-horizon",
+    "jetstreamer-firehose",
+    "jetstreamer-plugin",
+    "historical-runtime/v1_0_8/worker/src/poh_backend.rs",
+    "jetstreamer-utils/Cargo.toml",
+    "jetstreamer-utils/build.rs",
+    "jetstreamer-utils/src/lib.rs",
+    "jetstreamer-utils/src/clickhouse.rs",
+    "jetstreamer-utils/src/horizon_legacy_shred.rs",
+    "jetstreamer-utils/src/horizon_legacy_entry.rs",
+    "jetstreamer-utils/src/horizon_legacy_poh.rs",
+    "jetstreamer-utils/src/horizon_legacy_source.rs",
+    "jetstreamer-utils/src/horizon_legacy_bundle.rs",
+    "jetstreamer-utils/src/horizon_legacy_acquisition.rs",
+    "jetstreamer-utils/src/horizon_legacy_byte_diagnostic.rs",
+    "jetstreamer-utils/src/horizon_legacy_recovery.rs",
+    "jetstreamer-utils/src/horizon_legacy_v1_5_6.rs",
+    "jetstreamer-utils/src/horizon_ledger_tar.rs",
+    "jetstreamer-utils/src/horizon_ledger_bzip.rs",
+];
+
+fn reader_paths(plan: &Plan) -> &'static [&'static str] {
+    if staged247::published_reader(plan) {
+        PUBLISHED_READER_PATHS
+    } else {
+        READER_PATHS
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Bound {
@@ -389,7 +431,7 @@ fn current_branch(plan: &Plan) -> Result<(String, Value)> {
         &head,
         "--",
     ];
-    args.extend_from_slice(READER_PATHS);
+    args.extend_from_slice(reader_paths(plan));
     let changed = git(plan, &args)?;
     if !changed.is_empty() {
         // Only the individually reviewed exact operator-only blob transition is
@@ -401,7 +443,7 @@ fn current_branch(plan: &Plan) -> Result<(String, Value)> {
     }
     let equivalence = if changed.is_empty() {
         json!({"schema":"horizon-reader-byte-identical-source-v1",
-            "compared_paths":READER_PATHS})
+            "compared_paths":reader_paths(plan)})
     } else {
         operator_equivalence205::record(&changed)
     };
@@ -737,7 +779,7 @@ impl Gate {
         let mut receipt = json!({
             "schema":"horizon-r2-current-reader-playback-acceptance-v1",
             "epoch":self.epoch,"reader_commit":self.plan.reader_commit,
-            "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":READER_PATHS,
+            "fetched_branch_commit_before_sidecar":current,"compared_reader_paths":reader_paths(&self.plan),
             "source_equivalence":source_equivalence,
             "reader_plan":self.plan_binding,"qualification":self.plan.qualification,
             "local_playback":self.local_playback,"remote_playback":remote,
