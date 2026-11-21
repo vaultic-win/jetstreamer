@@ -40,7 +40,7 @@ test ! -L "$root"
 install -d -o root -g root -m0711 "$root"
 # This fresh mount hides all fixture paths from host services and is destroyed
 # with the transient unit. The native binary inodes come from the installed normal seals.
-mount -t tmpfs -o size=32m,mode=0711,nodev,nosuid tmpfs "$root"
+mount -t tmpfs -o size=32m,uid=1001,gid=1003,mode=0700,nodev,nosuid tmpfs "$root"
 install -d -m0700 -o sol -g horizon "$root/ledger" "$root/private"
 mkdir -m0755 "$root/runtime"
 # Build the actual projection from three normal sealed sources. The two large
