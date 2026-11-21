@@ -1,0 +1,367 @@
+//! Follow the funded semantic reader through local verification and publication.
+use super::*;
+use std::os::unix::{fs::FileTypeExt, process::CommandExt};
+use std::process::Stdio;
+
+const SOURCE: &str = "dc043eb78c4a4349b0098760dc764a1f";
+const START: &str = "epoch145-semantic-continuity-20261121-v1/V5B_ACTUAL_ADVANCING_WORKER.json";
+const ADVANCING: &str = "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199";
+const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v7";
+const SEAL: &str = "815df6ea2b602a2c6e17a56dfd38af4145e046b63e2e55f440221fcf7c0f568f";
+const POST: &str = "epoch145-publication-20261121-v1";
+const FLEET: &str = "ROOT_COMPLETE_OPERATIONAL_FLEET.json";
+const HEAD: &str = "973b1d0d30142d26d524386c50429a5d121103dfce3190d476a6eb23fe1feadd";
+const STATE_PATH: &str = "epoch145-v5b-delivery-handoff-20261121-v1/state";
+
+fn fleet() -> Result<Value> {
+    let mut dir = rt("root131959-live166167170-20261121-v1");
+    let mut at = json!({"path":dir.join(FLEET),"sha256":HEAD});
+    loop {
+        let body = from_ref(&at)?;
+        ensure!(
+            body["owner"] == "/root"
+                && body["schema"] == "horizon-Root-complete-fleet-operational-review-v1",
+            "foreign fleet"
+        );
+        let next = outcome::next(&body)?;
+        ensure!(
+            next.parent() != Some(dir.as_path()),
+            "self-referential successor"
+        );
+        if !next.try_exists()? {
+            return Ok(at);
+        }
+        let r = bound(&next)?;
+        let n = from_ref(&r)?;
+        ensure!(
+            n["previous_Root_operational_review"] == at
+                && n["recorded_unix_seconds"]
+                    .as_u64()
+                    .context("successor time")?
+                    > body["recorded_unix_seconds"]
+                        .as_u64()
+                        .context("fleet time")?,
+            "different or nonchronological fleet successor"
+        );
+        dir = next.parent().context("fleet directory")?.to_owned();
+        at = r;
+    }
+}
+/// Only a successful complete current booking can submit either next stage.
+fn funded() -> Result<Value> {
+    let pkg = rt("incident-replay-fit-20261121-v1/tools-v7");
+    let reader = check_member(
+        &pkg,
+        "680021c25c633362855b0380cbce500a318c8fc72bda2ef28c072e316d18b66d",
+        "post-stop-fit",
+    )?;
+    loop {
+        let head = fleet()?;
+        let out = Command::new(&reader)
+            .args(["145", text(&head["path"])?, text(&head["sha256"])?])
+            .output()?;
+        if !out.status.success()
+            && String::from_utf8_lossy(&out.stderr)
+                .trim_end()
+                .ends_with("ValueError: superseded fleet")
+            && fleet()? != head
+        {
+            continue;
+        }
+        ensure!(
+            out.stderr.is_empty() && (out.status.success() || out.status.code() == Some(1)),
+            "complete provider failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let v: Value = serde_json::from_slice(&out.stdout)?;
+        let number = |key: &str| -> Result<u64> {
+            v[key].as_u64().with_context(|| format!("missing {key}"))
+        };
+        let fits = number("available_HOME_bytes")? >= number("complete_required_HOME_bytes")?
+            && number("available_memory_bytes")? >= number("required_available_memory_bytes")?;
+        ensure!(
+            v["schema"] == "horizon-incident-replay-fit-v1"
+                && v["epoch"] == 145
+                && v["fleet"] == head
+                && v["resource_credit_bytes"] == 0
+                && v["fits"] == fits
+                && fits == out.status.success(),
+            "foreign complete fit"
+        );
+        if fits {
+            return Ok(head);
+        }
+        let next = outcome::next(&from_ref(&head)?)?;
+        eprintln!(
+            "epoch 145 awaiting {} after native fit: HOME {}/{} B, RAM {}/{} B",
+            next.display(),
+            v["available_HOME_bytes"],
+            v["complete_required_HOME_bytes"],
+            v["available_memory_bytes"],
+            v["required_available_memory_bytes"]
+        );
+        outcome::wait_file(&next)?;
+    }
+}
+fn original() -> Result<Value> {
+    let a = pinned(&rt(START), ADVANCING)?;
+    let manager = from_ref(&a["manager"])?;
+    let start = from_ref(&a["start"])?;
+    let launch = from_ref(&manager["intent"])?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(
+        launch["boot"] == boot && launch["old"] == "5e0e20bc974149f096ea4bab10b15e1b",
+        "different boot or semantic start"
+    );
+    ensure!(
+        a["invocation_id"] == SOURCE
+            && manager["new"]["InvocationID"] == SOURCE
+            && start["iid"] == SOURCE
+            && start["image"] == "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
+            && start["r2_mutations"] == false
+            && a["observations"]
+                .as_array()
+                .is_some_and(|rows| rows.len() == 2),
+        "foreign semantic predecessor"
+    );
+    Ok(a)
+}
+fn completed_semantics() -> Result<Value> {
+    let s = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
+    ensure!(
+        !s.join("failed.json").try_exists()?,
+        "semantic worker failed"
+    );
+    let done = bound(&s.join("complete.json"))?;
+    let d = from_ref(&done)?;
+    let e = from_ref(&d["receipt"])?;
+    ensure!(
+        d["iid"] == SOURCE
+            && d["recovered_from"] == ORIGINAL
+            && d["r2_mutations"] == false
+            && d["receipt"] == bound(&s.join("extraction-complete.json"))?
+            && e["actor_iid"] == SOURCE
+            && e["verified_frozen"] == bound(&s.join("verified-frozen.json"))?
+            && e["recovery_evidence"] == original()?["start"]
+            && e["original_export"] == ORIGINAL
+            && e["extraction"]["epoch"] == 145
+            && e["extraction"]["output_slot_count"] == 432000
+            && e["extraction"]["independent_output_reread_passed"] == true,
+        "different semantic completion"
+    );
+    Ok(done)
+}
+fn socket() -> Result<PathBuf> {
+    let mut paths = Vec::new();
+    for entry in fs::read_dir("/tmp")? {
+        let e = entry?;
+        let p = e.path();
+        if !e.file_name().to_string_lossy().starts_with("ssh-") {
+            continue;
+        }
+        let m = fs::symlink_metadata(&p)?;
+        if !m.is_dir() || m.uid() != 1001 || m.mode() & 0o077 != 0 {
+            continue;
+        }
+        for child in fs::read_dir(&p)? {
+            let f = child?;
+            let m = fs::symlink_metadata(f.path())?;
+            if f.file_name().to_string_lossy().starts_with("agent.")
+                && m.file_type().is_socket()
+                && m.uid() == 1001
+            {
+                paths.push(f.path());
+            }
+        }
+    }
+    paths.sort();
+    for p in paths {
+        if Command::new("/usr/bin/timeout")
+            .args(["4", "/usr/bin/ssh-add", "-l"])
+            .env_clear()
+            .env("SSH_AUTH_SOCK", &p)
+            .uid(1001)
+            .gid(1001)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()?
+            .success()
+        {
+            return Ok(p);
+        }
+    }
+    bail!("no active login SSH agent could validate the publication branch")
+}
+fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
+    let state = rt(STATE_PATH);
+    let receipt = state.join(format!("{mode}-actor.json"));
+    let argv_head = [
+        rt(PKG).join("export145").display().to_string(),
+        mode.to_owned(),
+    ];
+    if receipt.try_exists()? {
+        let v = from_ref(&bound(&receipt)?)?;
+        let iid = text(&v["invocation"])?;
+        ensure!(
+            v["mode"] == mode
+                && v["prior"] == prior
+                && v["prerequisite"] == *prerequisite
+                && valid_iid(iid),
+            "foreign recorded stage"
+        );
+        return Ok(iid.to_owned());
+    }
+    let intent = state.join(format!("{mode}-submission.json"));
+    let before = native(E)?;
+    let already = before["ActiveState"] == "active";
+    if !already {
+        drained(&before, E)?;
+        ensure!(
+            !intent.try_exists()?,
+            "unanswered {mode} submission requires native reconciliation"
+        );
+        let head = funded()?;
+        let launcher = check_member(&rt(PKG), SEAL, "run-post")?;
+        let mut argv = vec![mode.to_owned(), text(&head["path"])?.to_owned()];
+        if mode == "publish" {
+            argv.extend([prior.to_owned(), socket()?.display().to_string()]);
+        }
+        platform::save(
+            &intent,
+            &json!({"mode":mode,"prior":prior,"prerequisite":prerequisite,"fleet":head,"launcher":bound(&launcher)?}),
+        )?;
+        let args = argv.iter().map(String::as_str).collect::<Vec<_>>();
+        command(&launcher, &args)?;
+    }
+    let v = from_ref(&bound(&intent)?)?;
+    ensure!(
+        v["prior"] == prior && v["mode"] == mode && v["prerequisite"] == *prerequisite,
+        "crossed submission"
+    );
+    let (pid, iid) = stable(&native(E)?, E)?;
+    let cmd = fs::read(format!("/proc/{pid}/cmdline"))?;
+    let mut expected = Vec::from(argv_head);
+    expected.push(text(&v["fleet"]["path"])?.to_owned());
+    expected.push(text(&v["fleet"]["sha256"])?.to_owned());
+    if mode == "publish" {
+        expected.push(prior.to_owned());
+    }
+    let image = check_member(&rt(PKG), SEAL, "export145")?;
+    expected.push(text(&bound(&image)?["sha256"])?.to_owned());
+    ensure!(
+        platform::proc_exe(pid)? == image
+            && cmd == [expected.join("\0").into_bytes(), vec![0]].concat(),
+        "foreign post process"
+    );
+    platform::save(
+        &receipt,
+        &json!({"mode":mode,"invocation":iid,"pid":pid,"ticks":platform::ticks(pid)?,
+        "prior":prior,"prerequisite":prerequisite,"submission":bound(&intent)?}),
+    )?;
+    Ok(iid)
+}
+fn local_result(d: &Value, p: &Value, id: &str) -> Result<()> {
+    ensure!(
+        d["schema"] == "horizon-145-current-native-full-acceptance-v1"
+            && p["schema"] == "horizon-145-current-native-plugin-acceptance-v1"
+            && d["exit_code"] == 0
+            && p["exit_code"] == 0
+            && d["r2_mutations"] == false
+            && p["r2_mutations"] == false
+            && d["archive_sha256"]
+                .as_str()
+                .is_some_and(|h| h.len() == 64 && h.bytes().all(|c| c.is_ascii_hexdigit()))
+            && d["invocation"] == id
+            && p["invocation"] == id
+            && d["epoch"] == 145
+            && p["epoch"] == 145
+            && d["archive_sha256"] == p["archive_sha256"]
+            && d["verifier"]["sha256"]
+                == "eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0"
+            && p["pipeline"]["sha256"]
+                == "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e",
+        "local verification is incomplete"
+    );
+    Ok(())
+}
+pub fn run(mode: &str) -> Result<()> {
+    let original = original()?;
+    check_member(&rt(PKG), SEAL, "run-post")?;
+    check_member(&rt(PKG), SEAL, "export145")?;
+    if mode == "inspect-v5b" {
+        let current = native(E)?;
+        let (pid, iid) = stable(&current, E)?;
+        let obs = &original["observations"][1];
+        ensure!(
+            iid == SOURCE
+                && i64::from(pid) == obs["parent_pid"].as_i64().context("semantic parent")?
+                && platform::ticks(pid)? == obs["parent_ticks"]
+                && platform::proc_exe(pid)?
+                    == rt("epoch145-semantic-continuity-20261121-v1/tools-v5b/export145"),
+            "different original live verifier"
+        );
+        println!(
+            "{}",
+            json!({"original":iid,"manager":pid,"fleet":fleet()?,"post_seal":SEAL,"launch":false})
+        );
+        return Ok(());
+    }
+    ensure!(mode == "follow-v5b", "invalid incident mode");
+    let _lock = guard_instance(&rt(STATE_PATH))?;
+    events::manager(E, SOURCE)?;
+    let retained = completed_semantics()?;
+    let id = stage("post-full", SOURCE, &retained)?;
+    events::manager(E, &id)?;
+    let full = rt(POST).join(format!("full-{id}"));
+    let local = bound(&full.join("verified.json"))?;
+    let d = from_ref(&local)?;
+    let p = from_ref(&bound(&full.join("verified-plugin.json"))?)?;
+    local_result(&d, &p, &id)?;
+    let network = stage("publish", &id, &local)?;
+    events::manager(E, &network)?;
+    let published = bound(&rt(POST).join(format!("network-{network}/complete.json")))?;
+    let done = from_ref(&published)?;
+    ensure!(
+        done["invocation"] == network
+            && done["original_source_retained"] == true
+            && done["canonical_output_retained"] == true
+            && done["public_playback"].is_object()
+            && done["verified_pair"].is_object(),
+        "incomplete authenticated publication"
+    );
+    let end = rt(STATE_PATH).join("completed.json");
+    let result = json!({"epoch":145,"semantic_completion":retained,"local_verification":local,"public_verification":published,"network_invocation":network});
+    if end.try_exists()? {
+        ensure!(from_ref(&bound(&end)?)? == result, "foreign completion");
+    } else {
+        platform::save(&end, &result)?;
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn publication_waits_for_both_matching_current_local_results() {
+        let mut d = json!({"schema":"horizon-145-current-native-full-acceptance-v1","exit_code":0,"r2_mutations":false,"epoch":145,
+            "invocation":SOURCE,"archive_sha256":"a".repeat(64),"verifier":{"sha256":"eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0"}});
+        let p = json!({"schema":"horizon-145-current-native-plugin-acceptance-v1","exit_code":0,"r2_mutations":false,"epoch":145,
+            "invocation":SOURCE,"archive_sha256":"a".repeat(64),"pipeline":{"sha256":"8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e"}});
+        assert!(local_result(&d, &p, SOURCE).is_ok());
+        assert!(local_result(&d, &p, "unrelated").is_err());
+        for (key, value) in [
+            ("epoch", json!(146)),
+            ("exit_code", json!(1)),
+            ("archive_sha256", json!("b".repeat(64))),
+            ("verifier", json!({})),
+            ("schema", json!("other")),
+        ] {
+            let old = d[key].clone();
+            d[key] = value;
+            assert!(local_result(&d, &p, SOURCE).is_err());
+            d[key] = old;
+        }
+    }
+}

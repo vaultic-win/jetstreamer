@@ -22,8 +22,11 @@ fn boot() -> Result<()> {
     );
     Ok(())
 }
-fn next(f: &Value) -> Result<PathBuf> {
-    let name = text(&f["sole_next_timer"])?
+pub(super) fn next(f: &Value) -> Result<PathBuf> {
+    let name = f["sole_next_timer"]
+        .as_str()
+        .or_else(|| f["sole_next_timer"]["unit"].as_str())
+        .context("missing successor timer")?
         .strip_prefix("horizon-observer-")
         .and_then(|n| n.strip_suffix(".timer"))
         .context("foreign cadence timer")?;
@@ -92,7 +95,7 @@ fn head(mut at: Value, parent: &Path) -> Result<(Value, Value)> {
         }
     }
 }
-fn wait_file(path: &Path) -> Result<()> {
+pub(super) fn wait_file(path: &Path) -> Result<()> {
     // The next cycle's directory may still be absent. Watch its existing
     // parent first and recheck after watch installation to close both races.
     while !path.try_exists()? {

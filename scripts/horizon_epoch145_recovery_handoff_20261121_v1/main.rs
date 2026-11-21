@@ -8,6 +8,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 mod events;
+mod incident;
 mod outcome;
 #[allow(dead_code)]
 #[path = "../horizon_public_audit_v14_cutover_20261121_v1/platform.rs"]
@@ -219,6 +220,9 @@ fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if let [mode] = args.as_slice() {
+        if matches!(mode.as_str(), "inspect-v5b" | "follow-v5b") {
+            return incident::run(mode);
+        }
         return outcome::run(mode);
     }
     let [mode, seed, sha, parent_dir, parent_sha] = args.as_slice() else {
