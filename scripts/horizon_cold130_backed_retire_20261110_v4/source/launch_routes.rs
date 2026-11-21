@@ -164,7 +164,8 @@ fn classifying(d: &BTreeMap<String, String>) -> bool {
 fn credential_names(d: &BTreeMap<String, String>) -> Result<()> {
     for line in d
         .get("EnvironmentFiles")
-        .context("missing environment-file enumeration")?
+        .map(String::as_str)
+        .unwrap_or("")
         .lines()
         .filter(|l| !l.is_empty())
     {
