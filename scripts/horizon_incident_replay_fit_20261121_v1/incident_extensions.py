@@ -83,29 +83,46 @@ def held(s,unit,run,pid,proc,intent):
 
 
 FAILED_VERIFIER = "5e0e20bc974149f096ea4bab10b15e1b"
+FAILED_REJOIN = "dc043eb78c4a4349b0098760dc764a1f"
 VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
 
 
-def failed_verifier(s, manager):
+def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     """Preserve the failed verifier's reservation and its exact unpublished candidate."""
     import json
     import subprocess
 
     iid = manager["InvocationID"]
-    s.need(iid == FAILED_VERIFIER and manager["Id"] == VERIFIER_UNIT
+    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN) and iid == expected and manager["Id"] == VERIFIER_UNIT
            and manager["ActiveState"] == manager["SubState"] == "failed"
            and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
            and manager["NRestarts"] == "0" and not manager["Job"]
            and not (Path("/sys/fs/cgroup/system.slice") / VERIFIER_UNIT).exists(),
            "failed verifier still occupied or generation changed")
     state = R / "epoch145-guarded-export-20261121-v1/state" / iid
-    failed, failure = s.read(state / "failed.json", "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f")
-    started, recovery = s.read(state / "recovery-started.json", "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f")
-    s.need(failed["iid"] == started["iid"] == iid and failed["error"] == "stopped worker fresh-census deadline"
-           and started["image"] == "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    if expected == FAILED_VERIFIER:
+        failure_sha = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
+        start_sha = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
+        image_sha = "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    else:
+        failure_sha = "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943"
+        start_sha = "e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f"
+        image_sha = "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
+    failed, failure = s.read(state / "failed.json", failure_sha)
+    started, recovery = s.read(state / "recovery-started.json", start_sha)
+    if expected == FAILED_VERIFIER:
+        s.need(failed["error"] == "stopped worker fresh-census deadline", "unexpected census failure")
+    else:
+        s.need(set(p.name for p in state.iterdir()) == {"failed.json", "recovery-started.json"}
+               and manager["Result"] == "exit-code" and not manager["ControlGroup"]
+               and "subprocess.TimeoutExpired" in failed["error"]
+               and "horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds" in failed["error"]
+               and started["prior_frozen_recovery"]["failed_fresh_census"]["source_checkpoint_exists"] is False,
+               "failed rejoin advanced or terminal differs")
+    s.need(failed["iid"] == started["iid"] == iid and started["image"] == image_sha
            and started["r2_mutations"] is False
            and not any((state / n).exists() for n in ("source-semantics.json", "verified-frozen.json", "complete.json")),
-           "failed v5 verification phase changed")
+           "failed verification phase changed")
     candidate = Path(started["file"])
     s.need(candidate == Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN")
            and candidate.resolve(strict=True) == candidate, "failed verifier candidate path changed")

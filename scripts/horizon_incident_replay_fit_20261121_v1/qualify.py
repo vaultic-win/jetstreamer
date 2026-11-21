@@ -79,11 +79,12 @@ def main():
     rejected(lambda:m["capture"](171,fleet))
     observed,fork=fork_control(m,fleet)
     ext=m["extensions"];mgr=s.show(ext["VERIFIER_UNIT"])
-    if mgr["InvocationID"]==ext["FAILED_VERIFIER"]:
-        closure=ext["failed_verifier"](s,mgr)
+    if mgr["ActiveState"]=="failed" and mgr["InvocationID"] in (ext["FAILED_VERIFIER"],ext["FAILED_REJOIN"]):
+        closure=ext["failed_verifier"](s,mgr,mgr["InvocationID"])
         s.need(all(observed["phase145"][k]==v for k,v in closure.items()),"failed 145 evidence missed from full fit")
         for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
-            rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value})))
+            rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value}),mgr["InvocationID"]))
+        rejected(lambda:ext["failed_verifier"](s,mgr,"f"*32))
     else:
         original,_=s.read(D/"native-462833a6aba74481af5e276512bdcad4.json",
                            "3d9b77551ceafa52ca0fef30f957b7aba6053f55c84e320cf2632067b85c6ec0")
