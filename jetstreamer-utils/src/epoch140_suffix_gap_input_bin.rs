@@ -32,6 +32,11 @@ const PROTECTION_SHA: &str = "b81aa9d38775e3a73662108d8ddb4056ea2947d77a644fe750
 const NATIVE: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch140-native-restore-complete-20261020-v1/native.json";
 const NATIVE_SHA: &str = "53f1aa88f8f5f24aed1e291ff02318c102fac3bfb8ececf5c215c9fb70c11b20";
+const EDGE: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch140-cut-inspection-complete-20261020-v1/cut.json";
+const EDGE_SHA: &str = "dc4135977d89875b13f365a7888e38ed7fb627fd0c5bcb952c43dcccd3c45fcc";
+const ROOTS: &str = "/usr/local/lib/jetstreamer/deploy-epochs136-147-target4-20261011-v2/preflight-136-147-target4-v4.json";
+const ROOTS_SHA: &str = "ec62e2ce730a28033e5626e7afdb59c2b6e73a2ce188ae1040a77a7a09e396c3";
 const INDEX: &str =
     "/home/sol/.jetstreamer-private/epoch141-original-bundle-20261023-v1/index.json";
 const INDEX_SHA: &str = "fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3";
@@ -292,6 +297,32 @@ fn run() -> Result<()> {
             && native["replay_entries_sent"] == 0,
         "wrong original source or cut"
     );
+    let edge = read_json(Path::new(EDGE), EDGE_SHA, 64 << 10)?;
+    let cut = &edge["epoch140"]["inspected_slot"];
+    let checkpoint = &native["native_result"]["native_checkpoint"];
+    ensure!(
+        edge["epoch140"]["whole_source_sha256"] == protection["original_whole_digest"]
+            && cut["slot"] == CUT
+            && cut["observed_blockhash"] == checkpoint["last_blockhash"]
+            && cut["observed_next_write_version"] == native["original_producer_cursor"]
+            && checkpoint["next_write_version"] == 28_087_370_409u64
+            && native["original_producer_cursor"] == 28_029_693_043u64,
+        "restored cut and retained raw cursor disagree with the recorded independent evidence"
+    );
+    let roots = read_json(Path::new(ROOTS), ROOTS_SHA, 4 << 20)?;
+    let root = &roots["manifest"]["epochs"]
+        .as_array()
+        .context("missing epoch plans")?
+        .iter()
+        .find(|plan| plan["epoch"] == 141)
+        .context("epoch 141 missing")?["post_bootstrap_root_checkpoints"][0];
+    ensure!(
+        root["slot"] == ROOT
+            && root["source"] == "root"
+            && root["generation"] == 1_634_786_682_225_857u64
+            && root["accounts_hash"] == "8LfMXtdKmPEvMcBzEz2XZ56HZ8pUPGSaWGA6mYG4dAFY",
+        "wrong post-cut root obligation"
+    );
     let index: OriginalBundleIndex = serde_json::from_slice(&evidence::bound_file(
         Path::new(INDEX),
         INDEX_SHA,
@@ -390,7 +421,7 @@ fn run() -> Result<()> {
         .count();
     let receipt = json!({"schema":"jetstreamer-epoch140-suffix-gap-input-v1","invocation_id":iid,"protected_original_sha256":PROTECTION_SHA,
         "native_cut_receipt_sha256":NATIVE_SHA,"native_cut":native["native_result"]["native_checkpoint"],
-        "original_raw_cursor":native["original_producer_cursor"],"original_full_index_sha256":INDEX_SHA,"complete_poh_receipt_sha256":POH_COMPLETION_SHA256,
+        "cut_archive_observation_sha256":EDGE_SHA,"post_cut_root_manifest_sha256":ROOTS_SHA,"post_cut_root":root,"original_raw_cursor":native["original_producer_cursor"],"original_full_index_sha256":INDEX_SHA,"complete_poh_receipt_sha256":POH_COMPLETION_SHA256,
         "output_first_slot":CUT+1,"output_last_slot":END,"required_post_cut_root_slot":ROOT,"remaining_gap_targets_after_output":index.slots.len()-count,
         "first_following_gap":index.slots[count],"gap_records":rows,"data":{"path":data_path,"bytes":SIZE,"sha256":format!("{:x}",whole.finalize())},
         "independent_rpc_response_receipt_sha256":RESPONSE_SHA,"all_record_digests_reread":true,"selected_prefix_verified":false,"native_suffix_executed":false,
