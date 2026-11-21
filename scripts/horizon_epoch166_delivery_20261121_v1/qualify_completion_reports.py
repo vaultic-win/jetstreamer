@@ -63,7 +63,25 @@ def qualify(source, scratch):
     finally:
         watch.close()
     assert accepted == 64 and denied == 37
-    return dict(accepted=accepted, denied=denied, original_report=original, native_report_count=len(report["receipts"]))
+    sample, ref = event.document(Path(fleet["observer"]["path"]), 0o644)
+    assert ref == fleet["observer"]
+    scheduled = sample["cadence"]["configured_not_before_utc"]
+    drift_checks = []
+    if scheduled != fleet["sampled_at_utc"]:
+        assert event.sample_time(fleet, cycle, scheduled) == report["sampled_at_utc"]
+        for label, changed, due in (
+            ("foreign-observer", dict(fleet, observer=original), scheduled),
+            ("foreign-time", dict(fleet, sampled_at_utc=sample["completed_at_utc"] + "x"), scheduled),
+            ("foreign-schedule", fleet, "2000-01-01T00:00:00Z"),
+        ):
+            try:
+                event.sample_time(changed, cycle, due)
+            except event.Rejected:
+                drift_checks.append(label)
+            else:
+                raise AssertionError(label)
+    return dict(accepted=accepted, denied=denied, original_report=original, native_report_count=len(report["receipts"]),
+                scheduled=scheduled, sampled=fleet["sampled_at_utc"], rejected_clock_changes=drift_checks)
 
 
 if __name__ == "__main__":

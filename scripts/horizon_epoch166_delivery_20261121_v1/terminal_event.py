@@ -166,6 +166,20 @@ def head(fleet):
         [PARENT, "inspect-status", fleet["path"], fleet["sha256"]], timeout=35))["fleet"]
 
 
+def sample_time(fleet, directory, scheduled):
+    sampled = fleet["sampled_at_utc"]
+    if sampled == scheduled:
+        return sampled
+    path = R / ("sample-" + directory.name + ".json")
+    sample, ref = document(path, 0o644)
+    cadence = sample["cadence"]
+    need(fleet["observer"] == ref and sample["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+         and cadence["observation_reason"] == "routine" and cadence["routine_minimum_interval_enforced"] is True
+         and cadence["configured_not_before_utc"] == scheduled and sample["recorded_at_utc"] == sampled
+         and scheduled <= sampled <= sample["completed_at_utc"], "wrong scheduled or observed sample time")
+    return sampled
+
+
 def accepted(runtime, reports, expected, changes, checked_head, now, field="terminal166_local_commit", check_status=None):
     changes.watch(runtime)
     changes.watch(reports)
@@ -176,7 +190,7 @@ def accepted(runtime, reports, expected, changes, checked_head, now, field="term
             continue
         tag, day = match.groups()
         stamp = dt.datetime.strptime(day+tag, "%Y%m%d%H%M%S").replace(tzinfo=dt.timezone.utc).timestamp()
-        if 0 <= now-stamp <= 2400:
+        if stamp <= now:
             paths.append((stamp,p,tag,day))
     for stamp, directory, tag, day in sorted(paths, reverse=True):
         changes.watch(directory)
@@ -184,10 +198,11 @@ def accepted(runtime, reports, expected, changes, checked_head, now, field="term
         if not path.exists():
             continue
         fleet, ref = document(path, 0o600)
-        sampled = dt.datetime.fromtimestamp(stamp,dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        need(fleet["owner"] == "/root" and fleet["sampled_at_utc"] == sampled, "wrong root cadence")
+        need(fleet["owner"] == "/root", "wrong root cadence")
         if not 0 <= now-fleet["recorded_unix_seconds"] <= 2400 or not fleet.get(field):
             return None
+        scheduled = dt.datetime.fromtimestamp(stamp,dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        sampled = sample_time(fleet, directory, scheduled)
         need(fleet[field] == expected, "different local terminal in fleet")
         report_dir = reports / f"cycle{tag}-live166167170-19-{day}-v1"
         if not report_dir.exists():
