@@ -13,6 +13,8 @@ LAUNCH = "1990f8fe2c1c215586ad7c54980d2278ff937ce658588b5f6d321cd63ba04851"
 V14 = BASE / "public-audit73-observer-20261121-v1"
 V14_PACKAGE = V14 / "observer-package"
 V14_SEAL = "412c2d23437cdf3af6c5783f83489767709d5ab970420ade2c44bbc4dbbbe043"
+FOLLOWING_PACKAGE = V14 / "following-observer-v2"
+FOLLOWING_SEAL = "5c9a6bc8f123e67640a16b3a7d8712138110ae2aa744b0942e3f873ffed86d56"
 HOME_START = "c043d9d42a50bd2aac7b1ab0c865f3a0ee1759fe6adc6da657aed4d5b5ad2257"
 
 
@@ -34,17 +36,20 @@ def load_observer():
     # The complete publisher imports its own 172-specific live owner modules.
     # Our audit-only call retains the original sealed native/evidence adapters.
     old = members(PACKAGE, SEAL)
-    latest = members(V14_PACKAGE, V14_SEAL) if (V14_PACKAGE / "deployment-seal-receipt.json").exists() else None
+    witness_package, witness_members, witness_seal = PACKAGE, old, SEAL
+    for candidate, seal in ((V14_PACKAGE, V14_SEAL), (FOLLOWING_PACKAGE, FOLLOWING_SEAL)):
+        if (candidate / "deployment-seal-receipt.json").exists():
+            witness_package, witness_members, witness_seal = candidate, members(candidate, seal), seal
     for name in ("evidence", "owners", "audit_handoff", "public_witness"):
         filename = name + ".py"
-        package, entries = (V14_PACKAGE, latest) if name == "public_witness" and latest else (PACKAGE, old)
+        package, entries = (witness_package, witness_members) if name == "public_witness" else (PACKAGE, old)
         path = package / filename
         code = checked_bytes(path, entries[filename]["sha256"])
         module = types.ModuleType(name)
         sys.modules[name] = module
         exec(compile(code, str(path), "exec"), module.__dict__)
     observer = sys.modules["public_witness"]
-    observer.deployment_sha256 = V14_SEAL if latest else SEAL
+    observer.deployment_sha256 = witness_seal
     return observer
 
 
@@ -78,7 +83,7 @@ def capture(observer, obligation):
     launch = checked(owner["launch"])
     boundary = None
     if owner["launch"] != incumbent:
-        need(observer.deployment_sha256 == V14_SEAL
+        need(observer.deployment_sha256 in (V14_SEAL, FOLLOWING_SEAL)
              and owner["launch"]["path"] == str(V14 / "PUBLIC_OWNER.json")
              and owner["previous_owner"] == incumbent, "unqualified public audit handoff")
         boundary = checked(owner["natural_epoch73_boundary"])

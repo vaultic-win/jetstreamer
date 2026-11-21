@@ -37,9 +37,33 @@ pub fn manifest() -> Result<Value> {
         );
         files.insert(epoch, sha(&bytes));
     }
+    let inventory = pinned(&public().join("inventory.json"), INV_SHA)?;
+    let epochs = inventory["objects"]
+        .as_array()
+        .context("inventory objects")?;
     ensure!(
-        files.keys().copied().eq(0..73),
-        "accepted set is no longer 0 through 72"
+        files.len() >= 73
+            && files.len() <= epochs.len()
+            && files
+                .keys()
+                .zip(epochs)
+                .all(|(epoch, obj)| obj["epoch"] == *epoch),
+        "accepted results differ from the inventory prefix"
+    );
+    let first: BTreeMap<String, &String> = (0..73)
+        .map(|epoch| {
+            Ok((
+                epoch.to_string(),
+                files
+                    .get(&epoch)
+                    .context("original accepted epoch missing")?,
+            ))
+        })
+        .collect::<Result<_>>()?;
+    ensure!(
+        sha(&serde_json::to_vec(&first)?)
+            == "2e787eea29b2b0cf749dd4c9a809d02352bd4e516ba8d67df4ffee58e6c9afd4",
+        "original accepted epoch changed"
     );
     Ok(json!(files))
 }

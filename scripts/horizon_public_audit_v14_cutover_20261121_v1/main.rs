@@ -288,6 +288,23 @@ fn main() -> Result<()> {
             q["native_independent_trials"] = watch_units()?;
             println!("{}", q);
         }
+        "recovery-facts" => {
+            old_live()?;
+            verify_seal(&package(false), OLD_SEAL)?;
+            verify_seal(&package(true), NEW_SEAL)?;
+            let qa = pinned(&base(E2E), E2E_SHA)?;
+            ensure!(
+                qa["same_epoch_counters_and_digest"] == true
+                    && qa["old_and_new_links_verified"] == true,
+                "invalid recovery QA"
+            );
+            println!(
+                "{}",
+                json!({"old_row":old_live()?,"source_comparison":branch_equivalent()?,
+                "v14_e2e":bound(&base(E2E))?,"native_independent_trials":watch_units()?})
+            );
+        }
+        "finish-boundary" => closed_start()?,
         "publisher" => publisher::switch()?,
         "cut" => cut()?,
         "recover" => recover()?,
