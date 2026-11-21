@@ -1,6 +1,6 @@
 //! Recover only the empty, already charged inode from the last private run.
 use super::*;
-const OLD: &str = "022092e08a1c4f05bacb9453faead223";
+const OLD: &str = "7d5dcfa49704433193897039d3162d46";
 const INODE: u64 = 103237059;
 fn receipt(name: &str, digest: &str) -> Result<Value> {
     custody::evidence(&Bound {
@@ -32,15 +32,15 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
     }
     let a = receipt(
         "allocated.json",
-        "053fb2c0894bc74b069fb4a37aa2ae439129fb44b98d6e22b1ae842daebb5289",
+        "474a17652a5c4fe55a9d0c4b6d7474ba1fc5c52935c8979fd97d63507bc1809e",
     )?;
     let g = receipt(
         "post-allocation-guard.json",
-        "5cac329a193875b76960cbe1f61b66cfc60d265bd3a90940231d1d1f60990f87",
+        "3edcc38eca75c93733711cc9e5b3314eadb8fc6b6844eb63c4d4f71ae4134eb4",
     )?;
     let f = receipt(
         "failed.json",
-        "9c774cd75a790d45411080c6c04231c0c72464a0dbd7616c95819ddf40e78382",
+        "695035c47d4fb7f0320fd27a6828bbb2616bfc0b1e1f8ddf00908b1ebd416658",
     )?;
     let p = root.join(".tmp36MvkN");
     ensure!(
@@ -53,10 +53,8 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
             && a["inode"] == INODE
             && g["inode"] == INODE
             && a["logical_bytes"] == 0
-            && a["pid"] == 3476538
-            && f["error"]
-                .as_str()
-                .is_some_and(|e| e.starts_with("resource gate: HOME ")),
+            && a["pid"] == 3488079
+            && f["error"] == "/usr/bin/systemctl failed: ",
         "predecessor custody or failure changed"
     );
     let events = capacity::run(
@@ -82,7 +80,7 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
                 && v["EXIT_STATUS"] == "1"
         });
     ensure!(
-        ok && native::ticks(3476538).ok() != Some(357388027),
+        ok && native::ticks(3488079).ok() != Some(357482742),
         "predecessor still active or missing native termination"
     );
     check(&fs::symlink_metadata(&p)?)?;

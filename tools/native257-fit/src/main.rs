@@ -2,6 +2,22 @@ use anyhow::{Result, ensure};
 use std::path::Path;
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 6 && args[1] == "epoch228-demotion" {
+        ensure!(
+            matches!(args[2].as_str(), "initial" | "held"),
+            "epoch 228 phase"
+        );
+        println!(
+            "{}",
+            horizon_singleton211_launch::native228_demotion_fit::run(
+                Path::new(&args[3]),
+                &args[4],
+                Path::new(&args[5]),
+                args[2] == "held",
+            )?
+        );
+        return Ok(());
+    }
     if args.len() == 3 && args[1] == "qualify-full211-window" {
         println!(
             "{}",
