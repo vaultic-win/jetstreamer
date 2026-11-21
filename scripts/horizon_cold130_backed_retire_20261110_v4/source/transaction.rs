@@ -171,7 +171,23 @@ fn completion(
 ) -> Value {
     json!({"schema":"horizon-cold130-backed-private-body-retirement-complete-v2","scope":scope(p),"intent":intent,"native":native,"source_name_absent":true,"source_parent_and_capture_directories_fsynced":true,"captured_original_unlink_observed_in_this_invocation":known_unlink,"original_inode_file_blocks_unlinked_bytes":if known_unlink {body.and_then(|b|b["allocated_file_blocks_bytes"].as_u64()).unwrap_or(0)}else{0},"physical_file_bytes_retired":0,"physical_reclamation_proven":false,"reclamation_note":"Allocated file blocks unlinked are reported separately. Concurrent allocations and shared extents preclude crediting filesystem free-space change. Recovered absence never proves who unlinked the inode.","final_consumers":closure,"canonical_objects_untouched":true,"hard_promises_released_bytes":0,"resource_credit_bytes":0,"replay_launch_authorized":false,"remote_mutations":false})
 }
-pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
+pub(crate) fn run(
+    p: &Value,
+    execute: bool,
+    native: &Value,
+    historical: Option<&crate::prior_boot::Fence>,
+) -> Result<()> {
+    let current_census = || -> Result<Value> {
+        if let Some(fence) = historical {
+            fence.evidence()?;
+            crate::current_readers::controller()?;
+        }
+        crate::closure::census(p)
+    };
+    // Discover an incomplete reader fence before reading the body or capturing a name.
+    if historical.is_some() {
+        current_census()?;
+    }
     let source = Path::new(crate::SOURCE);
     let parent = source.parent().context("source parent")?;
     let leaf = source
@@ -217,7 +233,7 @@ pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
             p,
             "horizon-cold130-backed-private-body-retirement-complete-v2",
         )?;
-        let _closure = crate::closure::census(p)?;
+        let _closure = current_census()?;
         anchored.recheck()?;
         anchored.directory.sync_all()?;
         quarantine.sync_all()?;
@@ -240,7 +256,7 @@ pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
         );
         let body = hash_fd(&mut file, &p["source_identity"], crate::LENGTH, crate::SHA)?;
         drop(file);
-        let closure = crate::closure::census(p)?;
+        let closure = current_census()?;
         anchored.recheck()?;
         ensure!(crate::own(false)? == *native, "check unit changed");
         return atomic_fs::publish(
@@ -258,7 +274,7 @@ pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
     if current == State::RecoverUnknownAbsence {
         // The intent predates the final closure and unlink. Re-establish closure,
         // fsync both known parent descriptors, and claim only name absence.
-        let closure = crate::closure::census(p)?;
+        let closure = current_census()?;
         anchored.recheck()?;
         anchored.directory.sync_all()?;
         quarantine.sync_all()?;
@@ -290,7 +306,7 @@ pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
         );
         let body = hash_fd(&mut file, &p["source_identity"], crate::LENGTH, crate::SHA)?;
         drop(file);
-        let closure = crate::closure::census(p)?;
+        let closure = current_census()?;
         anchored.recheck()?;
         if !have_intent {
             atomic_fs::publish(
@@ -381,7 +397,7 @@ pub(crate) fn run(p: &Value, execute: bool, native: &Value) -> Result<()> {
         &captured,
         &body,
         || {
-            let closure = crate::closure::census(p)?;
+            let closure = current_census()?;
             anchored.recheck()?;
             ensure!(
                 crate::own(true)? == *native,

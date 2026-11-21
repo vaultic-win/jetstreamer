@@ -184,6 +184,8 @@ pub(crate) fn validate_review_shape(review: &Value) -> Result<()> {
     ensure!(
         fence["closed_source_owners"] == review["closed_source_owners"]
             && fence["consumers"] == review["consumers"]
+            && fence["disjoint_canonical_readers"] == review["disjoint_canonical_readers"]
+            && fence["reviewed_launch_routes"] == review["reviewed_launch_routes"]
             && fence["staged_inputs"] == review["staged_inputs"]
             && fence["absent_reader_classes"] == review["absent_reader_classes"]
             && fence["current_fleet"] == review["current_fleet"],
@@ -373,7 +375,7 @@ fn walk(
                     &bytes,
                     target.as_os_str().as_encoded_bytes(),
                     true
-                ),
+                ) || crate::current_readers::inert_probe(&resolved, target, &bytes)?,
                 "staged direct/indirect reader references {}: {}",
                 target.display(),
                 resolved.display()
@@ -456,10 +458,21 @@ pub(crate) fn census(p: &Value) -> Result<Value> {
             units.push(current);
         }
     }
+    if crate::prior_boot::alternative(&review)? {
+        crate::launch_routes::reviewed(&review["reviewed_launch_routes"])?;
+    }
     let consumers = review["consumers"]
         .as_array()
         .context("current and historical reader census required")?;
-    let mut consumer_classes = BTreeSet::new();
+    let mut consumer_classes = if crate::prior_boot::alternative(&review)? {
+        ensure!(
+            review["disjoint_canonical_readers"] == crate::current_readers::binding(),
+            "live canonical selection is unbound"
+        );
+        crate::current_readers::canonical_classes()?
+    } else {
+        BTreeSet::new()
+    };
     for consumer in consumers {
         let class = s(consumer, "class")?;
         consumer_classes.insert(class.to_owned());

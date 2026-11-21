@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::{
     fs::{self, File},
     io::{ErrorKind, Read},
-    os::unix::ffi::OsStrExt,
+    os::unix::{ffi::OsStrExt, fs::MetadataExt},
     path::{Component, Path, PathBuf},
 };
 const MAX_PROC_BYTES: u64 = 1 << 30;
@@ -33,12 +33,18 @@ pub(crate) fn encoded_reference(bytes: &[u8], needle: &[u8], end_of_file: bool) 
             })
     })
 }
-fn stream_reference(mut reader: impl Read, needle: &[u8], maximum: u64) -> Result<bool> {
+fn stream_reference(
+    mut reader: impl Read,
+    needle: &[u8],
+    second: Option<&[u8]>,
+    maximum: u64,
+) -> Result<bool> {
+    let overlap = needle.len().max(second.map_or(0, |s| s.len()));
     ensure!(
-        !needle.is_empty() && needle.len() < CHUNK_BYTES,
+        !needle.is_empty() && overlap < CHUNK_BYTES,
         "invalid needle"
     );
-    let mut buffer = vec![0; CHUNK_BYTES + needle.len() + 1];
+    let mut buffer = vec![0; CHUNK_BYTES + overlap + 1];
     let mut carry = 0;
     let mut total = 0u64;
     loop {
@@ -46,13 +52,15 @@ fn stream_reference(mut reader: impl Read, needle: &[u8], maximum: u64) -> Resul
         total = total.checked_add(count as u64).context("scan overflow")?;
         ensure!(total <= maximum, "process source bound");
         let end = carry + count;
-        if encoded_reference(&buffer[..end], needle, count == 0) {
+        if encoded_reference(&buffer[..end], needle, count == 0)
+            || second.is_some_and(|s| encoded_reference(&buffer[..end], s, count == 0))
+        {
             return Ok(true);
         }
         if count == 0 {
             return Ok(false);
         }
-        carry = (needle.len() + 1).min(end);
+        carry = (overlap + 1).min(end);
         buffer.copy_within(end - carry..end, 0);
     }
 }
@@ -189,7 +197,14 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
         }
         match File::open(root.join("maps")) {
             Ok(mut f) => {
-                if stream_reference(&mut f, target.as_os_str().as_bytes(), MAX_PROC_BYTES)? {
+                let inode_fields =
+                    (target == Path::new(crate::SOURCE)).then_some(b"fc:00 100794422".as_slice());
+                if stream_reference(
+                    &mut f,
+                    target.as_os_str().as_bytes(),
+                    inode_fields,
+                    MAX_PROC_BYTES,
+                )? {
                     result.references.push(format!("pid {pid} maps"));
                 }
             }
@@ -215,7 +230,19 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
                     let bytes = p.as_os_str().as_bytes();
                     let b = bytes.strip_suffix(b" (deleted)").unwrap_or(bytes);
                     let p = Path::new(std::ffi::OsStr::from_bytes(b));
-                    if relation(p, target, scope) || indirect.iter().any(|x| x.as_path() == p) {
+                    let same_inode = if target == Path::new(crate::SOURCE) && p.is_absolute() {
+                        match fs::metadata(fd.path()) {
+                            Ok(m) => (m.dev(), m.ino()) == (64512, 100794422),
+                            Err(e) if e.kind() == ErrorKind::NotFound => false,
+                            Err(e) => return Err(e).context("incomplete open-inode census"),
+                        }
+                    } else {
+                        false
+                    };
+                    if same_inode
+                        || relation(p, target, scope)
+                        || indirect.iter().any(|x| x.as_path() == p)
+                    {
                         result
                             .references
                             .push(format!("pid {pid} fd {}", fd.file_name().to_string_lossy()));
@@ -236,6 +263,28 @@ pub fn scan(proc_root: &Path, target: &Path, scope: &Path, indirect: &[PathBuf])
 mod tests {
     use super::*;
     use std::os::unix::fs::symlink;
+    #[test]
+    fn mapped_inode_is_detected_under_an_unrelated_bind_name() {
+        let maps = b"7f00-7f20 r--p 00000000 fc:00 100794422  /private/other-name.jet\n";
+        assert!(
+            stream_reference(
+                maps.as_slice(),
+                b"/old/body",
+                Some(b"fc:00 100794422"),
+                1 << 20
+            )
+            .unwrap()
+        );
+        assert!(
+            !stream_reference(
+                maps.as_slice(),
+                b"/old/body",
+                Some(b"fc:00 10079442"),
+                1 << 20
+            )
+            .unwrap()
+        );
+    }
     #[test]
     fn exact_reference_has_both_boundaries() {
         assert!(encoded_reference(b"--input=/x/body\0", b"/x/body", true));
@@ -275,7 +324,7 @@ mod tests {
         for offset in [CHUNK_BYTES - 3, CHUNK_BYTES, CHUNK_BYTES + 1] {
             let mut bytes = vec![b' '; offset];
             bytes.extend_from_slice(b"/x/body\n");
-            assert!(stream_reference(bytes.as_slice(), b"/x/body", 1 << 20).unwrap());
+            assert!(stream_reference(bytes.as_slice(), b"/x/body", None, 1 << 20).unwrap());
         }
     }
     #[test]

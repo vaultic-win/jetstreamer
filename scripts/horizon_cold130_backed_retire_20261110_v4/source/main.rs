@@ -17,6 +17,8 @@ use std::{
 mod atomic_fs;
 mod canonical;
 mod closure;
+mod current_readers;
+mod launch_routes;
 mod prior_boot;
 mod process_references;
 mod transaction;
@@ -194,7 +196,7 @@ fn own(execute: bool) -> Result<Value> {
     Ok(v)
 }
 fn open_output() -> Result<File> {
-    let path = if fs::read_link("/proc/self/exe")? == Path::new(prior_boot::IMAGE) {
+    let path = if prior_boot::is_image(&fs::read_link("/proc/self/exe")?) {
         Path::new(
             "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement",
         )
@@ -237,11 +239,32 @@ fn run(p: &Value, execute: bool) -> Result<()> {
         None
     };
     // All historical controller locks outlive the final census and unlink.
-    let _historical_fence = historical;
-    transaction::run(p, execute, &native)
+    let _holding_transition = historical
+        .as_ref()
+        .map(|_| prior_boot::holding_transition())
+        .transpose()?;
+    if historical.is_some() {
+        prior_boot::remote_state(&p["current_authenticated_remote"], &c)?;
+    }
+    transaction::run(p, execute, &native, historical.as_ref())
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--sample-scheduler-routes") {
+        ensure!(
+            args.len() == 4 && args[2] == "--self-sha256",
+            "sealed scheduler route sampling arguments"
+        );
+        let image = fs::read_link("/proc/self/exe")?;
+        ensure!(
+            unsafe { libc::geteuid() } == 0
+                && prior_boot::is_image(&image)
+                && sha(&raw(&image, 32 << 20, true)?) == args[3],
+            "sealed scheduler sampler required"
+        );
+        println!("{}", launch_routes::snapshot()?);
+        return Ok(());
+    }
     if args.get(1).map(String::as_str) == Some("--assess-prior-boot") {
         ensure!(
             args.len() == 8 && args[6] == "--self-sha256",
@@ -250,7 +273,7 @@ fn main() -> Result<()> {
         let image = fs::read_link("/proc/self/exe")?;
         ensure!(
             unsafe { libc::geteuid() } == 0
-                && image == Path::new(prior_boot::IMAGE)
+                && prior_boot::is_image(&image)
                 && sha(&raw(&image, 32 << 20, true)?) == args[7],
             "assess the sealed native image"
         );
@@ -269,7 +292,7 @@ fn main() -> Result<()> {
     let image = fs::read_link("/proc/self/exe")?;
     ensure!(
         unsafe { libc::geteuid() } == 0
-            && (image == Path::new(IMAGE) || image == Path::new(prior_boot::IMAGE))
+            && (image == Path::new(IMAGE) || prior_boot::is_image(&image))
             && sha(&raw(&image, 32 << 20, true)?) == args[5],
         "normally sealed root image required"
     );

@@ -13,6 +13,22 @@ use std::{
 };
 pub(super) const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/tools/retire";
+pub(super) fn is_image(path: &Path) -> bool {
+    path == Path::new(IMAGE)
+        || path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v2/retire",
+            )
+}
+pub(super) fn holding_transition() -> Result<File> {
+    acquire(
+        Path::new(
+            "/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/transition.lock",
+        ),
+        64512,
+        95818311,
+    )
+}
 const RECEIPT: &str = "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/BOUND_NATIVE_PRIOR_BOOT_EVIDENCE.json";
 const RECEIPT_SHA: &str = "a4f25ab7cc4e4905b38cfe7a92913ab4a9377a20fa96eab85dae121b59b4f5ef";
 pub(super) const UNIT: &str =
@@ -252,26 +268,7 @@ fn verify_lifetime(d: &Value, packet: &Value, btime: u64, completion_ns: u64) ->
     Ok(())
 }
 
-pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()> {
-    use crate::closure;
-    let _fence = Fence::take()?;
-    let lifetime = _fence.evidence()?;
-    println!(
-        "{}",
-        json!({"stage":"historical-ownership","result":lifetime})
-    );
-    let packet = bound(&json!({"path":RECEIPT,"sha256":RECEIPT_SHA}))?;
-    let eligibility = bound(&packet["original_controller_and_run_link"]["eligibility"])?;
-    let held = json!({"path":"/var/lib/jetstreamer/cold130-holding-20261110-v1/receipts/custody-7b0b0c27f95af14975f3ba5c40db87bb81812467dd3311ac471b2577100935ad.json","sha256":"29b6bb4e4a8ba713d28fb072f9498cfd5f6eb824a994c8622969ac34a3e0a6b7"});
-    let plan = json!({"custody":held,"park_spec":{"path":"/usr/local/lib/jetstreamer/horizon-cold130-holding-plan-20261110-v1/plan.json","sha256":"51521593b641d165c60fa3d0190d1b3ca0677110bdb0b2194230b338dedb0651"},
-       "holding_transport_qualification":{"path":"/usr/local/lib/jetstreamer/horizon-node02-holding-qualification-20261023-v1/qualification.json","sha256":"15692445c39b47b011851b9db68798730077be2cb665dbb7e527049c5e9c5f70"},
-       "holding_original_completion":{"path":"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/cold130-candidate-20261110-v1/ROOT_COLD130_CUSTODY_COMPLETE_NO_RETIREMENT.json","sha256":"50423005a35d87c6a674120069752d5bbc0e9a7d5c3a9abc7e3ab8ae33bacf7e"},
-       "canonical_R2_receipt":eligibility["canonical_R2_receipt"],"canonical_full":eligibility["canonical_current_full"],"canonical_plugin":eligibility["canonical_current_plugin"],
-       "canonical_left_boundary":eligibility["canonical_left_boundary"],"canonical_right_boundary":eligibility["canonical_right_boundary"]});
-    let custody = bound(&held)?;
-    crate::custody(&custody)?;
-    closure::holding_lineage(&plan, &custody)?;
-    crate::canonical::validate(&plan)?;
+pub(super) fn remote_state(remote_binding: &Value, custody: &Value) -> Result<()> {
     let remote_read = crate::bound_with_limit(remote_binding, 64 << 10, true)?;
     let remote_rows = &remote_read["rows"];
     let parked = &remote_rows[s(&custody, "object_key")?];
@@ -296,6 +293,35 @@ pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()
         json!({"stage":"authenticated-remote-metadata","observation":remote_binding,"utc":remote_read["utc"],"parked":parked,"canonical":canonical})
     );
 
+    Ok(())
+}
+pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()> {
+    use crate::closure;
+    let _fence = Fence::take()?;
+    let lifetime = _fence.evidence()?;
+    crate::current_readers::controller()?;
+    let disjoint = crate::current_readers::canonical_classes()?;
+    println!(
+        "{}",
+        json!({"stage":"live-local-canonical-watchers","classes":disjoint,"archive_root":"/home/sol/horizon","canonical_body_currently_present":false})
+    );
+    println!(
+        "{}",
+        json!({"stage":"historical-ownership","result":lifetime})
+    );
+    let packet = bound(&json!({"path":RECEIPT,"sha256":RECEIPT_SHA}))?;
+    let eligibility = bound(&packet["original_controller_and_run_link"]["eligibility"])?;
+    let held = json!({"path":"/var/lib/jetstreamer/cold130-holding-20261110-v1/receipts/custody-7b0b0c27f95af14975f3ba5c40db87bb81812467dd3311ac471b2577100935ad.json","sha256":"29b6bb4e4a8ba713d28fb072f9498cfd5f6eb824a994c8622969ac34a3e0a6b7"});
+    let plan = json!({"custody":held,"park_spec":{"path":"/usr/local/lib/jetstreamer/horizon-cold130-holding-plan-20261110-v1/plan.json","sha256":"51521593b641d165c60fa3d0190d1b3ca0677110bdb0b2194230b338dedb0651"},
+       "holding_transport_qualification":{"path":"/usr/local/lib/jetstreamer/horizon-node02-holding-qualification-20261023-v1/qualification.json","sha256":"15692445c39b47b011851b9db68798730077be2cb665dbb7e527049c5e9c5f70"},
+       "holding_original_completion":{"path":"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/cold130-candidate-20261110-v1/ROOT_COLD130_CUSTODY_COMPLETE_NO_RETIREMENT.json","sha256":"50423005a35d87c6a674120069752d5bbc0e9a7d5c3a9abc7e3ab8ae33bacf7e"},
+       "canonical_R2_receipt":eligibility["canonical_R2_receipt"],"canonical_full":eligibility["canonical_current_full"],"canonical_plugin":eligibility["canonical_current_plugin"],
+       "canonical_left_boundary":eligibility["canonical_left_boundary"],"canonical_right_boundary":eligibility["canonical_right_boundary"]});
+    let custody = bound(&held)?;
+    crate::custody(&custody)?;
+    closure::holding_lineage(&plan, &custody)?;
+    crate::canonical::validate(&plan)?;
+    remote_state(remote_binding, &custody)?;
     let m = fs::symlink_metadata(SOURCE)?;
     let nanos = |secs: i64, ns: i64| secs as i128 * 1_000_000_000 + ns as i128;
     let local = json!([
