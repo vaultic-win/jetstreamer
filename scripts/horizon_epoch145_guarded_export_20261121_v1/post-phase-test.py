@@ -75,7 +75,7 @@ class PostPhaseTest(unittest.TestCase):
                 def record(label, doc):
                     return save(folder / (label + ".json"), doc)
                 started = record("recovery-started", {"iid": gen, "r2_mutations": False})
-                proof = save(base / "V5_ACTUAL_ADVANCING_WORKER.json",
+                proof = save(base / "V5B_ACTUAL_ADVANCING_WORKER.json",
                              {"invocation_id": gen, "start": started})
                 frozen = record("verified-frozen", {"iid": gen, "r2_mutations": False})
                 original = "de6780b860b3467bae21fbd19176ca14"
@@ -86,7 +86,7 @@ class PostPhaseTest(unittest.TestCase):
                     "archive_publication_authorized": False, "extraction": e})
                 done = record("complete", {"iid": gen, "receipt": extracted,
                               "recovered_from": original, "r2_mutations": False})
-                fn.__globals__.update(STATE=folder.parent, PKG=base / "tools-v6", ADVANCING=proof["sha256"],
+                fn.__globals__.update(STATE=folder.parent, PKG=base / "tools-v7", ADVANCING=proof["sha256"],
                                       ARCHIVE=pub, OUTPUT=base)
                 self.assertEqual(fn(Status()), (done, e))
                 (base / ".tmp36MvkN").touch()

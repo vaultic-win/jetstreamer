@@ -6,8 +6,7 @@ const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publicati
 const REPOSITORY: &str = "/home/sol/workspace/jetstreamer";
 const ORIGIN: &str = "git@github-matt-vaultic:vaultic-win/jetstreamer.git";
 const UPLOADER: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
-const PIPELINE: &str = "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51";
-const VERIFIER: &str = "2f0546bcf253a0f21740ff1e297fb18f7a62e37c2df7d72806c433cddf4cd57b";
+use post::{PIPELINE, VERIFIER};
 
 fn bound(path: PathBuf, sha: &str) -> Bound {
     Bound {

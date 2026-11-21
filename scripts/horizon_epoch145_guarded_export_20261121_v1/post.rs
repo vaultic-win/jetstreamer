@@ -4,10 +4,25 @@
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 
-pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6/export145";
+pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
 const EXPORT: &str = "de6780b860b3467bae21fbd19176ca14";
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
-const VERIFIER: &str = "2f0546bcf253a0f21740ff1e297fb18f7a62e37c2df7d72806c433cddf4cd57b";
+#[cfg(not(incident_post145_only))]
+pub(super) const VERIFIER: &str =
+    "2f0546bcf253a0f21740ff1e297fb18f7a62e37c2df7d72806c433cddf4cd57b";
+#[cfg(incident_post145_only)]
+pub(super) const VERIFIER: &str =
+    "eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0";
+#[cfg(not(incident_post145_only))]
+pub(super) const PIPELINE: &str =
+    "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51";
+#[cfg(incident_post145_only)]
+pub(super) const PIPELINE: &str =
+    "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e";
+#[cfg(not(incident_post145_only))]
+const READER_COMMIT: &str = "ee55f614012585bc99e4ed7398a56758bde2664e";
+#[cfg(incident_post145_only)]
+const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
 const ANCHORS: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1";
 const PARENT: &str = "Fnoa95TKZ1U419CubZrxYDtFnqadRmvM554FFi2xSizB";
@@ -271,34 +286,58 @@ pub(super) fn plugin_counts(report: &Value, argv: &[String]) -> Result<()> {
     Ok(())
 }
 fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
-    let full = bound(&root.join("verifier-tools/verify_archive"), VERIFIER);
-    let seal = bound(
-        &root.join("verifier-tools/deployment-seal-receipt.json"),
-        "57b517db3333aa6abe2cd4f4dae001d27cc79e884b79b046a05a39b9c1a9e488",
-    );
-    let built = bound(
-        &root.join("verifier-tools/build-proof.json"),
-        "28a6f5a2c841256cb7e537d6c6b18a9f7481cb9c296fcfe0e8280944c85dfe9a",
-    );
-    let test = bound(
-        &root.join("recovery-ab3bdc4fd1df4d43b3afcefe4177c550/fixtures/native-results.json"),
-        "54bafc619501c938d209661ef52593ccd21ecdf920bdee1711f036f3888178e3",
-    );
-    let current = bound(
-        &Path::new(capacity::RUNTIME)
-            .join("public-reader-refresh-20261121-v1/CURRENT_READER_EQUIVALENCE.json"),
-        "8f4a045a212e7e20d7cbaa4dcaf9f1d2a9ced828ded1b0a44fb9084b812235c1",
+    #[cfg(not(incident_post145_only))]
+    let (full, seal, built, test, current) = {
+        let full = bound(&root.join("verifier-tools/verify_archive"), VERIFIER);
+        let seal = bound(
+            &root.join("verifier-tools/deployment-seal-receipt.json"),
+            "57b517db3333aa6abe2cd4f4dae001d27cc79e884b79b046a05a39b9c1a9e488",
+        );
+        let built = bound(
+            &root.join("verifier-tools/build-proof.json"),
+            "28a6f5a2c841256cb7e537d6c6b18a9f7481cb9c296fcfe0e8280944c85dfe9a",
+        );
+        let test = bound(
+            &root.join("recovery-ab3bdc4fd1df4d43b3afcefe4177c550/fixtures/native-results.json"),
+            "54bafc619501c938d209661ef52593ccd21ecdf920bdee1711f036f3888178e3",
+        );
+        let current = bound(
+            &Path::new(capacity::RUNTIME)
+                .join("public-reader-refresh-20261121-v1/CURRENT_READER_EQUIVALENCE.json"),
+            "8f4a045a212e7e20d7cbaa4dcaf9f1d2a9ced828ded1b0a44fb9084b812235c1",
+        );
+        (full, seal, built, test, current)
+    };
+    #[cfg(incident_post145_only)]
+    let (full, seal, built, test, current) = (
+        bound(
+            &root.join("current-reader-tools-v2/verify_archive"),
+            "eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0",
+        ),
+        bound(
+            &root.join("current-reader-tools-v2/deployment-seal-receipt.json"),
+            "ea311a5af72af43e09d092bcd4a02582106bbc5e678bb2173cbbb8e0d7dd24fc",
+        ),
+        bound(
+            &root.join("current-reader-tools-v2/build-proof.json"),
+            "5a28798a19f694028b748fec0f222cf654b3e2de464706d24e7c106259cccbd4",
+        ),
+        bound(
+            &root.join("current-reader-tools-v2/native-results.json"),
+            "eff17d9c60a6a2fdfacd750841a78f4f7eeddde7c3687b961bfb5b862b6a7019",
+        ),
+        bound(
+            &root.join("current-reader-tools-v2/reader-equivalence.json"),
+            "bf45b73e14acd383d23ac4088b28c94db98c0fee095d83d9be06c766bbbe1f61",
+        ),
     );
     let proof = custody::json(&current, true)?;
     ensure!(
-        proof["branch_commit"] == "ee55f614012585bc99e4ed7398a56758bde2664e",
+        proof["branch_commit"] == READER_COMMIT,
         "current pipeline build"
     );
     let pipe: Bound = serde_json::from_value(proof["pipeline"].clone())?;
-    ensure!(
-        pipe.sha256 == "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51",
-        "unqualified plugin"
-    );
+    ensure!(pipe.sha256 == PIPELINE, "unqualified plugin");
     for key in ["actual_current_build", "seal"] {
         custody::json(&serde_json::from_value(proof[key].clone())?, true)?;
     }
@@ -334,33 +373,69 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
             && custody::frozen_identity(&pipe.path)? == m,
         "pipeline image differs"
     );
-    let frozen_fixture = immutable_copy(
-        &state.join("native-fixture-evidence.json"),
-        &custody::bytes(&test, 8 << 20, false)?,
-    )?;
-    let compiler = custody::json(&built, true)?;
-    let args = compiler["compiler"]
-        .as_str()
-        .context("actual full verifier command")?
-        .split_whitespace()
-        .collect::<Vec<_>>();
-    let flags = args
-        .windows(2)
-        .filter(|w| w[0] == "-C")
-        .map(|w| w[1])
-        .collect::<Vec<_>>();
-    ensure!(
-        flags.contains(&"opt-level=1"),
-        "unexpected verifier optimization"
-    );
-    let accepted = json!({"schema":"horizon-current-reader-main-acceptance-v1","reader_commit":proof["branch_commit"],"pipeline":pipe,"full_verifier":full,
+    #[cfg(incident_post145_only)]
+    let qualified = {
+        let directory = Path::new(capacity::RUNTIME)
+            .join("epoch166-retry10-delivery-20261121-v1/qualified-reader");
+        let seal = bound(
+            &directory.join("deployment-seal-receipt.json"),
+            "25106ce6590af4022c0d0c4e25a50762c178215bd797973b719b68059cd8e3e0",
+        );
+        let item = bound(
+            &directory.join("qualification.json"),
+            "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486",
+        );
+        let deployment = custody::json(&seal, true)?;
+        let accepted = custody::json(&item, true)?;
+        ensure!(
+            deployment["destination"] == json!(directory)
+                && deployment["members"]
+                    .as_array()
+                    .is_some_and(|entries| entries
+                        .iter()
+                        .any(|m| m["name"] == "qualification.json" && m["sha256"] == item.sha256))
+                && accepted["schema"] == "horizon-current-reader-main-acceptance-v1"
+                && accepted["reader_commit"] == READER_COMMIT
+                && accepted["pipeline"] == json!(pipe)
+                && accepted["full_verifier"] == json!(full)
+                && accepted["minimum_thread_stack_bytes"] == 67_108_864
+                && accepted["source_artifact_correspondence_accepted"] == true
+                && accepted["full_and_plugin_capabilities_accepted"] == true,
+            "shared full reader acceptance changed"
+        );
+        item
+    };
+    #[cfg(not(incident_post145_only))]
+    let qualified = {
+        let frozen_fixture = immutable_copy(
+            &state.join("native-fixture-evidence.json"),
+            &custody::bytes(&test, 8 << 20, false)?,
+        )?;
+        let compiler = custody::json(&built, true)?;
+        let args = compiler["compiler"]
+            .as_str()
+            .context("actual full verifier command")?
+            .split_whitespace()
+            .collect::<Vec<_>>();
+        let flags = args
+            .windows(2)
+            .filter(|w| w[0] == "-C")
+            .map(|w| w[1])
+            .collect::<Vec<_>>();
+        ensure!(
+            flags.contains(&"opt-level=1"),
+            "unexpected verifier optimization"
+        );
+        let accepted = json!({"schema":"horizon-current-reader-main-acceptance-v1","reader_commit":proof["branch_commit"],"pipeline":pipe,"full_verifier":full,
         "cargo_features":["horizon_pipeline --no-default-features","verify_archive features=[]"],"rustc_flags":flags,"minimum_thread_stack_bytes":67108864u64,
         "source_build_evidence":[current,proof["actual_current_build"],proof["seal"],built,seal,frozen_fixture],
         "source_artifact_correspondence_accepted":true,"full_and_plugin_capabilities_accepted":true});
-    let qualified = immutable_copy(
-        &state.join("reader-qualification.json"),
-        &serde_json::to_vec_pretty(&accepted)?,
-    )?;
+        let qualified = immutable_copy(
+            &state.join("reader-qualification.json"),
+            &serde_json::to_vec_pretty(&accepted)?,
+        )?;
+        qualified
+    };
     Ok((full, pipe, qualified))
 }
 
@@ -487,7 +562,7 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let scratch = state.join("delivery");
     fs::DirBuilder::new().mode(0o700).create(&scratch)?;
     let plan = json!({"schema":"horizon-current-reader-plan-v1","repository":"/home/sol/workspace/jetstreamer",
-      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":"ee55f614012585bc99e4ed7398a56758bde2664e",
+      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":READER_COMMIT,
       "pipeline":pipeline,"full_verifier":reader,"qualification":qualified,"scratch_directory":scratch,"threads":1,
       "maximum_archive_bytes":BYTES,"minimum_free_bytes":first["protected_bytes"],"epoch_expectations":{"145":eb}});
     let plan_binding = immutable_copy(
@@ -575,7 +650,7 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
         &serde_json::to_vec_pretty(&json!({
         "schema":"horizon-145-current-native-plugin-acceptance-v1","epoch":145,"invocation":iid,"archive":archive,
         "archive_identity":identity,"archive_sha256":expected,"pipeline":pipeline,"report":report_binding,"argv":argv,"exit_code":0,
-        "current_branch_qualification":"8f4a045a212e7e20d7cbaa4dcaf9f1d2a9ced828ded1b0a44fb9084b812235c1","r2_mutations":false}))?,
+        "current_branch_qualification":qualified.sha256,"r2_mutations":false}))?,
     )?;
     fit.await_topology()?;
     fit.await_current(0)?;
@@ -592,6 +667,19 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(incident_post145_only)]
+    #[test]
+    #[ignore = "requires the native root-owned current reader and its positive/negative fixtures"]
+    fn current_full_and_plugin_use_the_same_qualified_plan_as_delivery() {
+        let dir = tempfile::tempdir().unwrap();
+        let (full, plugin, plan) = native_tools(Path::new(ROOT), dir.path()).unwrap();
+        assert_eq!(full.sha256, VERIFIER);
+        assert_eq!(plugin.sha256, PIPELINE);
+        assert_eq!(
+            plan.sha256,
+            "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486"
+        );
+    }
     #[test]
     fn complete_plugin_requires_all_slots_bound_source_and_stream_digest() {
         let argv = vec!["/native/pipeline".into(), "145".into()];

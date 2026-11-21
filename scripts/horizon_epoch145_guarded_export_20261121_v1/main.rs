@@ -289,7 +289,8 @@ fn while_stopped(
         match observe() {
             Ok(sample) => {
                 ensure!(
-                    cfg!(incident_rejoin145_only) || Instant::now() < deadline,
+                    cfg!(any(incident_rejoin145_only, incident_post145_only))
+                        || Instant::now() < deadline,
                     "late stopped-worker observation"
                 );
                 prove_stopped_child(pid, ticks)?;
@@ -297,7 +298,7 @@ fn while_stopped(
             }
             Err(e)
                 if (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>())
-                    || (cfg!(incident_rejoin145_only)
+                    || (cfg!(any(incident_rejoin145_only, incident_post145_only))
                         && (e.is::<capacity::Reprice>()
                             || e.is::<capacity::TopologyTimeout>())) =>
             {

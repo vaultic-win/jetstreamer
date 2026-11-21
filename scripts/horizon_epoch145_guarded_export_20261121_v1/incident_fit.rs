@@ -8,7 +8,7 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 #[cfg(incident_post145_only)]
-const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v4/post-stop-fit";
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v7/post-stop-fit";
 #[cfg(incident_rejoin145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
 #[cfg(not(any(incident_post145_only, incident_rejoin145_only)))]
@@ -263,7 +263,7 @@ fn held_170() -> Result<Option<u64>> {
 }
 
 fn pending_join(error: &str) -> Result<Option<u64>> {
-    if cfg!(incident_rejoin145_only)
+    if cfg!(any(incident_rejoin145_only, incident_post145_only))
         && error
             .trim_end()
             .ends_with("ValueError: foreign pending 170")
@@ -376,7 +376,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         .output()?;
     let err = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
-        if cfg!(incident_rejoin145_only)
+        if cfg!(any(incident_rejoin145_only, incident_post145_only))
             && out.status.signal() == Some(libc::SIGALRM)
             && out.stdout.is_empty()
             && out.stderr.is_empty()
@@ -664,15 +664,16 @@ impl Fit {
             // Both are admitted by the full provider. Check their exact current guard plan and remaining
             // allowance using the original rooted admission rather than letting a new peer bypass the check.
             for (epoch, plan, unit, remaining) in extra_guards(s)? {
-                let sample = if cfg!(incident_rejoin145_only) && epoch == 168 {
-                    Some(
-                        s["bookings"]["168"]
-                            .get("measured_guard")
-                            .context("missing priced 168 native sample")?,
-                    )
-                } else {
-                    None
-                };
+                let sample =
+                    if cfg!(any(incident_rejoin145_only, incident_post145_only)) && epoch == 168 {
+                        Some(
+                            s["bookings"]["168"]
+                                .get("measured_guard")
+                                .context("missing priced 168 native sample")?,
+                        )
+                    } else {
+                        None
+                    };
                 let (floor, growth) = current_guard(&plan, sample, remaining, &unit)?;
                 required = required.checked_add(growth).context("peer growth")?;
                 absolute = absolute.max(floor);

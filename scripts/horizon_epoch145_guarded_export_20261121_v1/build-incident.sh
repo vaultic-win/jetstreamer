@@ -14,9 +14,9 @@ recovery) sources=(incident-phase.py run-incident.sh) ;;
 rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only)
         ;;
-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
+post|current-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
       extra=(--cfg incident_post145_only)
-      fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild)
+      fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery)
       ;;
 *) exit 2 ;;
 esac
@@ -28,14 +28,31 @@ test "$(cat "$cg/memory.max")" = '1073741824'
 test "$(cat "$cg/memory.swap.max")" = '0'
 test "$(cat "$cg/pids.max")" = '128'
 test "$(findmnt -n -T "$current" -o SOURCE)" = /dev/loop4
-if [[ $flavor == rejoin ]]; then
+if [[ $flavor == rejoin || $flavor == current-post ]]; then
   # Keep the historical compiler/dependency cache immutable. Pay a new bounded
   # image on HOME for this generation and retain its exact products for sealing.
   provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v5/post-stop-fit
-  [[ $(sha256sum "$provider" | cut -d' ' -f1) == c5491d6f0e96c50cbe914db9956f6eff620d99db436897750e3eaf44d2b9e2b2 ]]
+  signature=c5491d6f0e96c50cbe914db9956f6eff620d99db436897750e3eaf44d2b9e2b2
+  if [[ $flavor == current-post ]]; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit
+    signature=f16e961612d5c74727fb62a9be280dbb298ebe937cc6c57e50c93839e603609f
+  fi
+  [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
   fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
-  "$provider" 145 "$1" "$fleet_sha" > "$q/before.json"
+  for probe in 1 2 3 4 5; do
+    if "$provider" 145 "$1" "$fleet_sha" > "$q/fit-$probe.json" 2> "$q/fit-$probe.stderr"; then
+      cp "$q/fit-$probe.json" "$q/before.json"
+      break
+    fi
+    # A different provider is never excluded from the live 145 cgroup. Wait
+    # out the read-only observer overlap and repeat the entire original fit.
+    last=$(tail -1 "$q/fit-$probe.stderr")
+    [[ $flavor == current-post && $probe -lt 5 &&
+       ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' ) ]] ||
+       { cat "$q/fit-$probe.stderr" >&2; exit 1; }
+    sleep "$((2+probe))"
+  done
   python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=1073741824' "$q/before.json"
   image="$q/cache.ext4"
   fallocate -l 92274688 "$image"
@@ -71,13 +88,13 @@ rustc --edition=2024 --test "${args[@]}" "$s/main.rs" -o "$out/tests"
 "$out/tests" --test-threads=1
 for name in "${fixture[@]}"; do "$out/tests" --ignored --exact "$name"; done
 "$out/tests" --ignored --exact incident_fit::tests::authenticates_the_actual_fleet_and_disallows_missing_members
-if [[ "$flavor" == post ]]; then /usr/bin/python3 -IB "$s/post-phase-test.py"; fi
+if [[ "$flavor" == post || "$flavor" == current-post ]]; then /usr/bin/python3 -IB "$s/post-phase-test.py"; fi
 rustc --edition=2024 "${args[@]}" "$s/main.rs" -o "$out/export145"
 sha256sum "$out/tests" "$out/export145" > "$q/artifacts"
 cat "$cg/memory.peak" > "$q/memory.peak"
 du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
-if [[ $flavor == rejoin ]]; then
+if [[ $flavor == rejoin || $flavor == current-post ]]; then
   mkdir -m0700 "$q/products"
   cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
   test "$(du -s -B1 "$q/products" | cut -f1)" -le 24117248

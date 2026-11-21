@@ -6,7 +6,7 @@ import stat
 import sys
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
-PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v6"
+PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 IMAGE = PKG / "export145"
 STATE = ROOT / "epoch145-guarded-export-20261121-v1/state"
 PUBLICATION = ROOT / "epoch145-publication-20261121-v1"
@@ -17,11 +17,11 @@ SIDECAR = OUTPUT / "epoch-145.jet.sha256"
 HOLDING = HOME / "r2-holding-state-dev-samjohnson-v1/transition.lock"
 UNIT = "horizon-holding-export145-20261121-v1.service"
 CGROUP = "/system.slice/" + UNIT
-PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/reader-1f81d625eeeb8a29-1795209991248531183/horizon_pipeline")
-VERIFIER = PUBLICATION / "verifier-tools/verify_archive"
+PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/consumer-bench-image-20261120-v1/regular-consumer-true-updates-8822f0ba8391/horizon_pipeline")
+VERIFIER = PUBLICATION / "current-reader-tools-v2/verify_archive"
 UPLOADER = PUBLICATION / "uploader-tools/jetstreamer-r2"
-BOOTSTRAP = "5e0e20bc974149f096ea4bab10b15e1b"
-ADVANCING = "511cee5b1559001e5691eda9f9d9de923849dc4a3b661792cade776cad6e55d6"
+BOOTSTRAP = "dc043eb78c4a4349b0098760dc764a1f"
+ADVANCING = "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199"
 
 
 def argv(pid):
@@ -62,7 +62,7 @@ def generation(s, parent, mode, args, fleet, m, profile):
 
 def completion(s):
     old = STATE / BOOTSTRAP
-    advancing, _ = s.read(PKG.parent / "V5_ACTUAL_ADVANCING_WORKER.json", ADVANCING)
+    advancing, _ = s.read(PKG.parent / "V5B_ACTUAL_ADVANCING_WORKER.json", ADVANCING)
     start, start_ref = s.read(old / "recovery-started.json", advancing["start"]["sha256"])
     verified, vr = s.read(old / "verified-frozen.json")
     done, dr = s.read(old / "complete.json")

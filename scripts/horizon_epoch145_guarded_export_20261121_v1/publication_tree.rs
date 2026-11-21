@@ -110,10 +110,27 @@ impl Tree {
                 checksum.check()?;
                 match fit.topology().and_then(|_| fit.current(0)) {
                     Ok(_) => {
-                        ensure!(Instant::now() < deadline, "late publisher census");
+                        ensure!(
+                            cfg!(incident_post145_only) || Instant::now() < deadline,
+                            "late publisher census"
+                        );
+                        ensure!(
+                            if frozen {
+                                self.event("frozen")?
+                            } else {
+                                !self.event("populated")?
+                            },
+                            "publication group changed across complete fit"
+                        );
                         return Ok(());
                     }
-                    Err(e) if cfg!(continuity145_only) && e.is::<peer_terminal::Pending>() => {
+                    Err(e)
+                        if (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>())
+                            || (cfg!(incident_post145_only)
+                                && (e.is::<capacity::Reprice>()
+                                    || e.is::<capacity::TopologyTimeout>())) =>
+                    {
+                        eprintln!("epoch145 holding publication group for a fresh fit: {e:#}");
                         thread::sleep(Duration::from_secs(10));
                         deadline = Instant::now() + Duration::from_secs(90);
                     }
@@ -143,6 +160,7 @@ impl Tree {
                     Ok(_) => false,
                     Err(e)
                         if e.is::<capacity::GuardInFlight>()
+                            || e.is::<capacity::Reprice>()
                             || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
                     {
                         true
