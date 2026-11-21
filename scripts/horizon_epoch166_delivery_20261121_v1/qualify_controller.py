@@ -22,9 +22,11 @@ def raw_sha(path):
 
 os.environ.update(FIXTURE_AUTHORITY=str(authority), FIXTURE_LIVE_SHA=hashlib.sha256(live_bytes).hexdigest(),
                   FIXTURE_LOCK=json.dumps(receiver.inode(lock.stat())), FIXTURE_PUBLICATION=str(run))
+manager = live["native"]["manager"]
+producer = receiver.Producer(166, manager["Id"], manager["InvocationID"])
 handoff = receiver.receive(authority, os.environ["FIXTURE_LIVE_SHA"], receiver.inode(lock.stat()),
                            source.parent / "watched", native, raw_sha(native), consumer, raw_sha(consumer),
-                           ["prepare", sys.argv[3]])
+                           ["prepare", sys.argv[3]], producer)
 plan = json.loads((run / "current-reader-plan.json").read_bytes())
 assert handoff["epoch"] == 166 and handoff["directory"] == str(source)
 assert plan["maximum_archive_bytes"] == (source / "epoch-166.jet").stat().st_size

@@ -6,6 +6,7 @@ import fcntl
 import importlib.util
 import json
 import os
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,6 +16,16 @@ here = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("receiver", here / "receiver.py")
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
+retry10 = "--retry10" in sys.argv[5:]
+if retry10:
+    sys.argv.remove("--retry10")
+    binding = runpy.run_path(str(here / "receive.py"))
+    live_root, original_sha = binding["BASE"], binding["LIVE"]
+    producer = r.Producer(166, binding["UNIT"], binding["IID"])
+    publication_unit = "horizon-publish-166-retry10-committed.service"
+else:
+    live_root, original_sha, producer = r.ROOT, r.LIVE_SHA, r.ORIGINAL
+    publication_unit = "horizon-publish-166-committed.service"
 native, generator, work, fixture = map(Path, sys.argv[1:5])
 fixture.mkdir(mode=0o700)
 os.chown(fixture, *r.OWNER)
@@ -30,7 +41,9 @@ def put(path, value, mode):
     path.write_text(json.dumps(value))
     path.chmod(mode)
 
-live = json.loads((r.ROOT/"LIVE.json").read_bytes())
+raw_live = (live_root/"LIVE.json").read_bytes()
+assert r.sha(raw_live) == original_sha
+live = json.loads(raw_live)
 real_fingerprint = live["manifest_fingerprint"].split(":")[1]
 with generator.open("rb") as gen:
     gen_path = f"/proc/self/fd/{gen.fileno()}"
@@ -56,9 +69,9 @@ put(live_path, live, 0o600)
 live_hash = r.sha(live_path.read_bytes())
 terminal = {"schema":"terminal166-success-v1","epoch":166,"live":{"path":str(live_path),"sha256":live_hash},
     "source_admission":live["admission"],"terminal_166_disposition":"node-published-local-cohort",
-    "producer_invocation_id":r.IID, "producer_unit":r.UNIT,
-    "manager_terminal":{"_PID":"1","_BOOT_ID":live["boot_id"].replace("-",""),"UNIT":r.UNIT,
-    "INVOCATION_ID":r.IID,"MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448"},
+    "producer_invocation_id":producer.invocation_id, "producer_unit":producer.unit,
+    "manager_terminal":{"_PID":"1","_BOOT_ID":live["boot_id"].replace("-",""),"UNIT":producer.unit,
+    "INVOCATION_ID":producer.invocation_id,"MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448"},
     "local_archive":{**d(archive),"size":archive.stat().st_size,"sha256":actual["sha256"]},
     "transaction_id":actual["transaction_id"],"committed_receipt":{"path":str(batch),"sha256":r.sha(batch.read_bytes())},
     "resource_credit_bytes":0,"reservation_ending_bytes":0,
@@ -70,7 +83,7 @@ probe=here/"probe.py"
 result=work/"consumer.json"
 native_sha=r.sha(native.read_bytes()); probe_sha=r.sha(probe.read_bytes())
 def run():
-    return r.receive(authority,live_hash,r.inode(lock.stat()),watched,native,native_sha,probe,probe_sha,[str(result)])
+    return r.receive(authority,live_hash,r.inode(lock.stat()),watched,native,native_sha,probe,probe_sha,[str(result)],producer)
 negatives={}
 def denied(name, action, expected):
     try:
@@ -92,6 +105,11 @@ wrong=copy.deepcopy(terminal);wrong["committed_receipt"]["sha256"]="ff"*32
 put(term_path,wrong,0o400);denied("wrong-receipt-digest",run,"terminal archive, sidecar or receipt changed")
 wrong=copy.deepcopy(terminal);wrong["producer_invocation_id"]="ff"*16
 put(term_path,wrong,0o400);denied("wrong-producer",run,"terminal authority or original producer differs")
+if retry10:
+    wrong=copy.deepcopy(terminal)
+    wrong.update(producer_invocation_id=r.ORIGINAL.invocation_id, producer_unit=r.ORIGINAL.unit)
+    wrong["manager_terminal"].update(INVOCATION_ID=r.ORIGINAL.invocation_id,UNIT=r.ORIGINAL.unit)
+    put(term_path,wrong,0o400);denied("predecessor-producer",run,"terminal authority or original producer differs")
 put(term_path,terminal,0o400)
 with lock.open("rb") as held:
     fcntl.flock(held, fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -110,10 +128,9 @@ if len(sys.argv) == 7 and sys.argv[5] == "--controller-test":
     # Qualify the controller while the generated cohort still has its original inode identities.
     subprocess.run([sys.argv[6], "--include-ignored", "--nocapture"], check=True)
 elif len(sys.argv) > 5:
-    import runpy
     runpy.run_path(str(here / "qualify_publisher.py"))["qualify"](
         r, Path(sys.argv[5]), work, authority, live_hash, terminal, out, lock,
-        watched, native, native_sha)
+        watched, native, native_sha, producer, publication_unit)
 with contextlib.ExitStack() as stack:
     nf=r.inherited_program(stack,native,native_sha)
     deny=subprocess.run([f"/proc/self/fd/{nf}","admit","166",str(batch),"ff"*32,str(watched)],
@@ -129,9 +146,9 @@ no_probe()
 try:
     r.watcher()
     with contextlib.ExitStack() as stack:
-        r.authority(stack,r.ROOT,r.LIVE_SHA)
+        r.authority(stack,live_root,original_sha,producer)
 except FileNotFoundError as e:
-    assert Path(e.filename)==r.ROOT/"TERMINAL_SUCCESS.json"
+    assert Path(e.filename)==live_root/"TERMINAL_SUCCESS.json"
     live_result="awaiting-original-terminal"
 else:
     live_result="original-terminal-present-no-execution"

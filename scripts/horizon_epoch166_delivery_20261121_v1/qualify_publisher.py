@@ -20,7 +20,7 @@ def capture(run):
 
 
 def qualify(receiver, fixture_consumer, work, authority, live_hash, terminal,
-            source, lock, watched, native, native_hash):
+            source, lock, watched, native, native_hash, producer, publication_unit):
     def read(path):
         return json.loads(path.read_bytes())
 
@@ -89,7 +89,7 @@ os.execv(elf, [elf, *args])
             "epoch": 166,
             "operation": "current-reader-sync-retain-local",
             "publication_authorized": False,
-            "unit": "horizon-publish-166-committed.service",
+            "unit": publication_unit,
             "invocation_id": os.environ["INVOCATION_ID"],
             "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
             "recorded_unix_seconds": recorded,
@@ -114,7 +114,7 @@ os.execv(elf, [elf, *args])
                 receiver.receive(
                     authority, live_hash, receiver.inode(lock.stat()), watched,
                     native, native_hash, wrapper, digest,
-                    [fault, str(fixture_consumer), mode, admission_sha])
+                    [fault, str(fixture_consumer), mode, admission_sha], producer)
         if expected:
             try:
                 attempt()
