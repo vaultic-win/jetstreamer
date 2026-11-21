@@ -163,7 +163,7 @@ fn prepared_transition(
                 && gate == &Bound::new(PRIOR_LAUNCHER.0, PRIOR_LAUNCHER.1)
                 && prepared["launcher"]["source_commit"] == PRIOR_LAUNCHER_COMMIT
                 || EPOCH == 261
-                    && crate::native261::v151_prepared(
+                    && crate::native261::registered_preparation(
                         reference,
                         gate,
                         &prepared["launcher"]["source_commit"]
