@@ -62,20 +62,56 @@ def native(epoch):
     return row, identity
 
 
+EXTENDED_170 = {
+    'path':str(BASE/'epoch170-retry10-guard384-20261121-v1/GUARD_QUALIFIED.json'),
+    'sha256':'6bd212f907ffa68a34dbc967f61ebba84cd3034b19643a4a0d1013b1fe6ba43d',
+}
+CLOSED_170 = {
+    'path':str(BASE/'epoch170-ancestor-accounts-20261121-v1/CLOSED_6_7_RETIRED.json'),
+    'sha256':'c246bb365dd59d234fd389d7dfcaed30910cbab36dfeeacff62cd2e9d64196dc',
+}
+
+
+def guard_budget(epoch, root, plan, admission):
+    original = ROUTES[epoch][4]
+    if epoch != 170 or plan['maximum_root_physical_bytes'] == original<<30:
+        return original, GUARD_SHA, checked(QUAL)
+    cap=384<<30
+    booking=bound(root/'ACCEPTED_384_BOOKING.json')
+    booked=checked(booking)
+    cost=checked(admission['post_guard_capacity'])
+    intent=checked(admission['intent'])
+    paid=checked(CLOSED_170)
+    retired={n:v['completion'] for n,v in paid['completions'].items()}
+    extension=cost['epoch170_extension']
+    need(plan['maximum_root_physical_bytes']==cap and intent['booking']==booking
+         and booked['epoch']==epoch and booked['cap_bytes']==cap and booked['extra_bytes']==96<<30
+         and booked['retired']==retired and booked['guard']==EXTENDED_170 and booked['prestart']==intent['prestart']
+         and booked['prestart']['fits'] and cost['fits'] and cost['epoch']==epoch
+         and cost['bookings']['170']['cap_bytes']==cap and extension['accepted']==booking
+         and extension['guard']==EXTENDED_170 and extension['retired']==retired
+         and extension['retirement']==CLOSED_170 and extension['extra_bytes']==96<<30
+         and cost['candidate']['producer_invocation_id']==admission['producer_invocation_id'],
+         'unfunded or foreign epoch 170 guard extension')
+    proof=checked(EXTENDED_170)
+    need(bound(Path(proof['guard']['path']))==proof['guard'], 'extended guard executable changed')
+    return 384,proof['guard']['sha256'],proof
+
+
 def guard(epoch, admission, actor):
     from owners import show
 
-    _, subdir, _, _, cap = ROUTES[epoch]
+    _, subdir, _, _, _ = ROUTES[epoch]
     root = BASE / subdir
     planref = bound(root/'ACTUAL_GUARD_PLAN.json')
     plan = checked(planref)
+    cap, guard_sha, qualified = guard_budget(epoch,root,plan,admission)
     directory = root/'guard-receipts'
     t = show(timer(epoch), ('Id','InvocationID','ActiveState','SubState','Triggers','Job'))
     service = timer(epoch).removesuffix('.timer')+'.service'
     required = dict(unit=node(epoch), invocation_id=actor['producer_invocation_id'], filesystem='/home/sol',
                     maximum_root_physical_bytes=cap<<30, receipt_directory=str(directory))
-    qualified = checked(QUAL)
-    need(qualified['guard']['sha256'] == GUARD_SHA and plan["data_fulfillment"] == qualified["contract"],
+    need(qualified['guard']['sha256'] == guard_sha and plan["data_fulfillment"] == qualified["contract"],
          "unqualified guard contract or image")
     need(admission['actual_guard_plan'] == planref and all(plan[k] == v for k,v in required.items())
          and t['InvocationID'] == admission['timer_invocation_id'] and t['ActiveState'] == 'active'
@@ -86,7 +122,7 @@ def guard(epoch, admission, actor):
     candidates=sorted(directory.glob('sample-*.json'), key=lambda p:p.stat().st_mtime_ns, reverse=True)
     for p in candidates[:3]:
         ref=bound(p);sample=checked(ref);gid=sample['guard_invocation_id']
-        need(sample['guard_sha256']==GUARD_SHA and sample['plan_sha256']==planref['sha256'] and
+        need(sample['guard_sha256']==guard_sha and sample['plan_sha256']==planref['sha256'] and
              p.name=='sample-'+gid+'.json' and sample['producer_invocation_id']==actor['producer_invocation_id']
              and sample['producer']['pid']==actor['producer_pid'] and sample['producer']['active']=='active'
              and sample['producer_stop_enabled'] and sample['trip_reason'] is None
@@ -411,6 +447,12 @@ def registered_config(cfg, fleet_ref, fleet):
         if row['range'] in old:
             continue
         epoch = int(row['range'])
+        if epoch == 168:
+            from status168 import inspect
+            normal = inspect()
+            need(normal and normal['ordinary_canonical'] and normal['first_worker']
+                 and row == normal['observer_row'], 'foreign normal 168 worker')
+            continue
         need(epoch in ROUTES, 'unknown added worker')
         candidate = current[row['range']]
         actor = candidate['actor']
