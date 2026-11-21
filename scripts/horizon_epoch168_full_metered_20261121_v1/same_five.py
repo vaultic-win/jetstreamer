@@ -39,6 +39,6 @@ def predecessor(prior,fit,unit):
         s.need(current!=ticks,'original frozen verifier still present')
     old=s.bound(START,STATE/'recovery-started.json')['fresh_fit']['remaining_native_owners']
     s.need(set(old)=={'166','167','169','170','172'} and fit['remaining_native_owners']==old and
-           fit['joint_closed166'] is False and fit['joint136_enabled'] is True and
+           fit['joint_closed166'] is None and fit['metered168'] is None and fit['joint136_enabled'] is True and
            fit['charged_cpu_micros']==64_000_000, 'different paid initial five-owner census')
     return FAILURE

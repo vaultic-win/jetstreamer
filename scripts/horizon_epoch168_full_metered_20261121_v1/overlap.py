@@ -89,7 +89,13 @@ def inspect(stable,manager,unit,children):
            and not any((state/n).exists() for n in ("failed.json","verified-frozen.json","complete.json")),
            "145 has left verified recovery or has different provenance")
     if same is None:
-        s.need(started["fresh_fit"]["joint_closed166"] is True, "166 still in post-terminal verifier")
+        closed=started["fresh_fit"]["joint_closed166"]
+        s.need(isinstance(closed,dict) and closed["unit"]=="horizon-qualify-independent-cold166-20261120-v1.service"
+               and closed["invocation_id"]=="fa16ee2f14fe44ecbc37c59e197553ac" and closed["pid1_success"] is True
+               and closed["resource_credit_bytes"]==0,"different post-terminal 166 owner")
+        terminal=s.bound(closed["terminal"],s.ROOT/"epoch166-terminal-20261121-v1/TERMINAL_SUCCESS.json")
+        s.need(terminal["producer_invocation_id"]==closed["invocation_id"] and terminal["resource_credit_bytes"]==0
+               and terminal["committed_receipt"]==closed["batch"] and terminal["transaction_id"]==closed["transaction"],"different post-terminal 166 evidence")
         failed=None
     else:
         failed=same_five.predecessor(predecessor,started["fresh_fit"],unit)

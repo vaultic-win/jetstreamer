@@ -1,12 +1,14 @@
 """Exercise fit selection, native-generation binding and atomic nonreplacement in isolation."""
 from copy import deepcopy
 from pathlib import Path
+import json
 import sys
 import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import fit
 import session
+import same_five
 
 
 def run():
@@ -46,5 +48,21 @@ def run():
     return dict(fixture_only=True,stage_positive=2,fit_denials=len(changes),native_rename_noreplace=True)
 
 
+def native_five(receipt):
+    sample=json.loads(receipt.read_bytes())
+    assert sample["166_credit_bytes"]==0 and sample["early"] and not sample["launch"]
+    prior=sample["original"]
+    current=sample["fit"]
+    assert same_five.predecessor(prior,current,fit.A145)==same_five.FAILURE
+    for key,value in (("joint_closed166",False),("joint_closed166",True),("joint136_enabled",False),
+                      ("metered168",{}),("charged_cpu_micros",0),("remaining_native_owners",{})):
+        try: same_five.predecessor(prior,dict(current,**{key:value}),fit.A145)
+        except ValueError: continue
+        raise AssertionError("accepted foreign native fit "+key)
+    return dict(original_five_native_fit=str(receipt),negative_cases=6)
+
+
 if __name__=="__main__":
     print(run())
+    if len(sys.argv)==2:
+        print(native_five(Path(sys.argv[1])))
