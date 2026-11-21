@@ -626,7 +626,7 @@ fn run() -> Result<()> {
     match a.as_slice() {
         #[cfg(all(partial145_only, not(joint145_only), not(continuity145_only)))]
         [_, mode, parent, sha] if mode == "recover-append" => partial::append(parent.parse()?, sha),
-        #[cfg(all(materialized145_only, not(joint145_only)))]
+        #[cfg(all(materialized145_only, not(joint145_only), not(incident_post145_only)))]
         [_, mode, fleet, digest, sha] if mode == "recover-full-output" => materialized::run(
             Bound {
                 path: fleet.into(),
@@ -634,7 +634,7 @@ fn run() -> Result<()> {
             },
             sha,
         ),
-        #[cfg(all(materialized145_only, not(joint145_only)))]
+        #[cfg(all(materialized145_only, not(joint145_only), not(incident_post145_only)))]
         [_, mode, parent, sha] if mode == "recover-worker" => {
             materialized::verify(parent.parse()?, sha)
         }
@@ -647,7 +647,7 @@ fn run() -> Result<()> {
             sha,
             tail,
         ),
-        #[cfg(not(incident145_only))]
+        #[cfg(any(not(incident145_only), incident_post145_only))]
         [_, mode, path, digest, full, sha] if mode == "publish" => publication::publish(
             Bound {
                 path: path.into(),
@@ -657,7 +657,7 @@ fn run() -> Result<()> {
             sha,
             cfg!(joint145_only),
         ),
-        #[cfg(not(incident145_only))]
+        #[cfg(any(not(incident145_only), incident_post145_only))]
         [_, mode, path, digest, sha] if mode == "post-full" => post::full(
             Bound {
                 path: path.into(),

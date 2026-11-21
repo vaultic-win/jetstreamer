@@ -4,6 +4,7 @@
 use super::*;
 use std::os::unix::fs::PermissionsExt;
 
+pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v6/export145";
 const EXPORT: &str = "de6780b860b3467bae21fbd19176ca14";
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
 const VERIFIER: &str = "2f0546bcf253a0f21740ff1e297fb18f7a62e37c2df7d72806c433cddf4cd57b";
@@ -207,7 +208,7 @@ fn archive_hash(
     archive: &Path,
     expected: &str,
     state: &Path,
-    fit: &capacity::Fit,
+    fit: &impl VerificationGuard,
     lease: &source_lease::ReadLease,
 ) -> Result<()> {
     let out = state.join(tag);
@@ -363,7 +364,9 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
 }
 
 pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
-    let image = if joint {
+    let image = if cfg!(incident_post145_only) {
+        PathBuf::from(INCIDENT_POST_IMAGE)
+    } else if joint {
         joint::IMAGE.into()
     } else if cfg!(materialized145_only) {
         PathBuf::from(materialized::IMAGE)
@@ -437,14 +440,25 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
         !archive.with_extension("jet.sha256").try_exists()?,
         "unexpected readiness marker"
     );
-    let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
-    fit.await_topology()?;
-    let first = fit.await_current(0)?;
+    #[cfg(not(incident_post145_only))]
+    let (fit, first) = {
+        let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
+        fit.await_topology()?;
+        let first = fit.await_current(0)?;
+        (fit, first)
+    };
     source_lease::arm_break_signal()?;
     let lease = source_lease::ReadLease::acquire(
         &archive,
         source_lease::FileIdentity::from(&fs::symlink_metadata(&archive)?),
     )?;
+    #[cfg(incident_post145_only)]
+    let (fit, first) = {
+        let fit = incident_fit::Fit::capture(&fleet)?;
+        fit.await_topology()?;
+        let first = fit.await_current(0)?;
+        (fit, first)
+    };
     let state = Path::new(ROOT).join(format!("full-{iid}"));
     fs::DirBuilder::new().mode(0o700).create(&state)?;
     let sealed_completion = immutable_copy(&state.join("export-completion.json"), &raw)?;

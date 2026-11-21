@@ -90,7 +90,7 @@ impl Tree {
     pub(super) fn run(
         &self,
         command: &mut Command,
-        fit: &capacity::Fit,
+        fit: &impl post::VerificationGuard,
         archive: &source_lease::ReadLease,
         checksum: &source_lease::ReadLease,
     ) -> Result<()> {

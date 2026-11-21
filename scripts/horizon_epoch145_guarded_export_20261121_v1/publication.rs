@@ -171,7 +171,9 @@ fn owner_command() -> Result<Command> {
 
 pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str, joint: bool) -> Result<()> {
     let root = Path::new(ROOT);
-    let image = if joint {
+    let image = if cfg!(incident_post145_only) {
+        PathBuf::from(post::INCIDENT_POST_IMAGE)
+    } else if joint {
         joint::IMAGE.into()
     } else if cfg!(materialized145_only) {
         PathBuf::from(materialized::IMAGE)
@@ -195,14 +197,25 @@ pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str, joint: bool) -> R
     let archive = Path::new(OUTPUT).join("epoch-145.jet");
     let (plan, hash) = local(&full, full_iid, &archive)?;
     let exe = uploader(root)?;
-    let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
-    fit.await_topology()?;
-    let first = fit.await_current(0)?;
+    #[cfg(not(incident_post145_only))]
+    let (fit, first) = {
+        let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
+        fit.await_topology()?;
+        let first = fit.await_current(0)?;
+        (fit, first)
+    };
     source_lease::arm_break_signal()?;
     let acquire =
         |p: &Path| source_lease::ReadLease::acquire(p, (&fs::symlink_metadata(p)?).into());
     let archive_lease = acquire(&archive)?;
     let checksum_lease = acquire(&archive.with_extension("jet.sha256"))?;
+    #[cfg(incident_post145_only)]
+    let (fit, first) = {
+        let fit = incident_fit::Fit::capture(&fleet)?;
+        fit.await_topology()?;
+        let first = fit.await_current(0)?;
+        (fit, first)
+    };
     let tree = publication_tree::Tree::create()?;
     let run = |cmd: &mut Command| tree.run(cmd, &fit, &archive_lease, &checksum_lease);
     let state = root.join(format!("network-{iid}"));

@@ -7,6 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
+#[cfg(incident_post145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v4/post-stop-fit";
+#[cfg(not(incident_post145_only))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v3/post-stop-fit";
 const HOST_MEMORY: u64 = 810_658_050_048;
 const GROUPS: &str = "/sys/fs/cgroup/system.slice";
