@@ -13,6 +13,9 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
+mod post;
+mod publication;
+mod publication_tree;
 mod recover;
 mod source_lease;
 mod stable;
@@ -75,8 +78,10 @@ fn verify_cgroup() -> Result<String> {
     Ok(iid)
 }
 fn check_self(sha: &str) -> Result<()> {
+    check_image(sha, &Path::new(BASE).join("deployment-v4/export145"))
+}
+fn check_image(sha: &str, path: &Path) -> Result<()> {
     privilege()?;
-    let path = Path::new(BASE).join("deployment-v4/export145");
     let this = fs::metadata("/proc/self/exe")?;
     let disk = fs::metadata(&path)?;
     ensure!(
@@ -85,7 +90,7 @@ fn check_self(sha: &str) -> Result<()> {
     );
     custody::bytes(
         &Bound {
-            path: path.clone(),
+            path: path.to_owned(),
             sha256: sha.to_owned(),
         },
         64 << 20,
@@ -579,6 +584,21 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        [_, mode, path, digest, full, sha] if mode == "publish" => publication::publish(
+            Bound {
+                path: path.into(),
+                sha256: digest.clone(),
+            },
+            full,
+            sha,
+        ),
+        [_, mode, path, digest, sha] if mode == "post-full" => post::full(
+            Bound {
+                path: path.into(),
+                sha256: digest.clone(),
+            },
+            sha,
+        ),
         [_, mode, sha, parent, fd] if mode == "worker" => child(sha, parent.parse()?, fd.parse()?),
         [_, mode, path, digest, sha] if mode == "preflight" || mode == "run" => supervise(
             Bound {
