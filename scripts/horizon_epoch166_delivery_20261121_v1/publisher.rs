@@ -21,15 +21,57 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-#[cfg(not(publisher_fixture))]
-const LIVE_SHA: &str = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
-const PRODUCER: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
-const PRODUCER_IID: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
-const UNIT: &str = "horizon-publish-166-committed.service";
-const QUAL: &str = "producer-publication-inputs-20261121-v1/qualified-reader/qualification.json";
-const QUAL_SHA: &str = "edc8d365190a1e2fd6630a3b3905bd7e6d88e776e4a97a5bfbff791fc9242f05";
-const BOUNDARIES: &str = "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json";
-const INPUT_SHA: &str = "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0";
+/// The operator compiles each approved source and reader as one immutable profile.
+struct PublicationProfile {
+    epoch: u64,
+    producer: &'static str,
+    producer_iid: &'static str,
+    unit: &'static str,
+    terminal: &'static str,
+    live_sha: &'static str,
+    lock: (u64, u64),
+    delivery: &'static str,
+    reader: &'static str,
+    reader_sha: &'static str,
+    boundaries: &'static str,
+    boundaries_sha: &'static str,
+}
+
+#[cfg(not(feature = "retry10"))]
+const PROFILE: PublicationProfile = PublicationProfile {
+    epoch: 166,
+    producer: "horizon-qualify-independent-cold166-20261120-v1.service",
+    producer_iid: "fa16ee2f14fe44ecbc37c59e197553ac",
+    unit: "horizon-publish-166-committed.service",
+    terminal: "epoch166-terminal-20261121-v1",
+    live_sha: "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe",
+    lock: (64512, 93717107),
+    delivery: "epoch166-committed-delivery-20261121-v1",
+    reader: "producer-publication-inputs-20261121-v1/qualified-reader/qualification.json",
+    reader_sha: "edc8d365190a1e2fd6630a3b3905bd7e6d88e776e4a97a5bfbff791fc9242f05",
+    boundaries: "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json",
+    boundaries_sha: "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0",
+};
+
+#[cfg(feature = "retry10")]
+#[path = "../horizon_epoch166_retry10_delivery_20261121_v1/generation.rs"]
+mod generation;
+
+#[cfg(feature = "retry10")]
+const PROFILE: PublicationProfile = PublicationProfile {
+    epoch: 166,
+    producer: generation::PRODUCER_UNIT,
+    producer_iid: generation::PRODUCER_IID,
+    unit: "horizon-publish-166-retry10-committed.service",
+    terminal: generation::TERMINAL_ROOT,
+    live_sha: generation::LIVE_SHA,
+    lock: (64512, 93782040),
+    delivery: "epoch166-retry10-delivery-20261121-v1",
+    reader: "epoch166-retry10-delivery-20261121-v1/qualified-reader/qualification.json",
+    reader_sha: env!("HORIZON_READER_QUALIFICATION_SHA256"),
+    boundaries: "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json",
+    boundaries_sha: "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0",
+};
 const UPLOADER: &str = "epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2";
 const ELF: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 const PAIR: &str = "producer-paired-publication-qa-20261121-v1/QUALIFIED.json";
@@ -159,8 +201,9 @@ fn root_dir(p: &Path) -> Result<()> {
     Ok(())
 }
 fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
+    let epoch = PROFILE.epoch;
     ensure!(
-        h.epoch == 166
+        h.epoch == epoch
             && h.directory == source
             && source.canonicalize()? == source
             && hex(&h.transaction_id, 64)
@@ -185,15 +228,15 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
         false,
     )?;
     ensure!(
-        live["epoch"] == 166
-            && term["schema"] == "terminal166-success-v1"
-            && term["epoch"] == 166
-            && live["native"]["manager"]["Id"] == PRODUCER
-            && live["native"]["manager"]["InvocationID"] == PRODUCER_IID
-            && term["producer_unit"] == PRODUCER
-            && term["producer_invocation_id"] == PRODUCER_IID
+        live["epoch"] == PROFILE.epoch
+            && term["schema"] == format!("terminal{epoch}-success-v1")
+            && term["epoch"] == PROFILE.epoch
+            && live["native"]["manager"]["Id"] == PROFILE.producer
+            && live["native"]["manager"]["InvocationID"] == PROFILE.producer_iid
+            && term["producer_unit"] == PROFILE.producer
+            && term["producer_invocation_id"] == PROFILE.producer_iid
             && term["source_admission"] == live["admission"]
-            && term["terminal_166_disposition"] == "node-published-local-cohort"
+            && term[format!("terminal_{epoch}_disposition")] == "node-published-local-cohort"
             && term["live"] == json!({"path":live_path,"sha256":a.live_sha})
             && term["transaction_id"] == h.transaction_id
             && term["canonical_r2_verified"] == false,
@@ -202,8 +245,8 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
     let manager = &term["manager_terminal"];
     ensure!(
         manager["_PID"] == "1"
-            && manager["UNIT"] == PRODUCER
-            && manager["INVOCATION_ID"] == PRODUCER_IID
+            && manager["UNIT"] == PROFILE.producer
+            && manager["INVOCATION_ID"] == PROFILE.producer_iid
             && manager["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
             && manager["_BOOT_ID"] == live["boot_id"].as_str().context("boot")?.replace('-', ""),
         "foreign producer termination"
@@ -225,16 +268,20 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
             "committed namespace changed"
         );
     }
-    let path = source.join("epoch-166.jet");
+    let path = source.join(format!("epoch-{epoch}.jet"));
     let archive = inherited(h.archive_fd, &path, true)?;
-    let sidecar = inherited(h.sidecar_fd, &source.join("epoch-166.jet.sha256"), true)?;
+    let sidecar = inherited(
+        h.sidecar_fd,
+        &source.join(format!("epoch-{epoch}.jet.sha256")),
+        true,
+    )?;
     let rp = batches.join(format!("batch-{}.json", h.transaction_id));
     let receipt = inherited(h.receipt_fd, &rp, true)?;
     let lockpath = batches
         .ancestors()
         .nth(3)
         .context("lock scope")?
-        .join("locks/epoch-166.lock");
+        .join(format!("locks/epoch-{epoch}.lock"));
     let lock = inherited(h.epoch_lock_fd, &lockpath, false)?;
     let lm = lock.metadata()?;
     ensure!(
@@ -263,7 +310,7 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
         "terminal archive or batch identity changed"
     );
     ensure!(
-        small(&sidecar, 1024)? == format!("{}  epoch-166.jet\n", h.sha256).as_bytes(),
+        small(&sidecar, 1024)? == format!("{}  epoch-{epoch}.jet\n", h.sha256).as_bytes(),
         "sidecar mismatch"
     );
     let bytes = small(&receipt, 32 << 20)?;
@@ -274,12 +321,12 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
         .context("committed members")?;
     ensure!(
         b["schema"] == "jetstreamer-root-cohort-publication-receipt-v2"
-            && b["epochs"] == json!([166])
+            && b["epochs"] == json!([epoch])
             && b["transaction_id"] == h.transaction_id
             && b["manifest_fingerprint"] == live["manifest_fingerprint"]
             && b["outcome"]["kind"] == "committed"
             && ms.len() == 1
-            && ms[0]["epoch"] == 166
+            && ms[0]["epoch"] == PROFILE.epoch
             && ms[0]["archive_sha256"] == h.sha256,
         "nonmatching singleton commit"
     );
@@ -353,13 +400,17 @@ fn admit(
         .context("capacity observation time")?;
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     ensure!(
-        v["schema"] == "horizon-epoch166-committed-publication-admission-v1"
+        v["schema"]
+            == format!(
+                "horizon-epoch{}-committed-publication-admission-v1",
+                PROFILE.epoch
+            )
             && v["operation"] == "current-reader-sync-retain-local"
             && (!sync || v["publication_authorized"] == true)
             && v["boot_id"] == boot.trim()
-            && v["unit"] == UNIT
+            && v["unit"] == PROFILE.unit
             && v["invocation_id"] == iid
-            && v["epoch"] == 166
+            && v["epoch"] == PROFILE.epoch
             && v["source_directory"] == json!(h.directory)
             && v["transaction_id"] == h.transaction_id
             && v["terminal_sha256"] == h.terminal_sha256
@@ -391,14 +442,15 @@ fn admit(
     Ok(floor)
 }
 fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
-    let qpath = rt(QUAL);
-    let q = document(&qpath, QUAL_SHA, false)?;
-    let bindings = document(&rt(BOUNDARIES), INPUT_SHA, false)?;
-    let b = &bindings["166"];
+    let qpath = rt(PROFILE.reader);
+    let q = document(&qpath, PROFILE.reader_sha, false)?;
+    let bindings = document(&rt(PROFILE.boundaries), PROFILE.boundaries_sha, false)?;
+    let key = PROFILE.epoch.to_string();
+    let b = &bindings[&key];
     let e = bound(b)?;
     ensure!(
         e["schema"] == "horizon-current-reader-epoch-expectation-v1"
-            && e["epoch"] == 166
+            && e["epoch"] == PROFILE.epoch
             && q["source_artifact_correspondence_accepted"] == true
             && q["full_and_plugin_capabilities_accepted"] == true,
         "reader proof or independent epoch expectation mismatch"
@@ -433,12 +485,12 @@ fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
         "reader_commit": q["reader_commit"],
         "full_verifier": q["full_verifier"],
         "pipeline": q["pipeline"],
-        "qualification": {"path": qpath, "sha256": QUAL_SHA},
+        "qualification": {"path": qpath, "sha256": PROFILE.reader_sha},
         "scratch_directory": scratch,
         "threads": 1,
         "maximum_archive_bytes": len,
         "minimum_free_bytes": floor,
-        "epoch_expectations": {"166": b},
+        "epoch_expectations": {(key): b},
     });
     let data = serde_json::to_vec_pretty(&plan)?;
     let path = a.run.join("current-reader-plan.json");
@@ -458,7 +510,7 @@ fn arguments(source: &Path, run: &Path, plan: &Path, sha: &str) -> Vec<std::ffi:
         "sync".into(),
         source.as_os_str().to_owned(),
         "--epochs".into(),
-        "166-166".into(),
+        format!("{0}-{0}", PROFILE.epoch).into(),
         "--receipt-directory".into(),
         run.join("receipts").into_os_string(),
         "--current-reader-plan".into(),
@@ -489,14 +541,15 @@ fn main() -> Result<()> {
     #[cfg(not(publisher_fixture))]
     let a = {
         ensure!(
-            fs::read_to_string("/proc/self/cgroup")?.trim() == format!("0::/system.slice/{UNIT}"),
+            fs::read_to_string("/proc/self/cgroup")?.trim()
+                == format!("0::/system.slice/{}", PROFILE.unit),
             "wrong publication owner"
         );
         Authority {
-            root: rt("epoch166-terminal-20261121-v1"),
-            live_sha: LIVE_SHA.into(),
-            lock: (64512, 93717107),
-            run: rt("epoch166-committed-delivery-20261121-v1").join(format!("run-{iid}")),
+            root: rt(PROFILE.terminal),
+            live_sha: PROFILE.live_sha.into(),
+            lock: PROFILE.lock,
+            run: rt(PROFILE.delivery).join(format!("run-{iid}")),
         }
     };
     #[cfg(publisher_fixture)]
@@ -539,7 +592,7 @@ fn main() -> Result<()> {
     if mode == "prepare" {
         println!(
             "{}",
-            json!({"epoch":166,"archive_bytes":len,"transaction":h.transaction_id,"source":source,"plan":plan,"plan_sha256":digest,"uploader":exe,"arguments":argv.iter().map(|x|x.to_string_lossy()).collect::<Vec<_>>(),"r2_mutations":false})
+            json!({"epoch":PROFILE.epoch,"archive_bytes":len,"transaction":h.transaction_id,"source":source,"plan":plan,"plan_sha256":digest,"uploader":exe,"arguments":argv.iter().map(|x|x.to_string_lossy()).collect::<Vec<_>>(),"r2_mutations":false})
         );
         return Ok(());
     }

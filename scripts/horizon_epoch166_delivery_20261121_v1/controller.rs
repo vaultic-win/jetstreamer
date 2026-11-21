@@ -16,15 +16,48 @@ use std::{
 };
 
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-const DELIVERY: &str = "epoch166-committed-delivery-20261121-v1";
-const WITNESS: &str = "epoch166-terminal-20261121-v1";
-const UNIT: &str = "horizon-publish-166-committed.service";
-const ORIGIN: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
-const GENERATION: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
-const LIVE: &str = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
-const RECEIVER: &str = "55fdf7dd39661229fce3559428217d295e7644af5624039a592b14191c8d6f86";
+#[cfg(not(feature = "retry10"))]
+mod deployment {
+    pub(super) const DELIVERY: &str = "epoch166-committed-delivery-20261121-v1";
+    pub(super) const WITNESS: &str = "epoch166-terminal-20261121-v1";
+    pub(super) const UNIT: &str = "horizon-publish-166-committed.service";
+    pub(super) const ORIGIN: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
+    pub(super) const GENERATION: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
+    pub(super) const LIVE: &str =
+        "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
+    pub(super) const RECEIVER: &str =
+        "55fdf7dd39661229fce3559428217d295e7644af5624039a592b14191c8d6f86";
+    pub(super) const PUBLISHER: &str =
+        "b734b3cc25696ea6329cf3c9fad9730f1ee789d402602826d5e206298c2c4422";
+    pub(super) const FLEET_FIELD: &str = "terminal166_local_commit";
+    pub(super) const FIT_PATH: &str =
+        "epoch166-publication-capacity-20261121-v1/tools/publication-fit";
+    pub(super) const RECEIVER_PATH: &str = "epoch166-receiver-20261121-v1/receiver-v1/receiver.py";
+    pub(super) const PUBLISHER_PATH: &str = "publisher-v1/publisher";
+}
+
+#[cfg(feature = "retry10")]
+#[path = "../horizon_epoch166_retry10_delivery_20261121_v1/generation.rs"]
+mod generation;
+#[cfg(feature = "retry10")]
+mod deployment {
+    pub(super) const DELIVERY: &str = "epoch166-retry10-delivery-20261121-v1";
+    pub(super) const WITNESS: &str = super::generation::TERMINAL_ROOT;
+    pub(super) const UNIT: &str = "horizon-publish-166-retry10-committed.service";
+    pub(super) const ORIGIN: &str = super::generation::PRODUCER_UNIT;
+    pub(super) const GENERATION: &str = super::generation::PRODUCER_IID;
+    pub(super) const LIVE: &str = super::generation::LIVE_SHA;
+    pub(super) const RECEIVER: &str = env!("HORIZON_HELD_RECEIVER_SHA256");
+    pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
+    pub(super) const FLEET_FIELD: &str = "recovered166_local_commit";
+    pub(super) const FIT_PATH: &str =
+        "epoch166-retry10-delivery-20261121-v1/capacity-tools/publication-fit";
+    pub(super) const RECEIVER_PATH: &str =
+        "epoch166-retry10-delivery-20261121-v1/publisher-tools/receive.py";
+    pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
+}
+use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
-const PUBLISHER: &str = "b734b3cc25696ea6329cf3c9fad9730f1ee789d402602826d5e206298c2c4422";
 const MEMORY: u64 = 2 << 30;
 
 fn sha(bytes: &[u8]) -> String {
@@ -301,16 +334,16 @@ fn main() -> Result<()> {
     ensure!(
         fleet_ref["sha256"] == *fleet_sha
             && fleet["owner"] == "/root"
-            && fleet["terminal166_local_commit"] == term_ref,
+            && fleet[FLEET_FIELD] == term_ref,
         "fleet has not adopted the original terminal"
     );
-    let provider = rt.join("epoch166-publication-capacity-20261121-v1/tools/publication-fit");
+    let provider = rt.join(FIT_PATH);
     program(&provider, fit_sha)?;
     let receiver_dir = rt.join("epoch166-receiver-20261121-v1/receiver-v1");
-    let receiver = receiver_dir.join("receiver.py");
+    let receiver = rt.join(RECEIVER_PATH);
     let native = receiver_dir.join("native");
     let base = rt.join(DELIVERY);
-    let publisher = base.join("publisher-v1/publisher");
+    let publisher = base.join(PUBLISHER_PATH);
     program(&receiver, RECEIVER)?;
     program(&native, NATIVE)?;
     program(&publisher, PUBLISHER)?;
