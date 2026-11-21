@@ -79,7 +79,23 @@ fn directory(pid: u32) -> Result<()> {
         match fs::symlink_metadata(view.join(name)) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
             Err(e) => return Err(e.into()),
-            Ok(_) => anyhow::bail!("new local canonical reader input requires independent review"),
+            Ok(m) => {
+                ensure!(
+                    m.is_file() && m.nlink() == 1 && (m.dev(), m.ino()) != (64512, 100794422),
+                    "canonical reader aliases old body"
+                );
+                if name.ends_with(".sha256") {
+                    ensure!(m.len() < 1024, "unexpected canonical sidecar size");
+                    let bytes = fs::read(view.join(name))?;
+                    ensure!(
+                        std::str::from_utf8(&bytes)?.split_whitespace().next()
+                            == Some(crate::CANONICAL_SHA),
+                        "canonical ready sidecar digest differs"
+                    );
+                } else {
+                    ensure!(m.len() == 83_405_061_082, "canonical body length differs");
+                }
+            }
         }
     }
     Ok(())

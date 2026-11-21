@@ -161,6 +161,51 @@ fn classifying(d: &BTreeMap<String, String>) -> bool {
     d.values()
         .any(|v| v.contains("jetstreamer") || v.contains("horizon") || v.contains("epoch-130"))
 }
+fn credential_names(d: &BTreeMap<String, String>) -> Result<()> {
+    for line in d
+        .get("EnvironmentFiles")
+        .map(String::as_str)
+        .unwrap_or("")
+        .lines()
+        .filter(|l| !l.is_empty())
+    {
+        let path = line
+            .strip_suffix(" (ignore_errors=no)")
+            .context("unreviewed optional environment-file argument")?;
+        let audit = match path {
+            "/etc/jetstreamer/horizon-r2.env" => false,
+            "/var/lib/jetstreamer/r2-chronological-plugin-audit-deployment-20261118-v1/credentials.env" => {
+                true
+            }
+            _ => anyhow::bail!("unreviewed mission environment file"),
+        };
+        let bytes = crate::raw(Path::new(path), 64 << 10, true)?;
+        let mut keys = BTreeSet::new();
+        for statement in std::str::from_utf8(&bytes)?
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        {
+            let (key, _) = statement
+                .split_once('=')
+                .context("unexpected environment statement")?;
+            ensure!(keys.insert(key), "duplicate environment selector");
+        }
+        let mut approved = BTreeSet::from([
+            "HORIZON_ACCESS_KEY_ID",
+            "HORIZON_S3_ENDPOINT",
+            "HORIZON_SECRET_ACCESS_KEY",
+        ]);
+        if audit {
+            approved.insert("SSH_AUTH_SOCK");
+        }
+        ensure!(
+            keys == approved,
+            "preexisting credential file gained a noncredential selector"
+        );
+    }
+    Ok(())
+}
 fn inputs(d: &BTreeMap<String, String>) -> Result<BTreeMap<String, Value>> {
     let mut found = BTreeMap::new();
     for (k, v) in d {
@@ -265,6 +310,7 @@ pub(super) fn snapshot() -> Result<Value> {
                 !d.values().any(|v| cold(v.as_bytes())),
                 "unresolved reachable historical reader unit: {id}"
             );
+            credential_names(&d)?;
             let bound = inputs(&d)?;
             routes.insert(
                 format!("{}:{id}", if user { "user" } else { "system" }),
@@ -274,6 +320,94 @@ pub(super) fn snapshot() -> Result<Value> {
     }
     Ok(json!(routes))
 }
+fn cadence_config(value: &Value) -> Result<(String, String, Value)> {
+    let mut copy = value.clone();
+    let map = copy.as_object_mut().context("observer input")?;
+    let utc = map.remove("not_before_utc").context("observer timestamp")?;
+    let utc = utc.as_str().context("observer timestamp type")?;
+    ensure!(
+        utc.len() == 20 && utc.starts_with("2026-11-21T") && utc.ends_with('Z'),
+        "observer date differs"
+    );
+    let output = map.remove("output").context("observer output")?;
+    let previous = map
+        .remove("previous_sample")
+        .context("observer predecessor")?;
+    fn stamp(v: &Value) -> Result<String> {
+        let x = v
+            .as_str()
+            .context("observer path")?
+            .strip_prefix("/var/lib/jetstreamer/horizon_runtime_data/sample-root")
+            .and_then(|t| t.strip_suffix("-live166167170-20261121-v1.json"))
+            .context("unknown observer input/output family")?;
+        ensure!(
+            x.len() == 6 && x.bytes().all(|b| b.is_ascii_digit()),
+            "observer time token"
+        );
+        Ok(x.into())
+    }
+    let out = stamp(&output)?;
+    let prev = stamp(&previous)?;
+    ensure!(
+        out == utc[11..19].replace(':', "") && prev < out,
+        "observer predecessor or timestamp differs"
+    );
+    Ok((out, prev, copy))
+}
+fn cadence(unit: &str, route: &Value, template: &Value) -> Result<bool> {
+    let Some(id) = unit.strip_prefix("system:horizon-observer-root") else {
+        return Ok(false);
+    };
+    let Some(now) = id.strip_suffix("-live166167170-20261121-v1.service") else {
+        return Ok(false);
+    };
+    ensure!(
+        now.len() == 6 && now.bytes().all(|b| b.is_ascii_digit()),
+        "unrecognized future observer"
+    );
+    let props = &route["properties"];
+    let exec = s(props, "ExecStart")?
+        .split_whitespace()
+        .collect::<Vec<_>>();
+    let elf = "/usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe";
+    ensure!(
+        exec.len() == 2 && exec[0] == elf && route["inputs"][elf] == template["executable"],
+        "future observer executable changed"
+    );
+    let config = Path::new(exec[1]);
+    let bytes = crate::raw(config, 2 << 20, true)?;
+    let (actual, prev, stable) = cadence_config(&serde_json::from_slice(&bytes)?)?;
+    let actual_id = format!("horizon-observer-root{now}-live166167170-20261121-v1.service");
+    ensure!(
+        actual == now
+            && stable == template["config"]
+            && exec[1]
+                == format!(
+                    "/var/lib/jetstreamer/horizon_runtime_data/root{prev}-live166167170-20261121-v1/sealed-next/observer.json"
+                ),
+        "observer has new activity scope"
+    );
+    let fragment = format!("/run/systemd/transient/{actual_id}");
+    let unit_bytes = crate::raw(Path::new(&fragment), 1 << 16, true)?;
+    let normalized = std::str::from_utf8(&unit_bytes)?.replace(exec[1], "<OBSERVER_PLAN>");
+    let mut props = props.clone();
+    let map = props
+        .as_object_mut()
+        .context("effective observer properties")?;
+    ensure!(
+        map.remove("Id") == Some(json!(actual_id))
+            && map.remove("FragmentPath") == Some(json!(fragment)),
+        "observer fragment or ID differs"
+    );
+    map.remove("ExecStart");
+    ensure!(
+        props == template["properties"]
+            && sha(normalized.as_bytes()) == template["normalized_fragment_sha256"]
+            && route["inputs"].as_object().is_some_and(|m| m.len() == 3),
+        "observer lifecycle or staged inputs changed"
+    );
+    Ok(true)
+}
 pub(super) fn reviewed(binding: &Value) -> Result<()> {
     let plan = crate::bound_with_limit(binding, 4 << 20, true)?;
     ensure!(
@@ -282,13 +416,40 @@ pub(super) fn reviewed(binding: &Value) -> Result<()> {
             && plan["sha256"] == SHA,
         "unbound prospective reader inventory"
     );
+    let libs = plan["reviewed_transitive_inputs"]
+        .as_array()
+        .context("missing actual routed library/control inputs")?;
+    ensure!(!libs.is_empty(), "empty dependency closure");
+    for entry in libs {
+        let p = Path::new(s(entry, "path")?);
+        ensure!(
+            p.is_absolute() && p.canonicalize()? == p,
+            "indirect path changed"
+        );
+        let before = fs::metadata(p)?;
+        ensure!(
+            before.is_file()
+                && before.len() <= 4 << 20
+                && crate::ident(&before) == entry["identity"],
+            "indirect reader identity differs: {}",
+            p.display()
+        );
+        let bytes = fs::read(p)?;
+        ensure!(
+            sha(&bytes) == entry["sha256"]
+                && crate::ident(&fs::metadata(p)?) == entry["identity"]
+                && !cold(&bytes),
+            "indirect source selection changed: {}",
+            p.display()
+        );
+    }
     let current = snapshot()?;
     let approved = plan["reviewed_routes"]
         .as_object()
         .context("independently reviewed route set")?;
     for (unit, route) in current.as_object().context("sampled route set")? {
         ensure!(
-            approved.get(unit) == Some(route),
+            approved.get(unit) == Some(route) || cadence(unit, route, &plan["cadence_template"])?,
             "new or changed reachable actor requires inspection: {unit}"
         );
     }
@@ -297,6 +458,18 @@ pub(super) fn reviewed(binding: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cadence_time_substitution_preserves_original_paths_and_scope() {
+        let good = json!({"not_before_utc":"2026-11-21T03:49:59Z","output":"/var/lib/jetstreamer/horizon_runtime_data/sample-root034959-live166167170-20261121-v1.json","previous_sample":"/var/lib/jetstreamer/horizon_runtime_data/sample-root031959-live166167170-20261121-v1.json","replays":["166"]});
+        let (_, _, stable) = cadence_config(&good).unwrap();
+        assert_eq!(stable, json!({"replays":["166"]}));
+        let mut bad = good.clone();
+        bad["output"] = json!(crate::SOURCE);
+        assert!(cadence_config(&bad).is_err());
+        bad = good;
+        bad["previous_sample"] = bad["output"].clone();
+        assert!(cadence_config(&bad).is_err());
+    }
     #[test]
     fn native_lifecycle_digest_ignores_runtime_timestamps_but_not_arguments() {
         let a=selected_fields("Id=x.service\nExecStart={ path=/bin/a ; argv[]=/bin/a /first ; ignore_errors=no ; start_time=now }").unwrap();
