@@ -32,7 +32,7 @@ mod pinned;
 pub use pinned::PinnedArchives;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, BufReader, ReadBuf};
 
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::{Mutex, OnceCell, Semaphore};
 
 use jetstreamer_horizon::account_updates::AccountUpdateView;
 use jetstreamer_horizon::archive::{
@@ -248,12 +248,31 @@ where
     let client = horizon_client(&src)?;
     let cache = Mutex::new(HashMap::<u64, Weak<OnceCell<EpochLayout>>>::new());
     let observed = HttpIdentities::default();
+    let resident_limit = match &src {
+        JetSource::HttpPinned(pins) => pins.max_active_partitions,
+        _ => None,
+    };
+    let permits = resident_limit
+        .filter(|limit| limit.get() < threads)
+        .map(|limit| Semaphore::new(limit.get().min(Semaphore::MAX_PERMITS)));
     let tasks = ranges.into_iter().enumerate().map(|(id, range)| {
         log::debug!(target: "jetstreamer_horizon_range",
             "horizon_worker id={id} first_slot={} end_slot_exclusive={}", range.start, range.end);
-        let mut visitor = make_visitor(id);
         let (src, client, cache, observed) = (&src, &client, &cache, &observed);
+        let (permits, make_visitor) = (&permits, &make_visitor);
         async move {
+            // Acquire before opening the archive or allocating decoder buffers.
+            // try_join_all still returns visitors in partition order.
+            let _permit = match permits {
+                Some(permits) => Some(
+                    permits
+                        .acquire()
+                        .await
+                        .expect("partition limit remains open"),
+                ),
+                None => None,
+            };
+            let mut visitor = make_visitor(id);
             let mut start = range.start;
             while start < range.end {
                 let epoch = slot_to_epoch(start);

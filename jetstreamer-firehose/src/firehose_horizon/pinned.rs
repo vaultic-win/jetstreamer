@@ -2,6 +2,7 @@
 use std::{
     collections::BTreeMap,
     io,
+    num::NonZeroUsize,
     ops::Range,
     path::Path,
     sync::{Arc, Mutex},
@@ -264,6 +265,7 @@ pub struct PinnedArchives {
     objects: Arc<BTreeMap<u64, Object>>,
     budget: Arc<RequestBudget>,
     read_ahead: usize,
+    pub(super) max_active_partitions: Option<NonZeroUsize>,
 }
 
 impl PinnedArchives {
@@ -307,7 +309,15 @@ impl PinnedArchives {
             objects: Arc::new(objects),
             budget: Arc::new(RequestBudget::new()),
             read_ahead: MAX_READ,
+            max_active_partitions: None,
         })
+    }
+
+    /// Limits simultaneously resident slot-range partitions, preserving each
+    /// partition's worker ID, slot boundaries and verification digest.
+    pub fn with_max_active_partitions(mut self, limit: NonZeroUsize) -> Self {
+        self.max_active_partitions = Some(limit);
+        self
     }
 
     pub(super) fn set_worker_count(&mut self, workers: usize) {

@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
-//!     [--threads N] [--slot-ranges] [--clickhouse-dsn URL] [--bench|--verify-only]
+//!     [--threads N] [--slot-ranges] [--max-active-partitions N] [--clickhouse-dsn URL] [--bench|--verify-only]
 //! ```
 //!
 //! `<jet-dir-or-base-url>` is a local directory of `epoch-<N>.jet` files, or
@@ -58,7 +58,7 @@ fn usage() -> ! {
     eprintln!(
         "usage: horizon-pipeline --archive-capacity-probe\n\
          or: horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
-         [--threads N] [--slot-ranges] [--clickhouse-dsn URL] [--bench|--verify-only] \
+         [--threads N] [--slot-ranges] [--max-active-partitions N] [--clickhouse-dsn URL] [--bench|--verify-only] \
          [--no-account-bytes|--no-account-updates] [--no-preload] [--archive-inventory PATH] [--verification-report PATH | --verification-report-dir DIR]\n\
          --verify-only runs the read-only Horizon verification plugin over \
          every decoded record and account-data byte; it does not start or \
@@ -76,6 +76,7 @@ fn usage() -> ! {
          file would fit in RAM (metadata-only benches preload by default \
          and measure pure decode)\n\
          --slot-ranges partitions the complete range across workers; emits overall TPS every 30 seconds\n\
+         --max-active-partitions limits simultaneous decoding in pinned slot-range runs; partition boundaries and worker IDs are preserved\n\
          --threads overrides JETSTREAMER_THREADS, otherwise defaults by declared plugin consumption: cores + 1/8 \
          when no plugin consumes account-update data (CPU-bound decode), \
          cores/2 when one does (memory-bandwidth-bound); preload likewise \
@@ -397,6 +398,7 @@ async fn main() {
     }
     let location = args.next().unwrap_or_else(|| usage());
     let mut threads_override: Option<usize> = None;
+    let mut max_active_partitions: Option<std::num::NonZeroUsize> = None;
     let mut dsn =
         std::env::var("JETSTREAMER_CLICKHOUSE_DSN").unwrap_or_else(|_| DEFAULT_DSN.to_string());
     let mut slot_ranges = false;
@@ -414,6 +416,13 @@ async fn main() {
                 threads_override = Some(
                     args.next()
                         .and_then(|v| v.parse().ok())
+                        .unwrap_or_else(|| usage()),
+                );
+            }
+            "--max-active-partitions" => {
+                max_active_partitions = Some(
+                    args.next()
+                        .and_then(|value| value.parse().ok())
                         .unwrap_or_else(|| usage()),
                 );
             }
@@ -441,6 +450,10 @@ async fn main() {
             "--no-preload" => no_preload = true,
             _ => usage(),
         }
+    }
+    if max_active_partitions.is_some() && !(slot_ranges && archive_inventory.is_some()) {
+        eprintln!("--max-active-partitions requires --slot-ranges and --archive-inventory");
+        usage();
     }
     if no_account_updates && !bench {
         eprintln!("--no-account-updates only applies to --bench");
@@ -506,12 +519,14 @@ async fn main() {
         if !(verify_only || bench) || !path.is_absolute() {
             usage();
         }
-        JetSource::HttpPinned(
-            PinnedArchives::load(&location, path).unwrap_or_else(|error| {
-                eprintln!("error: invalid archive inventory: {error}");
-                std::process::exit(1);
-            }),
-        )
+        let mut pins = PinnedArchives::load(&location, path).unwrap_or_else(|error| {
+            eprintln!("error: invalid archive inventory: {error}");
+            std::process::exit(1);
+        });
+        if let Some(limit) = max_active_partitions {
+            pins = pins.with_max_active_partitions(limit);
+        }
+        JetSource::HttpPinned(pins)
     } else if location.starts_with("http://") || location.starts_with("https://") {
         JetSource::http(&location).unwrap_or_else(|err| {
             eprintln!("error: {err}");
