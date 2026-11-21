@@ -108,7 +108,8 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
             cursor=ancestor
     same_window = mode == 'current' and matched
     day, tag = utc(stamp).strftime('%Y%m%d %H%M%S').split()
-    closed_window = utc(stamp)+dt.timedelta(seconds=1800) <= dt.datetime.now(dt.timezone.utc)
+    actual_slot=head['sampled_at_utc'] if mode=='current' else stamp
+    closed_window = utc(actual_slot)+dt.timedelta(seconds=1800) <= dt.datetime.now(dt.timezone.utc)
     cadence, controller_hash = (CADENCE, SEAL) if closed_window else active_controller()
     terminal = ROOT/'epoch145-guarded-export-20261121-v1/state/d37f36f898a44932a19fd50d7014a6fe/failed.json'
     first_successor=successor

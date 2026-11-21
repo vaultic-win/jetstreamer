@@ -21,14 +21,40 @@ def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_e
         return checked(ref)
 
     native = receipt('native_capacity', fit_path, fit_hash)
+    if native.get('schema')=='horizon-145-nine-phase-native-qualification-v1':
+        installed=ROOT/'incident-replay-fit-20261121-v1/tools-v15'
+        assert fit_path==installed/'qualification.json' and fit_hash=='45a6b4627bba3fc9b242d9c7030fc9c817f49466932a9fb067f24ed1bf5a800e'
+        seal=receipt('price_provider',installed/'deployment-seal-receipt.json','7f887c933698d424cd69244dede860f62cea2759a83f9edacc96f09c60c75eb6')
+        assert any(m['name']=='qualification.json' and m['sha256']==fit_hash for m in seal['members'])
+        assert len(native['registrations'])==9 and native['refused_crossed_modes']==13 and native['resource_credit_bytes']==0
+        native=native['fit']
     passive = receipt('standby', RECOVERY/'transition-state/V2_PASSIVE_CHECKPOINT_ACTIVE.json',
                       '5f5ab81a97a5c12f42ebeb5ec0a1f80e79efad63396f7814294eeb3b837d0af7')
+    budget_path = RECOVERY / 'phase-transition-v2/transition_budget.py'
+    active=RECOVERY/'transition-state/V3_PASSIVE_CHECKPOINT_ACTIVE.json'
+    if active.exists():
+        refs['standby']=bound(active)
+        passive=checked(refs['standby'])
+        assert passive['package']==bound(RECOVERY/'phase-transition-v3/deployment-seal-receipt.json') and passive['package']['sha256']=='c7a2e2d183a3213ad1bec65ac883946f7a4bd558f0da10d2363af3693eb19fb2'
+        assert passive['registry']==bound(RECOVERY/'phase-registry-v3/deployment-seal-receipt.json') and passive['registry']['sha256']=='6da2d82061418df532885105835ca96e9f2a1672952d6bc8d39b12bf52e7880e'
+        switch=checked(passive['before'])
+        assert switch['successor']==passive['package'] and switch['original']==bound(RECOVERY/'phase-transition-v2/deployment-seal-receipt.json')
+        assert all(r['InvocationID']==switch['before'][k]['InvocationID'] and r['SubState']=='waiting' for k,r in passive['registered_paths'].items())
+        assert len(passive['registered_paths'])==6 and passive['resource_credit_bytes']==0 and not passive['replay_started']
+        installed=checked(passive['qual'])
+        assert installed['package']==passive['package'] and installed['registry']==passive['registry']
+        assert installed['actual_provider']['sha256']=='7f887c933698d424cd69244dede860f62cea2759a83f9edacc96f09c60c75eb6'
+        assert installed['native_qa']['refused_crossed_modes']==13 and len(installed['native_qa']['nine_registered_modes'])==9
+        assert checked(passive['standby'])==dict(outcome='awaiting-original-transition',real_transition_evidence=[],replay_started=False)
+        refs['v3_preflight']=passive['qual']
+        budget_path=RECOVERY/'phase-transition-v3/transition_budget.py'
     qual = checked(passive['qual'])['native_qa']
     matrix = checked(qual['focused169_matrix'])['matrix']
     assert matrix['counts']['transfer_combinations'] == 486 and matrix['projection_only']
     assert not passive['physical_transfer_issued'] and not qual['test_grants_installed']
-    refs.update(v2_preflight=passive['qual'], v13_matrix=qual['focused169_matrix'])
-    budget_path = RECOVERY / 'phase-transition-v2/transition_budget.py'
+    refs['v13_matrix']=qual['focused169_matrix']
+    if 'v3_preflight' not in refs:
+        refs['v2_preflight']=passive['qual']
     refs['native_equation'] = bound(budget_path)
     assert refs['native_equation']['sha256'] == '77b65b79097dd62ce8b591f382ccb8a1597d510a211206ca4d2caf301eb9840d'
     budget = runpy.run_path(str(budget_path))
