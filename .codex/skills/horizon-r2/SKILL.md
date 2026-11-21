@@ -1590,9 +1590,11 @@ Do not use `--legacy-etag-only` unless the user has explicitly established that 
   mount and kernel-limit checks. Apply the transport to both preflights and the build launch;
   never truncate paths, broaden mounts or infer equivalent semantics for other properties.
 
-- During autonomous campaign work, use question cards only for an actual unresolved question.
-  Never use them for acknowledgements, keepalives, withdrawn questions or routine confirmations.
-  Continue already authorized work and use the established progress-update cadence.
+- Direct assignments, task paths and evidence pointers to the intended agent through the
+  collaboration tools or a shared handoff file. Use ordinary chat for routine user updates.
+  Question cards and asynchronous user messages trigger push notifications. Reserve those
+  tools for a material issue requiring the user's attention. Continue already authorized work
+  at the established cadence.
 - Do not give a systemd unit running `jetstreamer-r2` a task ceiling that is
   exhausted by Tokio's core runtime threads. `retire-local` performs its archive
   proof in `spawn_blocking`; if `TasksMax` is no larger than the runtime worker
