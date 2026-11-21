@@ -29,7 +29,12 @@ def trials(full, publication, measured, fleet):
         terminal, tr = read("authority/TERMINAL_SUCCESS.json")
         live, lr = read("authority/LIVE.json")
         batch, br = read("native-batch.json")
-        result, _ = read("RESULT.json")
+        result, rr = read("RESULT.json")
+        qualified=json.loads(Path(row["path"]).read_bytes())
+        claim=result["receiver"]["source"]
+        assert qualified["fixture_checks"]["publisher"]==rr and claim["epoch"]==epoch and claim["terminal_sha256"]==tr["sha256"]
+        assert claim["sha256"]==terminal["local_archive"]["sha256"] and claim["receipt_sha256"]==terminal["committed_receipt"]["sha256"]
+        assert claim["transaction_id"]==terminal["transaction_id"]
         assert result["native_batch"] == br and batch["epochs"] == [epoch] and result["receiver"]["canonical_writes"] == 0
         if epoch in (167, 170):
             guard = peers["authority"](epoch).guard
