@@ -22,8 +22,8 @@ TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for
 PACKAGES={166:D/"capacity-tools-v5",168:FULL168/"capacity-tools-v4",172:TERMINALS[172]/"capacity-tools-v2",
           **{e:TERMINALS[e]/"capacity-tools-v3" for e in (167,170)}}
 PAID145_PACKAGES={epoch:old.with_name("capacity-tools-paid145") for epoch,old in PACKAGES.items()}
-PAID145_PROVIDER=R/"incident-replay-fit-20261121-v1/tools-v14/post-stop-fit"
-PAID145_PROVIDER_SHA="63538fb9ff385f34b9b7b592c6b61b296e649f7eb3a70de017d9edeb0326ad50"
+PAID145_PROVIDER=R/"incident-replay-fit-20261121-v1/tools-v15/post-stop-fit"
+PAID145_PROVIDER_SHA="ef38a9640e35d60d2257d59d0cee5641f3a35df4d76365d336a741cf480490ea"
 CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30,172:288<<30}
 # Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
 PRESTART={166:169028829184,167:177601941504,170:230591926272}
