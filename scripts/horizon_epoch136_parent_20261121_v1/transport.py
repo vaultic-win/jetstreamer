@@ -15,18 +15,21 @@ data = json.load(sys.stdin)
 if action == "head":
     ref = data["fleet"]
     for _ in range(64):
-        fleet, cfg, prior = load_fleet(ref)
+        fleet, cfg, _ = load_fleet(ref)
         paths = names(cfg["not_before_utc"])
         successor = paths["out"] / "ROOT_COMPLETE_OPERATIONAL_FLEET.json"
         if not successor.exists():
             print(json.dumps(dict(fleet=ref, due=cfg["not_before_utc"], timer=paths["timer"],
-                                  sample=str(paths["sample"]), prior_lock=str(Path(prior["receipts"]["136"]["path"]).parent/"cycle.lock"))))
+                                  sample=str(paths["sample"]), next_lock=str(paths["statuses"]/"cycle.lock"))))
             break
         next_ref = bound(successor)
         assert checked(next_ref)["previous_Root_operational_review"] == ref
         ref = next_ref
     else:
         raise ValueError("too many cadence successors")
+elif action == "client":
+    Storage()
+    print("true")
 elif action == "project":
     stamp = data["stamp"]
     result, archive = forecast(SimpleNamespace(stamp=stamp, now=utc(stamp), lanes={}),136,data["old"])

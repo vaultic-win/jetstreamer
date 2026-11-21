@@ -54,6 +54,14 @@ fn verify_bridge() -> Result<()> {
     }
     Ok(())
 }
+pub fn check_registration_environment() -> Result<()> {
+    verify_bridge()?;
+    ensure!(
+        bridge("client", &Value::Null)? == true,
+        "cannot load authenticated status client"
+    );
+    Ok(())
+}
 fn bridge(op: &str, body: &Value) -> Result<Value> {
     bridge_timeout(op, body, 14)
 }
@@ -107,6 +115,15 @@ struct Waiting {
     owner: Value,
 }
 impl Waiting {
+    fn response_deadline(&self) -> Result<u64> {
+        let emitted = self.request["recorded_unix_seconds"]
+            .as_u64()
+            .context("status request time")?;
+        let upper = self.request["handoff_deadline_unix_seconds"]
+            .as_u64()
+            .context("handoff deadline")?;
+        Ok(upper.min(emitted.saturating_add(90)))
+    }
     fn load(x: &Input) -> Result<Self> {
         let request_ref = bound(&receipts().join("parent-status-request.json"))?;
         let request = immutable(&request_ref)?;
@@ -170,9 +187,7 @@ impl Waiting {
             .try_into()?;
         let r = native(ACTOR)?;
         ensure!(
-            self.request["handoff_deadline_unix_seconds"]
-                .as_u64()
-                .is_some_and(|n| n > now())
+            self.response_deadline()? > now()
                 && immutable(&self.request_ref)? == self.request
                 && r["ActiveState"] == "active"
                 && r["SubState"] == "running"
@@ -234,7 +249,7 @@ fn projection(
     f["epoch136_corresponding_status_fleet"] = accepted.clone();
     Ok(f)
 }
-fn event_dir(iid: &str) -> Result<PathBuf> {
+fn status_dir(name: &str) -> Result<PathBuf> {
     use std::os::unix::fs::DirBuilderExt;
     let root = Path::new(STATUS_ROOT);
     let m = fs::symlink_metadata(root)?;
@@ -246,7 +261,7 @@ fn event_dir(iid: &str) -> Result<PathBuf> {
             && m.dev() == fs::metadata(HOME)?.dev(),
         "unexpected campaign status root"
     );
-    let path = root.join(format!("event-136-waiting-{iid}"));
+    let path = root.join(name);
     match fs::DirBuilder::new().mode(0o700).create(&path) {
         Ok(()) => File::open(root)?.sync_all()?,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
@@ -273,10 +288,30 @@ fn head_for(waiting: &Waiting) -> Result<(Value, Value)> {
     quiet(&head)?;
     Ok((head, latest))
 }
+fn next_cycle_lock(head: &Value) -> Result<File> {
+    let p = Path::new(text(&head["next_lock"])?);
+    let dir = p.parent().context("next cycle directory")?;
+    let name = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .context("next cycle name")?;
+    ensure!(
+        dir.parent() == Some(Path::new(STATUS_ROOT))
+            && p.file_name().is_some_and(|n| n == "cycle.lock")
+            && name.starts_with("cycle")
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'),
+        "unexpected upcoming status lock"
+    );
+    status_dir(name)?;
+    take_lock(p, true)
+}
 pub fn register(x: &Input) -> Result<()> {
     verify_bridge()?;
     let w = Waiting::load(x)?;
-    let dir = event_dir(require_iid(&w.owner["invocation_id"])?)?;
+    let dir = status_dir(&format!(
+        "event-136-waiting-{}",
+        require_iid(&w.owner["invocation_id"])?
+    ))?;
     let _event = take_lock(&dir.join("writer.lock"), true)?;
     let intent_file = dir.join("INTENT.json");
     let receipt_file = dir.join("RECEIPT.json");
@@ -295,7 +330,8 @@ pub fn register(x: &Input) -> Result<()> {
     }
     w.current(x)?;
     let (head, latest) = head_for(&w)?;
-    let _cycle = take_lock(Path::new(text(&head["prior_lock"])?), false)?;
+    let cycle = next_cycle_lock(&head)?;
+    quiet(&head)?;
     let oldref = &latest["effective_status_receipts"]["136"];
     if !receipt_file.try_exists()? {
         if !intent_file.try_exists()? {
@@ -352,11 +388,9 @@ pub fn register(x: &Input) -> Result<()> {
             "intent belongs to another waiting owner or fleet"
         );
         if same_remote(&remote, &i["before_etag"], &i["before_sha256"])? {
-            let due = quiet(&head)?;
             w.current(x)?;
-            let expiry = w.request["handoff_deadline_unix_seconds"]
-                .as_u64()
-                .context("waiting deadline")?;
+            let due = quiet(&head)?;
+            let expiry = w.response_deadline()?;
             // Bound PUT and GET to the actual remaining session/cadence interval.
             let seconds = due.min(expiry).saturating_sub(now()) / 3;
             ensure!(
@@ -385,6 +419,7 @@ pub fn register(x: &Input) -> Result<()> {
         }
         finish_receipt(&dir, &i, &remote)?;
     }
+    drop(cycle);
     let proof = bound(&receipt_file)?;
     let evt = immutable(&proof)?;
     remote = bridge("get", &json!(null))?;

@@ -1,5 +1,6 @@
 //! The parent owns the admitted actor's systemd envelope and conditional status publication.
 mod actor;
+mod dispatch;
 mod status;
 // Reuse the campaign's no-follow, root-custody reads, exclusive fsynced receipt writes and native clock helpers.
 #[allow(dead_code)]
@@ -319,6 +320,13 @@ fn shape(full: &Value, payload: &Value, r: &Value, a: &Value, wp: &Value) -> Res
 }
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "dispatch") {
+        ensure!(
+            args.len() == 6 && unsafe { libc::geteuid() } == 0,
+            "parent136 dispatch WRITER_IID WRITER_PLAN SHA CONTROLLER_SEAL SHA"
+        );
+        return dispatch::run(&args[1], &args[2..]);
+    }
     if args.first().is_some_and(|a| a == "prepare-inputs") {
         ensure!(
             args.len() == 3 && unsafe { libc::geteuid() } == 0,

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import sys
+import subprocess
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,7 +22,7 @@ assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdige
 sys.path.insert(0,str(pkg))
 import status
 from cycle import load_fleet
-from evidence import bound, checked, durable, utc
+from evidence import bound, checked, durable, lock, names, utc
 
 f, cfg, cohort = load_fleet({"path":str(a.fleet),"sha256":a.digest})
 assert f["active_producer_count"] == 6 and f["all_active_status_reports_authenticated_readback"]
@@ -53,6 +54,19 @@ candidate={"epoch":136,"key":"epoch-136.epoch-status.json","previous_receipt":ol
 
 with tempfile.TemporaryDirectory(dir=a.fixture_parent) as temp:
     root=Path(temp)
+    head = json.loads(subprocess.check_output([sys.executable,"-IB",str(Path(__file__).with_name("transport.py")),"head"],
+                          input=json.dumps({"fleet":{"path":str(a.fleet),"sha256":a.digest}}).encode(),timeout=25))
+    upcoming = names(head["due"])
+    assert head["next_lock"] == str(upcoming["statuses"]/"cycle.lock") and head["timer"]==upcoming["timer"]
+    assert Path(head["next_lock"]).parent != Path(oldref["path"]).parent
+    lock_path=root/"cycle.lock"
+    fd=lock(lock_path)
+    try:
+        try:lock(lock_path)
+        except BlockingIOError:pass
+        else:raise AssertionError("two concurrent cycle writers")
+    finally:os.close(fd)
+    os.close(lock(lock_path))
     def fixture(name,document):
         folder=root/name
         folder.mkdir(mode=0o700)
@@ -77,4 +91,4 @@ with tempfile.TemporaryDirectory(dir=a.fixture_parent) as temp:
             try:status.follow_event(136,oldref,tag,status.body(after))
             except ValueError:pass
             else:raise AssertionError("unbound "+key)
-print(json.dumps({"source_fleet":a.digest,"actual_prior_status":oldref,"forecast_age_ms":17000,"six_dashboard_fields_preserved":True,"positive_simulated_event_followed":True,"malformed_event_denials":5,"preserved_initial_fleet_fields":preserved,"no_r2_client":True,"no_actor":True}))
+print(json.dumps({"source_fleet":a.digest,"actual_prior_status":oldref,"forecast_age_ms":17000,"six_dashboard_fields_preserved":True,"positive_simulated_event_followed":True,"malformed_event_denials":5,"preserved_initial_fleet_fields":preserved,"actual_next_cadence_lock":head["next_lock"],"simulated_cadence_lock_contention":True,"no_r2_client":True,"no_actor":True}))
