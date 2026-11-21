@@ -3,6 +3,10 @@ use super::*;
 use crate::Plan;
 
 const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
+#[cfg(feature = "epoch170-384")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1/tools/guard";
+#[cfg(not(feature = "epoch170-384"))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
 const HOME: &str = "/home/sol/.jetstreamer-private";
@@ -15,6 +19,14 @@ struct Lane {
     cap: u64,
 }
 
+#[cfg(feature = "epoch170-384")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
+    tree: "epoch170-standard-lane-20261109-v1",
+    runtime: "epoch170-retry10-recovery-20261121-v1",
+    cap: 384 << 30,
+}];
+#[cfg(not(feature = "epoch170-384"))]
 const LANES: &[Lane] = &[
     Lane {
         unit: "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -168,6 +180,21 @@ pub(super) fn observe(binding: &Value, scope: &Scope<'_>) -> Result<Observation>
 mod tests {
     use super::*;
 
+    #[cfg(feature = "epoch170-384")]
+    #[test]
+    fn enlarged_cap_is_exclusive_to_the_170_successor() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 384 << 30);
+        assert!(is_route(
+            "horizon-qualify-170-replacement-local3retry10-20261121-v1.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-166-independent-recovery-20261121-v1.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-167-source-index-v1-20261121.service"
+        ));
+    }
     #[test]
     #[ignore = "requires the original root-owned namespace evidence on dev-samjohnson"]
     fn original_namespace_receipts_and_all_precreated_roots() {
