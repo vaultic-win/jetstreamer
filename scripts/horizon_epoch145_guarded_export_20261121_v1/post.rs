@@ -168,6 +168,7 @@ pub(super) fn run_child(
                 Ok(_) => false,
                 Err(e)
                     if e.is::<capacity::GuardInFlight>()
+                        || e.is::<capacity::Reprice>()
                         || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
                 {
                     true

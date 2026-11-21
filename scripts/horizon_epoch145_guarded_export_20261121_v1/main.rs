@@ -255,6 +255,24 @@ fn freeze(pid: u32) -> Result<()> {
 // timeout (or pending fresh disk measurement) after the isolated worker has
 // reached a kernel stop. Never accept a changed topology, resource deficit
 // or any other command failure as an observation.
+fn prove_stopped_child(pid: u32, ticks: u64) -> Result<()> {
+    let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
+    ensure!(
+        native::ticks(pid)? == ticks
+            && status
+                .lines()
+                .any(|line| line.starts_with("State:")
+                    && line.split_whitespace().nth(1) == Some("T"))
+            && status.lines().any(|line| line.starts_with("PPid:")
+                && line
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|p| p.parse::<u32>().ok())
+                    == Some(std::process::id())),
+        "stopped child identity or state changed"
+    );
+    Ok(())
+}
 fn while_stopped(
     pid: u32,
     ticks: u64,
@@ -267,25 +285,22 @@ fn while_stopped(
             deadline.saturating_duration_since(Instant::now()) >= Duration::from_secs(12),
             "stopped worker fresh-census deadline"
         );
-        let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
-        ensure!(
-            native::ticks(pid)? == ticks
-                && status.lines().any(|line| line.starts_with("State:")
-                    && line.split_whitespace().nth(1) == Some("T"))
-                && status.lines().any(|line| line.starts_with("PPid:")
-                    && line
-                        .split_whitespace()
-                        .nth(1)
-                        .and_then(|p| p.parse::<u32>().ok())
-                        == Some(std::process::id())),
-            "stopped child identity or state changed"
-        );
+        prove_stopped_child(pid, ticks)?;
         match observe() {
             Ok(sample) => {
-                ensure!(Instant::now() < deadline, "late stopped-worker observation");
+                ensure!(
+                    cfg!(incident_rejoin145_only) || Instant::now() < deadline,
+                    "late stopped-worker observation"
+                );
+                prove_stopped_child(pid, ticks)?;
                 return Ok(sample);
             }
-            Err(e) if cfg!(continuity145_only) && e.is::<peer_terminal::Pending>() => {
+            Err(e)
+                if (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>())
+                    || (cfg!(incident_rejoin145_only)
+                        && (e.is::<capacity::Reprice>()
+                            || e.is::<capacity::TopologyTimeout>())) =>
+            {
                 eprintln!("epoch145 holding stopped verifier {pid}: {e}");
                 thread::sleep(if cfg!(test) {
                     Duration::from_millis(20)
@@ -294,7 +309,11 @@ fn while_stopped(
                 });
                 deadline = Instant::now() + Duration::from_secs(90);
             }
-            Err(e) if e.is::<capacity::TopologyTimeout>() || e.is::<capacity::GuardInFlight>() => {
+            Err(e)
+                if e.is::<capacity::TopologyTimeout>()
+                    || e.is::<capacity::GuardInFlight>()
+                    || e.is::<capacity::Reprice>() =>
+            {
                 eprintln!("epoch145 waiting with worker {pid} stopped: {e:#}");
                 thread::sleep(Duration::from_secs(1));
             }
@@ -713,6 +732,20 @@ mod tests {
         .unwrap();
         assert_eq!(calls, 2);
         assert_eq!(sample["positive_fit"], true);
+        #[cfg(incident_rejoin145_only)]
+        {
+            let mut attempts = 0;
+            let held = while_stopped(pid, ticks, deadline, || {
+                attempts += 1;
+                if attempts < 3 {
+                    return Err(capacity::Reprice("test HOME 90/100".into()).into());
+                }
+                Ok(json!({"positive_fit":true}))
+            })
+            .unwrap();
+            assert_eq!(attempts, 3);
+            assert_eq!(held["positive_fit"], true);
+        }
         let mut failures = 0;
         assert!(
             while_stopped(pid, ticks, deadline, || {

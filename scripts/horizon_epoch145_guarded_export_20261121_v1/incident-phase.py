@@ -7,12 +7,17 @@ import sys
 
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
-PKG = BASE / "epoch145-semantic-continuity-20261121-v1/tools-v5"
+REJOIN = Path(__file__).resolve().parent.name == "tools-v5b"
+PKG = BASE / "epoch145-semantic-continuity-20261121-v1" / ("tools-v5b" if REJOIN else "tools-v5")
 IMAGE = PKG / "export145"
 STATE = BASE / "epoch145-guarded-export-20261121-v1/state"
 OLD = "add576f115cc4d3b897f47d024af72fd"
 OLD_FAILURE = "33e011228a58df3c2a82ca49013a7d524eeca1e849fc59993effe5d2faf18e74"
 OLD_RECOVERY = "9cdcfdb688ee018b9cddd43c9c5ba129712195e11d6c8172104a7f4a9a160a28"
+if REJOIN:
+    OLD = "5e0e20bc974149f096ea4bab10b15e1b"
+    OLD_FAILURE = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
+    OLD_RECOVERY = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
 HOME = Path("/home/sol/.jetstreamer-private")
 OUTPUT = HOME / "epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN"
 SOURCE = HOME / "epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet"
@@ -62,7 +67,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         s.need(hashlib.file_digest(stream, "sha256").hexdigest() == image_sha, "145 image bytes changed")
     f, failed = s.read(STATE / OLD / "failed.json", OLD_FAILURE)
     _, previous = s.read(STATE / OLD / "recovery-started.json", OLD_RECOVERY)
-    s.need(f["iid"] == OLD and "exit status: 124" in f["error"], "foreign original failure")
+    expected_failure = f["error"] == "stopped worker fresh-census deadline" if REJOIN else "exit status: 124" in f["error"]
+    s.need(f["iid"] == OLD and expected_failure, "foreign original failure")
     state = STATE / generation
     parent = Path(f"/proc/{pid}")
     registered = argv(pid)
@@ -97,7 +103,7 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     started, started_ref = s.read(state / "recovery-started.json")
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
-           and started["prior_frozen_recovery"]["failed_preincident_verifier"]["current_boot_failure"]["failure"] == failed
+           and started["prior_frozen_recovery"]["failed_fresh_census" if REJOIN else "failed_preincident_verifier"]["current_boot_failure"]["failure"] == failed
            and not any((state / n).exists() for n in ("failed.json", "complete.json", "verified-frozen.json")),
            "145 left its native frozen read phase")
     objects = {}

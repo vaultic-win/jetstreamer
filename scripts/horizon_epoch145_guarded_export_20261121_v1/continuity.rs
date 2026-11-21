@@ -82,6 +82,10 @@ pub fn predecessor() -> Result<Value> {
     let previous = {
         let mut evidence = previous;
         evidence["failed_preincident_verifier"] = crate::incident145::predecessor()?;
+        #[cfg(incident_rejoin145_only)]
+        {
+            evidence["failed_fresh_census"] = crate::incident145::failed_census()?;
+        }
         evidence
     };
     Ok(previous)

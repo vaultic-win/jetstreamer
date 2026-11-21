@@ -11,6 +11,9 @@ extra=()
 fixture=(incident145::tests::failed_145_pass_keeps_the_original_leased_objects_and_requires_restart materialized::tests::paid_inode_native_projection)
 case "$flavor" in
 recovery) sources=(incident-phase.py run-incident.sh) ;;
+rejoin) sources=(incident-phase.py run-incident.sh)
+        extra=(--cfg incident_rejoin145_only)
+        ;;
 post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
       extra=(--cfg incident_post145_only)
       fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild)
@@ -25,8 +28,31 @@ test "$(cat "$cg/memory.max")" = '1073741824'
 test "$(cat "$cg/memory.swap.max")" = '0'
 test "$(cat "$cg/pids.max")" = '128'
 test "$(findmnt -n -T "$current" -o SOURCE)" = /dev/loop4
-test "$(df -B1 --output=avail "$current" | tail -1)" -gt 73400320
-mkdir -m0700 "$q" "$out" "$out/tmp"
+if [[ $flavor == rejoin ]]; then
+  # Keep the historical compiler/dependency cache immutable. Pay a new bounded
+  # image on HOME for this generation and retain its exact products for sealing.
+  provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v5/post-stop-fit
+  [[ $(sha256sum "$provider" | cut -d' ' -f1) == c5491d6f0e96c50cbe914db9956f6eff620d99db436897750e3eaf44d2b9e2b2 ]]
+  mkdir -m0700 "$q"
+  fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
+  "$provider" 145 "$1" "$fleet_sha" > "$q/before.json"
+  python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=1073741824' "$q/before.json"
+  image="$q/cache.ext4"
+  fallocate -l 92274688 "$image"
+  /usr/sbin/mke2fs -q -t ext4 -F -m0 -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 "$image"
+  [[ $(stat -c %s "$image") == 92274688 ]]
+  blocks=$(stat -c %b "$image"); ((blocks >= 180224 && blocks <= 182272))
+  stat -c '%d:%i:%h:%s:%u:%g:%a' "$image" > "$q/cache-identity"
+  out="$q/cache"
+  mkdir -m0700 "$out"
+  mount --make-rprivate /
+  mount -o loop,noatime,nodiscard,nodev,nosuid "$image" "$out"
+  test "$(df -B1 --output=avail "$out" | tail -1)" -gt 73400320
+  mkdir -m0700 "$out/tmp"
+else
+  test "$(df -B1 --output=avail "$current" | tail -1)" -gt 73400320
+  mkdir -m0700 "$q" "$out" "$out/tmp"
+fi
 exec > "$q/build.log" 2>&1
 cp -R "$old" "$out/source"
 s=scripts/horizon_epoch145_guarded_export_20261121_v1
@@ -51,3 +77,8 @@ sha256sum "$out/tests" "$out/export145" > "$q/artifacts"
 cat "$cg/memory.peak" > "$q/memory.peak"
 du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
+if [[ $flavor == rejoin ]]; then
+  mkdir -m0700 "$q/products"
+  cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
+  test "$(du -s -B1 "$q/products" | cut -f1)" -le 24117248
+fi

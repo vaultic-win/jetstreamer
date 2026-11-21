@@ -282,6 +282,16 @@ impl std::fmt::Display for GuardInFlight {
 }
 impl std::error::Error for GuardInFlight {}
 
+/// A verified sample whose measured inputs require a complete reprice before playback.
+#[derive(Debug)]
+pub struct Reprice(pub String);
+impl std::fmt::Display for Reprice {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.write_str(&self.0)
+    }
+}
+impl std::error::Error for Reprice {}
+
 /// The producer records its timestamp at the start of the two-pass scan.
 /// An already-published healthy result can cease to qualify its physical
 /// credit while its successor is still scanning. Require the same original

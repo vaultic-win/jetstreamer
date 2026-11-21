@@ -1,7 +1,7 @@
 //! Reuse the registered fleet admission while a leased, read-only verifier runs.
 //! A topology crossing stops the child until a new complete census succeeds.
 use super::*;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::{fs::OpenOptionsExt, process::ExitStatusExt};
 use std::{
     cell::RefCell,
     collections::BTreeMap,
@@ -9,7 +9,9 @@ use std::{
 };
 #[cfg(incident_post145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v4/post-stop-fit";
-#[cfg(not(incident_post145_only))]
+#[cfg(incident_rejoin145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
+#[cfg(not(any(incident_post145_only, incident_rejoin145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v3/post-stop-fit";
 const HOST_MEMORY: u64 = 810_658_050_048;
 const GROUPS: &str = "/sys/fs/cgroup/system.slice";
@@ -181,7 +183,93 @@ fn provider_identity() -> Result<Bound> {
     Ok(r)
 }
 
+/// Recognize only the native held retry10 process while its guard is joining.
+/// This result can defer a stopped verifier; only the full provider can resume it.
+fn held_170() -> Result<Option<u64>> {
+    let dir = Path::new(RUNTIME).join("epoch170-retry10-recovery-20261121-v1");
+    let unit = "horizon-qualify-170-replacement-local3retry10-20261121-v1.service";
+    if !dir.join("NATIVE_GATED.json").try_exists()?
+        || dir
+            .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
+            .try_exists()?
+        || dir.join("START_FAILURE.json").try_exists()?
+    {
+        return Ok(None);
+    }
+    let (intent, v) = original(&dir.join("START_INTENT.json"), 8 << 20)?;
+    let (gated, g) = original(&dir.join("NATIVE_GATED.json"), 2 << 20)?;
+    ensure!(
+        intent.sha256 == "762ecae29698c42a727b8ff0310a50f7219aa301420b473f4522cba27aa9fee7"
+            && gated.sha256 == "8a9a80e813441ae0058f4cfda392e2e430cb9461ddb3c319dd62a194c2e3a8c4"
+            && v["producer_unit"] == unit
+            && v["epoch"] == 170
+            && v["resource_credit_bytes"] == 0
+            && g["producer_unit"] == unit
+            && g["producer_invocation_id"] == "a456b826ce1c4634a2df66d66c5cc07f",
+        "foreign pending 170 source"
+    );
+    let session: Bound = serde_json::from_value(v["actual_session"].clone())?;
+    let controller: Bound = serde_json::from_value(v["controller"].clone())?;
+    let package = custody::evidence(&controller)?;
+    custody::evidence(&session)?;
+    let (profile, pr) = original(&dir.join("profile.json"), 2 << 20)?;
+    let gate = dir.join("controller/gate.py");
+    ensure!(
+        profile.sha256 == "1596f281f699b48f4e4c7e65adf1070e4961d604d38997a7747ffe60dc536782"
+            && package["destination"] == json!(dir.join("controller"))
+            && custody::sha(&fs::read(&gate)?)
+                == "8e5f7c0d3a3118d2deaa2fc88a77e12044d8c7d93c3690644f4df7a45afdf1f9",
+        "different pending 170 controller"
+    );
+    let pid: u32 = capacity::n(&g, "producer_pid")?.try_into()?;
+    let proc = Path::new("/proc").join(pid.to_string());
+    let m = capacity::native_values(unit)?;
+    let projected = fs::metadata(proc.join("root/run/horizon-recovered170/gate.py"))?;
+    let original_gate = fs::metadata(gate)?;
+    let image = fs::metadata(proc.join("exe"))?;
+    let python = fs::metadata("/usr/bin/python3")?;
+    let mut argv = vec![
+        "/usr/bin/python3",
+        "-IB",
+        "/run/horizon-recovered170/gate.py",
+    ];
+    for arg in pr["normal_argv"].as_array().context("held 170 argv")? {
+        argv.push(arg.as_str().context("argument")?);
+    }
+    let command = fs::read(proc.join("cmdline"))?;
+    let age = custody::now()?.checked_sub(capacity::n(&v, "recorded_unix_seconds")?);
+    ensure!(
+        age.is_some_and(|age| age <= 240)
+            && m["ActiveState"] == "active"
+            && m["SubState"] == "running"
+            && m["MainPID"] == pid.to_string()
+            && m["InvocationID"] == g["producer_invocation_id"]
+            && m["Job"] == ""
+            && m["NRestarts"] == "0"
+            && m["MemoryMax"] == (68u64 << 30).to_string()
+            && m["CPUQuotaPerSecUSec"] == "9s"
+            && m["MemorySwapMax"] == "0"
+            && fs::read_to_string(proc.join("cgroup"))?.trim()
+                == format!("0::/system.slice/{unit}")
+            && fs::read_to_string(Path::new(GROUPS).join(unit).join("cgroup.procs"))?.trim()
+                == pid.to_string()
+            && native::ticks(pid)? == capacity::n(&g, "start_ticks")?
+            && (image.dev(), image.ino()) == (python.dev(), python.ino())
+            && (projected.dev(), projected.ino()) == (original_gate.dev(), original_gate.ino())
+            && command == [argv.join("\0").into_bytes(), vec![0]].concat(),
+        "different pending 170 process"
+    );
+    Ok(Some(170))
+}
+
 fn pending_join(error: &str) -> Result<Option<u64>> {
+    if cfg!(incident_rejoin145_only)
+        && error
+            .trim_end()
+            .ends_with("ValueError: foreign pending 170")
+    {
+        return held_170();
+    }
     for (epoch, unit, directory) in [
         (
             166,
@@ -288,6 +376,16 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         .output()?;
     let err = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
+        if cfg!(incident_rejoin145_only)
+            && out.status.signal() == Some(libc::SIGALRM)
+            && out.stdout.is_empty()
+            && out.stderr.is_empty()
+        {
+            return Err(capacity::Reprice(
+                "sealed complete provider exceeded its 142s alarm".into(),
+            )
+            .into());
+        }
         if err.trim_end().ends_with("ValueError: superseded fleet") {
             let next = head(&fleet)?;
             if next != fleet {
@@ -299,7 +397,8 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         }
     }
     ensure!(
-        out.status.success(),
+        out.status.success()
+            || (out.status.code() == Some(1) && err.is_empty() && !out.stdout.is_empty()),
         "complete 145 capacity observation failed {}: {} {}",
         out.status,
         err,
@@ -312,15 +411,13 @@ fn refresh(previous: &Bound) -> Result<Capture> {
     ensure!(
         complete["epoch"] == 145
             && complete["schema"] == "horizon-incident-replay-fit-v1"
-            && complete["fits"] == true
             && complete["fleet"] == json!(fleet)
             && complete["resource_credit_bytes"] == 0
             && complete["complete_cpu_quota_micros"] == 64_000_000
             && complete["complete_memory_plus_reserve_bytes"] == HOST_MEMORY
             && complete["phase145"]["invocation_id"] == verify_cgroup()?
-            && custody::now()?
-                .checked_sub(capacity::n(&complete, "recorded_unix_seconds")?)
-                .is_some_and(|s| s <= 15),
+            && complete["stopped_generation_resident_credit_bytes"] == 0
+            && complete["replay_launch_authorized"] == false,
         "foreign incident capacity or 145 phase"
     );
     let actors = active_population()?;
@@ -333,10 +430,69 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             )
         })
         .collect();
-    ensure!(
-        complete["population"] == json!(expected),
-        "replay membership crossed 145 fresh fit"
+    let recorded = capacity::n(&complete, "recorded_unix_seconds")?;
+    let age = custody::now()?
+        .checked_sub(recorded)
+        .context("future provider capture")?;
+    let (home, required_home) = (
+        capacity::n(&complete, "available_HOME_bytes")?,
+        capacity::n(&complete, "complete_required_HOME_bytes")?,
     );
+    let (ram, required_ram) = (
+        capacity::n(&complete, "available_memory_bytes")?,
+        capacity::n(&complete, "required_available_memory_bytes")?,
+    );
+    let mut resident = 0u64;
+    for row in complete["survivors"]
+        .as_object()
+        .context("survivors")?
+        .values()
+    {
+        resident = resident
+            .checked_add(capacity::n(row, "resident")?)
+            .context("survivor resident total")?;
+    }
+    for n in complete["joined_resident_lower_bounds"]
+        .as_object()
+        .context("joined residents")?
+        .values()
+    {
+        resident = resident
+            .checked_add(n.as_u64().context("joined resident")?)
+            .context("joined resident total")?;
+    }
+    ensure!(
+        required_ram.checked_add(resident) == Some(HOST_MEMORY),
+        "registered memory equation changed"
+    );
+    let fits = home >= required_home && ram >= required_ram;
+    ensure!(
+        required_home >= capacity::n(&complete, "protected_raw_floor_bytes")?
+            && required_ram > 0
+            && required_ram <= HOST_MEMORY
+            && complete["fits"] == fits
+            && fits == out.status.success(),
+        "inconsistent provider result"
+    );
+    if complete["population"] != json!(expected) {
+        return Err(capacity::Reprice(format!(
+            "complete population crossing: captured={} actual={}",
+            complete["population"],
+            json!(expected)
+        ))
+        .into());
+    }
+    if age > 15 {
+        return Err(
+            capacity::Reprice(format!("provider capture at {recorded} is {age}s old")).into(),
+        );
+    }
+    if !fits {
+        return Err(capacity::Reprice(format!(
+            "complete fit at {recorded}: HOME {home}/{required_home}; memory {ram}/{required_ram}"
+        ))
+        .into());
+    }
     complete["provider_seal"] = json!(seal);
     Ok(Capture {
         fleet,
@@ -393,27 +549,31 @@ fn current_guard(
             && scan["maximum_physical_bytes"] == cap,
         "invalid current guard for {unit}"
     );
-    ensure!(
-        custody::now()?
-            .checked_sub(capacity::n(&observed, "recorded_unix_seconds")?)
-            .is_some_and(|age| age <= 90),
-        "stale guard for {unit}"
-    );
+    let recorded = capacity::n(&observed, "recorded_unix_seconds")?;
+    let age = custody::now()?
+        .checked_sub(recorded)
+        .context("future guard observation")?;
+    if age > 90 {
+        return Err(capacity::Reprice(format!("guard {unit} {sample_ref:?} is {age}s old")).into());
+    }
     let floor = capacity::n(&p, "minimum_free_bytes")?;
-    let remaining =
-        if scan["first"]["vanished_entries"] == 0 && scan["second"]["vanished_entries"] == 0 {
-            cap.checked_sub(
-                capacity::n(&scan["first"], "physical_bytes")?
-                    .min(capacity::n(&scan["second"], "physical_bytes")?),
-            )
-            .context("guard cap exceeded")?
-        } else if original_sample == Some(&json!(sample_ref)) {
-            expected_remaining
-        } else {
-            // Keep exactly the earlier independently funded stable-subtree basis only through its original sample;
-            // a changed unstable sample needs the provider's current measured lower-bound path.
-            return Err(capacity::GuardInFlight.into());
-        };
+    let remaining = if scan["first"]["vanished_entries"] == 0
+        && scan["second"]["vanished_entries"] == 0
+    {
+        cap.checked_sub(
+            capacity::n(&scan["first"], "physical_bytes")?
+                .min(capacity::n(&scan["second"], "physical_bytes")?),
+        )
+        .context("guard cap exceeded")?
+    } else if original_sample == Some(&json!(sample_ref)) {
+        expected_remaining
+    } else {
+        // Keep exactly the earlier independently funded stable-subtree basis only through its original sample;
+        // a changed unstable sample needs the provider's current measured lower-bound path.
+        return Err(capacity::Reprice(format!(
+                "guard {unit} measured remaining {expected_remaining} from {original_sample:?}; new {:?} has vanished counts {}/{}",
+                sample_ref, scan["first"]["vanished_entries"], scan["second"]["vanished_entries"])).into());
+    };
     Ok((floor, remaining.saturating_sub(expected_remaining)))
 }
 
@@ -440,7 +600,10 @@ impl Fit {
         let deadline = Instant::now() + Duration::from_secs(90);
         loop {
             match self.current(needed) {
-                Err(e) if e.is::<capacity::GuardInFlight>() && Instant::now() < deadline => {
+                Err(e)
+                    if (e.is::<capacity::GuardInFlight>() || e.is::<capacity::Reprice>())
+                        && Instant::now() < deadline =>
+                {
                     self.topology()?
                 }
                 result => return result,
@@ -451,9 +614,17 @@ impl Fit {
         let last = self.capture.borrow();
         let s = &last.complete;
         ensure!(needed == 0, "frozen reader requested staging bytes");
-        if last.captured.elapsed() > Duration::from_secs(45) || active_population()? != last.actors
-        {
-            return Err(capacity::GuardInFlight.into());
+        let age = last.captured.elapsed();
+        if age > Duration::from_secs(45) {
+            return Err(capacity::Reprice(format!("full capture age {age:?}")).into());
+        }
+        let actual = active_population()?;
+        if actual != last.actors {
+            return Err(capacity::Reprice(format!(
+                "native population crossed: previous={:?} current={actual:?}",
+                last.actors
+            ))
+            .into());
         }
         let mut required = capacity::n(s, "complete_required_HOME_bytes")?;
         let mut absolute = 0;
@@ -493,7 +664,16 @@ impl Fit {
             // Both are admitted by the full provider. Check their exact current guard plan and remaining
             // allowance using the original rooted admission rather than letting a new peer bypass the check.
             for (epoch, plan, unit, remaining) in extra_guards(s)? {
-                let (floor, growth) = current_guard(&plan, None, remaining, &unit)?;
+                let sample = if cfg!(incident_rejoin145_only) && epoch == 168 {
+                    Some(
+                        s["bookings"]["168"]
+                            .get("measured_guard")
+                            .context("missing priced 168 native sample")?,
+                    )
+                } else {
+                    None
+                };
+                let (floor, growth) = current_guard(&plan, sample, remaining, &unit)?;
                 required = required.checked_add(growth).context("peer growth")?;
                 absolute = absolute.max(floor);
                 ensure!(matches!(epoch, 136 | 168), "foreign peer");
@@ -552,7 +732,10 @@ impl Fit {
         let memory = HOST_MEMORY.checked_sub(resident).context("memory budget")?;
         let available = capacity::meminfo("MemAvailable:")?;
         if free < required || available < memory {
-            return Err(capacity::GuardInFlight.into());
+            return Err(capacity::Reprice(format!(
+                "live fit: HOME {free}/{required}; memory {available}/{memory}"
+            ))
+            .into());
         }
         Ok(
             json!({"free_bytes":free,"protected_bytes":required,"available_memory":available,"required_memory":memory,
