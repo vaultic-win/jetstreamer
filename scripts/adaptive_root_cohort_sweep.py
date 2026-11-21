@@ -57,6 +57,14 @@ MAX_R2_RECEIPT_BYTES = 64 * 1024
 MAX_COHORT_RUN_STATE_BYTES = 64 * 1024
 R2_RECEIPT_SCHEMA = "jetstreamer-horizon-r2-receipt-v1"
 ROOT_COHORT_RESUME_RUN_ENV = "JETSTREAMER_ROOT_COHORT_RESUME_RUN"
+EPOCH199200_INDEX_SOURCE = Path(
+    "/var/lib/jetstreamer/horizon_runtime_data/"
+    "epoch199-delivery-recovery-20261121-v1/input-package-v1"
+)
+EPOCH199200_INDEX_MOUNT = Path("/home/sol/horizon-199200-qualified-index-v1")
+EPOCH199200_INDEX_MANIFEST_SHA256 = "cc4250c62eee9136933a87909891041c40bf5f2bc28fde36906e071a1b7156d0"
+EPOCH199200_INDEX_SUMS_SHA256 = "f5349be495e6448b8ed4607c64482bfceae7d1ea191a544340a67621f5246e12"
+LEGACY_UPLOADER_DIRECTORY = Path("/home/sol/horizon")
 PRODUCTION_REAP_ENV = "JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS=600"
 ROOT_COHORT_RUN_STATE_SCHEMA = "jetstreamer-root-cohort-run-v1"
 DEFAULT_FIRST_EPOCH = 22
@@ -963,6 +971,10 @@ def runtime_worker_environment(cohort: Cohort, deploy: Path) -> tuple[str, ...]:
     )
 
 
+def uses_epoch199200_index(cohort: Cohort, enabled: bool) -> bool:
+    return enabled and cohort == Cohort(199, 200, "solana-v1.6.15")
+
+
 def producer_environment(
     cohort: Cohort,
     deploy: Path,
@@ -974,6 +986,7 @@ def producer_environment(
     gcloud_bin: Path | None = None,
     solana_rayon_threads: int | None = None,
     historical_trace: bool = False,
+    epoch199200_index: bool = False,
 ) -> tuple[str, ...]:
     producer_path = (
         DEFAULT_PRODUCER_PATH
@@ -1012,6 +1025,14 @@ def producer_environment(
         "JETSTREAMER_ARCHIVE_BACKEND=http",
         "JETSTREAMER_HTTP_BASE_URL=https://files.old-faithful.net/",
         "JETSTREAMER_COMPACT_INDEX_BASE_URL=https://files.old-faithful.net/",
+        *(
+            (
+                f"JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST={EPOCH199200_INDEX_MOUNT / 'manifest.json'}",
+                f"JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256={EPOCH199200_INDEX_MANIFEST_SHA256}",
+            )
+            if uses_epoch199200_index(cohort, epoch199200_index)
+            else ()
+        ),
         "JETSTREAMER_NETWORK_CAPACITY_MB=100000",
         "JETSTREAMER_THREADS=12",
         "JETSTREAMER_RIPGET_THREADS=12",
@@ -1027,10 +1048,14 @@ def producer_environment(
     )
 
 
-def producer_read_only_bindings(deploy: Path, cohort_bootstrap: Path | None) -> str:
+def producer_read_only_bindings(
+    deploy: Path, cohort_bootstrap: Path | None, qualified_index: bool = False
+) -> str:
     bindings = [f"{deploy}:{deploy}:rbind"]
     if cohort_bootstrap is not None and cohort_bootstrap.parent != deploy:
         bindings.append(f"{cohort_bootstrap}:{cohort_bootstrap}:rbind")
+    if qualified_index:
+        bindings.append(f"{EPOCH199200_INDEX_SOURCE}:{EPOCH199200_INDEX_MOUNT}:rbind")
     return " ".join(bindings)
 
 
@@ -1054,9 +1079,11 @@ def build_producer_command(
     solana_rayon_threads: int | None = None,
     historical_trace: bool = False,
     cohort_bootstrap: Path | None = None,
+    epoch199200_index: bool = False,
 ) -> list[str]:
     node = deploy / "jetstreamer-node"
     workers = tuple(deploy / name for _, name in runtime_workers(cohort))
+    qualified_index = uses_epoch199200_index(cohort, epoch199200_index)
     whole_lane_paths = f"{lane.root}"
     properties = (
         "Type=exec",
@@ -1098,7 +1125,7 @@ def build_producer_command(
         f"NoExecPaths={producer_home}",
         f"ExecPaths={node} {' '.join(map(str, workers))} {whole_lane_paths}",
         f"ReadWritePaths={whole_lane_paths}",
-        f"BindReadOnlyPaths={producer_read_only_bindings(deploy, cohort_bootstrap)}",
+        f"BindReadOnlyPaths={producer_read_only_bindings(deploy, cohort_bootstrap, qualified_index)}",
         "InaccessiblePaths="
         + " ".join(f"-{item}" for item in sensitive_paths(producer_home)),
         f"User={producer_user}",
@@ -1125,6 +1152,7 @@ def build_producer_command(
             gcloud_bin,
             solana_rayon_threads,
             historical_trace,
+            epoch199200_index,
         )
     )
     command.extend(
@@ -1639,7 +1667,9 @@ def unit_is_hardened_for_adoption(
     solana_rayon_threads: int | None = None,
     historical_trace: bool = False,
     cohort_bootstrap: Path | None = None,
+    epoch199200_index: bool = False,
 ) -> bool:
+    qualified_index = uses_epoch199200_index(cohort, epoch199200_index)
     properties = systemd_properties(
         unit,
         (
@@ -1747,7 +1777,7 @@ def unit_is_hardened_for_adoption(
         "SystemCallArchitectures": "native",
         "CapabilityBoundingSet": "",
         "AmbientCapabilities": "",
-        "BindReadOnlyPaths": producer_read_only_bindings(deploy, cohort_bootstrap),
+        "BindReadOnlyPaths": producer_read_only_bindings(deploy, cohort_bootstrap, qualified_index),
     }
     namespace_policy = properties.get("RestrictNamespaces")
     if namespace_policy == "yes":
@@ -1782,6 +1812,7 @@ def unit_is_hardened_for_adoption(
             gcloud_bin,
             solana_rayon_threads,
             historical_trace,
+            epoch199200_index,
         )
     )
     if configured_environment != expected_environment:
@@ -2683,6 +2714,36 @@ def verify_sealed_deployment_member(
         raise SweepError(f"{description} checksum mismatch: {path.name}")
 
 
+def verify_epoch199200_plan(cohorts: Sequence[Cohort], public_dir: Path) -> None:
+    if not any(uses_epoch199200_index(cohort, True) for cohort in cohorts):
+        raise SweepError("--epoch199200-qualified-index requires the exact 199–200 cohort")
+    watched = LEGACY_UPLOADER_DIRECTORY
+    if (
+        watched == public_dir
+        or watched in public_dir.parents
+        or public_dir in watched.parents
+        or public_dir.samefile(watched)
+    ):
+        raise SweepError("epoch 199–200 requires a destination separate from the legacy uploader")
+    verify_epoch199200_index()
+
+
+def verify_epoch199200_index() -> None:
+    source = validate_sealed_deployment_directory(EPOCH199200_INDEX_SOURCE, "epoch 199–200 index")
+    sums = read_deployment_sums(source, "epoch 199–200 index")
+    if (
+        checksum_file(source / "SHA256SUMS") != EPOCH199200_INDEX_SUMS_SHA256
+        or sums.get("manifest.json") != EPOCH199200_INDEX_MANIFEST_SHA256
+        or {entry.name for entry in source.iterdir()} != {"SHA256SUMS", *sums}
+    ):
+        raise SweepError("epoch 199–200 index package identity or membership changed")
+    for name in sums:
+        verify_sealed_deployment_member(source / name, sums, "epoch 199–200 index member")
+    target = validate_real_directory(EPOCH199200_INDEX_MOUNT, uid=0, gid=0, mode=0o555)
+    if any(target.iterdir()):
+        raise SweepError("epoch 199–200 index mount target must be empty on the host")
+
+
 def verify_deployment(
     deploy: Path,
     manifest: Path,
@@ -2859,6 +2920,13 @@ def controller_configuration_sha256(
         "controller_id": args.controller_id,
         "controller_sha256": args.controller_sha256,
     }
+    if getattr(args, "epoch199200_index", False):
+        configuration["epoch199200_index"] = {
+            "source": str(EPOCH199200_INDEX_SOURCE),
+            "target": str(EPOCH199200_INDEX_MOUNT),
+            "sha256sums": EPOCH199200_INDEX_SUMS_SHA256,
+            "manifest_sha256": EPOCH199200_INDEX_MANIFEST_SHA256,
+        }
     return hashlib.sha256(canonical_json(configuration)).hexdigest()
 
 
@@ -3209,6 +3277,8 @@ class Controller:
         }
         if args.r2_receipt_directory is not None:
             binding_paths.add(args.r2_receipt_directory)
+        if getattr(args, "epoch199200_index", False):
+            binding_paths.update((EPOCH199200_INDEX_SOURCE, EPOCH199200_INDEX_MOUNT))
         self.directory_bindings: dict[Path, BoundDirectory] = {}
         try:
             for path in sorted(binding_paths):
@@ -3512,6 +3582,7 @@ class Controller:
             self.args.solana_rayon_threads,
             self.args.historical_trace,
             cohort_bootstrap,
+            getattr(self.args, "epoch199200_index", False),
         ):
             raise SweepError(
                 f"matching producer PID {process.pid} for cohort {cohort.label} "
@@ -3799,6 +3870,8 @@ class Controller:
             (cohort,),
             (() if cohort_bootstrap is None else (cohort_bootstrap,)),
         )
+        if uses_epoch199200_index(cohort, getattr(self.args, "epoch199200_index", False)):
+            verify_epoch199200_index()
         command = build_producer_command(
             cohort=cohort,
             lane=lane,
@@ -3818,6 +3891,7 @@ class Controller:
             solana_rayon_threads=self.args.solana_rayon_threads,
             historical_trace=self.args.historical_trace,
             cohort_bootstrap=cohort_bootstrap,
+            epoch199200_index=getattr(self.args, "epoch199200_index", False),
         )
         self.revalidate_operational_directories()
         result = subprocess.run(command, check=False, capture_output=True, text=True)
@@ -4428,6 +4502,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "an isolated replay generation"
         ),
     )
+    parser.add_argument(
+        "--epoch199200-qualified-index",
+        dest="epoch199200_index",
+        action="store_true",
+        help="use the sealed 199–200 source indexes for that exact managed cohort",
+    )
     parser.add_argument("--gcloud-account", default=DEFAULT_ACCOUNT)
     parser.add_argument("--gcloud-project", default=DEFAULT_PROJECT)
     parser.add_argument(
@@ -4641,6 +4721,8 @@ def prepare(
                     f"cohort {other_first}-{other_last}"
                 )
     managed = (*cohorts, *adopted)
+    if getattr(args, "epoch199200_index", False):
+        verify_epoch199200_plan(managed, args.public_dir)
     managed_bounds = {
         (cohort.first_epoch, cohort.last_epoch) for cohort in managed
     }
@@ -4799,6 +4881,13 @@ def print_plan(
         "live_epoch_claims": live,
         "public_write_path": "jetstreamer-node --recover-staged-cohort-only only",
     }
+    if getattr(args, "epoch199200_index", False):
+        report["epoch199200_qualified_index"] = {
+            "source": str(EPOCH199200_INDEX_SOURCE),
+            "target": str(EPOCH199200_INDEX_MOUNT),
+            "manifest_sha256": EPOCH199200_INDEX_MANIFEST_SHA256,
+            "public_destination": str(args.public_dir),
+        }
     print(json.dumps(report, sort_keys=True, indent=2))
 
 

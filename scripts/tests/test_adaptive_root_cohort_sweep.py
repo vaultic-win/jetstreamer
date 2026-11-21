@@ -1383,6 +1383,89 @@ class AdoptionHardeningTests(unittest.TestCase):
                 )
             )
 
+    def test_epoch199200_index_requires_both_env_values_and_exact_mount(self) -> None:
+        normal = self.hardened_properties(epoch199200_index=True)
+        self.assertNotIn("SLOT_RANGES_OVERRIDE", normal["Environment"])
+        self.assertNotIn(str(sweep.EPOCH199200_INDEX_MOUNT), normal["BindReadOnlyPaths"])
+        self.cohort = sweep.Cohort(199, 200, "solana-v1.6.15")
+        self.process = dataclasses.replace(self.process, cohort=self.cohort)
+        self.assertNotIn("SLOT_RANGES_OVERRIDE", self.hardened_properties()["Environment"])
+        bootstrap = Path("/sealed/snapshots/snapshot-85967282-Hash.tar.zst")
+        profile = dict(cohort_bootstrap=bootstrap, epoch199200_index=True)
+        properties = self.hardened_properties(**profile)
+        mount = sweep.EPOCH199200_INDEX_MOUNT
+        source = sweep.EPOCH199200_INDEX_SOURCE
+        manifest_env = f"JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST={mount / 'manifest.json'}"
+        sha_env = f"JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256={sweep.EPOCH199200_INDEX_MANIFEST_SHA256}"
+        env = properties["Environment"]
+        binding = properties["BindReadOnlyPaths"]
+        self.assertIn(manifest_env, shlex.split(env))
+        self.assertIn(sha_env, shlex.split(env))
+        self.assertEqual(binding, f"{self.deploy}:{self.deploy}:rbind {bootstrap}:{bootstrap}:rbind {source}:{mount}:rbind")
+        for changes in (
+            {}, {"Environment": env.replace(manifest_env, "")},
+            {"Environment": env.replace(sha_env, "")},
+            {"Environment": env.replace(sha_env, sha_env[:-1] + "f")},
+            {"BindReadOnlyPaths": binding.replace(f" {source}:{mount}:rbind", "")},
+            {"BindReadOnlyPaths": binding.replace(str(source), str(source.parent))},
+            {"BindReadOnlyPaths": binding.replace(str(mount), str(mount) + "-other")},
+        ):
+            with self.subTest(changes=changes), mock.patch.object(
+                sweep, "systemd_properties", return_value=properties | changes
+            ):
+                self.assertEqual(
+                    sweep.unit_is_hardened_for_adoption(
+                        self.unit, self.process, self.cohort, self.lane, self.deploy, **profile
+                    ),
+                    not changes,
+                )
+
+    def test_index_package_rejects_unknown_members_or_changed_sum_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary)
+            (source / "manifest.json").touch()
+            sums_path = source / "SHA256SUMS"
+            sums_path.write_text("fixture")
+            digest = sweep.checksum_file(sums_path)
+            with (
+                mock.patch.object(sweep, "validate_sealed_deployment_directory", return_value=source),
+                mock.patch.object(sweep, "read_deployment_sums", return_value={
+                    "manifest.json": sweep.EPOCH199200_INDEX_MANIFEST_SHA256,
+                }),
+                mock.patch.object(sweep, "EPOCH199200_INDEX_SUMS_SHA256", digest),
+                mock.patch.object(sweep, "verify_sealed_deployment_member") as verify,
+            ):
+                extra = source / "other-source"
+                extra.touch()
+                with self.assertRaisesRegex(sweep.SweepError, "membership"):
+                    sweep.verify_epoch199200_index()
+                extra.unlink()
+                sums_path.write_text("changed")
+                with self.assertRaisesRegex(sweep.SweepError, "identity"):
+                    sweep.verify_epoch199200_index()
+                verify.assert_not_called()
+
+    def test_index_plan_requires_scoped_cohort_and_separate_public_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            watched = root / "old"
+            isolated = root / "isolated"
+            watched.mkdir()
+            isolated.mkdir()
+            qualified = [sweep.Cohort(199, 200, "solana-v1.6.15")]
+            with (
+                mock.patch.object(sweep, "LEGACY_UPLOADER_DIRECTORY", watched),
+                mock.patch.object(sweep, "verify_epoch199200_index") as verify,
+            ):
+                for path in (watched, watched / "child", root):
+                    with self.assertRaisesRegex(sweep.SweepError, "legacy uploader"):
+                        sweep.verify_epoch199200_plan(qualified, path)
+                with self.assertRaisesRegex(sweep.SweepError, "exact"):
+                    sweep.verify_epoch199200_plan([self.cohort], isolated)
+                verify.assert_not_called()
+                sweep.verify_epoch199200_plan(qualified, isolated)
+                verify.assert_called_once_with()
+
     def test_adoption_checks_the_exact_external_bootstrap_mount(self) -> None:
         snapshot = Path("/sealed/bootstrap-source/snapshot-123-Hash.tar.zst")
         base = f"{self.deploy}:{self.deploy}:rbind"

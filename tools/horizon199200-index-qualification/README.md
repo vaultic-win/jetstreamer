@@ -30,3 +30,10 @@ export JETSTREAMER_HTTP_BASE_URL=https://files.old-faithful.net/
 ```
 
 Firehose loads the two pinned range tables locally and continues to stream CAR data from the public source. The node still fetches the separate slot-to-CID compact index. It checks each slot against the corrected table and accepts only the 72 and 63 historical false positives respectively, each inside a CID-rooted physical parent-chain gap. Any other discrepancy, or a changed compact or range table, fails this profile. Epoch 198 continues using its public inputs for the 717-slot warmup.
+
+For the adaptive controller on this host, pass `--epoch199200-qualified-index` alongside the manifest-bound `--cohort-bootstrap`. The controller checks the sealed package and mounts it in that cohort's producer namespace. Launch and adoption use the same mount and environment. Use the separate import and receipt paths below so the legacy uploader watching `/home/sol/horizon` cannot publish the reconstruction.
+
+```sh
+--public-dir=/home/sol/.jetstreamer-private/epoch199200-reconstruction-v1/public
+--public-private-root=/home/sol/.jetstreamer-private/epoch199200-reconstruction-v1/public-private
+```
