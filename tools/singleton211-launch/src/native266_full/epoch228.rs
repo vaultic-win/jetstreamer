@@ -27,6 +27,12 @@ fn one<T>(mut rows: impl Iterator<Item = T>) -> Result<T> {
     ensure!(rows.next().is_none(), "ambiguous original row");
     Ok(value)
 }
+// The original delivery writer stores its digest-pinned receipts as root-owned 0600 files.
+fn read_terminal_receipt(receipt: &Bound) -> Result<Value> {
+    trusted_parents(&receipt.path)?;
+    receipt.json()
+}
+
 fn proof251(n: &mut Native, fleet: &Value, ledger: &Value) -> Result<Value> {
     let source = Path::new("/var/lib/jetstreamer/horizon-singleton-delivery251-20261119-v1");
     let hand = Bound::new(
@@ -37,8 +43,8 @@ fn proof251(n: &mut Native, fleet: &Value, ledger: &Value) -> Result<Value> {
         source.join("terminal-drain.json"),
         "dc4e672d2b95528a5758ae06355819d8a2f7bfe17fa80d2218c7f3c8ad1f6194",
     );
-    let h = hand.sealed()?;
-    let d = drain.sealed()?;
+    let h = read_terminal_receipt(&hand)?;
+    let d = read_terminal_receipt(&drain)?;
     let row = one(rows(ledger, "reservations")?
         .iter()
         .filter(|v| v["unit"] == U251))?;
@@ -358,11 +364,10 @@ mod tests {
     #[test]
     #[ignore = "requires the original immutable 251 handoff and private local pair"]
     fn opens_original_251_batch_sidecar_and_snapshot_seal() {
-        let h = Bound::new(
+        let h = read_terminal_receipt(&Bound::new(
             "/var/lib/jetstreamer/horizon-singleton-delivery251-20261119-v1/terminal-handoff.json",
             "85a9e5c794ebbb2699f00e0371aaaa2d8c4550c17622b967ae35defd13a0d65d",
-        )
-        .sealed()
+        ))
         .unwrap();
         local_pair(&h).unwrap();
         snapshot_identity().unwrap();
