@@ -6,6 +6,7 @@ StartLimitBurst=12
 
 [Service]
 Type=oneshot
+Slice=system.slice
 ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/epoch169-focused-terminal-20261121-v1/closure-tools/closure169.py settle
 TimeoutStartSec=200
 Restart=on-failure

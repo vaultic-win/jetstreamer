@@ -162,7 +162,8 @@ def exact_exit():
     if row.get("InvocationID")==IID and int(row.get("ExecMainExitTimestampMonotonic") or "0")>0:
         return dict(binding="original-manager",invocation=IID,exited=row["ExecMainCode"]=="1",status=row["ExecMainStatus"],result=row["Result"])
     # PID 1 passes these variables only to the original OnSuccess/OnFailure target.
-    name="horizon-focused169-terminal-event.service"
+    kind={"success":"success"}.get(os.environ.get("MONITOR_SERVICE_RESULT"),"failure")
+    name="horizon-focused169-terminal-event@"+kind+".service"
     me=shared["manager"](name)
     if (me["InvocationID"]==os.environ.get("INVOCATION_ID") and me["MainPID"]==str(os.getpid()) and
         Path("/proc/self/cgroup").read_text().strip()=="0::/system.slice/"+name and
