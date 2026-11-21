@@ -25,8 +25,10 @@ CAPS={"166":288*fit.G,"167":512*fit.G,"168":288*fit.G,"170":288*fit.G}
 
 def provider():
     cfg,ref=s.read(HERE/"incident-fit.json")
-    seal=s.bound(cfg["seal"],FITDIR/"tools/deployment-seal-receipt.json")
-    p=FITDIR/"tools/post-stop-fit"
+    package=Path(cfg["seal"]["path"]).parent
+    s.need(package.parent==FITDIR and package.name in ("tools","tools-v2"),"unknown incident provider package")
+    seal=s.bound(cfg["seal"],package/"deployment-seal-receipt.json")
+    p=package/"post-stop-fit"
     s.need(seal["destination"]==str(p.parent) and seal["sealer_sha256"]==cfg["sealer_sha256"]
            and cfg["image"]["path"]==str(p) and any(r["name"]==p.name and
            r["sha256"]==cfg["image"]["sha256"] for r in seal["members"]),"foreign incident fit provider")
@@ -161,7 +163,7 @@ def capacity(v,fleet,actor):
 
 def capture(fleet,actor=None):
     p,ref=provider()
-    proc=subprocess.run([p,"168",fleet["path"],fleet["sha256"]],stdout=subprocess.PIPE,timeout=125,check=False)
+    proc=subprocess.run([p,"168",fleet["path"],fleet["sha256"]],stdout=subprocess.PIPE,timeout=150,check=False)
     s.need(proc.returncode in (0,1) and proc.stdout,"incident fit provider failed")
     v=json.loads(proc.stdout)
     eligible=capacity(v,fleet,actor)

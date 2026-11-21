@@ -62,7 +62,8 @@ def verifier_profile(seal_path,seal_sha,image_sha,build_sha):
 
 
 def incident_profile(seal_sha):
-    package=D.parent/"incident-replay-fit-20261121-v1/tools"
+    name="tools" if seal_sha=="e8ba73178277950ed2bcc976534f49af21413745c8244026fcb1502bea9adc7e" else "tools-v2"
+    package=D.parent/"incident-replay-fit-20261121-v1"/name
     seal_path=package/"deployment-seal-receipt.json"
     require(seal_path.resolve(strict=True)==seal_path and seal_path.stat().st_uid==0 and
             re.fullmatch("[0-9a-f]{64}",seal_sha) and digest(seal_path)==seal_sha,"different incident provider seal")

@@ -54,7 +54,11 @@ fn member(path: &Path, sealdigest: &str) -> Result<Value> {
     Ok(sr)
 }
 fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
-    let path = rt(PROVIDER);
+    let path = if fit_seal == "e8ba73178277950ed2bcc976534f49af21413745c8244026fcb1502bea9adc7e" {
+        rt(PROVIDER)
+    } else {
+        rt("incident-replay-fit-20261121-v1/tools-v2/post-stop-fit")
+    };
     let se = member(&path, fit_seal)?;
     let b = command(
         path.to_str().unwrap(),
@@ -195,6 +199,80 @@ fn guarded(actor: &Value, floor: u64, binding: &Value) -> Result<(Value, Value)>
     let fr = record("FIRST_GUARD.json", &first)?;
     Ok((pr, fr))
 }
+/// A cold node can fork its historical reader between the first timer survey and
+/// the fleet census. Let the timer inspect that same child before charging it.
+fn post_guard_fit(
+    actor: &Value,
+    plan: &Value,
+    first: &Value,
+    fleet: &Value,
+    seal: &str,
+) -> Result<Value> {
+    let first_row = bound(first, &base().join("FIRST_GUARD.json"))?;
+    let mut previous = st(&first_row, "guard_invocation")?.to_owned();
+    let deadline = Instant::now() + Duration::from_secs(100);
+    loop {
+        ensure!(
+            Instant::now() < deadline,
+            "no later matching worker guard before admission deadline"
+        );
+        ensure!(
+            actor::sample()? == *actor,
+            "producer changed after first timer guard"
+        );
+        let (receipt, sample) = actor::guard(actor, plan)?;
+        let generation = st(&receipt, "guard_invocation")?;
+        let pid = n(actor, "producer_pid")?;
+        let mut live = members(UNIT)?;
+        ensure!(
+            live.contains(&pid) && live.len() <= 2,
+            "foreign producer descendants"
+        );
+        live.retain(|p| *p != pid);
+        if let Some(&child) = live.first() {
+            let exe = Path::new("/proc").join(child.to_string()).join("exe");
+            let target = fs::read_link(&exe)?;
+            let (parent, _, group) = proc_row(child)?;
+            ensure!(
+                parent == pid
+                    && group == format!("0::/system.slice/{UNIT}")
+                    && target.starts_with(run().join("private"))
+                    && target.file_name().is_some_and(|s| s == "historical-worker")
+                    && same(&exe, &target)?,
+                "foreign candidate worker"
+            );
+        }
+        let observed = sample["workers"].as_array().context("worker census")?;
+        let identities = observed
+            .iter()
+            .map(|r| {
+                let pid = r[0].as_u64().context("worker PID")?;
+                ensure!(
+                    r[1].as_u64().is_some_and(|v| v > 0 && v < 3_500_000),
+                    "invalid worker VMA count"
+                );
+                Ok(pid)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if generation != previous && identities == live {
+            match fit(fleet, seal) {
+                Ok(capacity) => return Ok(capacity),
+                Err(e)
+                    if e.to_string()
+                        .trim_end()
+                        .ends_with("ValueError: native worker transition or guard mismatch") =>
+                {
+                    // This verified child can appear during the provider's slower scan.
+                    // Require an independently completed later guard before retrying it.
+                    previous = generation.to_owned();
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        thread::sleep(Duration::from_secs(2));
+    }
+}
+
 fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
     let lock = OpenOptions::new()
         .read(true)
@@ -220,6 +298,7 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
     let binding = contract()?;
     let inv = record("INVENTORY_PRESTART.json", &require_missing()?)?;
     let before = fit(fleet, fit_seal)?;
+    ensure!(before["candidate"].is_null(), "candidate already active");
     let floor = n(&before, "protected_raw_floor_bytes")?
         .checked_add(128 << 20)
         .context("guard slack")?
@@ -247,10 +326,13 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
         let actor = actor::sample()?;
         record("ACTUAL_PRODUCER_NATIVE.json", &actor)?;
         let (plan, first) = guarded(&actor, floor, &binding)?;
-        #[cfg(epoch166_recovery)]
-        let after = source::post_guard_fit(&actor, &plan, &first, fleet, fit_seal)?;
-        #[cfg(not(epoch166_recovery))]
-        let after = fit(fleet, fit_seal)?;
+        let after = post_guard_fit(&actor, &plan, &first, fleet, fit_seal)?;
+        ensure!(
+            after["candidate"]["producer_invocation_id"] == actor["producer_invocation_id"]
+                && after["candidate"]["producer_pid"] == actor["producer_pid"]
+                && after["candidate"]["start_ticks"] == actor["start_ticks"],
+            "capacity was captured for another generation"
+        );
         ensure!(
             n(&after, "protected_raw_floor_bytes")? <= floor && actor::sample()? == actor,
             "post-guard floor or actor changed"
@@ -290,7 +372,12 @@ fn dispatch() -> Result<Value> {
         return Ok(prep);
     }
     ensure!(
-        env::current_exe()? == base().join(format!("tools/recover{EPOCH}")),
+        env::current_exe()?
+            == base().join(if EPOCH == 167 {
+                "tools-v2/recover167"
+            } else {
+                "tools/recover166"
+            }),
         "use sealed recovery executable"
     );
     match a.as_slice() {
