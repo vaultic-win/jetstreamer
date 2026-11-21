@@ -28,6 +28,20 @@ compiler grandchildren before restarting the controller. Each guarded subprocess
 also owns a private process group; an in-process guard failure kills that whole
 group before the controller enters its retry wait.
 
+## Recovering a completed public report across a branch change
+
+When a branch change interrupts a public range after an epoch has finalized, the
+controller qualifies the current reader and compares its executable SHA-256 with
+the reader that produced the report. An exact match lets the controller accept
+that epoch under its existing audit lock after checking the sealed executables,
+original invocation, complete native report, pinned inventory, current remote
+object and current branch. The result records both the original playback proof
+and the current build proof. A different executable starts that epoch again.
+
+Older branch-change markers can bind a nonterminal report through the preceding
+accepted epoch from the same pinned invocation. The current marker also binds
+the report digest, epoch start time and clean exit for a terminal epoch.
+
 ## Current source status and inventory
 
 The persistent service is deployed on this host. See
