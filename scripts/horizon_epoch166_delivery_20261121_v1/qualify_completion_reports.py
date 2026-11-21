@@ -23,7 +23,7 @@ def qualify(source, scratch):
     base = reports / Path(original["path"]).parent.name
     cycle.mkdir(parents=True)
     base.mkdir(parents=True)
-    labels = event.COMPLETION_LABELS
+    labels = event.report_labels()
     fields = {n: label + "_local_commit" for n, label in labels.items()}
     terminal = {e: {"test_epoch": e} for e in fields}
     candidate = dict(fleet, **{fields[e]: terminal[e] for e in fields})
@@ -62,7 +62,7 @@ def qualify(source, scratch):
                 raise AssertionError(f"accepted invalid directory {name}")
     finally:
         watch.close()
-    assert accepted == 64 and denied == 37
+    assert accepted == len(fields) * 2 ** len(fields) and denied == len(fields) * 2 ** (len(fields)-1) + 5
     sample, ref = event.document(Path(fleet["observer"]["path"]), 0o644)
     assert ref == fleet["observer"]
     scheduled = sample["cadence"]["configured_not_before_utc"]

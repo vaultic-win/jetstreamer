@@ -62,7 +62,8 @@ def run(work):
     simulator = {}
     sources={e:BASE/subdir for e,subdir in AUTH.items()}
     for e,digest_value in {167:'57c6ff2ccaee8fa8207c2f78fb9c7bb42c7de524d60c983e855376d7eba59582',
-                           170:'2322cb695d658f79acd50aa9a2b6d60b4e16e6b7cba5d5037268bbad7c3876c1'}.items():
+                           170:'2322cb695d658f79acd50aa9a2b6d60b4e16e6b7cba5d5037268bbad7c3876c1',
+                           172:'99e74c3c8b7ce841426098a0c630539b32647eee7b2d697cb7a80c4837a1ca9e'}.items():
         reference=dict(path=str(pair.ROUTES[e].T/'HELD_PUBLICATION_QUALIFIED.json'),sha256=digest_value)
         package=checked(reference)
         qualified=checked(package['qualification'])
@@ -100,7 +101,7 @@ def run(work):
         c = SimpleNamespace(fleet=f,fleet_ref=prev,cfg=cfg,sample=sample,sample_ref=sp,
                             paths=dict(out=HEAD.parent,statuses=folder),now=utc(head['sampled_at_utc']),stamp=head['sampled_at_utc'],
                             prior=previous,public_fresh=lambda:None,unchanged=lambda:None,rows={},private136=None,
-                            retired168=True,full172=True,full172_row=rows[172],terminal166=None,terminal_sample=None,
+                            retired168=True,full172=172 not in active,full172_row=rows[172] if 172 not in active else None,terminal166=None,terminal_sample=None,
                             historical166=None,diagnostic=cp['retained_private_diagnostic_168'],
                             diagnostic169=cp['retained_private_diagnostic_169'],native={},closures=actual[166]['historical_epoch170_closures'],
                             next={'timer':head['sole_next_timer']},lanes={})
@@ -121,7 +122,7 @@ def run(work):
 
     # Before the sample, seal and reuse exactly one survivor config for every nonempty set.
     projections={}
-    for active in (g for size in range(1,5) for g in combinations(all_epochs,size)):
+    for active in (g for size in range(1, len(all_epochs)+1) for g in combinations(all_epochs,size)):
         folder=work/('pre-'+'-'.join(map(str,active)))
         ensure_dir(folder)
         ref=save(folder/'fixture_fleet.json',dict(source=prev))
@@ -181,7 +182,7 @@ def run(work):
         with patch.object(pair,'proofs',side_effect=lambda f:dict(closed)),patch.object(pair,'transition',side_effect=lambda f,e:closed[e]),patch.object(pair,'wait_terminal',side_effect=observe_exit),patch.object(pair.subprocess,'run',side_effect=wrapped),patch.object(pair.os,'execv',side_effect=finish):
             try:pair.dispatch(arr,Path(up['path']),frozen,f,'/fixture/native')
             except Exec:pass
-        need(calls==[[e for e in (*all_epochs,172) if e not in order[:count]] for count in range(len(order)+1)],'duplicate or omitted native retry')
+        need(calls==[[e for e in sorted(rows) if e not in order[:count]] for count in range(len(order)+1)],'duplicate or omitted native retry')
         dispatches.append(calls)
         mixed=copy.deepcopy(sample)
         mixed['replays']=[r for r in mixed['replays'] if int(r['range'])!=order[0]]
@@ -201,8 +202,12 @@ def run(work):
         with patch.dict(pair.ROUTES,{e:route}):
             need(pair.transition(f,e)==p,'qualified terminal did not join registered fleet')
             wrong=copy.deepcopy(f)
-            if e!=168:wrong[pair.REGISTRY][str(e)]['actor']['producer_invocation_id']='0'*32
-            else:next(r for r in wrong['actual_executing_replays'] if r['epoch']==168)['first_worker']={}
+            if e == 172:
+                next(r for r in wrong['actual_executing_replays'] if r['epoch']==172)['unit']['InvocationID']='0'*32
+            elif e == 168:
+                next(r for r in wrong['actual_executing_replays'] if r['epoch']==168)['first_worker']={}
+            else:
+                wrong[pair.REGISTRY][str(e)]['actor']['producer_invocation_id']='0'*32
             with patch.object(route,'retire',side_effect=forbid) as unused:
                 reject('wrong-lineage-before-guard-'+str(e),lambda:pair.transition(wrong,e));need(not unused.called,'drained a foreign guard')
     captures=[]
@@ -228,7 +233,7 @@ def run(work):
         reject('crossed-captures-'+str(order[0]),lambda:pair.prior_paths(order,lambda group:pair.recovered_capture_path(folder,group)))
     passes=[]
     episodes=[((166,168),None),((168,166),None),((167,170),'landed'),((170,167),'unsent'),
-              (all_epochs,'landed'),(tuple(reversed(all_epochs)),'unsent'),((168,170,167,166),None)]
+              (all_epochs,'landed'),(tuple(reversed(all_epochs)),'unsent'),((168,170,167,166),None), ((172,166,170),'landed'), ((167,172,168),'unsent')]
     for order,partial in episodes:
         base=work/('post-'+'-'.join(map(str,order))+'-'+str(partial))
         ensure_dir(base)
@@ -287,7 +292,7 @@ def run(work):
                  'original projected next worker rejected by scheduled guard')
             for e in active:
                 need(accepted[pair.FIELDS[e]]==simulator[e]['terminal'] and pair.preceding(accepted,e) is None
-                     and caps['retained_local_commit_bookings'][str(e)]['retained_cap_bytes']=={166:288,167:512,168:288,170:384}[e]<<30,
+                     and caps['retained_local_commit_bookings'][str(e)]['retained_cap_bytes']=={166:288,167:512,168:288,170:384,172:288}[e]<<30,
                      'registered a retired owner or lost its booking')
             passes.append(dict(order=list(order),closed=list(active),report=sr,survivors=sorted(rows.keys()-set(active)),
                                conditional_puts=list(store.writes),retained=hr))

@@ -1,7 +1,7 @@
 """Reconcile the four original producers in one scheduled native observation."""
 import os
 from itertools import combinations
-from terminal_event import COMPLETION_LABELS, completion_report_dir
+from terminal_event import report_labels, completion_report_dir
 from pathlib import Path
 import select
 import runpy
@@ -13,6 +13,7 @@ import time
 import cadence168
 import closure
 import recovered166
+import full172_completion
 from evidence import SEALER, bound, checked, durable, ensure_dir, lock, need, sealed, utc
 
 def metered_authority():
@@ -41,9 +42,21 @@ def recovered_authorities():
     return {e:authority(e) for e in (167,170)}
 
 
-ROUTES = dict(sorted({166:closure,168:metered_authority(),**recovered_authorities()}.items()))
+def full172_authority():
+    root = closure.R / 'epoch172-current-delivery-20261121-v1/closure-tools'
+    seal = checked(dict(path=str(root/'deployment-seal-receipt.json'),
+                        sha256='0f06f5b8d2c10a0d83a0e30ab850567a97fd58b1852e5b7302450473cbfeee71'))
+    members = {m['name']:m['sha256'] for m in seal['members']}
+    need(seal['destination'] == str(root) and all(
+        members[n] == bound(root/n)['sha256'] for n in ('closure.py','closure172.py')),
+        'different original full 172 guard closure')
+    authority = runpy.run_path(str(root/'closure172.py'))
+    return SimpleNamespace(**{k:authority[k] for k in ('T','DONE','FIELD','UNIT','IID','committed','inspect','retire','guard')})
+
+
+ROUTES = dict(sorted({166:closure,168:metered_authority(),172:full172_authority(),**recovered_authorities()}.items()))
 FIELDS = {epoch: route.FIELD for epoch, route in ROUTES.items()}
-LABELS = COMPLETION_LABELS
+LABELS = report_labels()
 REGISTRY = recovered166.REGISTRY
 need(FIELDS=={e:label+'_local_commit' for e,label in LABELS.items()},'closure field differs from report route')
 
@@ -51,6 +64,8 @@ need(FIELDS=={e:label+'_local_commit' for e,label in LABELS.items()},'closure fi
 def preceding(fleet, epoch):
     if epoch == 168:
         return cadence168.previous(fleet)
+    if epoch == 172:
+        return full172_completion.preceding(fleet)
     return fleet.get(REGISTRY, {}).get(str(epoch))
 
 
@@ -342,6 +357,12 @@ def install_recovered(fleet,c):
             fleet[label+'_preselected_config'] = fleet['sole_next_observer']
         else:
             fleet.pop(label+'_preselected_config',None)
+        if epoch == 172:
+            frozen = full172_completion.frozen(c, proof)
+            if frozen:
+                fleet['historical_full172_frozen_capture'] = frozen
+            fleet.pop('current_full172_admission', None)
+            fleet.pop('current_full172_post_guard_fit', None)
         row = next(r for r in fleet['epochs'] if r['epoch']==epoch)
         row.pop('current_replay', None)
         row.pop('current_bootstrap', None)
@@ -357,7 +378,7 @@ def recovered_capture_path(out, group):
 
 
 def recover_capture(c, live):
-    closed = c.commits.keys()-{168}
+    closed = c.commits.keys()-{168, 172}
     out = c.paths['out']
     target = recovered_capture_path(out,closed)
     if closed and not target.exists():
@@ -387,13 +408,16 @@ def capacity(c):
         ad = checked(proof['admission'])
         post = ad['post_guard_capacity']
         fit = checked(post)
-        bookings = fit['native_incident_fit']['bookings'] if e==168 else fit['bookings']
-        booking = bookings[str(e)]
-        plan = checked(ad['actual_guard_plan'])
-        expected = {166:288,167:512,168:288,170:384}[e] << 30
-        need(booking['root']==plan['worker_root'] and
-             booking['cap_bytes']==plan['maximum_root_physical_bytes']==expected,
-             'changed retained root or cap for '+str(e))
+        if e == 172:
+            expected = full172_completion.retained_cap(proof)
+        else:
+            bookings = fit['native_incident_fit']['bookings'] if e==168 else fit['bookings']
+            booking = bookings[str(e)]
+            plan = checked(ad['actual_guard_plan'])
+            expected = {166:288,167:512,168:288,170:384}[e] << 30
+            need(booking['root']==plan['worker_root'] and
+                 booking['cap_bytes']==plan['maximum_root_physical_bytes']==expected,
+                 'changed retained root or cap for '+str(e))
         result[str(e)] = dict(terminal=proof['terminal'],guard_retirement=proof['guard_retirement'],
                               admission=proof['admission'],post_guard_capacity=post,retained_cap_bytes=expected,
                               resource_credit_bytes=0,reservation_ending_bytes=0)
@@ -422,6 +446,11 @@ def observation(c,out,probe):
         cap = dict(old,retained_local_commit_bookings=retained,prior_same_sample_capacity_observation=ref)
         if 168 in c.commits:
             cap.pop(cadence168.FIELD,None)
+        if 172 in c.commits:
+            for key in ('current_full172_admission', 'current_full172_post_guard_fit', 'full172_guard_plan',
+                        'full172_allocated_ceiling_bytes', 'full172_admitted_cpu_quota_micros',
+                        'full172_admitted_total_memory_bytes'):
+                cap.pop(key, None)
         return dict(record,capacity=cap)
     return probe(c)
 
