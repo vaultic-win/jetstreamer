@@ -87,7 +87,12 @@ nextfile=scratch/"effective-next.json";durable(nextfile,c.next_cfg)
 aggregate=reconcile.assemble(c,done,fleet["continuing_audit_obligation"]["current_observation"],fleet["current_home_cycle_capacity"],bound(nextfile))
 assert aggregate["historical166_scheduled_sample_before_local_commit"]==c.historical166
 assert aggregate["observer"]==fleet["observer"] and aggregate["sampled_at_utc"]==fleet["sampled_at_utc"]
-assert aggregate["canonical_producer_count"]==3 and aggregate["active_producer_count"]==5 and len(aggregate["effective_status_receipts"])==19
+assert aggregate["canonical_producer_count"]==fleet["canonical_producer_count"]-1==3
+assert aggregate["active_producer_count"]==fleet["active_producer_count"]-1
+assert aggregate["active_private_diagnostic_count"]==fleet["active_private_diagnostic_count"]
+assert aggregate.get("terminal168_trace_mismatch")==fleet.get("terminal168_trace_mismatch")
+assert [r["epoch"] for r in aggregate["actual_active_private_diagnostics"]]==[r["epoch"] for r in fleet["actual_active_private_diagnostics"]]
+assert len(aggregate["effective_status_receipts"])==19
 for k in ("complete_DATA_bytes","complete_projected_memory_bytes","all_reservation_ending_bytes","additional_independent166_DATA_cap_bytes"):
     assert aggregate[k]==fleet[k]
 def denied(call):

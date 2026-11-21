@@ -11,3 +11,15 @@ The publisher can also consume a complete four-row native sample whose epoch 166
 If the preceding consumer had started its conditional status writes, the alternative `after-166` status directory retains their immutable selected intents and readbacks. It uses the same cycle lock. Every outstanding write still uses the actual predecessor ETag and an immediate readback. A previous epoch 166 replay PUT that reached storage becomes the predecessor of the verification status. An uncommitted replay intent remains historical. A failed native observation that left partial output, a different sampled identity, expired publication age, an existing conflicting next config or another owner's R2 write requires reconciliation with the actual artifacts. Keep the prior sample and immutable status evidence.
 
 For a previously armed unwrapped native service, use its original scheduled config and unit identity. If a full four-row sample exists with corresponding PID 1 success, resume the same publisher using that sample. If PID 1 records failure and the registered output is absent, preserve that failure and diagnose epoch 166. Following actual terminal proof, install the qualified wrapper only on the existing elapsed/failed named sampler when the producer, sampler, pending timer, publisher lock and sample path have been checked. A single invocation of that scheduled service can then produce the genuine three-row result at the same registered path and a later actual start time. A newer complete fleet takes precedence. The dispatcher rejects a pre-existing output; do not overwrite a partial or a committed observation.
+
+After the original 168 private trace closes, the deployed predecessor is
+`epoch168-terminal-status-20261121-v1/publisher-v1` (seal SHA-256
+`76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53`).
+Preserve its 168 closure and its delivery estimates when assembling the next
+publisher. Copy its sealed members, update the three native package constants
+in its composed `closed166.py` from this directory's `closed166.py`, and copy
+this directory's `race166.py`. Run `qualify_race166.py` with this package, a
+completed predecessor fleet, its immediate successor fleet and a private
+scratch directory. The fixture reads the genuine four-row native sample and
+PID 1 history. After simulated local completion of 166 it expects three
+canonical replays, all original private rows and all 19 status readbacks.

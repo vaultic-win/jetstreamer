@@ -5,9 +5,9 @@ from pathlib import Path
 
 from evidence import BASE, bound, checked, need, sealed
 
-PACKAGE = BASE / "epoch166-terminal-20261121-v1/cadence-tools"
-SHA = "aeeb62e9d729010968d6e8391aa5194b75d457de79dbae4a12ce6ab99bd9edb2"
-SEAL = "219dec9469ef13ceca4d92028a1cb624e0ed50bb58a5a4ce3ca6b82b42e7c603"
+PACKAGE = BASE / "epoch166-terminal-20261121-v1/cadence-tools-v2"
+SHA = "6bc61b775d8c5ad46f52938405388bac84f7faf0e079b6be906eda6d5de6913c"
+SEAL = "9c6e1cdf403ed5921f516b8ca9714ff54bd08b052b695fd253b1eafe31362025"
 TERMINAL = PACKAGE.parent / "TERMINAL_SUCCESS.json"
 FIELD = "terminal166_local_commit"
 

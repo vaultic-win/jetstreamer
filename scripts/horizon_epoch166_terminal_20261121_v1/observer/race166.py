@@ -160,6 +160,13 @@ def successful_sample(c):
     begins=[e for e in records if e.get("MESSAGE_ID")==started]
     programs=(str(NATIVE)+" ",str(closed166.PACKAGE/"terminal166")+" dispatch-cadence ",
               "/usr/bin/python3 -B "+str(Path(__file__).resolve())+" ")
+    # A previously armed timer can still execute the preceding sealed sampler.
+    original=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1")
+    command="/usr/bin/python3 -B "+str(original/"race166.py")+" "
+    if len(begins)==1 and command in begins[0]["MESSAGE"]:
+        need(bound(original/"deployment-seal-receipt.json")["sha256"]=="76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53"
+             and bound(original/"race166.py")["sha256"]=="eecc61efb7203defeace51625cd59ee94efa99901927823c9585513a6f0219ec","preceding native sampler changed")
+        programs+= (command,)
     need(len(begins)==1 and any(program in begins[0]["MESSAGE"] for program in programs)
          and int(begins[0]["__REALTIME_TIMESTAMP"])<(start+1)*1000000
          and c.fleet["sole_next_observer"]["path"] in begins[0]["MESSAGE"]
