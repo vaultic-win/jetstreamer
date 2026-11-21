@@ -157,50 +157,7 @@ mod enabled {
 
     /// No source transaction, scheduler count or pending entry is consumed here.
     pub(crate) fn complete_source(buffer: &SlotExecutionBuffer) -> Result<bool, String> {
-        if buffer.processed_tx_count != 0 || buffer.processed_entry_count != 0 {
-            return Err("partial original-entry source resume is unqualified".into());
-        }
-        let (Some(txs), Some(entries)) = (buffer.expected_tx_count, buffer.expected_entry_count)
-        else {
-            return Ok(false);
-        };
-        if txs > 65536
-            || entries > 262144
-            || buffer.txs.len() as u64 > txs
-            || buffer.next_entry_index as u64 > entries
-            || buffer.pending_entries.len() as u64 > entries
-        {
-            return Err("original-entry source slot exceeds exact metadata bounds".into());
-        }
-        if !buffer.original_source_anchors_verified
-            || buffer.txs.len() as u64 != txs
-            || buffer.pending_entries.len() as u64 != entries
-            || buffer.next_entry_index as u64 != entries
-            || buffer.txs.iter().any(Option::is_none)
-        {
-            return Ok(false);
-        }
-        let mut cursor = 0usize;
-        for (index, entry) in buffer.pending_entries.iter().enumerate() {
-            if entry.entry_index != index {
-                return Err("source entry order differs".into());
-            }
-            if entry.tx_count > 0 {
-                if entry.start_index != cursor {
-                    return Err("source transaction grouping is not contiguous".into());
-                }
-                cursor = cursor
-                    .checked_add(entry.tx_count)
-                    .ok_or("source transaction range overflow")?;
-                if cursor as u64 > txs {
-                    return Err("source entry exceeds transaction sequence".into());
-                }
-            }
-        }
-        if cursor as u64 != txs {
-            return Err("source entries do not cover complete transaction sequence".into());
-        }
-        Ok(true)
+        buffer.complete_ordered_source(buffer.original_source_anchors_verified)
     }
 
     pub(crate) fn adapt(

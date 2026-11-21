@@ -35,6 +35,7 @@ mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 mod epoch141_original_entry;
+mod epoch141_suffix;
 mod epoch163_first_output128;
 mod epoch167_local_index;
 mod epoch207_singleton;
@@ -3737,6 +3738,7 @@ impl TransactionScheduler {
         parent_slot: Slot,
         slot: Slot,
     ) -> Result<(), String> {
+        epoch141_suffix::edge(parent_slot, slot)?;
         if slot == 0 {
             if parent_slot != 0 {
                 return Err(format!(
@@ -4272,6 +4274,11 @@ impl TransactionScheduler {
                 break;
             };
 
+            // A complete source slot is drained atomically while the scheduler lock is
+            // held. Before this point no entry from the slot can reach the worker.
+            if epoch141_suffix::active() && !epoch141_suffix::complete(current_slot, buffer)? {
+                break;
+            }
             #[cfg(feature = "epoch141-original-entry-qualification")]
             let original = if let Some(bundle) = &self.original_entries {
                 let mut bundle = bundle.lock().map_err(|_| "original bundle lock poisoned")?;
@@ -4337,6 +4344,7 @@ enum TransactionMetadataInput {
 
 #[derive(Debug, Default)]
 struct SlotExecutionBuffer {
+    suffix_anchor: Option<epoch141_suffix::Anchor>,
     txs: Vec<Option<ScheduledTransaction>>,
     pending_entries: VecDeque<PendingEntry>,
     next_entry_index: usize,
@@ -4349,7 +4357,54 @@ struct SlotExecutionBuffer {
 }
 
 impl SlotExecutionBuffer {
+    fn complete_ordered_source(&self, anchors_ready: bool) -> Result<bool, String> {
+        if self.processed_tx_count != 0 || self.processed_entry_count != 0 {
+            return Err("partial original-entry source resume is unqualified".into());
+        }
+        let (Some(txs), Some(entries)) = (self.expected_tx_count, self.expected_entry_count) else {
+            return Ok(false);
+        };
+        if txs > 65536
+            || entries > 262144
+            || self.txs.len() as u64 > txs
+            || self.next_entry_index as u64 > entries
+            || self.pending_entries.len() as u64 > entries
+        {
+            return Err("original-entry source slot exceeds exact metadata bounds".into());
+        }
+        if !anchors_ready
+            || self.txs.len() as u64 != txs
+            || self.pending_entries.len() as u64 != entries
+            || self.next_entry_index as u64 != entries
+            || self.txs.iter().any(Option::is_none)
+        {
+            return Ok(false);
+        }
+        let mut cursor = 0usize;
+        for (index, entry) in self.pending_entries.iter().enumerate() {
+            if entry.entry_index != index {
+                return Err("source entry order differs".into());
+            }
+            if entry.tx_count > 0 {
+                if entry.start_index != cursor {
+                    return Err("source transaction grouping is not contiguous".into());
+                }
+                cursor = cursor
+                    .checked_add(entry.tx_count)
+                    .ok_or("source transaction range overflow")?;
+                if cursor as u64 > txs {
+                    return Err("source entry exceeds transaction sequence".into());
+                }
+            }
+        }
+        if cursor as u64 != txs {
+            return Err("source entries do not cover complete transaction sequence".into());
+        }
+        Ok(true)
+    }
+
     fn reset_for_restart(&mut self) {
+        self.suffix_anchor = None;
         #[cfg(feature = "epoch141-original-entry-qualification")]
         {
             self.original_source_anchors_verified = false;
@@ -5109,6 +5164,33 @@ impl BlockMetadataNotifier for BankBlockMetadataNotifier {
             .lock()
             .expect("firehose gate lock poisoned");
         self.progress.note_block_meta_slot(slot);
+        if epoch141_suffix::active() {
+            match epoch141_suffix::Anchor::from_source(
+                parent_slot,
+                slot,
+                _parent_blockhash,
+                _blockhash,
+            ) {
+                Ok(anchor) => {
+                    let mut state = self
+                        .scheduler
+                        .state
+                        .lock()
+                        .expect("transaction scheduler lock");
+                    let place = &mut state.slots.entry(slot).or_default().suffix_anchor;
+                    if place.is_some_and(|prior| prior != anchor) {
+                        self.failure
+                            .record(format!("conflicting original source metadata at {slot}"));
+                        return;
+                    }
+                    *place = Some(anchor);
+                }
+                Err(error) => {
+                    self.failure.record(error);
+                    return;
+                }
+            }
+        }
         #[cfg(feature = "epoch141-original-entry-qualification")]
         if let Err(error) = self.scheduler.authenticate_original_source_metadata(
             slot,
@@ -5301,7 +5383,7 @@ fn usage(program: &str) -> String {
          \x20      [--recover-staged-only | --recover-staged-cohort-only |\n\
          \x20       --recover-unreceipted-root-cohort-only]\n\
          \x20      [--source-cohort-receipt=PATH | --unreceipted-recovery-evidence=PATH]\n\
-         \x20      [--publish-through-epoch=N] [--require-local-slot-ranges=167]\n\
+         \x20      [--publish-through-epoch=N] [--require-local-slot-ranges=167] [--epoch141-strict-suffix]\n\
          Read-only source diagnostic: {program} --probe-successor-boundary=SLOT\n\
          SLOT must be a nonzero epoch boundary; no other arguments are accepted.\n\
          This runs the production boundary reader with a 60-second total timeout,\n\
@@ -14999,6 +15081,7 @@ fn qualification_expectations(
     if plan.epoch == 228 {
         return epoch228_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
     }
+    epoch141_suffix::recheck_roots(&expected)?;
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
     if snapshot_slot != plan.bootstrap_slot {
@@ -19943,6 +20026,7 @@ async fn main() {
     let mut checkpoint_resume_sha: Option<String> = None;
     let mut checkpoint_exit_proof: Option<PathBuf> = None;
     let mut checkpoint_exit_sha: Option<String> = None;
+    let mut strict_epoch141_suffix = false;
     let mut epoch141_original_cli = epoch141_original_entry::Cli::default();
     let mut epoch223_tail_comparison = false;
     let mut epoch223_tail_preflight = false;
@@ -20099,6 +20183,11 @@ async fn main() {
                 exit(2);
             }
             epoch207_singleton_preflight = true;
+        } else if arg == "--epoch141-strict-suffix" {
+            if std::mem::replace(&mut strict_epoch141_suffix, true) {
+                eprintln!("duplicate --epoch141-strict-suffix");
+                exit(2);
+            }
         } else if arg == "--require-local-slot-ranges=167" {
             if std::mem::replace(&mut require_local_epoch167_index, true) {
                 eprintln!("duplicate --require-local-slot-ranges=167");
@@ -20661,6 +20750,34 @@ async fn main() {
         )
     {
         eprintln!("error: {error}");
+        exit(2);
+    }
+    if strict_epoch141_suffix
+        && let Err(error) = epoch141_suffix::configure(
+            qualification,
+            verify_option_count != 1
+                || root_checkpoint_cohort
+                || recover_staged_only
+                || recover_staged_cohort_only
+                || recover_unreceipted_root_cohort_only
+                || inherited_epoch_lease
+                || range_info.is_some()
+                || checkpoint_on_pressure
+                || checkpoint_export_directory.is_some()
+                || checkpoint_resume_report.is_some()
+                || env::var_os("JETSTREAMER_EXPORT_HANDOFF_SNAPSHOT_DIR").is_some()
+                || env_truthy("JETSTREAMER_LOAD_FROM_DIR")
+                || !env_truthy("JETSTREAMER_ALLOW_CANDIDATE_RUNTIME")
+                || publish_through_epoch.is_some(),
+            snapshot_archive_override.as_deref(),
+            epoch_hashes.as_deref(),
+            &dest_dir,
+            horizon_output.as_deref(),
+            replay_scratch.as_deref(),
+        )
+        .await
+    {
+        eprintln!("epoch 141 strict suffix rejected: {error}");
         exit(2);
     }
     if let Err(error) = epoch141_original_entry::configure(
