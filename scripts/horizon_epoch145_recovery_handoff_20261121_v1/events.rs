@@ -22,6 +22,9 @@ fn generation_event(row: &Value, unit: &str, iid: &str) -> Result<bool> {
     Ok(false)
 }
 pub fn manager(unit: &str, iid: &str) -> Result<Value> {
+    manager_exit(unit, iid, true)
+}
+pub fn manager_exit(unit: &str, iid: &str, success: bool) -> Result<Value> {
     ensure!(valid_iid(iid), "invalid invocation");
     let mut cmd = Command::new("/usr/bin/journalctl");
     cmd.args([
@@ -43,7 +46,16 @@ pub fn manager(unit: &str, iid: &str) -> Result<Value> {
     let result = (|| {
         for line in BufReader::new(child.stdout.take().context("manager event stream")?).lines() {
             let row: Value = serde_json::from_str(&line?)?;
+            if !success
+                && row["_PID"] == "1"
+                && row["UNIT"] == unit
+                && row["INVOCATION_ID"] == iid
+                && row["MESSAGE_ID"] == FAILURE
+            {
+                return Ok(row);
+            }
             if generation_event(&row, unit, iid)? {
+                ensure!(success, "unexpected original success");
                 return Ok(row);
             }
         }
@@ -53,13 +65,13 @@ pub fn manager(unit: &str, iid: &str) -> Result<Value> {
     child.wait()?;
     result
 }
-fn owned(n: i32) -> Result<OwnedFd> {
+pub(super) fn owned(n: i32) -> Result<OwnedFd> {
     if n < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
     Ok(unsafe { OwnedFd::from_raw_fd(n) })
 }
-fn watch(fd: &OwnedFd, path: &Path) -> Result<()> {
+pub(super) fn watch(fd: &OwnedFd, path: &Path) -> Result<()> {
     let p = std::ffi::CString::new(path.as_os_str().as_bytes())?;
     ensure!(
         unsafe {
@@ -76,11 +88,14 @@ fn watch(fd: &OwnedFd, path: &Path) -> Result<()> {
     Ok(())
 }
 pub fn started(dir: &Path, pid: i32, iid: &str) -> Result<PathBuf> {
+    started_record(dir, pid, iid, "started.json", "invocation")
+}
+pub fn started_record(dir: &Path, pid: i32, iid: &str, name: &str, field: &str) -> Result<PathBuf> {
     let parent = dir.parent().context("post directory")?;
     let proc = owned(unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as i32)?;
     let files = owned(unsafe { libc::inotify_init1(libc::IN_CLOEXEC) })?;
     watch(&files, parent)?;
-    let path = dir.join("started.json");
+    let path = dir.join(name);
     let mut watching = false;
     loop {
         if !watching && dir.try_exists()? {
@@ -93,7 +108,7 @@ pub fn started(dir: &Path, pid: i32, iid: &str) -> Result<PathBuf> {
             if let Ok(v) =
                 platform::read(&path).and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
             {
-                ensure!(v["invocation"] == iid, "crossed post start");
+                ensure!(v[field] == iid, "crossed owner start");
                 return Ok(path);
             }
         }
