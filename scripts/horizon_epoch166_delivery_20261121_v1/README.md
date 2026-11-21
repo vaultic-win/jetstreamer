@@ -1,0 +1,14 @@
+# Epoch 166 local publication receiver
+
+The receiver runs after the original terminal controller has committed its root-owned success record. It holds the original producer's existing epoch lock, opens the archive, checksum and batch receipt without following symlinks, takes kernel read leases, and runs the node's committed-cohort admission as the original producer user. It verifies the receipt digest against the terminal record and checks the destination, transaction, sidecar and inode identities. The active legacy progressive watcher must still point to its separate canonical directory.
+
+Run the sealed receiver as root with a separately admitted synchronous consumer. The receiver appends the original private output directory as the final argument. Its JSON environment variable `HORIZON_SOURCE_HANDOFF` contains the epoch, source directory, transaction, archive and receipt digests, and inherited descriptors named `archive_fd`, `sidecar_fd`, `receipt_fd` and `epoch_lock_fd`. Verify each opened pathname against its inherited inode before reading from it. Keep the consumer foregrounded until its work ends and use a single systemd control group for the receiver and its children. A lease break stops the supervisor. Linux delivers SIGKILL to the direct consumer if its supervisor dies. The consuming process owns its full verification, canonical-write and retry policy.
+
+```sh
+/usr/bin/python3 -IB /sealed/receiver.py \
+    /sealed/native NATIVE_SHA256 /sealed/consumer CONSUMER_SHA256 [CONSUMER_ARGS...]
+```
+
+The output names already match the publisher's canonical filenames inside the original private output directory. The handoff copies no archive data, does not modify the source, and grants no resource release or local retirement. For epochs 167, 170 and 172, use the same original-owner native admission and custody contract after independently binding each epoch's terminal controller, producer identity, directories and original lock. The epoch 166 command accepts only its own sealed authority.
+
+`native.rs` includes the production cohort implementation and links against the repository's node library. Build it with edition 2024 and the node package's existing Rust dependencies. Only a separate qualification build with `--cfg receiver_fixture` exposes the native fixture generator. The fixture uses the archive writer and reader, production batch publisher and production root-checkpoint commit. It constructs a one-slot archive and supplies a private manager envelope. `qualify.py NATIVE GENERATOR PRIVATE_ROOT FRESH_OWNER_FIXTURE` runs the receiver twice, verifies descriptor/filename agreement and lock exclusion in a synchronous consumer, and exercises missing terminal, altered receipt digest, wrong native fingerprint, wrong producer, partial pair and wrong file owner. Both package executables and the consumer must be immutable to the source owner. Run the fixture and consumer only in a private admitted interval.
