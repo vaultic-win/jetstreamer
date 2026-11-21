@@ -105,13 +105,16 @@ def main():
     assert 'PathChanged=' in units[U['PATH']] and all(U['CHECK'] in units[f'horizon-199200-after-publication-{e}.service'] for e in T['CAP'])
     live,fr=F['head'](event)
     assert fr==F['head'](event)[1] and live['owner']=='/root'
-    qualification='115fa1b4a0bd3c702d484a9f59cdfe272743c01ff5acfcd4e5b7c6f2da3fc4aa'
+    qualification='82672869ba90c9e63cf327929bb28172b8866b8c329849d184295155cc3f1e0d'
     five=json.loads(F['pin'](F['NATIVE']/'qualification.json',qualification).read_bytes())
-    full=five['fit']
+    full=F['bound'](event,five['native'],0o400)
+    mat=F['bound'](event,five['qualified_matrix'],0o400)['matrix']
+    assert five['counts']==mat['counts']==dict(populations=64,publisher_prices=160,transfer_combinations=486,adverse=160)
+    assert 'PathChanged='+str(F['R']/'epoch169-focused-terminal-20261121-v1/TERMINAL_GUARD_DRAINED.json') in units[U['PATH']]
     five_fleet=F['bound'](event,full['fleet'],0o600)
-    assert five['source_commit']=='2a3a480bcd0d50c84b342f30e6b0fa76b9c9ed1f' and full['fits'] and full['closed_full172'] is None
+    assert five['source_commit']=='c777aed01c50c69725adb60d0341a278c495e593' and full['fits'] and full['closed_full172'] is None
     current=T['scenarios'](full,ledger,five_fleet,prior,ram,64,set())
     assert len(current)==32 and current[0]['complete_protected_HOME_bytes']==full['complete_required_HOME_bytes'] and current[0]['gaps']['disk']>0
-    return dict(schema='horizon-199-phase-transition-qa-v1',qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
+    return dict(schema='horizon-199-phase-transition-qa-v2',focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
 if __name__=='__main__':
     print(json.dumps(main(),sort_keys=True))
