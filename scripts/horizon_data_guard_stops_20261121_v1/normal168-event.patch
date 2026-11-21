@@ -1,0 +1,11 @@
+--- a/status.py
++++ b/status.py
+@@ -152,3 +152,3 @@
+     if prior["after_etag"]==etag and prior["after_sha256"]==digest(raw) and prior["after_status"]==json.loads(raw):return ref,prior
+-    if e in guard_stops.EPOCHS:
++    if e in guard_stops.EPOCHS or e==168:
+         admission = recovered.admission_status(e,ref,etag,raw)
+@@ -156,2 +156,3 @@
+             return admission
++    if e in guard_stops.EPOCHS:
+         return guard_stops.initial_readback(e,ref,etag,raw)

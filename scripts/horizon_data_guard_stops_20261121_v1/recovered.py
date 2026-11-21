@@ -374,7 +374,7 @@ def admission_status_path(epoch, iid):
     from evidence import STATUS_ROOT
     import re
 
-    need(epoch in ROUTES and re.fullmatch('[0-9a-f]{32}', iid), 'unexpected recovery identity')
+    need((epoch in ROUTES or epoch==168) and re.fullmatch('[0-9a-f]{32}', iid), 'unexpected recovery identity')
     return STATUS_ROOT / f'event-{epoch}-guarded-admission-{iid}' / 'RECEIPT.json'
 
 
@@ -383,10 +383,19 @@ def admission_status(epoch, predecessor, tag, raw):
     from evidence import digest
     from status import body, key, FIELDS
 
-    current = native(epoch)
-    if current is None:
-        return None
-    _, actor = current
+    if epoch == 168:
+        from status168 import D, inspect
+        normal = inspect()
+        if not normal or not normal['ordinary_canonical'] or not normal['first_worker']:
+            return None
+        actor = normal['actor']
+        root = D
+    else:
+        current = native(epoch)
+        if current is None:
+            return None
+        _, actor = current
+        root = BASE / ROUTES[epoch][1]
     iid = actor['producer_invocation_id']
     path = admission_status_path(epoch, iid)
     # A measured startup transition follows the completed bootstrap status from the same worker.
@@ -399,7 +408,6 @@ def admission_status(epoch, predecessor, tag, raw):
     ref = bound(path)
     event = checked(ref)
     prior = checked(predecessor)
-    root = BASE / ROUTES[epoch][1]
     admitted = bound(root/'ACTUAL_ADMISSION_AND_PROTECTION.json')
     first = bound(root/'FIRST_PROTECTED_WORKER.json')
     admitted_actor = checked(admitted)
