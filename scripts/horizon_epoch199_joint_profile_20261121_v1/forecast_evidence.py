@@ -118,6 +118,8 @@ def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_e
     diagnostic = sample_ms + ceil((last['terminal_slot']-last['slot'])*delta_us*1.10/(1000*(last['slot']-first['slot'])))
     selected, cases = routes['select_routes'](rows, closed, deadlines, diagnostic, ready, alternatives)
     return dict(selected=selected, alternatives=cases, sources=refs, projected_populations=64,
+                projected_disk_margin_bytes=selected['case']['net_bytes']-selected['row']['gaps']['disk'],
+                price_assumptions='Uses the lower recorded free HOME and RAM at the fit and cycle, with native unspent bookings captured at the fit. Further retained growth, a smaller post-repair transfer or insufficient memory can change the selected route. No undated release is counted in the dashboard ETA.',
                 projected_transfer_combinations=len(rows), actual_grants=0, actual_new_physical_release_bytes=0,
                 measured_free_HOME_lower_bound=free_home, measured_available_RAM_lower_bound=free_memory,
                 focused169_private_endpoint_ms=diagnostic, public169_status_forecast_ms=deadlines[169],

@@ -3,6 +3,7 @@ from pathlib import Path
 import argparse
 import datetime as dt
 import hashlib
+import json
 import os
 import sys
 
@@ -82,18 +83,30 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
         stamp = head['sampled_at_utc']
         out = fleet.parent
         predecessor = head['previous_Root_operational_review']
-        assert matched or previous_model['native_fleet'] == predecessor
+        cursor=head_ref
+        while cursor != previous_model['native_fleet']:
+            ancestor=checked(cursor)['previous_Root_operational_review']
+            assert checked(ancestor)['recorded_unix_seconds'] < checked(cursor)['recorded_unix_seconds']
+            cursor=ancestor
     same_window = mode == 'current' and matched
     day, tag = utc(stamp).strftime('%Y%m%d %H%M%S').split()
     closed_window = utc(stamp)+dt.timedelta(seconds=1800) <= dt.datetime.now(dt.timezone.utc)
     cadence, controller_hash = (CADENCE, SEAL) if closed_window else active_controller()
-    suffix = f'{day}-{tag}-transfer-v1'
+    terminal = ROOT/'epoch145-guarded-export-20261121-v1/state/d37f36f898a44932a19fd50d7014a6fe/failed.json'
+    names_to_copy=('forecast_routes.py','forecast_evidence.py')
+    source_hashes={name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+                   for name in (*names_to_copy,'prepare_forecast.py')}
+    generation_inputs=dict(previous=predecessor, paid=paid_ref, fit=str(fit_path), fit_hash=fit_hash,
+                           controller=controller_hash, source=source_hashes, same_window=same_window,
+                           worker_terminal=bound(terminal) if terminal.exists() else None)
+    generation=hashlib.sha256(json.dumps(generation_inputs,sort_keys=True).encode()).hexdigest()[:16]
+    suffix = f'{day}-{tag}-transfer-{generation}'
     dest = INC / ('forecast-'+suffix)
     ensure_dir(dest)
     template = INC / 'forecast-165022-live145v5c'
     assert bound(template/'plan.py')['sha256'] == PLAN and bound(template/'apply.py')['sha256'] == APPLY
     pin = {}
-    for name in ('forecast_routes.py','forecast_evidence.py'):
+    for name in names_to_copy:
         source = Path(__file__).with_name(name).read_bytes()
         compile(source, name, 'exec')
         pin[name] = immutable(dest/name, source)
@@ -113,7 +126,6 @@ for key,item in paid['conditional_statuses_verified'].items():
     found,_=follow_event(int(key),basis[key],row['after_etag'],body(row['after_status']))
     assert found==item['receipt']
     basis[key]=found""")
-    terminal = ROOT/'epoch145-guarded-export-20261121-v1/state/d37f36f898a44932a19fd50d7014a6fe/failed.json'
     historical = False
     if terminal.exists():
         terminal_ref = bound(terminal)
@@ -182,7 +194,7 @@ after(141,max(ready,donor_available(167,replay_end[167]),"""
         ('2026-11-21T16:50:22Z',stamp,1), (" and next_time.date()==utc(head['sampled_at_utc']).date()", '',1),
         ("next_tag=next_time.strftime('%H%M%S')","next_tag=next_time.strftime('%H%M%S')\nnext_day=next_time.strftime('%Y%m%d')",1),
         ('{next_tag}-live166167170-20261121-v1.timer','{next_tag}-live166167170-{next_day}-v1.timer',1),
-        ('after165022-20261121-v1','after'+tag+'-'+day+'-transfer-v1',1),
+        ('after165022-20261121-v1','after'+tag+'-'+day+'-transfer-'+generation,1),
         ('cycle{next_tag}-live166167170-19-20261121-v1','cycle{next_tag}-live166167170-19-{next_day}-v1',2),
         ("for tag in ('165022',next_tag):",f"for tag,day in (('{tag}','{day}'),(next_tag,next_day)):",1),
         ('{tag}-live166167170-20261121-v1-status.service','{tag}-live166167170-{day}-v1-status.service',1),
@@ -236,4 +248,9 @@ if __name__ == '__main__':
     ap.add_argument('--fit',type=Path, default=ROOT/'epoch172-current-delivery-20261121-v1/event172-run-c077680a3b774395a639ee769f5c400b/fit.json')
     ap.add_argument('--fit-sha256',default='31744ff6348112e83adeaca1dac44f3c6ef3f706a888f1ad1365a893a2066445')
     args = ap.parse_args()
-    print(prepare(args.mode,args.fleet,args.paid,args.fit,args.fit_sha256))
+    directory=prepare(args.mode,args.fleet,args.paid,args.fit,args.fit_sha256)
+    from evidence import bound,checked,sealed
+    ref=bound(args.fleet)
+    fleet=checked(ref)
+    due=sealed(fleet['sole_next_observer'])['not_before_utc'] if args.mode=='next' else fleet['sampled_at_utc']
+    print(json.dumps(dict(previous=ref, due=due, plan=bound(directory/'plan.py'), apply=bound(directory/'apply.py'))))
