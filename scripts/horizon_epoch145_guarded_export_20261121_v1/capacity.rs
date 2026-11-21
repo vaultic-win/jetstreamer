@@ -224,6 +224,30 @@ fn resident(entry: &Value, epoch: u64) -> Result<u64> {
     };
     Ok(pss.min(get("anon ")? + get("file_mapped ")?).min(68 * G))
 }
+#[derive(Debug)]
+pub struct GuardInFlight;
+impl std::fmt::Display for GuardInFlight {
+    fn fmt(&self, o: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        o.write_str("waiting for next freshly measured native guard sample")
+    }
+}
+impl std::error::Error for GuardInFlight {}
+
+/// The producer records its timestamp at the start of the two-pass scan.
+/// An already-published healthy result can cease to qualify its physical
+/// credit while its successor is still scanning. Require the same original
+/// freshness on resumed work and place the private worker in an actual stop
+/// during the short gap. No stale sample can authorize a read or write.
+fn temporal(start: u64, completed: u64, now: u64) -> Result<()> {
+    ensure!(
+        start <= completed && completed <= now && now - completed <= 45,
+        "native guard completion expired"
+    );
+    if now - start > 45 {
+        return Err(GuardInFlight.into());
+    }
+    Ok(())
+}
 fn newest_sample(plan_ref: &Value) -> Result<(u64, u64)> {
     let plan = jsonref(plan_ref)?;
     let dir = Path::new(
@@ -258,12 +282,20 @@ fn newest_sample(plan_ref: &Value) -> Result<(u64, u64)> {
             && o["exceeds_budget"] == false
             && s["producer"]["active"] == "active"
             && s["producer_stop_enabled"] == true
-            && f::now()?
-                .checked_sub(n(&s, "recorded_unix_seconds")?)
-                .is_some_and(|age| age <= 45),
+            && s["worker_observation_error"].is_null()
+            && s["producer"]["invocation_id"] == plan["invocation_id"]
+            && s["producer"]["restarts"] == 0
+            && s["guard_sha256"]
+                == "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016",
         "stale or invalid native guard sample {}",
         p.display()
     );
+    let m = fs::symlink_metadata(&p)?;
+    temporal(
+        n(&s, "recorded_unix_seconds")?,
+        m.mtime().try_into()?,
+        f::now()?,
+    )?;
     let cap = n(&plan, "maximum_root_physical_bytes")?;
     let min = n(&o["first"], "physical_bytes")?.min(n(&o["second"], "physical_bytes")?);
     let realized = if o["first"]["vanished_entries"] == 0 && o["second"]["vanished_entries"] == 0 {
@@ -302,6 +334,22 @@ impl Fit {
         Ok(
             json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":self.memfloor,"169_unspent":ra,"172_unspent":rb}),
         )
+    }
+    /// Used only before the source barrier or while the worker is stopped.
+    /// Other current guard failures remain terminal immediately.
+    pub fn await_current(&self, needed: u64) -> Result<Value> {
+        let start = std::time::Instant::now();
+        loop {
+            match self.current(needed) {
+                Err(e)
+                    if e.is::<GuardInFlight>()
+                        && start.elapsed() < std::time::Duration::from_secs(35) =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(250))
+                }
+                result => return result,
+            }
+        }
     }
     pub fn topology(&self) -> Result<()> {
         ensure!(
@@ -456,4 +504,17 @@ pub fn capture(b: &Bound) -> Result<Fit> {
 
 pub fn output_allocation() -> u64 {
     BYTES.div_ceil(4096) * 4096
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+    #[test]
+    fn positive_credit_requires_fresh_scan_start() {
+        assert!(temporal(100, 120, 145).is_ok());
+        assert!(temporal(100, 120, 146).unwrap_err().is::<GuardInFlight>());
+        assert!(!temporal(100, 120, 170).unwrap_err().is::<GuardInFlight>());
+        assert!(temporal(100, 90, 110).is_err());
+        assert!(temporal(100, 120, 110).is_err());
+    }
 }

@@ -13,6 +13,7 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
+mod recover;
 mod source_lease;
 
 use anyhow::{Context, Result, ensure};
@@ -74,7 +75,7 @@ fn verify_cgroup() -> Result<String> {
 }
 fn check_self(sha: &str) -> Result<()> {
     privilege()?;
-    let path = Path::new(BASE).join("deployment/export145");
+    let path = Path::new(BASE).join("deployment-v2/export145");
     let this = fs::metadata("/proc/self/exe")?;
     let disk = fs::metadata(&path)?;
     ensure!(
@@ -207,15 +208,27 @@ fn existing_directories() -> Result<(PathBuf, PathBuf)> {
     );
     Ok((state, out))
 }
-fn empty(path: &Path) -> Result<()> {
+fn freeze(pid: u32) -> Result<()> {
     ensure!(
-        fs::read_dir(path)?.next().is_none(),
-        "previous contents require explicit reconciliation at {}",
-        path.display()
+        unsafe { libc::kill(pid.try_into()?, libc::SIGSTOP) } == 0,
+        "stop private worker"
     );
-    Ok(())
+    let start = Instant::now();
+    loop {
+        let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
+        if status
+            .lines()
+            .any(|l| l.starts_with("State:") && l.split_whitespace().nth(1) == Some("T"))
+        {
+            return Ok(());
+        }
+        ensure!(
+            start.elapsed() < Duration::from_secs(2),
+            "private worker did not stop"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
 }
-
 fn allocate(root: &Path, bytes: u64, minimum: u64) -> Result<tempfile::NamedTempFile> {
     let before = capacity::home()?.0;
     let rounded = bytes.div_ceil(4096) * 4096;
@@ -286,7 +299,19 @@ fn child(sha: &str, parent: u32, lock_fd: i32) -> Result<()> {
     };
     let archive = lease(SOURCE)?;
     let manifest = lease(MANIFEST)?;
-    let t = allocate(&out, BYTES, floor)?;
+    let t = match recover::predecessor(&out)? {
+        Some(p) => {
+            ensure!(
+                v["reused"] == p.to_str().unwrap(),
+                "crossed predecessor release"
+            );
+            recover::open(&p)?
+        }
+        None => {
+            ensure!(v["reused"].is_null(), "missing previously allocated output");
+            allocate(&out, BYTES, floor)?
+        }
+    };
     let m = t.as_file().metadata()?;
     custody::write_new(
         &state.join("allocated.json"),
@@ -360,10 +385,15 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
     pending()?;
     source_identity()?;
     let (state, out) = existing_directories()?;
-    empty(&out)?;
+    let predecessor = recover::predecessor(&out)?;
+    let needed = if predecessor.is_some() {
+        0
+    } else {
+        capacity::output_allocation()
+    };
     let fit = capacity::capture(&fleet)?;
     fit.topology()?;
-    let initial = fit.current(capacity::output_allocation())?;
+    let initial = fit.await_current(needed)?;
     if !execute {
         println!(
             "{}",
@@ -396,9 +426,9 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
     let pid = worker.id();
     let mut input = worker.stdin.take().context("worker barrier")?;
     let guard = (|| -> Result<()> {
-        let sample = fit.current(capacity::output_allocation())?;
+        let sample = fit.await_current(needed)?;
         pending()?;
-        let release = json!({"iid":iid,"parent":x,"pid":pid,"start_ticks":native::ticks(pid)?,"bytes":BYTES,"protected":sample["protected_bytes"]});
+        let release = json!({"iid":iid,"parent":x,"pid":pid,"start_ticks":native::ticks(pid)?,"bytes":BYTES,"reused":predecessor,"protected":sample["protected_bytes"]});
         custody::write_new(
             &state.join("first-guard.json"),
             &json!({"time":custody::now()?,"fit":fit.evidence,"sample":sample,"barrier":release}),
@@ -432,7 +462,7 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
                 && allocation["iid"] == iid,
             "wrong allocated inode"
         );
-        let a = fit.current(0)?;
+        let a = fit.await_current(0)?;
         fit.topology()?;
         let post = json!({"iid":iid,"pid":pid,"inode":m.ino(),"sample":a,"at":custody::now()?});
         custody::write_new(&state.join("post-allocation-guard.json"), &post)?;
@@ -449,7 +479,19 @@ fn supervise(fleet: Bound, sha: &str, execute: bool) -> Result<()> {
                 start.elapsed() < Duration::from_secs(72 * 3600),
                 "export execution deadline expired"
             );
-            let sample = fit.current(0)?;
+            let sample = match fit.current(0) {
+                Err(e) if e.is::<capacity::GuardInFlight>() => {
+                    freeze(pid)?;
+                    let current = fit.await_current(0)?;
+                    fit.topology()?;
+                    ensure!(
+                        unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
+                        "resume private worker"
+                    );
+                    current
+                }
+                result => result?,
+            };
             if last.elapsed() >= Duration::from_secs(30) {
                 fit.topology()?;
                 println!("{} epoch145 guard {}", custody::now()?, sample);
@@ -503,6 +545,18 @@ fn run() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn pending_scan_holds_only_the_owned_worker() {
+        let mut child = Command::new("/bin/sleep").arg("30").spawn().unwrap();
+        let pid = child.id();
+        let r = freeze(pid);
+        unsafe {
+            libc::kill(pid as i32, libc::SIGCONT);
+        }
+        child.kill().unwrap();
+        child.wait().unwrap();
+        r.unwrap();
+    }
     #[test]
     fn reservation_is_physical_without_extending_logical_eof() {
         let t = tempfile::tempdir().unwrap();
