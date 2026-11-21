@@ -5,7 +5,8 @@ use super::*;
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
 const REPOSITORY: &str = "/home/sol/workspace/jetstreamer";
 const ORIGIN: &str = "git@github-matt-vaultic:vaultic-win/jetstreamer.git";
-const UPLOADER: &str = "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
+pub(super) const UPLOADER: &str =
+    "eb448ede557144f04446dbe00a2d2ec7ad88c934a7a227797d0569a15307a904";
 use post::{PIPELINE, VERIFIER};
 
 fn bound(path: PathBuf, sha: &str) -> Bound {

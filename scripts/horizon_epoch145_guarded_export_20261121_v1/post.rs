@@ -6,7 +6,9 @@ use std::os::unix::fs::PermissionsExt;
 
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
-#[cfg(incident_retry_post145_only)]
+#[cfg(incident_timer_post145_only)]
+pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v11/export145";
+#[cfg(all(incident_retry_post145_only, not(incident_timer_post145_only)))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v10/export145";
 #[cfg(all(incident_focused_post145_only, not(incident_retry_post145_only)))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v9/export145";
@@ -23,7 +25,10 @@ pub(super) const VERIFIER: &str =
 #[cfg(not(incident_post145_only))]
 pub(super) const PIPELINE: &str =
     "30251e917ca0eb103aebd586556e235150e396a7354bb670b7bc1a44b83faa51";
-#[cfg(incident_timeout_post145_only)]
+#[cfg(incident_timer_post145_only)]
+pub(super) const PIPELINE: &str =
+    "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
+#[cfg(all(incident_timeout_post145_only, not(incident_timer_post145_only)))]
 pub(super) const PIPELINE: &str =
     "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
@@ -31,7 +36,9 @@ pub(super) const PIPELINE: &str =
     "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e";
 #[cfg(not(incident_post145_only))]
 const READER_COMMIT: &str = "ee55f614012585bc99e4ed7398a56758bde2664e";
-#[cfg(incident_timeout_post145_only)]
+#[cfg(incident_timer_post145_only)]
+const READER_COMMIT: &str = "58709604dfa4c97336c2e1f6fac53b862ed6f17f";
+#[cfg(all(incident_timeout_post145_only, not(incident_timer_post145_only)))]
 const READER_COMMIT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
@@ -334,7 +341,10 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
             &root.join("current-reader-tools-v2/build-proof.json"),
             "5a28798a19f694028b748fec0f222cf654b3e2de464706d24e7c106259cccbd4",
         ),
-        if cfg!(incident_timeout_post145_only) {
+        if cfg!(incident_timer_post145_only) {
+            bound(&Path::new(capacity::RUNTIME).join("fast-range-residency-20261121-v1/archive-publication-58709604/native-results.json"),
+                  "d1a49d01c795a48728005fa72b1a4c9ab578977159a1e0f8c3b4fc3f44f13b9b")
+        } else if cfg!(incident_timeout_post145_only) {
             bound(&Path::new(capacity::RUNTIME).join("public-rseek-reconnect-20261121-v1/archive-reader-1d1c4ea175b049c8a6487bc2cb3d1bde/fixtures/native-results.json"),"2e4f273f8fa04cf3438af5fdc23c19c1e3032c2619493e0e318d2ad21d83157a")
         } else {
             bound(
@@ -342,7 +352,10 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
                 "eff17d9c60a6a2fdfacd750841a78f4f7eeddde7c3687b961bfb5b862b6a7019",
             )
         },
-        if cfg!(incident_timeout_post145_only) {
+        if cfg!(incident_timer_post145_only) {
+            bound(&Path::new(capacity::RUNTIME).join("fast-range-residency-20261121-v1/archive-publication-58709604/ARCHIVE_QUALIFIED.json"),
+                  "8c233be38a9f6943bbf9efb4eb861e8d80fbb0c3b685d2ff6b08f746dce52989")
+        } else if cfg!(incident_timeout_post145_only) {
             bound(&Path::new(capacity::RUNTIME).join("public-rseek-reconnect-20261121-v1/archive-reader-1d1c4ea175b049c8a6487bc2cb3d1bde/ARCHIVE_QUALIFIED.json"),"433a9607c0e8d56461709caecf2a112aa75048ca5ac085bb2923af842e15115b")
         } else {
             bound(
@@ -410,7 +423,13 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     );
     #[cfg(incident_post145_only)]
     let qualified = {
-        let (directory, package, proof) = if cfg!(incident_timeout_post145_only) {
+        let (directory, package, proof) = if cfg!(incident_timer_post145_only) {
+            (
+                "fast-range-residency-20261121-v1/production-reader-v1",
+                "082893fdc45288721911818fd77f8b8db043122b27dd0b4fe596eb274213f42d",
+                "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a",
+            )
+        } else if cfg!(incident_timeout_post145_only) {
             (
                 "public-rseek-reconnect-20261121-v1/production-reader-v1",
                 "b76a3860a7c7d890e7405417a0848cc62575d7b501bdc5789502ef29b570af07",
@@ -444,6 +463,22 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
                 && accepted["full_and_plugin_capabilities_accepted"] == true,
             "shared full reader acceptance changed"
         );
+        #[cfg(incident_timer_post145_only)]
+        {
+            let pair = bound(
+                &Path::new(capacity::RUNTIME).join("fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"),
+                "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4",
+            );
+            let paired = custody::json(&pair, true)?;
+            ensure!(
+                paired["reader"] == json!(item)
+                    && paired["threads"] == 1
+                    && paired["slot_count"] == 432000
+                    && paired["uploader"]
+                        == json!({"path":root.join("uploader-tools/jetstreamer-r2"), "sha256":super::publication::UPLOADER}),
+                "paid archive reader and uploader fixture changed"
+            );
+        }
         item
     };
     #[cfg(not(incident_post145_only))]
@@ -718,7 +753,9 @@ mod tests {
         assert_eq!(plugin.sha256, PIPELINE);
         assert_eq!(
             plan.sha256,
-            if cfg!(incident_timeout_post145_only) {
+            if cfg!(incident_timer_post145_only) {
+                "c715952c42ac45b2ebce0a104fee239ff0e5374e18ca2613a569a8f4e91bc36a"
+            } else if cfg!(incident_timeout_post145_only) {
                 "432f57f077e6b82632d3bae94b000bd9a42751c9a3bab7ee20cb69c3b73fd471"
             } else {
                 "89dba1fa9e7d73581e0c1e81ef2d12a8c7bd9bc98f4259943f79caa6197a9486"
