@@ -146,6 +146,10 @@ fn run() -> Result<()> {
         contents == include_bytes!("gates.py"),
         "unsealed gate module"
     );
+    ensure!(
+        matches!(mode, "inspect" | "check" | "execute") && unsafe { libc::geteuid() } == 0,
+        "invalid mode/owner"
+    );
     let anchors = native_gates(&witness)?;
     let p = &anchors["scope"];
     let target = Path::new(string(p, "target")?);
@@ -175,6 +179,21 @@ fn run() -> Result<()> {
     let ledgerpath = dir.join("LEDGER.json");
     let process = scan(target)?;
     if mode == "check" {
+        let allocation = Command::new("/usr/bin/du")
+            .args(["--summarize", "--one-file-system", "--block-size=1", "--"])
+            .arg(target)
+            .output()?;
+        ensure!(
+            allocation.status.success() && allocation.stderr.is_empty(),
+            "account allocation walk failed"
+        );
+        let raw = std::str::from_utf8(&allocation.stdout)?.trim_end();
+        let (bytes, path) = raw.split_once('\t').context("malformed allocation")?;
+        ensure!(
+            Path::new(path) == target
+                && Some(bytes.parse::<u64>()?) == p["expected_bytes"].as_u64(),
+            "stopped allocation changed"
+        );
         let first = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         let second = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         ensure!(
