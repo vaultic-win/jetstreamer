@@ -68,17 +68,22 @@ fn create_receipt_mount(alias: &Path, iid: &str) -> Result<PathBuf> {
     verify_mount(alias, &actual)?;
     Ok(actual)
 }
-fn preserves_admitted_space(latest: &Value, a: &Value) -> Result<()> {
+fn preserves_admitted_space(latest: &Value, a: &Value, guard_floor: u64) -> Result<()> {
     let original = num(a, "protected_existing_floor_bytes")?;
-    let floor = num(latest, "protected_existing_floor_bytes")?;
+    let refreshed = num(latest, "protected_existing_floor_bytes")?;
+    let available = num(&latest["capacity"], "observed_available_bytes")?;
+    let required = capacity::add(original.max(refreshed), RESERVATION)?;
     ensure!(
-        floor <= original
-            && num(&latest["capacity"], "observed_available_bytes")?
-                >= capacity::add(original, RESERVATION)?,
-        "original admitted free space or floor no longer covered"
+        guard_floor >= original.max(refreshed),
+        "guard floor {guard_floor} does not cover admitted {original} and refreshed {refreshed} bytes"
+    );
+    ensure!(
+        available >= required,
+        "available {available} bytes below {required} required (admitted {original}, refreshed {refreshed}, reservation {RESERVATION})"
     );
     Ok(())
 }
+
 pub(super) fn run(
     n: &mut Native,
     review: &Value,
@@ -157,8 +162,15 @@ pub(super) fn run(
     units::producer(n, None, &pr, &affinity)?;
     // Recheck fresh capacity immediately before the first activation, without
     // rerunning Git/source hashing within the short first-fire clock.
+    // The stop qualification deliberately trips at its first firing. Its
+    // installed guard covers either complete census and cannot issue a token.
+    let guard_floor = if qualification {
+        u64::MAX
+    } else {
+        num(a, "protected_existing_floor_bytes")?
+    };
     let latest = refreshed_capacity(n, review, false)?;
-    preserves_admitted_space(&latest, a)?;
+    preserves_admitted_space(&latest, a, guard_floor)?;
     check_devices(&latest, a)?;
     units::producer(n, None, &pr, &affinity)?;
     peers.verify(n)?;
@@ -184,11 +196,6 @@ pub(super) fn run(
         let token_dest = token_root.join(&iid);
         absent(&token_dest)?;
         let receipts = create_receipt_mount(&receipt_mount, &iid)?;
-        let guard_floor = if qualification {
-            u64::MAX
-        } else {
-            num(a, "protected_existing_floor_bytes")?
-        };
         let gp = json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"filesystem":EXPECTED_FILESYSTEM,"boot_id":a["boot_id"],"main_start_ticks":process_ticks(pid)?,"native_main":{"main_pid":pid,"executable":HARNESS,"sha256":HARNESS_SHA},"minimum_free_bytes":guard_floor,"worker_root":ROOT,"maximum_root_physical_bytes":SCRATCH,"maximum_worker_vmas":3500000,"receipt_directory":receipts});
         let gr = save_json(&n.root, "guard-plan.json", &gp)?;
         let deployed_gr = units::bind_plan(n, &guard_binding, &gr, units::GUARD_ARG)?;
@@ -324,7 +331,7 @@ pub(super) fn run(
         check_mount_sample(a, &sample)?;
         first_guard(&p, &token, &gp, &sample, &journal, now()?)?;
         let latest = refreshed_capacity(n, review, true)?;
-        preserves_admitted_space(&latest, a)?;
+        preserves_admitted_space(&latest, a, guard_floor)?;
         check_devices(&latest, a)?;
         units::producer(n, Some(&iid), &pr, &affinity)?;
         gate::held_image(pid, &iid, UNIT, HARNESS)?;
@@ -382,4 +389,43 @@ pub(super) fn run(
         }
     }
     result
+}
+
+#[cfg(test)]
+mod disk_tests {
+    use super::*;
+
+    #[test]
+    fn rising_floor_requires_both_free_bytes_and_guard_coverage() {
+        let original = 4_174_855_092_600_u64;
+        let refreshed = original + (163_732_389_888 - 162_524_471_296_u64);
+        let admission = json!({"protected_existing_floor_bytes":original});
+        let latest = |floor: u64, free: u64| {
+            json!({
+                "protected_existing_floor_bytes": floor, "capacity":{"observed_available_bytes":free}
+            })
+        };
+        let required = refreshed + RESERVATION;
+        assert!(
+            preserves_admitted_space(&latest(refreshed, required), &admission, u64::MAX).is_ok()
+        );
+        assert!(
+            preserves_admitted_space(&latest(refreshed, required - 1), &admission, u64::MAX)
+                .is_err()
+        );
+        assert!(
+            preserves_admitted_space(&latest(refreshed, u64::MAX), &admission, original).is_err()
+        );
+        assert!(
+            preserves_admitted_space(
+                &latest(original - 1, original + RESERVATION - 1),
+                &admission,
+                original
+            )
+            .is_err()
+        );
+        assert!(
+            preserves_admitted_space(&latest(u64::MAX, u64::MAX), &admission, u64::MAX).is_err()
+        );
+    }
 }
