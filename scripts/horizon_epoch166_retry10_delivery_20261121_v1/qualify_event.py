@@ -85,6 +85,8 @@ def run(package,work,fleet_path,fixture,fit_program):
     validation=runpy.run_path(str(fit_program))["validate"]
     provider=evidence.checked(evidence.bound(work.parent/"whole-fit.json"))
     hypothetical=copy.deepcopy(provider)
+    hypothetical["required_available_memory_bytes"]+=hypothetical["joined_resident_lower_bounds"]["166"]
+    hypothetical["available_memory_bytes"]=max(hypothetical["available_memory_bytes"],hypothetical["required_available_memory_bytes"])
     del hypothetical["replacements"]["166"],hypothetical["population"][closure.UNIT],hypothetical["joined_resident_lower_bounds"]["166"]
     hypothetical.update(closed_recovered166=proof)
     hypothetical["bookings"]["166"]["measurement"]="two complete stopped-tree walks"

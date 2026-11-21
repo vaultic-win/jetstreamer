@@ -136,8 +136,24 @@ def main():
            observed["closed_recovered166"] is None and term["IID"]==incumbent["producer_invocation_id"],
            "active generation registered as closed")
     rejected(lambda:term["expected_timer"]({"Id":"foreign"}))
+    metered,registration168=m["terminal168_profile"]()
+    try:metered["inspect"]()
+    except FileNotFoundError as ex:
+        s.need(Path(ex.filename)==metered["T"]/"TERMINAL_SUCCESS.json","closure helper rejected unrelated evidence")
+    else:raise ValueError("live 168 incorrectly marked closed")
+    s.need(observed["closed_metered168"] is None and observed["normal168"]["actor"]["producer_invocation_id"]==metered["IID"] and
+           observed["registered_host_equation"]["retained_168_remaining"]==books["168"]["remaining_bytes"],
+           "metered 168 original allowance not in complete host fit")
+    # The common raw equation already includes cap minus physical 168 bytes.
+    # Dropping its retired guard must not subtract physical growth for a second time.
+    f,rows=m["fleet_head"](fleet)
+    t=dict(physical_bytes=books["168"]["physical_bytes"],root=books["168"]["root"],cap=books["168"]["cap_bytes"])
+    raw168,eq=m["fit"].floor(f,m["bound"](m["fit"].BOOK),t,peer)
+    s.need(raw==raw168+(observed["epoch170_extension"]["extra_bytes"] if observed["epoch170_extension"] else 0) and
+           eq["retained_168_remaining"]==t["cap"]-t["physical_bytes"] and
+           floor(raw,optional,books,145,peer,others,0,paid)[0]<=baseline[0],"closed metered booking changed original equation")
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:

@@ -333,6 +333,48 @@ def trace168():
            (st.st_dev,st.st_ino,st.st_size)==(v["device"],v["inode"],v["length"]) and st.st_blocks*512>=v["allocated"]
            and t["resource_credit_bytes"]==0,"lost original 168 trace")
 
+def terminal168_profile():
+    directory=R/"epoch168-current-delivery-20261121-v1/closure-tools"
+    module=directory/"closure168.py"
+    seal=s.ref(directory/"deployment-seal-receipt.json","073d0da33d8c4187aa25c7e8bccd0d5c1b41e0252170ece14df1d4e6941d11f1")
+    loader["load_package"](directory,seal["sha256"])
+    modules={m["name"]:m["sha256"] for m in bound(seal)["members"] if m["name"].endswith(".py")}
+    s.need(modules=={"closure168.py":"56b81259d2149bd28c2f36e8e75cb51fb6d9fcc0d754ee2d774b08fc4a7139d9",
+                     "closure.py":"bb2f740e675ff7b1d651ce6301a3fa6e5e35a138d7950dcc5f7c3ae81a22324f"},
+           "different metered 168 closure module")
+    return runpy.run_path(str(module)),dict(module=s.ref(module,modules[module.name]),seal=seal)
+
+def metered168_terminal(fleet,rows):
+    if not fleet.get("metered168_local_commit"):return None
+    helper,_=terminal168_profile()
+    terminal=helper["inspect"]()
+    live_ref=s.ref(R/"epoch168-current-delivery-20261121-v1/LIVE.json","11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7")
+    live=bound(live_ref)
+    adref=s.ref(s.D/"ACTUAL_ADMISSION_AND_PROTECTION.json","d2553d0008fa8e43500633e1f916daf4f9609f51eba0be60475c1e3293c9db56")
+    workerref=s.ref(s.D/"FIRST_PROTECTED_WORKER.json","f0881354a940f74fff699c5de9d205c427a3d0414672ce41133e28a2bd0428c6")
+    declaration=bound(terminal["terminal"]);plan=bound(bound(adref)["actual_guard_plan"])
+    s.need(terminal["terminal"]==fleet["metered168_local_commit"] and 168 not in rows and
+           terminal["live"]==live_ref and terminal["admission"]==live["admission"]==adref and
+           terminal["first_worker"]==live["first_protected_worker"]==workerref and bound(workerref)["admission"]==adref and
+           declaration["epoch"]==168 and declaration["producer_unit"]==s.U and declaration["source_admission"]==adref and
+           declaration["producer_invocation_id"]==plan["invocation_id"]=="9cebb1d022124fb08588e93e055d5446" and
+           declaration["terminal_168_disposition"]=="node-published-local-cohort" and
+           declaration["resource_credit_bytes"]==declaration["reservation_ending_bytes"]==0 and
+           declaration["canonical_r2_verified"] is False and declaration["archive_publication_authorized"] is False and
+           plan["worker_root"]==str(s.TREE) and plan["unit"]==s.U and plan["maximum_root_physical_bytes"]==fit.CAP and
+           not fit.members(s.U) and s.show(s.U)["ActiveState"]=="inactive",
+           "metered 168 closure does not match the original full booking")
+    return terminal
+
+def closed168_tree():
+    stable=bound(STABLE[167])["normal168"]
+    run=Path(stable["path"]);m=run.stat()
+    s.need(run==s.RUN and run.parent==s.TREE and run.resolve(strict=True)==run and
+           (m.st_dev,m.st_ino)==(stable["device"],stable["inode"]),"changed retained metered 168 namespace")
+    first=tree_size(s.TREE,fit.CAP);second=tree_size(s.TREE,fit.CAP)
+    s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
+    return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
+
 def census(peers,replacements,extra,c136,own,stops):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
@@ -490,7 +532,8 @@ def capture_once(epoch,ref):
         hist=0 if e==166 else ledger["native_inputs"]["roots"]["standard_peer_realized_bytes"][str(e)]
         books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=effective,physical_bytes=physical,measurement=measurement,
                             remaining_bytes=effective-physical,historical_realized_bytes=hist)
-    extra=s.inspect()
+    closed168=metered168_terminal(f,rows)
+    extra=None if closed168 else s.inspect()
     floor168=0;resident168=0;guard168=None
     tree_measurement="two complete stopped-tree walks"
     if extra:
@@ -521,7 +564,7 @@ def capture_once(epoch,ref):
                 tree_measurement="two retained-tree walks excluding active run"
             tree=dict(physical_bytes=physical,root=str(s.TREE),cap=fit.CAP)
         else:tree=fit.measure_tree()
-    else:tree=fit.measure_tree()
+    else:tree=closed168_tree() if closed168 else fit.measure_tree()
     if 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
@@ -537,6 +580,7 @@ def capture_once(epoch,ref):
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
+    if closed168:s.need(metered168_terminal(f,rows)==closed168,"metered 168 terminal changed during capture")
     if closed166:s.need(proof["inspect"]()==closed166,"terminal guard or archive changed during capture")
     for v in peers.values():
         m=s.show(v["unit"]);t=s.show(v["timer"])
@@ -545,7 +589,7 @@ def capture_once(epoch,ref):
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
-        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed166,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
+        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed166,closed_metered168=closed168,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,

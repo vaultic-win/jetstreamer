@@ -15,6 +15,9 @@ fit_sha=$5
 rt=/var/lib/jetstreamer/horizon_runtime_data
 delivery="$rt/epoch166-retry10-delivery-20261121-v1"
 pkg="$delivery/controller-tools"
+provider="$delivery/capacity-tools-v2/publication-fit"
+bound_provider="$delivery/capacity-tools/publication-fit"
+test "$(sha256sum -- "$provider" | cut -d' ' -f1)" = "$fit_sha"
 repo=/home/sol/workspace/jetstreamer
 test -f "$rt/epoch166-retry10-terminal-20261121-v1/TERMINAL_SUCCESS.json"
 test -S "$socket"
@@ -26,7 +29,7 @@ exec /usr/bin/systemd-run --quiet --unit=horizon-publish-166-retry10-committed.s
     -p CPUQuota=100% -p CPUWeight=10 -p Nice=15 -p MemoryMax=2G -p MemorySwapMax=0 \
     -p TasksMax=128 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=read-only \
     -p "ReadWritePaths=$repo/.git $delivery" -p "WorkingDirectory=$repo" \
-    -p "BindReadOnlyPaths=$socket:/run/epoch166-publisher-ssh" \
+    -p "BindReadOnlyPaths=$socket:/run/epoch166-publisher-ssh $provider:$bound_provider" \
     -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env \
     --setenv=HOME=/home/sol --setenv=TMPDIR="$delivery" --setenv=SSH_AUTH_SOCK=/run/epoch166-publisher-ssh \
     --setenv=TOKIO_WORKER_THREADS=1 --setenv=RAYON_NUM_THREADS=1 \

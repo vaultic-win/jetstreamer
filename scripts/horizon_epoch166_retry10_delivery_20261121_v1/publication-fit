@@ -15,6 +15,12 @@ D=R/"epoch166-retry10-delivery-20261121-v1"
 T=R/"epoch166-retry10-terminal-20261121-v1"
 BOOK=16<<20
 MEM=810658050048
+FULL168=R/"epoch168-current-delivery-20261121-v1"
+# Both publication controllers retain their epoch-specific, independently sealed inputs.
+FLEET_FIELDS={166:"recovered166_local_commit",168:"metered168_local_commit"}
+CLOSURES={166:"closed_recovered166",168:"closed_metered168"}
+TERMINALS={166:T,168:FULL168}
+PACKAGES={166:D/"capacity-tools-v2",168:FULL168/"capacity-tools"}
 
 def need(ok,why):
     if not ok:raise ValueError(why)
@@ -32,23 +38,43 @@ def read(path,mode,limit=32<<20):
 def identity(value):
     return {k:tuple(tuple(p) for p in v) for k,v in value['population'].items()}
 
-def validate(value,fleet,fr,tr):
-    closed=value["closed_recovered166"]
+def closing(value,fleet):
+    result={}
+    for epoch,field in FLEET_FIELDS.items():
+        registered=fleet.get(field)
+        proof=value.get(CLOSURES[epoch])
+        need((registered is None)==(proof is None),"fleet and native closure differ")
+        if proof:
+            need(proof["terminal"]==registered,"different epoch terminal")
+            result[epoch]=proof
+    return result
+
+def validate(value,fleet,fr,tr,epoch=166):
+    closed=closing(value,fleet)
     expected={row["unit"]["Id"] for group in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for row in fleet[group]}
     need(value["schema"]=="horizon-incident-replay-fit-v1" and value["epoch"]==145 and value["fleet"]==fr and value["fits"] and
-         fleet.get("recovered166_local_commit")==tr==closed["terminal"] and "166" not in value["replacements"] and
-         "166" not in fleet["original_disk_guard_recovery_workers"] and
-         set(value["population"])==expected and "166" not in value["joined_resident_lower_bounds"] and
+         epoch in closed and tr==closed[epoch]["terminal"] and set(value["population"])==expected and
          value["complete_cpu_quota_micros"]==64000000 and value["complete_memory_plus_reserve_bytes"]==MEM and
          value["resource_credit_bytes"]==value["stopped_generation_resident_credit_bytes"]==0 and
          value["replay_launch_authorized"] is False and 0<=time.time()-value["recorded_unix_seconds"]<=180,
          "different joined reservation or population")
-    b=value["bookings"]["166"]
-    need(b["measurement"]=="two complete stopped-tree walks" and b["physical_bytes"]>0 and
-         b["remaining_bytes"]+b["physical_bytes"]==b["cap_bytes"]==288<<30 and
-         value["available_HOME_bytes"]>=value["complete_required_HOME_bytes"]+BOOK and
-         value["available_memory_bytes"]>=value["required_available_memory_bytes"]>0,"insufficient publication capacity")
-    return value["complete_required_HOME_bytes"]+BOOK
+    for e in closed:
+        key=str(e);booking=value["bookings"][key]
+        need(key not in value["joined_resident_lower_bounds"] and key not in value["replacements"] and
+             not any(row["epoch"]==e for group in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for row in fleet[group]) and
+             (e!=166 or key not in fleet["original_disk_guard_recovery_workers"]) and
+             (e!=168 or value["normal168"] is None and value["active168_guard_floor"]==0 and
+              value["registered_host_equation"]["retained_168_remaining"]==booking["remaining_bytes"]) and
+             booking["measurement"]=="two complete stopped-tree walks" and booking["physical_bytes"]>0 and
+             booking["remaining_bytes"]+booking["physical_bytes"]==booking["cap_bytes"]==288<<30,"closed booking or owner changed")
+    memory=MEM-sum(p["resident"] for p in value["survivors"].values())-sum(value["joined_resident_lower_bounds"].values())
+    need(value["required_available_memory_bytes"]==memory,"different complete memory equation")
+    # Each closed archive may be verified concurrently on its own retained CPU/RAM
+    # allowance. Reserve the small additional HOME staging once for each such publisher.
+    floor=value["complete_required_HOME_bytes"]+len(closed)*BOOK
+    need(value["available_HOME_bytes"]>=floor and value["available_memory_bytes"]>=value["required_available_memory_bytes"]>0,
+         "insufficient publication capacity")
+    return floor
 
 def wait_for_145_probe():
     # A concurrent full census is a descendant of the frozen 145 verifier. Wait
@@ -92,12 +118,14 @@ def capture_provider(provider,path,digest):
             raise RuntimeError(result.stderr.decode(errors="replace")[-1800:])
         wait_for_145_probe()
 
-def capture(path,sha):
+def capture(path,sha,epoch=166):
+    terminal=TERMINALS[epoch]/"TERMINAL_SUCCESS.json"
+    pkg=PACKAGES[epoch]
     raw,fr=read(path,0o600);fleet=json.loads(raw)
     need(path.parent.parent==R and path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and fr["sha256"]==sha,"wrong fleet")
-    _,tr=read(T/"TERMINAL_SUCCESS.json",0o400)
-    need(fleet.get("recovered166_local_commit")==tr,"no accepted recovered commit")
-    pkg=D/"capacity-tools";snapshot,sr=read(pkg/"deployment-seal-receipt.json",0o444);seal=json.loads(snapshot)
+    _,tr=read(terminal,0o400)
+    need(fleet.get(FLEET_FIELDS[epoch])==tr,"no accepted recovered commit")
+    snapshot,sr=read(pkg/"deployment-seal-receipt.json",0o444);seal=json.loads(snapshot)
     refdata,rr=read(pkg/"provider.json",0o444);binding=json.loads(refdata)
     elf=Path(binding["path"]);_,pr=read(elf,0o555)
     need(seal["destination"]==str(pkg) and any(x["name"]=="provider.json" and x["sha256"]==rr["sha256"] for x in seal["members"]) and
@@ -105,22 +133,26 @@ def capture(path,sha):
     results=[];refs=[]
     for _ in range(2):
         data=capture_provider(elf,path,sha)
-        v=json.loads(data);validate(v,fleet,fr,tr);results.append(v)
+        v=json.loads(data);validate(v,fleet,fr,tr,epoch);results.append(v)
         refs.append(dict(sha256=hashlib.sha256(data).hexdigest(),recorded_unix_seconds=v["recorded_unix_seconds"],
                          available_home=v["available_HOME_bytes"],required_home=v["complete_required_HOME_bytes"],
                          available_memory=v["available_memory_bytes"],required_memory=v["required_available_memory_bytes"]))
     a,b=results
     need(identity(a)==identity(b) and a["phase145"]==b["phase145"] and a["candidate136"]==b["candidate136"] and
-         a["closed_recovered166"]==b["closed_recovered166"] and a["status_registration"]==b["status_registration"] and
-         read(path,0o600)[1]==fr and read(T/"TERMINAL_SUCCESS.json",0o400)[1]==tr,"capacity population changed between captures")
-    return dict(schema="horizon-166-publication-fit-v1",fleet=fr,terminal=tr,boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-                observed_unix_seconds=int(time.time()),available_bytes=b["available_HOME_bytes"],protected_bytes=validate(b,fleet,fr,tr),
+         closing(a,fleet)==closing(b,fleet) and a["status_registration"]==b["status_registration"] and
+         read(path,0o600)[1]==fr and read(terminal,0o400)[1]==tr,"capacity population changed between captures")
+    return dict(schema=f"horizon-{epoch}-publication-fit-v1",fleet=fr,terminal=tr,boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+                observed_unix_seconds=int(time.time()),available_bytes=b["available_HOME_bytes"],protected_bytes=validate(b,fleet,fr,tr,epoch),
                 available_memory_bytes=b["available_memory_bytes"],required_available_memory_bytes=b["required_available_memory_bytes"],
                 publication_cpu_quota_micros=1000000,publication_memory_bytes=2<<30,complete_cpu_quota_micros=64000000,
                 complete_memory_plus_reserve_bytes=MEM,resource_credit_bytes=0,all_existing_commitments_retained=True,
-                full_capacity_provider=pr,complete_captures=refs,source_booking=b["bookings"]["166"],funded_extra_home_bytes=BOOK,
-                charged_to_original_epoch=166,closed_recovered166=b["closed_recovered166"])
+                full_capacity_provider=pr,complete_captures=refs,source_booking=b["bookings"][str(epoch)],funded_extra_home_bytes=len(closing(b,fleet))*BOOK,
+                charged_to_original_epoch=epoch,closed_recovered166=b.get(CLOSURES[166]),closed_metered168=b.get(CLOSURES[168]))
 
 if __name__=="__main__":
     need(os.geteuid()==0 and __debug__ and sys.flags.isolated and len(sys.argv)==3,"expected FLEET SHA256")
-    print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2]),sort_keys=True))
+    path=Path(__file__).resolve(strict=True)
+    selected=168 if path==PACKAGES[168]/"publication-fit" else 166
+    installed=PACKAGES[selected]/"publication-fit"
+    need(path in (installed,D/"capacity-tools/publication-fit") and path.samefile(installed),"unregistered publication capacity image")
+    print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2],selected),sort_keys=True))

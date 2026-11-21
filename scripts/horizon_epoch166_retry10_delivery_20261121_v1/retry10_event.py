@@ -16,8 +16,8 @@ import closure
 import terminal_event as event
 
 D=event.R/"epoch166-retry10-delivery-20261121-v1"
-LAUNCH=D/"controller-tools/run-committed.sh"
-FIT=D/"capacity-tools/publication-fit"
+LAUNCH=D/"capacity-tools-v2/run-committed.sh"
+FIT=D/"capacity-tools-v2/publication-fit"
 UNIT="horizon-publish-166-retry10-committed.service"
 STATE=D/"event-state"
 
