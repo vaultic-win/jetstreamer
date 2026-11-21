@@ -55,6 +55,21 @@ const BOUNDED_VERIFIER: &str =
 const BOUNDED_QUALIFICATION: &str =
     "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/main-acceptance.json";
 const BOUNDED_READER: &str = "cf4d45a51820022fa8d2e4f63ca3e8bce261844d";
+const PUBLISHED_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/epoch-247-plan.json";
+const PUBLISHED_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-fadfe2d4-v1/horizon_pipeline";
+const PUBLISHED_VERIFIER: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-fadfe2d4-v1/verify_archive";
+const PUBLISHED_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/main-acceptance.json";
+pub(super) const PUBLISHED_READER: &str = "fadfe2d4a3784ba0f955d1b7a26a15f57ff593e0";
+pub(super) fn published_reader(plan: &Plan) -> bool {
+    plan.reader_commit == PUBLISHED_READER
+        && plan.qualification.path == Path::new(PUBLISHED_QUALIFICATION)
+        && plan.pipeline.path == Path::new(PUBLISHED_PIPELINE)
+        && plan.full_verifier.path == Path::new(PUBLISHED_VERIFIER)
+}
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
     "/home/ubuntu/.codex/diagnostics/horizon247-delivery-admission-20261119-v1/operation.log";
@@ -243,7 +258,9 @@ fn drained(unit: &str, iid: &str) -> Result<()> {
 }
 // Both successors follow the same registered staged uploader.
 fn requires_staged_terminal(plan: &Path) -> bool {
-    plan == Path::new(BENCH_PLAN) || plan == Path::new(BOUNDED_PLAN)
+    [BENCH_PLAN, BOUNDED_PLAN, PUBLISHED_PLAN]
+        .iter()
+        .any(|p| plan == Path::new(p))
 }
 
 // Only the qualified public reader and its acceptance change. Keep the exact
@@ -274,6 +291,15 @@ fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
                 ("pipeline", BENCH_PIPELINE),
                 ("full_verifier", BENCH_VERIFIER),
                 ("qualification", BENCH_QUALIFICATION),
+            ],
+        )
+    } else if path == Path::new(PUBLISHED_PLAN) {
+        (
+            PUBLISHED_READER,
+            &[
+                ("pipeline", PUBLISHED_PIPELINE),
+                ("full_verifier", PUBLISHED_VERIFIER),
+                ("qualification", PUBLISHED_QUALIFICATION),
             ],
         )
     } else {
@@ -316,7 +342,8 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
                 PUBLIC_PLAN,
                 CURRENT_PLAN,
                 BENCH_PLAN,
-                BOUNDED_PLAN
+                BOUNDED_PLAN,
+                PUBLISHED_PLAN
             ]
             .iter()
             .any(|registered| p == Path::new(registered)))
@@ -734,6 +761,40 @@ mod tests {
             next[key] = json!({"path":path,"sha256":"a".repeat(64)});
         }
         let path = Path::new(BOUNDED_PLAN);
+        assert!(requires_staged_terminal(path));
+        assert!(requires_staged_terminal(Path::new(BENCH_PLAN)));
+        assert!(!requires_staged_terminal(Path::new(CURRENT_PLAN)));
+        public_plan(path, &original, &next).unwrap();
+        assert!(public_plan(Path::new(BENCH_PLAN), &original, &next).is_err());
+        for (pointer, wrong) in [
+            ("/pipeline/path", json!(BENCH_PIPELINE)),
+            ("/full_verifier/path", json!(BENCH_VERIFIER)),
+            ("/qualification/path", json!(BENCH_QUALIFICATION)),
+            ("/reader_commit", json!(BENCH_READER)),
+            ("/threads", json!(1)),
+            ("/epoch_expectations/247", json!("foreign")),
+        ] {
+            let mut other = next.clone();
+            *other.pointer_mut(pointer).unwrap() = wrong;
+            assert!(public_plan(path, &original, &other).is_err());
+        }
+        next["features"] = json!(["other"]);
+        assert!(public_plan(path, &original, &next).is_err());
+    }
+
+    #[test]
+    fn published_reader_pins_images_layout_and_actual_staged_predecessor() {
+        let original = json!({"reader_commit":BENCH_READER, "threads":2, "epoch_expectations":{"247":"original"}});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(PUBLISHED_READER);
+        for (key, path) in [
+            ("pipeline", PUBLISHED_PIPELINE),
+            ("full_verifier", PUBLISHED_VERIFIER),
+            ("qualification", PUBLISHED_QUALIFICATION),
+        ] {
+            next[key] = json!({"path":path,"sha256":"a".repeat(64)});
+        }
+        let path = Path::new(PUBLISHED_PLAN);
         assert!(requires_staged_terminal(path));
         assert!(requires_staged_terminal(Path::new(BENCH_PLAN)));
         assert!(!requires_staged_terminal(Path::new(CURRENT_PLAN)));
