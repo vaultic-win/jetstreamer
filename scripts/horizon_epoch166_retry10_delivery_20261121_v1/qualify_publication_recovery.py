@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -60,6 +61,8 @@ def delayed_cadence(root):
         path.write_text(json.dumps(body))
         path.chmod(mode)
         return event.document(path, mode)[1]
+    header = {k: fleet[k] for k in ("owner", "recorded_unix_seconds", "sampled_at_utc", "observer",
+                                     "all_active_status_reports_authenticated_readback", "authenticated_status_count")}
     group_count = readbacks = 0
     for size in range(1,6):
         for group in combinations(event.report_labels(), size):
@@ -72,7 +75,7 @@ def delayed_cadence(root):
             target.parent.mkdir(parents=True)
             rep = write(target, report, 0o600)
             terms = {event.report_labels()[e]+"_local_commit":{"path":"/fixture/"+str(e),"sha256":f"{e:064x}"} for e in group}
-            candidate = dict(fleet,**terms,authenticated_status_audit=rep)
+            candidate = dict(header,**terms,authenticated_status_audit=rep)
             path = directory/event.FLEET_NAME
             fref = write(path,candidate,0o600)
             changes=event.Changes()
@@ -253,9 +256,11 @@ def suite(root):
             assert actual==term_ref and pub.status_evidence(candidate,report,term_ref,term_body["local_archive"],profile)==sr
             joined.append(dict(epoch=epoch,group=case["closed"],programs=five_price[str(epoch)]["programs"],report=rr,status=sr))
     assert len(cadence["fixture_status_and_fleet_passes"])==28 and {j["epoch"] for j in joined}==set(event.PUBLICATION_EPOCHS)
+    with TemporaryDirectory(dir=root, prefix="delayed-cadence-") as scratch:
+        delayed = delayed_cadence(Path(scratch))
     return dict(registered_controllers=manifests_ref,registered_cadence=cadence_ref,joined_terminal_status=joined,
                 five_price=five_price,price_authority=price_ref,legacy_to_successor_retried=True,
-                delayed_cadence=delayed_cadence(root),native_active=native,native_fit_refusal=failed,fixture_admission=ans,refutations=rejection_count,
+                delayed_cadence=delayed,native_active=native,native_fit_refusal=failed,fixture_admission=ans,refutations=rejection_count,
                 stale_fleet_waited=True,prior_intent=native_ref,prior_submission=submitted,admitted_once=len(calls),
                 unknown_held=True,pre_manager_retried_once=True,actual_pre_manager_refusals=preflight,production_dispatches=0,r2_writes=0)
 
