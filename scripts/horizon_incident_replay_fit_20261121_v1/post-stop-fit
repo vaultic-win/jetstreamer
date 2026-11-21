@@ -270,9 +270,14 @@ def confirm_fork(epoch,own,baseline,stop):
 
 
 def profile145(here, post=False, rejoin=False):
-    s.need(not (post and rejoin),"ambiguous 145 image")
-    profile="profile145-rejoin.json" if rejoin else "profile145-post.json" if post else "profile145.json"
-    directory="tools-v5b" if rejoin else "tools-v6" if post else "tools-v5"
+    if post and rejoin:
+        profile,directory="profile145-current-post.json","tools-v7"
+    elif rejoin:
+        profile,directory="profile145-rejoin.json","tools-v5b"
+    elif post:
+        profile,directory="profile145-post.json","tools-v6"
+    else:
+        profile,directory="profile145.json","tools-v5"
     name="incident-post-phase.py" if post else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
@@ -307,11 +312,13 @@ def phase145(epoch):
     current=Path(__file__).resolve()
     base=R/"epoch145-semantic-continuity-20261121-v1"
     post=(base/"tools-v6/export145").exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",base/"tools-v6/export145")
+    current_post=base/"tools-v7/export145"
+    post_rejoin=current_post.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",current_post)
     fp=base/"tools-v5/export145"
     rp=base/"tools-v5b/export145"
     rejoin=rp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",rp)
-    if post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent,post,rejoin)
+    if post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")

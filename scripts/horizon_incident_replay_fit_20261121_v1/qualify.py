@@ -71,6 +71,7 @@ def main():
     s.need(closure_path.read_bytes()==source,"different terminal registration source")
     src["closure.py"]=digest(source)
     _,_,rejoin=m["profile145"](here,rejoin=True)
+    _,_,current_post=m["profile145"](here,post=True,rejoin=True)
     _,_,binding=m["profile145"](here)
     _,_,post_binding=m["profile145"](here,True)
     rejected(lambda:m["fleet_head"](dict(fleet,sha256="0"*64)))
@@ -78,10 +79,20 @@ def main():
     rejected(lambda:m["capture"](171,fleet))
     observed,fork=fork_control(m,fleet)
     ext=m["extensions"];mgr=s.show(ext["VERIFIER_UNIT"])
-    closure=ext["failed_verifier"](s,mgr)
-    s.need(all(observed["phase145"][k]==v for k,v in closure.items()),"failed 145 evidence missed from full fit")
-    for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
-        rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value})))
+    if mgr["InvocationID"]==ext["FAILED_VERIFIER"]:
+        closure=ext["failed_verifier"](s,mgr)
+        s.need(all(observed["phase145"][k]==v for k,v in closure.items()),"failed 145 evidence missed from full fit")
+        for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
+            rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value})))
+    else:
+        original,_=s.read(D/"native-462833a6aba74481af5e276512bdcad4.json",
+                           "3d9b77551ceafa52ca0fef30f957b7aba6053f55c84e320cf2632067b85c6ec0")
+        closure=original["closed_verifier145"]
+        phase=observed["phase145"]
+        s.need(phase["invocation_id"]==mgr["InvocationID"]=="dc043eb78c4a4349b0098760dc764a1f" and phase["stage"]=="leased-worker" and
+               phase["window"]["predecessor"]==closure["failure"] and
+               phase["window"]["prior_started"]==closure["recovery"] and
+               phase["window"]["leases_parent"] and phase["window"]["leases_worker"],"foreign advancing 145")
     s.need(observed["fits"] and observed["stopped_generation_resident_credit_bytes"]==0 and
            set(observed["actual_original_stops"])=={"166","167","170"} and set(observed["survivors"])=={"169","172"} and
            set(observed["bookings"])=={"166","167","168","170"} and
@@ -126,7 +137,7 @@ def main():
            "active generation registered as closed")
     rejected(lambda:term["expected_timer"]({"Id":"foreign"}))
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,closed166_budget_conserved=True,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:
