@@ -219,7 +219,7 @@ impl Firing {
             ))
         };
         periodic::observe(n, &c)?;
-        let before = fence(n)?;
+        let before = peer_window::full211_capture_start(n, &c, &p)?;
         let ((gid, timer, next), trigger) = &before;
         let sample = peer_window::healthy_sample(&c, &p, gid)?;
         let s = sample.json()?;

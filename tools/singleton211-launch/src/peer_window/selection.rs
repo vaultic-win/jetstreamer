@@ -253,6 +253,59 @@ fn observe(
     bail!("guard failed to stabilize within natural firing observations")
 }
 
+// A capacity census can reach the full211 guard while its original oneshot is
+// executing. Keep that exact firing pinned through completion before using it.
+fn finish_current_firing(
+    mut observe: impl FnMut(Option<&Observation>) -> Result<Observation>,
+    mut clock: impl FnMut() -> Result<u64>,
+    mut sleep: impl FnMut(Duration),
+    outer: Option<u64>,
+) -> Result<Observation> {
+    let mut row = observe(None)?;
+    if row.completed.is_some() {
+        return Ok(row);
+    }
+    let end = row
+        .trigger
+        .checked_add(17 * SECOND)
+        .context("full211 firing clock overflow")?;
+    let end = outer.map_or(end, |d| d.min(end));
+    loop {
+        let now = clock()?;
+        ensure!(
+            now < end,
+            "original full211 firing exceeded its completion deadline"
+        );
+        sleep(Duration::from_micros((end - now).min(150_000)));
+        ensure!(clock()? < end, "original full211 firing wait expired");
+        let next = observe(Some(&row))?;
+        next.follows(&row)?;
+        ensure!(clock()? < end, "original full211 firing proof expired");
+        if next.completed.is_some() {
+            return Ok(next);
+        }
+        row = next;
+    }
+}
+
+pub(crate) fn full211_capture_start(
+    n: &mut Native,
+    c: &periodic::Control,
+    plan: &Value,
+) -> Result<((String, String, u64), u64)> {
+    let owner = &full211_peer::handoff().sealed()?["producer"];
+    let ticks = native257::process_ticks(text(owner, "MainPID")?.parse()?)?;
+    let deadline = n.deadline;
+    let row = finish_current_firing(
+        |previous| observe(n, c, plan, owner, ticks, previous),
+        mono,
+        std::thread::sleep,
+        deadline,
+    )?;
+    let (next, _) = row.completed.context("missing completed full211 sample")?;
+    Ok(((row.guard, row.timer, next), row.trigger))
+}
+
 fn next_probe(
     rows: &[(bool, Observation)],
     clock: u64,
@@ -408,6 +461,43 @@ mod tests {
     use super::*;
     fn next_probe(rows: &[(bool, Observation)], clock: u64, end: u64) -> Result<Option<u64>> {
         super::next_probe(rows, clock, end, 30 * SECOND)
+    }
+    #[test]
+    fn original_v156_inflight_guard_must_complete_before_either_deadline() {
+        let guard = "8d975e61dc2341f5a740809eb4850f5d";
+        let timer = "47e861b5e73747b392c7556b1610c5ca";
+        let start = 366_922_047_370;
+        let active = Observation {
+            guard: guard.into(),
+            timer: timer.into(),
+            start,
+            trigger: start - 1000,
+            completed: None,
+        };
+        let mut done = active.clone();
+        done.completed = Some((
+            active.trigger + 30 * SECOND,
+            Bound::new("/sample", digest(guard.as_bytes())),
+        ));
+        let replay = |last: Observation, elapsed: u64, outer: u64| {
+            let mut rows = [active.clone(), last].into_iter();
+            let mut clocks = [start, start + 150_000, start + elapsed].into_iter();
+            finish_current_firing(
+                |_| rows.next().context("excess capture"),
+                || clocks.next().context("excess clock read"),
+                |_| {},
+                Some(outer),
+            )
+        };
+        assert_eq!(replay(done.clone(), 200_000, start + SECOND).unwrap(), done);
+        let mut other = done.clone();
+        other.guard = "ee47f9a5d37f44ac860590249431830e".into();
+        assert!(replay(other, 200_000, start + SECOND).is_err());
+        let mut other = done.clone();
+        other.timer = "replacement".into();
+        assert!(replay(other, 200_000, start + SECOND).is_err());
+        assert!(replay(done.clone(), 17 * SECOND, start + 30 * SECOND).is_err());
+        assert!(replay(done, SECOND, start + SECOND).is_err());
     }
     #[test]
     fn actual_v151_251_deadline_waits_for_a_natural_successor() {

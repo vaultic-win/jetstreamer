@@ -2,6 +2,7 @@
 //! Periodic booking and the ordinary admission census still cover dormant commitments.
 use super::*;
 mod selection;
+pub(super) use selection::full211_capture_start;
 pub(super) use selection::select;
 pub(super) use selection::select_minimum;
 
