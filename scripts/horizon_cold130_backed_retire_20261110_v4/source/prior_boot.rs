@@ -17,7 +17,7 @@ pub(super) fn is_image(path: &Path) -> bool {
     path == Path::new(IMAGE)
         || path
             == Path::new(
-                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v3/retire",
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v4/retire",
             )
 }
 pub(super) fn holding_transition() -> Result<File> {
@@ -295,59 +295,8 @@ pub(super) fn remote_state(remote_binding: &Value, custody: &Value) -> Result<()
 
     Ok(())
 }
-pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()> {
-    use crate::closure;
-    let _fence = Fence::take()?;
-    let lifetime = _fence.evidence()?;
-    crate::current_readers::controller()?;
-    let disjoint = crate::current_readers::canonical_classes()?;
-    println!(
-        "{}",
-        json!({"stage":"live-local-canonical-watchers","classes":disjoint,"archive_root":"/home/sol/horizon","canonical_body_currently_present":false})
-    );
-    println!(
-        "{}",
-        json!({"stage":"historical-ownership","result":lifetime})
-    );
-    let packet = bound(&json!({"path":RECEIPT,"sha256":RECEIPT_SHA}))?;
-    let eligibility = bound(&packet["original_controller_and_run_link"]["eligibility"])?;
-    let held = json!({"path":"/var/lib/jetstreamer/cold130-holding-20261110-v1/receipts/custody-7b0b0c27f95af14975f3ba5c40db87bb81812467dd3311ac471b2577100935ad.json","sha256":"29b6bb4e4a8ba713d28fb072f9498cfd5f6eb824a994c8622969ac34a3e0a6b7"});
-    let plan = json!({"custody":held,"park_spec":{"path":"/usr/local/lib/jetstreamer/horizon-cold130-holding-plan-20261110-v1/plan.json","sha256":"51521593b641d165c60fa3d0190d1b3ca0677110bdb0b2194230b338dedb0651"},
-       "holding_transport_qualification":{"path":"/usr/local/lib/jetstreamer/horizon-node02-holding-qualification-20261023-v1/qualification.json","sha256":"15692445c39b47b011851b9db68798730077be2cb665dbb7e527049c5e9c5f70"},
-       "holding_original_completion":{"path":"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/cold130-candidate-20261110-v1/ROOT_COLD130_CUSTODY_COMPLETE_NO_RETIREMENT.json","sha256":"50423005a35d87c6a674120069752d5bbc0e9a7d5c3a9abc7e3ab8ae33bacf7e"},
-       "canonical_R2_receipt":eligibility["canonical_R2_receipt"],"canonical_full":eligibility["canonical_current_full"],"canonical_plugin":eligibility["canonical_current_plugin"],
-       "canonical_left_boundary":eligibility["canonical_left_boundary"],"canonical_right_boundary":eligibility["canonical_right_boundary"]});
-    let custody = bound(&held)?;
-    crate::custody(&custody)?;
-    closure::holding_lineage(&plan, &custody)?;
-    crate::canonical::validate(&plan)?;
-    remote_state(remote_binding, &custody)?;
-    let m = fs::symlink_metadata(SOURCE)?;
-    let nanos = |secs: i64, ns: i64| secs as i128 * 1_000_000_000 + ns as i128;
-    let local = json!([
-        m.dev(),
-        m.ino(),
-        m.uid(),
-        m.gid(),
-        m.mode(),
-        m.nlink(),
-        m.len(),
-        nanos(m.mtime(), m.mtime_nsec()) as i64,
-        nanos(m.ctime(), m.ctime_nsec()) as i64
-    ]);
-    ensure!(
-        local == packet["source_identity"]
-            && m.blocks() * 512
-                == packet["original_body_allocated_bytes"]
-                    .as_u64()
-                    .context("historical physical size")?,
-        "original body metadata changed"
-    );
-    println!(
-        "{}",
-        json!({"stage":"custody-canonical-identity","canonical_sha256":CANONICAL_SHA,"holding":held,"source_identity":local,"allocated_bytes":m.blocks()*512,"hash_from_historical_read":SHA,"source_bytes_hashed_this_run":0})
-    );
-    let fleet = closure::fleet(fleet_binding)?;
+pub(super) fn fleet_readers(fleet_binding: &Value) -> Result<()> {
+    let fleet = crate::closure::fleet(fleet_binding)?;
     let row = fleet["epochs"]
         .as_array()
         .context("complete epoch rows")?
@@ -404,7 +353,7 @@ pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()
     ] {
         for row in fleet[key].as_array().context("native fleet class")? {
             let u = &row["unit"];
-            let live = closure::native(s(u, "Id")?)?;
+            let live = crate::closure::native(s(u, "Id")?)?;
             ensure!(
                 live["ActiveState"] == "active"
                     && live["MainPID"] == u["MainPID"]
@@ -434,6 +383,61 @@ pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()
         "{}",
         json!({"stage":"current-readers","fleet":fleet_binding,"row":row,"replay":replay,"audit_future_canonical_object":remote,"other_active_holding":fleet["actual_active_holding_transfers"],"staged_scope_complete":false})
     );
+    Ok(())
+}
+pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()> {
+    use crate::closure;
+    let _fence = Fence::take()?;
+    let lifetime = _fence.evidence()?;
+    crate::current_readers::controller()?;
+    let disjoint = crate::current_readers::canonical_classes()?;
+    println!(
+        "{}",
+        json!({"stage":"live-local-canonical-watchers","classes":disjoint,"archive_root":"/home/sol/horizon","canonical_body_currently_present":false})
+    );
+    println!(
+        "{}",
+        json!({"stage":"historical-ownership","result":lifetime})
+    );
+    let packet = bound(&json!({"path":RECEIPT,"sha256":RECEIPT_SHA}))?;
+    let eligibility = bound(&packet["original_controller_and_run_link"]["eligibility"])?;
+    let held = json!({"path":"/var/lib/jetstreamer/cold130-holding-20261110-v1/receipts/custody-7b0b0c27f95af14975f3ba5c40db87bb81812467dd3311ac471b2577100935ad.json","sha256":"29b6bb4e4a8ba713d28fb072f9498cfd5f6eb824a994c8622969ac34a3e0a6b7"});
+    let plan = json!({"custody":held,"park_spec":{"path":"/usr/local/lib/jetstreamer/horizon-cold130-holding-plan-20261110-v1/plan.json","sha256":"51521593b641d165c60fa3d0190d1b3ca0677110bdb0b2194230b338dedb0651"},
+       "holding_transport_qualification":{"path":"/usr/local/lib/jetstreamer/horizon-node02-holding-qualification-20261023-v1/qualification.json","sha256":"15692445c39b47b011851b9db68798730077be2cb665dbb7e527049c5e9c5f70"},
+       "holding_original_completion":{"path":"/home/sol/.jetstreamer-private/epoch173-independent-singleton-20261110-v1/cold130-candidate-20261110-v1/ROOT_COLD130_CUSTODY_COMPLETE_NO_RETIREMENT.json","sha256":"50423005a35d87c6a674120069752d5bbc0e9a7d5c3a9abc7e3ab8ae33bacf7e"},
+       "canonical_R2_receipt":eligibility["canonical_R2_receipt"],"canonical_full":eligibility["canonical_current_full"],"canonical_plugin":eligibility["canonical_current_plugin"],
+       "canonical_left_boundary":eligibility["canonical_left_boundary"],"canonical_right_boundary":eligibility["canonical_right_boundary"]});
+    let custody = bound(&held)?;
+    crate::custody(&custody)?;
+    closure::holding_lineage(&plan, &custody)?;
+    crate::canonical::validate(&plan)?;
+    remote_state(remote_binding, &custody)?;
+    let m = fs::symlink_metadata(SOURCE)?;
+    let nanos = |secs: i64, ns: i64| secs as i128 * 1_000_000_000 + ns as i128;
+    let local = json!([
+        m.dev(),
+        m.ino(),
+        m.uid(),
+        m.gid(),
+        m.mode(),
+        m.nlink(),
+        m.len(),
+        nanos(m.mtime(), m.mtime_nsec()) as i64,
+        nanos(m.ctime(), m.ctime_nsec()) as i64
+    ]);
+    ensure!(
+        local == packet["source_identity"]
+            && m.blocks() * 512
+                == packet["original_body_allocated_bytes"]
+                    .as_u64()
+                    .context("historical physical size")?,
+        "original body metadata changed"
+    );
+    println!(
+        "{}",
+        json!({"stage":"custody-canonical-identity","canonical_sha256":CANONICAL_SHA,"holding":held,"source_identity":local,"allocated_bytes":m.blocks()*512,"hash_from_historical_read":SHA,"source_bytes_hashed_this_run":0})
+    );
+    fleet_readers(fleet_binding)?;
     let old185 = bound(
         &json!({"path":"/var/lib/jetstreamer/horizon-old185-scratch-runtime-20261024-v1/control-execute-0946-v2/execute-plan.json","sha256":"06416146cc34819c5dafcebd20305472c3627a48ba9933f4b311607d3302ba66"}),
     )?;

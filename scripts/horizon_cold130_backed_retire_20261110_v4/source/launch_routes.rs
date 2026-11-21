@@ -86,7 +86,7 @@ fn scheduled(user: bool) -> Result<BTreeSet<String>> {
     Ok(targets)
 }
 fn selected_fields(input: &str) -> Result<BTreeMap<String, String>> {
-    let mut d = BTreeMap::new();
+    let mut d: BTreeMap<String, String> = BTreeMap::new();
     for line in input.lines() {
         let (k, v) = line.split_once('=').context("invalid manager property")?;
         let value = if k.starts_with("Exec") {
@@ -106,10 +106,16 @@ fn selected_fields(input: &str) -> Result<BTreeMap<String, String>> {
         } else {
             v.to_owned()
         };
-        ensure!(
-            d.insert(k.into(), value).is_none(),
-            "duplicate manager property"
-        );
+        if let Some(prior) = d.get_mut(k) {
+            ensure!(
+                k.starts_with("Exec") || k == "EnvironmentFiles",
+                "duplicate scalar manager property: {k}"
+            );
+            prior.push('\n');
+            prior.push_str(&value);
+        } else {
+            d.insert(k.into(), value);
+        }
     }
     Ok(d)
 }
@@ -296,6 +302,9 @@ mod tests {
         let a=selected_fields("Id=x.service\nExecStart={ path=/bin/a ; argv[]=/bin/a /first ; ignore_errors=no ; start_time=now }").unwrap();
         let b=selected_fields("Id=x.service\nExecStart={ path=/bin/a ; argv[]=/bin/a /second ; ignore_errors=no ; start_time=now }").unwrap();
         assert_ne!(a, b);
+        let ordered=selected_fields("Id=test.service\nExecStart={ argv[]=/first ; ignore_errors=no }\nExecStart={ argv[]=/second ; ignore_errors=no }").unwrap();
+        assert_eq!(ordered["ExecStart"], "/first\n/second");
+        assert!(selected_fields("Id=x\nId=y").is_err());
         assert!(selected_fields("Id=x\nExecStart=unknown").is_err());
         assert!(cold(b"args=../run-382916-1790762712552279895/archives"));
     }

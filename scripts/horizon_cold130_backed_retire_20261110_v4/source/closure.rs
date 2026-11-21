@@ -459,6 +459,7 @@ pub(crate) fn census(p: &Value) -> Result<Value> {
         }
     }
     if crate::prior_boot::alternative(&review)? {
+        crate::prior_boot::fleet_readers(&review["current_fleet"])?;
         crate::launch_routes::reviewed(&review["reviewed_launch_routes"])?;
     }
     let consumers = review["consumers"]
