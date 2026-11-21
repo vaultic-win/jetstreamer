@@ -18,6 +18,7 @@ use std::{
     io::{Read, Write},
     os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
+    process::Command,
 };
 
 const CUT: u64 = 60_911_751;
@@ -206,12 +207,70 @@ fn rebuild(
     ))
 }
 
+const CURL: &str =
+    "/usr/local/lib/jetstreamer/horizon-epoch141-source-equivalence-20261023-v1/curl";
+const CURL_SHA: &str = "1ccbd3dae948374ba8eef1ebda26c64b783ede50b463196e53666e0880bdac60";
+const ENDPOINT: &str = "https://api.mainnet-beta.solana.com";
+
+fn fetch_finalized(out: &Path, slot: u64, remaining: &mut usize) -> Result<(Vec<u8>, Value)> {
+    let request = json!({"jsonrpc":"2.0","id":slot,"method":"getBlock","params":[slot,
+        {"commitment":"finalized","encoding":"base64","transactionDetails":"full","rewards":false,"maxSupportedTransactionVersion":0}]});
+    let limit = (*remaining).min(4 << 20);
+    ensure!(limit > 0, "total independent RPC input budget exhausted");
+    let response = Command::new(CURL)
+        .env_clear()
+        .args([
+            "--disable",
+            "--silent",
+            "--show-error",
+            "--fail",
+            "--proto",
+            "=https",
+            "--max-time",
+            "25",
+            "--max-filesize",
+            &limit.to_string(),
+            "-H",
+            "Content-Type: application/json",
+            "--data-binary",
+            &request.to_string(),
+            ENDPOINT,
+        ])
+        .output()?;
+    ensure!(
+        response.status.success() && response.stdout.len() <= limit && response.stderr.is_empty(),
+        "bounded finalized RPC failed for slot {slot}: {}",
+        String::from_utf8_lossy(&response.stderr)
+    );
+    *remaining -= response.stdout.len();
+    let path = out.join(format!("rpc-{slot}.json"));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)?;
+    file.write_all(&response.stdout)?;
+    file.sync_all()?;
+    let sha = evidence::sha(&response.stdout);
+    let bytes = evidence::bound_file(&path, &sha, limit as u64, false)?;
+    Ok((
+        bytes,
+        json!({"path":path,"sha256":sha,"request":request,"endpoint":ENDPOINT,"curl_sha256":CURL_SHA}),
+    ))
+}
+
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     ensure!(
-        args.len() == 1 && unsafe { libc::geteuid() } == 0,
-        "usage: jetstreamer-epoch140-suffix-gap-input NEW_PRIVATE_OUTPUT"
+        (args.len() == 1 || (args.len() == 2 && args[1] == "--fetch-finalized"))
+            && unsafe { libc::geteuid() } == 0,
+        "usage: jetstreamer-epoch140-suffix-gap-input NEW_PRIVATE_OUTPUT [--fetch-finalized]"
     );
+    let fetch = args.len() == 2;
+    if fetch {
+        evidence::bound_file(Path::new(CURL), CURL_SHA, 1 << 20, true)?;
+    }
+    let mut rpc_budget = 16 << 20;
     let out = PathBuf::from(&args[0]);
     let iid = std::env::var("INVOCATION_ID")?;
     ensure!(
@@ -279,10 +338,21 @@ fn run() -> Result<()> {
             "wrong native path"
         );
         let raw = read_json(&raw_path, str_field(raw_bound, "sha256")?, 4 << 20)?;
-        let rpc = (row.slot == index.slots[0].slot)
-            .then(|| {
+        let response = if row.slot == index.slots[0].slot {
+            Some((
+                first_rpc.clone(),
+                json!({"path":RESPONSE,"sha256":RESPONSE_SHA,"encoding":"retained-base64-envelope"}),
+            ))
+        } else if fetch {
+            Some(fetch_finalized(&out, row.slot, &mut rpc_budget)?)
+        } else {
+            None
+        };
+        let rpc = response
+            .as_ref()
+            .map(|(bytes, _)| {
                 verified_rpc(
-                    &first_rpc,
+                    bytes,
                     row.slot,
                     row.parent_slot,
                     &target["finalized_metadata"],
@@ -290,6 +360,9 @@ fn run() -> Result<()> {
             })
             .transpose()?;
         let (record, mut observed) = rebuild(row, &raw, &target, rpc.as_deref())?;
+        if let Some((_, input)) = response {
+            observed["independent_rpc"] = input;
+        }
         observed["poh_target"] = bound.clone();
         observed["raw_target"] = raw_bound.clone();
         data.write_all(&record)?;
@@ -308,13 +381,20 @@ fn run() -> Result<()> {
             "independent record reread differs"
         );
     }
+    if fetch {
+        evidence::bound_file(Path::new(CURL), CURL_SHA, 1 << 20, true)?;
+    }
+    let compared = rows
+        .iter()
+        .filter(|row| row["independent_rpc_transactions_compared"] == true)
+        .count();
     let receipt = json!({"schema":"jetstreamer-epoch140-suffix-gap-input-v1","invocation_id":iid,"protected_original_sha256":PROTECTION_SHA,
         "native_cut_receipt_sha256":NATIVE_SHA,"native_cut":native["native_result"]["native_checkpoint"],
         "original_raw_cursor":native["original_producer_cursor"],"original_full_index_sha256":INDEX_SHA,"complete_poh_receipt_sha256":POH_COMPLETION_SHA256,
         "output_first_slot":CUT+1,"output_last_slot":END,"required_post_cut_root_slot":ROOT,"remaining_gap_targets_after_output":index.slots.len()-count,
         "first_following_gap":index.slots[count],"gap_records":rows,"data":{"path":data_path,"bytes":SIZE,"sha256":format!("{:x}",whole.finalize())},
         "independent_rpc_response_receipt_sha256":RESPONSE_SHA,"all_record_digests_reread":true,"selected_prefix_verified":false,"native_suffix_executed":false,
-        "all_source_transaction_sequences_compared":false,"canonical_root_matched":false,"assembly_authorized":false,"publication_authorized":false});
+        "independent_gap_sequences_compared":compared,"all_gap_source_transaction_sequences_compared":compared==count,"canonical_root_matched":false,"assembly_authorized":false,"publication_authorized":false});
     evidence::write_receipt(&out.join("suffix-gap-input.json"), &receipt)
 }
 fn main() {
