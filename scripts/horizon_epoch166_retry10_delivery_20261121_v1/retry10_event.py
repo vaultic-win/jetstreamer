@@ -43,6 +43,22 @@ def metered():
                        "horizon-publish-168-metered-committed.service", closure168)
 
 
+def current_reader(epoch):
+    if epoch in (166, 168):
+        original = RECOVERED if epoch == 166 else metered()
+        capacity = "capacity-tools-v3" if epoch == 166 else "capacity-tools-v2"
+        return original._replace(launch=original.delivery / "controller-tools-v2/run-committed.sh",
+                                 fit=original.delivery / capacity / "publication-fit")
+
+    import peer_closures
+
+    units = {167: "horizon-publish-167-source-index-committed.service",
+             170: "horizon-publish-170-retry10-committed.service"}
+    authority = peer_closures.authority(epoch)
+    return Publication(epoch, authority.T, authority.T / "controller-tools/run-committed.sh",
+                       authority.T / "capacity-tools/publication-fit", units[epoch], authority)
+
+
 def status_evidence(fleet, report, terminal, archive, profile=RECOVERED):
     key = str(profile.epoch)
     ref = report["receipts"][key]
@@ -71,6 +87,12 @@ def head(fleet):
     if (event.R/mo.group(1)/event.FLEET_NAME).exists():return None
     return event.document(Path(fleet["path"]),0o600)[1]
 
+def bound_fit(profile, bindings):
+    programs = {p.name: event.member(p, 0o555)[1] for p in (profile.fit, profile.launch)}
+    event.need(programs == bindings, "changed qualified publication programs")
+    return programs[profile.fit.name]["sha256"]
+
+
 def main(profile=RECOVERED):
     authority = profile.authority
     state = profile.delivery / "event-state"
@@ -80,9 +102,7 @@ def main(profile=RECOVERED):
 
     event.need(os.geteuid()==0 and __debug__ and sys.flags.isolated,"isolated root required")
     bindings,_=event.document(HERE/"programs.json",0o444)
-    for p in (profile.fit, profile.launch):
-        event.need(event.member(p,0o555)[1]==bindings[p.name],"changed qualified program")
-    fit_sha=bindings[profile.fit.name]["sha256"]
+    fit_sha=bound_fit(profile, bindings)
     original=authority.retire()["terminal"]
     m=state.lstat()
     event.need(state.resolve(strict=True)==state and m.st_uid==m.st_gid==0 and stat.S_IMODE(m.st_mode)==0o700,"untrusted event state")
@@ -115,7 +135,9 @@ def main(profile=RECOVERED):
 if __name__ == "__main__":
     if sys.argv[1:] == ["--metered168"]:
         main(metered())
+    elif len(sys.argv) == 3 and sys.argv[1] == "--current-reader" and sys.argv[2] in ("166", "167", "168", "170"):
+        main(current_reader(int(sys.argv[2])))
     elif len(sys.argv) == 1:
         main()
     else:
-        sys.exit("usage: retry10_event.py [--metered168]")
+        sys.exit("usage: retry10_event.py [--metered168 | --current-reader {166,167,168,170}]")
