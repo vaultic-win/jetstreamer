@@ -97,13 +97,75 @@ fn validate_clock(f: &Value, cfg: &Value, previous: &Value) -> Result<()> {
 /// The parent cohort receipt and physical process drain are validated separately.
 /// Remove exactly one original primary row. Derive no fresh fleet from an old sample.
 fn project(f: &Value, cfg: &Value, live: &Value) -> Result<Value> {
+    let private = epochs(f, "actual_active_private_diagnostics")?;
+    let retired = f.get("terminal168_trace_mismatch");
+    if let Some(event) = retired {
+        ensure!(
+            event
+                == &json!({
+                    "path": format!("{BASE}/epoch168-terminal-trace-20261121-v1/TERMINAL.json"),
+                    "sha256": "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2"
+                }),
+            "foreign 168 terminal receipt"
+        );
+        let terminal = bound(event)?;
+        ensure!(
+            terminal["epoch"] == 168
+                && terminal["terminal_before_routine_sample"] == true
+                && terminal["resource_credit_bytes"] == 0
+                && terminal["archive_publication_authorized"] == false
+                && rows(cfg, "diagnostic_replays")?
+                    .iter()
+                    .all(|r| r["range"] != "168"),
+            "168 terminal conflicts with registered diagnostics"
+        );
+    }
+    let mut expected = if retired.is_some() {
+        BTreeSet::from([169])
+    } else {
+        BTreeSet::from([168, 169])
+    };
+    if let Some(reference) = f.get("private_epoch136_observation") {
+        let capture = bound(reference)?;
+        let row = &capture["row"];
+        ensure!(
+            capture["schema"] == "horizon-private136-cycle-v1"
+                && row["epoch"] == 136
+                && capture["sample"] == f["observer"]
+                && capture["fleet"] == f["previous_Root_operational_review"],
+            "136 observation belongs to another sample or fleet"
+        );
+        if row["positive_worker"] == true {
+            let registered = rows(f, "actual_active_private_diagnostics")?
+                .iter()
+                .find(|r| r["epoch"] == 136)
+                .context("missing admitted private 136")?;
+            ensure!(
+                registered["receipt"] == *reference
+                    && registered["canonical_replay_claimed"] == false
+                    && [
+                        "entry",
+                        "children",
+                        "admission",
+                        "post_prefire_capacity",
+                        "native_start_ticks",
+                        "unit"
+                    ]
+                    .iter()
+                    .all(|&key| row.get(key).is_some() && registered[key] == row[key]),
+                "changed private 136 registration"
+            );
+            expected.insert(136);
+        }
+    }
     ensure!(
         epochs(f, "actual_executing_replays")? == BTreeSet::from([166, 167, 170, 172])
-            && epochs(f, "actual_active_private_diagnostics")? == BTreeSet::from([168, 169])
+            && private == expected
             && rows(f, "actual_active_bootstraps")?.is_empty()
-            && f["active_producer_count"] == 6
+            && f["active_private_diagnostic_count"] == private.len()
+            && f["active_producer_count"] == 4 + private.len()
             && f["additional_independent166_DATA_cap_bytes"] == live["reserved_disk_bytes"],
-        "five-owner route needs original six-owner predecessor"
+        "166 retirement needs its original primary peers and registered diagnostics"
     );
     let original = rows(f, "actual_executing_replays")?;
     let primary = rows(cfg, "replays")?;
@@ -367,11 +429,54 @@ mod tests {
         let mut changed_fleet = f.clone();
         changed_fleet["additional_independent166_DATA_cap_bytes"] = json!(0);
         assert!(project(&changed_fleet, &cfg, &live).is_err());
+        if f.get("terminal168_trace_mismatch").is_some() {
+            let mut bad = f.clone();
+            bad["terminal168_trace_mismatch"]["sha256"] = json!("0".repeat(64));
+            assert!(project(&bad, &cfg, &live).is_err());
+            let mut missing = f.clone();
+            missing
+                .as_object_mut()
+                .unwrap()
+                .remove("terminal168_trace_mismatch");
+            assert!(project(&missing, &cfg, &live).is_err());
+            let mut resurrected = cfg.clone();
+            resurrected["diagnostic_replays"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"range":"168"}));
+            assert!(project(&f, &resurrected, &live).is_err());
+        }
         let mut late = cfg.clone();
         late["not_before_utc"] = json!("2099-01-01T00:00:00Z");
         assert!(validate_clock(&f, &late, &previous).is_err());
         assert!(scratch.is_absolute() && !scratch.try_exists()? && unsafe { libc::geteuid() } == 0);
         fs::DirBuilder::new().mode(0o700).create(&scratch)?;
+        if f.get("terminal168_trace_mismatch").is_some() {
+            let row = json!({"epoch":136,"positive_worker":true,"canonical_replay_claimed":false,
+                "entry":"fixture-entry","children":{"worker":{"pid":std::process::id()}},
+                "admission":"fixture-admission","post_prefire_capacity":"fixture-capacity",
+                "native_start_ticks":1,"unit":{"InvocationID":"fixture-invocation"}});
+            let captured = json!({"schema":"horizon-private136-cycle-v1","sample":f["observer"],
+                "fleet":f["previous_Root_operational_review"],"row":row});
+            let file = scratch.join("bounded136.json");
+            write_once(&file, &captured)?;
+            let reference = binding(&file, &data(&file, 1 << 20)?);
+            let mut additional = f.clone();
+            additional["private_epoch136_observation"] = reference.clone();
+            let mut registered = row;
+            registered["receipt"] = reference;
+            additional["actual_active_private_diagnostics"]
+                .as_array_mut()
+                .unwrap()
+                .push(registered);
+            additional["active_private_diagnostic_count"] = json!(2);
+            additional["active_producer_count"] = json!(6);
+            assert_eq!(project(&additional, &cfg, &live)?, reduced);
+            *additional
+                .pointer_mut("/actual_active_private_diagnostics/1/native_start_ticks")
+                .unwrap() = json!(2);
+            assert!(project(&additional, &cfg, &live).is_err());
+        }
         let original_name = scratch.join("sealed-next/observer.json");
         let choice = json!({"only_a_test":true,"original":binding(&path,&bytes)});
         let dest = materialize(&original_name, &reduced, &choice)?;
