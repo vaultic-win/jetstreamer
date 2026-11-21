@@ -300,3 +300,38 @@ sidecars or R2 mutation. Source tests are not actual-source sandbox qualificatio
 Keep this profile dormant until the live metadata collection and ledger retention
 complete and a sealed exact-package check, fresh admission and independent
 operational qualification have passed.
+
+## Recovered gap input and historical execution of the 248-slot suffix
+
+The epoch 141 freeze-components and vote-prefix diagnostics both bootstrapped
+from snapshot 60,911,751, replayed slots 60,911,752 through 60,911,999 as
+warmup, and enabled their archive writers at 60,912,000. Their worker
+invocations were `412f43b5db1046a2822efe3aeff95162` and
+`5b09e442086149b3a9775d728f1ff047`. Each original parent journal contains
+ten source-verification records for post-gap blocks within the warmup. Each
+worker independently reconstructed the terminal Bank hash
+`AYzJ6h8BcyraPHeypjd4uhj4L99y7WdMkmeb1L93id7L`. Its capitalization,
+tick height and last blockhash agree with the frozen terminal captured by the
+original epoch 140 producer. Finalized slot 60,912,004 names slot 60,911,999
+as its parent and confirms that last blockhash.
+
+`jetstreamer-epoch140-suffix-gap-input NEW_PRIVATE_OUTPUT` reconstructs those
+ten native records directly from the retained SlotMeta rows and data shreds.
+It decodes all original entry batches, checks the ten framed records against
+the separately prepared complete-census index, and independently rereads all
+6,730,171 output bytes. It compares the retained finalized RPC transactions
+for the first target byte for byte. It then checks each real parent's reported
+transaction, entry, boundary and PoH-work counts against the reconstructed
+records, and reads the frozen components directly from both worker journals.
+The command uses an empty mode-0700 root-owned directory named for its systemd
+invocation under `epoch140-suffix-gap-input-20261121-v1` in the campaign
+runtime data directory. Its two private outputs are `suffix-gap-entries.data`
+and `suffix-gap-input.json`. The data preserves the original framed record
+layout and offsets from zero through the last selected target.
+
+These retained runs provide execution evidence through the end of epoch 140.
+Their recorder configuration leaves the account-update output for all 248
+slots outstanding. The original producer's terminal accounts hash also still
+requires independent confirmation. The full prefix semantic audit, a
+suffix-recording worker with its pre-entry cut comparison, and canonical
+verification at 61,328,765 remain necessary for the private V4 assembly path.
