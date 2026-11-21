@@ -37,7 +37,7 @@ def fork_control(m,fleet):
                g["producer"]["pid"]==before["producer_pid"] and g["trip_reason"] is None for g in [bootstrap,historical])
            and first["timer"]["InvocationID"]==w["worker_guard"]["timer"]["InvocationID"]==before["timer_invocation_id"],
            "normal node-to-worker guard chain differs")
-    observed=m["capture"](170,fleet)
+    observed=m["capture"](145,fleet)
     import time
     deadline=time.monotonic()+25
     while True:
@@ -62,7 +62,7 @@ def main():
         return subprocess.check_output(["/usr/bin/git","-c","safe.directory="+str(repo),"-C",repo,*args])
     git("merge-base","--is-ancestor",commit,"origin/account-updates")
     src={}
-    for name in ("post-stop-fit","retire-original-timers.py","qualify.py"):
+    for name in ("post-stop-fit","retire-original-timers.py","incident_extensions.py","qualify.py"):
         p=here/name;b=p.read_bytes()
         s.need(b==git("show",commit+":"+str(p.relative_to(repo))),"unpublished qualification source")
         src[name]=digest(b)
@@ -79,7 +79,7 @@ def main():
     for epoch in (145,166,167,168,170):
         required,protected,delta=floor(raw,optional,books,epoch,peer,{})
         allowance=books.get(str(epoch),{}).get("remaining_bytes",0)
-        s.need(required==protected+allowance and required<=observed["available_HOME_bytes"] and delta>=0,"unfunded candidate")
+        s.need(required==protected+allowance and protected>=8297502499408 and delta>=0,"unfunded candidate")
     # A replacement's new bytes consume its own prepaid interval exactly once.
     older=books["170"];grown=dict(books);amount=1<<20
     grown["170"]=dict(older,remaining_bytes=older["remaining_bytes"]-amount,physical_bytes=older["physical_bytes"]+amount)

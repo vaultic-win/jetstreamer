@@ -64,10 +64,6 @@ j=json.loads(w.read_bytes());assert (j['native_identity']['executable_sha256']==
 c['qualified_native_witness']=ref(w);cp=base/'qualified-contract.json';durable(cp,c)
 cs=seal('contract',[member('contract.json',cp,0o444)])
 binding={'contract':ref(base/'contract/contract.json'),'deployment_seal':cs}
-profiles=[
- (166,'horizon-qualify-166-independent-recovery-20261121-v1.service','epoch166-independent-cold-20261120-v1','epoch166-independent-cold-recovery-20261121-v1',288),
- (167,'horizon-qualify-167-source-index-v1-20261121.service','epoch167-standard-lane-20261109-v1','epoch167-source-index-recovery-20261121-v1',512),
- (170,'horizon-qualify-170-replacement-local3retry10-20261121-v1.service','epoch170-standard-lane-20261109-v1','epoch170-retry10-recovery-20261121-v1',288)]
 unit="horizon-qualify-170-replacement-local3retry10-20261121-v1.service"
 run=base.parent/"epoch170-retry10-recovery-20261121-v1"
 plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=unit,invocation_id=os.environ["INVOCATION_ID"],
@@ -81,7 +77,7 @@ for label,p in [("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_b
  fp=base/(label+"-"+os.environ["INVOCATION_ID"]+".json");durable(fp,p)
  proc=subprocess.run([exe,fp,"--plan-sha256",sha(fp),"--self-sha256",sha(exe),"--validate-plan-only"],capture_output=True)
  if label=="positive":assert proc.returncode==0 and json.loads(proc.stdout)["validated"]
- else:assert proc.returncode and b"Error" in proc.stderr or (proc.returncode and proc.stderr)
+ else:assert proc.returncode != 0 and proc.stderr
  records[label]=ref(fp)
 result=dict(schema="horizon-170-384-native-guard-qualified-v1",build=ref(bp),guard=ref(exe),seal=bseal,witness=ref(w),
             contract=binding,static_controls=records,physical_launch=False,qualification_invocation=os.environ["INVOCATION_ID"])

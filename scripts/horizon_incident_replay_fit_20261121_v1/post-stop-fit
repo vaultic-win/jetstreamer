@@ -23,6 +23,7 @@ loader["load_package"](PKG,"c70887c1a09f91d48b1af23c19004419d255e933848abd7513be
 sys.path.insert(0,str(PKG))
 import fit
 import status168 as s
+extensions=runpy.run_path(str(Path(__file__).resolve().with_name("incident_extensions.py")))
 
 G=1<<30
 INC=R/"epoch168-witness-incident-20261121-v1"
@@ -145,7 +146,8 @@ def native_actor(e,own,tree,run,stop):
                "replacement admission has no native producer")
         return None
     intent,_=s.read(d/"START_INTENT.json")
-    actor,aref=s.read(d/"ACTUAL_PRODUCER_NATIVE.json")
+    gated=e==170 and not (d/"ACTUAL_PRODUCER_NATIVE.json").exists()
+    actor,aref=s.read(d/("NATIVE_GATED.json" if gated else "ACTUAL_PRODUCER_NATIVE.json"))
     pid=int(manager["MainPID"]);iid=manager["InvocationID"];group="/system.slice/"+unit
     s.need(s.iid(iid) and iid!=stop["original"]["producer_invocation_id"] and manager["ActiveState"]=="active" and
            manager["SubState"]=="running" and manager["ControlGroup"]==group and not manager["Job"] and manager["NRestarts"]=="0" and
@@ -155,18 +157,25 @@ def native_actor(e,own,tree,run,stop):
     identity=dict(producer_unit=unit,producer_invocation_id=iid,producer_pid=pid,start_ticks=ticks)
     s.identity(actor,identity)
     pkg=R/"epoch167-local-index-successor-20261121-v1/deployment" if e==167 else Path(f"/usr/local/lib/jetstreamer/horizon-independent{e}-singleton-package-20261109-v1")
-    s.need(pg=="0::"+group and s.same_file(pr/"exe",pkg/"jetstreamer-node") and s.same_file(pr/"fd/1",run/"producer.log")
+    if gated:
+        s.need(e==own and len(ps)==1,"foreign pending 170")
+        extensions["held"](s,unit,run,pid,pr,intent)
+    else:s.need(s.same_file(pr/"exe",pkg/"jetstreamer-node"),"different normal node")
+    s.need(pg=="0::"+group and s.same_file(pr/"fd/1",run/"producer.log")
            and s.same_file(pr/"fd/2",run/"producer.log"),"foreign replacement executable or output")
+    cap,guard_image,contract=CAPS[e],IMAGE,CONTRACT
+    if e==170:
+        wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
     plan,pref=s.read(d/"ACTUAL_GUARD_PLAN.json");first,fr=s.read(d/"FIRST_GUARD.json")
     s.need(plan["invocation_id"]==iid and plan["unit"]==unit and plan["filesystem"]==str(HOME) and plan["worker_root"]==str(tree)
-           and plan["receipt_directory"]==str(d/"guard-receipts") and plan["maximum_root_physical_bytes"]==CAPS[e]
-           and plan["maximum_worker_vmas"]==3500000 and plan["data_fulfillment"]==CONTRACT,"foreign replacement plan")
+           and plan["receipt_directory"]==str(d/"guard-receipts") and plan["maximum_root_physical_bytes"]==cap
+           and plan["maximum_worker_vmas"]==3500000 and plan["data_fulfillment"]==contract,"foreign replacement plan")
     timerrow=s.show(timer);guard=s.show(timer.removesuffix(".timer")+".service")
     s.need(timerrow["ActiveState"]=="active" and s.iid(timerrow["InvocationID"]) and not timerrow["Job"]
            and timerrow["Triggers"]==guard["Id"] and guard["TriggeredBy"]==timer and guard["MemoryMax"]==str(G)
            and guard["CPUQuotaPerSecUSec"]=="1s" and guard["MemorySwapMax"]=="0","foreign replacement guard")
     historical=s.bound(first["receipt"],d/"guard-receipts"/("sample-"+first["guard_invocation"]+".json"))
-    s.need(s.iid(first["guard_invocation"]) and historical["guard_sha256"]==IMAGE and historical["plan_sha256"]==pref["sha256"]
+    s.need(s.iid(first["guard_invocation"]) and historical["guard_sha256"]==guard_image and historical["plan_sha256"]==pref["sha256"]
            and historical["producer_invocation_id"]==iid and historical["producer"]["pid"]==pid and
            historical["producer_stop_enabled"] is True and historical["trip_reason"] is None and
            first["timer"]["InvocationID"]==timerrow["InvocationID"],"different first native guard")
@@ -174,8 +183,8 @@ def native_actor(e,own,tree,run,stop):
            intent["predecessor_stop"]==stop["stop_completion"],"wrong predecessor or start intent")
     pre=intent["prestart"]
     s.need(pre["schema"]=="horizon-incident-replay-fit-v1" and pre["epoch"]==e and pre["fits"] is True and pre["candidate"] is None
-           and pre["bookings"][str(e)]["cap_bytes"]==CAPS[e] and pre["bookings"][str(e)]["root"]==str(tree)
-           and 0<=pre["bookings"][str(e)]["remaining_bytes"]<=CAPS[e],"unbound prepaid allocation")
+           and pre["bookings"][str(e)]["cap_bytes"]==cap and pre["bookings"][str(e)]["root"]==str(tree)
+           and 0<=pre["bookings"][str(e)]["remaining_bytes"]<=cap,"unbound prepaid allocation")
     admission=None
     if (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists():
         ad,adref=s.read(d/"ACTUAL_ADMISSION_AND_PROTECTION.json");s.identity(ad,identity)
@@ -192,7 +201,7 @@ def native_actor(e,own,tree,run,stop):
         f.seek(max(0,os.fstat(f.fileno()).st_size-(1<<20))); latest=next(json.loads(line) for line in reversed(f.read().splitlines()) if line.startswith(b"{"))
     gid=latest["guard_invocation_id"];s.need(s.iid(gid),"missing native guard")
     sample,sr=s.read(d/"guard-receipts"/("sample-"+gid+".json"))
-    s.need(not any((d/"guard-receipts").glob("stop-*.json")) and sample==latest and sample["guard_sha256"]==IMAGE and
+    s.need(not any((d/"guard-receipts").glob("stop-*.json")) and sample==latest and sample["guard_sha256"]==guard_image and
            sample["producer_invocation_id"]==sample["producer"]["invocation_id"]==iid and sample["plan_sha256"]==pref["sha256"]
            and sample["producer"]["pid"]==pid and sample["producer"]["cgroup"]==group and sample["producer_stop_enabled"] and
            sample["producer"]["active"]=="active" and sample["trip_reason"] is None and sample["worker_observation_error"] is None and sample["DATA_fulfillment_observation_error"] is None
@@ -213,8 +222,8 @@ def native_actor(e,own,tree,run,stop):
             with exe.open("rb") as f:s.need(hashlib.file_digest(f,"sha256").hexdigest()=="cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819","different worker image")
         processes.append([p,start,st.st_dev,st.st_ino])
     obs=sample["root_physical_observation"]
-    s.need(obs["maximum_physical_bytes"]==CAPS[e] and obs["exceeds_budget"] is False and
-           all(0<=obs[k]["physical_bytes"]<=CAPS[e] for k in ("first","second")),"guarded whole tree exceeds its cap")
+    s.need(obs["maximum_physical_bytes"]==cap and obs["exceeds_budget"] is False and
+           all(0<=obs[k]["physical_bytes"]<=cap for k in ("first","second")),"guarded whole tree exceeds its cap")
     # Disappearing appendvecs can invalidate disk credit, while the guard still
     # enforces the complete live tree. Measure the fixed, disjoint part separately.
     exact=all(obs[k]["vanished_entries"]==0 for k in ("first","second"))
@@ -259,7 +268,7 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def phase145():
+def phase145(epoch):
     m=s.show(fit.A145);ps=fit.members(fit.A145)
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
@@ -271,6 +280,20 @@ def phase145():
                    "exit status: 124" in failure["error"],"unbound failed 145")
             v["failure"]=fr
         return v
+    current=Path(__file__).resolve()
+    fp=R/"epoch145-semantic-continuity-20261121-v1/tools-v5/export145"
+    if fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,_=s.read(current.with_name("profile145.json"))
+        v5=fp.parent
+        receipt,_=s.read(v5/"deployment-seal-receipt.json",cfg["seal_sha256"])
+        adapter=v5/"incident-phase.py"
+        s.need(any(x["name"]==adapter.name and x["sha256"]==cfg["adapter_sha256"] for x in receipt["members"]),
+               "different 145 native phase adapter")
+        fit.binary(adapter,cfg["adapter_sha256"])
+        mod=runpy.run_path(str(adapter))
+        item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
+        s.need(item is not None,"unbound new 145 verifier")
+        return item
     phase,_=fit.phase145()
     s.need(phase.get("window") and len(ps)>0,"unknown 145 holding generation")
     return phase
@@ -387,7 +410,8 @@ def capture_once(epoch,ref):
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     peers=survivors(rows,ledger);status=registered_status();c136=fit.candidate136(f,status["registration"])
     s.need((136 in rows)==c136["occupied"],"136 registration drift")
-    phase=phase145()
+    phase=phase145(epoch)
+    extension=extensions["funding"](s,epoch)
     rep={};books={}
     for e in sorted(ORIGINAL):
         row=stopped[str(e)]
@@ -401,13 +425,14 @@ def capture_once(epoch,ref):
         root=Path(plan["worker_root"]);run=stable_root(e)
         s.need(run.is_relative_to(root) and plan["maximum_root_physical_bytes"]==CAPS[e] and
                plan["invocation_id"]==original["iid"],"different original booked tree")
+        effective=extension["cap_bytes"] if e==170 and extension else CAPS[e]
         a=native_actor(e,epoch,root,run,row)
         if a:rep[str(e)]=a
         if a and a["physical"] is not None:
             physical=a["physical"];measurement="two complete native whole-tree walks"
         else:
             exclude=run if a else None
-            first=tree_size(root,CAPS[e],exclude);second=tree_size(root,CAPS[e],exclude)
+            first=tree_size(root,effective,exclude);second=tree_size(root,effective,exclude)
             s.need(first==second,"retained allocation changed during walk")
             physical=first
             measurement="two retained-tree walks excluding active run" if a else "two complete stopped-tree walks"
@@ -416,8 +441,8 @@ def capture_once(epoch,ref):
                 a and a["admission"] and rows[e]["unit"]["InvocationID"]==a["producer_invocation_id"] and rows[e]["unit"]["Id"]==a["producer_unit"])
             s.need(allowed,"stale or foreign fleet generation")
         hist=0 if e==166 else ledger["native_inputs"]["roots"]["standard_peer_realized_bytes"][str(e)]
-        books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=CAPS[e],physical_bytes=physical,measurement=measurement,
-                            remaining_bytes=CAPS[e]-physical,historical_realized_bytes=hist)
+        books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=effective,physical_bytes=physical,measurement=measurement,
+                            remaining_bytes=effective-physical,historical_realized_bytes=hist)
     extra=s.inspect()
     if extra:
         s.need(extra["ordinary_canonical"] or epoch==168,"foreign pending normal 168")
@@ -438,12 +463,13 @@ def capture_once(epoch,ref):
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
     population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
+    raw+=extension["extra_bytes"] if extension else 0
     need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep)
     resident={e:joined_resident(v) for e,v in rep.items()}
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145()==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
     for v in peers.values():
         m=s.show(v["unit"]);t=s.show(v["timer"])
@@ -452,7 +478,7 @@ def capture_once(epoch,ref):
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
-        fits=avail>=need and mem["MemAvailable:"]>=needmem,actual_original_stops=stopped,survivors=peers,
+        fits=avail>=need and mem["MemAvailable:"]>=needmem,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
