@@ -34,6 +34,7 @@ pub mod native257_fit;
 pub mod native228_demotion_fit;
 pub mod native212;
 pub mod native266;
+pub mod native266_full;
 pub mod native261;
 mod native265_growth;
 mod peer_window;

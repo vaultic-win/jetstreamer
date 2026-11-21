@@ -1,0 +1,146 @@
+[
+  {
+    "path": "/var/lib/jetstreamer/horizon265-replacement-20261119-receipts-v3/sample-d984617498cd4c88895980a4ab885bba.json",
+    "sha256": "911671275035f5365c153e33baa68778f9a63652b7150f13dc863e8a6ba57647",
+    "sample": {
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "producer_invocation_id": "182de64d33674f95b7758d410eb1812b",
+      "guard_invocation_id": "d984617498cd4c88895980a4ab885bba",
+      "guard_sha256": "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d",
+      "plan_sha256": "ebd9d801abd65d504dd4b63e8e6106fa771cae4d1b320a5ae3ce358df983501a",
+      "producer_stop_enabled": true,
+      "trip_reason": null,
+      "workers": [
+        [
+          1583403,
+          403112
+        ]
+      ],
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-qualify-265-replacement-20261119-v3.service",
+        "delegated": false,
+        "invocation_id": "182de64d33674f95b7758d410eb1812b",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "pid": 1581654,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running"
+      },
+      "root_physical_observation": {
+        "conservative_physical_bytes": 374907125760,
+        "exceeds_budget": false,
+        "first": {
+          "directories": 35,
+          "entries": 401813,
+          "physical_bytes": 374907125760,
+          "symlinks": 0,
+          "vanished_entries": 0
+        },
+        "maximum_physical_bytes": 506191984640,
+        "second": {
+          "directories": 35,
+          "entries": 401813,
+          "physical_bytes": 374907125760,
+          "symlinks": 0,
+          "vanished_entries": 0
+        }
+      },
+      "worker_observation_error": null,
+      "root_physical_observation_error": null,
+      "remote_mutations": false,
+      "r2_mutations": false,
+      "plan": "/var/lib/jetstreamer/horizon265-replacement-20261119-guard-v3/guard-plan.json"
+    },
+    "original_fields": [
+      "guard_invocation_id",
+      "guard_sha256",
+      "plan",
+      "plan_sha256",
+      "producer",
+      "producer_invocation_id",
+      "producer_stop_enabled",
+      "r2_mutations",
+      "remote_mutations",
+      "root_physical_observation",
+      "root_physical_observation_error",
+      "schema",
+      "trip_reason",
+      "worker_observation_error",
+      "workers"
+    ]
+  },
+  {
+    "path": "/var/lib/jetstreamer/horizon266-host-stop-capture-v160-stop-a1/stop-intent.json",
+    "sha256": "d08b1ce3debc1d2c446280e6a9e87bc53bb425c53316fb76bb63fd65733d2dc7",
+    "sample": {
+      "schema": "jetstreamer-horizon-standalone-guard-sample-v1",
+      "producer_invocation_id": "84c5c696a58f48e48d41f764383e0715",
+      "guard_invocation_id": "9a807187522d4081aac361f96e46c8e9",
+      "guard_sha256": "63defdffad878d470ff6f100471408efcd2a207a5c1bb60ac4b75e7204c49c10",
+      "plan_sha256": "8108850acf00d3a0edba29d972bb7930a7fa6f663a52e6d47862b27b3233931a",
+      "producer_stop_enabled": true,
+      "trip_reason": "filesystem-floor",
+      "workers": [
+        [
+          2560780,
+          31
+        ]
+      ],
+      "producer": {
+        "active": "active",
+        "cgroup": "/system.slice/horizon-266-native-input-20261121-v1.service",
+        "control_pid": 0,
+        "delegated": false,
+        "exec_main_code": 0,
+        "exec_main_status": 0,
+        "invocation_id": "84c5c696a58f48e48d41f764383e0715",
+        "kill_mode": "control-group",
+        "load_state": "loaded",
+        "memory_high": "100000000000",
+        "memory_max": "192000000000",
+        "memory_swap_max": "0",
+        "pid": 2560780,
+        "restart_policy": "no",
+        "restarts": 0,
+        "result": "success",
+        "sub": "running",
+        "tasks_max": "512"
+      },
+      "root_physical_observation": {
+        "conservative_physical_bytes": 0,
+        "device": 123,
+        "exceeds_budget": false,
+        "free_inodes": 1048575,
+        "inode": 1,
+        "maximum_physical_bytes": 133143986176,
+        "tmpfs_capacity_bytes": 137438953472,
+        "total_inodes": 1048576
+      },
+      "worker_observation_error": null,
+      "root_physical_observation_error": null,
+      "remote_mutations": false,
+      "r2_mutations": false,
+      "plan": "/var/lib/jetstreamer/horizon-native266-guard-binding-guard-5e05c518-v156-a/guard-plan.json"
+    },
+    "original_fields": [
+      "guard_invocation_id",
+      "guard_sha256",
+      "plan",
+      "plan_sha256",
+      "producer",
+      "producer_invocation_id",
+      "producer_stop_enabled",
+      "r2_mutations",
+      "remote_mutations",
+      "root_physical_observation",
+      "root_physical_observation_error",
+      "schema",
+      "trip_reason",
+      "worker_observation_error",
+      "workers"
+    ]
+  }
+]
