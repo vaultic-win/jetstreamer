@@ -2,6 +2,17 @@ use anyhow::{Result, ensure};
 use std::path::Path;
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 5 && args[1] == "epoch228-demotion-control" {
+        println!(
+            "{}",
+            horizon_singleton211_launch::native228_demotion_fit::controller::run(
+                Path::new(&args[2]),
+                &args[3],
+                Path::new(&args[4]),
+            )?
+        );
+        return Ok(());
+    }
     if args.len() == 6 && args[1] == "epoch228-demotion" {
         ensure!(
             matches!(args[2].as_str(), "initial" | "held"),
