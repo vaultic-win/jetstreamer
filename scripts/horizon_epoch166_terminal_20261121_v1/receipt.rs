@@ -299,19 +299,55 @@ mod tests {
     #[test]
     #[ignore = "run as root in the admitted private fixture directory"]
     fn native_committed_inode_fixture() -> Result<()> {
+        let (live, r) = inputs();
+        committed_inode_fixture("TERMINAL166_PRIVATE_FIXTURE", live, r, &BOUNDARY166)
+    }
+
+    #[cfg(feature = "metered168")]
+    #[test]
+    #[ignore = "requires the actual epoch 168 witness and a private fixture directory"]
+    fn metered168_committed_inode_fixture() -> Result<()> {
+        let live = checked_live()?;
+        let expected = generation::boundary(&live)?;
+        let checkpoint = &live["checkpoint"];
+        let bootstrap = &live["bootstrap"];
+        let fp = s(&live["manifest_fingerprint"])?
+            .strip_prefix("sha256:")
+            .context("manifest prefix")?;
+        let fingerprint = (0..32)
+            .map(|i| u8::from_str_radix(&fp[2 * i..2 * i + 2], 16))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let gate = json!({"kind":"sealed-root-checkpoint-cohort","version":1,
+            "verified_manifest_checkpoints":[{"slot":checkpoint["slot"],"accounts_hash":b58_hash(&checkpoint["accounts_hash"])?}],
+            "members":[{"epoch":168,"bootstrap":{"slot_complete":true,"slot":bootstrap["slot"],"accounts_hash":b58_hash(&bootstrap["accounts_hash"])?},
+                "terminal":{"slot_complete":true,"slot":expected.last_block,"last_blockhash":expected.last_block_hash}}]});
+        let ctx = json!({"schema":"jetstreamer-root-checkpoint-gate-context-v1","manifest_fingerprint":fingerprint,"epochs":[168],"gate":gate});
+        let r = json!({"schema":"jetstreamer-root-cohort-publication-receipt-v2","epochs":[168],"manifest_fingerprint":live["manifest_fingerprint"],
+            "root_checkpoint_gate":gate,"publication_context_base64":STANDARD.encode(serde_json::to_vec(&ctx)?)});
+        let mut foreign = live.clone();
+        foreign["independent_boundary"]["sha256"] = json!("0".repeat(64));
+        assert!(generation::boundary(&foreign).is_err());
+        assert!(super::gate(&live, &r, &BOUNDARY166).is_err());
+        committed_inode_fixture("TERMINAL168_PRIVATE_FIXTURE", live, r, &expected)
+    }
+
+    fn committed_inode_fixture(
+        env: &str,
+        mut live: Value,
+        mut r: Value,
+        boundary: &TerminalBoundary,
+    ) -> Result<()> {
+        let epoch = boundary.epoch;
         ensure!(
             unsafe { libc::geteuid() } == 0,
             "fixture needs root ownership for producer log"
         );
-        let fixture = PathBuf::from(std::env::var("TERMINAL166_PRIVATE_FIXTURE")?);
+        let fixture = PathBuf::from(std::env::var(env)?);
         ensure!(
             fixture.is_absolute() && !fixture.try_exists()?,
             "fresh fixture required"
         );
         fs::create_dir(&fixture)?;
-        let mut live;
-        let mut r;
-        (live, r) = inputs();
         let out = fixture.join("output");
         let batches = fixture.join("receipts");
         let dir_ref = |p: &Path| -> Result<Value> {
@@ -329,8 +365,8 @@ mod tests {
             fs::set_permissions(p, fs::Permissions::from_mode(0o600))?;
             Ok(())
         };
-        let archive = out.join("epoch-166.jet");
-        let checksum = out.join("epoch-166.jet.sha256");
+        let archive = out.join(format!("epoch-{epoch}.jet"));
+        let checksum = out.join(format!("epoch-{epoch}.jet.sha256"));
         let data = b"archive-identity fixture";
         let hash = format!("{:x}", Sha256::digest(data));
         let tx = "6f".repeat(32);
@@ -338,29 +374,29 @@ mod tests {
         write(&archive, data, 1001)?;
         write(
             &checksum,
-            format!("{hash}  epoch-166.jet\n").as_bytes(),
+            format!("{hash}  epoch-{epoch}.jet\n").as_bytes(),
             1001,
         )?;
         r["transaction_id"] = json!(tx);
         r["destination"] = json!({"device":live["output"]["device"],"inode":live["output"]["inode"],"path_base64":STANDARD.encode(out.as_os_str().as_bytes())});
-        r["outcome"] = json!({"kind":"committed","members":[{"epoch":166,"archive_path_base64":STANDARD.encode(archive.as_os_str().as_bytes()),"checksum_path_base64":STANDARD.encode(checksum.as_os_str().as_bytes()),"archive_sha256":hash,"initial_archive":null,"initial_checksum":null,"initial_manifest":null,"manifest_path_base64":null,"committed_manifest":null,"committed_archive":identity(&archive,1001)?,"committed_checksum":identity(&checksum,1001)?}]});
+        r["outcome"] = json!({"kind":"committed","members":[{"epoch":epoch,"archive_path_base64":STANDARD.encode(archive.as_os_str().as_bytes()),"checksum_path_base64":STANDARD.encode(checksum.as_os_str().as_bytes()),"archive_sha256":hash,"initial_archive":null,"initial_checksum":null,"initial_manifest":null,"manifest_path_base64":null,"committed_manifest":null,"committed_archive":identity(&archive,1001)?,"committed_checksum":identity(&checksum,1001)?}]});
         write(&rp, &serde_json::to_vec(&r)?, 1001)?;
         let log = fixture.join("producer.log");
-        write(&log,format!("root-checkpoint cohort 166-166 published 1 archive(s) with checksums in transaction {tx}; receipt {} is durable\n",rp.display()).as_bytes(),0)?;
+        write(&log,format!("root-checkpoint cohort {epoch}-{epoch} published 1 archive(s) with checksums in transaction {tx}; receipt {} is durable\n",rp.display()).as_bytes(),0)?;
         let m = log.metadata()?;
         live["producer_log"] = json!({"path":log,"device":m.dev(),"inode":m.ino()});
-        let good = inspect(&live)?;
+        let good = inspect_with_boundary(&live, boundary)?;
         assert_eq!(good["local_archive"]["sha256"], hash);
         let original = r.clone();
         r["outcome"]["kind"] = json!("rolled_back");
         write(&rp, &serde_json::to_vec(&r)?, 1001)?;
-        assert!(inspect(&live).is_err());
+        assert!(inspect_with_boundary(&live, boundary).is_err());
         write(&rp, &serde_json::to_vec(&original)?, 1001)?;
         fs::hard_link(&archive, out.join("alias"))?;
-        assert!(inspect(&live).is_err());
+        assert!(inspect_with_boundary(&live, boundary).is_err());
         fs::remove_file(out.join("alias"))?;
         write(&checksum, b"bad\n", 1001)?;
-        assert!(inspect(&live).is_err());
+        assert!(inspect_with_boundary(&live, boundary).is_err());
         Ok(())
     }
 }

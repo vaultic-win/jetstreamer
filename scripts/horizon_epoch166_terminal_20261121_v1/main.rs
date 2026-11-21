@@ -1,4 +1,4 @@
-//! Local terminal evidence only. The original 166 budget remains reserved.
+//! Capture the committed local archive from the selected original producer.
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -10,27 +10,36 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 mod cadence;
 mod receipt;
-#[cfg(feature = "retry10")]
+#[cfg(any(feature = "retry10", feature = "metered168"))]
 #[path = "../horizon_epoch166_retry10_delivery_20261121_v1/wait.rs"]
 mod wait;
 
 #[cfg(feature = "retry10")]
 #[path = "../horizon_epoch166_retry10_delivery_20261121_v1/generation.rs"]
 mod generation;
-#[cfg(feature = "retry10")]
+#[cfg(all(feature = "retry10", feature = "metered168"))]
+compile_error!("select a single terminal producer generation");
+#[cfg(all(feature = "metered168", not(feature = "retry10")))]
+#[path = "../horizon_epoch168_full_metered_20261121_v1/terminal.rs"]
+mod generation;
+#[cfg(any(feature = "retry10", feature = "metered168"))]
 use generation::{LIVE_SHA, PRODUCER_IID as IID, PRODUCER_UNIT as UNIT, TERMINAL_ROOT as ROOT};
 
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1";
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 const LIVE_SHA: &str = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 const UNIT: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
-#[cfg(not(feature = "retry10"))]
+#[cfg(not(any(feature = "retry10", feature = "metered168")))]
 const IID: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
+#[cfg(not(feature = "metered168"))]
+const EPOCH: u64 = 166;
+#[cfg(feature = "metered168")]
+const EPOCH: u64 = 168;
 const SUCCEEDED: &str = "7ad2d189f7e94e70a38c781354912448";
 const STARTED: &str = "39f53479d3a045ac8e11786248231fbf";
 const STOPPING: &str = "de5b426a63be47a7b6ac3eaac82e2f6f";
@@ -158,7 +167,7 @@ fn checked_live() -> Result<Value> {
     );
     let live: Value = serde_json::from_slice(&bytes)?;
     ensure!(
-        live["epoch"] == 166
+        live["epoch"] == EPOCH
             && live["native"]["manager"]["Id"] == UNIT
             && live["native"]["manager"]["InvocationID"] == IID,
         "foreign native generation"
@@ -173,7 +182,7 @@ fn closed(live: &Value) -> Result<BTreeMap<String, String>> {
             && v["ControlPID"] == "0"
             && v["Job"].is_empty()
             && v["NRestarts"] == "0",
-        "166 node or control still active, failed, or queued"
+        "{EPOCH} node or control still active, failed, or queued"
     );
     ensure!(
         v["InvocationID"].is_empty() || v["InvocationID"] == IID,
@@ -184,7 +193,7 @@ fn closed(live: &Value) -> Result<BTreeMap<String, String>> {
         !group.try_exists()?
             && !process_bound(&live["native"]["parent"])?
             && !process_bound(&live["native"]["worker"])?,
-        "166 process or cgroup remains"
+        "{EPOCH} process or cgroup remains"
     );
     Ok(v)
 }
@@ -217,15 +226,18 @@ fn complete(live: &Value) -> Result<Value> {
         .map(serde_json::from_str)
         .collect::<Result<Vec<Value>, _>>()?;
     let event = exit_events(&records, &boot)?;
+    #[cfg(not(feature = "metered168"))]
     let evidence = receipt::inspect(live)?;
+    #[cfg(feature = "metered168")]
+    let evidence = receipt::inspect_with_boundary(live, &generation::boundary(live)?)?;
     ensure!(
         closed(live)? == state,
         "unit changed during terminal capture"
     );
     Ok(
-        json!({"schema":"terminal166-success-v1","epoch":166,"producer_invocation_id":IID,
+        json!({"schema":format!("terminal{EPOCH}-success-v1"),"epoch":EPOCH,"producer_invocation_id":IID,
         "live":{"path":Path::new(ROOT).join("LIVE.json"),"sha256":LIVE_SHA},"source_admission":live["admission"],
-        "terminal_166_disposition":"node-published-local-cohort","local_archive":evidence["local_archive"],"committed_receipt":evidence["committed_receipt"],"transaction_id":evidence["transaction_id"],
+        (format!("terminal_{EPOCH}_disposition")):"node-published-local-cohort","local_archive":evidence["local_archive"],"committed_receipt":evidence["committed_receipt"],"transaction_id":evidence["transaction_id"],
         "producer_log":evidence["producer_log"],"manager_terminal":event,"producer_unit":UNIT,"resource_credit_bytes":0,"reservation_ending_bytes":0,
         "archive_publication_authorized":false,"new_producer_authorized":false,"canonical_r2_verified":false}),
     )
@@ -297,7 +309,7 @@ fn publish_exact(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    #[cfg(not(feature = "retry10"))]
+    #[cfg(not(any(feature = "retry10", feature = "metered168")))]
     if let [mode, path] = args.as_slice()
         && matches!(mode.as_str(), "inspect-cadence" | "dispatch-cadence")
     {
@@ -307,7 +319,7 @@ fn main() -> Result<()> {
         );
         return Ok(());
     }
-    #[cfg(feature = "retry10")]
+    #[cfg(any(feature = "retry10", feature = "metered168"))]
     if args == ["wait-record"] {
         let value = wait::committed(&checked_live()?)?;
         record(&value)?;
@@ -329,7 +341,7 @@ fn main() -> Result<()> {
         );
         println!(
             "{}",
-            json!({"epoch":166,"outcome":"awaiting-original-node-exit","node_alive":process_bound(&live["native"]["parent"])?,"worker_alive":process_bound(&live["native"]["worker"])?,"resource_credit_bytes":0})
+            json!({"epoch":EPOCH,"outcome":"awaiting-original-node-exit","node_alive":process_bound(&live["native"]["parent"])?,"worker_alive":process_bound(&live["native"]["worker"])?,"resource_credit_bytes":0})
         );
         return Ok(());
     }
