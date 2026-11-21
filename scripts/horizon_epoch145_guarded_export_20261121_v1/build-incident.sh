@@ -14,6 +14,10 @@ recovery) sources=(incident-phase.py run-incident.sh) ;;
 rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only)
         ;;
+timeout-rejoin) sources=(incident-phase.py run-incident.sh)
+        extra=(--cfg incident_rejoin145_only --cfg incident_timeout145_only)
+        fixture+=(incident145::tests::distinguishes_native_query_timeout_from_foreign_or_malformed_failures)
+        ;;
 post|current-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
       extra=(--cfg incident_post145_only)
       fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery)
@@ -24,11 +28,13 @@ q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-2026112
 out="$current/tmp/incident145-$INVOCATION_ID"
 cg="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"
 test "$(cat "$cg/cpu.max")" = '100000 100000'
-test "$(cat "$cg/memory.max")" = '1073741824'
+memory=1073741824
+if [[ $flavor == timeout-rejoin ]]; then memory=805306368; fi
+test "$(cat "$cg/memory.max")" = "$memory"
 test "$(cat "$cg/memory.swap.max")" = '0'
 test "$(cat "$cg/pids.max")" = '128'
 test "$(findmnt -n -T "$current" -o SOURCE)" = /dev/loop4
-if [[ $flavor == rejoin || $flavor == current-post ]]; then
+if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin ]]; then
   # Keep the historical compiler/dependency cache immutable. Pay a new bounded
   # image on HOME for this generation and retain its exact products for sealing.
   provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v5/post-stop-fit
@@ -36,6 +42,11 @@ if [[ $flavor == rejoin || $flavor == current-post ]]; then
   if [[ $flavor == current-post ]]; then
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit
     signature=f16e961612d5c74727fb62a9be280dbb298ebe937cc6c57e50c93839e603609f
+  fi
+  if [[ $flavor == timeout-rejoin ]]; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v9/post-stop-fit
+    signature=57e2f4666f62efe9f65abde6bb3b9fc3e4280f8641c1ee730fad22e906f978aa
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == a3c04e5f662aaca041398496a609bb9a7072177cbc180fa6e1dac32fd1ab0b9c ]]
   fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
@@ -53,7 +64,7 @@ if [[ $flavor == rejoin || $flavor == current-post ]]; then
        { cat "$q/fit-$probe.stderr" >&2; exit 1; }
     sleep "$((2+probe))"
   done
-  python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=1073741824' "$q/before.json"
+  python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory"
   image="$q/cache.ext4"
   fallocate -l 92274688 "$image"
   /usr/sbin/mke2fs -q -t ext4 -F -m0 -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 "$image"
@@ -94,7 +105,7 @@ sha256sum "$out/tests" "$out/export145" > "$q/artifacts"
 cat "$cg/memory.peak" > "$q/memory.peak"
 du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
-if [[ $flavor == rejoin || $flavor == current-post ]]; then
+if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin ]]; then
   mkdir -m0700 "$q/products"
   cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
   test "$(du -s -B1 "$q/products" | cut -f1)" -le 24117248

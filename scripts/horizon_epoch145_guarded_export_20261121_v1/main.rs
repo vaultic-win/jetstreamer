@@ -747,6 +747,21 @@ mod tests {
             assert_eq!(attempts, 3);
             assert_eq!(held["positive_fit"], true);
         }
+        #[cfg(incident_timeout145_only)]
+        {
+            let mut attempts = 0;
+            while_stopped(pid, ticks, deadline, || {
+                prove_stopped_child(pid, ticks)?;
+                attempts += 1;
+                if attempts <= 2 {
+                    return Err(capacity::TopologyTimeout.into());
+                }
+                Ok(json!({"positive_fit":true}))
+            })
+            .unwrap();
+            assert_eq!(attempts, 3);
+            prove_stopped_child(pid, ticks).unwrap();
+        }
         let mut failures = 0;
         assert!(
             while_stopped(pid, ticks, deadline, || {

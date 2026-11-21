@@ -9,7 +9,9 @@ use std::{
 };
 #[cfg(incident_post145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v7/post-stop-fit";
-#[cfg(incident_rejoin145_only)]
+#[cfg(incident_timeout145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit";
+#[cfg(all(incident_rejoin145_only, not(incident_timeout145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
 #[cfg(not(any(incident_post145_only, incident_rejoin145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v3/post-stop-fit";
@@ -364,6 +366,39 @@ fn pending_join(error: &str) -> Result<Option<u64>> {
     Ok(None)
 }
 
+/// Only the sealed fleet provider's exact, read-only PID1 probe can defer the child.
+#[cfg(incident_timeout145_only)]
+pub fn manager_timeout<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
+    let trace = stderr.trim_end();
+    let entry = format!("Traceback (most recent call last):\n  File \"{provider}\", line ");
+    if !trace.starts_with(&entry)
+        || !trace.contains("  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3/status168.py\", line 61, in show\n")
+        || !trace.contains("  File \"/usr/lib/python3.12/subprocess.py\", line 1253, in _check_timeout\n    raise TimeoutExpired(") {
+        return None;
+    }
+    let unit = trace.lines().next_back()?.strip_prefix("subprocess.TimeoutExpired: Command '['/usr/bin/systemctl', 'show', '-p', 'Id,LoadState,ActiveState,SubState,InvocationID,Description,MainPID,StartLimitAction,ControlPID,ControlGroup,Job,NRestarts,Triggers,TriggeredBy,Result,ExecMainStatus,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec', '")?.strip_suffix("']' timed out after 10 seconds")?;
+    let registered = unit == UNIT
+        || [
+            "166-independent-recovery-20261121-v1",
+            "167-source-index-v1-20261121",
+            "168-full-metered-20261121-v1",
+            "169-focused-20261120-v4",
+            "170-replacement-local3retry10-20261121-v1",
+            "172-full-half-core-20261120-v1",
+        ]
+        .iter()
+        .any(|name| {
+            unit.strip_prefix("horizon-qualify-")
+                .and_then(|s| s.strip_suffix(".service"))
+                == Some(*name)
+                || unit.strip_prefix("horizon-guard-").and_then(|s| {
+                    s.strip_suffix(".timer")
+                        .or_else(|| s.strip_suffix(".service"))
+                }) == Some(*name)
+        });
+    registered.then_some(unit)
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -385,6 +420,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
                 "sealed complete provider exceeded its 142s alarm".into(),
             )
             .into());
+        }
+        #[cfg(incident_timeout145_only)]
+        if out.status.code() == Some(1)
+            && out.stdout.is_empty()
+            && let Some(unit) = manager_timeout(&err, PROVIDER)
+        {
+            return Err(anyhow::Error::new(capacity::TopologyTimeout)
+                .context(format!("sealed PID1 census timed out reading {unit}")));
         }
         if err.trim_end().ends_with("ValueError: superseded fleet") {
             let next = head(&fleet)?;
@@ -577,9 +620,27 @@ fn current_guard(
     Ok((floor, remaining.saturating_sub(expected_remaining)))
 }
 
+/// During initial admission and between independent passes there is no worker to stop.
+/// Keep the lock, retrying just the authenticated transient probe before doing any work.
+fn observe_idle<T>(mut observe: impl FnMut() -> Result<T>) -> Result<T> {
+    loop {
+        match observe() {
+            Err(e) if cfg!(incident_timeout145_only) && e.is::<capacity::TopologyTimeout>() => {
+                eprintln!("epoch145 waiting for a complete PID1 census: {e:#}");
+                thread::sleep(if cfg!(test) {
+                    Duration::from_millis(20)
+                } else {
+                    Duration::from_secs(10)
+                });
+            }
+            result => return result,
+        }
+    }
+}
+
 impl Fit {
     pub fn capture(fleet: &Bound) -> Result<Self> {
-        let initial = refresh(fleet)?;
+        let initial = observe_idle(|| refresh(fleet))?;
         Ok(Self {
             evidence: initial.complete.clone(),
             capture: RefCell::new(initial),
@@ -592,7 +653,7 @@ impl Fit {
     }
     pub fn await_topology(&self) -> Result<()> {
         if self.capture.borrow().captured.elapsed() > Duration::from_secs(10) {
-            self.topology()?;
+            observe_idle(|| self.topology())?;
         }
         Ok(())
     }
@@ -604,7 +665,7 @@ impl Fit {
                     if (e.is::<capacity::GuardInFlight>() || e.is::<capacity::Reprice>())
                         && Instant::now() < deadline =>
                 {
-                    self.topology()?
+                    observe_idle(|| self.topology())?
                 }
                 result => return result,
             }

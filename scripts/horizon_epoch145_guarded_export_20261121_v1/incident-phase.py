@@ -7,8 +7,10 @@ import sys
 
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
-REJOIN = Path(__file__).resolve().parent.name == "tools-v5b"
-PKG = BASE / "epoch145-semantic-continuity-20261121-v1" / ("tools-v5b" if REJOIN else "tools-v5")
+VERSION = Path(__file__).resolve().parent.name
+TIMEOUT_REJOIN = VERSION == "tools-v5c"
+REJOIN = VERSION in ("tools-v5b", "tools-v5c")
+PKG = BASE / "epoch145-semantic-continuity-20261121-v1" / (VERSION if REJOIN else "tools-v5")
 IMAGE = PKG / "export145"
 STATE = BASE / "epoch145-guarded-export-20261121-v1/state"
 OLD = "add576f115cc4d3b897f47d024af72fd"
@@ -18,6 +20,10 @@ if REJOIN:
     OLD = "5e0e20bc974149f096ea4bab10b15e1b"
     OLD_FAILURE = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
     OLD_RECOVERY = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
+if TIMEOUT_REJOIN:
+    OLD = "dc043eb78c4a4349b0098760dc764a1f"
+    OLD_FAILURE = "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943"
+    OLD_RECOVERY = "e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f"
 HOME = Path("/home/sol/.jetstreamer-private")
 OUTPUT = HOME / "epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN"
 SOURCE = HOME / "epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet"
@@ -68,6 +74,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     f, failed = s.read(STATE / OLD / "failed.json", OLD_FAILURE)
     _, previous = s.read(STATE / OLD / "recovery-started.json", OLD_RECOVERY)
     expected_failure = f["error"] == "stopped worker fresh-census deadline" if REJOIN else "exit status: 124" in f["error"]
+    if TIMEOUT_REJOIN:
+        expected_failure = f["error"].rstrip().endswith("'horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds")
     s.need(f["iid"] == OLD and expected_failure, "foreign original failure")
     state = STATE / generation
     parent = Path(f"/proc/{pid}")
@@ -101,9 +109,11 @@ def inspect(s, leased, m, members, epoch, provider, profile):
            and ("INVOCATION_ID=" + generation).encode() in (cp / "environ").read_bytes().split(b"\0"),
            "foreign recovery worker")
     started, started_ref = s.read(state / "recovery-started.json")
+    predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
+                   "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
-           and started["prior_frozen_recovery"]["failed_fresh_census" if REJOIN else "failed_preincident_verifier"]["current_boot_failure"]["failure"] == failed
+           and started["prior_frozen_recovery"][predecessor]["current_boot_failure"]["failure"] == failed
            and not any((state / n).exists() for n in ("failed.json", "complete.json", "verified-frozen.json")),
            "145 left its native frozen read phase")
     objects = {}

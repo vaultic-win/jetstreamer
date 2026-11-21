@@ -86,6 +86,10 @@ pub fn predecessor() -> Result<Value> {
         {
             evidence["failed_fresh_census"] = crate::incident145::failed_census()?;
         }
+        #[cfg(incident_timeout145_only)]
+        {
+            evidence["failed_manager_query"] = crate::incident145::failed_manager_query()?;
+        }
         evidence
     };
     Ok(previous)

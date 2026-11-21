@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_rejoin145_only)]
+#[cfg(incident_timeout145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5c/export145";
+#[cfg(all(incident_rejoin145_only, not(incident_timeout145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5b/export145";
 #[cfg(not(incident_rejoin145_only))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5/export145";
@@ -139,6 +141,16 @@ pub fn failed_census() -> Result<Value> {
             && native::ticks(3890831).ok() != Some(360969081),
         "different prior verifier, file, or terminal"
     );
+    verify_observed_pair(&observed, (3890323, 360965610), (3890831, 360969081))?;
+    let id = retained_output(&state, &paid)?;
+    Ok(
+        json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,
+        "original_candidate":id,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
+    )
+}
+
+#[cfg(incident_rejoin145_only)]
+fn verify_observed_pair(observed: &Value, parent: (u32, u64), child: (u32, u64)) -> Result<()> {
     let rows = observed["observations"]
         .as_array()
         .context("prior leased samples")?;
@@ -149,11 +161,11 @@ pub fn failed_census() -> Result<Value> {
     );
     for row in rows {
         ensure!(
-            row["parent_pid"] == 3890323
-                && row["child_pid"] == 3890831
-                && row["parent_ticks"] == 360965610
-                && row["child_ticks"] == 360969081
-                && row["native_members"] == json!(["3890323", "3890831"])
+            row["parent_pid"] == parent.0
+                && row["child_pid"] == child.0
+                && row["parent_ticks"] == parent.1
+                && row["child_ticks"] == child.1
+                && row["native_members"] == json!([parent.0.to_string(), child.0.to_string()])
                 && row["source_inode"] == 100214450,
             "original epoch145 native pair changed"
         );
@@ -166,14 +178,14 @@ pub fn failed_census() -> Result<Value> {
                     "FLOCK",
                     "ADVISORY",
                     "WRITE",
-                    "3890323",
+                    parent.0.to_string(),
                     "fc:00:95818311",
                     "0",
                     "EOF"
                 ])),
             "different predecessor FLOCK"
         );
-        for pid in ["3890323", "3890831"] {
+        for pid in [parent.0.to_string(), child.0.to_string()] {
             for ino in ["100214429", "100214450", "103237059"] {
                 ensure!(
                     leases.contains(&json!([
@@ -190,6 +202,11 @@ pub fn failed_census() -> Result<Value> {
             }
         }
     }
+    Ok(())
+}
+
+#[cfg(incident_rejoin145_only)]
+fn retained_output(state: &Path, paid: &Path) -> Result<Value> {
     for checkpoint in [
         "source-semantics.json",
         "verified-frozen.json",
@@ -206,15 +223,119 @@ pub fn failed_census() -> Result<Value> {
         id.device == 64512 && id.inode == 103237059 && id.bytes == BYTES,
         "original frozen candidate changed"
     );
+    Ok(json!(id))
+}
+
+#[cfg(incident_timeout145_only)]
+pub fn failed_manager_query() -> Result<Value> {
+    const IID: &str = "dc043eb78c4a4349b0098760dc764a1f";
+    let state = Path::new(BASE).join("state").join(IID);
+    let failed = continuity::failure(IID)?;
+    ensure!(
+        failed["failure"]["sha256"]
+            == "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943",
+        "different manager-query failure"
+    );
+    let f = custody::evidence(&serde_json::from_value(failed["failure"].clone())?)?;
+    let started = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f".into(),
+    };
+    let s = custody::evidence(&started)?;
+    let progress = Bound {
+        path: Path::new(RUNTIME)
+            .join("epoch145-semantic-continuity-20261121-v1/V5B_ACTUAL_ADVANCING_WORKER.json"),
+        sha256: "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199".into(),
+    };
+    let observed = custody::evidence(&progress)?;
+    let manager: Bound = serde_json::from_value(observed["manager"].clone())?;
+    let actual = custody::evidence(&manager)?;
+    let paid = Path::new(OUTPUT).join(".tmp36MvkN");
+    let trace = f["error"]
+        .as_str()
+        .and_then(|e| e.strip_prefix("complete 145 capacity observation failed exit status: 1: "))
+        .context("missing native timeout trace")?;
+    ensure!(
+        f["iid"] == IID
+            && crate::incident_fit::manager_timeout(
+                trace,
+                "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit"
+            ) == Some("horizon-qualify-168-full-metered-20261121-v1.service")
+            && s["iid"] == IID
+            && s["image"] == "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
+            && s["file"] == json!(paid)
+            && s["r2_mutations"] == false
+            && observed["invocation_id"] == IID
+            && observed["start"] == json!(started)
+            && observed["resource_credit_bytes"] == 0
+            && manager.sha256 == "f17ed7e2c744287b42fa8fe3fbbf922bb8e534fb9e8361b98c64b5dcda5c8525"
+            && actual["new"]["InvocationID"] == IID
+            && actual["parent_pid"] == 3944205
+            && actual["parent_start_ticks"] == 361483926
+            && native::ticks(3944205).ok() != Some(361483926)
+            && native::ticks(3944778).ok() != Some(361486356),
+        "different epoch 145 verifier or terminal"
+    );
+    verify_observed_pair(&observed, (3944205, 361483926), (3944778, 361486356))?;
+    let rows = &observed["observations"];
+    ensure!(
+        capacity::n(&rows[1], "worker_cpu_ticks")? > capacity::n(&rows[0], "worker_cpu_ticks")?,
+        "missing CPU advancement"
+    );
+    let id = retained_output(&state, &paid)?;
     Ok(
-        json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,
-        "original_candidate":id,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
+        json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,"prior_manager":manager,"original_candidate":id,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(incident_timeout145_only)]
+    #[test]
+    #[ignore = "requires the original manager's native failure"]
+    fn distinguishes_native_query_timeout_from_foreign_or_malformed_failures() {
+        let p = Path::new(BASE).join("state/dc043eb78c4a4349b0098760dc764a1f/failed.json");
+        let original = custody::evidence(&Bound {
+            path: p,
+            sha256: "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943".into(),
+        })
+        .unwrap();
+        let actual = original["error"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("complete 145 capacity observation failed exit status: 1: ")
+            .unwrap();
+        let provider = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
+        let unit = "horizon-qualify-168-full-metered-20261121-v1.service";
+        assert_eq!(
+            crate::incident_fit::manager_timeout(actual, provider),
+            Some(unit)
+        );
+        for (old, new) in [
+            (unit, "other.service"),
+            ("timed out after 10", "timed out after 1"),
+            ("'/usr/bin/systemctl'", "'/tmp/systemctl'"),
+            (" 'show',", " 'stop',"),
+            ("CPUQuotaPerSecUSec", "MainPID"),
+            ("in _check_timeout", "in other_call"),
+            ("status168.py", "foreign.py"),
+            ("subprocess.TimeoutExpired:", "RuntimeError:"),
+            ("tools-v6/post-stop-fit", "other/provider"),
+        ] {
+            let changed = actual.replace(old, new);
+            assert_ne!(changed, actual);
+            assert_eq!(
+                crate::incident_fit::manager_timeout(&changed, provider),
+                None,
+                "{old}"
+            );
+        }
+        assert_eq!(
+            crate::incident_fit::manager_timeout(&format!("{actual}different failure"), provider),
+            None
+        );
+    }
     #[test]
     #[ignore = "requires the original root-owned stopped verifier and frozen inode"]
     fn failed_145_pass_keeps_the_original_leased_objects_and_requires_restart() {
@@ -225,6 +346,11 @@ mod tests {
         #[cfg(incident_rejoin145_only)]
         assert_eq!(
             failed_census().unwrap()["original_candidate"]["inode"],
+            103237059
+        );
+        #[cfg(incident_timeout145_only)]
+        assert_eq!(
+            failed_manager_query().unwrap()["original_candidate"]["inode"],
             103237059
         );
         assert!(
