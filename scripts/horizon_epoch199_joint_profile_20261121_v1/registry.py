@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import subprocess
 import sys
 
 B=Path('/var/lib/jetstreamer/horizon_runtime_data/epoch199-delivery-recovery-20261121-v1')
@@ -72,8 +73,20 @@ def prepare(epoch,commit=False):
         prior,pr=event['document'](destination,0o400)
         f['transfer'](event,epoch,pr,dict(terminal=tr),book(f,epoch),fleet)
         return dict(outcome='existing-exclusive-transfer',epoch=epoch,receipt=pr,transfer=prior)
-    with (REG/f'.{epoch}-issuance.lock').open('a+b') as lock:
+    with (B/'transition-state/checkpoint.lock').open('a+b') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
+        if destination.exists():
+            prior,pr=event['document'](destination,0o400)
+            f['transfer'](event,epoch,pr,dict(terminal=tr),book(f,epoch),fleet)
+            return dict(outcome='existing-exclusive-transfer',epoch=epoch,receipt=pr,transfer=prior)
+        # The half-core 172 publisher retains the original 0.5 CPU. Use at most
+        # its separate drained quarter-core guard share even if it is first.
+        cg=Path('/sys/fs/cgroup')/Path('/proc/self/cgroup').read_text().strip().removeprefix('0::/'); unit=f'horizon-199200-phase-allocation-{epoch}.service'
+        props=dict(x.split('=',1) for x in subprocess.check_output(['/usr/bin/systemctl','show',unit,'-p','MainPID,InvocationID,ControlGroup,MemoryMax,MemorySwapMax,CPUQuotaPerSecUSec'],text=True,timeout=10).splitlines())
+        need(cg==Path('/sys/fs/cgroup')/props['ControlGroup'].lstrip('/') and cg.name==unit and int(props['MainPID'])==os.getpid() and props['InvocationID']==os.environ['INVOCATION_ID'] and props['MemoryMax']==str(512<<20) and props['MemorySwapMax']=='0' and props['CPUQuotaPerSecUSec']=='250ms','unfunded grant issuer')
+        for actor in ('horizon-qualify-199200-reservation-20261121-v1.service','horizon-199200-joint-cached-controller-20261121-v1.service'):
+            active=subprocess.check_output(['/usr/bin/systemctl','show',actor,'-p','ActiveState','--value'],text=True,timeout=10).strip()
+            need(active in ('inactive','failed'),'199/200 already owns its allocation')
         # Both native captures must independently determine the stopped original footprint.
         cap=f['capture'](fr)
         values=[row['native']['bookings'][str(epoch)] for row in cap['records']]
