@@ -344,7 +344,7 @@ pub(super) fn elect(
     let floor = if let Some(peer) = &peer266 {
         floor
             .max(num(peer, "original_floor")?)
-            .checked_add(epoch228_peer::EXCLUSIVE_DISK)
+            .checked_add(num(peer, "additional_disk_above_shared_qa")?)
             .context("joint 266 floor overflow")?
     } else {
         floor
