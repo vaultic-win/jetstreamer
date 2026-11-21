@@ -313,3 +313,36 @@ def admission_status(epoch, predecessor, tag, raw):
          and event['after_sha256']==digest(raw) and raw==body(event['after_status']),
          'unbound recovery admission status for '+str(epoch))
     return ref,event
+
+
+def before_sample_path(fleet_ref):
+    return BASE / 'epoch168-witness-incident-20261121-v1' / ('before-' + fleet_ref['sha256']) / 'sealed-next' / 'observer.json'
+
+
+def registered_config(cfg, fleet_ref, fleet):
+    """Include newly admitted workers in the next scheduled sample of this exact fleet."""
+    from evidence import sealed
+
+    original = Path(fleet['sole_next_observer']['path'])
+    selected = before_sample_path(fleet_ref)
+    if not selected.exists():
+        return cfg, original
+    extra = sealed(bound(selected))
+    rows = extra['replays']
+    keys = [int(r['range']) for r in rows]
+    need(keys == sorted(set(keys)) and extra == dict(cfg, replays=rows), 'recovery changed the scheduled sample')
+    old = {r['range']:r for r in cfg['replays']}
+    need(all(r in rows for r in old.values()) and len(rows)>len(old), 'scheduled workers changed')
+    current = ownership(fleet)
+    for row in rows:
+        if row['range'] in old:
+            continue
+        epoch = int(row['range'])
+        need(epoch in ROUTES, 'unknown added worker')
+        candidate = current[row['range']]
+        actor = candidate['actor']
+        first = checked(candidate['first_worker'])
+        need(first['admission'] == candidate['admission'], 'unadmitted observation row')
+        _, sample = guard(epoch, checked(candidate['admission']), actor)
+        need(row == observe_worker(epoch, actor, first, sample), 'added worker identity changed')
+    return extra, selected
