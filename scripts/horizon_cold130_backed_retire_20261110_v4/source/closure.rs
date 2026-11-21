@@ -375,7 +375,8 @@ fn walk(
                     &bytes,
                     target.as_os_str().as_encoded_bytes(),
                     true
-                ) || crate::current_readers::inert_probe(&resolved, target, &bytes)?,
+                ) || crate::current_readers::inert_probe(&resolved, target, &bytes)?
+                    || crate::current_readers::own_sandbox(&resolved, target, &bytes)?,
                 "staged direct/indirect reader references {}: {}",
                 target.display(),
                 resolved.display()

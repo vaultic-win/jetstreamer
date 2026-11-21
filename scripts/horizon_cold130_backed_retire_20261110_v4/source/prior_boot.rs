@@ -17,7 +17,7 @@ pub(super) fn is_image(path: &Path) -> bool {
     path == Path::new(IMAGE)
         || path
             == Path::new(
-                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v6/retire",
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v7/retire",
             )
 }
 pub(super) fn holding_transition() -> Result<File> {

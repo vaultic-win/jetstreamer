@@ -209,3 +209,74 @@ pub(super) fn inert_probe(path: &Path, target: &Path, bytes: &[u8]) -> Result<bo
     ensure!(d["InvocationID"]=="d2efb2081e754736a905a9161701c46e" && d["ActiveState"]=="failed" && evidence==b"Error: holding evidence digest differs: path=/usr/local/lib/jetstreamer/horizon-cold130-holding-plan-20261110-v1/plan.json actual_bytes=815 allowed_bytes=1048576\n", "probe is no longer the original terminal digest rejection");
     Ok(true)
 }
+
+fn exact_write_mounts(bytes: &[u8], parent: &Path) -> Result<bool> {
+    let source = parent.to_str().context("nonunicode source parent")?;
+    let permitted = BTreeSet::from([
+        source,
+        "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement",
+        "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock",
+    ]);
+    let mut seen = BTreeSet::new();
+    for line in std::str::from_utf8(bytes)?.lines() {
+        if let Some(list) = line.strip_prefix("ReadWritePaths=") {
+            for item in list.split_ascii_whitespace() {
+                let item = item
+                    .strip_prefix('"')
+                    .and_then(|s| s.strip_suffix('"'))
+                    .unwrap_or(item);
+                if !permitted.contains(item) || !seen.insert(item) {
+                    return Ok(false);
+                }
+            }
+        } else if crate::process_references::encoded_reference(
+            line.as_bytes(),
+            source.as_bytes(),
+            true,
+        ) {
+            return Ok(false);
+        }
+    }
+    Ok(seen == permitted)
+}
+pub(super) fn own_sandbox(path: &Path, target: &Path, bytes: &[u8]) -> Result<bool> {
+    if Some(target) != Path::new(SOURCE).parent() {
+        return Ok(false);
+    }
+    let mode = match path.to_str() {
+        Some("/run/systemd/transient/horizon-cold130-backed-retire-check-20261110-v2.service") => {
+            false
+        }
+        Some(
+            "/run/systemd/transient/horizon-cold130-backed-retire-execute-20261110-v2.service",
+        ) => true,
+        _ => return Ok(false),
+    };
+    if !exact_write_mounts(bytes, target)? {
+        return Ok(false);
+    }
+    ensure!(
+        fs::symlink_metadata(path)?.uid() == 0
+            && crate::prior_boot::is_image(&fs::read_link("/proc/self/exe")?),
+        "untrusted native sandbox exception"
+    );
+    crate::own(mode)?;
+    Ok(true)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn only_the_three_projected_write_mounts_can_name_the_paid_caller_source_parent() {
+        let p = Path::new("/private/source/archives");
+        let allowed = "ReadWritePaths=\"/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement\" \"/private/source/archives\" \"/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock\"\n";
+        assert!(exact_write_mounts(allowed.as_bytes(), p).unwrap());
+        for extra in [
+            "ExecStart=/reader /private/source/archives/epoch-130.jet\n",
+            "ReadWritePaths=/home/sol/foreign\n",
+            "ReadWritePaths=/private/source/archives\n",
+        ] {
+            assert!(!exact_write_mounts(format!("{allowed}{extra}").as_bytes(), p).unwrap());
+        }
+    }
+}
