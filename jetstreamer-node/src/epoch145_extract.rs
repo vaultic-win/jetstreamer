@@ -339,7 +339,24 @@ impl PinnedSource {
         root: &Path,
         maximum_bytes: u64,
         prepared: Option<tempfile::NamedTempFile>,
+        guard: G,
+    ) -> Result<ExtractionEvidence>
+    where
+        G: FnMut(u64) -> io::Result<()>,
+    {
+        self.extract_with_source_pass(root, maximum_bytes, prepared, guard, |derive| derive())
+    }
+
+    /// A frozen-inode supervisor can persist the completed source pass while
+    /// its independent candidate reread runs. A recovered value must be bound
+    /// to the same authenticated source, manifest, operation and frozen inode.
+    pub(crate) fn extract_with_source_pass<G>(
+        &mut self,
+        root: &Path,
+        maximum_bytes: u64,
+        prepared: Option<tempfile::NamedTempFile>,
         mut guard: G,
+        source_pass: impl FnOnce(&mut dyn FnMut() -> Result<[u8; 32]>) -> Result<[u8; 32]>,
     ) -> Result<ExtractionEvidence>
     where
         G: FnMut(u64) -> io::Result<()>,
@@ -404,7 +421,7 @@ impl PinnedSource {
         } else {
             // Receipt-recovery retry derives the same expected semantics without
             // allocating or replacing another archive.
-            self.export_prefix(io::sink(), &expected)?
+            source_pass(&mut || self.export_prefix(io::sink(), &expected))?
         };
         let output_path = temporary
             .as_ref()
@@ -644,7 +661,7 @@ mod tests {
             CANONICAL_SLOTS,
         )
         .unwrap();
-        let mut reader = ArchiveReader::open(std::io::Cursor::new(output)).unwrap();
+        let mut reader = ArchiveReader::open(std::io::Cursor::new(&output)).unwrap();
         reader.verify_chain = true;
         assert_eq!(reader.header().slot_count, CANONICAL_SLOTS);
         assert!(reader.has_complete_slot_coverage().unwrap());
@@ -656,6 +673,36 @@ mod tests {
             CANONICAL_SLOTS
         );
         assert_eq!(digest.finish().unwrap(), stats.output_semantic_sha256);
+        // A retained source digest still requires a complete independent
+        // candidate pass. The same frozen 432000-slot output rejects a
+        // switched digest and remains available for a valid retry.
+        let stage = tempfile::tempdir().unwrap();
+        let output_dir = stage.path().join(".jetstreamer-private/epoch145-prefix-extract-fixture");
+        fs::create_dir_all(&output_dir).unwrap();
+        fs::set_permissions(&output_dir, fs::Permissions::from_mode(0o700)).unwrap();
+        let target = output_dir.join("epoch-145.jet");
+        readonly(&target, &output);
+        let mut fixture = pinned_fixture_data(stage.path(), &source);
+        let refuse_write = |_| Err(io::Error::other("frozen fixture cannot write"));
+        let limit = output.len() as u64;
+        assert!(
+            fixture
+                .extract_with_source_pass(&output_dir, limit, None, refuse_write, |_| Ok([0; 32]))
+                .unwrap_err()
+                .to_string()
+                .contains("independent output semantic reread failed")
+        );
+        let result = fixture
+            .extract_with_source_pass(&output_dir, limit, None, refuse_write, |_| {
+                Ok(stats.output_semantic_sha256)
+            })
+            .unwrap();
+        assert!(result.independent_output_reread_passed);
+        assert_eq!(
+            result.archive_sha256,
+            format!("{:x}", Sha256::digest(&output))
+        );
+
         let mut expected = match provenance {
             ArchiveProvenance::V2(p) => p,
             _ => unreachable!(),
@@ -785,9 +832,12 @@ mod tests {
     }
 
     fn pinned_fixture(root: &Path) -> PinnedSource {
+        pinned_fixture_data(root, b"fixture source identity")
+    }
+    fn pinned_fixture_data(root: &Path, archive: &[u8]) -> PinnedSource {
         let path = root.join("source.jet");
         let manifest_path = root.join("source.jet.segment.json");
-        readonly(&path, b"fixture source identity");
+        readonly(&path, archive);
         readonly(&manifest_path, b"fixture manifest identity");
         let (file, identity) = open_immutable(&path).unwrap();
         let (manifest_file, manifest_identity) = open_immutable(&manifest_path).unwrap();

@@ -10,7 +10,9 @@ const ORIGINAL: &str = "de6780b860b3467bae21fbd19176ca14";
 const LEAF: &str = ".tmp36MvkN";
 const VIEW: &str =
     "/home/sol/.jetstreamer-private/epoch145-prefix-extract-materialized-view-20261121-v1";
-#[cfg(partial145_only)]
+#[cfg(continuity145_only)]
+pub const IMAGE: &str = continuity::IMAGE;
+#[cfg(all(partial145_only, not(continuity145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-partial-recovery-20261121-v1/tools/export145";
 #[cfg(not(partial145_only))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-materialized-recovery-20261121-v1/tools-v2/export145";
@@ -134,7 +136,14 @@ pub(super) fn leaf() -> Result<PathBuf> {
     Ok(path.clone())
 }
 fn inspect_leaf(m: &fs::Metadata) -> Result<()> {
-    if cfg!(partial145_only) {
+    if cfg!(continuity145_only) {
+        check_file(m)?;
+        ensure!(
+            m.mode() & 0o777 == 0o400,
+            "frozen recovery cannot open an unfinished candidate"
+        );
+        Ok(())
+    } else if cfg!(partial145_only) {
         partial::check(m)
     } else {
         check_file(m)
@@ -236,11 +245,18 @@ pub fn verify(parent: u32, sha: &str) -> Result<()> {
         decode_sha(MANIFEST_SHA)?,
         epoch145_extract::PINNED_WORKER_SHA256,
     )?;
-    let extraction = source.extract_private(Path::new(VIEW), BYTES, |_| {
+    let deny_write = |_| {
         Err(std::io::Error::other(
-            "read-only materialized verifier cannot create or write an archive",
+            "frozen verifier cannot write an archive",
         ))
-    })?;
+    };
+    let extraction = if cfg!(continuity145_only) {
+        source.extract_with_source_pass(Path::new(VIEW), BYTES, None, deny_write, |derive| {
+            continuity::source_pass(&iid, sha, &file, derive)
+        })?
+    } else {
+        source.extract_private(Path::new(VIEW), BYTES, deny_write)?
+    };
     ensure!(
         extraction.archive == view()
             && extraction.archive_bytes == BYTES
@@ -288,10 +304,15 @@ pub fn run(fleet: Bound, sha: &str) -> Result<()> {
     let _lock = lock()?;
     pending()?;
     let prior = pred()?;
+    let prior_recovery = if cfg!(continuity145_only) {
+        Some(continuity::predecessor()?)
+    } else {
+        None
+    };
     source_identity()?;
     let file = leaf()?;
     prove_view(&file)?;
-    let fit = capacity::capture(&fleet)?;
+    let fit = capacity::capture_phase(&fleet, cfg!(continuity145_only))?;
     fit.await_topology()?;
     let initial = fit.await_current(0)?;
     ensure!(
@@ -302,27 +323,40 @@ pub fn run(fleet: Bound, sha: &str) -> Result<()> {
     fs::DirBuilder::new().mode(0o700).create(&root)?;
     custody::write_new(
         &root.join("recovery-started.json"),
-        &json!({"iid":iid,"predecessor":prior,"file":file,"image":sha,"fresh_fit":fit.evidence,"initial":initial,"r2_mutations":false}),
+        &json!({"iid":iid,"predecessor":prior,"prior_frozen_recovery":prior_recovery,"file":file,"image":sha,"fresh_fit":fit.evidence,"initial":initial,"r2_mutations":false}),
     )?;
     let attempt = (|| -> Result<()> {
         source_lease::arm_break_signal()?;
         let original = lease(Path::new(SOURCE))?;
         let manifest = lease(Path::new(MANIFEST))?;
-        if cfg!(partial145_only) && fs::symlink_metadata(&file)?.len() < BYTES {
+        if cfg!(all(partial145_only, not(continuity145_only)))
+            && fs::symlink_metadata(&file)?.len() < BYTES
+        {
             post::run_child(
                 Command::new(IMAGE).args(["recover-append", &std::process::id().to_string(), sha]),
                 &fit,
                 &original,
             )?;
         }
-        seal_candidate(&file)?;
+        if !cfg!(continuity145_only) {
+            seal_candidate(&file)?;
+        }
         let candidate = lease(&file)?;
         let id = custody::frozen_identity(&file)?;
-        post::run_child(
-            Command::new(IMAGE).args(["recover-worker", &std::process::id().to_string(), sha]),
-            &fit,
-            &original,
-        )?;
+        let prior_verified = if cfg!(continuity145_only) {
+            continuity::reusable_completion(&iid, sha, &file, &view())?
+        } else {
+            None
+        };
+        if let Some(verified) = prior_verified {
+            custody::write_new(&root.join("verified-frozen.json"), &verified)?;
+        } else {
+            post::run_child(
+                Command::new(IMAGE).args(["recover-worker", &std::process::id().to_string(), sha]),
+                &fit,
+                &original,
+            )?;
+        }
         let verification = custody::binding(&root.join("verified-frozen.json"))?;
         let v = custody::evidence(&verification)?;
         ensure!(
@@ -470,7 +504,13 @@ mod tests {
         );
         assert!(closed166::drained().is_err());
         let live = Path::new(OUTPUT).join(LEAF);
-        assert!(check_file(&fs::symlink_metadata(live).unwrap()).is_err());
+        let meta = fs::symlink_metadata(live).unwrap();
+        if cfg!(continuity145_only) {
+            check_file(&meta).unwrap();
+            assert_eq!(meta.mode() & 0o777, 0o400);
+        } else {
+            assert!(check_file(&meta).is_err());
+        }
     }
     #[test]
     fn promotion_preserves_prior_target_and_reuses_the_original_inode() {

@@ -95,7 +95,7 @@ impl Tree {
         checksum: &source_lease::ReadLease,
     ) -> Result<()> {
         let confirm = |frozen: bool| -> Result<()> {
-            let deadline = Instant::now() + Duration::from_secs(90);
+            let mut deadline = Instant::now() + Duration::from_secs(90);
             loop {
                 ensure!(
                     deadline.saturating_duration_since(Instant::now()) >= Duration::from_secs(12)
@@ -112,6 +112,10 @@ impl Tree {
                     Ok(_) => {
                         ensure!(Instant::now() < deadline, "late publisher census");
                         return Ok(());
+                    }
+                    Err(e) if cfg!(continuity145_only) && e.is::<peer_terminal::Pending>() => {
+                        thread::sleep(Duration::from_secs(10));
+                        deadline = Instant::now() + Duration::from_secs(90);
                     }
                     Err(e)
                         if e.is::<capacity::TopologyTimeout>()
@@ -137,7 +141,12 @@ impl Tree {
                 checksum.check()?;
                 let pending = match fit.current(0) {
                     Ok(_) => false,
-                    Err(e) if e.is::<capacity::GuardInFlight>() => true,
+                    Err(e)
+                        if e.is::<capacity::GuardInFlight>()
+                            || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
+                    {
+                        true
+                    }
                     Err(e) => return Err(e),
                 };
                 if pending || sampled.elapsed() >= Duration::from_secs(30) {

@@ -8,12 +8,17 @@ use jetstreamer_node::{
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 pub(super) fn publish(
     dir: &Path,
+    epoch: u64,
     fingerprint: [u8; 32],
     bootstrap: [u8; 32],
     checkpoint: [u8; 32],
     last: [u8; 32],
 ) -> Result<()> {
-    let epoch = 166;
+    ensure!(
+        matches!(epoch, 166 | 167 | 170),
+        "unsupported native fixture"
+    );
+    let shift = (epoch - 166) * 432000;
     let private = |path: &Path| {
         fs::DirBuilder::new()
             .recursive(true)
@@ -29,13 +34,13 @@ pub(super) fn publish(
     private(&batch)?;
     let locks = dir.join("private/destination-fixture/locks");
     private(&locks)?;
-    let lock = locks.join("epoch-166.lock");
+    let lock = locks.join(format!("epoch-{epoch}.lock"));
     fs::File::create(&lock)?;
     fs::set_permissions(lock, fs::Permissions::from_mode(0o600))?;
     let staging = dir.join("staged");
     private(&staging)?;
-    let staged = staging.join("epoch-166.jet");
-    let slot = 72_143_999;
+    let staged = staging.join(format!("epoch-{epoch}.jet"));
+    let slot = 72_143_999 + shift;
     let mut writer = ArchiveWriter::new(
         fs::File::create(&staged)?,
         epoch,
@@ -54,7 +59,7 @@ pub(super) fn publish(
     let item = ArchiveBatchItem {
         epoch,
         staged_archive: staged,
-        destination_archive: output.join("epoch-166.jet"),
+        destination_archive: output.join(format!("epoch-{epoch}.jet")),
         evidence,
     };
     let summary = |slot, accounts_hash, last_blockhash| cohort::RootCheckpointSummary {
@@ -73,12 +78,12 @@ pub(super) fn publish(
         kind: cohort::ROOT_CHECKPOINT_GATE_KIND.into(),
         version: 1,
         verified_manifest_checkpoints: vec![cohort::VerifiedManifestCheckpoint {
-            slot: 72_143_703,
+            slot: 72_143_703 + shift,
             accounts_hash: checkpoint,
         }],
         members: vec![cohort::RootCheckpointGateMember {
             epoch,
-            bootstrap: summary(71_711_708, bootstrap, [2; 32]),
+            bootstrap: summary(71_711_708 + shift, bootstrap, [2; 32]),
             terminal: summary(slot, [3; 32], last),
         }],
     };

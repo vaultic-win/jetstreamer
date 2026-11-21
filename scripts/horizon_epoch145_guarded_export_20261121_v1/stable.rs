@@ -56,6 +56,14 @@ fn candidate(m: &fs::Metadata, dev: u64) -> Option<(u64, u64)> {
     (bytes >= 2 << 20).then_some((m.ino(), bytes))
 }
 pub fn measure(path: &Path) -> Result<(u64, Value)> {
+    stable_subset(path, false)
+}
+/// A drained diagnostic's paid accounts database can be rechecked alongside
+/// its other retained files. Count only root-relative, twice witnessed blocks.
+pub fn measure_closed(path: &Path) -> Result<(u64, Value)> {
+    stable_subset(path, true)
+}
+fn stable_subset(path: &Path, drained: bool) -> Result<(u64, Value)> {
     let root = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -66,15 +74,29 @@ pub fn measure(path: &Path) -> Result<(u64, Value)> {
     let mut remaining = vec![PathBuf::from(".")];
     let mut candidates = BTreeMap::new();
     let mut count = 0;
+    let (max_entries, max_files, per_dir) = if drained {
+        let mut limit = std::mem::MaybeUninit::uninit();
+        ensure!(
+            unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, limit.as_mut_ptr()) } == 0,
+            "descriptor budget unavailable"
+        );
+        let open = fs::read_dir("/proc/self/fd")?.count();
+        let spare = usize::try_from(unsafe { limit.assume_init() }.rlim_cur)
+            .unwrap_or(usize::MAX)
+            .saturating_sub(open + 64);
+        (100_000, 16_384.min(spare), 32_768)
+    } else {
+        (20_000, 400, 384)
+    };
     while let Some(rel) = remaining.pop() {
-        if count >= 20000 || candidates.len() >= 400 {
+        if count >= max_entries || candidates.len() >= max_files {
             break;
         }
         let Ok(d) = beneath(&root, &rel, libc::O_DIRECTORY | libc::O_RDONLY) else {
             continue;
         };
         let inodes = fs::read_dir(format!("/proc/self/fd/{}", d.as_raw_fd()))?;
-        for entry in inodes.take(384) {
+        for entry in inodes.take(per_dir) {
             count += 1;
             let Ok(e) = entry else {
                 continue;
@@ -86,7 +108,8 @@ pub fn measure(path: &Path) -> Result<(u64, Value)> {
             if ty.is_dir() {
                 // The large appendvec database supplies no credit in this
                 // bounded subset. Its complete cap remains in the native fit.
-                if e.file_name() != "accounts-state" && child.components().count() < 24 {
+                if (drained || e.file_name() != "accounts-state") && child.components().count() < 24
+                {
                     remaining.push(child);
                 }
             } else if ty.is_file() {
@@ -95,7 +118,7 @@ pub fn measure(path: &Path) -> Result<(u64, Value)> {
                 };
                 if let Some((inode, bytes)) = candidate(&file.metadata()?, dev) {
                     candidates.entry(inode).or_insert((child, file, bytes));
-                    if candidates.len() >= 400 {
+                    if candidates.len() >= max_files {
                         break;
                     }
                 }

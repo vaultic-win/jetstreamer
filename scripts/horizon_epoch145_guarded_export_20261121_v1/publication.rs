@@ -195,7 +195,7 @@ pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str, joint: bool) -> R
     let archive = Path::new(OUTPUT).join("epoch-145.jet");
     let (plan, hash) = local(&full, full_iid, &archive)?;
     let exe = uploader(root)?;
-    let fit = capacity::capture_phase(&fleet, joint)?;
+    let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
     fit.await_topology()?;
     let first = fit.await_current(0)?;
     source_lease::arm_break_signal()?;

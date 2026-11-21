@@ -318,14 +318,22 @@ pub(super) fn incumbents(fleet: &Value) -> Result<BTreeMap<String, Value>> {
         }
     }
     ensure!(
-        owners.keys().map(String::as_str).collect::<BTreeSet<_>>()
-            == if cfg!(partial145_only) {
-                BTreeSet::from(["166", "167", "169", "170", "172"])
-            } else if cfg!(materialized145_only) {
-                BTreeSet::from(["167", "168", "169", "170", "172"])
-            } else {
-                BTreeSet::from(["166", "167", "168", "169", "170", "172"])
-            },
+        if cfg!(continuity145_only) {
+            let epochs = owners
+                .keys()
+                .map(|k| k.parse())
+                .collect::<std::result::Result<BTreeSet<u64>, _>>()?;
+            crate::continuity::roster(&epochs)
+        } else {
+            owners.keys().map(String::as_str).collect::<BTreeSet<_>>()
+                == if cfg!(partial145_only) {
+                    BTreeSet::from(["166", "167", "169", "170", "172"])
+                } else if cfg!(materialized145_only) {
+                    BTreeSet::from(["167", "168", "169", "170", "172"])
+                } else {
+                    BTreeSet::from(["166", "167", "168", "169", "170", "172"])
+                }
+        },
         "incomplete incumbents"
     );
     Ok(owners)

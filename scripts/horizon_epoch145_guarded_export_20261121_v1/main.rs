@@ -14,11 +14,13 @@ mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
 mod closed166;
+mod continuity;
 mod joint;
 mod joint_candidate;
 mod joint_worker;
 mod materialized;
 mod partial;
+mod peer_terminal;
 mod post;
 mod publication;
 mod publication_tree;
@@ -248,7 +250,7 @@ fn freeze(pid: u32) -> Result<()> {
 fn while_stopped(
     pid: u32,
     ticks: u64,
-    deadline: Instant,
+    mut deadline: Instant,
     mut observe: impl FnMut() -> Result<Value>,
 ) -> Result<Value> {
     loop {
@@ -274,6 +276,15 @@ fn while_stopped(
             Ok(sample) => {
                 ensure!(Instant::now() < deadline, "late stopped-worker observation");
                 return Ok(sample);
+            }
+            Err(e) if cfg!(continuity145_only) && e.is::<peer_terminal::Pending>() => {
+                eprintln!("epoch145 holding stopped verifier {pid}: {e}");
+                thread::sleep(if cfg!(test) {
+                    Duration::from_millis(20)
+                } else {
+                    Duration::from_secs(10)
+                });
+                deadline = Instant::now() + Duration::from_secs(90);
             }
             Err(e) if e.is::<capacity::TopologyTimeout>() || e.is::<capacity::GuardInFlight>() => {
                 eprintln!("epoch145 waiting with worker {pid} stopped: {e:#}");
@@ -590,7 +601,7 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
-        #[cfg(all(partial145_only, not(joint145_only)))]
+        #[cfg(all(partial145_only, not(joint145_only), not(continuity145_only)))]
         [_, mode, parent, sha] if mode == "recover-append" => partial::append(parent.parse()?, sha),
         #[cfg(all(materialized145_only, not(joint145_only)))]
         [_, mode, fleet, digest, sha] if mode == "recover-full-output" => materialized::run(

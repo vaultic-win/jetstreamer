@@ -135,14 +135,18 @@ fn peer_names(fleet: &Value, ad: &Value, joint: bool) -> Result<BTreeSet<String>
         }
     }
     ensure!(
-        epochs
-            == if cfg!(partial145_only) {
-                BTreeSet::from([166, 167, 169, 170, 172])
-            } else if cfg!(materialized145_only) {
-                BTreeSet::from([167, 168, 169, 170, 172])
-            } else {
-                BTreeSet::from([166, 167, 168, 169, 170, 172])
-            },
+        if cfg!(continuity145_only) {
+            crate::continuity::roster(&epochs)
+        } else {
+            epochs
+                == if cfg!(partial145_only) {
+                    BTreeSet::from([166, 167, 169, 170, 172])
+                } else if cfg!(materialized145_only) {
+                    BTreeSet::from([167, 168, 169, 170, 172])
+                } else {
+                    BTreeSet::from([166, 167, 168, 169, 170, 172])
+                }
+        },
         "authoritative fleet differs from the admitted roster"
     );
     Ok(names)
@@ -357,6 +361,9 @@ pub struct Fit {
     pub memfloor: u64,
     pub g169: Value,
     pub g172: Value,
+    metered168: std::cell::RefCell<Option<Value>>,
+    transitions: crate::peer_terminal::Transitions,
+    peer_rss: std::collections::BTreeMap<u64, u64>,
 }
 impl Fit {
     pub fn current(&self, needed: u64) -> Result<Value> {
@@ -379,15 +386,60 @@ impl Fit {
         Ok(sample)
     }
     pub fn existing(&self, needed: u64) -> Result<Value> {
-        let (a, ra, sa) = newest_sample(&self.g169)?;
+        match self.existing_measurement(needed) {
+            Err(e) if cfg!(continuity145_only) => {
+                self.transitions.rapid_check()?;
+                Err(e)
+            }
+            result => result,
+        }
+    }
+    fn existing_measurement(&self, needed: u64) -> Result<Value> {
+        if cfg!(continuity145_only) {
+            self.transitions.rapid_check()?;
+            if self.metered168.borrow().is_none()
+                && Path::new("/sys/fs/cgroup/system.slice")
+                    .join(crate::continuity::REPLACEMENT)
+                    .try_exists()?
+            {
+                return Err(crate::peer_terminal::Pending(168).into());
+            }
+        }
+        let (a, ra, sa) = if cfg!(continuity145_only) && self.transitions.closed(169) {
+            let plan = jsonref(&self.g169)?;
+            let (realized, evidence) = crate::stable::measure_closed(Path::new(
+                plan["worker_root"].as_str().context("169 retained root")?,
+            ))?;
+            (
+                n(&plan, "minimum_free_bytes")?,
+                n(&plan, "maximum_root_physical_bytes")?
+                    .checked_sub(realized)
+                    .context("closed 169 root cap")?,
+                Some(evidence),
+            )
+        } else {
+            newest_sample(&self.g169)?
+        };
         let (b, rb, sb) = newest_sample(&self.g172)?;
-        let protected = (self.base.max(a) + ra + 16 * G).max(b) + rb + META;
+        let mut protected = (self.base.max(a) + ra + 16 * G).max(b) + rb + META;
+        if let Some(replacement) = self.metered168.borrow().as_ref() {
+            // The standard root cap is already charged in base. The guard's
+            // own absolute minimum may be higher at its actual admission.
+            let (floor, _, _) = newest_sample(&replacement["guard"])?;
+            protected = protected.max(floor);
+        }
         let free = home()?.0;
         let available = meminfo("MemAvailable:")?;
+        let required_memory = self
+            .peer_rss
+            .iter()
+            .filter(|(epoch, _)| self.transitions.closed(**epoch))
+            .try_fold(self.memfloor, |n, (_, bytes)| {
+                n.checked_add(*bytes).context("retired peer memory")
+            })?;
         ensure!(
-            available >= self.memfloor,
-            "RAM {available} needs {}",
-            self.memfloor
+            available >= required_memory,
+            "RAM {available} needs {required_memory}"
         );
         let required = protected.checked_add(needed).context("disk sum")?;
         if free < required && (sa.is_some() || sb.is_some()) {
@@ -399,9 +451,11 @@ impl Fit {
             free >= required,
             "HOME {free} needs {required} (protected {protected}, new bytes {needed})"
         );
-        Ok(
-            json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":self.memfloor,"169_unspent":ra,"172_unspent":rb,"169_subset":sa,"172_subset":sb}),
-        )
+        let mut sample = json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":required_memory,"169_unspent":ra,"172_unspent":rb,"169_subset":sa,"172_subset":sb});
+        if cfg!(continuity145_only) {
+            sample["retained_peer_terminal_evidence"] = self.transitions.receipts();
+        }
+        Ok(sample)
     }
     /// Used only before the source barrier or while the worker is stopped.
     /// Other current guard failures remain terminal immediately.
@@ -409,6 +463,9 @@ impl Fit {
         let start = std::time::Instant::now();
         loop {
             match self.topology() {
+                Err(e) if cfg!(continuity145_only) && e.is::<crate::peer_terminal::Pending>() => {
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                }
                 Err(e)
                     if self.joint
                         && (e.is::<GuardInFlight>() || e.is::<TopologyTimeout>())
@@ -424,6 +481,9 @@ impl Fit {
         let start = std::time::Instant::now();
         loop {
             match self.existing(0) {
+                Err(e) if cfg!(continuity145_only) && e.is::<crate::peer_terminal::Pending>() => {
+                    self.await_topology()?;
+                }
                 Err(e)
                     if e.is::<GuardInFlight>()
                         && start.elapsed() < std::time::Duration::from_secs(90) =>
@@ -438,6 +498,9 @@ impl Fit {
         let start = std::time::Instant::now();
         loop {
             match self.current(needed) {
+                Err(e) if cfg!(continuity145_only) && e.is::<crate::peer_terminal::Pending>() => {
+                    self.await_topology()?;
+                }
                 Err(e)
                     if e.is::<GuardInFlight>()
                         && start.elapsed() < std::time::Duration::from_secs(90) =>
@@ -449,24 +512,85 @@ impl Fit {
         }
     }
     pub fn topology(&self) -> Result<()> {
-        validate_roster(&self.names, self.joint)?;
+        if cfg!(continuity145_only) {
+            self.transitions.reconcile()?;
+        } else {
+            validate_roster(&self.names, self.joint)?;
+        }
         if cfg!(materialized145_only) {
             if cfg!(partial145_only) {
                 crate::partial::drained()?;
             } else {
                 crate::closed166::drained()?;
             }
-            let fresh = crate::joint::incumbents(
-                self.successor_fleet
-                    .as_ref()
-                    .context("missing five-owner fleet")?,
-            )?;
-            ensure!(
-                self.evidence["remaining_native_owners"] == json!(fresh),
-                "remaining producer or guard changed"
-            );
+            if cfg!(continuity145_only) {
+                crate::closed166::drained()?;
+            }
+            let initial = self
+                .successor_fleet
+                .as_ref()
+                .context("missing bound fleet")?;
+            if cfg!(continuity145_only) {
+                let mut fleet = self.transitions.projected(initial)?;
+                let mut names = self.transitions.names(&self.names);
+                let row = crate::continuity::replacement_row()?;
+                let had = initial["actual_executing_replays"]
+                    .as_array()
+                    .context("roster")?
+                    .iter()
+                    .chain(
+                        initial["actual_active_bootstraps"]
+                            .as_array()
+                            .context("bootstrap roster")?,
+                    )
+                    .chain(
+                        initial["actual_active_private_diagnostics"]
+                            .as_array()
+                            .context("private roster")?,
+                    )
+                    .any(|r| r["epoch"] == 168);
+                ensure!(!had || row.is_some(), "registered metered 168 disappeared");
+                if let Some(row) = row {
+                    names.insert(crate::continuity::REPLACEMENT.into());
+                    if !had {
+                        fleet["actual_active_bootstraps"]
+                            .as_array_mut()
+                            .context("mutable bootstrap roster")?
+                            .push(row);
+                    }
+                }
+                validate_roster(&names, self.joint)?;
+                let now = crate::joint::incumbents(&fleet)?;
+                for (e, actor) in self.evidence["remaining_native_owners"]
+                    .as_object()
+                    .context("bound original owners")?
+                {
+                    if !self.transitions.closed(e.parse()?) {
+                        ensure!(
+                            now.get(e) == Some(actor),
+                            "remaining {e} changed generation"
+                        );
+                    }
+                }
+                let metered = crate::continuity::metered(&json!(now))?;
+                let mut previous = self.metered168.borrow_mut();
+                ensure!(
+                    previous.is_none() || *previous == metered,
+                    "registered metered 168 changed"
+                );
+                *previous = metered;
+            } else {
+                let fresh = crate::joint::incumbents(initial)?;
+                ensure!(
+                    self.evidence["remaining_native_owners"] == json!(fresh),
+                    "remaining producer or guard changed"
+                );
+            }
         }
         for (pid, ticks, unit) in &self.owners {
+            if cfg!(continuity145_only) && self.transitions.unit_closed(unit) {
+                continue;
+            }
             ensure!(
                 crate::native::ticks(*pid)? == *ticks
                     && fs::read_to_string(format!("/proc/{pid}/cgroup"))?.trim()
@@ -492,12 +616,44 @@ fn validate_roster(names: &BTreeSet<String>, joint: bool) -> Result<()> {
             {
                 return Err(GuardInFlight.into());
             }
+            if cfg!(continuity145_only) {
+                let missing = expected.difference(&actual).collect::<Vec<_>>();
+                if !missing.is_empty() && actual.difference(&expected).next().is_none() {
+                    for unit in missing {
+                        let Some(peer) =
+                            crate::peer_terminal::PEERS.iter().find(|p| p.unit == unit)
+                        else {
+                            anyhow::bail!("unknown removed producer");
+                        };
+                        let m =
+                            crate::joint_candidate::show(unit, "Id,InvocationID,ActiveState,Job")?;
+                        ensure!(
+                            m["Id"] == unit.as_str()
+                                && (m["InvocationID"] == peer.iid || m["InvocationID"] == ""),
+                            "unrelated native transition"
+                        );
+                        if matches!(
+                            m["ActiveState"].as_str(),
+                            Some("deactivating" | "inactive" | "failed")
+                        ) {
+                            return Err(crate::peer_terminal::Pending(peer.epoch).into());
+                        }
+                    }
+                }
+            }
             anyhow::bail!("unexpected simultaneous replay topology");
         }
     } else {
         ensure!(&actual == names, "replay topology changed");
     }
     Ok(())
+}
+
+fn skip_original(epoch: &str) -> bool {
+    (cfg!(partial145_only) && epoch == "168")
+        || (cfg!(materialized145_only)
+            && (!cfg!(partial145_only) || cfg!(continuity145_only))
+            && epoch == "166")
 }
 
 pub fn capture(b: &Bound) -> Result<Fit> {
@@ -523,6 +679,10 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     );
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
+    let transitions = crate::peer_terminal::Transitions::default();
+    if cfg!(continuity145_only) {
+        transitions.reconcile()?;
+    }
     let names = peer_names(&fleet, &ad, joint)?;
     let retired = if cfg!(partial145_only) {
         Some(crate::partial::closed168()?)
@@ -634,10 +794,22 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         .max(8_297_502_499_408 + n(roots, "remaining_standard_root_bytes")?);
     let before = meminfo("MemAvailable:")?;
     let mut rss = 0;
+    let mut peer_rss = std::collections::BTreeMap::new();
     for (k, row) in post["owners"].as_object().context("172 native owners")? {
-        if !(cfg!(materialized145_only) && k == if cfg!(partial145_only) { "168" } else { "166" }) {
-            rss += resident(row, k.parse()?)?.min(resident(row, k.parse()?)?);
+        let epoch = k.parse()?;
+        if !skip_original(k) && !transitions.closed(epoch) {
+            let credit = resident(row, epoch)?.min(resident(row, epoch)?);
+            rss += credit;
+            if crate::peer_terminal::PEERS.iter().any(|p| p.epoch == epoch) {
+                peer_rss.insert(epoch, credit);
+            }
         }
+    }
+    if cfg!(continuity145_only) {
+        let row = json!({"unit":"horizon-qualify-172-full-half-core-20261120-v1.service","iid":"0e17b745938546608b0bdc52815151d0",
+            "processes":[[3454288,357194400],[3455054,357199661]]});
+        let bytes = resident(&row, 172)?.min(resident(&row, 172)?);
+        rss += bytes;
     }
     let live172 = native_values(ad["producer_unit"].as_str().context("172 native unit")?)?;
     ensure!(
@@ -669,13 +841,10 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         .values()
     {
         let unit = row["unit"].as_str().context("owner name")?;
-        if cfg!(materialized145_only)
-            && unit
-                == if cfg!(partial145_only) {
-                    crate::partial::NODE
-                } else {
-                    crate::closed166::NODE
-                }
+        if (cfg!(partial145_only) && unit == crate::partial::NODE)
+            || (cfg!(materialized145_only)
+                && (!cfg!(partial145_only) || cfg!(continuity145_only))
+                && unit == crate::closed166::NODE)
         {
             continue;
         }
@@ -698,9 +867,22 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     } else {
         None
     };
-    let evidence = json!({"remaining_native_owners":guarded,"completed166":if cfg!(partial145_only){None}else{retired.as_ref()},"terminal168":if cfg!(partial145_only){retired.as_ref()}else{None},"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    let after166 = if cfg!(continuity145_only) {
+        Some(crate::closed166::evidence()?)
+    } else {
+        None
+    };
+    let metered168 = if cfg!(continuity145_only) {
+        crate::continuity::metered(&json!(guarded))?
+    } else {
+        None
+    };
+    let evidence = json!({"joint_closed166":after166,"metered168":metered168,"remaining_native_owners":guarded,"completed166":if cfg!(partial145_only){None}else{retired.as_ref()},"terminal168":if cfg!(partial145_only){retired.as_ref()}else{None},"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
         successor_fleet: cfg!(materialized145_only).then_some(fleet),
+        metered168: std::cell::RefCell::new(metered168),
+        transitions,
+        peer_rss,
         evidence,
         joint,
         names,

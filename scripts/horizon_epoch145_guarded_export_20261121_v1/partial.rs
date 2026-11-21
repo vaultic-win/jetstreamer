@@ -215,7 +215,14 @@ mod tests {
         let path = materialized::leaf().unwrap();
         let m = fs::symlink_metadata(path).unwrap();
         check(&m).unwrap();
-        assert_eq!(m.len(), ORIGINAL);
+        assert_eq!(
+            m.len(),
+            if cfg!(continuity145_only) {
+                BYTES
+            } else {
+                ORIGINAL
+            }
+        );
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("partial");
         fs::write(&path, b"sample").unwrap();

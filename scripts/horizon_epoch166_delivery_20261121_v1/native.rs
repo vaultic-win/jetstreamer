@@ -26,6 +26,20 @@ fn main() -> Result<()> {
     {
         return fixture::publish(
             Path::new(dir),
+            166,
+            digest(fingerprint)?,
+            digest(bootstrap)?,
+            digest(checkpoint)?,
+            digest(last)?,
+        );
+    }
+    #[cfg(receiver_fixture)]
+    if let [cmd, epoch, dir, fingerprint, bootstrap, checkpoint, last] = args.as_slice()
+        && cmd == "fixture-epoch"
+    {
+        return fixture::publish(
+            Path::new(dir),
+            epoch.parse()?,
             digest(fingerprint)?,
             digest(bootstrap)?,
             digest(checkpoint)?,

@@ -17,7 +17,7 @@ fn digest(v: &Value, key: &str) -> Result<String> {
     ensure!(custody::hex(hash, 64), "invalid {key} SHA-256");
     Ok(hash.to_owned())
 }
-fn extraction(e: &Value, archive: &Path) -> Result<()> {
+pub(super) fn extraction(e: &Value, archive: &Path) -> Result<()> {
     ensure!(
         e["schema"] == "jetstreamer-private-epoch145-canonical-prefix-extraction-v1"
             && e["epoch"] == 145
@@ -138,7 +138,12 @@ pub(super) fn run_child(
             lease.check()?;
             let wait = match fit.current(0) {
                 Ok(_) => false,
-                Err(e) if e.is::<capacity::GuardInFlight>() => true,
+                Err(e)
+                    if e.is::<capacity::GuardInFlight>()
+                        || (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>()) =>
+                {
+                    true
+                }
                 Err(e) => return Err(e),
             };
             if wait || last.elapsed() >= Duration::from_secs(30) {
@@ -405,7 +410,7 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
         !archive.with_extension("jet.sha256").try_exists()?,
         "unexpected readiness marker"
     );
-    let fit = capacity::capture_phase(&fleet, joint)?;
+    let fit = capacity::capture_phase(&fleet, joint || cfg!(continuity145_only))?;
     fit.await_topology()?;
     let first = fit.await_current(0)?;
     source_lease::arm_break_signal()?;
