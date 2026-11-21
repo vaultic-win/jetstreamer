@@ -4,6 +4,7 @@ import ctypes
 import datetime as dt
 import fcntl
 import hashlib
+from itertools import combinations
 import json
 import os
 import pwd
@@ -36,6 +37,33 @@ PROGRAMS = (
 FLEET_NAME = "ROOT_COMPLETE_OPERATIONAL_FLEET.json"
 CYCLE = re.compile(r"root(\d{6})-live166167170-(\d{8})-v1")
 EPOCHS = {136,137,141,145,159,161,163,166,167,168,169,170,171,172,173,185,186,199,200}
+COMPLETION_LABELS = {166: "recovered166", 167: "indexed167", 168: "metered168", 170: "recovered170"}
+
+
+def completion_report_dir(root, epochs):
+    ordered = tuple(sorted(epochs))
+    if not ordered:
+        return root
+    need(len(set(ordered)) == len(ordered) and all(e in COMPLETION_LABELS for e in ordered),
+         "unknown or duplicate local completion")
+    suffix = COMPLETION_LABELS[ordered[0]] if len(ordered) == 1 else "-".join(map(str, ordered))
+    return root / ("after-" + suffix)
+
+
+def registered_report(root, fleet, field):
+    registered = fleet["authenticated_status_audit"]["path"]
+    base = root / "COMPLETED.json"
+    if registered == str(base):
+        return base
+    fields = {epoch: label + "_local_commit" for epoch, label in COMPLETION_LABELS.items()}
+    need(field in fields.values(), "crossed cadence report")
+    committed = [epoch for epoch, key in fields.items() if fleet.get(key)]
+    for size in range(1, len(committed) + 1):
+        for group in combinations(committed, size):
+            candidate = completion_report_dir(root, group) / base.name
+            if registered == str(candidate):
+                return candidate
+    raise Rejected("crossed or unregistered terminal status directory")
 
 
 class Rejected(ValueError):
@@ -165,19 +193,9 @@ def accepted(runtime, reports, expected, changes, checked_head, now, field="term
         if not report_dir.exists():
             return None
         changes.watch(report_dir)
-        rp = report_dir / "COMPLETED.json"
-        if field in ("recovered166_local_commit", "metered168_local_commit"):
-            registered = Path(fleet["authenticated_status_audit"]["path"])
-            for name, required in (("after-recovered166", ("recovered166_local_commit",)),
-                                   ("after-metered168", ("metered168_local_commit",)),
-                                   ("after-166-168", ("recovered166_local_commit", "metered168_local_commit"))):
-                candidate = report_dir / name / rp.name
-                if registered == candidate:
-                    need(all(fleet.get(key) for key in required), "unregistered terminal status directory")
-                    changes.watch(candidate.parent)
-                    rp = candidate
-                    break
-        need(fleet["authenticated_status_audit"]["path"] == str(rp), "crossed cadence report")
+        rp = registered_report(report_dir, fleet, field)
+        if rp.parent != report_dir:
+            changes.watch(rp.parent)
         if not rp.exists():
             return None
         doc, report = document(rp,0o600,8 << 20)

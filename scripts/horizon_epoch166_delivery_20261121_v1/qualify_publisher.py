@@ -58,7 +58,7 @@ os.execv(elf, [elf, *args])
     wrapper.chmod(0o555)
     digest = receiver.sha(wrapper.read_bytes())
     checks = {}
-    for fault, expected in [
+    cases = [
             ("wrong-fd", "source descriptor differs"),
             ("unlocked", "receiver lacks original exclusive claim"),
             ("wrong-terminal", "proof digest mismatch"),
@@ -69,7 +69,27 @@ os.execv(elf, [elf, *args])
             ("stale", "publication admission differs"),
             ("conflict", "proof digest mismatch"),
             ("dispatch", "invalid HORIZON_S3_ENDPOINT"),
-            ("positive", None)]:
+            ("positive", None)]
+    pre_cut = "258560f902d07e217c96a042b7e78d5c2cb105a9"
+    post_cut = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef"
+    reader_cases = {}
+    if epoch in receiver.PEERS:
+        reader_cases = {
+            "original-branch": (pre_cut, None, "907c5b3c26837c75c5c62f76bb124ff4fd8fe642", None),
+            "candidate-branch": (post_cut, None, post_cut, None),
+            "premature-candidate": (pre_cut, "candidate", None, "reader revision is outside the publication branch"),
+            "stale-reader": (post_cut, "previous", None, "qualified reader inputs differ"),
+        }
+        cases.extend((name, test[3]) for name, test in reader_cases.items())
+
+    for fault, expected in cases:
+        for name in ("FIXTURE_READER_REVISION", "FIXTURE_QUALIFIED_READER"):
+            os.environ.pop(name, None)
+        if fault in reader_cases:
+            revision, forced, _, _ = reader_cases[fault]
+            os.environ["FIXTURE_READER_REVISION"] = revision
+            if forced:
+                os.environ["FIXTURE_QUALIFIED_READER"] = forced
         run = work / fault
         run.mkdir(mode=0o700)
         for name in ("scratch", "receipts"):
@@ -145,6 +165,11 @@ os.execv(elf, [elf, *args])
             "--current-reader-plan-sha256", receiver.sha(plan_path.read_bytes()),
             "--concurrency", "1", "--part-size-mib", "8"]
         assert result["r2_mutations"] is False and result["transaction"] == terminal["transaction_id"]
+        if fault in reader_cases:
+            assert plan["reader_commit"] == reader_cases[fault][2]
+            checks[fault] = {"commit": plan["reader_commit"], "qualification": plan["qualification"],
+                             "pipeline": plan["pipeline"], "plan_sha256": result["plan_sha256"]}
+            continue
         checks["plan_sha256"] = result["plan_sha256"]
         checks["positive"] = "prepared twice with an identical plan on the same inode"
     put(work / "publisher-qualification.json", checks)

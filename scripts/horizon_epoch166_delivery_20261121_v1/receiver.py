@@ -39,6 +39,14 @@ METERED = Producer(168, "horizon-qualify-168-full-metered-20261121-v1.service",
 METERED_ROOT = ROOT.parent / "epoch168-current-delivery-20261121-v1"
 METERED_LIVE = "11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7"
 METERED_LOCK = (64512, 109323419)
+PEERS = {
+    167: (ROOT.parent / "epoch167-current-delivery-20261121-v1",
+          "f9b3e1fbdddfd983f1589ead46439a5bde07762cfc6151a8cfbb6f5580e818be", (64512, 113979804),
+          Producer(167, "horizon-qualify-167-source-index-v1-20261121.service", "0876e9944c784b41afeff1b666539ead")),
+    170: (ROOT.parent / "epoch170-current-delivery-20261121-v1",
+          "8221f8f31df8bd360b7ef95a82b6cbf04c27fff2a0dc53508f6c79d1731dff7b", (64512, 113907416),
+          Producer(170, "horizon-qualify-170-replacement-local3retry10-20261121-v1.service", "a456b826ce1c4634a2df66d66c5cc07f")),
+}
 
 
 def require(condition, message):
@@ -121,7 +129,8 @@ def authority(stack, root, expected_digest, producer=ORIGINAL):
     raw_term = seal(stack, root / "TERMINAL_SUCCESS.json", 0o400)
     term = json.loads(raw_term)
     manager = term["manager_terminal"]
-    require(live["schema"] == f"horizon-{epoch}-live-to-terminal-witness-v1" and live["epoch"] == epoch
+    schema = "horizon-singleton-live-to-terminal-witness-v1" if epoch in PEERS else f"horizon-{epoch}-live-to-terminal-witness-v1"
+    require(live["schema"] == schema and live["epoch"] == epoch
             and live["native"]["manager"]["Id"] == unit and live["native"]["manager"]["InvocationID"] == iid
             and term["schema"] == f"terminal{epoch}-success-v1" and term["epoch"] == epoch
             and term["producer_unit"] == unit and term["producer_invocation_id"] == iid
@@ -221,7 +230,10 @@ def receive(root, expected_digest, lock_id, watched, native, native_hash, consum
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--metered168", action="store_true")
+    profile = parser.add_mutually_exclusive_group()
+    profile.add_argument("--metered168", action="store_true")
+    profile.add_argument("--source167", dest="peer", action="store_const", const=167)
+    profile.add_argument("--retry170", dest="peer", action="store_const", const=170)
     parser.add_argument("native", type=Path)
     parser.add_argument("native_sha256")
     parser.add_argument("consumer", type=Path)
@@ -231,7 +243,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGIO, signal.SIG_DFL)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGIO})
     try:
-        if a.metered168:
+        if a.peer:
+            root, live_sha, lock_id, producer = PEERS[a.peer]
+        elif a.metered168:
             root, live_sha, lock_id, producer = METERED_ROOT, METERED_LIVE, METERED_LOCK, METERED
         else:
             root, live_sha, lock_id, producer = ROOT, LIVE_SHA, LOCK_ID, ORIGINAL

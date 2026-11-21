@@ -70,6 +70,15 @@ def main():
     source=git("show",commit+":scripts/horizon_epoch166_retry10_delivery_20261121_v1/closure.py")
     s.need(closure_path.read_bytes()==source,"different terminal registration source")
     src["closure.py"]=digest(source)
+    _,adapter,timeout_rejoin=m["profile145"](here,timeout_rejoin=True)
+    timeout=runpy.run_path(str(adapter))
+    s.need(timeout["TIMEOUT_REJOIN"] and timeout["REJOIN"] and timeout["OLD"]==m["extensions"]["FAILED_REJOIN"]
+           and timeout["OLD_FAILURE"]=="baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943"
+           and timeout["OLD_RECOVERY"]=="e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f"
+           and timeout["IMAGE"].parent==adapter.parent and timeout["UNIT"]==m["extensions"]["VERIFIER_UNIT"],
+           "new 145 verifier adapter targets another predecessor")
+    rejected(lambda:m["profile145"](here,post=True,timeout_rejoin=True))
+    rejected(lambda:m["profile145"](here,rejoin=True,timeout_rejoin=True))
     _,_,rejoin=m["profile145"](here,rejoin=True)
     _,_,current_post=m["profile145"](here,post=True,rejoin=True)
     _,_,binding=m["profile145"](here)
@@ -79,11 +88,12 @@ def main():
     rejected(lambda:m["capture"](171,fleet))
     observed,fork=fork_control(m,fleet)
     ext=m["extensions"];mgr=s.show(ext["VERIFIER_UNIT"])
-    if mgr["InvocationID"]==ext["FAILED_VERIFIER"]:
-        closure=ext["failed_verifier"](s,mgr)
+    if mgr["ActiveState"]=="failed" and mgr["InvocationID"] in (ext["FAILED_VERIFIER"],ext["FAILED_REJOIN"]):
+        closure=ext["failed_verifier"](s,mgr,mgr["InvocationID"])
         s.need(all(observed["phase145"][k]==v for k,v in closure.items()),"failed 145 evidence missed from full fit")
         for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
-            rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value})))
+            rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value}),mgr["InvocationID"]))
+        rejected(lambda:ext["failed_verifier"](s,mgr,"f"*32))
     else:
         original,_=s.read(D/"native-462833a6aba74481af5e276512bdcad4.json",
                            "3d9b77551ceafa52ca0fef30f957b7aba6053f55c84e320cf2632067b85c6ec0")
@@ -153,7 +163,7 @@ def main():
            eq["retained_168_remaining"]==t["cap"]-t["physical_bytes"] and
            floor(raw,optional,books,145,peer,others,0,paid)[0]<=baseline[0],"closed metered booking changed original equation")
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_timeout_rejoin_registration=timeout_rejoin,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:

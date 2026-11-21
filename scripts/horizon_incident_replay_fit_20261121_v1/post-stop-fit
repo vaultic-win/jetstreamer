@@ -269,8 +269,11 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def profile145(here, post=False, rejoin=False):
-    if post and rejoin:
+def profile145(here, post=False, rejoin=False, timeout_rejoin=False):
+    if timeout_rejoin:
+        s.need(not post and not rejoin, "ambiguous 145 recovery profile")
+        profile,directory="profile145-timeout-rejoin.json","tools-v5c"
+    elif post and rejoin:
         profile,directory="profile145-current-post.json","tools-v7"
     elif rejoin:
         profile,directory="profile145-rejoin.json","tools-v5b"
@@ -296,8 +299,8 @@ def phase145(epoch):
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed" and m["InvocationID"]==extensions["FAILED_VERIFIER"]:
-            v.update(extensions["failed_verifier"](s,m))
+        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"]):
+            v.update(extensions["failed_verifier"](s,m,m["InvocationID"]))
         elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",
                               "33e011228a58df3c2a82ca49013a7d524eeca1e849fc59993effe5d2faf18e74")
@@ -317,8 +320,10 @@ def phase145(epoch):
     fp=base/"tools-v5/export145"
     rp=base/"tools-v5b/export145"
     rejoin=rp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",rp)
-    if post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin)
+    timeout_image=base/"tools-v5c/export145"
+    timeout_rejoin=timeout_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",timeout_image)
+    if timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")

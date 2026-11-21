@@ -37,7 +37,15 @@ struct PublicationProfile {
     boundaries_sha: &'static str,
 }
 
-#[cfg(not(any(feature = "retry10", feature = "metered168")))]
+#[cfg(any(feature = "source167", feature = "retry170"))]
+mod peer_profile;
+
+#[cfg(not(any(
+    feature = "retry10",
+    feature = "metered168",
+    feature = "source167",
+    feature = "retry170"
+)))]
 const PROFILE: PublicationProfile = PublicationProfile {
     epoch: 166,
     producer: "horizon-qualify-independent-cold166-20261120-v1.service",
@@ -71,6 +79,21 @@ const PROFILE: PublicationProfile = PublicationProfile {
     reader_sha: env!("HORIZON_READER_QUALIFICATION_SHA256"),
     boundaries: "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json",
     boundaries_sha: "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0",
+};
+#[cfg(any(feature = "source167", feature = "retry170"))]
+const PROFILE: PublicationProfile = PublicationProfile {
+    epoch: peer_profile::EPOCH,
+    producer: peer_profile::ORIGIN,
+    producer_iid: peer_profile::GENERATION,
+    unit: peer_profile::UNIT,
+    terminal: peer_profile::DELIVERY,
+    live_sha: peer_profile::LIVE,
+    lock: peer_profile::LOCK,
+    delivery: peer_profile::DELIVERY,
+    reader: reader_transition::PREVIOUS_PATH,
+    reader_sha: reader_transition::PREVIOUS_SHA,
+    boundaries: "epoch168-current-delivery-20261121-v1/epoch-expectations/bindings.json",
+    boundaries_sha: "b31b09549161b515da4d254662545ed11dbd2b0d33cb9263072485cbd6985488",
 };
 #[cfg(feature = "metered168")]
 const PROFILE: PublicationProfile = PublicationProfile {
@@ -237,6 +260,11 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
     root_dir(&a.root)?;
     let live_path = a.root.join("LIVE.json");
     let live = document(&live_path, &a.live_sha, true)?;
+    #[cfg(any(feature = "source167", feature = "retry170"))]
+    ensure!(
+        live["schema"] == peer_profile::LIVE_SCHEMA,
+        "wrong singleton live schema"
+    );
     let term = document(
         &a.root.join("TERMINAL_SUCCESS.json"),
         &h.terminal_sha256,
@@ -456,9 +484,30 @@ fn admit(
     on_home(&a.run, floor)?;
     Ok(floor)
 }
+#[cfg(any(
+    feature = "source167",
+    feature = "retry170",
+    feature = "transition_reader"
+))]
+mod reader_transition;
+
 fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
-    let qpath = rt(PROFILE.reader);
-    let q = document(&qpath, PROFILE.reader_sha, false)?;
+    #[cfg(any(
+        feature = "source167",
+        feature = "retry170",
+        feature = "transition_reader"
+    ))]
+    let (qpath, qualification_sha, q) = reader_transition::current()?;
+    #[cfg(not(any(
+        feature = "source167",
+        feature = "retry170",
+        feature = "transition_reader"
+    )))]
+    let (qpath, qualification_sha, q) = {
+        let path = rt(PROFILE.reader);
+        let q = document(&path, PROFILE.reader_sha, false)?;
+        (path, PROFILE.reader_sha, q)
+    };
     let bindings = document(&rt(PROFILE.boundaries), PROFILE.boundaries_sha, false)?;
     let key = PROFILE.epoch.to_string();
     let b = &bindings[&key];
@@ -500,7 +549,7 @@ fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
         "reader_commit": q["reader_commit"],
         "full_verifier": q["full_verifier"],
         "pipeline": q["pipeline"],
-        "qualification": {"path": qpath, "sha256": PROFILE.reader_sha},
+        "qualification": {"path": qpath, "sha256": qualification_sha},
         "scratch_directory": scratch,
         "threads": 1,
         "maximum_archive_bytes": len,
