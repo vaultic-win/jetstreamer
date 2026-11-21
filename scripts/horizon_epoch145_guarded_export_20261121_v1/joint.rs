@@ -3,6 +3,13 @@
 use super::*;
 use std::collections::{BTreeMap, BTreeSet};
 
+const AFTER_TRACE: bool = cfg!(all(joint145_only, partial145_only, materialized145_only));
+pub(super) const RECOVERY: &str = "5dfb817906f74b73a27f61a386751d75";
+const RECOVERY_IMAGE: &str = "f8c57a5c069ee60430221c16534d3fb5b265e62f5d554ad9a3dd8c71404179a6";
+const RECOVERY_SEAL: &str = "d0152a51339f3a867ae3e406eb30e5c4b8d8839fb1cc77c0ffee90c00fc91210";
+#[cfg(all(joint145_only, partial145_only, materialized145_only))]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v3/export145";
+#[cfg(not(all(joint145_only, partial145_only, materialized145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v2/export145";
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
 const EXPORT: &str = "de6780b860b3467bae21fbd19176ca14";
@@ -42,6 +49,15 @@ pub(super) fn route(sha: &str) -> Result<Bound> {
             && b.1["candidate_limit_bytes"] == joint_candidate::LIMIT,
         "next 145 phase route is not sealed to the joint image"
     );
+    if AFTER_TRACE {
+        ensure!(
+            b.1["recovery_invocation_id"] == RECOVERY
+                && b.1["recovery_image"]
+                    == json!(binding(Path::new(materialized::IMAGE), RECOVERY_IMAGE))
+                && b.1["recovery_seal_sha256"] == RECOVERY_SEAL,
+            "staged route does not bind the native partial recovery"
+        );
+    }
     Ok(b.0)
 }
 
@@ -61,7 +77,7 @@ fn paid_output(mode: &str) -> Result<fs::Metadata> {
     .1;
     let temp = Path::new(paid["temporary"].as_str().context("145 prepaid file")?);
     let canonical = Path::new(OUTPUT).join("epoch-145.jet");
-    let f = if !canonical.try_exists()? && matches!(mode, "run" | "gap") {
+    let f = if !canonical.try_exists()? && matches!(mode, "run" | "gap" | "recover-full-output") {
         temp
     } else {
         &canonical
@@ -82,6 +98,33 @@ fn paid_output(mode: &str) -> Result<fs::Metadata> {
         "145 prepaid output changed"
     );
     Ok(m)
+}
+fn verify_recovery(
+    native: &Value,
+    iid: &str,
+    hash: &str,
+    fleet: &[String],
+    locked: bool,
+) -> Result<()> {
+    let fit = &native["fresh_fit"];
+    ensure!(
+        locked
+            && iid == RECOVERY
+            && hash == RECOVERY_IMAGE
+            && native["iid"] == iid
+            && native["image"] == hash
+            && fit["joint136_enabled"] == false
+            && fit["terminal168"]["resource_credit_bytes"] == 0
+            && fleet
+                == [
+                    fit["fleet"]["path"].as_str().context("recovery fleet")?,
+                    fit["fleet"]["sha256"]
+                        .as_str()
+                        .context("recovery fleet hash")?
+                ],
+        "incompatible recovery differs from its native five-owner fit"
+    );
+    Ok(())
 }
 fn phase(sha: &str, staged: &Bound) -> Result<Value> {
     let v = service()?;
@@ -132,7 +175,16 @@ fn phase(sha: &str, staged: &Bound) -> Result<Value> {
     let mode = args.get(1).context("145 phase")?.as_str();
     let old_root = Path::new(BASE).join("deployment-v4/export145");
     let (known, hash) = match mode {
-        "run" if iid == EXPORT => (old_root, EXPORT_IMAGE),
+        "recover-full-output" if AFTER_TRACE && iid == RECOVERY => {
+            let path = Path::new(materialized::IMAGE);
+            let seal = binding(
+                &path.with_file_name("deployment-seal-receipt.json"),
+                RECOVERY_SEAL,
+            );
+            custody::bytes(&seal, 1 << 20, true)?;
+            (path.to_owned(), RECOVERY_IMAGE)
+        }
+        "run" if !AFTER_TRACE && iid == EXPORT => (old_root, EXPORT_IMAGE),
         "post-full" | "publish" if args[0] == IMAGE => (PathBuf::from(IMAGE), sha),
         "post-full" | "publish" if args[0] == format!("{ROOT}/joint-tools/export145") => (
             Path::new(ROOT).join("joint-tools/export145"),
@@ -176,6 +228,17 @@ fn phase(sha: &str, staged: &Bound) -> Result<Value> {
             && f[6..8] == ["0", "EOF"]
     });
     let capable = known == Path::new(IMAGE) && matches!(mode, "post-full" | "publish");
+    if mode == "recover-full-output" {
+        let start = binding(
+            &Path::new(BASE)
+                .join("state")
+                .join(RECOVERY)
+                .join("recovery-started.json"),
+            "abfd9eca8c8249e4f1f6b69aaa7ba05c6b970a3d0a932d0087b8cea51e0ff0c2",
+        );
+        let native = custody::evidence(&start)?;
+        verify_recovery(&native, iid, hash, &args[2..4], lock)?;
+    }
     let admitted = if capable && lock {
         let label = if mode == "post-full" {
             "full"
@@ -188,7 +251,8 @@ fn phase(sha: &str, staged: &Bound) -> Result<Value> {
             ensure!(
                 r["invocation"] == iid
                     && r["fit"]["joint136_enabled"] == true
-                    && r["fit"]["charged_cpu_micros"] == 64_000_000,
+                    && r["fit"]["charged_cpu_micros"] == 64_000_000
+                    && (!AFTER_TRACE || r["fit"]["terminal168"]["resource_credit_bytes"] == 0),
                 "joint phase has no complete funding proof"
             );
             true
@@ -320,4 +384,27 @@ pub fn inspect(fleet: Bound, sha: &str, tail: &[String]) -> Result<()> {
         "replay_launch_authorized":false,"r2_mutations":false});
     println!("{}", serde_json::to_string(&out)?);
     Ok(())
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+    #[test]
+    fn recovery_binds_the_exact_incompatible_phase_and_the_charged_fleet() {
+        let native = json!({"iid": RECOVERY, "image": RECOVERY_IMAGE, "fresh_fit": {
+            "joint136_enabled": false, "terminal168": {"resource_credit_bytes": 0},
+            "fleet": {"path": "/fleet", "sha256": "a".repeat(64)}}});
+        let args = ["/fleet".to_owned(), "a".repeat(64)];
+        assert!(verify_recovery(&native, RECOVERY, RECOVERY_IMAGE, &args, true).is_ok());
+        assert!(verify_recovery(&native, EXPORT, RECOVERY_IMAGE, &args, true).is_err());
+        assert!(verify_recovery(&native, RECOVERY, EXPORT_IMAGE, &args, true).is_err());
+        assert!(verify_recovery(&native, RECOVERY, RECOVERY_IMAGE, &args, false).is_err());
+        assert!(verify_recovery(&native, RECOVERY, RECOVERY_IMAGE, &args[..1], true).is_err());
+        let mut wrong = native.clone();
+        wrong["fresh_fit"]["joint136_enabled"] = true.into();
+        assert!(verify_recovery(&wrong, RECOVERY, RECOVERY_IMAGE, &args, true).is_err());
+        let mut wrong = native;
+        wrong["fresh_fit"]["terminal168"]["resource_credit_bytes"] = 1.into();
+        assert!(verify_recovery(&wrong, RECOVERY, RECOVERY_IMAGE, &args, true).is_err());
+    }
 }

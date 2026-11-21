@@ -171,10 +171,10 @@ fn owner_command() -> Result<Command> {
 
 pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str, joint: bool) -> Result<()> {
     let root = Path::new(ROOT);
-    let image = if cfg!(materialized145_only) {
-        PathBuf::from(materialized::IMAGE)
-    } else if joint {
+    let image = if joint {
         joint::IMAGE.into()
+    } else if cfg!(materialized145_only) {
+        PathBuf::from(materialized::IMAGE)
     } else {
         root.join("network-tools/export145")
     };

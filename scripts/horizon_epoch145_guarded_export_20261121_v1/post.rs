@@ -331,10 +331,10 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
 }
 
 pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
-    let image = if cfg!(materialized145_only) {
-        PathBuf::from(materialized::IMAGE)
-    } else if joint {
+    let image = if joint {
         joint::IMAGE.into()
+    } else if cfg!(materialized145_only) {
+        PathBuf::from(materialized::IMAGE)
     } else {
         Path::new(ROOT).join("post-tools/export145")
     };
@@ -351,6 +351,12 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     } else {
         EXPORT.into()
     };
+    if joint && cfg!(partial145_only) {
+        ensure!(
+            export == joint::RECOVERY,
+            "unexpected recovered export owner"
+        );
+    }
     terminal(&export)?;
     let completed = Path::new(BASE).join("state").join(&export);
     let done = custody::binding(&completed.join("complete.json"))?;

@@ -590,9 +590,9 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
-        #[cfg(partial145_only)]
+        #[cfg(all(partial145_only, not(joint145_only)))]
         [_, mode, parent, sha] if mode == "recover-append" => partial::append(parent.parse()?, sha),
-        #[cfg(materialized145_only)]
+        #[cfg(all(materialized145_only, not(joint145_only)))]
         [_, mode, fleet, digest, sha] if mode == "recover-full-output" => materialized::run(
             Bound {
                 path: fleet.into(),
@@ -600,11 +600,11 @@ fn run() -> Result<()> {
             },
             sha,
         ),
-        #[cfg(materialized145_only)]
+        #[cfg(all(materialized145_only, not(joint145_only)))]
         [_, mode, parent, sha] if mode == "recover-worker" => {
             materialized::verify(parent.parse()?, sha)
         }
-        #[cfg(not(materialized145_only))]
+        #[cfg(any(not(materialized145_only), joint145_only))]
         [_, mode, fleet, digest, sha, tail @ ..] if mode == "joint-fit" => joint::inspect(
             Bound {
                 path: fleet.into(),
