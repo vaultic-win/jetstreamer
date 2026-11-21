@@ -8,7 +8,7 @@ old="$current/tmp/early145-f3c1e61202f340f8a43902eb27fea7fc/source"
 d="$current/target/release"
 flavor="${2:-recovery}"
 focused=false
-if [[ $flavor == focused-rejoin || $flavor == focused-post || $flavor == retry-post ]]; then
+if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused-post || $flavor == retry-post ]]; then
   focused=true
   src=/home/sol/.jetstreamer-private/paid145-focused169-recovery-20261121-v1
 fi
@@ -19,9 +19,10 @@ recovery) sources=(incident-phase.py run-incident.sh) ;;
 rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only)
         ;;
-timeout-rejoin|focused-rejoin) sources=(incident-phase.py run-incident.sh)
+timeout-rejoin|focused-rejoin|timer-rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only --cfg incident_timeout145_only)
         if $focused; then extra+=(--cfg incident_focused145_only); fixture+=(incident145::preserves_the_actual_cadence_failure_and_frozen_inode); fi
+        if [[ $flavor == timer-rejoin ]]; then extra+=(--cfg incident_timer145_only); fixture+=(incident145::proves_retirement_timeout_and_rejects_other_commands); fi
         fixture+=(incident145::tests::distinguishes_native_query_timeout_from_foreign_or_malformed_failures)
         ;;
 post|current-post|timeout-post|focused-post|retry-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
@@ -71,6 +72,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14b-prestart/post-stop-fit
     signature=7caf7d7eb81ac5c0972649666e6d22273926c841640b537cd7fe336706514cd3
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == db71be720088b97a5fe0db694d0f863b77273cd7963112b61ac673b23213fda8 ]]
+  fi
+  if [[ $flavor == timer-rejoin ]]; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v15b-prestart/post-stop-fit
+    signature=350295e25c3404b9e23f60969a378061e780ad5a580fdf71c8c29861722d953b
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 6222a205645ea6a2bf34b4b2c4085d30a0fda7349e4243524a2c52089fc19931 ]]
   fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"

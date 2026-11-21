@@ -7,11 +7,13 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
+#[cfg(incident_timer145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_retry_post145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v15/post-stop-fit";
 #[cfg(all(
     any(incident_focused145_only, incident_focused_post145_only),
-    not(incident_retry_post145_only)
+    not(any(incident_retry_post145_only, incident_timer145_only))
 ))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14/post-stop-fit";
 #[cfg(all(incident_timeout_post145_only, not(incident_focused_post145_only)))]
@@ -416,6 +418,29 @@ pub fn missing_status_owner(trace: &str, provider: &str) -> bool {
         && trace.trim_end().ends_with("  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3/status168.py\", line 34, in need\n    raise ValueError(message)\nValueError: cadence publisher absent")
 }
 
+/// A bounded, read-only retirement inspection can time out while all paid files stay leased.
+#[cfg(incident_timer145_only)]
+pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
+    let Some(directory) = Path::new(provider).parent() else {
+        return false;
+    };
+    let probe = directory.join("retire-original-timers.py");
+    let frame = format!("  File \"{provider}\", line ");
+    let expected = format!(
+        "subprocess.TimeoutExpired: Command '['/usr/bin/python3', '-IB', PosixPath('{}'), 'inspect']' timed out after 20 seconds",
+        probe.display()
+    );
+    let mut lines = stderr.trim_end().lines();
+    lines.next() == Some("Traceback (most recent call last):")
+        && lines
+            .next()
+            .is_some_and(|line| line.starts_with(&frame) && line.ends_with(", in <module>"))
+        && lines
+            .clone()
+            .any(|line| line.starts_with(&frame) && line.ends_with(", in proof_stops"))
+        && lines.next_back() == Some(expected.as_str())
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -453,6 +478,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         {
             return Err(anyhow::Error::new(capacity::TopologyTimeout)
                 .context("registered status publisher is unavailable"));
+        }
+        #[cfg(incident_timer145_only)]
+        if out.status.code() == Some(1)
+            && out.stdout.is_empty()
+            && timer_inspection_timeout(&err, PROVIDER)
+        {
+            return Err(anyhow::Error::new(capacity::TopologyTimeout)
+                .context("sealed retirement inspection timed out"));
         }
         if err.trim_end().ends_with("ValueError: superseded fleet") {
             let next = head(&fleet)?;
