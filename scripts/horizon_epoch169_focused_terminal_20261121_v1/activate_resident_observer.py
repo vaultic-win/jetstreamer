@@ -106,10 +106,13 @@ def main():
             folder=Path('/run/systemd/system')/(u+'.d');folder.mkdir(mode=0o755,exist_ok=True)
             p=folder/'zzz-qualified-resident-census.conf'
             with p.open('x') as out:
-                os.fchmod(out.fileno(),0o644);out.write('[Service]\nExecStart=\nExecStart='+command+'\n');out.flush();os.fsync(out.fileno())
+                os.fchmod(out.fileno(),0o644)
+                if u==service:out.write('[Unit]\nDescription='+command+'\n')
+                out.write('[Service]\nExecStart=\nExecStart='+command+'\n');out.flush();os.fsync(out.fileno())
             changes[p]=bound(p)
         ctl('daemon-reload');window()
         assert before==current(OLD)
+        assert show(service,['Description'])['Description']==commands[service]
         assert all(argv in show(u,['ExecStart'])['ExecStart'] for u,argv in commands.items())
         boundary=fresh_paid_boundary()
         ctl('restart',UNIT)
