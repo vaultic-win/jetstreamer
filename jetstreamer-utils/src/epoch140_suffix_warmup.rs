@@ -95,6 +95,40 @@ fn capture(
             && result["terminal"]["exit_status"] == 1,
         "wrong warmup launch, result or artifact lineage"
     );
+    let guard_ref = &launch["first_guard"];
+    let guard_path = Path::new(&launch_path).with_file_name("first-guard.json");
+    ensure!(
+        guard_ref["path"].as_str() == guard_path.to_str(),
+        "wrong original guard path"
+    );
+    let guard = read_json(&guard_path, str_field(guard_ref, "sha256")?, 64 << 10)?;
+    let parent = guard["producer"]["pid"]
+        .as_u64()
+        .context("missing guarded parent")?;
+    let workers = guard["workers"]
+        .as_array()
+        .context("missing guarded workers")?;
+    ensure!(
+        workers.len() == 1
+            && guard["producer"]["invocation_id"] == iid
+            && guard["producer"]["restarts"] == 0,
+        "ambiguous warmup worker"
+    );
+    let worker = workers[0][0]
+        .as_u64()
+        .context("missing original worker PID")?;
+    ensure!(
+        parent > 1 && worker > 1 && parent != worker,
+        "invalid warmup PIDs"
+    );
+    let parent = parent.to_string();
+    let worker = worker.to_string();
+    let parent_exe = str_field(&launch, "expected_exec_start")?
+        .strip_prefix("{ path=")
+        .and_then(|s| s.split_once(" ;").map(|v| v.0))
+        .context("missing parent executable")?;
+    let worker_scratch =
+        Path::new(str_field(&launch, "run_root")?).join("scratch/.historical-runtime");
     let checkpoint = &native["native_result"]["native_checkpoint"];
     let initialize = format!(
         "historical worker initialized at slot {CUT} (last_blockhash={}, ticks_per_slot=64, next_write_version={})",
@@ -116,7 +150,10 @@ fn capture(
         let Some(message) = entry["MESSAGE"].as_str() else {
             continue;
         };
-        if entry["_COMM"] == "jetstreamer-nod" {
+        if entry["_COMM"] == "jetstreamer-nod"
+            && entry["_PID"] == parent
+            && entry["_EXE"] == parent_exe
+        {
             let body = message.split_once("] ").map(|(_, body)| body).unwrap_or("");
             if body == initialize {
                 init_count += 1;
@@ -160,10 +197,16 @@ fn capture(
                     );
                 }
             }
-        } else if entry["_COMM"] == "historical-work" {
+        } else if entry["_COMM"] == "historical-work" && entry["_PID"] == worker {
             if let Some(encoded) = message.strip_prefix("epoch141 frozen-bank components: ") {
                 let v: Value = serde_json::from_str(encoded)?;
                 if v["slot"] == END {
+                    let exe = Path::new(str_field(&entry, "_EXE")?);
+                    ensure!(
+                        exe.starts_with(&worker_scratch)
+                            && exe.ends_with("bound-worker/historical-worker"),
+                        "wrong mapped historical worker"
+                    );
                     ensure!(
                         bank.is_none() && observed.len() == rows.len(),
                         "duplicate or premature epoch-end frozen Bank"
@@ -184,7 +227,7 @@ fn capture(
     Ok(
         json!({"launch":{"path":launch_path,"sha256":c.launch_sha},"result":{"path":result_path,"sha256":c.result_sha},
         "journal":{"path":file,"sha256":c.journal_sha},"unit":unit,"invocation_id":iid,"worker_sha256":launch["worker_sha256"],
-        "parent_sha256":launch["node_sha256"],"source_matches":observed,"frozen_epoch_end":bank,"archive_recording_began_at":END+1}),
+        "first_guard":guard_ref,"parent_pid":parent,"worker_pid":worker,"parent_sha256":launch["node_sha256"],"source_matches":observed,"frozen_epoch_end":bank,"archive_recording_began_at":END+1}),
     )
 }
 
