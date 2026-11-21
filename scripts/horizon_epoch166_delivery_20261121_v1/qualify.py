@@ -15,7 +15,7 @@ here = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("receiver", here / "receiver.py")
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
-native, generator, work, fixture = map(Path, sys.argv[1:])
+native, generator, work, fixture = map(Path, sys.argv[1:5])
 fixture.mkdir(mode=0o700)
 os.chown(fixture, *r.OWNER)
 who = dict(user=r.OWNER[0], group=r.OWNER[1], extra_groups=())
@@ -105,6 +105,11 @@ assert observed["sha256"]==success["sha256"] and observed["epoch_lock_held"]
 result.unlink()
 assert run()==success and json.loads(result.read_bytes())==observed
 result.unlink()
+if len(sys.argv) > 5:
+    import runpy
+    runpy.run_path(str(here / "qualify_publisher.py"))["qualify"](
+        r, Path(sys.argv[5]), work, authority, live_hash, terminal, out, lock,
+        watched, native, native_sha)
 with contextlib.ExitStack() as stack:
     nf=r.inherited_program(stack,native,native_sha)
     deny=subprocess.run([f"/proc/self/fd/{nf}","admit","166",str(batch),"ff"*32,str(watched)],
