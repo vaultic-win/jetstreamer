@@ -33,6 +33,40 @@ def timer(epoch):
     return 'horizon-guard-' + ROUTES[epoch][0] + '.timer'
 
 
+def check_170_payload(root, intent, proc, actor):
+    """Follow the same systemd MainPID from its guarded hold through the authorized exec."""
+    import os
+
+    prepared = bound(root / 'PREPARED.json')
+    need(intent['prepared'] == prepared and
+         prepared['sha256'] == '82f8d1992252e0c376aa773a27ba6d38e041638daa51e2376c0be54bcc114d83',
+         'different prepared epoch 170 inputs')
+    profile = checked(checked(prepared)['profile'])
+    args = profile['normal_argv']
+    image = proc / 'exe'
+    argv = [os.fsdecode(x) for x in (proc / 'cmdline').read_bytes().split(b'\0') if x]
+    if image.samefile('/usr/bin/python3'):
+        gate = root / 'controller/gate.py'
+        alias = Path('run/horizon-recovered170')
+        need(bound(gate)['sha256'] == '8e5f7c0d3a3118d2deaa2fc88a77e12044d8c7d93c3690644f4df7a45afdf1f9' and
+             (proc / 'root' / alias / 'gate.py').samefile(gate) and
+             (proc / 'root' / alias / 'profile.json').samefile(root / 'profile.json') and
+             argv == ['/usr/bin/python3', '-IB', '/' + str(alias / 'gate.py'), *args] and
+             (Path('/sys/fs/cgroup/system.slice') / node(170) / 'cgroup.procs').read_text().split() ==
+             [str(actor['producer_pid'])] and not (root / 'ACTUAL_PRODUCER_NATIVE.json').exists(),
+             'foreign process in the epoch 170 startup gate')
+        return
+    permit = checked(bound(root / 'AUTHORIZED_GATED_PAYLOAD.json'))
+    need(argv == args and image.samefile(profile['node']['path']) and
+         all(permit[k] == v for k, v in actor.items()) and
+         permit['intent'] == bound(root / 'START_INTENT.json') and
+         permit['first_guard'] == bound(root / 'FIRST_GUARD.json') and
+         permit['capacity'] == bound(root / 'POST_GUARD_CAPACITY.json') and
+         checked(permit['capacity'])['fits'] and
+         (root / 'barrier/allow').read_bytes() == actor['producer_invocation_id'].encode(),
+         'epoch 170 payload lacks its matching guard release')
+
+
 def native(epoch):
     from owners import show, ticks
 
@@ -50,9 +84,12 @@ def native(epoch):
          and not row['Job'] and row['ControlGroup'] == '/system.slice/' + unit, 'wrong replacement node or booking')
     pid = int(row['MainPID'])
     proc = Path('/proc') / str(pid)
-    need((proc/'exe').readlink().name == 'jetstreamer-node' and
-         (proc/'cgroup').read_text().strip() == '0::'+row['ControlGroup'], 'foreign replacement node image')
     identity = dict(producer_pid=pid, producer_unit=unit, producer_invocation_id=row['InvocationID'], start_ticks=ticks(pid))
+    need((proc/'cgroup').read_text().strip() == '0::'+row['ControlGroup'], 'foreign replacement cgroup')
+    if epoch == 170:
+        check_170_payload(root, intent, proc, identity)
+    else:
+        need((proc/'exe').readlink().name == 'jetstreamer-node', 'foreign replacement node image')
     if (root/'ACTUAL_PRODUCER_NATIVE.json').exists():
         observed=checked(bound(root/'ACTUAL_PRODUCER_NATIVE.json'))
         image=(proc/'exe').stat()
