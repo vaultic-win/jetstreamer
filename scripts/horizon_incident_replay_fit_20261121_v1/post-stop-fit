@@ -289,7 +289,9 @@ def phase145(epoch):
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed":
+        if m["ActiveState"]=="failed" and m["InvocationID"]==extensions["FAILED_VERIFIER"]:
+            v.update(extensions["failed_verifier"](s,m))
+        elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",
                               "33e011228a58df3c2a82ca49013a7d524eeca1e849fc59993effe5d2faf18e74")
             s.need(m["InvocationID"]==failure["iid"] and m["ExecMainStatus"]=="1" and

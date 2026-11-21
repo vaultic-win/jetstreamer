@@ -80,3 +80,51 @@ def held(s,unit,run,pid,proc,intent):
            args==expected and hashlib.sha256(src.read_bytes()).hexdigest()==members["gate.py"] and s.same_file(path/"gate.py",src) and
            s.same_file(path/"profile.json",D/"profile.json") and s.same_file(path/"barrier",D/"barrier") and
            ("HORIZON_REPLAY170_PROFILE_SHA256="+pref["sha256"]).encode() in env and not (D/"barrier/allow").exists(),"foreign 170 held gate")
+
+
+FAILED_VERIFIER = "5e0e20bc974149f096ea4bab10b15e1b"
+VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
+
+
+def failed_verifier(s, manager):
+    """Preserve the failed verifier's reservation and its exact unpublished candidate."""
+    import json
+    import subprocess
+
+    iid = manager["InvocationID"]
+    s.need(iid == FAILED_VERIFIER and manager["Id"] == VERIFIER_UNIT
+           and manager["ActiveState"] == manager["SubState"] == "failed"
+           and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
+           and manager["NRestarts"] == "0" and not manager["Job"]
+           and not (Path("/sys/fs/cgroup/system.slice") / VERIFIER_UNIT).exists(),
+           "failed verifier still occupied or generation changed")
+    state = R / "epoch145-guarded-export-20261121-v1/state" / iid
+    failed, failure = s.read(state / "failed.json", "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f")
+    started, recovery = s.read(state / "recovery-started.json", "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f")
+    s.need(failed["iid"] == started["iid"] == iid and failed["error"] == "stopped worker fresh-census deadline"
+           and started["image"] == "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+           and started["r2_mutations"] is False
+           and not any((state / n).exists() for n in ("source-semantics.json", "verified-frozen.json", "complete.json")),
+           "failed v5 verification phase changed")
+    candidate = Path(started["file"])
+    s.need(candidate == Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN")
+           and candidate.resolve(strict=True) == candidate, "failed verifier candidate path changed")
+    m = candidate.lstat()
+    identity = dict(bytes=m.st_size, ctime_ns=m.st_ctime_ns, device=m.st_dev, gid=m.st_gid, inode=m.st_ino,
+                    mode=m.st_mode, mtime_ns=m.st_mtime_ns, uid=m.st_uid)
+    s.need(m.st_nlink == 1 and stat.S_ISREG(m.st_mode) and identity == started["prior_frozen_recovery"]["failed_preincident_verifier"]["original_candidate"],
+           "failed verifier candidate replaced")
+    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
+    raw = subprocess.check_output(["/usr/bin/journalctl", "--no-pager", "-ojson",
+        "--output-fields=_PID,_BOOT_ID,UNIT,INVOCATION_ID,MESSAGE_ID,EXIT_CODE,EXIT_STATUS",
+        "_BOOT_ID=" + boot, "_PID=1", "UNIT=" + VERIFIER_UNIT, "INVOCATION_ID=" + iid], text=True, timeout=10)
+    rows = [json.loads(line) for line in raw.splitlines()]
+    exits = [r for r in rows if r["MESSAGE_ID"] == "98e322203f7a4ed290d09fe03c09fe15"]
+    starts = [r for r in rows if r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"]
+    s.need(len(starts) == len(exits) == 1 and all(r["_PID"] == "1" and r["_BOOT_ID"] == boot
+           and r["UNIT"] == VERIFIER_UNIT and r["INVOCATION_ID"] == iid for r in rows)
+           and exits[0]["EXIT_CODE"] == "exited" and exits[0]["EXIT_STATUS"] == "1"
+           and int(starts[0]["__MONOTONIC_TIMESTAMP"]) < int(exits[0]["__MONOTONIC_TIMESTAMP"]),
+           "missing original verifier PID 1 failure")
+    return dict(failure=failure, recovery=recovery, candidate=identity, manager_exit=exits[0],
+                source_checkpoint_exists=False, resource_credit_bytes=0)

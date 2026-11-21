@@ -72,6 +72,11 @@ def main():
     if fleet!=m["PREV"]:rejected(lambda:m["fleet_head"](m["PREV"]))
     rejected(lambda:m["capture"](171,fleet))
     observed,fork=fork_control(m,fleet)
+    ext=m["extensions"];mgr=s.show(ext["VERIFIER_UNIT"])
+    closure=ext["failed_verifier"](s,mgr)
+    s.need(all(observed["phase145"][k]==v for k,v in closure.items()),"failed 145 evidence missed from full fit")
+    for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
+        rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value})))
     s.need(observed["fits"] and observed["stopped_generation_resident_credit_bytes"]==0 and
            set(observed["actual_original_stops"])=={"166","167","170"} and set(observed["survivors"])=={"169","172"} and
            set(observed["bookings"])=={"166","167","168","170"} and
@@ -95,7 +100,7 @@ def main():
     s.need(realized[0]+amount==baseline[0] and realized[1]==baseline[1],"own growth changes protected unrelated claims")
     name="native-"+os.environ["INVOCATION_ID"]+".json"
     receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,
-                 rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork)
+                 rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:
         os.fchmod(f.fileno(),0o400);f.write((json.dumps(receipt,sort_keys=True,indent=2)+"\n").encode());f.flush();os.fsync(f.fileno())
