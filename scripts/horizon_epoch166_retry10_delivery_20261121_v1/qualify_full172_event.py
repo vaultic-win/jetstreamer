@@ -80,9 +80,9 @@ def absent():
     return dict(terminal=str(term), native=outcome, original_guard=timer, manager=before)
 
 
-def namespace():
+def namespace(package="event-tools-current"):
     bindings, handoff, cap = programs()
-    assert event.document(P.delivery/"event-tools-current/programs.json",0o444)[0] == bindings
+    assert event.document(P.delivery/package/"programs.json",0o444)[0] == bindings
     result = absent()
     state = P.delivery/"event-state"
     assert not list(state.iterdir())
@@ -133,6 +133,19 @@ def check_case(work, label, base, report, group, archive, clock_terminal):
         changes.close()
 
 
+def fixture_admission(root, original, intent, bindings, iid):
+    terminal = read(original,0o400)
+    a = terminal["local_archive"]
+    folder = root/("run-"+iid)
+    folder.mkdir()
+    event.once(folder/"capacity.json",dict(terminal=original,invocation_id=iid,boot_id=recovery.boot(),
+                fleet=intent["fleet"],provider=bindings[P.fit.name]))
+    event.once(folder/"admission.json",dict(epoch=172,invocation_id=iid,unit=P.unit,schema="horizon-epoch172-committed-publication-admission-v1",
+                operation="current-reader-sync-retain-local",publication_authorized=True,terminal_sha256=original["sha256"],
+                transaction_id=terminal["transaction_id"],archive_bytes=a["size"],archive_sha256=a["sha256"],archive_inode=a["inode"],
+                archive_device=a["device"],capacity=event.document(folder/"capacity.json",0o400)[1],boot_id=recovery.boot()))
+
+
 def fixture_dispatch(work, original, proof, bindings):
     root = work/"dispatch"
     state = root/"event-state"
@@ -143,17 +156,7 @@ def fixture_dispatch(work, original, proof, bindings):
     def launch(profile, intent, socket):
         assert intent["terminal"] == original and intent["fleet"] == proof["fleet"] and intent["controller"] == str(P.launch)
         seen.append(intent)
-        terminal = read(original,0o400)
-        a = terminal["local_archive"]
-        iid = "e"*32
-        folder = root/("run-"+iid)
-        folder.mkdir()
-        event.once(folder/"capacity.json",dict(terminal=original,invocation_id=iid,boot_id=recovery.boot(),
-                    fleet=intent["fleet"],provider=bindings[P.fit.name]))
-        event.once(folder/"admission.json",dict(epoch=172,invocation_id=iid,unit=P.unit,schema="horizon-epoch172-committed-publication-admission-v1",
-                    operation="current-reader-sync-retain-local",publication_authorized=True,terminal_sha256=original["sha256"],
-                    transaction_id=terminal["transaction_id"],archive_bytes=a["size"],archive_sha256=a["sha256"],archive_inode=a["inode"],
-                    archive_device=a["device"],capacity=event.document(folder/"capacity.json",0o400)[1],boot_id=recovery.boot()))
+        fixture_admission(root,original,intent,bindings,"e"*32)
         return dict(returncode=0,pre_manager_refusal=False)
     class NoWait:
         def wait(self):
@@ -167,11 +170,11 @@ def fixture_dispatch(work, original, proof, bindings):
     return dict(launch_count=len(seen), admitted=first,submission=sr)
 
 
-def qualify(work):
+def qualify(work, peer_profile=publication.five_source_reader):
     bindings, held, cap = programs()
     denied = {}
     for epoch in (166,167,168,170):
-        other = publication.five_source_reader(epoch)
+        other = peer_profile(epoch)
         for name, prog in [(P.launch.name,other.launch),(P.fit.name,other.fit)]:
             crossed = dict(bindings,**{name:event.member(prog,0o555)[1]})
             denied[f"{epoch}/{name}"] = refused(lambda: publication.bound_fit(P,crossed))
