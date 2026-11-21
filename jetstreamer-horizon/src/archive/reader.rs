@@ -272,10 +272,7 @@ impl<R: std::io::Read + std::io::Seek> ArchiveReader<R> {
         }
         self.decoder.verify_chain = self.verify_chain;
         self.decoder.chain_mismatch_policy = self.chain_mismatch_policy;
-        let consumption = visitor.consumption();
-        self.decoder.materialize_account_data = consumption.account_update_data;
-        self.decoder.materialize_block_account_update_arenas =
-            consumption.block_account_update_arenas;
+        self.decoder.set_consumption(visitor.consumption());
         self.load_bucket(index)?;
         let bucket_header = self.decoder.current_bucket_header().ok_or(
             ArchiveFormatError::InvalidContainerLayout(
@@ -319,10 +316,7 @@ impl<R: std::io::Read + std::io::Seek> ArchiveReader<R> {
         }
         self.decoder.verify_chain = self.verify_chain;
         self.decoder.chain_mismatch_policy = self.chain_mismatch_policy;
-        let consumption = visitor.consumption();
-        self.decoder.materialize_account_data = consumption.account_update_data;
-        self.decoder.materialize_block_account_update_arenas =
-            consumption.block_account_update_arenas;
+        self.decoder.set_consumption(visitor.consumption());
         let target_bucket = bucket_containing(&self.header, &self.index, start_slot);
         let continue_in_place = match self.current_bucket {
             // Right bucket already loaded and we haven't decoded past the

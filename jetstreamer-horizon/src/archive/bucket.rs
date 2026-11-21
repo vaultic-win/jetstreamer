@@ -117,6 +117,9 @@ pub(crate) fn decode_file_header_bytes(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Consumption {
+    /// Deliver account updates in transaction, block and epoch notifications
+    /// and through ordered pre/post callbacks. Other record fields are independent.
+    pub account_updates: bool,
     /// Materialize account-update data bytes (the per-account diff
     /// reconstruction). When `false`, every update still arrives with full
     /// metadata (pubkey, lamports, owner, executable, rent_epoch,
@@ -139,9 +142,19 @@ impl Consumption {
     /// Consume everything the archive stores (the default).
     pub const fn all() -> Self {
         Self {
+            account_updates: true,
             account_update_data: true,
             block_account_update_arenas: true,
         }
+    }
+
+    /// Omit all account writes, including metadata, data, and ordered callbacks.
+    /// The decoder still validates their framing, count and declared size limits.
+    pub const fn without_account_updates(mut self) -> Self {
+        self.account_updates = false;
+        self.account_update_data = false;
+        self.block_account_update_arenas = false;
+        self
     }
 
     /// Drop account-update data bytes: updates keep metadata and counts but
@@ -163,6 +176,7 @@ impl Consumption {
     /// children's declarations.
     pub const fn union(self, other: Self) -> Self {
         Self {
+            account_updates: self.account_updates || other.account_updates,
             account_update_data: self.account_update_data || other.account_update_data,
             block_account_update_arenas: self.block_account_update_arenas
                 || other.block_account_update_arenas,
@@ -286,6 +300,7 @@ pub struct BucketDecoder {
     /// mid-bucket would corrupt or fail reconstruction. The effective
     /// setting changes only when a bucket is (re)loaded.
     pub materialize_account_data: bool,
+    deliver_account_updates: bool,
     /// Populate pre/post account-update arenas on block notifications. This
     /// does not affect the ordered borrowed update callbacks.
     pub materialize_block_account_update_arenas: bool,
@@ -353,6 +368,16 @@ impl Default for BucketDecoder {
 }
 
 impl BucketDecoder {
+    /// Apply the visitor's combined declaration before loading a bucket.
+    /// Account-data reconstruction is latched per bucket to preserve diff history.
+    pub fn set_consumption(&mut self, consumption: Consumption) {
+        self.deliver_account_updates = consumption.account_updates;
+        self.materialize_account_data =
+            consumption.account_updates && consumption.account_update_data;
+        self.materialize_block_account_update_arenas =
+            consumption.account_updates && consumption.block_account_update_arenas;
+    }
+
     /// Allocates the reusable decode scratches once. Cheap to keep around;
     /// expensive to recreate (the notification scratches are ~225 MiB each).
     /// This retains the historical V1 default for raw-bucket API callers;
@@ -372,6 +397,7 @@ impl BucketDecoder {
             verify_chain: false,
             chain_mismatch_policy: ChainMismatchPolicy::Reject,
             materialize_account_data: true,
+            deliver_account_updates: true,
             materialize_block_account_update_arenas: true,
             archive_version: version,
             bucket_slots: None,
@@ -770,7 +796,11 @@ impl BucketDecoder {
         cur.read(&mut kind)?;
         let kind = SlotKind::try_from(kind[0])?;
         let emit = slot >= start_slot;
-        let materialize = self.bucket_materialize;
+        let consumption = Consumption {
+            account_updates: self.deliver_account_updates,
+            account_update_data: self.bucket_materialize,
+            block_account_update_arenas: self.materialize_block_account_update_arenas,
+        };
 
         if emit {
             visitor.on_slot_start(slot, kind);
@@ -820,7 +850,7 @@ impl BucketDecoder {
                             &mut cur,
                             &mut self.dec_ctx,
                             &mut self.diff,
-                            materialize,
+                            consumption,
                             |view| updates.push(view),
                         )?;
                         add_phase_data(
@@ -844,17 +874,16 @@ impl BucketDecoder {
                 let mut pre_data_bytes = 0usize;
                 for _ in 0..pre_count {
                     let pre = &mut meta.pre_updates;
-                    let materialize_arena = self.materialize_block_account_update_arenas;
                     let data_len = decode_update_record_into(
                         &mut cur,
                         &mut self.dec_ctx,
                         &mut self.diff,
-                        materialize,
+                        consumption,
                         |view| {
                             if emit {
                                 visitor.on_pre_account_update(slot, view);
                             }
-                            if materialize_arena {
+                            if consumption.block_account_update_arenas {
                                 pre.push(view)
                             } else {
                                 Ok(())
@@ -883,7 +912,7 @@ impl BucketDecoder {
                         &mut self.scratch,
                         &mut self.dec_ctx,
                         &mut self.diff,
-                        materialize,
+                        consumption,
                         self.max_tx_updates,
                         self.max_tx_data_bytes,
                     )?;
@@ -909,17 +938,16 @@ impl BucketDecoder {
                 let mut post_data_bytes = 0usize;
                 for _ in 0..post_count {
                     let post = &mut meta.post_updates;
-                    let materialize_arena = self.materialize_block_account_update_arenas;
                     let data_len = decode_update_record_into(
                         &mut cur,
                         &mut self.dec_ctx,
                         &mut self.diff,
-                        materialize,
+                        consumption,
                         |view| {
                             if emit {
                                 visitor.on_post_account_update(slot, view);
                             }
-                            if materialize_arena {
+                            if consumption.block_account_update_arenas {
                                 post.push(view)
                             } else {
                                 Ok(())
@@ -1261,7 +1289,7 @@ fn decode_update_record_into(
     reader: &mut impl Read,
     ctx: &mut DecoderContext,
     diff: &mut DiffDecoder,
-    materialize: bool,
+    consumption: Consumption,
     store: impl FnOnce(&AccountUpdateView<'_>) -> Result<(), PushAccountUpdateError>,
 ) -> Result<usize, ArchiveFormatError> {
     let pubkey = Address::decode_ext(reader, Some(ctx))?;
@@ -1270,7 +1298,7 @@ fn decode_update_record_into(
     let executable = bool::decode_ext(reader, Some(ctx))?;
     let rent_epoch = u64::decode_ext(reader, Some(ctx))?;
     let write_version = u64::decode_ext(reader, Some(ctx))?;
-    let (data_slice, data_len): (&[u8], usize) = if materialize {
+    let (data_slice, data_len): (&[u8], usize) = if consumption.account_update_data {
         diff.set_key(account_diff_key(&pubkey));
         // Borrowed decode (lencode 1.2): the reconstruction stays in the
         // diff store's slot and is copied exactly once by `store`, into
@@ -1281,6 +1309,11 @@ fn decode_update_record_into(
         let data_len = skip_diff_blob_with_max_mode(reader, diff.max_supported_mode())?;
         (&[], data_len)
     };
+    // Addresses and scalars above share the record decoder's dictionary.
+    // Consume them even when no account notification is requested.
+    if !consumption.account_updates {
+        return Ok(data_len);
+    }
     store(&AccountUpdateView {
         pubkey,
         lamports,
@@ -1369,7 +1402,7 @@ fn read_tx_record<R: Read>(
     scratch: &mut Transaction,
     ctx: &mut DecoderContext,
     diff: &mut DiffDecoder,
-    materialize: bool,
+    consumption: Consumption,
     max_account_updates: usize,
     max_account_data_bytes: usize,
 ) -> Result<usize, ArchiveFormatError> {
@@ -1406,7 +1439,7 @@ fn read_tx_record<R: Read>(
     let au_start = cur.consumed();
     let mut account_data_bytes = 0usize;
     for _ in 0..au_count {
-        let data_len = decode_update_record_into(cur, ctx, diff, materialize, |view| {
+        let data_len = decode_update_record_into(cur, ctx, diff, consumption, |view| {
             scratch.push_account_update(view)
         })?;
         add_phase_data(

@@ -98,3 +98,11 @@ wire-format and cache limits. A shared 16-request HTTP limit allows all decoder
 workers to remain scheduled while respecting origin backpressure. A 429 or
 a 503 with a Retry-After header defers reads for the whole run. Every accepted HTTP response still requires the pinned
 strong ETag, HTTP 206, exact Content-Range, and exact body length.
+
+The counting plugin in `horizon_pipeline --bench` consumes all account updates by
+default. With `--no-account-bytes` it receives account metadata and counts the
+updates with empty payloads. With `--no-account-updates` it receives the same
+epoch, slot, transaction and block records with all account-write collections
+empty. Ordered pre/post update callbacks are skipped. The reader still consumes
+the encoded fields and checks their framing and declared limits. Multiple
+plugins share the union of their declared fields.

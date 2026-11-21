@@ -447,9 +447,7 @@ async fn stream_chunk<V: SlotVisitor + Send + 'static>(
         decoder.verify_chain = false;
         // Honor the visitor's declared consumption: unconsumed
         // account-update data is skipped, not reconstructed.
-        let consumption = visitor.consumption();
-        decoder.materialize_account_data = consumption.account_update_data;
-        decoder.materialize_block_account_update_arenas = consumption.block_account_update_arenas;
+        decoder.set_consumption(visitor.consumption());
         'outer: while let Some((entry, raw)) = rx.blocking_recv() {
             decoder.load_indexed_bucket_bytes(raw.as_slice(), entry)?;
             // The decoder copied/decompressed what it needs; return the

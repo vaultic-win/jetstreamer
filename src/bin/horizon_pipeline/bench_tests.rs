@@ -44,42 +44,44 @@ async fn range_benchmark_counts_all_update_sources_with_and_without_payloads() {
     writer.write_skipped_slot(1).unwrap();
     let (bytes, _) = writer.finish().unwrap();
     let src = JetSource::in_memory(0, bytes);
-    for consume_account_bytes in [false, true] {
+    for consumption in [
+        Consumption::all().without_account_updates(),
+        Consumption::all().without_account_update_data(),
+        Consumption::all(),
+    ] {
+        let present = u64::from(consumption.account_updates);
+        let consume_account_bytes = consumption.account_update_data;
         let counters = Arc::new(BenchCounters::default());
         let mut runner = HorizonPluginRunner::new("http://127.0.0.1:1", 2);
         runner.add_plugin(Arc::new(BenchPlugin {
             counters: counters.clone(),
-            consume_account_bytes,
+            consumption,
         }));
         let run = runner.run_range(src.clone(), 0..2).await.unwrap();
-        let report = counters.range_report(&run, consume_account_bytes).unwrap();
+        let report = counters.range_report(&run, consumption).unwrap();
         assert_eq!(report["slots"], 2);
         assert_eq!(report["blocks"], 1);
         assert_eq!(report["transactions"], 1);
-        assert_eq!(report["transaction_updates"], 1);
-        assert_eq!(report["orphan_updates"], 2);
-        assert_eq!(report["epoch_updates"], 1);
-        assert_eq!(report["account_updates"], 4);
+        assert_eq!(report["transaction_updates"], present);
+        assert_eq!(report["orphan_updates"], 2 * present);
+        assert_eq!(report["epoch_updates"], present);
+        assert_eq!(report["account_updates"], 4 * present);
         assert_eq!(
             report["account_data_bytes"],
             if consume_account_bytes { 28 } else { 0 }
         );
         assert_eq!(report["workers"], 2);
+        assert_eq!(
+            report["consume_account_updates"],
+            consumption.account_updates
+        );
         assert_eq!(report["consume_account_bytes"], consume_account_bytes);
         assert!(report["overall_tps"].as_f64().unwrap() > 0.0);
         let mut wrong = run.clone();
         wrong.transactions += 1;
-        assert!(
-            counters
-                .range_report(&wrong, consume_account_bytes)
-                .is_err()
-        );
+        assert!(counters.range_report(&wrong, consumption).is_err());
         wrong = run;
         wrong.slots.end += 1;
-        assert!(
-            counters
-                .range_report(&wrong, consume_account_bytes)
-                .is_err()
-        );
+        assert!(counters.range_report(&wrong, consumption).is_err());
     }
 }

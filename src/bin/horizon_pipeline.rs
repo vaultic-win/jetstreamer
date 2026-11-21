@@ -59,7 +59,7 @@ fn usage() -> ! {
         "usage: horizon-pipeline --archive-capacity-probe\n\
          or: horizon-pipeline <epoch|start:end> <jet-dir-or-base-url> \
          [--threads N] [--slot-ranges] [--clickhouse-dsn URL] [--bench|--verify-only] \
-         [--no-account-bytes] [--no-preload] [--archive-inventory PATH] [--verification-report PATH | --verification-report-dir DIR]\n\
+         [--no-account-bytes|--no-account-updates] [--no-preload] [--archive-inventory PATH] [--verification-report PATH | --verification-report-dir DIR]\n\
          --verify-only runs the read-only Horizon verification plugin over \
          every decoded record and account-data byte; it does not start or \
          write to ClickHouse\n\
@@ -68,6 +68,7 @@ fn usage() -> ! {
          --archive-inventory (with --bench or --verify-only) binds each anonymous HTTPS request to the archive ETag and length in PATH\n\
          --bench --slot-ranges prints final counting-plugin counters as JSON on stdout and skips embedded ClickHouse startup\n\
          --verification-report-dir writes epoch-N.json after each successful epoch in an existing absolute directory\n\
+         --no-account-updates (with --bench): omit all account updates from plugin notifications\n\
          --no-account-bytes (with --bench): declare account-update data \
          unconsumed so the decoder skips diff reconstruction — benchmarks \
          the metadata-only fast path (update counts stay real, bytes read 0)\n\
@@ -99,7 +100,7 @@ impl BenchCounters {
     fn range_report(
         &self,
         run: &RangeRunReport,
-        consume_account_bytes: bool,
+        consumption: Consumption,
     ) -> std::io::Result<serde_json::Value> {
         let slots = self.slots.load(Ordering::Relaxed);
         let transactions = self.txs.load(Ordering::Relaxed);
@@ -112,7 +113,14 @@ impl BenchCounters {
                 "counting plugin totals differ from requested slots or dispatched transactions",
             ));
         }
-        if !consume_account_bytes && account_data_bytes != 0 {
+        if !consumption.account_updates
+            && [transaction_updates, orphan_updates, epoch_updates] != [0; 3]
+        {
+            return Err(std::io::Error::other(
+                "counting plugin received unsubscribed account updates",
+            ));
+        }
+        if !consumption.account_update_data && account_data_bytes != 0 {
             return Err(std::io::Error::other(
                 "metadata-only counting plugin received account data bytes",
             ));
@@ -121,7 +129,8 @@ impl BenchCounters {
         Ok(serde_json::json!({
             "schema": "horizon-range-benchmark-v1",
             "start_slot": run.slots.start, "end_slot_exclusive": run.slots.end,
-            "workers": run.workers, "consume_account_bytes": consume_account_bytes,
+            "workers": run.workers, "consume_account_updates": consumption.account_updates,
+            "consume_account_bytes": consumption.account_update_data,
             "slots": slots, "blocks": self.blocks.load(Ordering::Relaxed), "transactions": transactions,
             "transaction_updates": transaction_updates, "orphan_updates": orphan_updates,
             "epoch_updates": epoch_updates, "account_updates": transaction_updates + orphan_updates + epoch_updates,
@@ -198,11 +207,7 @@ impl PluginWorker for BenchWorker {
 /// The worker creates no tables and submits no inserts.
 struct BenchPlugin {
     counters: Arc<BenchCounters>,
-    /// With `--no-account-bytes` this is false: the plugin declares it does
-    /// not consume account-update data, so the decoder skips the diff
-    /// reconstruction — benchmarking the metadata-only fast path. Update
-    /// COUNTS stay real (metas still decode); `update_bytes` reads 0.
-    consume_account_bytes: bool,
+    consumption: Consumption,
 }
 
 impl HorizonPlugin for BenchPlugin {
@@ -222,11 +227,7 @@ impl HorizonPlugin for BenchPlugin {
     }
 
     fn consumption(&self) -> Consumption {
-        if self.consume_account_bytes {
-            Consumption::all()
-        } else {
-            Consumption::all().without_account_update_data()
-        }
+        self.consumption
     }
 }
 
@@ -402,6 +403,7 @@ async fn main() {
     let mut bench = false;
     let mut verify_only = false;
     let mut no_account_bytes = false;
+    let mut no_account_updates = false;
     let mut no_preload = false;
     let mut verification_report = None;
     let mut report_directory = None;
@@ -435,9 +437,14 @@ async fn main() {
                 ));
             }
             "--no-account-bytes" => no_account_bytes = true,
+            "--no-account-updates" => no_account_updates = true,
             "--no-preload" => no_preload = true,
             _ => usage(),
         }
+    }
+    if no_account_updates && !bench {
+        eprintln!("--no-account-updates only applies to --bench");
+        usage();
     }
     if no_account_bytes && !bench {
         // The real plugins declare their own consumption; forcing bytes off
@@ -545,6 +552,13 @@ async fn main() {
         log::info!("using external ClickHouse at {dsn} (no embedded spawn)");
     }
 
+    let bench_consumption = if no_account_updates {
+        Consumption::all().without_account_updates()
+    } else if no_account_bytes {
+        Consumption::all().without_account_update_data()
+    } else {
+        Consumption::all()
+    };
     let bench_counters = Arc::new(BenchCounters::default());
     let verification_plugin = Arc::new(VerificationPlugin::new());
     let range_verifier = Arc::new(RangeVerificationPlugin::default());
@@ -555,7 +569,7 @@ async fn main() {
     } else if bench {
         vec![Arc::new(BenchPlugin {
             counters: bench_counters.clone(),
-            consume_account_bytes: !no_account_bytes,
+            consumption: bench_consumption,
         })]
     } else {
         vec![
@@ -576,10 +590,9 @@ async fn main() {
     //   resident buffer only competes for DRAM — so no preload.
     let consumes_bytes = plugins
         .iter()
-        .fold(
-            Consumption::all().without_account_update_data(),
-            |acc, p| acc.union(p.consumption()),
-        )
+        .fold(Consumption::all().without_account_updates(), |acc, p| {
+            acc.union(p.consumption())
+        })
         .account_update_data;
     let threads = threads_override
         .or_else(|| {
@@ -639,7 +652,7 @@ async fn main() {
                         failure = Some(format!("cannot finalize range verification: {err}"));
                     }
                 }
-                Ok(run) if bench => match bench_counters.range_report(&run, !no_account_bytes) {
+                Ok(run) if bench => match bench_counters.range_report(&run, bench_consumption) {
                     Ok(report) => println!("{report}"),
                     Err(error) => failure = Some(format!("cannot finalize range benchmark: {error}")),
                 },

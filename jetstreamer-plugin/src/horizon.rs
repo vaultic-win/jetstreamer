@@ -160,6 +160,9 @@ pub trait HorizonPlugin: Send + Sync + 'static {
     /// dropped, updates still arrive with full metadata and correct counts,
     /// but every `data` slice is empty — a plugin that reads `data` (even
     /// just `data.len()`) must keep the default.
+    /// A plugin interested only in non-update records may declare
+    /// `Consumption::all().without_account_updates()`. All workers see the
+    /// combined projection when multiple plugins share one decoder.
     fn consumption(&self) -> Consumption {
         Consumption::all()
     }
@@ -408,10 +411,12 @@ impl HorizonPluginRunner {
         // A stream field is materialized iff at least one plugin consumes
         // it; with no plugins nothing is consumed. Fold starts from
         // "consumes nothing" and unions each declaration in.
-        let combined = self.plugins.iter().fold(
-            Consumption::all().without_account_update_data(),
-            |acc, p| acc.union(p.consumption()),
-        );
+        let combined = self
+            .plugins
+            .iter()
+            .fold(Consumption::all().without_account_updates(), |acc, p| {
+                acc.union(p.consumption())
+            });
         log::info!(
             target: LOG_TARGET,
             "combined plugin consumption: account_update_data={}",
@@ -555,7 +560,7 @@ mod tests {
             }
         }
 
-        let none = Consumption::all().without_account_update_data();
+        let none = Consumption::all().without_account_updates();
         let combine = |plugins: &[&dyn HorizonPlugin]| {
             plugins
                 .iter()
@@ -563,6 +568,11 @@ mod tests {
         };
 
         // No plugins → nothing consumed.
+        assert!(!combine(&[]).account_updates);
+        assert!(!combine(&[&Declares(none), &Declares(none)]).account_updates);
+        let metadata = Consumption::all().without_account_update_data();
+        assert_eq!(combine(&[&Declares(none), &Declares(metadata)]), metadata);
+        assert_eq!(combine(&[&Declares(none), &Defaulted]), Consumption::all());
         assert!(!combine(&[]).account_update_data);
         // All opted out → still nothing consumed.
         assert!(!combine(&[&Declares(none), &Declares(none)]).account_update_data);

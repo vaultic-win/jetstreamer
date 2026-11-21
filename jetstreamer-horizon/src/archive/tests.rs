@@ -3485,6 +3485,101 @@ fn elide_update_data(expected: &[ExpectedSlot]) -> Vec<ExpectedSlot> {
         .collect()
 }
 
+/// Hash every non-update field of the same notifications with updates enabled
+/// and disabled. Only this test projects the full reader's records to derive
+/// the independent expected stream; the OFF visitor observes the actual arenas.
+#[test]
+fn unsubscribed_updates_preserve_complete_non_update_stream() {
+    struct Observe {
+        consumption: Consumption,
+        digest: SemanticDigest,
+        // Epoch writes, ordered pre, nested tx, ordered post, grouped pre and post.
+        writes: [usize; 6],
+        events: [usize; 4],
+    }
+    impl SlotVisitor for Observe {
+        fn consumption(&self) -> Consumption {
+            self.consumption
+        }
+
+        fn on_slot_start(&mut self, slot: u64, kind: SlotKind) {
+            self.events[0] += 1;
+            self.digest.on_slot_start(slot, kind);
+        }
+
+        fn on_epoch(&mut self, meta: &EpochMeta) {
+            self.events[1] += 1;
+            self.writes[0] += meta.updates.len();
+            let mut bytes = Vec::new();
+            meta.encode_ext(&mut bytes, None).unwrap();
+            let mut projected = EpochMeta::new_boxed();
+            projected
+                .decode_into(&mut lencode::io::Cursor::new(&bytes), None)
+                .unwrap();
+            projected.updates.clear();
+            self.digest.on_epoch(&projected);
+        }
+
+        fn on_pre_account_update(&mut self, _: u64, _: &AccountUpdateView<'_>) {
+            self.writes[1] += 1;
+        }
+
+        fn on_transaction(&mut self, slot: u64, index: u32, tx: &Transaction) {
+            self.events[2] += 1;
+            self.writes[2] += tx.account_updates().len();
+            let mut bytes = Vec::new();
+            tx.encode_ext(&mut bytes, None).unwrap();
+            let mut projected = Transaction::new_boxed();
+            projected
+                .decode_into(&mut lencode::io::Cursor::new(&bytes), None)
+                .unwrap();
+            projected.clear_account_updates();
+            self.digest.on_transaction(slot, index, &projected);
+        }
+
+        fn on_post_account_update(&mut self, _: u64, _: &AccountUpdateView<'_>) {
+            self.writes[3] += 1;
+        }
+
+        fn on_block(&mut self, block: &BlockNotification, entries: &[EntryRecord]) {
+            self.events[3] += 1;
+            if let BlockNotification::Block(meta) = block {
+                self.writes[4] += meta.pre_updates.len();
+                self.writes[5] += meta.post_updates.len();
+            }
+            // SemanticDigest hashes the block fields and entries here. The two
+            // orphan streams were already counted by their ordered callbacks.
+            self.digest.on_block(block, entries);
+        }
+    }
+    let bytes = closed_prefix_export_source(Hash::new_from_array([0xa5; 32]), 7, 7);
+    let read = |consumption| {
+        let mut reader = ArchiveReader::open(std::io::Cursor::new(&bytes)).unwrap();
+        let mut trace = Observe {
+            consumption,
+            digest: SemanticDigest::new(),
+            writes: [0; 6],
+            events: [0; 4],
+        };
+        assert_eq!(reader.read_slots(432_000, 7, &mut trace).unwrap(), 7);
+        (
+            trace.digest.finish().unwrap(),
+            trace.events,
+            trace.writes,
+            reader.payload_byte_stats(),
+        )
+    };
+    let (expected, events, writes, stats) = read(Consumption::all());
+    assert_eq!(events, [7, 1, 5, 7]);
+    assert_eq!(writes, [1, 5, 5, 5, 5, 5]);
+    let (actual, off_events, off_writes, off_stats) =
+        read(Consumption::all().without_account_updates());
+    assert_eq!(off_events, events);
+    assert_eq!(off_writes, [0; 6]);
+    assert_eq!(off_stats, stats);
+    assert_eq!(actual, expected);
+}
+
 /// Skip mode must leave every non-update field of the stream byte-identical
 /// (fees, sigs, loaded addresses, block meta, entries, update counts and
 /// write_versions) while eliding update data across all three update
@@ -3864,25 +3959,25 @@ fn resource_limits_all_update_phases_are_consumption_independent() {
             (0, usize::MAX, count_section),
             (usize::MAX, 32, data_section),
         ] {
-            for materialize_data in [true, false] {
-                for materialize_arena in [true, false] {
-                    let mut limits = [
-                        (usize::MAX, usize::MAX),
-                        (usize::MAX, usize::MAX),
-                        (usize::MAX, usize::MAX),
-                        (usize::MAX, usize::MAX),
-                    ];
-                    limits[phase] = (count_limit, data_limit);
-                    let mut decoder = BucketDecoder::for_archive_version(ArchiveVersion::V2);
-                    decoder.materialize_account_data = materialize_data;
-                    decoder.materialize_block_account_update_arenas = materialize_arena;
-                    decoder.set_phase_limits_for_test(limits[0], limits[1], limits[2], limits[3]);
-                    assert!(matches!(
-                        decoder.decode_bucket(frame, 0, u64::MAX, &mut Collector::default()),
-                        Err(ArchiveFormatError::SectionTooLarge { section, .. })
-                            if section == expected_section
-                    ));
-                }
+            for consumption in [
+                Consumption::all(),
+                Consumption::all().without_account_update_data(),
+                Consumption::all().without_block_account_update_arenas(),
+                Consumption::all()
+                    .without_account_update_data()
+                    .without_block_account_update_arenas(),
+                Consumption::all().without_account_updates(),
+            ] {
+                let mut limits = [(usize::MAX, usize::MAX); 4];
+                limits[phase] = (count_limit, data_limit);
+                let mut decoder = BucketDecoder::for_archive_version(ArchiveVersion::V2);
+                decoder.set_consumption(consumption);
+                decoder.set_phase_limits_for_test(limits[0], limits[1], limits[2], limits[3]);
+                assert!(matches!(
+                    decoder.decode_bucket(frame, 0, u64::MAX, &mut Collector::default()),
+                    Err(ArchiveFormatError::SectionTooLarge { section, .. })
+                        if section == expected_section
+                ));
             }
         }
     }
