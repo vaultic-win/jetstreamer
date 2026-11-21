@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "epoch": 199,
+      "path": "/home/sol/horizon-199200-qualified-index-v1/epoch-199-slot-ranges.raw",
+      "sha256": "ebabf661a7608e72169e85d3be3129a575ab8f5b1d2e67d2f10c95a8de79a1ae"
+    },
+    {
+      "epoch": 200,
+      "path": "/home/sol/horizon-199200-qualified-index-v1/epoch-200-slot-ranges.raw",
+      "sha256": "d37e594b89638dac4fb8ca094bccce5c388f5c583472a592dec1ed811c749cd7"
+    }
+  ],
+  "schema": "jetstreamer-local-slot-ranges-overrides-v1"
+}

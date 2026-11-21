@@ -38,6 +38,7 @@ mod epoch141_original_entry;
 mod epoch141_suffix;
 mod epoch163_first_output128;
 mod epoch167_local_index;
+mod epoch199200_presence;
 mod epoch207_singleton;
 mod epoch223_qualification;
 mod epoch224_qualification;
@@ -9798,7 +9799,7 @@ async fn build_slot_presence_map(
         ));
     }
 
-    let mut epoch_indexes: Vec<(u64, Slot, Slot, PathBuf)> = Vec::new();
+    let mut epoch_indexes = Vec::new();
     let start_epoch = slot_to_epoch(start_slot);
     let end_epoch = slot_to_epoch(end_inclusive);
     for epoch in start_epoch..=end_epoch {
@@ -9808,12 +9809,15 @@ async fn build_slot_presence_map(
         if range_start > range_end {
             continue;
         }
-        let slot_index_path = if epoch == target_epoch {
+        let rooted = epoch199200_presence::RootedSlotPresence::configured(epoch).await?;
+        // The confirmed local range source never reads the legacy CID-to-offset file.
+        // The independent slot-to-CID table still supplies presence for each slot.
+        let slot_index_path = if epoch == target_epoch && rooted.is_none() {
             ensure_compact_indexes_cached(epoch, ledger_dir, shutdown.clone()).await?
         } else {
             ensure_slot_index_cached(epoch, ledger_dir, shutdown.clone()).await?
         };
-        epoch_indexes.push((epoch, range_start, range_end, slot_index_path));
+        epoch_indexes.push((epoch, range_start, range_end, slot_index_path, rooted));
     }
 
     let shutdown = shutdown.clone();
@@ -9839,7 +9843,7 @@ async fn build_slot_presence_map(
         let mut last_log = Instant::now();
         let mut processed = 0u64;
 
-        for (epoch, range_start, range_end, slot_index_path) in epoch_indexes {
+        for (epoch, range_start, range_end, slot_index_path, rooted) in epoch_indexes {
             info!(
                 "slot-to-cid index cached for epoch {} at {}",
                 epoch,
@@ -9852,6 +9856,9 @@ async fn build_slot_presence_map(
             );
             let data = fs::read(&slot_index_path)
                 .map_err(|err| format!("failed to read {}: {err}", slot_index_path.display()))?;
+            if let Some(source) = &rooted {
+                source.verify_compact(&data)?;
+            }
             let index = LocalSlotIndex::from_bytes(data)?;
             if let Some(meta_epoch) = index.header.metadata_epoch() {
                 if meta_epoch != epoch {
@@ -9869,7 +9876,12 @@ async fn build_slot_presence_map(
                     return Err("shutdown requested during slot presence scan".to_string());
                 }
                 let idx = (slot - start_slot) as usize;
-                if index.contains_slot(slot)? {
+                let legacy = index.contains_slot(slot)?;
+                let is_present = match &rooted {
+                    Some(source) => source.present(slot, legacy)?,
+                    None => legacy,
+                };
+                if is_present {
                     states[idx] = SlotPresenceState::Present;
                     present += 1;
                 } else {

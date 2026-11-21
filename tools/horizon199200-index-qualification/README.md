@@ -17,3 +17,16 @@ The offline verifier checks each captured CAR section's CID, the physical block 
 | --- | ---: | ---: | --- |
 | 199 | 75 | 319,922 | `ebabf661a7608e72169e85d3be3129a575ab8f5b1d2e67d2f10c95a8de79a1ae` |
 | 200 | 67 | 318,235 | `d37e594b89638dac4fb8ca094bccce5c388f5c583472a592dec1ed811c749cd7` |
+
+## Use the qualified inputs in the replay node
+
+Install the two corrected raw tables and the exact [manifest](manifest.json) in a sealed, read-only package. Mount that package at `/home/sol/horizon-199200-qualified-index-v1` in the producer's mount namespace, with read access for the worker. Set the following variables in that producer's environment and leave `JETSTREAMER_FORCE_LEGACY_INDEX` unset.
+
+```sh
+export JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST=/home/sol/horizon-199200-qualified-index-v1/manifest.json
+export JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256=cc4250c62eee9136933a87909891041c40bf5f2bc28fde36906e071a1b7156d0
+export JETSTREAMER_COMPACT_INDEX_BASE_URL=https://files.old-faithful.net/
+export JETSTREAMER_HTTP_BASE_URL=https://files.old-faithful.net/
+```
+
+Firehose loads the two pinned range tables locally and continues to stream CAR data from the public source. The node still fetches the separate slot-to-CID compact index. It checks each slot against the corrected table and accepts only the 72 and 63 historical false positives respectively, each inside a CID-rooted physical parent-chain gap. Any other discrepancy, or a changed compact or range table, fails this profile. Epoch 198 continues using its public inputs for the 717-slot warmup.
