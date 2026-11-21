@@ -148,7 +148,8 @@ def fixture_dispatch(work, original, proof, bindings):
         iid = "e"*32
         folder = root/("run-"+iid)
         folder.mkdir()
-        event.once(folder/"capacity.json",dict(terminal=original,invocation_id=iid,boot_id=recovery.boot()))
+        event.once(folder/"capacity.json",dict(terminal=original,invocation_id=iid,boot_id=recovery.boot(),
+                    fleet=intent["fleet"],provider=bindings[P.fit.name]))
         event.once(folder/"admission.json",dict(epoch=172,invocation_id=iid,unit=P.unit,schema="horizon-epoch172-committed-publication-admission-v1",
                     operation="current-reader-sync-retain-local",publication_authorized=True,terminal_sha256=original["sha256"],
                     transaction_id=terminal["transaction_id"],archive_bytes=a["size"],archive_sha256=a["sha256"],archive_inode=a["inode"],
@@ -161,7 +162,9 @@ def fixture_dispatch(work, original, proof, bindings):
         def invoke():return recovery.service(profile,state,original,fit,lambda:proof,NoWait())
         first=invoke()
         assert first==invoke() and first["disposition"]=="native-sync-admission" and len(seen)==1
-    return dict(launch_count=len(seen), admitted=first)
+    submission, sr = event.document(state/"SUBMISSION.json",0o400)
+    assert submission["admission"] == first["admission"] and submission["unit"] == P.unit and submission["terminal"] == original
+    return dict(launch_count=len(seen), admitted=first,submission=sr)
 
 
 def qualify(work):
