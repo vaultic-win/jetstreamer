@@ -75,7 +75,7 @@ fn immutable_copy(path: &Path, bytes: &[u8]) -> Result<Bound> {
     custody::bytes(&b, 8 << 20, true)?;
     Ok(b)
 }
-fn terminal() -> Result<()> {
+pub(super) fn terminal(iid: &str) -> Result<()> {
     let rows = capacity::run(
         "/usr/bin/journalctl",
         &[
@@ -84,7 +84,7 @@ fn terminal() -> Result<()> {
             "--output-fields=UNIT,INVOCATION_ID,MESSAGE_ID",
             "_PID=1",
             &format!("UNIT={UNIT}"),
-            &format!("INVOCATION_ID={EXPORT}"),
+            &format!("INVOCATION_ID={iid}"),
             "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448",
         ],
         "15",
@@ -93,7 +93,7 @@ fn terminal() -> Result<()> {
         rows.lines()
             .filter_map(|l| serde_json::from_str::<Value>(l).ok())
             .any(|v| v["UNIT"] == UNIT
-                && v["INVOCATION_ID"] == EXPORT
+                && v["INVOCATION_ID"] == iid
                 && v["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"),
         "missing successful export termination"
     );
@@ -197,7 +197,7 @@ fn archive_hash(
     File::open(out)?.sync_all()?;
     Ok(())
 }
-fn plugin_counts(report: &Value, argv: &[String]) -> Result<()> {
+pub(super) fn plugin_counts(report: &Value, argv: &[String]) -> Result<()> {
     let r = &report["report"];
     ensure!(
         report["schema"] == "jetstreamer-horizon-plugin-playback-v1"
@@ -333,7 +333,7 @@ pub fn full(fleet: Bound, sha: &str) -> Result<()> {
     let _lock = lock()?;
     pending()?;
     source_identity()?;
-    terminal()?;
+    terminal(EXPORT)?;
     let completed = Path::new(BASE).join("state").join(EXPORT);
     let done = custody::binding(&completed.join("complete.json"))?;
     let d = custody::evidence(&done)?;
