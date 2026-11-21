@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod branch_recovery;
+
 const ORIGIN: &str = "https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev";
 
 fn validate_inventory(inv: &Inventory, bucket: &str) -> Result<()> {
@@ -114,6 +116,67 @@ fn verify_report(path: &Path, object: &Object, args: &[String], threads: u64) ->
     Ok(doc)
 }
 
+fn playback_args(
+    reader: &Path,
+    first: u64,
+    last: u64,
+    threads: u64,
+    manifest: &Path,
+    reports: &Path,
+) -> Vec<String> {
+    vec![
+        reader.display().to_string(),
+        format!("{first}:{last}"),
+        ORIGIN.into(),
+        "--verify-only".into(),
+        "--threads".into(),
+        threads.to_string(),
+        "--archive-inventory".into(),
+        manifest.display().to_string(),
+        "--verification-report-dir".into(),
+        reports.display().to_string(),
+    ]
+}
+
+struct CompletedPlayback<'a> {
+    reader: &'a source::Reader,
+    proof: &'a Path,
+    proof_sha: &'a str,
+    args: &'a [String],
+    path: &'a Path,
+    native: &'a Value,
+    threads: u64,
+    started_at: u64,
+}
+
+impl CompletedPlayback<'_> {
+    fn publish(
+        &self,
+        dir: &Path,
+        object: &Object,
+        inventory_sha: &str,
+        authenticated: Value,
+    ) -> Result<()> {
+        let attempt = self.proof.parent().context("missing proof directory")?;
+        ensure!(
+            self.path.parent().and_then(Path::parent) == Some(attempt),
+            "playback and reader proof have different attempts"
+        );
+        write_json(
+            &result_file(dir, object.epoch),
+            &json!({
+            "schema":"horizon-r2-public-audit-result-v1","status":"passed","started_at":self.started_at,"finished_at":now(),
+            "epoch":object.epoch,"object":object,"inventory_sha256":inventory_sha,"public_base":ORIGIN,
+            "reader_commit":self.reader.branch_commit,"reader_sha256":self.reader.artifact_sha256,
+            "reader_proof":self.proof,"reader_proof_sha256":self.proof_sha,"threads":self.threads,
+            "invocation":self.args,"native_report":self.path,"native_report_sha256":hash_file(self.path)?,
+            "report":self.native["report"],"authenticated_readiness":authenticated,"epoch_plugin_completed":true,
+            "range_attempt":attempt,"remote_mutations":false}),
+            false,
+        )
+    }
+}
+
 fn result_file(dir: &Path, epoch: u64) -> PathBuf {
     dir.join("results").join(format!("epoch-{epoch}.json"))
 }
@@ -160,8 +223,10 @@ fn resume(dir: &Path, inventory: &Inventory, manifest_sha: &str) -> Result<(BTre
                 let (actual_sha, proof) = match proofs.entry(proof_path) {
                     std::collections::btree_map::Entry::Occupied(e) => e.into_mut(),
                     std::collections::btree_map::Entry::Vacant(e) => {
-                        let metadata = (hash_file(e.key())?, read_json(e.key())?);
-                        e.insert(metadata)
+                        let doc: Value = read_json(e.key())?;
+                        branch_recovery::validate_build_links(dir, e.key(), &doc)?;
+                        let proof_metadata = (hash_file(e.key())?, serde_json::from_value(doc)?);
+                        e.insert(proof_metadata)
                     }
                 };
                 ensure!(
@@ -286,23 +351,25 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
         let mut reader_proof = attempt.join("reader.json");
         write_json(&reader_proof, &reader, false)?;
         let mut reader_proof_sha = hash_file(&reader_proof)?;
-        let args = vec![
-            reader.artifact.display().to_string(),
-            format!("{start}:{end}"),
-            ORIGIN.into(),
-            "--verify-only".into(),
-            "--threads".into(),
-            cfg.threads.to_string(),
-            "--archive-inventory".into(),
-            manifest.display().to_string(),
-            "--verification-report-dir".into(),
-            reports.display().to_string(),
-        ];
+        if let Some(candidate) = branch_recovery::find(&dir, &range[0], &binding, cfg.threads)?
+            && candidate.accept(&range[0], &binding, cfg, remote, &reader, &reader_proof)?
+        {
+            done.insert(start);
+            continue;
+        }
+        let args = playback_args(
+            &reader.artifact,
+            start,
+            end,
+            cfg.threads,
+            &manifest,
+            &reports,
+        );
         let mut cmd = clean_command(&reader.artifact);
         cmd.args(&args[1..])
             .env("TOKIO_WORKER_THREADS", cfg.threads.to_string());
         let mut cursor = 0;
-        let mut expired = false;
+        let mut expired = None;
         let mut branch_error = None;
         let mut epoch_start = now();
         let log = attempt.join("playback.log");
@@ -363,7 +430,12 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
                                 reader = next;
                             }
                             Ok(None) => {
-                                expired = true;
+                                expired = Some(
+                                    json!({"at":now(),"completed":cursor,"reader_commit":reader.branch_commit,
+                                    "epoch_started_at":epoch_start,"object":obj,"inventory_sha256":binding,
+                                    "native_report_sha256":hash_file(&path)?,"reader_proof":reader_proof,
+                                    "reader_proof_sha256":reader_proof_sha,"clean_range_exit":completed==Some(true)}),
+                                );
                                 bail!("fetched branch changed reader inputs");
                             }
                             Err(error) => {
@@ -374,11 +446,17 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
                     }
                     let authenticated = readiness(remote, obj)
                         .context("authenticated archive identity/sidecar check")?;
-                    write_json(
-                        &result_file(&dir, obj.epoch),
-                        &json!({"schema":"horizon-r2-public-audit-result-v1","status":"passed","started_at":epoch_start,"finished_at":now(),"epoch":obj.epoch,"object":obj,"inventory_sha256":binding,"public_base":ORIGIN,"reader_commit":reader.branch_commit,"reader_sha256":reader.artifact_sha256,"reader_proof":reader_proof,"reader_proof_sha256":reader_proof_sha,"threads":cfg.threads,"invocation":args,"native_report":path,"native_report_sha256":hash_file(&path)?,"report":native["report"],"authenticated_readiness":authenticated,"epoch_plugin_completed":true,"range_attempt":attempt,"remote_mutations":false}),
-                        false,
-                    )?;
+                    CompletedPlayback {
+                        reader: &reader,
+                        proof: &reader_proof,
+                        proof_sha: &reader_proof_sha,
+                        args: &args,
+                        path: &path,
+                        native: &native,
+                        threads: cfg.threads,
+                        started_at: epoch_start,
+                    }
+                    .publish(&dir, obj, &binding, authenticated)?;
                     done.insert(obj.epoch);
                     cursor += 1;
                     epoch_start = now();
@@ -417,12 +495,8 @@ async fn run(cfg: &Config, remote: &Remote) -> Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(30));
             continue;
         }
-        if expired {
-            write_json(
-                &attempt.join("branch-change.json"),
-                &json!({"at":now(),"completed":cursor,"reader_commit":reader.branch_commit}),
-                false,
-            )?;
+        if let Some(marker) = expired {
+            write_json(&attempt.join("branch-change.json"), &marker, false)?;
             continue;
         }
         // A controller/guard/branch lookup error is never attributed to an archive.

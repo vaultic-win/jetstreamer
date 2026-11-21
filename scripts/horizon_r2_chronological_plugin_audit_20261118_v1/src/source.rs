@@ -30,7 +30,7 @@ pub struct Reader {
     pub equivalence_reused: bool,
     pub fetched_at: u64,
 }
-fn check_sealed_reader(reader: &Reader) -> Result<()> {
+pub(crate) fn check_sealed_reader(reader: &Reader) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
     let parent = reader
         .artifact
