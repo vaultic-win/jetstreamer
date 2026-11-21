@@ -19,8 +19,8 @@ FULL168=R/"epoch168-current-delivery-20261121-v1"
 FLEET_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",168:"metered168_local_commit",170:"recovered170_local_commit",172:"full172_local_commit"}
 CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered168",170:"closed_recovered170",172:"closed_full172"}
 TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170,172)}}
-PACKAGES={166:D/"capacity-tools-v4",168:FULL168/"capacity-tools-v3",172:TERMINALS[172]/"capacity-tools",
-          **{e:TERMINALS[e]/"capacity-tools-v2" for e in (167,170)}}
+PACKAGES={166:D/"capacity-tools-v5",168:FULL168/"capacity-tools-v4",172:TERMINALS[172]/"capacity-tools-v2",
+          **{e:TERMINALS[e]/"capacity-tools-v3" for e in (167,170)}}
 CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30,172:288<<30}
 # Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
 PRESTART={166:169028829184,167:177601941504,170:230591926272}
@@ -41,7 +41,26 @@ def read(path,mode,limit=32<<20):
 def identity(value):
     return {k:tuple(tuple(p) for p in v) for k,v in value['population'].items()}
 
+def diagnostic(value,fleet):
+    registered=fleet.get("focused169_terminal");retirement=fleet.get("focused169_guard_retirement")
+    proof=value.get("closed_focused169")
+    need((registered is None)==(retirement is None)==(proof is None),"split focused 169 terminal")
+    if proof is None:
+        need("169" in value["survivors"] and "169" not in value["bookings"],"lost or repeated focused 169 booking")
+        return
+    book=value["bookings"]["169"];eq=value["registered_host_equation"]
+    need(proof["terminal"]==registered and proof["guard_retirement"]==retirement and proof["resource_credit_bytes"]==0 and
+         proof["producer_invocation_id"]=="0dfa0d36fbc246c28443a1c90a82c9cb" and
+         str(TERMINALS[172].parent/"epoch169-focused-terminal-20261121-v1/TERMINAL.json")==registered["path"]
+         and proof["disposition"] in ("completed-private-span","diagnosed-target-mismatch","interrupted-or-unclassified")
+         and book["cap_bytes"]==96<<30 and 0<=book["remaining_bytes"]<=book["cap_bytes"] and
+         book["remaining_bytes"]+book["physical_bytes"]==book["cap_bytes"] and book["plan"]==eq["retained_169_plan"]==proof["actual_guard_plan"]
+         and book["remaining_bytes"]==eq["retained_169_remaining"] and book["measurement"]=="two complete stopped-tree walks"
+         and "169" not in value["survivors"] and "169" not in value["joined_resident_lower_bounds"] and
+         not any(r["epoch"]==169 for g in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for r in fleet[g]),"different focused 169 retained obligation")
+
 def closing(value,fleet):
+    diagnostic(value,fleet)
     result={}
     for epoch,field in FLEET_FIELDS.items():
         registered=fleet.get(field)
@@ -140,7 +159,7 @@ def capture(path,sha,epoch=166):
     refdata,rr=read(pkg/"provider.json",0o444);binding=json.loads(refdata)
     elf=Path(binding["path"]);_,pr=read(elf,0o555)
     need(seal["destination"]==str(pkg) and any(x["name"]=="provider.json" and x["sha256"]==rr["sha256"] for x in seal["members"]) and
-         pr==binding and elf.parent.parent==R/"incident-replay-fit-20261121-v1" and elf.name=="post-stop-fit","unsealed capacity provider")
+         pr==binding and elf.parent==R/"incident-replay-fit-20261121-v1/tools-v13" and elf.name=="post-stop-fit","unsealed capacity provider")
     results=[];refs=[]
     for _ in range(2):
         data=capture_provider(elf,path,sha)

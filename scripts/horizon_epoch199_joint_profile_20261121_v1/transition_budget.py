@@ -24,12 +24,21 @@ def calculate(fit, ledger, fleet, prior169, transfers, closed, host_ram, cpus):
     remaining={e:books[str(e)]['remaining_bytes'] for e in CAP}
     is_closed=172 in closed
     present=set(CAP)|({172} if is_closed else set())
+    diag=fit.get('closed_focused169')
+    if diag:
+        focused=books['169']
+        need(diag['terminal']==fleet.get('focused169_terminal') and diag['guard_retirement']==fleet.get('focused169_guard_retirement') and
+             diag['resource_credit_bytes']==0 and 0<=focused['remaining_bytes']<=96*G and
+             focused['cap_bytes']==96*G==focused['remaining_bytes']+focused['physical_bytes'] and
+             fit['registered_host_equation']['retained_169_remaining']==focused['remaining_bytes'] and
+             fit['registered_host_equation']['retained_169_plan']==focused['plan']==diag['actual_guard_plan'],'unfunded closed focused diagnostic')
+    else:need(fleet.get('focused169_terminal') is None and fleet.get('focused169_guard_retirement') is None,'missing diagnostic closure')
     if is_closed:
         remaining[172]=books['172']['remaining_bytes']
-    need(set(map(int,books))==present and all(books[str(e)]['physical_bytes']+remaining[e]==ALL_CAP[e]==books[str(e)]['cap_bytes'] and 0<=remaining[e]<=ALL_CAP[e] for e in present),'different producer bookings')
+    need(set(map(int,books))==present|({169} if diag else set()) and all(books[str(e)]['physical_bytes']+remaining[e]==ALL_CAP[e]==books[str(e)]['cap_bytes'] and 0<=remaining[e]<=ALL_CAP[e] for e in present),'different producer bookings')
     need(set(transfers)<=set(closed)<=set(ALL_CAP) and set(map(int,resident))==set(CAP)-set(closed),'different original population')
     need(fit['epoch']==145 and fit['resource_credit_bytes']==fit['stopped_generation_resident_credit_bytes']==0 and fit['replay_launch_authorized'] is False and fit['complete_memory_plus_reserve_bytes']==MEM and fit['complete_cpu_quota_micros']==64000000 and cpus==64,'different base funding authority')
-    need(host_ram>=MEM and set(fit['survivors'])==({'169'} if is_closed else {'169','172'}) and fit['candidate136']['remaining']>=0,'changed survivor provider')
+    need(host_ram>=MEM and set(fit['survivors'])==((set() if diag else {'169'}) | (set() if is_closed else {'172'})) and fit['candidate136']['remaining']>=0,'changed survivor provider')
     retained={e:t['retained_growth_bytes'] for e,t in transfers.items()}
     for e,t in transfers.items():
         need(type(retained[e]) is int and retained[e]>=BOOK and type(t['maximum_transfer_bytes']) is int and 0<=t['maximum_transfer_bytes']<=ALL_CAP[e],'invalid transfer envelope')
@@ -45,7 +54,7 @@ def calculate(fit, ledger, fleet, prior169, transfers, closed, host_ram, cpus):
     # peer/independent balances are inside its original pre-169 aggregate.
     extension_transfer=min(ext,cash.get(170,0))
     shared=max(x['historical_floor_bytes'],audit['configured_free_floor_bytes'])+x['roots']['peer_remaining_growth_bytes']+10*G+x['auxiliary']['remaining_growth_bytes']+(64<<20)+x['independent166_whole_cap_bytes']+18*G
-    a=fit['survivors']['169']['guard']
+    a=dict(floor=0,remaining=focused['remaining_bytes']) if diag else fit['survivors']['169']['guard']
     if is_closed:
         b=dict(floor=0,remaining=remaining[172])
         need(fit['registered_host_equation']['retained_172_remaining']==b['remaining'] and fit.get('closed_full172'),'absent full172 retained booking')

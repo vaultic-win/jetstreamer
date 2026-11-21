@@ -67,12 +67,14 @@ def fleet_head(ref):
     s.need(mo and not (R/mo.group(1)/p.name).exists(),"superseded fleet")
     rows=[v for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for v in f[k]]
     roster={v["epoch"]:v for v in rows}
-    s.need(169 in roster and ((172 in roster) == (f.get("full172_local_commit") is None)) and roster.keys()<=ORIGINAL|{136,168,169,172} and len(rows)==len(roster),"unexpected root fleet membership")
+    s.need(((169 in roster)==(f.get("focused169_terminal") is None)) and ((172 in roster) == (f.get("full172_local_commit") is None)) and roster.keys()<=ORIGINAL|{136,168,169,172} and len(rows)==len(roster),"unexpected root fleet membership")
     return f,roster
 
 def survivors(rows,ledger):
     a=ledger["owners"]["169"]
-    result={"169":fit.incumbent(169,rows[169],a,fit.P169,rows[169]["guard_timer"]["Id"],a["timer_iid"],s.GIMAGE)}
+    result={}
+    if 169 in rows:
+        result["169"]=fit.incumbent(169,rows[169],a,fit.P169,rows[169]["guard_timer"]["Id"],a["timer_iid"],s.GIMAGE)
     if 172 not in rows:
         return result
     ad=bound(fit.AD172);w=bound(fit.W172)
@@ -112,18 +114,41 @@ def full172_booking(proof):
     return dict(root=str(path),cap_bytes=cap,physical_bytes=first,remaining_bytes=cap-first,historical_realized_bytes=0,
                 measurement="two complete stopped-tree walks",plan=ad["actual_guard_plan"],retired_guard_floor=plan["minimum_free_bytes"])
 
-def host_floor(fleet,ledger,tree,surviving,closed_booking):
-    # The registered host equation includes 172 exactly once. Retain its actual unspent
-    # allowance. Its original trip threshold is recorded in the closed booking, while
-    # the complete 169/168/other host obligations survive through fit.floor().
-    charged=surviving
-    if closed_booking is not None:
-        s.need("172" not in surviving,"172 charged as both a live and a closed producer")
-        charged={**surviving,"172":{"guard":{"floor":0,"remaining":closed_booking["remaining_bytes"]}}}
+def focused169_terminal(fleet,rows):
+    terminal=fleet.get("focused169_terminal")
+    guard=fleet.get("focused169_guard_retirement")
+    s.need((169 in rows)==(terminal is None)==(guard is None),"partial focused 169 registration")
+    if terminal is None:return None
+    package=R/"epoch169-focused-terminal-20261121-v1/closure-tools"
+    loader["load_package"](package,"63b5ba5c870820feae7bcbc15b61f2872a0c13b6b3b22295775873cbfab676b3")
+    route=runpy.run_path(str(package/"closure169.py"))
+    proof=route["inspect"]()
+    s.need(proof["terminal"]==terminal and proof["guard_retirement"]==guard and proof["actual_guard_plan"]==fit.P169
+           and proof["producer_invocation_id"]==route["IID"] and proof["resource_credit_bytes"]==0,"changed diagnostic settlement")
+    return proof
+
+def focused169_booking(proof):
+    plan=bound(proof["actual_guard_plan"]);witness=bound(proof["live"])
+    root=Path(plan["worker_root"]);identity=witness["booked_tree"];st=root.lstat()
+    cap=plan["maximum_root_physical_bytes"]
+    s.need(root==H/"epoch169-focused-diagnostic-20261117-v1" and identity==dict(path=str(root),device=st.st_dev,inode=st.st_ino)
+           and cap==96*G and plan["invocation_id"]==proof["producer_invocation_id"],"foreign diagnostic tree or booking")
+    first=tree_size(root,cap);second=tree_size(root,cap)
+    s.need(first==second and os.path.samestat(st,root.lstat()),"closed 169 allocation changed between walks")
+    return dict(root=str(root),cap_bytes=cap,physical_bytes=first,remaining_bytes=cap-first,historical_realized_bytes=0,
+                measurement="two complete stopped-tree walks",plan=proof["actual_guard_plan"],retired_guard_floor=plan["minimum_free_bytes"])
+
+def host_floor(fleet,ledger,tree,surviving,closed_booking,focused_booking=None):
+    charged=dict(surviving);retained={}
+    for epoch,book in (("169",focused_booking),("172",closed_booking)):
+        if book is not None:
+            s.need(epoch not in surviving,"duplicate live and closed producer "+epoch)
+            charged[epoch]={"guard":{"floor":0,"remaining":book["remaining_bytes"]}}
+            retained["retained_"+epoch+"_remaining"]=book["remaining_bytes"]
+            retained["retained_"+epoch+"_plan"]=book["plan"]
+    s.need(set(charged)=={"169","172"},"missing original guard or retained booking")
     value,registration=fit.floor(fleet,ledger,tree,charged)
-    if closed_booking is not None:
-        registration=dict(registration,retained_172_remaining=closed_booking["remaining_bytes"],retained_172_plan=closed_booking["plan"])
-    return value,registration
+    return value,{**registration,**retained}
 
 def stable_root(e):
     v=bound(STABLE[e])
@@ -570,6 +595,7 @@ def capture_once(epoch,ref):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    closed169=focused169_terminal(f,rows)
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status();c136=fit.candidate136(f,status["registration"])
     s.need((136 in rows)==c136["occupied"],"136 registration drift")
@@ -649,8 +675,9 @@ def capture_once(epoch,ref):
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
     if guard168:books["168"]["measured_guard"]=guard168["receipt"]
     population=census(peers,rep,extra,c136,epoch,stopped)
+    if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
-    raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"))
+    raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
     raw+=extension["extra_bytes"] if extension else 0
     need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep,floor168,closed_prepaid)
     resident={e:joined_resident(v) for e,v in rep.items()}
@@ -660,6 +687,7 @@ def capture_once(epoch,ref):
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
+    s.need(focused169_terminal(f,rows)==closed169,"focused 169 terminal changed during capture")
     s.need(full172_terminal(f,rows)==closed172,"full 172 guard or terminal changed during capture")
     if closed168:s.need(metered168_terminal(f,rows)==closed168,"metered 168 terminal changed during capture")
     s.need(replacement_terminals(f,rows)==closed,"terminal guard or archive changed during capture")
@@ -670,7 +698,7 @@ def capture_once(epoch,ref):
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
-        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed.get(166),closed_indexed167=closed.get(167),closed_recovered170=closed.get(170),closed_prestart_remaining=closed_prepaid,closed_metered168=closed168,closed_full172=closed172,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
+        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed.get(166),closed_indexed167=closed.get(167),closed_recovered170=closed.get(170),closed_prestart_remaining=closed_prepaid,closed_metered168=closed168,closed_full172=closed172,closed_focused169=closed169,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
