@@ -14,10 +14,12 @@ from types import SimpleNamespace
 
 p=SimpleNamespace(**runpy.run_path(str(Path(__file__).resolve().with_name("profile.py"))))
 D=p.D
-FIT=p.R/"incident-replay-fit-20261121-v1/tools-v3/post-stop-fit"
+FIT=p.R/"incident-replay-fit-20261121-v1/tools-v4/post-stop-fit"
 GUARD=p.GUARD/"tools/guard"
 ALIAS=Path("/run/horizon-recovered170")
 C=D/"controller"
+SESSION=D/"controller-v2"
+ORIGINAL_SEAL="e5da777707c6ff70923de35b763ba939e9f275a59e9315c10f0b17ebb90e2941"
 LOCK=Path("/run/horizon-epoch171-to136-g1.operation.lock")
 UPLOAD=p.R/"epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2"
 
@@ -46,8 +48,43 @@ def inventory():
            v["entries"][0]["epoch"]==170,"inventory does not justify a normal epoch 170 replay")
     return p.record(D/"INVENTORY_PRESTART.json",v)
 
+def wait_for_145_window():
+    # Each v5 verifier's synchronous self-check temporarily stops its leased child.
+    # Align our capture with a fresh resumed interval. The fit then revalidates
+    # the complete fleet and both lease sets without special-casing an extra PID.
+    base=p.R/"epoch145-semantic-continuity-20261121-v1"
+    record,_=p.read(base/"V5_ACTUAL_ADVANCING_WORKER.json","511cee5b1559001e5691eda9f9d9de923849dc4a3b661792cade776cad6e55d6")
+    proof=record["observations"][-1];parent=proof["parent_pid"];child=proof["child_pid"]
+    unit="horizon-holding-export145-20261121-v1.service";manager=p.show(unit)
+    if manager["InvocationID"]!=record["invocation_id"] or manager["ActiveState"]!="active":return
+    image=base/"tools-v5/export145";group="0::/system.slice/"+unit
+    expected=sorted((parent,child));deadline=time.monotonic()+77;observed=False
+    while time.monotonic()<deadline:
+        if p.show(unit)["InvocationID"]!=record["invocation_id"] or not p.members(unit):return
+        ids=p.members(unit)
+        try:
+            pp,ct,cg,_,_=p.native(child);_,pt,pg,_,_=p.native(parent)
+        except (FileNotFoundError,ProcessLookupError):
+            return
+        p.need((pp,ct,cg,pt,pg)==(parent,proof["child_ticks"],group,proof["parent_ticks"],group) and
+               all(Path(f"/proc/{pid}/exe").samefile(image) for pid in expected),"145 verifier identity changed")
+        if observed and ids==expected:return
+        for pid in set(ids)-set(expected):
+            proc=Path(f"/proc/{pid}")
+            try:
+                if p.native(pid)[0]!=parent or not (proc/"exe").samefile("/usr/bin/python3"):continue
+                a=[os.fsdecode(v) for v in (proc/"cmdline").read_bytes().split(b"\0") if v]
+                tools=p.R/"incident-replay-fit-20261121-v1/tools-v3/post-stop-fit"
+                if len(a)==6 and a[1:4]==["-IB",str(tools),"145"] and Path(a[4]).parent.parent==p.R and len(a[5])==64:
+                    observed=True
+            except (FileNotFoundError,ProcessLookupError):
+                continue
+        time.sleep(.20)
+    raise ValueError("145 verifier did not leave a proven self-check interval")
+
 def fit(fleet,seal_sha):
     sr=member(FIT,seal_sha)
+    wait_for_145_window()
     proc=subprocess.run([FIT,"170",fleet["path"],fleet["sha256"]],capture_output=True,timeout=150)
     if proc.returncode and not proc.stdout:
         raise ValueError("170 capacity capture failed: "+proc.stderr.decode(errors="replace")[-900:])
@@ -175,7 +212,8 @@ def protected_worker():
 
 def start(fleet,seal):
     lock=open(LOCK,"r+b");fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    obj,pr,profile,pref=prepared();controller=member(C/"session.py",p.digest(C/"deployment-seal-receipt.json"))
+    obj,pr,profile,pref=prepared();controller=member(C/"gate.py",ORIGINAL_SEAL)
+    session=member(SESSION/"session.py",p.digest(SESSION/"deployment-seal-receipt.json"))
     p.need(p.show(p.UNIT)["LoadState"]=="not-found" and p.show(p.TIMER)["LoadState"]=="not-found" and
            not (D/"START_INTENT.json").exists() and not (D/"barrier/allow").exists() and not list((D/"guard-receipts").iterdir()) and
            not list((p.RUN/"private").iterdir()) and (p.RUN/"producer.log").stat().st_size==0,"prior attempt or occupied successor")
@@ -184,7 +222,7 @@ def start(fleet,seal):
     floor=min(pre["available_HOME_bytes"],pre["protected_raw_floor_bytes"]+(128<<20))
     intent=p.record(D/"START_INTENT.json",dict(schema="horizon-170-recovery-start-intent-v1",epoch=170,producer_unit=p.UNIT,timer_unit=p.TIMER,
             prepared=pr,fleet=fleet,prestart=pre,armed_floor=floor,authenticated_inventory=inv,stable_root=obj["stable_root"],
-            predecessor_stop=obj["predecessor_stop"],controller=controller,booking=book,recorded_unix_seconds=int(time.time()),resource_credit_bytes=0))
+            predecessor_stop=obj["predecessor_stop"],controller=controller,actual_session=session,booking=book,recorded_unix_seconds=int(time.time()),resource_credit_bytes=0))
     argv=args(profile,pref);p.record(D/"PRODUCER_ARGV.json",argv);iid=None
     try:
         run(argv);held=wait_actor(True);iid=held["producer_invocation_id"];p.record(D/"NATIVE_GATED.json",held)
@@ -219,7 +257,7 @@ def start(fleet,seal):
 def main():
     p.need(os.geteuid()==0 and sys.flags.isolated and __debug__,"root isolated session required")
     if sys.argv[1:]==["prepare"]:return p.prepare()
-    p.need(Path(__file__).resolve()==C/"session.py","use sealed 170 controller")
+    p.need(Path(__file__).resolve()==SESSION/"session.py","use sealed 170 controller")
     if sys.argv[1:]==["record-worker"]:return protected_worker()
     mode,path,sha,seal=sys.argv[1:];_,fleet=p.read(Path(path),sha)
     if mode=="preflight":prepared();return fit(fleet,seal)
