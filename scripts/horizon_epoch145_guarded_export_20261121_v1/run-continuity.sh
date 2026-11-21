@@ -26,7 +26,7 @@ post-full)
     ;;
 *) exit 2;;
 esac
-read -r image_sha _ < <(sha256sum -- "$pkg/tools/export145")
+read -r image_sha _ < <(sha256sum -- "$pkg/tools-v2/export145")
 test "$image_sha" = PINNED_CONTINUITY_SHA
 read -r fleet_sha _ < <(sha256sum -- "$fleet")
-exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 -p Type=exec -p CPUQuota=100% -p CPUWeight=10 -p Nice=15 -p MemoryMax=2147483648 -p MemorySwapMax=0 -p TasksMax=128 -p KillMode=control-group -p Restart=no -p RuntimeMaxSec=259500 -p UMask=0077 -p NoNewPrivileges=yes -p PrivateNetwork=yes -p ProtectSystem=strict -p ProtectHome=read-only "${route[@]}" -p "StandardOutput=append:$pkg/$mode.stdout" -p "StandardError=append:$pkg/$mode.stderr" -- "$pkg/tools/export145" "$mode" "$fleet" "$fleet_sha" "$image_sha"
+exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 -p Type=exec -p CPUQuota=100% -p CPUWeight=10 -p Nice=15 -p MemoryMax=2147483648 -p MemorySwapMax=0 -p TasksMax=128 -p KillMode=control-group -p Restart=no -p RuntimeMaxSec=259500 -p UMask=0077 -p NoNewPrivileges=yes -p PrivateNetwork=yes -p ProtectSystem=strict -p ProtectHome=read-only "${route[@]}" -p "StandardOutput=append:$pkg/$mode.stdout" -p "StandardError=append:$pkg/$mode.stderr" -- "$pkg/tools-v2/export145" "$mode" "$fleet" "$fleet_sha" "$image_sha"

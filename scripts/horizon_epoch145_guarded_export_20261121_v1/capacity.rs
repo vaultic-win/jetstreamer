@@ -517,6 +517,14 @@ impl Fit {
         } else {
             validate_roster(&self.names, self.joint)?;
         }
+        let result = self.live_topology();
+        if cfg!(continuity145_only) && result.is_err() {
+            self.transitions.check_crossing()?;
+        }
+        result
+    }
+
+    fn live_topology(&self) -> Result<()> {
         if cfg!(materialized145_only) {
             if cfg!(partial145_only) {
                 crate::partial::drained()?;

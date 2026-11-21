@@ -240,11 +240,15 @@ fn native_commit(
     );
     Ok(result)
 }
-fn terminal(p: &Peer, manager: &Value) -> Result<Value> {
-    let history = custody::evidence(&Bound {
-        path: Path::new(RUNTIME).join(HISTORY),
-        sha256: HISTORY_SHA.into(),
-    })?;
+fn original(p: &Peer) -> Result<(Value, Bound, Value)> {
+    let history: Value = serde_json::from_slice(&custody::bytes(
+        &Bound {
+            path: Path::new(RUNTIME).join(HISTORY),
+            sha256: HISTORY_SHA.into(),
+        },
+        32 << 20,
+        false,
+    )?)?;
     let old = rows(&history)?
         .find(|r| r["epoch"] == p.epoch)
         .context("original peer missing from pinned census")?;
@@ -268,6 +272,15 @@ fn terminal(p: &Peer, manager: &Value) -> Result<Value> {
     } else {
         old["guard_timer"].clone()
     };
+    Ok((old.clone(), a, guard))
+}
+
+fn terminal(p: &Peer, manager: &Value) -> Result<Value> {
+    ensure!(
+        p.epoch == 169 || manager["ActiveState"] == "inactive",
+        "original singleton failed before a successful commit"
+    );
+    let (old, a, guard) = original(p)?;
     let lines = capacity::run(
         "/usr/bin/journalctl",
         &[
@@ -298,10 +311,6 @@ fn terminal(p: &Peer, manager: &Value) -> Result<Value> {
                 && v["EXIT_STATUS"].as_str().is_some_and(|s| s != "0")
     });
     let Some(exit) = exit else {
-        ensure!(
-            p.epoch == 169 || manager["ActiveState"] != "failed",
-            "original singleton failed before a successful commit"
-        );
         return Err(Pending(p.epoch).into());
     };
     let proof = if p.epoch == 169 {
@@ -390,6 +399,25 @@ impl Transitions {
     pub fn rapid_check(&self) -> Result<()> {
         for p in &PEERS {
             if !self.closed(p.epoch) && original_processes(p) != [true, true] {
+                return Err(Pending(p.epoch).into());
+            }
+        }
+        Ok(())
+    }
+    /// PID1 can start draining an original while the slower live census is
+    /// reading its service or timer. Retry only under that original manager
+    /// identity, and run the complete census again before thawing.
+    pub fn check_crossing(&self) -> Result<()> {
+        self.rapid_check()?;
+        for p in PEERS.iter().filter(|p| !self.closed(p.epoch)) {
+            let manager = joint_candidate::show(p.unit, "Id,InvocationID,ActiveState")?;
+            if manager["Id"] == p.unit
+                && manager["InvocationID"] == p.iid
+                && matches!(
+                    manager["ActiveState"].as_str(),
+                    Some("deactivating" | "inactive" | "failed")
+                )
+            {
                 return Err(Pending(p.epoch).into());
             }
         }
@@ -505,6 +533,17 @@ mod tests {
         state.reconcile().unwrap();
         state.rapid_check().unwrap();
         assert!(state.closed.borrow().is_empty());
+        for p in &PEERS {
+            let (row, admission, guard) = original(p).unwrap();
+            assert_eq!(row["epoch"], p.epoch);
+            assert!(admission.path.is_absolute());
+            if p.epoch == 169 {
+                assert_eq!(row["service_owned_stdout"]["inode"], p.log_inode);
+                assert_eq!(guard["Id"], "horizon-guard-169-focused-20261120-v4.timer");
+            } else {
+                assert_eq!(guard["producer_invocation_id"], p.iid);
+            }
+        }
         let prog = File::open(Path::new(RUNTIME).join(NATIVE)).unwrap();
         for p in [&PEERS[0], &PEERS[2]] {
             let local: Value = serde_json::from_slice(

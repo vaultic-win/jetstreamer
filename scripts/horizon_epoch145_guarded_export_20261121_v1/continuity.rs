@@ -3,7 +3,7 @@ use super::*;
 use std::{collections::BTreeSet, os::unix::fs::PermissionsExt};
 
 pub const PREVIOUS: &str = "5dfb817906f74b73a27f61a386751d75";
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools/export145";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v2/export145";
 pub const REPLACEMENT: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
 const METERED: &str = "epoch168-full-metered-20261121-v1";
 const ORIGINAL_TRACE: &str = "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2";

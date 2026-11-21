@@ -18,9 +18,9 @@ publish)
     fleet=$1
     full_iid=$2
     read -r fleet_sha _ < <(sha256sum "$fleet")
-    read -r image_sha _ < <(sha256sum "$recovery/tools/export145")
+    read -r image_sha _ < <(sha256sum "$recovery/tools-v2/export145")
     test "$image_sha" = PINNED_CONTINUITY_SHA
-    exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 "${opts[@]}" -p RuntimeMaxSec=259500 -p "ReadWritePaths=$holding $rt $recovery/peer-terminals" -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env -p "StandardOutput=append:$rt/network.stdout" -p "StandardError=append:$rt/network.stderr" -- "$recovery/tools/export145" publish "$fleet" "$fleet_sha" "$full_iid" "$image_sha"
+    exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 "${opts[@]}" -p RuntimeMaxSec=259500 -p "ReadWritePaths=$holding $rt $recovery/peer-terminals" -p EnvironmentFile=/etc/jetstreamer/horizon-r2.env -p "StandardOutput=append:$rt/network.stdout" -p "StandardError=append:$rt/network.stderr" -- "$recovery/tools-v2/export145" publish "$fleet" "$fleet_sha" "$full_iid" "$image_sha"
     ;;
 *) exit 2;;
 esac
