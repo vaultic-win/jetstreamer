@@ -21,7 +21,7 @@ def checked(ref, mode):
     return body
 
 
-def status_rows():
+def status_rows(profile_for=publication.paid145_reader):
     cadence, ref = event.document(fixture.CADENCE, 0o600)
     event.need(ref["sha256"] == "a5ff0f41a934b1eb8a1b53a5f378eb0f02e39a3384de8eb07940d5f9c22ba2a8",
                "different five-source cadence fixture")
@@ -30,7 +30,7 @@ def status_rows():
         report = checked(case["report"], 0o600)
         fleet = dict(observer=report["observer"], effective_status_receipts=report["receipts"])
         for epoch in case["closed"]:
-            profile = publication.paid145_reader(epoch)
+            profile = profile_for(epoch)
             original = checked(cadence["singleton_fixtures"][str(epoch)], 0o400)
             status = report["receipts"][str(epoch)]
             terminal = checked(status, 0o600)[profile.authority.FIELD]
@@ -43,17 +43,29 @@ def status_rows():
     return rows
 
 
-def qualify(digest, work):
-    current, manifest = event.document(FAMILY / "FIVE_PAID145_PUBLICATION_CONTROLLERS.json", 0o400)
-    old, prior = event.document(FAMILY / "FIVE_V13_PUBLICATION_CONTROLLERS.json", 0o400)
-    event.need(manifest["sha256"] == digest and prior["sha256"] == "105bf534a321a4ca11679ef6485048b34e5eb734436c2b7d3a4c5817aa341e9b"
+def qualify(digest, work, *, bounded=False):
+    if bounded:
+        current_name = "BOUNDED_FIVE_PUBLICATION_CONTROLLERS.json"
+        prior_name = "FIVE_PAID145_PUBLICATION_CONTROLLERS.json"
+        prior_digest = "5eb7102ef2b71689e0d956b2e60ae31ae6d36284e9a80f3247a9c99a8e0bbbd3"
+        profile_for = publication.bounded_reader
+        predecessors = publication.bounded_predecessors
+    else:
+        current_name = "FIVE_PAID145_PUBLICATION_CONTROLLERS.json"
+        prior_name = "FIVE_V13_PUBLICATION_CONTROLLERS.json"
+        prior_digest = "105bf534a321a4ca11679ef6485048b34e5eb734436c2b7d3a4c5817aa341e9b"
+        profile_for = publication.paid145_reader
+        predecessors = publication.paid145_predecessors
+    current, manifest = event.document(FAMILY / current_name, 0o400)
+    old, prior = event.document(FAMILY / prior_name, 0o400)
+    event.need(manifest["sha256"] == digest and prior["sha256"] == prior_digest
                and set(current["epochs"]) == set(map(str, EPOCHS)), "unregistered controller handoff")
     prices = checked(current["capacity"], 0o400)
-    statuses = status_rows()
+    statuses = status_rows(profile_for)
     rows = {}
     for epoch in EPOCHS:
         label = str(epoch)
-        profile = publication.paid145_reader(epoch)
+        profile = profile_for(epoch)
         item = current["epochs"][label]
         price = prices["epochs"][label]
         event.need(item["epoch"] == epoch and item["predecessor_controller"] == old["epochs"][label]["controller"]
@@ -66,7 +78,7 @@ def qualify(digest, work):
                        m["sha256"] == programs[exe.name]["sha256"] and m["mode"] == "0555"
                        for m in record["members"]), "unsealed program")
         registered = {}
-        for old_profile, package in publication.paid145_predecessors(epoch):
+        for old_profile, package in predecessors(epoch):
             previous, binding = event.document(old_profile.delivery / package / "programs.json", 0o444)
             old_fit = publication.bound_fit(old_profile, previous)
             event.need((profile.unit, profile.authority.FIELD, profile.authority.T) ==
@@ -85,12 +97,17 @@ def qualify(digest, work):
     for a, b in itertools.permutations(EPOCHS, 2):
         for name in rows[b]["programs"]:
             try:
-                publication.bound_fit(publication.paid145_reader(a), {**rows[a]["programs"], name: rows[b]["programs"][name]})
+                publication.bound_fit(profile_for(a), {**rows[a]["programs"], name: rows[b]["programs"][name]})
             except event.Rejected:
                 crossed += 1
-    event.need(crossed == 40 and sum(len(row["prior"]) for row in rows.values()) == 14, "incomplete event coverage")
+    event.need(crossed == 40 and sum(len(row["prior"]) for row in rows.values()) == sum(len(predecessors(e)) for e in EPOCHS), "incomplete event coverage")
     return dict(manifest=manifest, prior=prior, epochs=rows, crossed_refused=crossed, production_dispatches=0)
 
 
 if __name__ == "__main__":
-    print(json.dumps(qualify(sys.argv[1], Path(sys.argv[2])), sort_keys=True))
+    args = sys.argv[1:]
+    bounded = args[:1] == ["--bounded"]
+    if bounded:
+        args = args[1:]
+    digest, directory = args
+    print(json.dumps(qualify(digest, Path(directory), bounded=bounded), sort_keys=True))
