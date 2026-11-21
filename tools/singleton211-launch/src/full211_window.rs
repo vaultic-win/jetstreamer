@@ -372,17 +372,39 @@ impl Window {
     pub(super) fn receipt(&self) -> Value {
         json!(self.current)
     }
-    pub(super) fn verify(&mut self, n: &mut Native) -> Result<()> {
-        if mono()?.saturating_add(5_000_000) >= self.current.next {
-            self.current.await_successor(n)?;
+    fn transition_firing(
+        &self,
+        mut clock: impl FnMut() -> Result<u64>,
+        mut capture: impl FnMut(bool) -> Result<Firing>,
+    ) -> Result<Firing> {
+        let has_margin = |now: u64, next: u64| now.checked_add(5_000_000).is_some_and(|t| t < next);
+        let mut wait = !has_margin(clock()?, self.current.next);
+        loop {
+            let new = capture(wait)?;
+            self.current.same_or_successor(&new)?;
+            ensure!(
+                !wait || self.current.guard != new.guard,
+                "full211 successor did not fire"
+            );
+            if has_margin(clock()?, new.next) {
+                return Ok(new);
+            }
+            // A fenced capture can consume the last fraction of the five-second reserve.
+            // Wait for one adjacent firing under the existing peer and operator deadlines.
+            ensure!(
+                !wait && new.guard == self.current.guard,
+                "full211 next firing too near for a custody transition"
+            );
+            wait = true;
         }
-        let new = Firing::capture(n)?;
-        self.current.same_or_successor(&new)?;
-        let clock = mono()?;
-        ensure!(
-            clock.checked_add(5_000_000).is_some_and(|t| t < new.next),
-            "full211 next firing too near for a custody transition"
-        );
+    }
+    pub(super) fn verify(&mut self, n: &mut Native) -> Result<()> {
+        let new = self.transition_firing(mono, |wait| {
+            if wait {
+                self.current.await_successor(n)?;
+            }
+            Firing::capture(n)
+        })?;
         if new.guard != self.current.guard {
             save_json(
                 &n.root,
@@ -514,6 +536,50 @@ mod tests {
             assert!(!equal_journal_rows(rows, raw.as_bytes()).unwrap());
         }
         assert!(equal_journal_rows(rows, b"incomplete").is_err());
+    }
+
+    #[test]
+    fn capture_crossing_the_custody_reserve_requires_one_completed_successor() {
+        let original = firing(GID, 364_880_555_906);
+        let successor = firing(&"b".repeat(32), original.next + 500_000);
+        let window = Window {
+            current: original.clone(),
+        };
+        // v155 entered the repeat capture with over five seconds and finished with 4.844s.
+        let mut times = [364_905_417_520, 364_905_711_521, successor.end + 1].into_iter();
+        let mut waits = Vec::new();
+        let selected = window
+            .transition_firing(
+                || Ok(times.next().unwrap()),
+                |wait| {
+                    waits.push(wait);
+                    Ok(if wait {
+                        successor.clone()
+                    } else {
+                        original.clone()
+                    })
+                },
+            )
+            .unwrap();
+        assert_eq!(waits, [false, true]);
+        assert_eq!(selected.guard, successor.guard);
+        // A stale re-read or a second rollover cannot supply custody.
+        for returned in [
+            original.clone(),
+            firing(&"c".repeat(32), successor.next + 500_000),
+        ] {
+            assert!(
+                window
+                    .transition_firing(|| Ok(original.next), |_| Ok(returned.clone()))
+                    .is_err()
+            );
+        }
+        let mut times = [original.next, successor.next - 5_000_000].into_iter();
+        assert!(
+            window
+                .transition_firing(|| Ok(times.next().unwrap()), |_| Ok(successor.clone()))
+                .is_err()
+        );
     }
 
     #[test]
