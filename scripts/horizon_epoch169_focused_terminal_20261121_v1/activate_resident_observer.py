@@ -68,6 +68,10 @@ def fresh_paid_boundary():
                 assert p.poll(60000)
             finally:os.close(fd)
             assert (parent/'exe').exists()
+            prices=sp.run(['pgrep','-f','^/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/[^ ]+/post-stop-fit '],stdout=sp.PIPE,check=False)
+            if prices.returncode==0:
+                continue
+            assert prices.returncode==1
             return dict(manager=m,refresh_pid=int(row),refresh_exited_utc=dt.datetime.now(dt.timezone.utc).isoformat())
         time.sleep(.05)
     raise ValueError('active paid verifier did not produce a full-fit handoff boundary')
