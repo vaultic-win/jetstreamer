@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import select
 from pathlib import Path
 import stat
 import subprocess
@@ -49,6 +50,48 @@ def validate(value,fleet,fr,tr):
          value["available_memory_bytes"]>=value["required_available_memory_bytes"]>0,"insufficient publication capacity")
     return value["complete_required_HOME_bytes"]+BOOK
 
+def wait_for_145_probe():
+    # A concurrent full census is a descendant of the frozen 145 verifier. Wait
+    # for that exact process to exit, then discard every earlier fit measurement.
+    unit="horizon-holding-export145-20261121-v1.service"
+    scope=Path("/sys/fs/cgroup/system.slice")/unit
+    manager,worker=3944205,3944778
+    iid="dc043eb78c4a4349b0098760dc764a1f"
+    image=R/"epoch145-semantic-continuity-20261121-v1/tools-v5b/export145"
+    for pid in (manager,worker):
+        proc=Path("/proc")/str(pid)
+        need((proc/"exe").samefile(image) and (proc/"cgroup").read_text().strip()=="0::/system.slice/"+unit and
+             ("INVOCATION_ID="+iid).encode() in (proc/"environ").read_bytes().split(b"\0"),"foreign 145 verifier")
+    candidates=set(map(int,(scope/"cgroup.procs").read_text().split()))-{manager,worker}
+    if not candidates:return
+    original=R/"incident-replay-fit-20261121-v1/tools-v6/post-stop-fit"
+    need(read(original,0o555)[1]["sha256"]=="f16e961612d5c74727fb62a9be280dbb298ebe937cc6c57e50c93839e603609f","different 145 internal provider")
+    for pid in candidates:
+        try:
+            proc=Path("/proc")/str(pid)
+            fd=os.pidfd_open(pid)
+            try:
+                args=(proc/"cmdline").read_bytes().decode().strip("\0").split("\0")
+                if (not (proc/"exe").samefile("/usr/bin/python3") or len(args)!=6 or
+                    args[:4]!=["/usr/bin/python3","-IB",str(original),"145"] or
+                    int((proc/"stat").read_text().rsplit(")",1)[1].split()[1])!=manager):continue
+                fleet=Path(args[4])
+                need(fleet.parent.parent==R and fleet.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and read(fleet,0o600)[1]["sha256"]==args[5],
+                     "foreign 145 internal census fleet")
+                need(select.select([fd],[],[],120)[0],"145 census deadline")
+                return
+            finally:os.close(fd)
+        except (FileNotFoundError,ProcessLookupError):continue
+    need(set(map(int,(scope/"cgroup.procs").read_text().split()))=={manager,worker},"unidentified 145 descendant")
+
+def capture_provider(provider,path,digest):
+    for attempt in range(3):
+        result=subprocess.run([provider,"145",path,digest],capture_output=True,timeout=150)
+        if result.returncode==0:return result.stdout
+        if attempt==2 or b"foreign 145 descendants" not in result.stderr and b"capacity generation changed during collection" not in result.stderr:
+            raise RuntimeError(result.stderr.decode(errors="replace")[-1800:])
+        wait_for_145_probe()
+
 def capture(path,sha):
     raw,fr=read(path,0o600);fleet=json.loads(raw)
     need(path.parent.parent==R and path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and fr["sha256"]==sha,"wrong fleet")
@@ -61,7 +104,7 @@ def capture(path,sha):
          pr==binding and elf.parent.parent==R/"incident-replay-fit-20261121-v1" and elf.name=="post-stop-fit","unsealed capacity provider")
     results=[];refs=[]
     for _ in range(2):
-        data=subprocess.check_output([elf,"145",path,sha],timeout=150)
+        data=capture_provider(elf,path,sha)
         v=json.loads(data);validate(v,fleet,fr,tr);results.append(v)
         refs.append(dict(sha256=hashlib.sha256(data).hexdigest(),recorded_unix_seconds=v["recorded_unix_seconds"],
                          available_home=v["available_HOME_bytes"],required_home=v["complete_required_HOME_bytes"],
