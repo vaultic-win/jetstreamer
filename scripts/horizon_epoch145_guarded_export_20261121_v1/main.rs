@@ -17,6 +17,10 @@ mod closed166;
 mod continuity;
 #[cfg(early145_only)]
 mod early166;
+#[cfg(incident145_only)]
+mod incident145;
+#[cfg(incident145_only)]
+mod incident_fit;
 mod joint;
 mod joint_candidate;
 mod joint_worker;
@@ -643,6 +647,7 @@ fn run() -> Result<()> {
             sha,
             tail,
         ),
+        #[cfg(not(incident145_only))]
         [_, mode, path, digest, full, sha] if mode == "publish" => publication::publish(
             Bound {
                 path: path.into(),
@@ -652,6 +657,7 @@ fn run() -> Result<()> {
             sha,
             cfg!(joint145_only),
         ),
+        #[cfg(not(incident145_only))]
         [_, mode, path, digest, sha] if mode == "post-full" => post::full(
             Bound {
                 path: path.into(),

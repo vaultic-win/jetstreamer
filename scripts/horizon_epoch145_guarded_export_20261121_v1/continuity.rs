@@ -3,9 +3,11 @@ use super::*;
 use std::{collections::BTreeSet, os::unix::fs::PermissionsExt};
 
 pub const PREVIOUS: &str = "5dfb817906f74b73a27f61a386751d75";
-#[cfg(not(early145_only))]
+#[cfg(all(not(early145_only), not(incident145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v3/export145";
-#[cfg(early145_only)]
+#[cfg(incident145_only)]
+pub const IMAGE: &str = crate::incident145::IMAGE;
+#[cfg(all(early145_only, not(incident145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v4/export145";
 pub const REPLACEMENT: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
 const METERED: &str = "epoch168-full-metered-20261121-v1";
@@ -15,7 +17,7 @@ const APPEND: &str = "9d8fc46ba227c4875f516d2318b2e397caa8884d058ccb217313ec3ae9
 fn state(iid: &str) -> PathBuf {
     Path::new(BASE).join("state").join(iid)
 }
-fn failure(iid: &str) -> Result<Value> {
+pub(super) fn failure(iid: &str) -> Result<Value> {
     ensure!(custody::hex(iid, 32), "foreign recovery IID");
     let p = state(iid);
     let f = custody::binding(&p.join("failed.json"))?;
@@ -75,7 +77,14 @@ pub fn predecessor() -> Result<Value> {
             && v["appended"] == 64_739_665_517u64,
         "frozen candidate lost its completed append"
     );
-    Ok(json!({"verified_predecessor_failure":failed,"append":p}))
+    let previous = json!({"verified_predecessor_failure":failed,"append":p});
+    #[cfg(incident145_only)]
+    let previous = {
+        let mut evidence = previous;
+        evidence["failed_preincident_verifier"] = crate::incident145::predecessor()?;
+        evidence
+    };
+    Ok(previous)
 }
 pub fn roster(epochs: &BTreeSet<u64>) -> bool {
     epochs.contains(&172)

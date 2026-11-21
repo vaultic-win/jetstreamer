@@ -102,9 +102,36 @@ pub(super) fn terminal_for(unit: &str, iid: &str) -> Result<()> {
     );
     Ok(())
 }
+pub(super) trait VerificationGuard {
+    fn topology(&self) -> Result<()>;
+    fn current(&self, needed: u64) -> Result<Value>;
+    fn await_topology(&self) -> Result<()>;
+    fn await_current(&self, needed: u64) -> Result<Value>;
+}
+macro_rules! implement_guard {
+    ($guard:ty) => {
+        impl VerificationGuard for $guard {
+            fn topology(&self) -> Result<()> {
+                <$guard>::topology(self)
+            }
+            fn current(&self, n: u64) -> Result<Value> {
+                <$guard>::current(self, n)
+            }
+            fn await_topology(&self) -> Result<()> {
+                <$guard>::await_topology(self)
+            }
+            fn await_current(&self, n: u64) -> Result<Value> {
+                <$guard>::await_current(self, n)
+            }
+        }
+    };
+}
+implement_guard!(capacity::Fit);
+#[cfg(incident145_only)]
+implement_guard!(crate::incident_fit::Fit);
 pub(super) fn run_child(
     command: &mut Command,
-    fit: &capacity::Fit,
+    fit: &impl VerificationGuard,
     lease: &source_lease::ReadLease,
 ) -> Result<()> {
     fit.await_topology()?;

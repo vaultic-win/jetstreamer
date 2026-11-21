@@ -312,6 +312,9 @@ pub fn run(fleet: Bound, sha: &str) -> Result<()> {
     source_identity()?;
     let file = leaf()?;
     prove_view(&file)?;
+    #[cfg(incident145_only)]
+    let fit = crate::incident_fit::Fit::capture(&fleet)?;
+    #[cfg(not(incident145_only))]
     let fit = capacity::capture_phase(&fleet, cfg!(continuity145_only))?;
     fit.await_topology()?;
     let initial = fit.await_current(0)?;
@@ -502,6 +505,12 @@ mod tests {
                 .raw_os_error(),
             Some(libc::EROFS)
         );
+        #[cfg(incident145_only)]
+        {
+            closed166::drained().unwrap();
+            crate::continuity::failure(crate::incident145::PREVIOUS).unwrap();
+        }
+        #[cfg(not(incident145_only))]
         assert!(closed166::drained().is_err());
         let live = Path::new(OUTPUT).join(LEAF);
         let meta = fs::symlink_metadata(live).unwrap();

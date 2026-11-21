@@ -91,7 +91,7 @@ pub fn run(program: &str, args: &[&str], seconds: &str) -> Result<String> {
 fn number_file(path: &Path) -> Result<u64> {
     Ok(fs::read_to_string(path)?.trim().parse()?)
 }
-fn meminfo(key: &str) -> Result<u64> {
+pub(super) fn meminfo(key: &str) -> Result<u64> {
     let s = fs::read_to_string("/proc/meminfo")?;
     let mut w = s
         .lines()

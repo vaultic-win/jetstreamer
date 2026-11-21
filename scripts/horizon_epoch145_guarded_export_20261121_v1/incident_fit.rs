@@ -1,0 +1,623 @@
+//! Reuse the registered fleet admission while a leased, read-only verifier runs.
+//! A topology crossing stops the child until a new complete census succeeds.
+use super::*;
+use std::os::unix::fs::OpenOptionsExt;
+use std::{
+    cell::RefCell,
+    collections::BTreeMap,
+    io::{Read, Seek, SeekFrom},
+};
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v3/post-stop-fit";
+const HOST_MEMORY: u64 = 810_658_050_048;
+const GROUPS: &str = "/sys/fs/cgroup/system.slice";
+type Process = (u32, u64, u64, u64);
+type Population = BTreeMap<String, Vec<Process>>;
+
+struct Capture {
+    fleet: Bound,
+    complete: Value,
+    actors: Population,
+    captured: Instant,
+}
+
+pub struct Fit {
+    pub evidence: Value,
+    capture: RefCell<Capture>,
+}
+
+fn original(path: &Path, limit: u64) -> Result<(Bound, Value)> {
+    let before = fs::symlink_metadata(path)?;
+    ensure!(
+        path.is_absolute()
+            && path.canonicalize()? == path
+            && before.is_file()
+            && before.nlink() == 1
+            && before.uid() == 0
+            && before.gid() == 0
+            && (before.mode() & 0o222 == 0 || before.mode() & 0o777 == 0o600)
+            && before.len() > 0
+            && before.len() <= limit,
+        "untrusted original evidence {}",
+        path.display()
+    );
+    let id = custody::identity(&before);
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
+        .open(path)?;
+    ensure!(
+        custody::identity(&file.metadata()?) == id,
+        "original descriptor changed"
+    );
+    let mut bytes = Vec::new();
+    (&mut file).take(limit + 1).read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == id.bytes
+            && custody::identity(&file.metadata()?) == id
+            && custody::identity(&fs::symlink_metadata(path)?) == id,
+        "original receipt changed during read"
+    );
+    Ok((
+        Bound {
+            path: path.into(),
+            sha256: custody::sha(&bytes),
+        },
+        serde_json::from_slice(&bytes)?,
+    ))
+}
+fn head(start: &Bound) -> Result<Bound> {
+    let mut b = start.clone();
+    loop {
+        ensure!(
+            b.path
+                .file_name()
+                .is_some_and(|n| n == "ROOT_COMPLETE_OPERATIONAL_FLEET.json")
+                && b.path.parent().and_then(Path::parent) == Some(Path::new(RUNTIME)),
+            "foreign accepted fleet path"
+        );
+        let v: Value = serde_json::from_slice(&custody::bytes(&b, 32 << 20, false)?)?;
+        ensure!(
+            v["owner"] == "/root"
+                && v["schema"] == "horizon-Root-complete-fleet-operational-review-v1",
+            "invalid head of accepted fleet chain"
+        );
+        let timer = v["sole_next_timer"]
+            .as_str()
+            .or_else(|| v["sole_next_timer"]["unit"].as_str())
+            .context("successor timer")?;
+        let d = timer
+            .strip_prefix("horizon-observer-")
+            .and_then(|s| s.strip_suffix(".timer"))
+            .context("observer timer")?;
+        ensure!(
+            d.starts_with("root")
+                && d.len() < 128
+                && d.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'),
+            "unsafe timer name"
+        );
+        let p = Path::new(RUNTIME)
+            .join(d)
+            .join("ROOT_COMPLETE_OPERATIONAL_FLEET.json");
+        if !p.try_exists()? {
+            return Ok(b);
+        }
+        let (n, successor) = original(&p, 32 << 20)?;
+        ensure!(
+            capacity::n(&successor, "recorded_unix_seconds")?
+                > capacity::n(&v, "recorded_unix_seconds")?,
+            "fleet chain is not advancing"
+        );
+        b = n;
+    }
+}
+
+fn active_population() -> Result<Population> {
+    let mut population = BTreeMap::new();
+    for entry in fs::read_dir(GROUPS)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !name.starts_with("horizon-qualify") || !name.ends_with(".service") {
+            continue;
+        }
+        let processes = entry.path().join("cgroup.procs");
+        let ids = match fs::read_to_string(processes) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            other => other?,
+        };
+        let mut group = Vec::new();
+        for line in ids.lines() {
+            let p: u32 = line.parse()?;
+            let t = native::ticks(p)?;
+            let proc = Path::new("/proc").join(p.to_string());
+            let e = fs::metadata(proc.join("exe"))?;
+            ensure!(
+                fs::read_to_string(proc.join("cgroup"))?.trim()
+                    == format!("0::/system.slice/{name}")
+                    && native::ticks(p)? == t,
+                "unstable replay PID"
+            );
+            group.push((p, t, e.dev(), e.ino()));
+        }
+        if !group.is_empty() {
+            group.sort();
+            population.insert(name.to_owned(), group);
+        }
+    }
+    Ok(population)
+}
+
+fn provider_identity() -> Result<Bound> {
+    let path = Path::new(PROVIDER);
+    let directory = path.parent().unwrap();
+    let (r, seal) = original(&directory.join("deployment-seal-receipt.json"), 1 << 20)?;
+    ensure!(
+        seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            && seal["destination"] == json!(directory)
+            && seal["sealer_sha256"]
+                == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+            && seal["remote_mutations"] == false,
+        "unknown provider deployment"
+    );
+    let member = seal["members"]
+        .as_array()
+        .context("provider members")?
+        .iter()
+        .find(|v| v["name"] == "post-stop-fit")
+        .context("missing provider")?;
+    let m = fs::symlink_metadata(path)?;
+    ensure!(
+        path.canonicalize()? == path
+            && m.is_file()
+            && m.uid() == 0
+            && m.mode() & 0o7777 == 0o555
+            && m.len() < 1 << 20
+            && member["sha256"] == custody::sha(&fs::read(path)?),
+        "changed provider"
+    );
+    Ok(r)
+}
+
+fn pending_join(error: &str) -> Result<Option<u64>> {
+    for (epoch, unit, directory) in [
+        (
+            166,
+            "horizon-qualify-166-independent-recovery-20261121-v1.service",
+            "epoch166-independent-cold-recovery-20261121-v1",
+        ),
+        (
+            167,
+            "horizon-qualify-167-source-index-v1-20261121.service",
+            "epoch167-source-index-recovery-20261121-v1",
+        ),
+        (
+            168,
+            "horizon-qualify-168-full-metered-20261121-v1.service",
+            "epoch168-full-metered-20261121-v1",
+        ),
+        (
+            170,
+            "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
+            "epoch170-retry10-recovery-20261121-v1",
+        ),
+    ] {
+        let dir = Path::new(RUNTIME).join(directory);
+        let known_missing = [
+            "FIRST_GUARD.json",
+            "ACTUAL_PRODUCER_NATIVE.json",
+            "ACTUAL_GUARD_PLAN.json",
+            "NATIVE_GATED.json",
+        ]
+        .iter()
+        .any(|name| {
+            error.lines().last().is_some_and(|l| {
+                l.starts_with("FileNotFoundError:")
+                    && l.contains(&dir.join(name).display().to_string())
+            })
+        });
+        if !(known_missing
+            || error
+                .trim_end()
+                .ends_with("ValueError: unadmitted peer or expired intent")
+            || (epoch == 168
+                && error
+                    .trim_end()
+                    .ends_with("ValueError: foreign pending normal 168")))
+        {
+            continue;
+        }
+        let intent = dir.join("START_INTENT.json");
+        if !intent.try_exists()?
+            || dir
+                .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
+                .try_exists()?
+            || dir.join("START_FAILURE.json").try_exists()?
+            || !Path::new(GROUPS).join(unit).try_exists()?
+        {
+            continue;
+        }
+        let (_, v) = original(&intent, 8 << 20)?;
+        let age = custody::now()?.checked_sub(intent.metadata()?.mtime().try_into()?);
+        let m = capacity::native_values(unit)?;
+        let pid = m["MainPID"]
+            .as_str()
+            .context("joining PID")?
+            .parse::<u32>()?;
+        let proc = Path::new("/proc").join(pid.to_string());
+        if !age.is_some_and(|s| s <= 240)
+            || v["producer_unit"] != unit
+            || m["MemoryMax"] != (68u64 << 30).to_string()
+            || m["CPUQuotaPerSecUSec"] != "9s"
+            || fs::read_to_string(proc.join("cgroup"))?.trim() != format!("0::/system.slice/{unit}")
+        {
+            continue;
+        }
+        let native = dir.join(if epoch == 168 {
+            "NATIVE_GATED.json"
+        } else {
+            "ACTUAL_PRODUCER_NATIVE.json"
+        });
+        if native.try_exists()? {
+            let (_, actor) = original(&native, 2 << 20)?;
+            ensure!(
+                actor["producer_pid"] == pid
+                    && actor["producer_invocation_id"] == m["InvocationID"]
+                    && actor["start_ticks"] == native::ticks(pid)?,
+                "different pending actor"
+            );
+        }
+        // A pending result can only keep the already-stopped reader stopped. The
+        // complete provider must establish the real guard before SIGCONT.
+        return Ok(Some(epoch));
+    }
+    Ok(None)
+}
+
+fn refresh(previous: &Bound) -> Result<Capture> {
+    let fleet = head(previous)?;
+    let seal = provider_identity()?;
+    // Direct execution lets the provider identify and exclude only its own PID
+    // from its caller's cgroup without exempting another verifier or subprocess.
+    let out = Command::new(PROVIDER)
+        .arg("145")
+        .arg(&fleet.path)
+        .arg(&fleet.sha256)
+        .output()?;
+    let err = String::from_utf8_lossy(&out.stderr);
+    if !out.status.success() {
+        if err.trim_end().ends_with("ValueError: superseded fleet") {
+            let next = head(&fleet)?;
+            if next != fleet {
+                return refresh(&next);
+            }
+        }
+        if let Some(epoch) = pending_join(&err)? {
+            return Err(crate::peer_terminal::Pending(epoch).into());
+        }
+    }
+    ensure!(
+        out.status.success(),
+        "complete 145 capacity observation failed {}: {} {}",
+        out.status,
+        err,
+        String::from_utf8_lossy(&out.stdout)
+            .chars()
+            .take(220)
+            .collect::<String>()
+    );
+    let mut complete: Value = serde_json::from_slice(&out.stdout)?;
+    ensure!(
+        complete["epoch"] == 145
+            && complete["schema"] == "horizon-incident-replay-fit-v1"
+            && complete["fits"] == true
+            && complete["fleet"] == json!(fleet)
+            && complete["resource_credit_bytes"] == 0
+            && complete["complete_cpu_quota_micros"] == 64_000_000
+            && complete["complete_memory_plus_reserve_bytes"] == HOST_MEMORY
+            && complete["phase145"]["invocation_id"] == verify_cgroup()?
+            && custody::now()?
+                .checked_sub(capacity::n(&complete, "recorded_unix_seconds")?)
+                .is_some_and(|s| s <= 15),
+        "foreign incident capacity or 145 phase"
+    );
+    let actors = active_population()?;
+    let expected: BTreeMap<_, _> = actors
+        .iter()
+        .map(|(unit, ps)| {
+            (
+                unit,
+                ps.iter().map(|p| [u64::from(p.0), p.1]).collect::<Vec<_>>(),
+            )
+        })
+        .collect();
+    ensure!(
+        complete["population"] == json!(expected),
+        "replay membership crossed 145 fresh fit"
+    );
+    complete["provider_seal"] = json!(seal);
+    Ok(Capture {
+        fleet,
+        complete,
+        actors,
+        captured: Instant::now(),
+    })
+}
+
+fn current_guard(
+    plan: &Value,
+    original_sample: Option<&Value>,
+    expected_remaining: u64,
+    unit: &str,
+) -> Result<(u64, u64)> {
+    let b: Bound = serde_json::from_value(plan.clone())?;
+    let p = custody::evidence(&b)?;
+    let d = Path::new(
+        p["receipt_directory"]
+            .as_str()
+            .context("guard receipt directory")?,
+    );
+    let mut file = File::open(d.parent().context("guard root")?.join("guard.stdout"))?;
+    let len = file.metadata()?.len();
+    file.seek(SeekFrom::Start(len.saturating_sub(2 << 20)))?;
+    let mut tail = Vec::new();
+    file.take(2 << 20).read_to_end(&mut tail)?;
+    let latest = tail
+        .split(|c| *c == b'\n')
+        .rev()
+        .find_map(|l| serde_json::from_slice::<Value>(l).ok())
+        .context("latest native guard")?;
+    let id = latest["guard_invocation_id"]
+        .as_str()
+        .context("guard IID")?;
+    ensure!(custody::hex(id, 32), "invalid guard IID");
+    let (sample_ref, observed) = original(&d.join(format!("sample-{id}.json")), 2 << 20)?;
+    let scan = &observed["root_physical_observation"];
+    let cap = capacity::n(&p, "maximum_root_physical_bytes")?;
+    ensure!(
+        observed == latest
+            && observed["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && p["unit"] == unit
+            && observed["producer_invocation_id"] == p["invocation_id"]
+            && observed["plan_sha256"] == b.sha256
+            && observed["trip_reason"].is_null()
+            && observed["worker_observation_error"].is_null()
+            && observed["root_physical_observation_error"].is_null()
+            && observed["DATA_fulfillment_observation_error"].is_null()
+            && observed["producer_stop_enabled"] == true
+            && observed["producer"]["active"] == "active"
+            && observed["producer"]["restarts"] == 0
+            && scan["exceeds_budget"] == false
+            && scan["maximum_physical_bytes"] == cap,
+        "invalid current guard for {unit}"
+    );
+    ensure!(
+        custody::now()?
+            .checked_sub(capacity::n(&observed, "recorded_unix_seconds")?)
+            .is_some_and(|age| age <= 90),
+        "stale guard for {unit}"
+    );
+    let floor = capacity::n(&p, "minimum_free_bytes")?;
+    let remaining =
+        if scan["first"]["vanished_entries"] == 0 && scan["second"]["vanished_entries"] == 0 {
+            cap.checked_sub(
+                capacity::n(&scan["first"], "physical_bytes")?
+                    .min(capacity::n(&scan["second"], "physical_bytes")?),
+            )
+            .context("guard cap exceeded")?
+        } else if original_sample == Some(&json!(sample_ref)) {
+            expected_remaining
+        } else {
+            // Keep exactly the earlier independently funded stable-subtree basis only through its original sample;
+            // a changed unstable sample needs the provider's current measured lower-bound path.
+            return Err(capacity::GuardInFlight.into());
+        };
+    Ok((floor, remaining.saturating_sub(expected_remaining)))
+}
+
+impl Fit {
+    pub fn capture(fleet: &Bound) -> Result<Self> {
+        let initial = refresh(fleet)?;
+        Ok(Self {
+            evidence: initial.complete.clone(),
+            capture: RefCell::new(initial),
+        })
+    }
+    pub fn topology(&self) -> Result<()> {
+        let previous = self.capture.borrow().fleet.clone();
+        *self.capture.borrow_mut() = refresh(&previous)?;
+        Ok(())
+    }
+    pub fn await_topology(&self) -> Result<()> {
+        if self.capture.borrow().captured.elapsed() > Duration::from_secs(10) {
+            self.topology()?;
+        }
+        Ok(())
+    }
+    pub fn await_current(&self, needed: u64) -> Result<Value> {
+        let deadline = Instant::now() + Duration::from_secs(90);
+        loop {
+            match self.current(needed) {
+                Err(e) if e.is::<capacity::GuardInFlight>() && Instant::now() < deadline => {
+                    self.topology()?
+                }
+                result => return result,
+            }
+        }
+    }
+    pub fn current(&self, needed: u64) -> Result<Value> {
+        let last = self.capture.borrow();
+        let s = &last.complete;
+        ensure!(needed == 0, "frozen reader requested staging bytes");
+        if last.captured.elapsed() > Duration::from_secs(45) || active_population()? != last.actors
+        {
+            return Err(capacity::GuardInFlight.into());
+        }
+        let mut required = capacity::n(s, "complete_required_HOME_bytes")?;
+        let mut absolute = 0;
+        for row in s["survivors"]
+            .as_object()
+            .context("incumbent guards")?
+            .values()
+        {
+            let g = &row["guard"];
+            let (floor, growth) = current_guard(
+                &g["plan"],
+                Some(&g["guard"]),
+                capacity::n(g, "remaining")?,
+                row["unit"].as_str().context("incumbent unit")?,
+            )?;
+            required = required.checked_add(growth).context("incumbent growth")?;
+            absolute = absolute.max(floor);
+        }
+        for (epoch, row) in s["replacements"]
+            .as_object()
+            .context("replacement guards")?
+        {
+            let b = &s["bookings"][epoch];
+            let (floor, growth) = current_guard(
+                &row["plan"],
+                Some(&row["guard"]),
+                capacity::n(b, "remaining_bytes")?,
+                row["producer_unit"].as_str().context("replacement unit")?,
+            )?;
+            // A new deficit can affect the original physical baseline and the independent new-generation spending calculation.
+            required = required
+                .checked_add(growth.checked_mul(2).context("baseline growth")?)
+                .context("replacement growth")?;
+            absolute = absolute.max(floor);
+        }
+        if !s["normal168"].is_null() || s["candidate136"]["occupied"] == true {
+            // Both are admitted by the full provider. Check their exact current guard plan and remaining
+            // allowance using the original rooted admission rather than letting a new peer bypass the check.
+            for (epoch, plan, unit, remaining) in extra_guards(s)? {
+                let (floor, growth) = current_guard(&plan, None, remaining, &unit)?;
+                required = required.checked_add(growth).context("peer growth")?;
+                absolute = absolute.max(floor);
+                ensure!(matches!(epoch, 136 | 168), "foreign peer");
+            }
+        }
+        required = required.max(absolute);
+        let free = capacity::home()?.0;
+        let mut resident = 0u64;
+        let peers = s["survivors"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|row| (&row["unit"], row, capacity::n(row, "resident")));
+        let joined = s["replacements"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(e, row)| {
+                (
+                    &row["producer_unit"],
+                    row,
+                    capacity::n(&s["joined_resident_lower_bounds"], e),
+                )
+            });
+        for (unit, row, baseline) in peers.chain(joined) {
+            let p = Path::new(GROUPS).join(unit.as_str().context("resident unit")?);
+            let values = fs::read_to_string(p.join("memory.stat"))?;
+            let stat = |name: &str| -> Result<u64> {
+                Ok(values
+                    .lines()
+                    .find_map(|l| l.strip_prefix(name))
+                    .context("resident memory")?
+                    .parse()?)
+            };
+            let mut pss = 0u64;
+            for t in row["processes"].as_array().context("processes")? {
+                let v = fs::read_to_string(format!("/proc/{}/smaps_rollup", t[0]))?;
+                let kb: u64 = v
+                    .lines()
+                    .find_map(|l| l.strip_prefix("Pss:"))
+                    .context("PSS")?
+                    .split_whitespace()
+                    .next()
+                    .context("KiB")?
+                    .parse()?;
+                pss = pss.checked_add(kb * 1024).context("PSS sum")?;
+            }
+            resident = resident
+                .checked_add(
+                    pss.min(stat("anon ")? + stat("file_mapped ")?)
+                        .min(baseline?)
+                        .min(68 << 30),
+                )
+                .context("resident sum")?;
+        }
+        let memory = HOST_MEMORY.checked_sub(resident).context("memory budget")?;
+        let available = capacity::meminfo("MemAvailable:")?;
+        if free < required || available < memory {
+            return Err(capacity::GuardInFlight.into());
+        }
+        Ok(
+            json!({"free_bytes":free,"protected_bytes":required,"available_memory":available,"required_memory":memory,
+            "fleet":last.fleet,"recorded_unix_seconds":s["recorded_unix_seconds"],"resource_credit_bytes":0}),
+        )
+    }
+}
+
+fn extra_guards(s: &Value) -> Result<Vec<(u64, Value, String, u64)>> {
+    let mut result = Vec::new();
+    if !s["normal168"].is_null() {
+        let r = &s["normal168"];
+        ensure!(r["ordinary_canonical"] == true, "unadmitted 168");
+        let a = custody::evidence(&serde_json::from_value(r["admission"].clone())?)?;
+        result.push((
+            168,
+            a["actual_guard_plan"].clone(),
+            a["producer_unit"].as_str().context("168 unit")?.to_owned(),
+            capacity::n(&s["bookings"]["168"], "remaining_bytes")?,
+        ));
+    }
+    if s["candidate136"]["occupied"] == true {
+        let r = &s["candidate136"];
+        let identity = &r["identity"];
+        let path = Path::new(
+            "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1/reproduction/receipts/guard-plan.json",
+        );
+        let (plan, entry) = original(path, 2 << 20)?;
+        ensure!(
+            entry["invocation_id"] == identity["iid"]
+                && entry["unit"] == identity["unit"]
+                && entry["minimum_free_bytes"] == r["guard_floor"]
+                && entry["maximum_root_physical_bytes"] == r["cap"],
+            "foreign current 136 guard"
+        );
+        result.push((
+            136,
+            json!(plan),
+            identity["unit"].as_str().context("136 unit")?.to_owned(),
+            capacity::n(r, "remaining")?,
+        ));
+    }
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    #[ignore = "root-owned accepted fleet and native production cgroups"]
+    fn authenticates_the_actual_fleet_and_disallows_missing_members() {
+        let p = PathBuf::from(std::env::var("INCIDENT_FLEET").unwrap());
+        let (binding, _) = original(&p, 32 << 20).unwrap();
+        let current = head(&binding).unwrap();
+        let v: Value =
+            serde_json::from_slice(&custody::bytes(&current, 32 << 20, false).unwrap()).unwrap();
+        assert_eq!(v["owner"], "/root");
+        let a = active_population().unwrap();
+        for unit in [
+            "horizon-qualify-172-full-half-core-20261120-v1.service",
+            "horizon-qualify-166-independent-recovery-20261121-v1.service",
+        ] {
+            let ps = a.get(unit).unwrap();
+            assert_eq!(ps.len(), 2);
+            assert!(ps[0].0 != ps[1].0 && ps.iter().all(|p| p.1 > 0 && p.3 > 0));
+        }
+        assert!(
+            current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus").is_err()
+        );
+    }
+}
