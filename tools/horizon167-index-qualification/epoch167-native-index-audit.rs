@@ -1,4 +1,5 @@
 //! Read-only, root-bound comparison of a captured epoch 167 CAR window and its original index.
+#[path = "../../jetstreamer-firehose/src/bin/native_window/mod.rs"]
 mod native_window;
 use jetstreamer_firehose::node::{Node, NodeReader};
 use native_window::{Block, Result};
