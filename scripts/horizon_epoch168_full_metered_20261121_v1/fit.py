@@ -419,14 +419,15 @@ def capture(fleetref,own=None):
           if l.startswith(("MemTotal:","MemAvailable:"))}
     vfs=os.statvfs("/home/sol")
     available=vfs.f_bavail*vfs.f_frsize
-    need_mem=MEM-sum(v["resident"] for v in peers.values())
+    early=bool((phase.get("window") or {}).get("original_five_peer_failure"))
+    need_mem=MEM-sum(v["resident"] for epoch,v in peers.items() if not early or epoch!="166")
     s.need(len(os.sched_getaffinity(0))>=1 and int(command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64
            and info["MemTotal:"]>=MEM and need_mem>0,"host resource baseline changed")
     s.need(phase145()==(phase,compatible) and status_ready()==ready and membership(peers,own,candidate)==topo,
            "intervening 145, status or peer generation")
     if own is not None:
         s.identity(s.native_actor(intent)[1],own)
-    fits=available>=required and info["MemAvailable:"]>=need_mem
+    fits=available>=(joint if early else required) and info["MemAvailable:"]>=need_mem
     return dict(schema="horizon-168-original-reservation-fresh-fit-v1",recorded_unix_seconds=int(time.time()),
         fleet=fleetref,producer_invocation_id=gate["producer_invocation_id"] if gate else None,
         complete_cpu_quota_micros=64000000,complete_memory_plus_reserve_bytes=MEM,
@@ -439,6 +440,7 @@ def capture(fleetref,own=None):
         normal_168_guard_memory_bytes=G,original_whole_tree=tree,booking=evidence,incumbents=peers,
         retired166=closed.get("166"),retired_original_peers=closed,population=topo,phase145=phase,status_registration=ready,
         registered_population_compatible=bool(ready),fresh_phase_compatible=compatible,
+        original166_resident_credit_bytes=0 if early else peers.get("166",{}).get("resident",0),
         resource_fits=fits,eligible_with_168_alone=bool(fits and ready and compatible),
         replay_launch_authorized=False,r2_mutations=False)
 
@@ -448,6 +450,10 @@ def select(before,after=None,armed=None):
     s.need(item["eligible_with_168_alone"] and item["registered_population_compatible"] and item["fresh_phase_compatible"]
            and item["available_HOME_bytes"]>=item["complete_required_DATA_bytes"]
            and item["available_memory_bytes"]>=item["required_available_memory_bytes"],"168 capacity/phase/status admission denied")
+    window=item["phase145"].get("window") or {}
+    if window.get("original_five_peer_failure"):
+        s.need(item["combined_disk_fits"] and item["available_HOME_bytes"]>=item["combined_required_HOME_bytes"],
+               "live-166 recovery needs the full 136 donor allowance")
     if after is not None:
         for k in ("population","phase145","status_registration","fleet","retired_original_peers"):
             s.need(before[k]==after[k],"intervening change: "+k)

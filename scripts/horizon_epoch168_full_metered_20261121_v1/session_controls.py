@@ -16,6 +16,13 @@ def run():
              phase145={"final":"verified-original"},status_registration={"sha256":"b"*64},fleet={"sha256":"c"*64},
              retired_original_peers={},standalone_guard_floor=100)
     assert fit.select(pre)==100 and fit.select(pre,dict(pre,standalone_guard_floor=101),110)==101
+    early=dict(pre,phase145={"window":{"original_five_peer_failure":{"sha256":"f"*64}}},
+               combined_disk_fits=True,combined_required_HOME_bytes=138)
+    assert fit.select(early)==100
+    for late in (dict(early,combined_disk_fits=False),dict(early,combined_required_HOME_bytes=141)):
+        try: fit.select(early,late,110)
+        except ValueError: pass
+        else: raise AssertionError("accepted unfunded 136 donor")
     changes=[("population",{"167":{"pid":10,"ticks":13},"169":{"timer":"a"*32}}),
              ("population",{"167":{"pid":10,"ticks":12},"169":{"timer":"d"*32}}),
              ("phase145",{"final":"another-generation"}),("status_registration",{}),

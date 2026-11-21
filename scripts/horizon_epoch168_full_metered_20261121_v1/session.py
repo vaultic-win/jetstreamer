@@ -15,7 +15,7 @@ import time
 import uuid
 
 HERE=Path(__file__).resolve().parent
-if __name__=="__main__" and (HERE != Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v2") or not sys.flags.isolated):
+if __name__=="__main__" and (HERE != Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3") or not sys.flags.isolated):
     raise SystemExit("use the sealed root session with python3 -IB")
 sys.path.insert(0,str(HERE))
 import fit
@@ -24,9 +24,9 @@ import status168 as s
 D=s.D
 BACKING=Path("/home/sol/.jetstreamer-private/horizon-root-runtime-data")/D.name
 OP_LOCK="/run/horizon-epoch171-to136-g1.operation.lock"
-PACKAGE=D/"session-v2"
+PACKAGE=D/"session-v3"
 SEALER="e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
-INPUTS=("session.py","fit.py","status168.py","overlap.py")
+INPUTS=("session.py","fit.py","status168.py","overlap.py","same_five.py","same-five-image.json")
 
 
 def sync(directory):
@@ -74,7 +74,7 @@ def record(name,obj):
 
 def controller(sealref):
     s.need(os.geteuid()==0 and HERE==PACKAGE and sys.flags.isolated,"use root isolated sealed epoch 168 session")
-    artifact,ar=s.read(D/"SESSION_DEPLOYMENT_V2.json")
+    artifact,ar=s.read(D/"SESSION_DEPLOYMENT_V3.json")
     seal=s.bound(sealref,HERE/"deployment-seal-receipt.json")
     s.need(artifact["seal"]==sealref and artifact["source_commit"] and artifact["branch"]=="account-updates"
            and seal["sealer_sha256"]==SEALER and seal["destination"]==str(HERE)

@@ -5,6 +5,7 @@ from pathlib import Path
 import stat
 
 import status168 as s
+import same_five
 
 BASE=s.ROOT/"epoch145-semantic-continuity-20261121-v1"
 IMAGE=BASE/"tools-v3/export145"
@@ -38,21 +39,26 @@ def leases(pid,objects):
     return actual
 
 
-def qualified_image():
-    seal,sealref=s.read(IMAGE.parent/"deployment-seal-receipt.json",SEAL_SHA)
-    build,buildref=s.read(IMAGE.parent/"build-proof.json",BUILD_SHA)
+def qualified_image(profile=None):
+    image,image_sha,seal_sha,build_sha=profile or (IMAGE,IMAGE_SHA,SEAL_SHA,BUILD_SHA)
+    seal,sealref=s.read(image.parent/"deployment-seal-receipt.json",seal_sha)
+    build,buildref=s.read(image.parent/"build-proof.json",build_sha)
     members={row["name"]:row["sha256"] for row in seal["members"]}
-    s.need(seal["destination"]==str(IMAGE.parent) and members.get("export145")==IMAGE_SHA
-           and members.get("build-proof.json")==BUILD_SHA
-           and build["content_hashes"]["export145"]["sha256"]==IMAGE_SHA,"foreign 145 continuity seal or build")
-    with IMAGE.open("rb") as f:
-        s.need(hashlib.file_digest(f,"sha256").hexdigest()==IMAGE_SHA,"different available 145 executable")
+    s.need(seal["destination"]==str(image.parent) and members.get("export145")==image_sha
+           and members.get("build-proof.json")==build_sha, "foreign 145 continuity seal or build")
+    if profile is None:
+        s.need(build["content_hashes"]["export145"]["sha256"]==image_sha,"different post-terminal verifier build")
+    with image.open("rb") as f:
+        s.need(hashlib.file_digest(f,"sha256").hexdigest()==image_sha,"different available 145 executable")
     return sealref,buildref
 
 
 def inspect(stable,manager,unit,children):
+    same = None
     if str(IMAGE)!=stable["exe"]:
-        return None
+        same=same_five.profile(stable["exe"])
+        if same is None: return None
+    image,image_sha=(same or (IMAGE,IMAGE_SHA))[:2]
     if len(stable["argv"])!=5 or stable["argv"][1]!="recover-full-output":
         return None
     who=manager["InvocationID"];pid=int(manager["MainPID"]);proc=Path(f"/proc/{pid}")
@@ -60,28 +66,33 @@ def inspect(stable,manager,unit,children):
            and manager["ActiveState"]=="active" and manager["SubState"]=="running" and manager["NRestarts"]=="0"
            and not manager["Job"] and manager["ControlPID"]=="0" and manager["CPUQuotaPerSecUSec"]=="1s"
            and manager["MemoryMax"]==str(2<<30) and manager["MemorySwapMax"]=="0"
-           and s.same_file(proc/"exe",IMAGE) and s.process(pid)[1:]==(stable["start_ticks"],"0::/system.slice/"+unit)
+           and s.same_file(proc/"exe",image) and s.process(pid)[1:]==(stable["start_ticks"],"0::/system.slice/"+unit)
            and (stable["holding_lock"]["device"],stable["holding_lock"]["inode"])==(64512,95818311)
            and stable["holding_lock"]["fds"],"different recovery manager")
-    sealref,buildref=qualified_image()
+    sealref,buildref=qualified_image(same)
     if len(children)!=2 or pid not in children: return None
     child=next(p for p in children if p!=pid);cproc=Path(f"/proc/{child}")
     ppid,ticks,group=s.process(child)
     cargv=(cproc/"cmdline").read_bytes().split(b"\0")[:-1]
-    if cargv!=[os.fsencode(IMAGE),b"recover-worker",str(pid).encode(),IMAGE_SHA.encode()]: return None
-    s.need(ppid==pid and group=="0::/system.slice/"+unit and s.same_file(cproc/"exe",IMAGE)
+    if cargv!=[os.fsencode(image),b"recover-worker",str(pid).encode(),image_sha.encode()]: return None
+    s.need(ppid==pid and group=="0::/system.slice/"+unit and s.same_file(cproc/"exe",image)
            and all(("INVOCATION_ID="+who).encode() in (p/"environ").read_bytes().split(b"\0") for p in (proc,cproc)),
            "different native 145 recovery child")
     state=s.ROOT/"epoch145-guarded-export-20261121-v1/state"/who
     started,startref=s.read(state/"recovery-started.json")
     fleetref=started["fresh_fit"]["fleet"]
     predecessor=started["prior_frozen_recovery"]
-    s.need(stable["argv"]==[str(IMAGE),"recover-full-output",fleetref["path"],fleetref["sha256"],IMAGE_SHA]
-           and started["iid"]==who and started["image"]==IMAGE_SHA and started["r2_mutations"] is False
-           and started["fresh_fit"]["joint136_enabled"] is True and started["fresh_fit"]["joint_closed166"]
+    s.need(stable["argv"]==[str(image),"recover-full-output",fleetref["path"],fleetref["sha256"],image_sha]
+           and started["iid"]==who and started["image"]==image_sha and started["r2_mutations"] is False
+           and started["fresh_fit"]["joint136_enabled"] is True
            and predecessor["append"]["sha256"]=="9d8fc46ba227c4875f516d2318b2e397caa8884d058ccb217313ec3ae9071fc4"
            and not any((state/n).exists() for n in ("failed.json","verified-frozen.json","complete.json")),
            "145 has left verified recovery or has different provenance")
+    if same is None:
+        s.need(started["fresh_fit"]["joint_closed166"] is True, "166 still in post-terminal verifier")
+        failed=None
+    else:
+        failed=same_five.predecessor(predecessor,started["fresh_fit"],unit)
     candidate=Path(started["file"])
     s.need(candidate.parent==OUTPUT and candidate.name in (".tmp36MvkN","epoch-145.jet"),"different frozen output")
     objects={}
@@ -94,7 +105,7 @@ def inspect(stable,manager,unit,children):
     a=leases(pid,objects);b=leases(child,objects)
     s.need(s.process(child)==(ppid,ticks,group) and s.process(pid)[1]==stable["start_ticks"],"145 census changed")
     return dict(mode="recover-full-output",native_child=dict(pid=child,start_ticks=ticks),
-                recovery=startref,continuity_seal=sealref,continuity_build=buildref,
+                recovery=startref,original_five_peer_failure=failed,continuity_seal=sealref,continuity_build=buildref,
                 leases_parent=a,leases_worker=b)
 
 
