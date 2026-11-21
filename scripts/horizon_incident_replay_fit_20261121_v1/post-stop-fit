@@ -23,6 +23,7 @@ loader["load_package"](PKG,"c70887c1a09f91d48b1af23c19004419d255e933848abd7513be
 sys.path.insert(0,str(PKG))
 import fit
 import status168 as s
+registered_idle_floor=runpy.run_path(str(Path(__file__).resolve().with_name("idle_floor.py")))["floor"]
 extensions=runpy.run_path(str(Path(__file__).resolve().with_name("incident_extensions.py")))
 
 G=1<<30
@@ -147,7 +148,7 @@ def host_floor(fleet,ledger,tree,surviving,closed_booking,focused_booking=None):
             retained["retained_"+epoch+"_remaining"]=book["remaining_bytes"]
             retained["retained_"+epoch+"_plan"]=book["plan"]
     s.need(set(charged)=={"169","172"},"missing original guard or retained booking")
-    value,registration=fit.floor(fleet,ledger,tree,charged)
+    value,registration=registered_idle_floor(fleet,ledger,tree,charged)
     return value,{**registration,**retained}
 
 def stable_root(e):
@@ -336,11 +337,13 @@ def confirm_fork(epoch,own,baseline,stop):
 
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
-        s.need(focused in ("semantic", "post", "retry-post") and not any((post, rejoin, timeout_rejoin, recovery_post)),
+        profiles = {"semantic": ("profile145-focused-semantic.json", "tools-v5d"),
+                    "post": ("profile145-focused-post.json", "tools-v9"),
+                    "retry-post": ("profile145-retried-post.json", "tools-v10"),
+                    "timer-semantic": ("profile145-timer-semantic.json", "tools-v5e")}
+        s.need(focused in profiles and not any((post, rejoin, timeout_rejoin, recovery_post)),
                "ambiguous paid verifier profile")
-        profile,directory = (("profile145-focused-semantic.json", "tools-v5d") if focused == "semantic" else
-                             ("profile145-focused-post.json", "tools-v9") if focused == "post" else
-                             ("profile145-retried-post.json", "tools-v10"))
+        profile, directory = profiles[focused]
     elif recovery_post:
         s.need(not post and not rejoin and not timeout_rejoin, "ambiguous 145 post-recovery profile")
         profile,directory="profile145-recovery-post.json","tools-v8"
@@ -373,7 +376,7 @@ def phase145(epoch):
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"]):
+        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"],extensions["FAILED_TIMER_INSPECTION"]):
             v.update(extensions["failed_verifier"](s,m,m["InvocationID"]))
         elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",
@@ -399,7 +402,7 @@ def phase145(epoch):
     recovery_post_image=base/"tools-v8/export145"
     recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
     image=Path("/proc")/m["MainPID"]/"exe"
-    focused_mode=next((mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"))
+    focused_mode=next((mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"))
                        if (candidate:=base/directory/"export145").exists() and s.same_file(image,candidate)),None)
     if focused_mode or recovery_post or timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(image,fp):
         cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin,recovery_post,focused_mode)

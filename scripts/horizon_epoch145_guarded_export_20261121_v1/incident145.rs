@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_focused145_only)]
+#[cfg(incident_timer145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5e/export145";
+#[cfg(all(incident_focused145_only, not(incident_timer145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5d/export145";
 #[cfg(all(incident_timeout145_only, not(incident_focused145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5c/export145";
@@ -292,25 +294,86 @@ pub fn failed_manager_query() -> Result<Value> {
 
 /// Bind the natural V5C failure to its original paid candidate and advancing worker.
 #[cfg(incident_focused145_only)]
+struct FailedObservation {
+    iid: &'static str,
+    failure_hash: &'static str,
+    start_hash: &'static str,
+    progress_name: &'static str,
+    progress_sha: &'static str,
+    manager_sha: &'static str,
+    prior_image: &'static str,
+    provider: &'static str,
+    recognize: fn(&str, &str) -> bool,
+    parent: (u32, u64),
+    child: (u32, u64),
+}
+
+#[cfg(incident_focused145_only)]
 pub fn failed_status_owner() -> Result<Value> {
-    const IID: &str = "d37f36f898a44932a19fd50d7014a6fe";
+    failed_observation(FailedObservation {
+        iid: "d37f36f898a44932a19fd50d7014a6fe",
+        failure_hash: "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29",
+        start_hash: "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81",
+        progress_name: "V5C_ACTUAL_ADVANCING_WORKER.json",
+        progress_sha: "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76",
+        manager_sha: "9e1ff569a5f6373a9f0d8a2c6339ce9a5d91bff92009f3e5ead9bb105f9d1f44",
+        prior_image: "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d",
+        provider: "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit",
+        recognize: crate::incident_fit::missing_status_owner,
+        parent: (4011654, 362077125),
+        child: (4011889, 362079682),
+    })
+}
+
+#[cfg(incident_timer145_only)]
+pub fn failed_timer_inspection() -> Result<Value> {
+    failed_observation(FailedObservation {
+        iid: "e6551a0bb8a14b989902e15c9ecc0751",
+        failure_hash: "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f",
+        start_hash: "55d2a0504271e8a1eea2ca8c105a288be9497f1a2b80177279481692d06e041f",
+        progress_name: "V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json",
+        progress_sha: "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0",
+        manager_sha: "4e16813452fb3a5e965b6f939aa632c5b435592911a8c592ca9989abd4c24f85",
+        prior_image: "3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066",
+        provider: "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14/post-stop-fit",
+        recognize: crate::incident_fit::timer_inspection_timeout,
+        parent: (11975, 364473153),
+        child: (12292, 364475843),
+    })
+}
+
+#[cfg(incident_focused145_only)]
+fn failed_observation(
+    FailedObservation {
+        iid,
+        failure_hash,
+        start_hash,
+        progress_name,
+        progress_sha,
+        manager_sha,
+        prior_image,
+        provider,
+        recognize,
+        parent,
+        child,
+    }: FailedObservation,
+) -> Result<Value> {
     let base = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
-    let state = Path::new(BASE).join("state").join(IID);
-    let failed = continuity::failure(IID)?;
+    let state = Path::new(BASE).join("state").join(iid);
+    let failed = continuity::failure(iid)?;
     ensure!(
-        failed["failure"]["sha256"]
-            == "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29",
+        failed["failure"]["sha256"] == failure_hash,
         "wrong original status failure"
     );
     let failure = custody::evidence(&serde_json::from_value(failed["failure"].clone())?)?;
     let started = Bound {
         path: state.join("recovery-started.json"),
-        sha256: "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81".into(),
+        sha256: start_hash.into(),
     };
     let original = custody::evidence(&started)?;
     let progress = Bound {
-        path: base.join("V5C_ACTUAL_ADVANCING_WORKER.json"),
-        sha256: "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76".into(),
+        path: base.join(progress_name),
+        sha256: progress_sha.into(),
     };
     let observed = custody::evidence(&progress)?;
     let manager: Bound = serde_json::from_value(observed["manager"].clone())?;
@@ -322,33 +385,59 @@ pub fn failed_status_owner() -> Result<Value> {
         .and_then(|t| t.strip_prefix("complete 145 capacity observation failed exit status: 1: "))
         .context("missing original status error")?;
     ensure!(
-        failure["iid"] == IID
-            && crate::incident_fit::missing_status_owner(
-                trace,
-                "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit"
-            )
+        failure["iid"] == iid
+            && recognize(trace, provider)
             && observed["start"] == json!(started)
-            && observed["invocation_id"] == IID
-            && manager.sha256 == "9e1ff569a5f6373a9f0d8a2c6339ce9a5d91bff92009f3e5ead9bb105f9d1f44"
-            && native["new"]["InvocationID"] == IID
-            && native["parent_pid"] == 4011654
-            && native["parent_start_ticks"] == 362077125u64
-            && original["image"]
-                == "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d"
-            && original["iid"] == IID
+            && observed["invocation_id"] == iid
+            && manager.sha256 == manager_sha
+            && native["new"]["InvocationID"] == iid
+            && native["parent_pid"] == parent.0
+            && native["parent_start_ticks"] == parent.1
+            && original["image"] == prior_image
+            && original["iid"] == iid
             && original["file"] == json!(paid)
             && original["r2_mutations"] == false
             && original["prior_frozen_recovery"]["failed_preincident_verifier"]["original_candidate"]
                 == original_identity
-            && native::ticks(4011654).ok() != Some(362077125)
-            && native::ticks(4011889).ok() != Some(362079682),
+            && native::ticks(parent.0).ok() != Some(parent.1)
+            && native::ticks(child.0).ok() != Some(child.1),
         "different paid verifier, original failure or frozen candidate"
     );
-    verify_observed_pair(&observed, (4011654, 362077125), (4011889, 362079682))?;
+    verify_observed_pair(&observed, parent, child)?;
     Ok(
         json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,"prior_manager":manager,
               "original_candidate":original_identity,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
     )
+}
+
+#[cfg(all(test, incident_timer145_only))]
+#[test]
+#[ignore = "requires the retained e655 failure and original paid inode"]
+fn proves_retirement_timeout_and_rejects_other_commands() {
+    let prior = failed_timer_inspection().unwrap();
+    let binding = serde_json::from_value(prior["current_boot_failure"]["failure"].clone()).unwrap();
+    let failure = custody::evidence(&binding).unwrap();
+    let trace = failure["error"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("complete 145 capacity observation failed exit status: 1: ")
+        .unwrap();
+    let provider = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14/post-stop-fit";
+    assert!(crate::incident_fit::timer_inspection_timeout(
+        trace, provider
+    ));
+    for (from, to) in [
+        ("'inspect'", "'retire'"),
+        ("20 seconds", "2 seconds"),
+        ("in proof_stops", "in another_probe"),
+        ("retire-original-timers.py", "foreign.py"),
+    ] {
+        assert!(!crate::incident_fit::timer_inspection_timeout(
+            &trace.replace(from, to),
+            provider
+        ));
+    }
+    assert_eq!(prior["original_candidate"]["inode"], 103237059);
 }
 
 #[cfg(all(test, incident_focused145_only))]

@@ -15,6 +15,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "$pkg/tools-v5b") image="$pkg/tools-v5b/export145" ;;
     "$pkg/tools-v5c") image="$pkg/tools-v5c/export145" ;;
     "$pkg/tools-v5d") image="$pkg/tools-v5d/export145" ;;
+    "$pkg/tools-v5e") image="$pkg/tools-v5e/export145" ;;
     *) exit 1 ;;
 esac
 read -r image_sha _ < <(sha256sum -- "$image")
