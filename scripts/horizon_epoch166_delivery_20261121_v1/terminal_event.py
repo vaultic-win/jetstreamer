@@ -138,7 +138,7 @@ def head(fleet):
         [PARENT, "inspect-status", fleet["path"], fleet["sha256"]], timeout=35))["fleet"]
 
 
-def accepted(runtime, reports, expected, changes, checked_head, now):
+def accepted(runtime, reports, expected, changes, checked_head, now, field="terminal166_local_commit", check_status=None):
     changes.watch(runtime)
     changes.watch(reports)
     paths = []
@@ -158,14 +158,17 @@ def accepted(runtime, reports, expected, changes, checked_head, now):
         fleet, ref = document(path, 0o600)
         sampled = dt.datetime.fromtimestamp(stamp,dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         need(fleet["owner"] == "/root" and fleet["sampled_at_utc"] == sampled, "wrong root cadence")
-        if not 0 <= now-fleet["recorded_unix_seconds"] <= 2400 or not fleet.get("terminal166_local_commit"):
+        if not 0 <= now-fleet["recorded_unix_seconds"] <= 2400 or not fleet.get(field):
             return None
-        need(fleet["terminal166_local_commit"] == expected, "different 166 terminal in fleet")
+        need(fleet[field] == expected, "different 166 terminal in fleet")
         report_dir = reports / f"cycle{tag}-live166167170-19-{day}-v1"
         if not report_dir.exists():
             return None
         changes.watch(report_dir)
         rp = report_dir / "COMPLETED.json"
+        if field=="recovered166_local_commit" and fleet["authenticated_status_audit"]["path"]==str(report_dir/"after-recovered166"/rp.name):
+            changes.watch(report_dir/"after-recovered166")
+            rp=report_dir/"after-recovered166"/rp.name
         need(fleet["authenticated_status_audit"]["path"] == str(rp), "crossed cadence report")
         if not rp.exists():
             return None
@@ -179,7 +182,10 @@ def accepted(runtime, reports, expected, changes, checked_head, now):
              and doc["authenticated_status_count"] == 19, "unbound authenticated cadence report")
         if checked_head(ref) != ref:
             return None
-        return dict(fleet=ref, report=report)
+        proof=dict(fleet=ref, report=report)
+        if check_status:
+            proof["status"]=check_status(fleet,doc,expected)
+        return proof
     return None
 
 
@@ -210,15 +216,18 @@ def agents():
     raise RuntimeError("no current sol SSH agent authenticated the branch")
 
 
-def manager():
-    out = subprocess.check_output(["/usr/bin/systemctl","show",UNIT,"-p",
-        "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,LoadState,Result"],text=True,timeout=10)
-    return dict(row.split("=",1) for row in out.splitlines())
+def manager(unit=UNIT):
+    result = subprocess.run(["/usr/bin/systemctl","show",unit,"-p",
+        "Id,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,LoadState,Result"],capture_output=True,text=True,timeout=10)
+    row=dict(line.split("=",1) for line in result.stdout.splitlines())
+    need(row.get("Id")==unit and (result.returncode==0 or result.returncode==4 and row.get("LoadState")=="not-found"),
+         "cannot establish publication unit identity")
+    return row
 
 
-def previous(terminal):
+def previous(terminal, delivery=DELIVERY, unit=UNIT):
     known_prepares = set()
-    for p in DELIVERY.glob("run-*/admission.json"):
+    for p in delivery.glob("run-*/admission.json"):
         if not re.fullmatch(r"run-[a-f0-9]{32}",p.parent.name):
             continue
         admission, ref = document(p,0o400,2 << 20)
@@ -226,31 +235,31 @@ def previous(terminal):
             return {"prior_sync":ref}
         if admission.get("publication_authorized") is False:
             known_prepares.add(p.parent.name[4:])
-    state = manager()
+    state = manager(unit)
     if state["ActiveState"]!="inactive" or state["MainPID"]!="0" or state["ControlPID"]!="0" or state["Job"]:
         return {"existing_publication_unit":state}
     journal = subprocess.check_output(["/usr/bin/journalctl","-b","-ojson","--no-pager",
-        "--output-fields=UNIT,INVOCATION_ID,MESSAGE_ID","_PID=1",f"UNIT={UNIT}"],timeout=12,text=True)
+        "--output-fields=UNIT,INVOCATION_ID,MESSAGE_ID","_PID=1",f"UNIT={unit}"],timeout=12,text=True)
     for line in journal.splitlines():
         event=json.loads(line)
         iid=event.get("INVOCATION_ID","")
-        if event.get("UNIT")==UNIT and re.fullmatch("[a-f0-9]{32}",iid) and iid not in known_prepares:
+        if event.get("UNIT")==unit and re.fullmatch("[a-f0-9]{32}",iid) and iid not in known_prepares:
             return {"earlier_manager_invocation":iid,"existing_publication_unit":state}
     return None
 
 
-def submit(state, original, proof, socket, launch, existing):
+def submit(state, original, proof, socket, launch, existing, unit=UNIT, controller=LAUNCH, fit_sha=FIT_SHA):
     intent = state/"INTENT.json"
     if intent.exists():
         prior, _ = document(intent,0o400,1 << 20)
         need(prior["terminal"] == original, "different terminal at prior submission")
         return "already-submitted-or-uncertain"
     other = existing(original)
-    record = dict(terminal=original, **proof, unit=UNIT, observed_unix_seconds=int(time.time()))
+    record = dict(terminal=original, **proof, unit=unit, observed_unix_seconds=int(time.time()))
     if other:
         once(intent,dict(record,existing=other))
         return "prior-publication"
-    once(intent,dict(record,ssh_socket=str(socket),controller=str(LAUNCH),provider_sha256=FIT_SHA))
+    once(intent,dict(record,ssh_socket=str(socket),controller=str(controller),provider_sha256=fit_sha))
     # Even if the caller crashes after manager submission, INTENT is durable.
     result = launch(proof["fleet"],socket)
     once(state/"SUBMISSION.json",dict(record,manager=result))
