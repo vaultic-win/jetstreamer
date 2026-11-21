@@ -13,7 +13,13 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v2/export145";
+const LEGACY_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v2/export145";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v3/export145";
+const TERMINAL: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-trace-20261121-v1/TERMINAL.json";
+const TERMINAL_SHA: &str = "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2";
+const ORIGINAL: &[u64] = &[166, 167, 168, 169, 170, 172];
+const SURVIVORS: &[u64] = &[166, 167, 169, 170, 172];
 const EXPORTER: &str = "horizon-holding-export145-20261121-v1.service";
 const SEALER: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
@@ -50,14 +56,80 @@ fn observe_145() -> Result<Value> {
         "image":fs::read_link(proc.join("exe"))?,"device":image.dev(),"inode":image.ino(),"mode":std::str::from_utf8(mode)?}),
     )
 }
-fn image(provider: &Value) -> Result<PathBuf> {
+fn check_generation(fleet: &Value, path: &Path) -> Result<()> {
+    let terminal = &fleet["terminal168_trace_mismatch"];
+    if terminal.is_null() && path == Path::new(LEGACY_IMAGE) {
+        return Ok(());
+    }
+    ensure!(
+        *terminal == binding(Path::new(TERMINAL), TERMINAL_SHA) && path == Path::new(IMAGE),
+        "145 provider and fleet trace generation differ"
+    );
+    Ok(())
+}
+
+fn terminal_evidence(fleet: &Value) -> Result<Value> {
+    if fleet["terminal168_trace_mismatch"].is_null() {
+        return Ok(Value::Null);
+    }
+    let t = json_pin(Path::new(TERMINAL), TERMINAL_SHA)?;
+    let unit = text(&t, "unit")?;
+    let state = show(unit)?;
+    let guard = show(text(&t["guard_state"], "Id")?)?;
+    ensure!(
+        t["schema"] == "horizon-epoch168-target-trace-terminal-v1"
+            && t["epoch"] == 168
+            && t["resource_credit_bytes"] == 0
+            && t["archive_verified"] == false
+            && t["archive_publication_authorized"] == false
+            && t["r2_mutations"] == false
+            && t["boot"]
+                == fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+                    .trim()
+                    .replace('-', "")
+            && closed(&state)
+            && state["InvocationID"] == t["invocation"]
+            && [
+                "ActiveState",
+                "SubState",
+                "ExecMainStatus",
+                "Result",
+                "NRestarts",
+                "ControlGroup"
+            ]
+            .iter()
+            .all(|k| state[*k] == t["state"][*k])
+            && closed(&guard)
+            && guard["ActiveState"] == "inactive",
+        "168 original producer or guard is no longer closed"
+    );
+    super::cgroup_empty(unit)?;
+    Ok(t)
+}
+
+fn bind_terminal(native: &Value, terminal: &Value) -> Result<()> {
+    if terminal.is_null() {
+        ensure!(
+            native.is_null(),
+            "unexpected 168 terminal for original fleet"
+        );
+    } else {
+        ensure!(
+            native["terminal"] == *terminal
+                && native["partial145"]["terminal168"]
+                    == binding(Path::new(TERMINAL), TERMINAL_SHA)
+                && native["resource_credit_bytes"] == 0,
+            "145 fit does not retain the same closed trace and commitments"
+        );
+    }
+    Ok(())
+}
+
+fn image(provider: &Value, fleet: &Value) -> Result<PathBuf> {
     let file = &provider["image"];
     let path = PathBuf::from(text(file, "path")?);
     let parent = path.parent().context("provider directory")?;
-    ensure!(
-        path == Path::new(IMAGE),
-        "joint 145 provider deployment namespace"
-    );
+    check_generation(fleet, &path)?;
     let sealref = &provider["seal"];
     ensure!(
         Path::new(text(sealref, "path")?) == parent.join("deployment-seal-receipt.json"),
@@ -151,10 +223,13 @@ fn candidate(waiting: Option<&str>) -> Result<Value> {
         json!({"admission":bound,"writer_invocation_id":r["writer_invocation_id"],"unit":UNIT,"iid":iid,"producer_pid":pid,"start_ticks":ticks,"root":path,"guard_plan":binding(&receipts.join("guard-plan.json"),text(&ready,"guard_plan_sha256")?)}),
     )
 }
-fn bind_incumbents(fleet: &Value, proof: &Value, own: &Value) -> Result<()> {
-    let rows = proof
-        .as_object()
-        .context("six live peer/guard identities")?;
+fn bind_incumbents(fleet: &Value, proof: &Value, own: &Value, terminal: &Value) -> Result<()> {
+    let expected = if terminal.is_null() {
+        ORIGINAL
+    } else {
+        SURVIVORS
+    };
+    let rows = proof.as_object().context("live peer/guard identities")?;
     let mut seen = std::collections::BTreeSet::new();
     for key in [
         "actual_executing_replays",
@@ -174,7 +249,7 @@ fn bind_incumbents(fleet: &Value, proof: &Value, own: &Value) -> Result<()> {
                 continue;
             }
             ensure!(
-                [166, 167, 168, 169, 170, 172].contains(&epoch) && seen.insert(epoch),
+                expected.contains(&epoch) && seen.insert(epoch),
                 "unexpected or duplicate fleet peer"
             );
             let peer = rows
@@ -185,6 +260,15 @@ fn bind_incumbents(fleet: &Value, proof: &Value, own: &Value) -> Result<()> {
                     && peer["invocation_id"] == row["unit"]["InvocationID"],
                 "live peer differs from accepted fleet {epoch}"
             );
+            if !terminal.is_null() {
+                let original = &terminal["live_original_owners"][epoch.to_string()];
+                ensure!(
+                    original["Id"] == peer["unit"]
+                        && original["InvocationID"] == peer["invocation_id"]
+                        && (key == "actual_active_private_diagnostics") == (epoch == 169),
+                    "different original peer or role after trace closure {epoch}"
+                );
+            }
             let timer = if let Some(iid) = row["guard_timer"]["InvocationID"].as_str() {
                 iid.to_owned()
             } else {
@@ -206,11 +290,8 @@ fn bind_incumbents(fleet: &Value, proof: &Value, own: &Value) -> Result<()> {
         }
     }
     ensure!(
-        [166, 167, 168, 169, 170, 172]
-            .iter()
-            .all(|e| seen.contains(e))
-            && rows.len() == 6,
-        "exact six incumbents required"
+        expected.iter().all(|e| seen.contains(e)) && rows.len() == expected.len(),
+        "incomplete or substituted incumbent roster"
     );
     Ok(())
 }
@@ -296,15 +377,18 @@ fn evaluate(wire: &Value, own: &Value, active: &Value, need_start: bool) -> Resu
             "foreign gap witness"
         );
     }
-    if supports {
+    if phase["seven_capable"] == true {
         ensure!(
             active["state"] == "running"
                 && (active["mode"] == "post-full" || active["mode"] == "publish")
-                && phase["seven_capable"] == true
                 && phase["image"] == wire["provider"],
-            "six-only exporter or empty handoff claimed support for a seventh worker"
+            "incompatible 145 actor claimed support for another worker"
         );
     }
+    ensure!(
+        !supports || phase["seven_capable"] == true,
+        "145 admission requires an eligible live actor"
+    );
     if need_start {
         ensure!(
             supports && wire["disk_fits"] == true,
@@ -335,7 +419,8 @@ pub(super) fn inspect(
     let ancestry = fence::ancestry()?;
     let audit = fit::observe_audit(&fleet["continuing_audit_obligation"])?;
     let p = &plan["joint_fit_145"];
-    let executable = image(p)?;
+    let executable = image(p, &fleet)?;
+    let terminal = terminal_evidence(&fleet)?;
     let provider = &p["image"];
     let mut cmd = Command::new(&executable);
     cmd.arg("joint-fit")
@@ -382,7 +467,8 @@ pub(super) fn inspect(
             && (start..=now()?).contains(&stamp),
         "stale or foreign 145 response"
     );
-    bind_incumbents(&fleet, &wire["incumbents"], &own)?;
+    bind_terminal(&wire["actual_native_fit"]["terminal168"], &terminal)?;
+    bind_incumbents(&fleet, &wire["incumbents"], &own, &terminal)?;
     evaluate(&wire, &own, &active, require_activation_compatible)?;
     if !own.is_null() {
         let id = &wire["candidate"]["identity"];
@@ -414,6 +500,7 @@ pub(super) fn inspect(
     ensure!(
         candidate(waiting_iid)? == own
             && observe_145()? == active
+            && terminal_evidence(&fleet)? == terminal
             && fit::observe_audit(&fleet["continuing_audit_obligation"])? == audit,
         "136 or 145 generation changed during fit"
     );
@@ -449,6 +536,143 @@ mod tests {
             "candidate":{"limit_bytes":CANDIDATE_DISK,"realized_bytes":0,"remaining_bytes":CANDIDATE_DISK,
             "required_total_bytes":100+CANDIDATE_DISK,"identity":null},"phase145":phase,"provider":provider,"disk_fits":true});
         (wire, active)
+    }
+
+    #[test]
+    fn provider_generation_and_native_terminal_are_bound_to_the_same_receipt() {
+        let old = json!({});
+        let receipt = binding(Path::new(TERMINAL), TERMINAL_SHA);
+        let mut fleet = json!({"terminal168_trace_mismatch":receipt});
+        for (f, path, accepted) in [
+            (&old, LEGACY_IMAGE, true),
+            (&old, IMAGE, false),
+            (&fleet, LEGACY_IMAGE, false),
+            (&fleet, IMAGE, true),
+        ] {
+            assert_eq!(check_generation(f, Path::new(path)).is_ok(), accepted);
+        }
+        fleet["terminal168_trace_mismatch"]["sha256"] = "0".repeat(64).into();
+        assert!(check_generation(&fleet, Path::new(IMAGE)).is_err());
+
+        let terminal = json!({"resource_credit_bytes":0,"archive_verified":false});
+        let mut native = json!({"terminal":terminal,"resource_credit_bytes":0,"partial145":{"terminal168":receipt}});
+        assert!(bind_terminal(&native, &terminal).is_ok());
+        assert!(bind_terminal(&native, &Value::Null).is_err());
+        assert!(bind_terminal(&Value::Null, &terminal).is_err());
+        native["resource_credit_bytes"] = 1.into();
+        assert!(bind_terminal(&native, &terminal).is_err());
+        native["resource_credit_bytes"] = 0.into();
+        native["terminal"]["archive_verified"] = true.into();
+        assert!(bind_terminal(&native, &terminal).is_err());
+        native["terminal"] = terminal.clone();
+        native["partial145"]["terminal168"]["path"] = "/foreign".into();
+        assert!(bind_terminal(&native, &terminal).is_err());
+    }
+
+    #[test]
+    fn surviving_peers_keep_the_original_invocations_and_roles() {
+        let mut fleet = json!({"actual_executing_replays":[], "actual_active_bootstraps":[], "actual_active_private_diagnostics":[]});
+        let mut proof = json!({});
+        let mut t = json!({"live_original_owners":{}});
+        for e in SURVIVORS {
+            let unit = json!({"Id":format!("worker-{e}"), "InvocationID":format!("{e:032x}")});
+            let guard = format!("{:032x}", e + 10);
+            let key = if *e == 169 {
+                "actual_active_private_diagnostics"
+            } else {
+                "actual_executing_replays"
+            };
+            fleet[key]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"epoch":e,"unit":unit,"guard_timer":{"InvocationID":guard}}));
+            proof[e.to_string()] = json!({"unit":unit["Id"],"invocation_id":unit["InvocationID"],"guard_timer_invocation_id":guard});
+            t["live_original_owners"][e.to_string()] = unit;
+        }
+        assert!(bind_incumbents(&fleet, &proof, &Value::Null, &t).is_ok());
+        assert!(bind_incumbents(&fleet, &proof, &Value::Null, &Value::Null).is_err());
+        let mut crossed = fleet.clone();
+        crossed["actual_executing_replays"][0]["epoch"] = 168.into();
+        assert!(bind_incumbents(&crossed, &proof, &Value::Null, &t).is_err());
+        let mut impersonated = proof.clone();
+        impersonated["166"]["invocation_id"] = "c".repeat(32).into();
+        crossed = fleet.clone();
+        crossed["actual_executing_replays"][0]["unit"]["InvocationID"] =
+            impersonated["166"]["invocation_id"].clone();
+        assert!(bind_incumbents(&crossed, &impersonated, &Value::Null, &t).is_err());
+        crossed = fleet.clone();
+        let private = crossed["actual_active_private_diagnostics"]
+            .as_array_mut()
+            .unwrap()
+            .pop()
+            .unwrap();
+        crossed["actual_executing_replays"]
+            .as_array_mut()
+            .unwrap()
+            .push(private);
+        assert!(bind_incumbents(&crossed, &proof, &Value::Null, &t).is_err());
+        let mut missing = proof;
+        missing.as_object_mut().unwrap().remove("167");
+        assert!(bind_incumbents(&fleet, &missing, &Value::Null, &t).is_err());
+    }
+
+    #[test]
+    #[ignore = "reads the native original 168 close and the private 145 recovery receipt on the campaign host"]
+    fn original_recovery_receipt_binds_the_closed_diagnostic_and_live_survivors() {
+        let path = Path::new(
+            "/var/lib/jetstreamer/horizon_runtime_data/root081959-live166167170-20261121-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
+        );
+        let fleet = json_pin(
+            path,
+            "dca8533d21f7e17ea46b957d5a8693a8ae04615b08905e224463624bf6f67bfb",
+        )
+        .unwrap();
+        check_generation(&fleet, Path::new(IMAGE)).unwrap();
+        let t = terminal_evidence(&fleet).unwrap();
+        let recovery = json_pin(Path::new("/var/lib/jetstreamer/horizon_runtime_data/epoch145-guarded-export-20261121-v1/state/5dfb817906f74b73a27f61a386751d75/recovery-started.json"), "abfd9eca8c8249e4f1f6b69aaa7ba05c6b970a3d0a932d0087b8cea51e0ff0c2").unwrap();
+        bind_terminal(&recovery["fresh_fit"]["terminal168"], &t).unwrap();
+        assert_eq!(recovery["fresh_fit"]["joint136_enabled"], false);
+        let mut proof = json!({});
+        for name in [
+            "actual_executing_replays",
+            "actual_active_private_diagnostics",
+        ] {
+            for row in fleet[name].as_array().unwrap() {
+                let epoch = row["epoch"].as_u64().unwrap();
+                let owner = show(row["unit"]["Id"].as_str().unwrap()).unwrap();
+                assert_eq!(owner["ActiveState"], "active");
+                let guard = if let Some(unit) = row["guard_timer"]["Id"].as_str() {
+                    unit.to_string()
+                } else {
+                    let b = &row["guard_protection"];
+                    let p = json_pin(
+                        Path::new(text(b, "path").unwrap()),
+                        text(b, "sha256").unwrap(),
+                    )
+                    .unwrap();
+                    text(&p, "timer_unit").unwrap().to_string()
+                };
+                let timer = show(&guard).unwrap();
+                assert_eq!(timer["ActiveState"], "active");
+                proof[epoch.to_string()] = json!({"unit":owner["Id"], "invocation_id":owner["InvocationID"], "guard_timer_invocation_id":timer["InvocationID"]});
+            }
+        }
+        bind_incumbents(&fleet, &proof, &Value::Null, &t).unwrap();
+        assert!(bind_incumbents(&fleet, &proof, &Value::Null, &Value::Null).is_err());
+    }
+
+    #[test]
+    fn recovery_never_admits_even_when_space_fits() {
+        let (mut wire, active) = sample("recover-full-output", false);
+        assert!(evaluate(&wire, &Value::Null, &active, false).is_ok());
+        assert!(evaluate(&wire, &Value::Null, &active, true).is_err());
+        wire["phase145"]["activation_compatible"] = true.into();
+        assert!(evaluate(&wire, &Value::Null, &active, false).is_err());
+        wire["phase145"]["seven_capable"] = true.into();
+        assert!(evaluate(&wire, &Value::Null, &active, false).is_err());
+        let (mut wire, active) = sample("publish", true);
+        wire["resources"]["available_memory_bytes"] = 49.into();
+        assert!(evaluate(&wire, &Value::Null, &active, true).is_err());
     }
 
     #[test]
