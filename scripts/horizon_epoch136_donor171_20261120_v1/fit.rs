@@ -82,7 +82,7 @@ fn aux(fleet: &Value, e: &Value) -> Result<Value> {
         json!({"retained_bookings":a,"phase_admissions":bindings,"native":native,"corrected_images":more,"fixed_image_remaining_growth_bytes":fixed_remaining,"remaining_growth_bytes":growth,"memory_bytes":mem,"cpu_quota_micros":cpu}),
     )
 }
-fn memory() -> Result<(u64, u64)> {
+pub(super) fn memory() -> Result<(u64, u64)> {
     let data = fs::read_to_string("/proc/meminfo")?;
     let get = |key: &str| -> Result<u64> {
         let mut w = data

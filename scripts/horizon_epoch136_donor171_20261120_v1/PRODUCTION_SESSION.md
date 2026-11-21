@@ -191,3 +191,23 @@ The live fleet and historical snapshot download receipt may be mode 0600.
 Bind root-owned, byte-identical immutable copies at those exact paths inside
 the helper's read-only mount namespace and retain their digests and custody
 evidence. Expose the same sealed controller image at its canonical path.
+
+## Concurrent six-peer operation
+
+For a concurrent session, supply both `standard169_cpu_loan` and
+`joint_fit_145` in the full writer plan. The first binds the historical
+standard epoch 169 route and its 4.25-core loan. The second binds the sealed
+145 capacity executable and deployment receipt. Preflight reports the
+prospective fit while the original six-owner exporter is active. Each
+activation step requires positive support from the actual 145 process and
+its native guard. The gap between export and publication retains the
+activation hold.
+
+The writer checks CPU and the complete joint fit before fencing, again after
+fencing, on admission, and after the waiting helper's guard prefire. All
+standard 169 routes must be masked and physically drained. The focused 169
+worker keeps its own reservation. The loan covers the 136 helper, guard and
+writer within the 64-core total and leaves 4.75 standard cores reserved.
+The 145 guard computes remaining candidate disk from the protected physical
+root. The sealed helper also requires the original admission free-space
+floor on its post-prefire call.

@@ -2,6 +2,7 @@
 #![recursion_limit = "384"]
 mod fence;
 mod fit;
+mod joint_fit;
 mod session;
 mod standard169;
 mod topology;
@@ -481,10 +482,26 @@ fn capacity(
     let total = n(fit, "complete_memory_plus_reserve_bytes")?;
     let cpu = n(fit, "simultaneous_cpu_upper_bound_micros")?;
     let actual = n(fit, "available_HOME_bytes")?;
+    if fit["schema"] == "horizon-136-writer-joint-fit-v1" {
+        ensure!(
+            cpu == 64_000_000
+                && fit["exclusive_standard169_cpu_lease"]["cpu_quota_micros"] == 4_250_000
+                && fit["activation_compatible"] == true
+                && fit["disk_fits"] == true
+                && actual >= n(fit, "complete_required_HOME_bytes")?,
+            "missing qualified joint capacity or CPU fence"
+        );
+    } else {
+        ensure!(
+            cpu == 63_500_000,
+            "exclusive-window CPU reservation differs"
+        );
+    }
+    // The sealed payload checks the original physical start floor again before
+    // spawning its node. Report observed free bytes on both visits.
     ensure!(
         total == 810658050048
             && n(fit, "total_memory_bytes")? >= total
-            && cpu == 63500000
             && n(fit, "protected_raw_floor_bytes")? <= protected
             && actual
                 >= protected
@@ -612,13 +629,81 @@ fn no_older_136() -> Result<()> {
     }
     Ok(())
 }
-/// Use the same topology and native fit as the writer before altering donor launchability.
-fn initial_fit(fleet_path: &Path, fleet_sha: &str, fleet: &Value) -> Result<Value> {
-    verify_fleet(fleet)?;
-    topology::exclusive_post172(fleet)?;
-    no_older_136()?;
-    fit::inspect(fleet_path, fleet_sha, None)
+fn joint_mode(plan: &Value) -> Result<bool> {
+    let joint = standard169::requested(plan)?;
+    ensure!(
+        joint == plan.get("joint_fit_145").is_some(),
+        "joint fit requires both the capacity provider and the exclusive CPU loan"
+    );
+    Ok(joint)
 }
+
+fn inspect_fit(
+    plan: &Value,
+    fleet_path: &Path,
+    fleet_sha: &str,
+    waiting: Option<&str>,
+    for_activation: bool,
+) -> Result<Value> {
+    let fleet = json_pin(fleet_path, fleet_sha)?;
+    verify_fleet(&fleet)?;
+    no_older_136()?;
+    if joint_mode(plan)? {
+        let cpu = standard169::inspect(fleet_path, fleet_sha)?;
+        let mut fit = joint_fit::inspect(plan, fleet_path, fleet_sha, waiting, for_activation)?;
+        ensure!(
+            cpu["fleet"] == fit["fleet"],
+            "CPU and joint fit use different fleets"
+        );
+        fit["standard169_preflight"] = cpu;
+        Ok(fit)
+    } else {
+        topology::exclusive_post172(&fleet)?;
+        fit::inspect(fleet_path, fleet_sha, waiting)
+    }
+}
+
+fn apply_cpu_lease(fit: &mut Value, native: &Value) -> Result<()> {
+    let cpu = &fit["standard169_preflight"];
+    let accounting = &cpu["accounting"];
+    let lease = &native["standard169_cpu_lease"];
+    let borrowed = n(lease, "cpu_quota_micros")?;
+    let before = n(fit, "unfenced_with_candidate_cpu_micros")?;
+    let actual = before
+        .checked_sub(borrowed)
+        .context("CPU loan exceeds booked total")?;
+    let retained: BTreeSet<String> =
+        serde_json::from_value(lease["masked_standard_routes"].clone())?;
+    let routes = cpu["current_standard_routes"]
+        .as_object()
+        .context("current standard 169 routes")?;
+    ensure!(
+        fit["schema"] == "horizon-136-writer-joint-fit-v1"
+            && fit["activation_compatible"] == true
+            && fit["disk_fits"] == true
+            && borrowed == 4_250_000
+            && actual == 64_000_000
+            && n(accounting, "candidate_cpu_micros")? == borrowed
+            && n(accounting, "unfenced_simultaneous_micros")? == before
+            && n(accounting, "online_and_allowed_cpu_micros")? == actual
+            && n(
+                accounting,
+                "prospective_host_total_with_exclusive_loan_micros"
+            )? == actual
+            && lease["unassigned_standard169_cpu_micros"] == 4_750_000
+            && lease["additional_host_cpu_micros"] == 0
+            && !routes.is_empty()
+            && routes
+                .iter()
+                .all(|(name, row)| retained.contains(name) && row["load"] == "masked")
+            && lease["registry"].is_object(),
+        "CPU loan is incomplete or does not fit the host"
+    );
+    fit["simultaneous_cpu_upper_bound_micros"] = json!(actual);
+    fit["exclusive_standard169_cpu_lease"] = lease.clone();
+    Ok(())
+}
+
 fn run() -> Result<()> {
     use std::os::fd::AsRawFd;
     let a: Vec<_> = std::env::args().skip(1).collect();
@@ -651,12 +736,11 @@ fn run() -> Result<()> {
         ensure!(a.len() == 5, "preflight PLAN SHA FLEET SHA");
         let plan = json_pin(Path::new(&a[1]), &a[2])?;
         let fleet_path = Path::new(&a[3]);
-        let fleet = json_pin(fleet_path, &a[4])?;
         let controller = installed_controller(&plan)?;
         generation(&plan)?;
         let ancestry = fence::ancestry()?;
         let disk = donor_disk()?;
-        let fit = initial_fit(fleet_path, &a[4], &fleet)?;
+        let fit = inspect_fit(&plan, fleet_path, &a[4], None, false)?;
         println!(
             "{}",
             json!({"controller":controller,"plan":binding(Path::new(&a[1]),&a[2]),"donor_ancestry":ancestry,"donor_disk":disk,"fit":fit,"donor_fenced":false,"admission_granted":false})
@@ -736,32 +820,34 @@ fn phase(a: &[String]) -> Result<Value> {
     generation(&plan)?;
     let (author, iid) = writer(&plan)?;
     let fpath = Path::new(&a[3]);
-    let f = json_pin(fpath, &a[4])?;
     let fleet = binding(fpath, &a[4]);
     let anc = fence::ancestry()?;
     if a[0] == "establish" {
-        initial_fit(fpath, &a[4], &f)?;
-
-        let cpu = standard169::requested(&plan)?;
-        if cpu {
-            standard169::inspect(fpath, &a[4])?;
-        }
+        let cpu = joint_mode(&plan)?;
+        inspect_fit(&plan, fpath, &a[4], None, true)?;
         let native = fence::establish(cpu)?;
-        let loan = json!({"schema":"horizon-exclusive-171-to136-v1","complete_fleet":fleet,"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":now()?,"ancestry":anc,"HOME":donor_disk()?,"native":native,"new_memory_credit_bytes":0,"replay_launched":false});
+        let mut fenced_fit = inspect_fit(&plan, fpath, &a[4], None, true)?;
+        if cpu {
+            apply_cpu_lease(&mut fenced_fit, &native)?;
+        }
+        ensure!(
+            fence::check(cpu)? == native,
+            "donor changed during post-fence fit"
+        );
+        let loan = json!({"schema":"horizon-exclusive-171-to136-v1","complete_fleet":fleet,"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":now()?,"ancestry":anc,"HOME":donor_disk()?,"native":native,"writer_plan":plan_ref,"post_fence_host_cpu_micros":fenced_fit["simultaneous_cpu_upper_bound_micros"],"new_memory_credit_bytes":0,"replay_launched":false});
         let receipt = file_write(&base.join("donor171.json"), &loan)?;
         return Ok(receipt);
     }
-    verify_fleet(&f)?;
-    topology::exclusive_post172(&f)?;
     no_older_136()?;
     let donor_path = base.join("donor171.json");
     let bytes = root_file(&donor_path, 1 << 20)?;
-    let cpu = standard169::requested(&plan)?;
+    let cpu = joint_mode(&plan)?;
     let native = fence::check(cpu)?;
     let loan: Value = serde_json::from_slice(&bytes)?;
     ensure!(
         loan["writer"] == author
             && loan["writer_invocation_id"] == iid
+            && loan["writer_plan"] == plan_ref
             && loan["native"] == native
             && loan["ancestry"] == anc
             && loan["HOME"] == donor_disk()?,
@@ -769,7 +855,10 @@ fn phase(a: &[String]) -> Result<Value> {
     );
     let dref = binding(&donor_path, &format!("{:x}", Sha256::digest(bytes)));
     let own = a.get(5).map(String::as_str);
-    let fit = fit::inspect(fpath, &a[4], own)?;
+    let mut fit = inspect_fit(&plan, fpath, &a[4], own, true)?;
+    if cpu {
+        apply_cpu_lease(&mut fit, &native)?;
+    }
     ensure!(fence::check(cpu)? == native, "fence changed during fit");
     no_older_136()?;
     let cap_path = base.join("capacity.json");
@@ -792,6 +881,10 @@ fn phase(a: &[String]) -> Result<Value> {
         session::load_admission_for_post(&plan_ref, &dref, &iid)?["plan"].clone()
     };
     let mut full = capacity(&fit, protected, &dref, &fleet, &author, &iid)?;
+    if cpu {
+        full["complete_cpu_quota_micros"] = fit["simultaneous_cpu_upper_bound_micros"].clone();
+        full["exclusive_standard169_cpu_lease"] = fit["exclusive_standard169_cpu_lease"].clone();
+    }
     full["writer_plan"] = plan_ref.clone();
     full["payload_plan"] = payload_ref.clone();
     check_plan_bindings(&plan, &plan_ref, &payload_ref, &full)?;
@@ -814,6 +907,35 @@ mod tests {
     fn fit() -> Value {
         json!({"complete_memory_plus_reserve_bytes":810658050048u64,"simultaneous_cpu_upper_bound_micros":63500000,"available_HOME_bytes":CANDIDATE_DISK+100,"total_memory_bytes":810902843392u64,"protected_raw_floor_bytes":100})
     }
+    #[test]
+    fn joint_capacity_needs_the_paid_and_masked_cpu_lease() {
+        let mut fit = fit();
+        fit["schema"] = json!("horizon-136-writer-joint-fit-v1");
+        fit["disk_fits"] = json!(true);
+        fit["activation_compatible"] = json!(true);
+        fit["complete_required_HOME_bytes"] = json!(CANDIDATE_DISK + 100);
+        fit["unfenced_with_candidate_cpu_micros"] = json!(68_250_000);
+        fit["standard169_preflight"] = json!({
+            "current_standard_routes":{"route.service":{"load":"masked"}},
+            "accounting":{"candidate_cpu_micros":4_250_000,"unfenced_simultaneous_micros":68_250_000,
+                "online_and_allowed_cpu_micros":64_000_000,"prospective_host_total_with_exclusive_loan_micros":64_000_000}
+        });
+        let native = json!({"standard169_cpu_lease":{"masked_standard_routes":["route.service"],"cpu_quota_micros":4_250_000,
+            "unassigned_standard169_cpu_micros":4_750_000,"additional_host_cpu_micros":0,"registry":{"path":"fixture"}}});
+        let receipt =
+            |f: &Value| capacity(f, 100, &Value::Null, &Value::Null, &Value::Null, "writer");
+        assert!(receipt(&fit).is_err());
+        let mut bad = fit.clone();
+        bad["standard169_preflight"]["current_standard_routes"]["route.service"]["load"] =
+            json!("loaded");
+        assert!(apply_cpu_lease(&mut bad, &native).is_err());
+        assert!(apply_cpu_lease(&mut fit.clone(), &Value::Null).is_err());
+        apply_cpu_lease(&mut fit, &native).unwrap();
+        assert!(receipt(&fit).is_ok());
+        fit["available_HOME_bytes"] = json!(CANDIDATE_DISK + 99);
+        assert!(receipt(&fit).is_err());
+    }
+
     #[test]
     fn exactly_one_donor_and_private_root() {
         let v = capacity(&fit(), 100, &Value::Null, &Value::Null, &Value::Null, "x").unwrap();
