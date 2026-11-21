@@ -708,7 +708,7 @@ fn run(args: &[String]) -> Result<()> {
         let proof=full266::validate(&json!(b))?; let m=properties(full266::UNIT)?;
         if m["ActiveState"]=="active" {
             let pid=proof["pid"].as_u64().context("266 PID")?;
-            ensure!(m["InvocationID"]==proof["iid"] && m["MainPID"]==pid.to_string() && m["NRestarts"]=="0","266 due census changed");
+            ensure!(m["InvocationID"]==proof["iid"] && m["MainPID"].as_str().and_then(|s|s.parse::<u64>().ok())==Some(pid) && m["NRestarts"]=="0","266 due census changed");
             full266::mapped_node(pid)?;
         }
     }

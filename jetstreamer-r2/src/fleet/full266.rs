@@ -33,7 +33,7 @@ pub(super) fn live(c: &DiagnosticClaim, current: &Value) -> Result<()> {
     ensure!(
         current["Id"] == bridge::UNIT
             && current["InvocationID"] == c.invocation_id
-            && current["MainPID"] == pid.to_string()
+            && current["MainPID"].as_str().and_then(|s|s.parse::<u64>().ok())==Some(pid)
             && current["NRestarts"] == "0"
             && current["ActiveState"] == "active"
             && current["SubState"] == "running"
