@@ -14,6 +14,8 @@ mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
 mod post;
+mod publication;
+mod publication_tree;
 mod recover;
 mod source_lease;
 mod stable;
@@ -582,6 +584,14 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        [_, mode, path, digest, full, sha] if mode == "publish" => publication::publish(
+            Bound {
+                path: path.into(),
+                sha256: digest.clone(),
+            },
+            full,
+            sha,
+        ),
         [_, mode, path, digest, sha] if mode == "post-full" => post::full(
             Bound {
                 path: path.into(),
