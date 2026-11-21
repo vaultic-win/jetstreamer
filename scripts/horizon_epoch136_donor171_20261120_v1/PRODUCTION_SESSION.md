@@ -16,6 +16,14 @@ No independently proven donor CPU credit exists. Retained memory remains
 peer, audit, auxiliary, OS and historical obligations remain. No 172 closure is
 treated as resource or disk credit.
 
+Use `admit136 cpu-preflight FLEET SHA` to inspect the CPU reservation for a
+concurrent epoch 136 run. It checks the 43-core historical booking against
+its four original producer invocations and the standard epoch 169 retry, then
+reads the current focused 169 owner and both PID 1 unit inventories. The report
+lists the closed standard launch routes and the proposed 4.25-core allocation.
+It takes no lease. The existing session continues to require its exclusive
+topology until a compatible writer and guard can enforce the loan.
+
 The new topology check binds the exact post-172 closure and requires its producer
 and guard to remain drained. It refuses live 169 actors/guards, while the existing
 shared operation lock excludes concurrent 169/172 admission. The complete native

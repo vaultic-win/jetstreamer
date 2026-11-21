@@ -3,6 +3,7 @@
 mod fence;
 mod fit;
 mod session;
+mod standard169;
 mod topology;
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -570,6 +571,11 @@ fn run() -> Result<()> {
         !a.is_empty(),
         "expected inventory|preflight|establish|prepare|post|session|register-status|release"
     );
+    if a[0] == "cpu-preflight" {
+        ensure!(a.len() == 3, "cpu-preflight FLEET SHA");
+        println!("{}", standard169::inspect(Path::new(&a[1]), &a[2])?);
+        return Ok(());
+    }
     if a.first().is_some_and(|mode| mode == "audit-owner") {
         ensure!(a.len() == 3, "audit-owner FLEET SHA");
         let fleet = json_pin(Path::new(&a[1]), &a[2])?;
