@@ -135,8 +135,13 @@ fn peer_names(fleet: &Value, ad: &Value, joint: bool) -> Result<BTreeSet<String>
         }
     }
     ensure!(
-        epochs == BTreeSet::from([166, 167, 168, 169, 170, 172]),
-        "authoritative fleet does not have the six admitted epochs"
+        epochs
+            == if cfg!(materialized145_only) {
+                BTreeSet::from([167, 168, 169, 170, 172])
+            } else {
+                BTreeSet::from([166, 167, 168, 169, 170, 172])
+            },
+        "authoritative fleet differs from the admitted roster"
     );
     Ok(names)
 }
@@ -341,6 +346,7 @@ fn newest_sample(plan_ref: &Value) -> Result<(u64, u64, Option<Value>)> {
 }
 
 pub struct Fit {
+    successor_fleet: Option<Value>,
     pub evidence: Value,
     pub names: BTreeSet<String>,
     pub joint: bool,
@@ -442,6 +448,18 @@ impl Fit {
     }
     pub fn topology(&self) -> Result<()> {
         validate_roster(&self.names, self.joint)?;
+        if cfg!(materialized145_only) {
+            crate::closed166::drained()?;
+            let fresh = crate::joint::incumbents(
+                self.successor_fleet
+                    .as_ref()
+                    .context("missing five-owner fleet")?,
+            )?;
+            ensure!(
+                self.evidence["remaining_native_owners"] == json!(fresh),
+                "remaining producer or guard changed"
+            );
+        }
         for (pid, ticks, unit) in &self.owners {
             ensure!(
                 crate::native::ticks(*pid)? == *ticks
@@ -500,6 +518,11 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
     let names = peer_names(&fleet, &ad, joint)?;
+    let retired = if cfg!(materialized145_only) {
+        Some(crate::closed166::evidence()?)
+    } else {
+        None
+    };
     let start = std::time::Instant::now();
     loop {
         match validate_roster(&names, joint) {
@@ -604,7 +627,9 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     let before = meminfo("MemAvailable:")?;
     let mut rss = 0;
     for (k, row) in post["owners"].as_object().context("172 native owners")? {
-        rss += resident(row, k.parse()?)?.min(resident(row, k.parse()?)?);
+        if !(cfg!(materialized145_only) && k == "166") {
+            rss += resident(row, k.parse()?)?.min(resident(row, k.parse()?)?);
+        }
     }
     let live172 = native_values(ad["producer_unit"].as_str().context("172 native unit")?)?;
     ensure!(
@@ -636,6 +661,9 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         .values()
     {
         let unit = row["unit"].as_str().context("owner name")?;
+        if cfg!(materialized145_only) && unit == crate::closed166::NODE {
+            continue;
+        }
         for process in row["processes"].as_array().context("owner processes")? {
             owners.push((
                 u32::try_from(process[0].as_u64().context("owner PID")?)?,
@@ -650,8 +678,14 @@ pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
         crate::native::ticks(pid)?,
         ad["producer_unit"].as_str().context("172 unit")?.to_owned(),
     ));
-    let evidence = json!({"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    let guarded = if cfg!(materialized145_only) {
+        Some(crate::joint::incumbents(&fleet)?)
+    } else {
+        None
+    };
+    let evidence = json!({"remaining_native_owners":guarded,"completed166":retired,"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
+        successor_fleet: cfg!(materialized145_only).then_some(fleet),
         evidence,
         joint,
         names,

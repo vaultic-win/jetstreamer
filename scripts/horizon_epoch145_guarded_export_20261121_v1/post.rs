@@ -76,6 +76,9 @@ fn immutable_copy(path: &Path, bytes: &[u8]) -> Result<Bound> {
     Ok(b)
 }
 pub(super) fn terminal(iid: &str) -> Result<()> {
+    terminal_for(UNIT, iid)
+}
+pub(super) fn terminal_for(unit: &str, iid: &str) -> Result<()> {
     let rows = capacity::run(
         "/usr/bin/journalctl",
         &[
@@ -83,7 +86,7 @@ pub(super) fn terminal(iid: &str) -> Result<()> {
             "-ojson",
             "--output-fields=UNIT,INVOCATION_ID,MESSAGE_ID",
             "_PID=1",
-            &format!("UNIT={UNIT}"),
+            &format!("UNIT={unit}"),
             &format!("INVOCATION_ID={iid}"),
             "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448",
         ],
@@ -92,14 +95,14 @@ pub(super) fn terminal(iid: &str) -> Result<()> {
     ensure!(
         rows.lines()
             .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-            .any(|v| v["UNIT"] == UNIT
+            .any(|v| v["UNIT"] == unit
                 && v["INVOCATION_ID"] == iid
                 && v["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"),
         "missing successful export termination"
     );
     Ok(())
 }
-fn run_child(
+pub(super) fn run_child(
     command: &mut Command,
     fit: &capacity::Fit,
     lease: &source_lease::ReadLease,
@@ -328,7 +331,9 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
 }
 
 pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
-    let image = if joint {
+    let image = if cfg!(materialized145_only) {
+        PathBuf::from(materialized::IMAGE)
+    } else if joint {
         joint::IMAGE.into()
     } else {
         Path::new(ROOT).join("post-tools/export145")
@@ -341,12 +346,17 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let _lock = lock()?;
     pending()?;
     source_identity()?;
-    terminal(EXPORT)?;
-    let completed = Path::new(BASE).join("state").join(EXPORT);
+    let export = if cfg!(materialized145_only) {
+        materialized::completion_owner()?
+    } else {
+        EXPORT.into()
+    };
+    terminal(&export)?;
+    let completed = Path::new(BASE).join("state").join(&export);
     let done = custody::binding(&completed.join("complete.json"))?;
     let d = custody::evidence(&done)?;
     ensure!(
-        d["iid"] == EXPORT
+        d["iid"] == export
             && d["r2_mutations"] == false
             && !completed.join("failed.json").try_exists()?,
         "export incomplete or failed"
@@ -360,7 +370,7 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let c: Value = serde_json::from_slice(&raw)?;
     ensure!(
         c["schema"] == "horizon-epoch145-guarded-private-prefix-completion-v1"
-            && c["actor_iid"] == EXPORT
+            && c["actor_iid"] == export
             && c["r2_mutations"] == false,
         "export completion changed"
     );
@@ -370,7 +380,12 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let expected = digest(e, "archive_sha256")?;
     let provenance = digest(e, "expected_output_provenance_sha256")?;
     let identity = custody::frozen_identity(&archive)?;
-    let alloc = custody::evidence(&custody::binding(&completed.join("allocated.json"))?)?;
+    let alloc = custody::evidence(&custody::binding(
+        &Path::new(BASE)
+            .join("state")
+            .join(EXPORT)
+            .join("allocated.json"),
+    )?)?;
     ensure!(
         identity.device == 64512
             && identity.inode == 103237059

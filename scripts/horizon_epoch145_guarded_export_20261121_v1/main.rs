@@ -13,8 +13,10 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
+mod closed166;
 mod joint;
 mod joint_candidate;
+mod materialized;
 mod post;
 mod publication;
 mod publication_tree;
@@ -586,6 +588,19 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        #[cfg(materialized145_only)]
+        [_, mode, fleet, digest, sha] if mode == "recover-full-output" => materialized::run(
+            Bound {
+                path: fleet.into(),
+                sha256: digest.clone(),
+            },
+            sha,
+        ),
+        #[cfg(materialized145_only)]
+        [_, mode, parent, sha] if mode == "recover-worker" => {
+            materialized::verify(parent.parse()?, sha)
+        }
+        #[cfg(not(materialized145_only))]
         [_, mode, fleet, digest, sha, tail @ ..] if mode == "joint-fit" => joint::inspect(
             Bound {
                 path: fleet.into(),
@@ -611,9 +626,9 @@ fn run() -> Result<()> {
             sha,
             cfg!(joint145_only),
         ),
-        #[cfg(not(joint145_only))]
+        #[cfg(not(any(joint145_only, materialized145_only)))]
         [_, mode, sha, parent, fd] if mode == "worker" => child(sha, parent.parse()?, fd.parse()?),
-        #[cfg(not(joint145_only))]
+        #[cfg(not(any(joint145_only, materialized145_only)))]
         [_, mode, path, digest, sha] if mode == "preflight" || mode == "run" => supervise(
             Bound {
                 path: path.into(),

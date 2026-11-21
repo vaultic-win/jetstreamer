@@ -204,7 +204,7 @@ fn phase(sha: &str, staged: &Bound) -> Result<Value> {
         "output_device":m.dev(),"output_inode":m.ino()}),
     )
 }
-fn incumbents(fleet: &Value) -> Result<BTreeMap<String, Value>> {
+pub(super) fn incumbents(fleet: &Value) -> Result<BTreeMap<String, Value>> {
     let mut owners = BTreeMap::new();
     for field in [
         "actual_executing_replays",
@@ -251,7 +251,11 @@ fn incumbents(fleet: &Value) -> Result<BTreeMap<String, Value>> {
     }
     ensure!(
         owners.keys().map(String::as_str).collect::<BTreeSet<_>>()
-            == BTreeSet::from(["166", "167", "168", "169", "170", "172"]),
+            == if cfg!(materialized145_only) {
+                BTreeSet::from(["167", "168", "169", "170", "172"])
+            } else {
+                BTreeSet::from(["166", "167", "168", "169", "170", "172"])
+            },
         "incomplete incumbents"
     );
     Ok(owners)
