@@ -2160,6 +2160,16 @@ impl HistoricalRuntimeClient {
     pub fn shutdown_with_outcome(
         &mut self,
     ) -> Result<HistoricalShutdownOutcome, HistoricalRuntimeError> {
+        self.shutdown_with_cleanup_grace(self.timeouts.reap)
+    }
+
+    /// Allow a snapshot-backed Bank a bounded interval to destroy its storage
+    /// after its ordered acknowledgement. The forced-reap fallback retains its
+    /// existing independent deadline.
+    pub(crate) fn shutdown_with_cleanup_grace(
+        &mut self,
+        grace: Duration,
+    ) -> Result<HistoricalShutdownOutcome, HistoricalRuntimeError> {
         if self.closed {
             return Ok(HistoricalShutdownOutcome::AlreadyClosed);
         }
@@ -2177,7 +2187,7 @@ impl HistoricalRuntimeClient {
         self.transport.take();
         let mut child = self.child.take().ok_or(HistoricalRuntimeError::Closed)?;
         let worker_pid = child.id();
-        let status = match wait_for_child(&mut child, self.timeouts.reap) {
+        let status = match wait_for_child(&mut child, grace) {
             Ok(Some(status)) => status,
             Ok(None) => {
                 let termination_error = child.kill().err();
@@ -2203,7 +2213,7 @@ impl HistoricalRuntimeClient {
                     // fallback, not a replay or validation failure.
                     log::warn!(
                         "historical worker acknowledged shutdown but required forced cleanup after {:?}",
-                        self.timeouts.reap,
+                        grace,
                     );
                     return Ok(HistoricalShutdownOutcome::Reaped {
                         worker_pid,

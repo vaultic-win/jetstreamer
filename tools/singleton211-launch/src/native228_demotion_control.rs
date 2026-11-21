@@ -1,6 +1,9 @@
 //! Finite epoch 228 controller. The actual worker remains blocked on its private
 //! request pipe until an independent positive guard and a second complete fit.
+#[path = "child_cleanup.rs"]
+mod child_cleanup;
 use super::*;
+use child_cleanup::wait_for_cleanup;
 use std::os::{fd::AsRawFd, unix::fs::FileTypeExt};
 use std::process::{Child, ChildStdin, ChildStdout};
 const GUARD_EXE: &str = "/var/lib/jetstreamer/horizon228-demotion-controls-v160-a1-qualified/guard";
@@ -450,18 +453,12 @@ fn checked_floor(fit: &Value, installed: Option<u64>) -> Result<(u64, u64)> {
     Ok((floor, required))
 }
 fn wait_for(child: &mut Child, timeout: Duration) -> Result<std::process::ExitStatus> {
-    let end = Instant::now() + timeout;
-    loop {
-        if let Some(s) = child.try_wait()? {
-            return Ok(s);
-        }
-        if Instant::now() >= end {
-            let _ = child.kill();
-            let _ = child.wait();
-            bail!("finite subprocess deadline");
-        }
-        std::thread::sleep(Duration::from_millis(200));
+    if let Some(status) = wait_for_cleanup(child, timeout)? {
+        return Ok(status);
     }
+    child.kill()?;
+    let _ = wait_for_cleanup(child, Duration::from_secs(5))?;
+    bail!("protocol subprocess exceeded its deadline")
 }
 fn stop_original_timer(n: &mut Native, id: &str) -> Result<()> {
     let t = n.show(TIMER228)?;
@@ -663,11 +660,6 @@ fn exercise(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
     n.deadline = None;
     let status = wait_for(&mut peer, Duration::from_secs(2700))?;
     ensure!(status.success(), "protocol failed {status}");
-    let manager_status = wait_for(&mut manager, Duration::from_secs(40))?;
-    ensure!(
-        manager_status.success(),
-        "worker systemd-run failed {manager_status}"
-    );
     let proof_file = n.root.join("protocol.stderr");
     let proof = Bound::new(&proof_file, hash(&proof_file)?);
     let response = proof.sealed()?;
@@ -682,6 +674,37 @@ fn exercise(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
             && response["checkpoint"]["next_write_version"] == 113_087_684_591u64
             && response["checkpoint"]["writes"] == json!([]),
         "driver evidence differs"
+    );
+    // The worker acknowledges Shutdown before dropping its Bank and private
+    // AccountsDb. Preserve validated protocol evidence before waiting for that
+    // independent Linux process lifecycle.
+    let ack = save_json(
+        &n.root,
+        "shutdown-ack.json",
+        &json!({"schema":"horizon-guarded-worker-shutdown-ack-v1","unit":COLD,
+            "invocation_id":iid,"worker_pid":pid,"worker":worker_image(),"origin":origin_ref,
+            "release":durable,"protocol":protocol_image(),"protocol_proof":proof,
+            "protocol_exit_code":status.code(),"shutdown_acknowledged":true,
+            "recorded_unix_seconds":now()?,"worker_exit_code":null,
+            "worker_drained":false,"native_cold_qualified":false,"resource_release_authorized":false}),
+    )?;
+    let close_wait = Instant::now();
+    let manager_status = wait_for_cleanup(&mut manager, Duration::from_secs(300))?;
+    let closed = save_json(
+        &n.root,
+        "launcher-close.json",
+        &json!({
+            "schema":"horizon-guarded-worker-launcher-close-v1","shutdown_ack":ack,
+            "launcher_pid":manager.id(),"launcher_exit_code":manager_status.and_then(|s|s.code()),
+            "launcher_exit_observed":manager_status.is_some(),"elapsed_millis":close_wait.elapsed().as_millis() as u64,
+            "worker_exit_code":null,"resource_release_authorized":false
+        }),
+    )?;
+    let manager_status = manager_status
+        .context("guarded worker cleanup exceeded 300 seconds after acknowledged Shutdown")?;
+    ensure!(
+        manager_status.success(),
+        "worker systemd-run failed {manager_status}"
     );
     let terminal = manager_journal(n, COLD, iid)?;
     ensure!(
@@ -700,7 +723,7 @@ fn exercise(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
         "guard issued stop"
     );
     Ok(
-        json!({"schema":"horizon-epoch228-demotion-cold-controller-completed-v1","epoch":228,"unit":COLD,"producer_iid":iid,"worker_pid":pid,"origin":origin_ref,"release":durable,"protocol":protocol_image(),"worker":worker_image(),"protocol_proof":proof,"worker_exit_code":manager_status.code(),"protocol_exit_code":status.code(),"journal":terminal,"controller":outer,"timer_invocation_id":timer_id,"timer_stopped":true,"worker_drained":true,"native_cold_qualified":true,"replay_entries":0,"replay_launch_authorized":false,"r2_mutations":false}),
+        json!({"schema":"horizon-epoch228-demotion-cold-controller-completed-v1","epoch":228,"unit":COLD,"producer_iid":iid,"worker_pid":pid,"origin":origin_ref,"release":durable,"protocol":protocol_image(),"worker":worker_image(),"protocol_proof":proof,"launcher_close":closed,"worker_exit_code":manager_status.code(),"protocol_exit_code":status.code(),"journal":terminal,"controller":outer,"timer_invocation_id":timer_id,"timer_stopped":true,"worker_drained":true,"native_cold_qualified":true,"replay_entries":0,"replay_launch_authorized":false,"r2_mutations":false}),
     )
 }
 pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {

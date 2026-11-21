@@ -364,6 +364,20 @@ pub(crate) fn checkpoint(cp: &h::HistoricalCheckpoint) -> Result<(), String> {
     }
     Ok(())
 }
+pub(crate) fn require_natural_close(outcome: h::HistoricalShutdownOutcome) -> Result<(), String> {
+    match outcome {
+        h::HistoricalShutdownOutcome::Reaped {
+            worker_pid,
+            forced: false,
+        } => {
+            log::info!("epoch 228 qualification worker reaped after natural exit pid={worker_pid}");
+            Ok(())
+        }
+        other => Err(format!(
+            "epoch 228 qualification worker lacked a natural exit: {other:?}"
+        )),
+    }
+}
 pub(crate) fn capability() -> Result<serde_json::Value, String> {
     let selection = select(FIRST..END + 1, true, true)?;
     worker_profile(selection.descriptor)?;
@@ -383,6 +397,27 @@ pub(crate) fn capability() -> Result<serde_json::Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn qualification_requires_a_natural_reap_after_shutdown() {
+        use h::HistoricalShutdownOutcome::*;
+        assert!(
+            require_natural_close(Reaped {
+                worker_pid: 42,
+                forced: false
+            })
+            .is_ok()
+        );
+        for outcome in [
+            Reaped {
+                worker_pid: 42,
+                forced: true,
+            },
+            ReapPending { worker_pid: 42 },
+            AlreadyClosed,
+        ] {
+            assert!(require_natural_close(outcome).is_err());
+        }
+    }
     #[test]
     fn exact_private_route_cannot_promote_ordinary_or_epoch229() {
         assert!(select(FIRST..END + 1, true, true).is_ok());

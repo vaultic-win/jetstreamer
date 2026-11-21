@@ -941,6 +941,20 @@ impl HistoricalReplay {
         let mut state = self.state.lock().map_err(|_| {
             "historical replay lock poisoned while shutting down worker".to_string()
         })?;
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        {
+            // This dedicated parent already requires the candidate identity
+            // and original checkpoint before accepting its first entry.
+            let client = state
+                .client
+                .as_mut()
+                .ok_or("missing owned qualification worker")?;
+            let result = client
+                .shutdown_with_cleanup_grace(std::time::Duration::from_secs(300))
+                .map_err(|error| format!("qualification worker shutdown failed: {error}"))?;
+            crate::epoch228_demotion::require_natural_close(result)
+        }
+        #[cfg(not(feature = "epoch228-called-program-demotion-qualification"))]
         match state.client.as_mut() {
             Some(client) => client
                 .shutdown()
