@@ -13,6 +13,7 @@ import signal
 import stat
 import subprocess
 import sys
+from typing import NamedTuple
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1")
 LIVE_SHA = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe"
@@ -24,6 +25,15 @@ LEGACY = Path("/home/sol/horizon")
 WATCH_UNIT = "horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service"
 WATCH_EXE = "/usr/local/lib/jetstreamer/horizon-r2-rust-20261017-v3-auth-only/jetstreamer-r2-progressive"
 NOFOLLOW = os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+
+
+class Producer(NamedTuple):
+    epoch: int
+    unit: str
+    invocation_id: str
+
+
+ORIGINAL = Producer(166, UNIT, IID)
 
 
 def require(condition, message):
@@ -97,7 +107,8 @@ def watcher():
     return LEGACY
 
 
-def authority(stack, root, expected_digest):
+def authority(stack, root, expected_digest, producer=ORIGINAL):
+    epoch, unit, iid = producer
     directory(root, 0)
     raw_live = seal(stack, root / "LIVE.json", 0o600)
     require(sha(raw_live) == expected_digest, "live authority digest differs")
@@ -105,16 +116,16 @@ def authority(stack, root, expected_digest):
     raw_term = seal(stack, root / "TERMINAL_SUCCESS.json", 0o400)
     term = json.loads(raw_term)
     manager = term["manager_terminal"]
-    require(live["schema"] == "horizon-166-live-to-terminal-witness-v1" and live["epoch"] == 166
-            and live["native"]["manager"]["Id"] == UNIT and live["native"]["manager"]["InvocationID"] == IID
-            and term["schema"] == "terminal166-success-v1" and term["epoch"] == 166
-            and term["producer_unit"] == UNIT and term["producer_invocation_id"] == IID
+    require(live["schema"] == f"horizon-{epoch}-live-to-terminal-witness-v1" and live["epoch"] == epoch
+            and live["native"]["manager"]["Id"] == unit and live["native"]["manager"]["InvocationID"] == iid
+            and term["schema"] == f"terminal{epoch}-success-v1" and term["epoch"] == epoch
+            and term["producer_unit"] == unit and term["producer_invocation_id"] == iid
             and term["source_admission"] == live["admission"]
             and term["live"] == {"path": str(root / "LIVE.json"), "sha256": expected_digest}
-            and term["terminal_166_disposition"] == "node-published-local-cohort"
+            and term[f"terminal_{epoch}_disposition"] == "node-published-local-cohort"
             and all(term[k] is False for k in ("archive_publication_authorized", "new_producer_authorized", "canonical_r2_verified"))
             and (manager["_PID"], manager["_BOOT_ID"], manager["UNIT"], manager["INVOCATION_ID"], manager["MESSAGE_ID"])
-            == ("1", live["boot_id"].replace("-", ""), UNIT, IID, "7ad2d189f7e94e70a38c781354912448"),
+            == ("1", live["boot_id"].replace("-", ""), unit, iid, "7ad2d189f7e94e70a38c781354912448"),
             "terminal authority or original producer differs")
     return live, term, sha(raw_term)
 
@@ -128,11 +139,11 @@ def inherited_program(stack, path, digest):
     return fd
 
 
-def receive(root, expected_digest, lock_id, watched, native, native_hash, consumer, consumer_hash, args):
+def receive(root, expected_digest, lock_id, watched, native, native_hash, consumer, consumer_hash, args, producer=ORIGINAL):
     require(os.geteuid() == 0, "receiver requires root")
-    epoch = 166
+    epoch = producer.epoch
     with contextlib.ExitStack() as stack:
-        live, term, terminal_hash = authority(stack, root, expected_digest)
+        live, term, terminal_hash = authority(stack, root, expected_digest, producer)
         output = source_dir(live["output"])
         batches = source_dir(live["private_batch_receipts"])
         tx = term["transaction_id"]

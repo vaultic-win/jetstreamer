@@ -10,12 +10,26 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+#[cfg(not(feature = "retry10"))]
 mod cadence;
 mod receipt;
+#[cfg(feature = "retry10")]
+#[path = "../horizon_epoch166_retry10_delivery_20261121_v1/wait.rs"]
+mod wait;
 
+#[cfg(feature = "retry10")]
+#[path = "../horizon_epoch166_retry10_delivery_20261121_v1/generation.rs"]
+mod generation;
+#[cfg(feature = "retry10")]
+use generation::{LIVE_SHA, PRODUCER_IID as IID, PRODUCER_UNIT as UNIT, TERMINAL_ROOT as ROOT};
+
+#[cfg(not(feature = "retry10"))]
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch166-terminal-20261121-v1";
+#[cfg(not(feature = "retry10"))]
 const LIVE_SHA: &str = "23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe";
+#[cfg(not(feature = "retry10"))]
 const UNIT: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
+#[cfg(not(feature = "retry10"))]
 const IID: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
 const SUCCEEDED: &str = "7ad2d189f7e94e70a38c781354912448";
 const STARTED: &str = "39f53479d3a045ac8e11786248231fbf";
@@ -283,6 +297,7 @@ fn publish_exact(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    #[cfg(not(feature = "retry10"))]
     if let [mode, path] = args.as_slice()
         && matches!(mode.as_str(), "inspect-cadence" | "dispatch-cadence")
     {
@@ -290,6 +305,13 @@ fn main() -> Result<()> {
             "{}",
             cadence::select(Path::new(path), mode == "dispatch-cadence")?
         );
+        return Ok(());
+    }
+    #[cfg(feature = "retry10")]
+    if args == ["wait-record"] {
+        let value = wait::committed(&checked_live()?)?;
+        record(&value)?;
+        println!("{}", serde_json::to_string(&value)?);
         return Ok(());
     }
     ensure!(

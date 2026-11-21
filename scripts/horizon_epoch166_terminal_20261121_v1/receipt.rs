@@ -60,11 +60,23 @@ const LAST_BLOCK_HASH: [u8; 32] = [
     0x21, 0x27, 0x07, 0xb5, 0x3c, 0x02, 0x21, 0x82, 0x79, 0x60, 0x1c, 0x14, 0x50, 0x1b, 0x77, 0x23,
 ];
 
-fn gate(live: &Value, receipt: &Value) -> Result<()> {
+pub(super) struct TerminalBoundary {
+    pub epoch: u64,
+    pub last_block: u64,
+    pub last_block_hash: [u8; 32],
+}
+
+const BOUNDARY166: TerminalBoundary = TerminalBoundary {
+    epoch: 166,
+    last_block: LAST_BLOCK,
+    last_block_hash: LAST_BLOCK_HASH,
+};
+
+fn gate(live: &Value, receipt: &Value, boundary: &TerminalBoundary) -> Result<()> {
     ensure!(
         receipt["schema"] == "jetstreamer-root-cohort-publication-receipt-v2"
             && receipt["manifest_fingerprint"] == live["manifest_fingerprint"]
-            && receipt["epochs"] == json!([166]),
+            && receipt["epochs"] == json!([boundary.epoch]),
         "wrong source receipt"
     );
     let g = &receipt["root_checkpoint_gate"];
@@ -78,7 +90,7 @@ fn gate(live: &Value, receipt: &Value) -> Result<()> {
     );
     let members = g["members"].as_array().context("missing gate members")?;
     ensure!(
-        members.len() == 1 && members[0]["epoch"] == 166,
+        members.len() == 1 && members[0]["epoch"] == boundary.epoch,
         "wrong gate membership"
     );
     let boot = &members[0]["bootstrap"];
@@ -88,14 +100,14 @@ fn gate(live: &Value, receipt: &Value) -> Result<()> {
             && end["slot_complete"] == true
             && boot["slot"] == live["bootstrap"]["slot"]
             && boot["accounts_hash"] == b58_hash(&live["bootstrap"]["accounts_hash"])?
-            && end["slot"] == LAST_BLOCK
-            && end["last_blockhash"] == json!(LAST_BLOCK_HASH)
+            && end["slot"] == boundary.last_block
+            && end["last_blockhash"] == json!(boundary.last_block_hash)
             && live["epoch_bounds"][0]
                 .as_u64()
-                .is_some_and(|start| start <= LAST_BLOCK)
+                .is_some_and(|start| start <= boundary.last_block)
             && live["epoch_bounds"][1]
                 .as_u64()
-                .is_some_and(|end_slot| LAST_BLOCK <= end_slot),
+                .is_some_and(|end_slot| boundary.last_block <= end_slot),
         "bootstrap or complete terminal Bank mismatch"
     );
     let context: Value =
@@ -119,6 +131,11 @@ fn gate(live: &Value, receipt: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn inspect(live: &Value) -> Result<Value> {
+    inspect_with_boundary(live, &BOUNDARY166)
+}
+
+pub(super) fn inspect_with_boundary(live: &Value, boundary: &TerminalBoundary) -> Result<Value> {
+    let epoch = boundary.epoch;
     let output = dir(&live["output"])?;
     let batches = dir(&live["private_batch_receipts"])?;
     let log = Path::new(s(&live["producer_log"]["path"])?);
@@ -135,12 +152,13 @@ pub(super) fn inspect(live: &Value) -> Result<Value> {
     )?))?;
     let mut tail = Vec::new();
     f.take(131072).read_to_end(&mut tail)?;
-    let prefix =
-        "root-checkpoint cohort 166-166 published 1 archive(s) with checksums in transaction ";
+    let prefix = format!(
+        "root-checkpoint cohort {epoch}-{epoch} published 1 archive(s) with checksums in transaction "
+    );
     let text = String::from_utf8_lossy(&tail);
     let markers: Vec<_> = text
         .lines()
-        .filter_map(|line| line.split_once(prefix).map(|(_, tail)| tail))
+        .filter_map(|line| line.split_once(prefix.as_str()).map(|(_, tail)| tail))
         .collect();
     ensure!(
         markers.len() == 1,
@@ -164,7 +182,7 @@ pub(super) fn inspect(live: &Value) -> Result<Value> {
     let rid = identity(&rp, 1001)?;
     let raw = small(&rp, 32 << 20)?;
     let receipt: Value = serde_json::from_slice(&raw)?;
-    gate(live, &receipt)?;
+    gate(live, &receipt, boundary)?;
     ensure!(
         receipt["transaction_id"] == tx
             && receipt["destination"]["device"] == live["output"]["device"]
@@ -178,8 +196,8 @@ pub(super) fn inspect(live: &Value) -> Result<Value> {
         .as_array()
         .context("missing publication members")?;
     ensure!(
-        o["kind"] == "committed" && m.len() == 1 && m[0]["epoch"] == 166,
-        "no single committed epoch 166"
+        o["kind"] == "committed" && m.len() == 1 && m[0]["epoch"] == epoch,
+        "no single committed epoch {epoch}"
     );
     let m = &m[0];
     for k in [
@@ -194,8 +212,8 @@ pub(super) fn inspect(live: &Value) -> Result<Value> {
             "unexpected prior or segment artifact {k}"
         );
     }
-    let archive = output.join("epoch-166.jet");
-    let sum = output.join("epoch-166.jet.sha256");
+    let archive = output.join(format!("epoch-{epoch}.jet"));
+    let sum = output.join(format!("epoch-{epoch}.jet.sha256"));
     let a = identity(&archive, 1001)?;
     let c = identity(&sum, 1001)?;
     let h = digest_string(&m["archive_sha256"])?;
@@ -211,7 +229,7 @@ pub(super) fn inspect(live: &Value) -> Result<Value> {
         "committed output identity changed"
     );
     ensure!(
-        small(&sum, 1024)? == format!("{h}  epoch-166.jet\n").as_bytes(),
+        small(&sum, 1024)? == format!("{h}  epoch-{epoch}.jet\n").as_bytes(),
         "local checksum mismatch"
     );
     ensure!(
@@ -246,7 +264,12 @@ mod tests {
     #[test]
     fn receipt_binds_complete_epoch_bootstrap_checkpoint_and_serialized_gate() {
         let (live, r) = inputs();
-        assert!(gate(&live, &r).is_ok());
+        assert!(gate(&live, &r, &BOUNDARY166).is_ok());
+        let foreign = TerminalBoundary {
+            epoch: 168,
+            ..BOUNDARY166
+        };
+        assert!(gate(&live, &r, &foreign).is_err());
         for (ptr, v) in [
             ("/schema", json!("v1")),
             (
@@ -270,7 +293,7 @@ mod tests {
         ] {
             let mut changed = r.clone();
             *changed.pointer_mut(ptr).unwrap() = v;
-            assert!(gate(&live, &changed).is_err(), "{ptr}");
+            assert!(gate(&live, &changed, &BOUNDARY166).is_err(), "{ptr}");
         }
     }
     #[test]

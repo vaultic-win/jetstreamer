@@ -5,6 +5,9 @@ edition = "2024"
 
 [workspace]
 
+[features]
+retry10 = []
+
 [dependencies]
 anyhow = "1"
 base64 = "0.22"
