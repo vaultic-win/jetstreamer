@@ -5,6 +5,7 @@ import os
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 if __name__ == '__main__':
@@ -82,7 +83,7 @@ def identity(fleet):
 def guard_view(ref):
     # Isolate the deployed controller's capacity/profile imports from the cadence modules.
     args = ['/usr/bin/python3','-I','-B',str(Path(__file__).resolve()), 'guard', ref['sha256']]
-    return json.loads(subprocess.check_output(args,timeout=60,text=True))
+    return json.loads(subprocess.check_output(args,timeout=100,text=True))
 
 
 def guard_main(sha):
@@ -99,19 +100,35 @@ def guard_main(sha):
     sys.path.insert(0,str(PACKAGE))
     import session
     ad = checked({'path':str(ADMISSION),'sha256':sha})
-    n = session.native(UNIT)
     plan = checked(ad['actual_guard_plan'])
-    need(n['InvocationID'] == ad['producer_invocation_id'], '172 invocation changed')
-    samples = sorted(Path(plan['receipt_directory']).glob('sample-*.json'), key=lambda p:p.stat().st_mtime_ns,reverse=True)
-    need(samples, 'missing protective guard evidence')
-    if content(samples[0])['workers']:
-        w = session.observer_row(ad)
-        m = LOG.lstat()
-        need(m.st_uid == 0 and m.st_nlink == 1 and not m.st_mode & 0o077 and stat.S_ISREG(m.st_mode), '172 log not observable by native sampler')
-        return {'proof':w['worker_guard'], 'observer_config':w['observer_row'], 'worker_pid':w['worker_pid'], 'worker_start_ticks':w['worker_start_ticks']}
-    proof = session.latest_guard(n, plan, ad['actual_guard_plan']['sha256'])
-    need(proof is not None, 'no current protective bootstrap guard')
-    return {'proof':proof[0],'observer_config':None}
+    return current_guard(session, ad, plan)
+
+
+def current_guard(session, ad, plan):
+    # A full disk scan can finish after the preceding guard has aged out.
+    # Keep the original freshness and PID 1 completion checks on every attempt.
+    deadline = time.monotonic() + 75
+    while True:
+        n = session.native(UNIT)
+        need(n['InvocationID'] == ad['producer_invocation_id'], '172 invocation changed')
+        samples = sorted(Path(plan['receipt_directory']).glob('sample-*.json'), key=lambda p:p.stat().st_mtime_ns,reverse=True)
+        need(samples, 'missing protective guard evidence')
+        if content(samples[0])['workers']:
+            try:
+                w = session.observer_row(ad)
+            except ValueError as error:
+                if str(error) != 'waiting for first protected historical worker':
+                    raise
+            else:
+                m = LOG.lstat()
+                need(m.st_uid == 0 and m.st_nlink == 1 and not m.st_mode & 0o077 and stat.S_ISREG(m.st_mode), '172 log not observable by native sampler')
+                return {'proof':w['worker_guard'], 'observer_config':w['observer_row'], 'worker_pid':w['worker_pid'], 'worker_start_ticks':w['worker_start_ticks']}
+        else:
+            proof = session.latest_guard(n, plan, ad['actual_guard_plan']['sha256'])
+            if proof is not None:
+                return {'proof':proof[0],'observer_config':None}
+        need(time.monotonic() < deadline, 'timed out waiting for a completed fresh 172 guard')
+        time.sleep(1)
 
 
 def freeze(c):

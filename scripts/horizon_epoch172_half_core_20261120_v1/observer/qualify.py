@@ -4,7 +4,7 @@ import datetime as dt
 from pathlib import Path
 import sys
 import tempfile
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 package = Path(sys.argv[1]).resolve(strict=True)
 sys.path.insert(0, str(package))
@@ -90,7 +90,31 @@ def scenario(root, replay):
         rejected(lambda:full172.owned(f))
 
 
+def guard_completion_race(root):
+    session = Mock()
+    session.native.return_value = {'InvocationID': 'worker'}
+    plan = {'receipt_directory': str(root)}
+    ad = {'producer_invocation_id': 'worker', 'actual_guard_plan': {'sha256': 'plan'}}
+    evidence.durable(root/'sample-one.json', {'workers': [[123, 10]]})
+    result = {'worker_guard': 'guard', 'observer_row': 'row', 'worker_pid': 123, 'worker_start_ticks': 3}
+    missing = ValueError('waiting for first protected historical worker')
+    session.observer_row.side_effect = [missing, result]
+    with patch.object(full172, 'LOG', root/'sample-one.json'), patch.object(full172.time, 'sleep') as wait:
+        assert full172.current_guard(session, ad, plan)['proof'] == 'guard'
+        wait.assert_called_once_with(1)
+        wait.reset_mock()
+        session.observer_row.side_effect = ValueError('guard incomplete or tripped')
+        rejected(lambda: full172.current_guard(session, ad, plan))
+        wait.assert_not_called()
+        session.observer_row.side_effect = missing
+        with patch.object(full172.time, 'monotonic', side_effect=[0, 76]):
+            rejected(lambda: full172.current_guard(session, ad, plan))
+        wait.assert_not_called()
+
+
 if __name__=='__main__':
+    with tempfile.TemporaryDirectory(dir=evidence.BASE) as tmp:
+        guard_completion_race(Path(tmp))
     for replay in (False,True):
         with tempfile.TemporaryDirectory(dir=evidence.BASE) as tmp:
             with patch.object(full172,"ADMISSION",Path(tmp)/"ad.json"):
