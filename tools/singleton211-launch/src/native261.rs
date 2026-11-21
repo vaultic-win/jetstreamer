@@ -52,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v7/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v8/horizon-native261-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
@@ -105,10 +105,27 @@ const V151_GATE: (&str, &str) = (
     "4fc9b06ff47a39ccf7c93b20683f2ecab8a95b6bb3b548d5aec12e3ba323ea17",
 );
 const V151_GATE_COMMIT: &str = "52df886711c0f700335dd952f73b6379bf513fbc";
-pub(super) fn v151_prepared(reference: &Bound, gate: &Bound, commit: &Value) -> bool {
-    reference == &Bound::new(V151_PREPARED.0, V151_PREPARED.1)
-        && gate == &Bound::new(V151_GATE.0, V151_GATE.1)
-        && commit == V151_GATE_COMMIT
+const V153_PREPARED: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-native261-prepared-zetted-guard-f648ab35-v153-v1/prepared.json",
+    "913d18e9daec9fc23b0a8f6211e498f94f4921cc5c96327b578cd4446cd2154d",
+);
+const V153_GATE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261120-v7/horizon-native261-launch",
+    "80ab4ea99b965f619c1f51b5d64a78389d3d15864f30944fa0876e10d4a140d8",
+);
+const V153_GATE_COMMIT: &str = "f648ab3547ddef529cb8e2e0de1f30787b8fd87f";
+
+pub(super) fn registered_preparation(reference: &Bound, gate: &Bound, commit: &Value) -> bool {
+    [
+        (V151_PREPARED, V151_GATE, V151_GATE_COMMIT),
+        (V153_PREPARED, V153_GATE, V153_GATE_COMMIT),
+    ]
+    .iter()
+    .any(|(prepared, launcher, revision)| {
+        reference == &Bound::new(prepared.0, prepared.1)
+            && gate == &Bound::new(launcher.0, launcher.1)
+            && commit == *revision
+    })
 }
 pub(super) fn stop_window(census_us: u64) -> Result<u64> {
     // Include the mandatory pre-start census, the existing five-second peer margin,
@@ -124,6 +141,28 @@ include!("native261/controller.rs");
 #[cfg(test)]
 mod v151_window_tests {
     use super::*;
+    #[test]
+    fn v153_preparation_requires_its_original_controller() {
+        let prepared = Bound::new(V153_PREPARED.0, V153_PREPARED.1);
+        let gate = Bound::new(V153_GATE.0, V153_GATE.1);
+        assert!(registered_preparation(
+            &prepared,
+            &gate,
+            &json!(V153_GATE_COMMIT)
+        ));
+        assert!(!registered_preparation(
+            &prepared,
+            &gate,
+            &json!(V151_GATE_COMMIT)
+        ));
+        let unrelated = Bound::new(V151_PREPARED.0, V151_PREPARED.1);
+        assert!(!registered_preparation(
+            &unrelated,
+            &gate,
+            &json!(V153_GATE_COMMIT)
+        ));
+    }
+
     #[test]
     fn only_the_original_v151_preparation_and_unchanged_images_transfer() {
         let evidence: Value =
