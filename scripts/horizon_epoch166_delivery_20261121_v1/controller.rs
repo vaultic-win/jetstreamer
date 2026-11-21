@@ -390,6 +390,11 @@ fn write_admission(
 }
 
 fn provider_path(runtime: &Path) -> PathBuf {
+    if cfg!(feature = "paid145_fit") {
+        return runtime
+            .join(DELIVERY)
+            .join("capacity-tools-paid145/publication-fit");
+    }
     if cfg!(feature = "focused169_fit") {
         let package = match EPOCH {
             166 => "capacity-tools-v5",
@@ -516,7 +521,11 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(any(feature = "five_source_fit", feature = "focused169_fit"))]
+    #[cfg(any(
+        feature = "five_source_fit",
+        feature = "focused169_fit",
+        feature = "paid145_fit"
+    ))]
     #[test]
     #[ignore = "requires the sealed five-source capacity package"]
     fn selects_the_installed_five_source_fit() -> Result<()> {

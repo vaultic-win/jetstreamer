@@ -74,6 +74,23 @@ def focused169_reader(epoch):
     return versioned_reader(epoch, {166: (4, 5), 167: (3, 3), 168: (4, 4), 170: (3, 3)})
 
 
+def paid145_predecessors(epoch):
+    if epoch == 172:
+        import focused169_full172_event
+        import full172_event
+        return [(full172_event.profile(), "event-tools-current"),
+                (focused169_full172_event.profile(), "event-tools-focused169")]
+    return [(current_reader(epoch), "event-tools-current"),
+            (five_source_reader(epoch), "event-tools-five-v1"),
+            (focused169_reader(epoch), "event-tools-focused169")]
+
+
+def paid145_reader(epoch):
+    prior = paid145_predecessors(epoch)[-1][0]
+    return prior._replace(launch=prior.delivery/"controller-tools-paid145/run-committed.sh",
+                          fit=prior.delivery/"capacity-tools-paid145/publication-fit")
+
+
 def status_evidence(fleet, report, terminal, archive, profile=RECOVERED):
     key = str(profile.epoch)
     ref = report["receipts"][key]
@@ -177,7 +194,10 @@ if __name__ == "__main__":
         epoch = int(sys.argv[2])
         main(focused169_reader(epoch), recover=True,
              predecessors=[(current_reader(epoch), "event-tools-current"), (five_source_reader(epoch), "event-tools-five-v1")])
+    elif len(sys.argv) == 3 and sys.argv[1] == "--paid145-reader" and sys.argv[2] in ("166", "167", "168", "170", "172"):
+        epoch = int(sys.argv[2])
+        main(paid145_reader(epoch), recover=True, predecessors=paid145_predecessors(epoch))
     elif len(sys.argv) == 1:
         main()
     else:
-        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader | --focused169-reader) {166,167,168,170}]")
+        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader | --focused169-reader) {166,167,168,170} | --paid145-reader {166,167,168,170,172}]")

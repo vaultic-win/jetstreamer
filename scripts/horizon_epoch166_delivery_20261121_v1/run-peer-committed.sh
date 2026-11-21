@@ -29,7 +29,7 @@ case "$delivery" in
         unit=horizon-publish-172-full-committed.service ;;
     *) echo "unrecognized committed-source package location" >&2; exit 2 ;;
 esac
-[[ $pkg == "$delivery/controller-tools" || $pkg == "$delivery/controller-tools-v2" || $pkg == "$delivery/controller-tools-v3" ]]
+[[ $pkg == "$delivery/controller-tools" || $pkg == "$delivery/controller-tools-v2" || $pkg == "$delivery/controller-tools-v3" || $pkg == "$delivery/controller-tools-paid145" ]]
 repo=/home/sol/workspace/jetstreamer
 test -f "$delivery/TERMINAL_SUCCESS.json"
 test -S "$socket"

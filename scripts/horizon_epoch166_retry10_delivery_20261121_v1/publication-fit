@@ -21,6 +21,9 @@ CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered1
 TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170,172)}}
 PACKAGES={166:D/"capacity-tools-v5",168:FULL168/"capacity-tools-v4",172:TERMINALS[172]/"capacity-tools-v2",
           **{e:TERMINALS[e]/"capacity-tools-v3" for e in (167,170)}}
+PAID145_PACKAGES={epoch:old.with_name("capacity-tools-paid145") for epoch,old in PACKAGES.items()}
+PAID145_PROVIDER=R/"incident-replay-fit-20261121-v1/tools-v14/post-stop-fit"
+PAID145_PROVIDER_SHA="63538fb9ff385f34b9b7b592c6b61b296e649f7eb3a70de017d9edeb0326ad50"
 CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30,172:288<<30}
 # Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
 PRESTART={166:169028829184,167:177601941504,170:230591926272}
@@ -146,11 +149,18 @@ def capture_provider(provider,path,digest):
         if result.returncode==0:return result.stdout
         if attempt==2 or b"foreign 145 descendants" not in result.stderr and b"capacity generation changed during collection" not in result.stderr:
             raise RuntimeError(result.stderr.decode(errors="replace")[-1800:])
-        if b"foreign 145 descendants" in result.stderr:wait_for_145_probe()
+        if b"foreign 145 descendants" in result.stderr:
+            if Path(provider)==PAID145_PROVIDER:
+                # The next full census must succeed independently. A concurrent
+                # self-check may already have exited before this call returns.
+                time.sleep(2)
+            else:
+                wait_for_145_probe()
 
-def capture(path,sha,epoch=166):
+def capture(path,sha,epoch=166,pkg=None):
     terminal=TERMINALS[epoch]/"TERMINAL_SUCCESS.json"
-    pkg=PACKAGES[epoch]
+    if pkg is None:pkg=PACKAGES[epoch]
+    need(pkg in (PACKAGES[epoch],PAID145_PACKAGES[epoch]),"foreign epoch capacity package")
     raw,fr=read(path,0o600);fleet=json.loads(raw)
     need(path.parent.parent==R and path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json" and fr["sha256"]==sha,"wrong fleet")
     _,tr=read(terminal,0o400)
@@ -158,8 +168,12 @@ def capture(path,sha,epoch=166):
     snapshot,sr=read(pkg/"deployment-seal-receipt.json",0o444);seal=json.loads(snapshot)
     refdata,rr=read(pkg/"provider.json",0o444);binding=json.loads(refdata)
     elf=Path(binding["path"]);_,pr=read(elf,0o555)
+    if pkg==PAID145_PACKAGES[epoch]:
+        need(elf==PAID145_PROVIDER and pr["sha256"]==PAID145_PROVIDER_SHA,"wrong paid 145 provider")
+    else:
+        need(elf==R/"incident-replay-fit-20261121-v1/tools-v13/post-stop-fit","wrong original provider")
     need(seal["destination"]==str(pkg) and any(x["name"]=="provider.json" and x["sha256"]==rr["sha256"] for x in seal["members"]) and
-         pr==binding and elf.parent==R/"incident-replay-fit-20261121-v1/tools-v13" and elf.name=="post-stop-fit","unsealed capacity provider")
+         pr==binding,"unsealed capacity provider")
     results=[];refs=[]
     for _ in range(2):
         data=capture_provider(elf,path,sha)
@@ -182,6 +196,6 @@ def capture(path,sha,epoch=166):
 if __name__=="__main__":
     need(os.geteuid()==0 and __debug__ and sys.flags.isolated and len(sys.argv)==3,"expected FLEET SHA256")
     path=Path(__file__).resolve(strict=True)
-    selected=next((e for e,pkg in PACKAGES.items() if path==pkg/"publication-fit"),None)
+    selected=next((e for packages in (PACKAGES, PAID145_PACKAGES) for e,pkg in packages.items() if path==pkg/"publication-fit"),None)
     need(selected is not None,"unregistered publication capacity image")
-    print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2],selected),sort_keys=True))
+    print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2],selected,path.parent),sort_keys=True))
