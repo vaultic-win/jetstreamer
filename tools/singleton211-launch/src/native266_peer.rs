@@ -1,5 +1,7 @@
 //! Registration of the original, separately guarded epoch 266 cold Bank worker.
 use super::*;
+mod terminal;
+pub(super) use terminal::live_owner as terminal_owner;
 const UNIT266: &str = native266::UNIT;
 const GUARD266: &str = "horizon-native266-protective-v1.service";
 const TIMER266: &str = "horizon-native266-protective-v1.timer";
@@ -170,17 +172,24 @@ pub(super) fn validate(
         return Ok(());
     }
     let entry = one(pipelines.iter().filter(|e| owns(e)))?;
-    let a = one(active.iter().filter(|e| owns(e)))?;
-    let d = one(diagnostics
+    let running = entry["live"]
+        .as_bool()
+        .context("native266 lifecycle state")?;
+    let related_diagnostics = diagnostics
         .iter()
-        .filter(|d| d["producer_unit"] == UNIT266 || d["range"] == "266-266"))?;
+        .filter(|d| {
+            d["producer_unit"] == UNIT266
+                || d["range"] == "266-266"
+                || d["expected_producer_invocation_id"] == IID
+                || d["observation"]["producer_before"]["unit"] == UNIT266
+                || d["observation"]["producer_after"]["unit"] == UNIT266
+        })
+        .collect::<Vec<_>>();
     ensure!(
         pipeline(entry)
-            && *a == *entry
             && entry["unit"] == *census
             && entry["expected_invocation_id"] == IID
             && entry["evidence"] == json!([origin()])
-            && entry["live"] == true
             && entry["private_qualification_only"] == true
             && entry["sampled_at_utc"] == f["sampled_at_utc"]
             && [
@@ -222,9 +231,20 @@ pub(super) fn validate(
             && intent["ordinary_replay_claim"] == false,
         "native266 accepted original capture changed"
     );
+    if !running {
+        ensure!(
+            !active.iter().any(owns),
+            "native266 terminal also marked active"
+        );
+        return terminal::roster(f, o, &related_diagnostics, &handoff, &ac, boot);
+    }
+    ensure!(
+        one(active.iter().filter(|e| owns(e)))? == entry,
+        "native266 active roster changed"
+    );
     live::same_owner(&handoff["producer"], census)?;
     observation(
-        d,
+        one(related_diagnostics.into_iter())?,
         &handoff,
         &ac["original"]["tmpfs_charged_within_producer"],
     )

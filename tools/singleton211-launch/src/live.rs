@@ -411,6 +411,13 @@ pub(super) fn census_with_held(
             retained_terminals.insert(r.unit.clone(), current);
             continue;
         }
+        if r.unit == native266::UNIT && fleet["unit_census"][&r.unit]["ActiveState"] == "inactive" {
+            ensure!(r.release.is_none(), "native266 original reservation released");
+            let manager = n.show(&r.unit)?;
+            native266_peer::terminal_owner(&manager, fleet)?;
+            retained_terminals.insert(r.unit.clone(), manager);
+            continue;
+        }
         if peers::is_retained(&r.unit) {
             ensure!(r.release.is_none(), "native terminal reservation released");
             let v = n.show(&r.unit)?;
@@ -582,6 +589,8 @@ pub(super) fn census_with_held(
             delivery247::UNIT247 | delivery247::STAGED_UNIT
         ) {
             delivery247::terminal_owner(n, &after)?;
+        } else if unit == native266::UNIT {
+            native266_peer::terminal_owner(&after, fleet)?;
         } else {
             peers::terminal_owner(&unit, &after)?;
         }
