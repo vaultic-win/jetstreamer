@@ -121,7 +121,36 @@ pub(super) fn canonical_classes() -> Result<BTreeSet<String>> {
         directory(pid)?;
         for k in ["actually_loaded_fragments", "reviewed_wrappers"] {
             for b in r[k].as_array().context("actual archive selection code")? {
-                let bytes = raw(Path::new(s(b, "path")?), 16 << 20, true)?;
+                let declared = Path::new(s(b, "path")?);
+                let resolved = declared.canonicalize()?;
+                if declared != resolved {
+                    let permitted = match declared.to_str() {
+                        Some(
+                            "/etc/systemd/system/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service.d/50-native198-receipts.conf",
+                        ) => {
+                            "/usr/local/lib/jetstreamer/horizon-epoch198-uploader-transition-20261021-v1/50-native198-receipts.conf"
+                        }
+                        Some(
+                            "/etc/systemd/system/horizon-r2-progressive-epochs101-200-v21-rust-authenticated.service.d/60-native183-receipts.conf",
+                        ) => {
+                            "/usr/local/lib/jetstreamer/horizon-cohort183-uploader-transition-20261029-v2/60-native183-receipts.conf"
+                        }
+                        _ => anyhow::bail!(
+                            "unknown canonical watcher configuration alias: {}",
+                            declared.display()
+                        ),
+                    };
+                    ensure!(
+                        resolved == Path::new(permitted)
+                            && fs::symlink_metadata(declared)?.uid() == 0,
+                        "canonical watcher drop-in alias changed"
+                    );
+                }
+                let bytes = raw(&resolved, 16 << 20, true)?;
+                ensure!(
+                    declared.canonicalize()? == resolved,
+                    "canonical watcher drop-in changed"
+                );
                 ensure!(
                     sha(&bytes) == b["sha256"],
                     "loaded input or root selector changed: {}",
