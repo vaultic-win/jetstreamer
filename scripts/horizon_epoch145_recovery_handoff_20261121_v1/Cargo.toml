@@ -3,6 +3,9 @@ name = "horizon-recovery-handoff"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+timeout-rejoin = []
+
 [workspace]
 
 [dependencies]

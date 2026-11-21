@@ -220,7 +220,7 @@ fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if let [mode] = args.as_slice() {
-        if matches!(mode.as_str(), "inspect-v5b" | "follow-v5b") {
+        if incident::handles(mode) {
             return incident::run(mode);
         }
         return outcome::run(mode);

@@ -3,15 +3,61 @@ use super::*;
 use std::os::unix::{fs::FileTypeExt, process::CommandExt};
 use std::process::Stdio;
 
-const SOURCE: &str = "dc043eb78c4a4349b0098760dc764a1f";
-const START: &str = "epoch145-semantic-continuity-20261121-v1/V5B_ACTUAL_ADVANCING_WORKER.json";
-const ADVANCING: &str = "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199";
-const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v7";
-const SEAL: &str = "815df6ea2b602a2c6e17a56dfd38af4145e046b63e2e55f440221fcf7c0f568f";
+use generation::*;
 const POST: &str = "epoch145-publication-20261121-v1";
 const FLEET: &str = "ROOT_COMPLETE_OPERATIONAL_FLEET.json";
 const HEAD: &str = "973b1d0d30142d26d524386c50429a5d121103dfce3190d476a6eb23fe1feadd";
-const STATE_PATH: &str = "epoch145-v5b-delivery-handoff-20261121-v1/state";
+#[cfg(not(feature = "timeout-rejoin"))]
+mod generation {
+    pub(super) const SOURCE: &str = "dc043eb78c4a4349b0098760dc764a1f";
+    pub(super) const START: &str =
+        "epoch145-semantic-continuity-20261121-v1/V5B_ACTUAL_ADVANCING_WORKER.json";
+    pub(super) const ADVANCING: &str =
+        "c8c4a5572906fb348658759ed4c81a7edaf4ee790faab391d700ad9fd4e4c199";
+    pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v7";
+    pub(super) const SEAL: &str =
+        "815df6ea2b602a2c6e17a56dfd38af4145e046b63e2e55f440221fcf7c0f568f";
+    pub(super) const STATE_PATH: &str = "epoch145-v5b-delivery-handoff-20261121-v1/state";
+    pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v7";
+    pub(super) const FIT_SEAL: &str =
+        "680021c25c633362855b0380cbce500a318c8fc72bda2ef28c072e316d18b66d";
+    pub(super) const PRIOR: &str = "5e0e20bc974149f096ea4bab10b15e1b";
+    pub(super) const IMAGE: &str =
+        "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1";
+    pub(super) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5b/export145";
+    pub(super) const PIPELINE: &str =
+        "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e";
+    pub(super) const INSPECT: &str = "inspect-v5b";
+    pub(super) const FOLLOW: &str = "follow-v5b";
+}
+
+#[cfg(feature = "timeout-rejoin")]
+mod generation {
+    pub(super) const SOURCE: &str = "d37f36f898a44932a19fd50d7014a6fe";
+    pub(super) const START: &str =
+        "epoch145-semantic-continuity-20261121-v1/V5C_ACTUAL_ADVANCING_WORKER.json";
+    pub(super) const ADVANCING: &str =
+        "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76";
+    pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v8";
+    pub(super) const SEAL: &str = "972bb0747591e741b761671a272e536694d6039b870d627f5fac8f87cbab0e0f";
+    pub(super) const STATE_PATH: &str = "epoch145-v5c-delivery-handoff-20261121-v1/state";
+    pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v11";
+    pub(super) const FIT_SEAL: &str = "50a46e9010b448f2e038300c7aa5ffcdf38bf36ff4caf9bd783fe76ae513f4dc";
+    pub(super) const PRIOR: &str = "dc043eb78c4a4349b0098760dc764a1f";
+    pub(super) const IMAGE: &str =
+        "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d";
+    pub(super) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5c/export145";
+    pub(super) const PIPELINE: &str =
+        "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
+    pub(super) const INSPECT: &str = "inspect-v5c";
+    pub(super) const FOLLOW: &str = "follow-v5c";
+}
+
+pub fn handles(mode: &str) -> bool {
+    mode == INSPECT || mode == FOLLOW
+}
 
 fn fleet() -> Result<Value> {
     let mut dir = rt("root131959-live166167170-20261121-v1");
@@ -49,12 +95,8 @@ fn fleet() -> Result<Value> {
 }
 /// Only a successful complete current booking can submit either next stage.
 fn funded() -> Result<Value> {
-    let pkg = rt("incident-replay-fit-20261121-v1/tools-v7");
-    let reader = check_member(
-        &pkg,
-        "680021c25c633362855b0380cbce500a318c8fc72bda2ef28c072e316d18b66d",
-        "post-stop-fit",
-    )?;
+    let pkg = rt(FIT_PKG);
+    let reader = check_member(&pkg, FIT_SEAL, "post-stop-fit")?;
     loop {
         let head = fleet()?;
         let out = Command::new(&reader)
@@ -112,14 +154,14 @@ fn original() -> Result<Value> {
         .trim()
         .replace('-', "");
     ensure!(
-        launch["boot"] == boot && launch["old"] == "5e0e20bc974149f096ea4bab10b15e1b",
+        launch["boot"] == boot && launch["old"] == PRIOR,
         "different boot or semantic start"
     );
     ensure!(
         a["invocation_id"] == SOURCE
             && manager["new"]["InvocationID"] == SOURCE
             && start["iid"] == SOURCE
-            && start["image"] == "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
+            && start["image"] == IMAGE
             && start["r2_mutations"] == false
             && a["observations"]
                 .as_array()
@@ -280,8 +322,7 @@ fn local_result(d: &Value, p: &Value, id: &str) -> Result<()> {
             && d["archive_sha256"] == p["archive_sha256"]
             && d["verifier"]["sha256"]
                 == "eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0"
-            && p["pipeline"]["sha256"]
-                == "8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e",
+            && p["pipeline"]["sha256"] == PIPELINE,
         "local verification is incomplete"
     );
     Ok(())
@@ -290,7 +331,7 @@ pub fn run(mode: &str) -> Result<()> {
     let original = original()?;
     check_member(&rt(PKG), SEAL, "run-post")?;
     check_member(&rt(PKG), SEAL, "export145")?;
-    if mode == "inspect-v5b" {
+    if mode == INSPECT {
         let current = native(E)?;
         let (pid, iid) = stable(&current, E)?;
         let obs = &original["observations"][1];
@@ -298,8 +339,7 @@ pub fn run(mode: &str) -> Result<()> {
             iid == SOURCE
                 && i64::from(pid) == obs["parent_pid"].as_i64().context("semantic parent")?
                 && platform::ticks(pid)? == obs["parent_ticks"]
-                && platform::proc_exe(pid)?
-                    == rt("epoch145-semantic-continuity-20261121-v1/tools-v5b/export145"),
+                && platform::proc_exe(pid)? == rt(SEMANTIC),
             "different original live verifier"
         );
         println!(
@@ -308,7 +348,7 @@ pub fn run(mode: &str) -> Result<()> {
         );
         return Ok(());
     }
-    ensure!(mode == "follow-v5b", "invalid incident mode");
+    ensure!(mode == FOLLOW, "invalid incident mode");
     let _lock = guard_instance(&rt(STATE_PATH))?;
     events::manager(E, SOURCE)?;
     let retained = completed_semantics()?;
@@ -348,9 +388,12 @@ mod tests {
         let mut d = json!({"schema":"horizon-145-current-native-full-acceptance-v1","exit_code":0,"r2_mutations":false,"epoch":145,
             "invocation":SOURCE,"archive_sha256":"a".repeat(64),"verifier":{"sha256":"eec3a8093b52f7dd3a87d508b3b09e34680f2a5d887343cf12df70621d99f8a0"}});
         let p = json!({"schema":"horizon-145-current-native-plugin-acceptance-v1","exit_code":0,"r2_mutations":false,"epoch":145,
-            "invocation":SOURCE,"archive_sha256":"a".repeat(64),"pipeline":{"sha256":"8822f0ba8391ea0be3a5f6cb0970dd264352dcfe0b075efc536d915d2763787e"}});
+            "invocation":SOURCE,"archive_sha256":"a".repeat(64),"pipeline":{"sha256":PIPELINE}});
         assert!(local_result(&d, &p, SOURCE).is_ok());
         assert!(local_result(&d, &p, "unrelated").is_err());
+        let mut stale = p.clone();
+        stale["pipeline"]["sha256"] = json!("unqualified archive reader");
+        assert!(local_result(&d, &stale, SOURCE).is_err());
         for (key, value) in [
             ("epoch", json!(146)),
             ("exit_code", json!(1)),
