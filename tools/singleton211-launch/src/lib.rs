@@ -31,6 +31,7 @@ mod lifecycle;
 mod live;
 pub mod native257;
 pub mod native257_fit;
+pub mod native228_demotion_fit;
 pub mod native212;
 pub mod native266;
 pub mod native261;

@@ -70,6 +70,7 @@ mod native228_peer209;
 mod native228_terminal;
 mod native257;
 mod native266;
+mod native266_recovery;
 mod native212;
 mod native261;
 pub(super) fn capture_native257_input() -> Result<()> {
@@ -2805,7 +2806,7 @@ pub(super) async fn run() -> Result<()> {
                 || event["schema"] == native257::terminal::SCHEMA
             {
                 native257::event::predecessor(&previous, &plan, &event, sample, started_seconds)?;
-            } else if event["schema"] == native266::SCHEMA
+            } else if event["schema"] == native266_recovery::SCHEMA || event["schema"] == native266::SCHEMA
                 || event["schema"] == native266::terminal::SCHEMA
             {
                 native266::event::predecessor(&previous, &plan, &event, sample, started_seconds)?;

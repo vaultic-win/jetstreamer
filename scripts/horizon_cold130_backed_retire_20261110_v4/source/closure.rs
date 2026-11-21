@@ -16,6 +16,11 @@ pub(crate) const LANE: &str =
 const QUALIFICATION: &str = "/usr/local/lib/jetstreamer/horizon-node02-holding-qualification-20261023-v1/qualification.json";
 const QUALIFICATION_SHA: &str = "15692445c39b47b011851b9db68798730077be2cb665dbb7e527049c5e9c5f70";
 const ROOTS: &[&str] = &[
+    "/etc/systemd/system.control",
+    "/run/systemd/system.control",
+    "/etc/systemd/system.attached",
+    "/run/systemd/system.attached",
+    "/usr/local/lib/systemd/system",
     "/etc/systemd/system",
     "/usr/lib/systemd/system",
     "/lib/systemd/system",
@@ -29,6 +34,23 @@ const ROOTS: &[&str] = &[
     "/lib/systemd/user",
     "/home/sol/.config/systemd/user",
     "/root/.config/systemd/user",
+    "/home/sol/.config/systemd/user.control",
+    "/root/.config/systemd/user.control",
+    "/etc/xdg/systemd/user",
+    "/run/systemd/user",
+    "/usr/local/lib/systemd/user",
+    "/usr/local/share/systemd/user",
+    "/usr/share/systemd/user",
+    "/home/sol/.local/share/systemd/user",
+    "/root/.local/share/systemd/user",
+    "/home/sol/.nix-profile/share/systemd/user",
+    "/nix/var/nix/profiles/default/share/systemd/user",
+    "/run/user/1001/systemd/user.control",
+    "/run/user/1001/systemd/transient",
+    "/run/user/1001/systemd/generator.early",
+    "/run/user/1001/systemd/user",
+    "/run/user/1001/systemd/generator",
+    "/run/user/1001/systemd/generator.late",
     "/etc/crontab",
     "/etc/anacrontab",
     "/etc/cron.d",
@@ -38,7 +60,7 @@ const ROOTS: &[&str] = &[
     "/etc/cron.monthly",
     "/var/spool/cron",
 ];
-fn native(name: &str) -> Result<Value> {
+pub(super) fn native(name: &str) -> Result<Value> {
     ensure!(
         name.ends_with(".service") || name.ends_with(".timer") || name.ends_with(".path"),
         "explicit unit required"
@@ -58,7 +80,7 @@ fn native(name: &str) -> Result<Value> {
     }
     Ok(Value::Object(m))
 }
-fn terminal(name: &str, v: &Value) -> Result<()> {
+pub(super) fn terminal(name: &str, v: &Value) -> Result<()> {
     let service = name.ends_with(".service");
     let zero = |key: &str| v[key] == "0" || (!service && (v.get(key).is_none() || v[key] == ""));
     ensure!(
@@ -257,6 +279,46 @@ pub(crate) fn holding_lineage(p: &Value, c: &Value) -> Result<()> {
     )?;
     Ok(())
 }
+// A generated .wants symlink names a dependency by unit name. On this host
+// networkd's relative generator target is absent and PID1 selects its vendor
+// fragment. Resolve only that dependency via the actual loaded unit.
+fn generated_dependency(path: &Path) -> Result<PathBuf> {
+    const LINK: &str = "/run/systemd/generator/multi-user.target.wants/systemd-networkd.service";
+    const VENDOR: &str = "/usr/lib/systemd/system/systemd-networkd.service";
+    ensure!(
+        path == Path::new(LINK)
+            && fs::symlink_metadata(path)?.uid() == 0
+            && fs::read_link(path)? == Path::new("../systemd-networkd.service"),
+        "unresolved staged symlink {}",
+        path.display()
+    );
+    let out = Command::new("/usr/bin/systemctl")
+        .env_remove("SYSTEMD_HOST")
+        .env_remove("SYSTEMD_BUS_ADDRESS")
+        .env_remove("DBUS_SYSTEM_BUS_ADDRESS")
+        .args([
+            "show",
+            "systemd-networkd.service",
+            "-p",
+            "Id,FragmentPath,LoadState",
+        ])
+        .output()?;
+    let properties = std::str::from_utf8(&out.stdout)?;
+    ensure!(
+        out.status.success()
+            && out.stderr.is_empty()
+            && properties
+                .lines()
+                .any(|x| x == "Id=systemd-networkd.service")
+            && properties.lines().any(|x| x == "LoadState=loaded")
+            && properties
+                .lines()
+                .any(|x| x == format!("FragmentPath={VENDOR}"))
+            && Path::new(VENDOR).canonicalize()? == Path::new(VENDOR),
+        "generated dependency lacks a loaded fragment"
+    );
+    Ok(VENDOR.into())
+}
 fn walk(
     path: &Path,
     seen: &mut BTreeSet<PathBuf>,
@@ -273,8 +335,13 @@ fn walk(
     // Follow a staged symlink deliberately, retaining a global canonical cycle set;
     // never silently skip a directory or broken link.
     let resolved = if m.file_type().is_symlink() {
-        path.canonicalize()
-            .with_context(|| format!("unresolved staged symlink {}", path.display()))?
+        match path.canonicalize() {
+            Ok(target) => target,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                generated_dependency(path)?
+            }
+            Err(error) => return Err(error.into()),
+        }
     } else {
         path.to_path_buf()
     };
@@ -313,8 +380,38 @@ fn walk(
             );
         }
         *count += 1;
+    } else {
+        use std::os::unix::fs::FileTypeExt;
+        ensure!(
+            resolved == Path::new("/dev/null")
+                && m.file_type().is_char_device()
+                && m.rdev() == libc::makedev(1, 3),
+            "unexpected special staged node {}",
+            resolved.display()
+        );
     }
     Ok(())
+}
+pub(super) fn staged_census(targets: &[PathBuf]) -> Result<u64> {
+    let mut count = 0;
+    let mut seen = BTreeSet::new();
+    for root in ROOTS {
+        walk(Path::new(root), &mut seen, 0, &mut count, targets)?;
+    }
+    Ok(count)
+}
+pub(super) fn fleet(binding: &Value) -> Result<Value> {
+    let path = Path::new(s(binding, "path")?);
+    if !path
+        .file_name()
+        .is_some_and(|n| n == "ROOT_COMPLETE_OPERATIONAL_FLEET.json")
+        || !path.starts_with("/var/lib/jetstreamer/horizon_runtime_data")
+    {
+        return bound(binding);
+    }
+    // Complete November 21 fleet snapshots exceed 10 MB. Keep this allowance
+    // specific to a digest-bound root-owned complete fleet.
+    crate::bound_with_limit(binding, 64 << 20, true)
 }
 pub(crate) fn census(p: &Value) -> Result<Value> {
     let review = bound(&p["indirect_consumers_review"])?;
@@ -322,32 +419,42 @@ pub(crate) fn census(p: &Value) -> Result<Value> {
     let mut units = Vec::new();
     let mut indirect = Vec::new();
     let mut known = BTreeSet::new();
-    for owner in review["closed_source_owners"]
-        .as_array()
-        .context("original source owners")?
-    {
-        let unit = s(owner, "unit")?;
-        let iid = s(owner, "invocation_id")?;
+    if crate::prior_boot::alternative(&review)? {
+        let current = native(crate::prior_boot::UNIT)?;
+        terminal(crate::prior_boot::UNIT, &current)?;
         ensure!(
-            known.insert(unit.to_owned()),
-            "duplicate original source owner"
-        );
-        let lineage = bound(&owner["terminal_evidence"])?;
-        ensure!(
-            lineage["source"] == SOURCE
-                && lineage["sha256"] == SHA
-                && lineage["unit"] == unit
-                && lineage["invocation_id"] == iid,
-            "source owner lineage not tied to exact body"
-        );
-        terminal_lineage(&lineage, unit, iid)?;
-        let current = native(unit)?;
-        terminal(unit, &current)?;
-        ensure!(
-            current["InvocationID"] == "" || current["InvocationID"] == iid,
-            "source unit reused after terminal proof"
+            current["InvocationID"] == "" && current["LoadState"] == "not-found",
+            "historical producer name reused"
         );
         units.push(current);
+    } else {
+        for owner in review["closed_source_owners"]
+            .as_array()
+            .context("original source owners")?
+        {
+            let unit = s(owner, "unit")?;
+            let iid = s(owner, "invocation_id")?;
+            ensure!(
+                known.insert(unit.to_owned()),
+                "duplicate original source owner"
+            );
+            let lineage = bound(&owner["terminal_evidence"])?;
+            ensure!(
+                lineage["source"] == SOURCE
+                    && lineage["sha256"] == SHA
+                    && lineage["unit"] == unit
+                    && lineage["invocation_id"] == iid,
+                "source owner lineage not tied to exact body"
+            );
+            terminal_lineage(&lineage, unit, iid)?;
+            let current = native(unit)?;
+            terminal(unit, &current)?;
+            ensure!(
+                current["InvocationID"] == "" || current["InvocationID"] == iid,
+                "source unit reused after terminal proof"
+            );
+            units.push(current);
+        }
     }
     let consumers = review["consumers"]
         .as_array()
@@ -387,7 +494,7 @@ pub(crate) fn census(p: &Value) -> Result<Value> {
             indirect.push(path);
         }
     }
-    let fleet = bound(&review["current_fleet"])?;
+    let fleet = fleet(&review["current_fleet"])?;
     ensure!(
         fleet["owner"] == "/root"
             && fleet["epochs"].as_array().is_some_and(|rows| rows
@@ -544,6 +651,16 @@ mod tests {
         let t = tempfile::tempdir().unwrap();
         symlink("absent", t.path().join("link")).unwrap();
         assert!(walk(&t.path().join("link"), &mut BTreeSet::new(), 0, &mut 0, &[]).is_err());
+    }
+    #[test]
+    fn scheduler_mask_accepts_only_the_null_device() {
+        let t = tempfile::tempdir().unwrap();
+        let link = t.path().join("masked.service");
+        symlink("/dev/null", &link).unwrap();
+        assert!(walk(&link, &mut BTreeSet::new(), 0, &mut 0, &[]).is_ok());
+        fs::remove_file(&link).unwrap();
+        symlink("/dev/zero", &link).unwrap();
+        assert!(walk(&link, &mut BTreeSet::new(), 0, &mut 0, &[]).is_err());
     }
     #[test]
     fn reader_reappearance_is_not_a_terminal_shape() {

@@ -17,6 +17,7 @@ use std::{
 mod atomic_fs;
 mod canonical;
 mod closure;
+mod prior_boot;
 mod process_references;
 mod transaction;
 const IMAGE: &str =
@@ -77,7 +78,10 @@ fn raw(p: &Path, limit: u64, root_only: bool) -> Result<Vec<u8>> {
     Ok(b)
 }
 fn bound(v: &Value) -> Result<Value> {
-    let b = raw(Path::new(s(v, "path")?), 2 << 20, false)?;
+    bound_with_limit(v, 2 << 20, false)
+}
+fn bound_with_limit(v: &Value, limit: u64, root_only: bool) -> Result<Value> {
+    let b = raw(Path::new(s(v, "path")?), limit, root_only)?;
     ensure!(sha(&b) == s(v, "sha256")?, "metadata digest differs");
     Ok(serde_json::from_slice(&b)?)
 }
@@ -190,7 +194,13 @@ fn own(execute: bool) -> Result<Value> {
     Ok(v)
 }
 fn open_output() -> Result<File> {
-    let path = Path::new(OUT);
+    let path = if fs::read_link("/proc/self/exe")? == Path::new(prior_boot::IMAGE) {
+        Path::new(
+            "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement",
+        )
+    } else {
+        Path::new(OUT)
+    };
     let fd = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -219,10 +229,36 @@ fn run(p: &Value, execute: bool) -> Result<()> {
     closure::validate_review_shape(&review)?;
     let native = own(execute)?;
     let _lock = lock()?;
+    let historical = if prior_boot::alternative(&review)? {
+        let fence = prior_boot::Fence::take()?;
+        fence.evidence()?;
+        Some(fence)
+    } else {
+        None
+    };
+    // All historical controller locks outlive the final census and unlink.
+    let _historical_fence = historical;
     transaction::run(p, execute, &native)
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--assess-prior-boot") {
+        ensure!(
+            args.len() == 8 && args[6] == "--self-sha256",
+            "--assess-prior-boot FLEET FLEET_SHA256 REMOTE_OBSERVATION SHA256 --self-sha256 ELF_SHA256"
+        );
+        let image = fs::read_link("/proc/self/exe")?;
+        ensure!(
+            unsafe { libc::geteuid() } == 0
+                && image == Path::new(prior_boot::IMAGE)
+                && sha(&raw(&image, 32 << 20, true)?) == args[7],
+            "assess the sealed native image"
+        );
+        return prior_boot::assess(
+            &json!({"path":args[2],"sha256":args[3]}),
+            &json!({"path":args[4],"sha256":args[5]}),
+        );
+    }
     ensure!(
         args.len() == 7
             && args[2] == "--plan-sha256"
@@ -233,7 +269,7 @@ fn main() -> Result<()> {
     let image = fs::read_link("/proc/self/exe")?;
     ensure!(
         unsafe { libc::geteuid() } == 0
-            && image == Path::new(IMAGE)
+            && (image == Path::new(IMAGE) || image == Path::new(prior_boot::IMAGE))
             && sha(&raw(&image, 32 << 20, true)?) == args[5],
         "normally sealed root image required"
     );
