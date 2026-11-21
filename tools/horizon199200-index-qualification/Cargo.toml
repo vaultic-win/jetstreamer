@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "horizon199200-index-qualification"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "horizon199200-index-qualification"
+path = "repair.rs"
+
+[dependencies]
+jetstreamer-firehose = { path = "../../jetstreamer-firehose" }
+serde_json = "1"
+sha2 = "0.10"
