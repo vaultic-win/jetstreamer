@@ -35,11 +35,22 @@ def terminal_path(f,epoch):
 
 def apply(fleet):
     """Called by the single normal fleet writer on its pending, complete in-memory result."""
-    if os.geteuid()!=0 or not sys.flags.isolated or not __debug__:
-        raise ValueError('isolated controlling fleet required')
+    if os.geteuid()!=0 or not __debug__:
+        raise ValueError('controlling root fleet required')
     existing=fleet.get(KEY,{})
     present={str(e):REG/f'{e}.json' for e in ROOTS if (REG/f'{e}.json').exists()}
     if not present and not existing:
+        return fleet
+    if not sys.flags.isolated:
+        # The campaign's established cadence uses python -B. Its sole writer
+        # can call this hook without changing imports or its execution image.
+        keys=('owner','schema','all_active_status_reports_authenticated_readback','all_reservation_ending_bytes',KEY,'recovered166_local_commit','indexed167_local_commit','metered168_local_commit','recovered170_local_commit','full172_local_commit')
+        small={k:fleet[k] for k in keys if k in fleet}
+        original=B/'phase-registry-v1/registry.py'
+        if Path(__file__).resolve(strict=True)!=original:
+            raise ValueError('unsealed normal-cadence grant hook')
+        out=subprocess.run(['/usr/bin/python3','-IB',str(original),'register-stdin'],input=json.dumps(small).encode(),capture_output=True,check=True,timeout=30)
+        fleet[KEY]=json.loads(out.stdout)
         return fleet
     f=service();need=f['need'];_,event=f['helpers']()
     need(fleet['owner']=='/root' and fleet['schema']=='horizon-Root-complete-fleet-operational-review-v1' and fleet['all_active_status_reports_authenticated_readback'] is True and fleet['all_reservation_ending_bytes']==0 and isinstance(existing,dict),'different fleet writer')
@@ -123,6 +134,14 @@ def prepare(epoch,commit=False):
         return dict(outcome='awaiting-registration-in-normal-fleet',epoch=epoch,receipt=actual,resource_credit_bytes=0)
 
 if __name__=='__main__':
+    if sys.argv[1:]==['register-stdin']:
+        if not sys.flags.isolated or os.geteuid()!=0:
+            raise ValueError('isolated registration')
+        data=sys.stdin.buffer.read((128<<10)+1)
+        if len(data)>128<<10:
+            raise ValueError('oversized enrollment')
+        print(json.dumps(apply(json.loads(data)).get(KEY,{}),sort_keys=True))
+        sys.exit(0)
     options=argparse.ArgumentParser()
     options.add_argument('command',choices=['prepare','issue'])
     options.add_argument('epoch',type=int,choices=ROOTS)
