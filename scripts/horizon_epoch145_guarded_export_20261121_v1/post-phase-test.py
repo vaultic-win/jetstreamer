@@ -46,6 +46,10 @@ class PostPhaseTest(unittest.TestCase):
     def test_expected_reader_and_semantic_predecessor(self):
         if "POST_PHASE_UNDER_TEST" in os.environ:
             self.assertTrue(phase["TIMEOUT_SUCCESSOR"])
+            if phase["TIMER_SUCCESSOR"]:
+                self.assertEqual(phase["ADVANCING_NAME"], "V5E_ACTUAL_ADVANCING_WORKER.json")
+                self.assertEqual(phase["PIPE"].parent.name, "fast-range-residency-0f29fd116ef5")
+                return
             if phase["RETRIED_SEMANTIC"]:
                 self.assertEqual(phase["BOOTSTRAP"], "e6551a0bb8a14b989902e15c9ecc0751")
                 self.assertEqual(phase["ADVANCING"], "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0")
@@ -98,6 +102,16 @@ class PostPhaseTest(unittest.TestCase):
                 started = record("recovery-started", {"iid": gen, "r2_mutations": False})
                 proof = save(base / phase["ADVANCING_NAME"],
                              {"invocation_id": gen, "start": started})
+                build = None
+                if phase["TIMER_SUCCESSOR"]:
+                    old_failure = {"sha256": "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f"}
+                    old_start = {"sha256": "2" * 64}
+                    intent = save(base / "V5E_START_INTENT.json", {
+                        "schema": "horizon-145-retry-after-timer-inspection-intent-v1",
+                        "old": "e6551a0bb8a14b989902e15c9ecc0751", "failure": old_failure, "recovery": old_start})
+                    manager = save(base / "V5E_ACTUAL_MANAGER.json", {"intent": intent, "new": {"InvocationID": gen}})
+                    proof = save(base / phase["ADVANCING_NAME"], {"invocation_id": gen, "start": started, "manager": manager})
+                    build = {"prior_phase": proof, "old_failure": old_failure, "old_start": old_start}
                 frozen = record("verified-frozen", {"iid": gen, "r2_mutations": False})
                 original = "de6780b860b3467bae21fbd19176ca14"
                 e = {"epoch": 145, "archive": str(pub), "archive_bytes": 105610995833,
@@ -109,14 +123,17 @@ class PostPhaseTest(unittest.TestCase):
                               "recovered_from": original, "r2_mutations": False})
                 fn.__globals__.update(STATE=folder.parent, PKG=base / phase["PKG"].name, ADVANCING=proof["sha256"],
                                       ARCHIVE=pub, OUTPUT=base)
-                self.assertEqual(fn(Status()), (done, e))
+                self.assertEqual(fn(Status(), build), (done, e))
+                if phase["TIMER_SUCCESSOR"]:
+                    with self.assertRaisesRegex(ValueError, "different original timer recovery"):
+                        fn(Status(), dict(build, old_start={"sha256": "7"*64}))
                 (base / ".tmp36MvkN").touch()
                 with self.assertRaisesRegex(ValueError, "unverified original paid archive promotion"):
-                    fn(Status())
+                    fn(Status(), build)
                 (base / ".tmp36MvkN").unlink()
                 record("failed", {"iid": gen, "error": "incomplete"})
                 with self.assertRaisesRegex(ValueError, "unverified original paid archive promotion"):
-                    fn(Status())
+                    fn(Status(), build)
                 if phase["FOCUSED_SUCCESSOR"]:
                     second = "a" * 32
                     intent = save(base / "V5D_START_INTENT.json",

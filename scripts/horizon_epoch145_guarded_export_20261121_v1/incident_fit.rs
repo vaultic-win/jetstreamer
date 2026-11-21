@@ -9,7 +9,9 @@ use std::{
 };
 #[cfg(incident_timer145_only)]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
-#[cfg(incident_retry_post145_only)]
+#[cfg(incident_timer_post145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v17/post-stop-fit";
+#[cfg(all(incident_retry_post145_only, not(incident_timer_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v15/post-stop-fit";
 #[cfg(all(
     any(incident_focused145_only, incident_focused_post145_only),
@@ -419,7 +421,7 @@ pub fn missing_status_owner(trace: &str, provider: &str) -> bool {
 }
 
 /// A bounded, read-only retirement inspection can time out while all paid files stay leased.
-#[cfg(incident_timer145_only)]
+#[cfg(any(incident_timer145_only, incident_timer_post145_only))]
 pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
     let Some(directory) = Path::new(provider).parent() else {
         return false;
@@ -479,7 +481,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             return Err(anyhow::Error::new(capacity::TopologyTimeout)
                 .context("registered status publisher is unavailable"));
         }
-        #[cfg(incident_timer145_only)]
+        #[cfg(any(incident_timer145_only, incident_timer_post145_only))]
         if out.status.code() == Some(1)
             && out.stdout.is_empty()
             && timer_inspection_timeout(&err, PROVIDER)

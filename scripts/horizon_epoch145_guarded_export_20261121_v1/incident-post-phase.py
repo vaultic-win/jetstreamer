@@ -10,7 +10,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10")
+TIMER_SUCCESSOR = VERSION == "tools-v11"
+TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10", "tools-v11")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
 IMAGE = PKG / "export145"
@@ -38,6 +39,11 @@ if RETRIED_SEMANTIC:
     BOOTSTRAP = "e6551a0bb8a14b989902e15c9ecc0751"
     ADVANCING = "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0"
     ADVANCING_NAME = "V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json"
+
+
+if TIMER_SUCCESSOR:
+    PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/fast-range-residency-0f29fd116ef5/horizon_pipeline")
+    ADVANCING_NAME = "V5E_ACTUAL_ADVANCING_WORKER.json"
 
 
 def argv(pid):
@@ -76,9 +82,23 @@ def generation(s, parent, mode, args, fleet, m, profile):
     return sr, br
 
 
-def completion(s):
-    bootstrap = BOOTSTRAP
-    advancing, _ = s.read(PKG.parent / ADVANCING_NAME, ADVANCING)
+def completion(s, build=None):
+    if TIMER_SUCCESSOR:
+        # The price observer authenticates the build receipt against the sealed
+        # deployment before passing its ID-bound original worker reference.
+        advancing = s.bound(build["prior_phase"], PKG.parent / ADVANCING_NAME)
+        bootstrap = advancing["invocation_id"]
+        manager = s.bound(advancing["manager"], PKG.parent / "V5E_ACTUAL_MANAGER.json")
+        intent = s.bound(manager["intent"], PKG.parent / "V5E_START_INTENT.json")
+        s.need(s.iid(bootstrap) and manager["new"]["InvocationID"] == bootstrap and
+               intent["schema"] == "horizon-145-retry-after-timer-inspection-intent-v1" and
+               intent["old"] == "e6551a0bb8a14b989902e15c9ecc0751" and
+               intent["failure"] == build["old_failure"] and intent["recovery"] == build["old_start"] and
+               intent["failure"]["sha256"] == "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f",
+               "different original timer recovery")
+    else:
+        bootstrap = BOOTSTRAP
+        advancing, _ = s.read(PKG.parent / ADVANCING_NAME, ADVANCING)
     if FOCUSED_SUCCESSOR and (PKG.parent / "V5D_START_INTENT.json").exists():
         intent, original = s.read(PKG.parent / "V5D_START_INTENT.json")
         advancing, _ = s.read(PKG.parent / "V5D_ACTUAL_ADVANCING_WORKER.json")
@@ -191,7 +211,7 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         seen.remove(os.getpid())
     s.need(parent in seen, "holding controller absent")
     seen.remove(parent)
-    done, e = completion(s)
+    done, e = completion(s, s.bound(br, PKG / "build-proof.json") if TIMER_SUCCESSOR else None)
     meta = ARCHIVE.lstat()
     s.need((meta.st_dev, meta.st_ino, meta.st_size, meta.st_nlink, meta.st_uid, meta.st_gid,
             stat.S_IMODE(meta.st_mode)) == (64512, 103237059, 105610995833, 1, 0, 0, 0o400)

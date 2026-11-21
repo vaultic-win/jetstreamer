@@ -8,7 +8,7 @@ old="$current/tmp/early145-f3c1e61202f340f8a43902eb27fea7fc/source"
 d="$current/target/release"
 flavor="${2:-recovery}"
 focused=false
-if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused-post || $flavor == retry-post ]]; then
+if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused-post || $flavor == retry-post || $flavor == timer-post ]]; then
   focused=true
   src=/home/sol/.jetstreamer-private/paid145-focused169-recovery-20261121-v1
 fi
@@ -25,11 +25,12 @@ timeout-rejoin|focused-rejoin|timer-rejoin) sources=(incident-phase.py run-incid
         if [[ $flavor == timer-rejoin ]]; then extra+=(--cfg incident_timer145_only); fixture+=(incident145::proves_retirement_timeout_and_rejects_other_commands); fi
         fixture+=(incident145::tests::distinguishes_native_query_timeout_from_foreign_or_malformed_failures)
         ;;
-post|current-post|timeout-post|focused-post|retry-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
+post|current-post|timeout-post|focused-post|retry-post|timer-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
       extra=(--cfg incident_post145_only)
-      if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-post ]]; then extra+=(--cfg incident_timeout_post145_only); fi
+      if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-post || $flavor == timer-post ]]; then extra+=(--cfg incident_timeout_post145_only); fi
       if $focused; then extra+=(--cfg incident_focused_post145_only); fi
-      if [[ $flavor == retry-post ]]; then extra+=(--cfg incident_retry_post145_only); fi
+      if [[ $flavor == retry-post || $flavor == timer-post ]]; then extra+=(--cfg incident_retry_post145_only); fi
+      if [[ $flavor == timer-post ]]; then extra+=(--cfg incident_timer_post145_only); fi
       fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery)
       ;;
 *) exit 2 ;;
@@ -78,11 +79,16 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=350295e25c3404b9e23f60969a378061e780ad5a580fdf71c8c29861722d953b
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 6222a205645ea6a2bf34b4b2c4085d30a0fda7349e4243524a2c52089fc19931 ]]
   fi
+  if [[ $flavor == timer-post ]]; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit
+    signature=5829fb668122a391d61672598e82967e5299a9d84909d2ee6fc6ffd5563d1ee4
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == b11e6366a6fc0cf3ed91d2584314851b628f2589d60b70d41b922cb1170d0cb5 ]]
+  fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
   fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
   maximum_attempts=5
-  if [[ $flavor == retry-post ]]; then maximum_attempts=10; fi
+  if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
     if "$provider" 145 "$1" "$fleet_sha" > "$q/fit-$probe.json" 2> "$q/fit-$probe.stderr"; then
       cp "$q/fit-$probe.json" "$q/before.json"
@@ -92,7 +98,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     # out the read-only observer overlap and repeat the entire original fit.
     last=$(tail -1 "$q/fit-$probe.stderr")
     manager_timeout=false
-    if [[ $flavor == retry-post && $last == "subprocess.TimeoutExpired: Command '['/usr/bin/systemctl', 'show', '-p', "*" 'horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds" ]]; then
+    if [[ ( $flavor == retry-post || $flavor == timer-post ) && $last == "subprocess.TimeoutExpired: Command '['/usr/bin/systemctl', 'show', '-p', "*" 'horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds" ]]; then
       manager_timeout=true
     fi
     [[ ( $flavor == current-post || $flavor == timeout-post || $focused == true ) && $probe -lt $maximum_attempts &&
@@ -144,10 +150,11 @@ rustc --edition=2024 --test "${args[@]}" "$s/main.rs" -o "$out/tests"
 "$out/tests" --test-threads=1
 for name in "${fixture[@]}"; do "$out/tests" --ignored --exact "$name"; done
 "$out/tests" --ignored --exact incident_fit::tests::authenticates_the_actual_fleet_and_disallows_missing_members
-if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-post ]]; then
+if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-post || $flavor == timer-post ]]; then
   phase_package=tools-v8
   if $focused; then phase_package=tools-v9; fi
   if [[ $flavor == retry-post ]]; then phase_package=tools-v10; fi
+  if [[ $flavor == timer-post ]]; then phase_package=tools-v11; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
