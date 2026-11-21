@@ -348,12 +348,17 @@ mod tests {
     fn bounded_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!("fixtures/successor247-history.json"))?;
         let old = &f["recovery"];
-        let tier: Value = serde_json::from_str(include_str!("fixtures/successor247-cf4d.json"))?;
+        let tier: Value = serde_json::from_str(include_str!("fixtures/successor247-fadfe2d4.json"))?;
         let recovery = &tier["recovery"];
         let plan = &tier["plan"];
         let acceptance = &tier["main_acceptance"];
         let source = &tier["source_acceptance"];
         next::reader_source(plan, acceptance, source)?;
+        let previous: Value = serde_json::from_str(include_str!("fixtures/successor247-cf4d.json"))?;
+        assert!(next::reader_source(plan, acceptance, &previous["source_acceptance"]).is_err());
+        let mut foreign = source.clone();
+        foreign["published_head"] = json!("0".repeat(40));
+        assert!(next::reader_source(plan, acceptance, &foreign).is_err());
         for (field, altered) in [
             ("reader_commit", "99f306410aa59a41394e9c4bf379143fb2a4ada1"),
             (

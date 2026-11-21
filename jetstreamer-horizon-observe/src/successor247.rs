@@ -4,31 +4,31 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, io::Read, os::unix::fs::MetadataExt, path::Path};
 
-pub const UNIT: &str = "horizon-upload-247-staged-cf4d45a5-v1.service";
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/jetstreamer-r2";
-pub const IMAGE_SHA: &str = "388a8454ebab60c1fcd346a332abda3863d8b7addf0f8b68cffb52742b9ba995";
+pub const UNIT: &str = "horizon-upload-247-staged-fadfe2d4-v1.service";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon247-public-images-fadfe2d4-v1/jetstreamer-r2";
+pub const IMAGE_SHA: &str = "bc1255740a761743221838383816272966580a79d752e589ccafb31664fedd77";
 pub const PLAN: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/epoch-247-plan.json";
-pub const PLAN_SHA: &str = "e2c03e00972ed32cc634adb19fa05f0899bc1853b1bc9dd921e4e7814722344f";
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/epoch-247-plan.json";
+pub const PLAN_SHA: &str = "bc8252dbbf21f5396a3669313835787c79a7da46919d6243dbc3f29ff9064fe8";
 pub const RECOVERY: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/staged247-recovery.json";
-pub const RECOVERY_SHA: &str = "11ef28a2de54e0a4e6ea502760c06275536af4d5c00edf0150060cbdf308c15a";
-const READER: &str = "cf4d45a51820022fa8d2e4f63ca3e8bce261844d";
-const UPLOADER: &str = "16f900240c58dd779441c4d9bd7c720515673ee2";
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/staged247-recovery.json";
+pub const RECOVERY_SHA: &str = "f40250678635a011051e043b44d8e1247096491a99f48e3cc5d89b0d7b936dee";
+const READER: &str = "fadfe2d4a3784ba0f955d1b7a26a15f57ff593e0";
+const UPLOADER: &str = "ff6005f4b59f9e8e91925e680481acb21de5bd01";
 const ACCEPTANCE: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/main-acceptance.json";
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/main-acceptance.json";
 const SOURCE: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/source-acceptance.json";
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/source-acceptance.json";
 pub const PRIOR_UNIT: &str = "horizon-upload-247-staged-680e1173-v1.service";
 pub const PRIOR_IID: &str = "3e08307874db424886cd8c46b3ecfba6";
 pub const ORIGINAL: &str = "horizon-upload-247-singleton-20261119-v1.service";
 pub const ORIGINAL_IID: &str = "69218e2e0924497ea595a1227a6c31db";
-pub const ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-cf4d45a5-v1";
+pub const ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-fadfe2d4-v1";
 pub const PRIOR: &str =
-    "/var/lib/jetstreamer/horizon247-public-images-cf4d45a5-v1/prior-staged-owner.json";
+    "/var/lib/jetstreamer/horizon247-public-images-fadfe2d4-v1/prior-staged-owner.json";
 pub const PRIOR_SHA: &str = "b53133a0d9f828a5543dece1f343dd39828c96de618dc65095e471ba9ce2cef2";
 pub const FIRST: &str =
-    "/var/lib/jetstreamer/horizon247-public-reader-cf4d45a5-v1/original-uploader-terminal.json";
+    "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/original-uploader-terminal.json";
 pub const FIRST_SHA: &str = "c8c3f9f09e84a11c13887628f9bc207bb5eac53c58328f4055b32ba8bb0643d0";
 pub const HARD: u64 = 10 << 30;
 pub const BOOKED: u64 = HARD + (512 << 20);
@@ -155,7 +155,7 @@ pub fn reader_source(plan: &Value, acceptance: &Value, source: &Value) -> Result
             && acceptance["full_and_plugin_capabilities_accepted"] == true
             && source["reader_commit"] == READER
             && source["uploader_commit"] == UPLOADER
-            && source["uploader_commit_is_ancestor"] == true
+            && source["published_head"] == "8ced4c9cf3b0d96bd466dc5dbee397128914917e"
             && source["complete_fixture_reports"] == true,
         "epoch 247 bounded reader or uploader build differs"
     );
@@ -200,6 +200,7 @@ pub fn load(reference: &Value) -> Result<Owner> {
         .filter(|entry| entry["path"] == SOURCE);
     let source_ref = sources.next().context("bounded reader source acceptance")?;
     ensure!(sources.next().is_none(), "ambiguous bounded reader source");
+    ensure!(source_ref == &binding(SOURCE, "4e0437e3505376711e576fc39dba367792c7154c24cddb9d0270c20ce1565eca"), "published reader source proof changed");
     let source = doc(source_ref, Path::new(SOURCE))?;
     reader_source(&plan, &acceptance, &source)?;
     graph(&c, &booking, &launch, &recovery, &previous)?;
