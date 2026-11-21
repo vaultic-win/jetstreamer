@@ -831,6 +831,14 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   Bind any PoH verification receipt to the same data and range. Compare actual transfer
   sizes for equivalent inputs and use measured bytes for capacity planning. Continue
   using the qualified GCS generation for epochs awaiting this evidence.
+- For the Foundation Compact V2 query backup, read the per-epoch file manifest at
+  `/compact-v2/blockzilla-20261004/epoch-N/BLOCKZILLA-QUERY-WITH-SIGNATURES-MANIFEST.json`
+  on that public origin. The manifests for 166, 167, 170 and 208 identify CAR-derived block,
+  registry and signature files. They explicitly exclude `poh.wincode` and list no bank
+  snapshot. Inspect `source_files`, `excluded_files` and `previously_uploaded_extras_retained`
+  for the target epoch before planning a transfer. The separate Blockzilla samples Worker
+  serves `/compact-v2/900/poh.wincode` (9,681,441,209 bytes). Use each source's own path
+  convention and verify coverage for the specific epoch. [Epoch 208 manifest](https://pub-97348740d6ef467aa2f1b4b62daa98dc.r2.dev/compact-v2/blockzilla-20261004/epoch-208/BLOCKZILLA-QUERY-WITH-SIGNATURES-MANIFEST.json) · [Epoch 900 PoH sample](https://blockzilla-archive-samples-v1.cheron-augustin.workers.dev/compact-v2/900/poh.wincode)
 - Before sealing a generation-pinned GCS restore helper, exercise its metadata parser against the
   host's live `gcloud storage objects describe --format=json` output. Current Homebrew gcloud uses
   normalized `crc32c_hash`, `md5_hash`, integer `size`, and `storage_url` fields, while older
