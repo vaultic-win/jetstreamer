@@ -90,7 +90,7 @@ def main():
         closure=original["closed_verifier145"]
         phase=observed["phase145"]
         s.need(phase["invocation_id"]==mgr["InvocationID"]=="dc043eb78c4a4349b0098760dc764a1f" and phase["stage"]=="leased-worker" and
-               phase["window"]["predecessor"]==closure["failure"] and
+               phase["window"]["failed_predecessor"]==closure["failure"] and
                phase["window"]["prior_started"]==closure["recovery"] and
                phase["window"]["leases_parent"] and phase["window"]["leases_worker"],"foreign advancing 145")
     s.need(observed["fits"] and observed["stopped_generation_resident_credit_bytes"]==0 and
