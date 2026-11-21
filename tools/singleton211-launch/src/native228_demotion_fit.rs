@@ -1,6 +1,8 @@
 //! Current-fleet capacity, before opening either real epoch 228 input. No launches.
 use super::*;
 use std::os::unix::fs::DirBuilderExt;
+#[path = "native228_demotion_control.rs"]
+pub mod controller;
 
 const COLD: &str = "horizon-native-input-228-demotion-16d4b158-v1.service";
 const GUARD228: &str = "horizon-native-input-228-demotion-guard-v1.service";
@@ -91,6 +93,55 @@ fn charges(review: &Value) -> Result<Value> {
     )
 }
 
+fn apply_retry(
+    rows: &mut [capacity::Reservation],
+    observed: Option<&Value>,
+    review: &Value,
+) -> Result<Option<Value>> {
+    let election = review.get("epoch228_completed_retry_memory");
+    let Some(retry) = observed else {
+        ensure!(
+            election.is_none(),
+            "epoch 228 retry election lacks fresh original drainage"
+        );
+        return Ok(None);
+    };
+    let name = text(retry, "unit")?;
+    let row = rows
+        .iter_mut()
+        .find(|row| row.unit == name)
+        .context("missing completed retry row")?;
+    let original = row
+        .release
+        .as_ref()
+        .context("retry still booked in effective view")?;
+    ensure!(
+        name == "horizon205206-adjacent-boundary-v137-v2.service"
+            && text(retry, "invocation_id")? == "5c0fb3eb5d594e06981838633f47dfaf"
+            && row.invocation_id == text(retry, "invocation_id")?
+            && row.maximum_memory_bytes == 125_000_000_000
+            && num(retry, "released_memory_bytes")? == row.maximum_memory_bytes
+            && retry["bridge"] == json!(original)
+            && retry["original_ledger_unchanged"] == true
+            && retry["inherited_floor_credit_bytes"] == 0
+            && retry["physical_allocation_credit_bytes"] == 0
+            && retry["released_disk_growth_bytes"] == 0,
+        "distinct retry memory binding"
+    );
+    if let Some(e) = election {
+        let requested = &review["completed_boundary205206_retry_memory_release"];
+        ensure!(
+            e == &json!({"unit":COLD,"scope":"epoch228-cold","bridge":original})
+                && requested
+                    == &json!({"bridge":original,"no_pending_or_future_retry_confirmed":true}),
+            "retry authorization is not for this cold producer"
+        );
+        return Ok(Some(retry.clone()));
+    }
+    row.release = None;
+    Ok(None)
+}
+
 fn fit(host: &native257_fit::BookedHost, memory: u64, disk: u64) -> Value {
     match capacity::candidate_arithmetic(
         host.resources,
@@ -145,24 +196,7 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound, held: bool) -> Resul
             .all(|r| r.unit != FULL && r.unit != controller),
         "candidate/controls already in producer ledger"
     );
-    // A paired boundary retry release belongs to its original admission. Retain
-    // that hard cap here until an epoch 228-specific transition is introduced.
-    if let Some(retry) = &host.retry_memory {
-        let name = text(retry, "unit")?;
-        let row = host
-            .rows
-            .iter_mut()
-            .find(|r| r.unit == name)
-            .context("missing completed retry row")?;
-        ensure!(
-            row.release.is_some()
-                && row.invocation_id == text(retry, "invocation_id")?
-                && row.maximum_memory_bytes == num(retry, "released_memory_bytes")?
-                && num(retry, "released_disk_growth_bytes")? == 0,
-            "paired retry binding"
-        );
-        row.release = None;
-    }
+    let retry = apply_retry(&mut host.rows, host.retry_memory.as_ref(), review)?;
     let final_resources = live::resources_at(&path)?;
     ensure!(
         final_resources.0 == host.resources.0
@@ -174,6 +208,15 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound, held: bool) -> Resul
     host.resources.1 = host.resources.1.min(final_resources.1);
     host.resources.2 = host.resources.2.min(final_resources.2);
     let cold = fit(&host, COLD_MEMORY, COLD_DISK);
+    // A cold-only choice cannot discharge this reservation for a full root-tail replay.
+    if let Some(proof) = &retry {
+        let name = text(proof, "unit")?;
+        host.rows
+            .iter_mut()
+            .find(|r| r.unit == name)
+            .context("retry row")?
+            .release = None;
+    }
     let full = fit(&host, 225_000_000_000, FULL_DISK);
     let after = protected_unit(n, held)?;
     if held {
@@ -185,7 +228,7 @@ fn evaluate(n: &mut Native, review: &Value, source: &Bound, held: bool) -> Resul
     fresh(num(review, "recorded_unix_seconds")?, now()?, 300)?;
     n.check()?;
     Ok(
-        json!({"schema":"horizon-native228-demotion-current-fit-v1","epoch":228,"unit":COLD,"held":held,"producer":after,"worker":worker,"review":source,"observer":review["observer"],"fleet":review["fleet"],"reservation_ledger":review["reservation_ledger"],"recorded_unix_seconds":now()?,"boot_id":host.boot,"control_charges":controls,"controller":outer,"disk_device":device,"cold_root":ROOT228,"full_root":FULL_ROOT,"full_unit":FULL,"scenarios":{"cold":cold,"root_tail":full},"actual_current_memory":host.currents,"full211_growth":host.full211_growth,"old_boundary_memory_release":host.boundary_memory,"additional_paired_retry_credit_bytes":0,"holding_reclamation_credit_bytes":0,"admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false}),
+        json!({"schema":"horizon-native228-demotion-current-fit-v1","epoch":228,"unit":COLD,"held":held,"producer":after,"worker":worker,"review":source,"observer":review["observer"],"fleet":review["fleet"],"reservation_ledger":review["reservation_ledger"],"recorded_unix_seconds":now()?,"boot_id":host.boot,"control_charges":controls,"controller":outer,"disk_device":device,"cold_root":ROOT228,"full_root":FULL_ROOT,"full_unit":FULL,"scenarios":{"cold":cold,"root_tail":full},"actual_current_memory":host.currents,"full211_growth":host.full211_growth,"old_boundary_memory_release":host.boundary_memory,"epoch228_completed_retry_memory_release":retry,"additional_paired_retry_credit_bytes":0,"holding_reclamation_credit_bytes":0,"admission_authorized":false,"replay_launch_authorized":false,"remote_mutations":false}),
     )
 }
 
@@ -227,6 +270,44 @@ pub fn run(review: &Path, sha256: &str, evidence: &Path, held: bool) -> Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_a_separately_elected_original_retry_can_fund_epoch228_cold() {
+        let original = Bound::new("/protected/bridge", "a".repeat(64));
+        let row = capacity::Reservation {
+            unit: "horizon205206-adjacent-boundary-v137-v2.service".into(),
+            invocation_id: "5c0fb3eb5d594e06981838633f47dfaf".into(),
+            maximum_memory_bytes: 125_000_000_000,
+            remaining_disk_growth_bytes: 7,
+            minimum_free_bytes: 11,
+            source: original.clone(),
+            release: Some(original.clone()),
+        };
+        let actual = json!({"unit":row.unit,"invocation_id":row.invocation_id,"bridge":original,"original_ledger_unchanged":true,"released_memory_bytes":row.maximum_memory_bytes,"inherited_floor_credit_bytes":0,"physical_allocation_credit_bytes":0,"released_disk_growth_bytes":0});
+        let reviewed = json!({"completed_boundary205206_retry_memory_release":{"bridge":original,"no_pending_or_future_retry_confirmed":true},"epoch228_completed_retry_memory":{"unit":COLD,"scope":"epoch228-cold","bridge":original}});
+        let mut rows = [row.clone()];
+        assert_eq!(
+            apply_retry(&mut rows, Some(&actual), &reviewed).unwrap(),
+            Some(actual.clone())
+        );
+        assert!(
+            rows[0].release.is_some()
+                && rows[0].remaining_disk_growth_bytes == 7
+                && rows[0].minimum_free_bytes == 11
+        );
+        assert!(apply_retry(&mut rows, None, &reviewed).is_err());
+        let mut other = reviewed.clone();
+        other["epoch228_completed_retry_memory"]["scope"] = json!("full");
+        assert!(apply_retry(&mut rows, Some(&actual), &other).is_err());
+        let mut bad = actual.clone();
+        bad["released_disk_growth_bytes"] = json!(1);
+        assert!(apply_retry(&mut rows, Some(&bad), &reviewed).is_err());
+        assert!(
+            apply_retry(&mut rows, Some(&actual), &json!({}))
+                .unwrap()
+                .is_none()
+                && rows[0].release.is_none()
+        );
+    }
     #[test]
     fn must_book_original_controller_and_guard_in_existing_pool() {
         let name = "horizon228-demotion-cold-control-v1.service";

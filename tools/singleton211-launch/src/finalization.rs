@@ -303,6 +303,7 @@ pub(super) fn validate_roster(
             && fleet["auxiliary_diagnostics"] == json!([]),
         "unsupported fleet diagnostic owner"
     );
+    native266_peer::validate(fleet, observer, rows, boot)?;
     full265::validate(fleet, observer, rows, boot)?;
     delivery247::validate_roster(fleet, rows)?;
     // Admission independently authenticates both exact native terminal peers.
@@ -310,7 +311,7 @@ pub(super) fn validate_roster(
         .as_array()
         .context("pipeline census")?
         .iter()
-        .filter(|e| !peers::selected(e) && !delivery247::selected(e) && !full265::pipeline(e))
+        .filter(|e| !peers::selected(e) && !delivery247::selected(e) && !full265::pipeline(e) && !native266_peer::pipeline(e))
         .collect();
     let observed_diagnostics = observer["diagnostic_replays"]
         .as_array()
@@ -318,7 +319,7 @@ pub(super) fn validate_roster(
     let mut diagnostics = Vec::new();
     let mut native265_diagnostic_seen = false;
     for d in observed_diagnostics {
-        if (full211 && full211_peer::observed(d)) || full265::diagnostic(d) {
+        if (full211 && full211_peer::observed(d)) || full265::diagnostic(d) || native266_peer::diagnostic(d) {
             // Already authenticated by the complete full265 cross-census validator.
             continue;
         }
@@ -354,7 +355,7 @@ pub(super) fn validate_roster(
         );
     }
     for a in fleet["active"].as_array().context("active census")? {
-        if (full211 && full211_peer::active(a)) || a["epoch"] == 265 {
+        if (full211 && full211_peer::active(a)) || a["epoch"] == 265 || native266_peer::pipeline(a) {
             // Ordinary or exact post-EOF form validated above; no private promotion.
             continue;
         }
@@ -386,7 +387,7 @@ pub(super) fn verify_inputs(fleet: &Value) -> Result<()> {
             delivery247::verify_inputs(e)?;
             continue;
         }
-        if peers::selected(e) || full265::pipeline(e) {
+        if peers::selected(e) || full265::pipeline(e) || native266_peer::pipeline(e) {
             continue;
         }
         let p = registered(num(e, "epoch")?)?;
