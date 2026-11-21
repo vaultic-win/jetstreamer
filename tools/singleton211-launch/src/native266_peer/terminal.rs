@@ -303,6 +303,10 @@ fn completed_observer(f: &Value, o: &Value) -> Result<()> {
                 && f["new_resource_samples"] == 0,
             "native266 later event replaced its scheduled observation"
         );
+    } else if version == 164 && previous["observer_receipt"] != cfg["previous_sample"] {
+        let prior = binding(&f["previous_fleet"])?;
+        ensure!(f["admission_transition_guard"].is_null(), "v164 requires a routine fleet");
+        native266::validate_v164_observer_predecessor(&prior.path, &prior.sha256, Path::new(output), o)?;
     } else {
         ensure!(
             previous["observer_sha256"] == cadence["previous_sample_sha256"]

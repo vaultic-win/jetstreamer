@@ -312,13 +312,16 @@ pub(in crate::fleet) fn census_check(
     let same = previous["observer_receipt"].as_str() == p.observer.path.to_str()
         && previous["observer_sha256"] == p.observer.sha256;
     if !same {
-        ensure!(
-            observation["cadence"]["previous_sample"] == previous["observer_receipt"]
-                && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
-                && observation["cadence"]["previous_sample_recorded_at_utc"]
-                    == previous["sampled_at_utc"],
-            "native bootstrap observation chain interrupted"
-        );
+        let continuous = observation["cadence"]["previous_sample"] == previous["observer_receipt"]
+            && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
+            && observation["cadence"]["previous_sample_recorded_at_utc"] == previous["sampled_at_utc"];
+        if !continuous {
+            ensure!(EPOCH == 266 && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
+                "native bootstrap observation chain interrupted");
+            horizon_singleton211_launch::native266::validate_v164_observer_predecessor(
+                &predecessor.path, &predecessor.sha256, &p.observer.path, observation,
+            )?;
+        }
     }
     if initial
         || event

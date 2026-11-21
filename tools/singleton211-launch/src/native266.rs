@@ -1,5 +1,8 @@
 //! Device-aware fleet admission for the bounded epoch 266 bootstrap.
 use super::*;
+#[path = "native266_observer_gap.rs"]
+mod observer_gap;
+pub use observer_gap::validate_v164_observer_predecessor;
 mod funding {
     include!("native261/funding.rs");
 }
