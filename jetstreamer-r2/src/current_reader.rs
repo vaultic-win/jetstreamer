@@ -59,6 +59,7 @@ const PUBLISHED_READER_PATHS: &[&str] = &[
     "historical-runtime/v1_0_8/worker/src/poh_backend.rs",
     "jetstreamer-utils/Cargo.toml",
     "jetstreamer-utils/build.rs",
+    "jetstreamer-utils/build_support",
     "jetstreamer-utils/src/lib.rs",
     "jetstreamer-utils/src/clickhouse.rs",
     "jetstreamer-utils/src/horizon_legacy_shred.rs",
