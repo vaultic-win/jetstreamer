@@ -320,7 +320,7 @@ fn generation(plan: &Value) -> Result<()> {
     session::native_denial_provenance(plan)?;
     Ok(())
 }
-fn writer(plan: &Value) -> Result<(Value, String)> {
+fn installed_controller(plan: &Value) -> Result<Value> {
     let exe = Path::new(BASE).join("controller/admit136");
     let own = fs::metadata("/proc/self/exe")?;
     let installed = fs::symlink_metadata(&exe)?;
@@ -331,14 +331,18 @@ fn writer(plan: &Value) -> Result<(Value, String)> {
     let image = root_file(&exe, 64 << 20)?;
     let hash = format!("{:x}", Sha256::digest(image));
     let bound = binding(&exe, &hash);
+    ensure!(plan["controller"] == bound, "controller plan binding");
+    Ok(bound)
+}
+fn writer(plan: &Value) -> Result<(Value, String)> {
+    let bound = installed_controller(plan)?;
     let v = show(WRITER_UNIT)?;
     let iid = std::env::var("INVOCATION_ID")?;
     ensure!(
         v["InvocationID"] == iid
             && guard168::iid(&iid)
             && fs::read_to_string("/proc/self/cgroup")?.trim()
-                == format!("0::/system.slice/{WRITER_UNIT}")
-            && plan["controller"] == bound,
+                == format!("0::/system.slice/{WRITER_UNIT}"),
         "writer cgroup/plan binding"
     );
     let cg = Path::new("/sys/fs/cgroup/system.slice").join(WRITER_UNIT);
@@ -551,18 +555,38 @@ fn no_older_136() -> Result<()> {
     }
     Ok(())
 }
+/// Use the same topology and native fit as the writer before altering donor launchability.
+fn initial_fit(fleet_path: &Path, fleet_sha: &str, fleet: &Value) -> Result<Value> {
+    verify_fleet(fleet)?;
+    topology::exclusive_post172(fleet)?;
+    no_older_136()?;
+    fit::inspect(fleet_path, fleet_sha, None)
+}
 fn run() -> Result<()> {
     use std::os::fd::AsRawFd;
     let a: Vec<_> = std::env::args().skip(1).collect();
     ensure!(unsafe { libc::geteuid() } == 0, "root controller required");
     ensure!(
         !a.is_empty(),
-        "expected inventory|establish|prepare|post|session|register-status|release"
+        "expected inventory|preflight|establish|prepare|post|session|register-status|release"
     );
     if a.first().is_some_and(|mode| mode == "audit-owner") {
         ensure!(a.len() == 3, "audit-owner FLEET SHA");
         let fleet = json_pin(Path::new(&a[1]), &a[2])?;
         println!("{}", fit::observe_audit(&fleet["continuing_audit_obligation"])?);
+        return Ok(());
+    }
+    if a[0] == "preflight" {
+        ensure!(a.len() == 5, "preflight PLAN SHA FLEET SHA");
+        let plan = json_pin(Path::new(&a[1]), &a[2])?;
+        let fleet_path = Path::new(&a[3]);
+        let fleet = json_pin(fleet_path, &a[4])?;
+        let controller = installed_controller(&plan)?;
+        generation(&plan)?;
+        let ancestry = fence::ancestry()?;
+        let disk = donor_disk()?;
+        let fit = initial_fit(fleet_path, &a[4], &fleet)?;
+        println!("{}", json!({"controller":controller,"plan":binding(Path::new(&a[1]),&a[2]),"donor_ancestry":ancestry,"donor_disk":disk,"fit":fit,"donor_fenced":false,"admission_granted":false}));
         return Ok(());
     }
     if a == ["inventory"] {
@@ -640,16 +664,18 @@ fn phase(a: &[String]) -> Result<Value> {
     let fpath = Path::new(&a[3]);
     let f = json_pin(fpath, &a[4])?;
     let fleet = binding(fpath, &a[4]);
-    verify_fleet(&f)?;
-    topology::exclusive_post172(&f)?;
     let anc = fence::ancestry()?;
-    no_older_136()?;
     if a[0] == "establish" {
+        initial_fit(fpath, &a[4], &f)?;
+
         let native = fence::establish()?;
         let loan = json!({"schema":"horizon-exclusive-171-to136-v1","complete_fleet":fleet,"writer":author,"writer_invocation_id":iid,"recorded_unix_seconds":now()?,"ancestry":anc,"HOME":donor_disk()?,"native":native,"new_memory_credit_bytes":0,"replay_launched":false});
         let receipt = file_write(&base.join("donor171.json"), &loan)?;
         return Ok(receipt);
     }
+    verify_fleet(&f)?;
+    topology::exclusive_post172(&f)?;
+    no_older_136()?;
     let donor_path = base.join("donor171.json");
     let bytes = root_file(&donor_path, 1 << 20)?;
     let native = fence::check()?;

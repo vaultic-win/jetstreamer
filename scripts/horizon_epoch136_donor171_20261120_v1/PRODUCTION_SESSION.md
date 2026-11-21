@@ -30,6 +30,19 @@ checks the real worker's image/credentials/PID/start ticks, waits for a new genu
 guard sample containing exactly that worker, measures the whole run root and then
 sends `R`. That code and the original 7,396-slot reproduction are unchanged.
 
+Run the sealed controller in its intended read-only mount namespace to check the
+current production plan and fleet before scheduling the writer.
+
+```text
+BASE/controller/admit136 preflight PLAN SHA FLEET SHA
+```
+
+Preflight checks the installed controller, payload provenance, donor ancestry,
+whole donor root, production topology and complete native fit. It exits nonzero
+at the first failed gate. A successful result describes the sampled conditions.
+The writer repeats the full initial fit immediately before fencing 171 and again
+after the exclusive donor handoff.
+
 ## Integration sequence
 
 1. Parent applies this source to `account-updates`, builds/tests it in the retained
