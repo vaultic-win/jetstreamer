@@ -138,13 +138,14 @@ def same_fork(before,after,observed):
         s.need(after["guard"]!=before["guard"] and after["guard_time"]>=before["guard_time"],
                "worker lacks a subsequent completed native guard")
 
-def native_actor(e,own,tree,run,stop):
+def native_actor(e,own,tree,run,stop,terminal=None):
     d=R/DIRS[e];unit="horizon-qualify-"+UNITS[e]+".service";timer="horizon-guard-"+UNITS[e]+".timer"
     manager=s.show(unit);ps=fit.members(unit)
     if not ps:
-        s.need(manager["ActiveState"] in ("failed","inactive") and not manager["Job"] and not (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists(),
+        s.need(manager["ActiveState"] in ("failed","inactive") and not manager["Job"] and (terminal is not None or not (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists()),
                "replacement admission has no native producer")
         return None
+    s.need(terminal is None,"closed replacement has a live process")
     intent,_=s.read(d/"START_INTENT.json")
     gated=e==170 and not (d/"ACTUAL_PRODUCER_NATIVE.json").exists()
     actor,aref=s.read(d/("NATIVE_GATED.json" if gated else "ACTUAL_PRODUCER_NATIVE.json"))
@@ -268,9 +269,10 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def profile145(here, post=False):
-    profile="profile145-post.json" if post else "profile145.json"
-    directory="tools-v6" if post else "tools-v5"
+def profile145(here, post=False, rejoin=False):
+    s.need(not (post and rejoin),"ambiguous 145 image")
+    profile="profile145-rejoin.json" if rejoin else "profile145-post.json" if post else "profile145.json"
+    directory="tools-v5b" if rejoin else "tools-v6" if post else "tools-v5"
     name="incident-post-phase.py" if post else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
@@ -306,8 +308,10 @@ def phase145(epoch):
     base=R/"epoch145-semantic-continuity-20261121-v1"
     post=(base/"tools-v6/export145").exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",base/"tools-v6/export145")
     fp=base/"tools-v5/export145"
-    if post or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent,post)
+    rp=base/"tools-v5b/export145"
+    rejoin=rp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",rp)
+    if post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,adapter,_=profile145(current.parent,post,rejoin)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")
@@ -405,7 +409,7 @@ def registered_status():
            x["sha256"]==hashlib.sha256(script.read_bytes()).hexdigest() for x in seal["members"]),"unsealed status package")
     return dict(registration=registration,consumer_seal=sr,invocation_id=m["InvocationID"],pid=pid,start_ticks=s.process(pid)[1])
 
-def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0):
+def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0,closed_prepaid=None):
     # The original aggregate includes a full independent-166 allowance and standard
     # peer allowances measured net of the original, single physical baseline.
     # Charge any newly unfulfilled baseline. Never count closed-file reclamation twice.
@@ -413,6 +417,7 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0):
     # Native incumbent floors retain the stopped-era basis. Growth already realized by
     # a newly admitted generation consumes only its own stop-era, prepaid allowance.
     spent=sum(v["prestart_remaining"]-booking[k]["remaining_bytes"] for k,v in replacements.items())
+    spent+=sum(prior-booking[k]["remaining_bytes"] for k,prior in (closed_prepaid or {}).items())
     required=max(raw+deficit-spent,c136.get("guard_floor",0))+c136["remaining"]
     # Each candidate spends its prepaid share of the aggregate, while all other
     # commitments and every incumbent's absolute native trip threshold stay protected.
@@ -430,6 +435,13 @@ def capture_once(epoch,ref):
     s.need((136 in rows)==c136["occupied"],"136 registration drift")
     phase=phase145(epoch)
     extension=extensions["funding"](s,epoch)
+    closed166=None
+    closed_prepaid={}
+    if f.get("recovered166_local_commit"):
+        proof=runpy.run_path(str(Path(__file__).with_name("closure.py")))
+        closed166=proof["inspect"]()
+        s.need(closed166["terminal"]==f["recovered166_local_commit"] and 166 not in rows and
+               "166" not in f["original_disk_guard_recovery_workers"],"closed producer still registered")
     rep={};books={}
     for e in sorted(ORIGINAL):
         row=stopped[str(e)]
@@ -444,7 +456,17 @@ def capture_once(epoch,ref):
         s.need(run.is_relative_to(root) and plan["maximum_root_physical_bytes"]==CAPS[e] and
                plan["invocation_id"]==original["iid"],"different original booked tree")
         effective=extension["cap_bytes"] if e==170 and extension else CAPS[e]
-        a=native_actor(e,epoch,root,run,row)
+        terminal=closed166 if e==166 else None
+        if terminal:
+            ad=bound(terminal["admission"])
+            intent=s.bound(ad["intent"],R/DIRS[e]/"START_INTENT.json")
+            pre=intent["prestart"];b=pre["bookings"]["166"]
+            s.need(pre["schema"]=="horizon-incident-replay-fit-v1" and pre["epoch"]==166 and pre["fits"] and
+                   ad["predecessor_stop"]==intent["predecessor_stop"]==row["stop_completion"] and pre["candidate"] is None and
+                   b["root"]==str(root) and b["cap_bytes"]==CAPS[e] and 0<=b["remaining_bytes"]<=CAPS[e],
+                   "closed epoch 166 booking changed")
+            closed_prepaid["166"]=b["remaining_bytes"]
+        a=native_actor(e,epoch,root,run,row,terminal)
         if a:rep[str(e)]=a
         if a and a["physical"] is not None:
             physical=a["physical"];measurement="two complete native whole-tree walks"
@@ -500,7 +522,7 @@ def capture_once(epoch,ref):
     population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
     raw+=extension["extra_bytes"] if extension else 0
-    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep,floor168)
+    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep,floor168,closed_prepaid)
     resident={e:joined_resident(v) for e,v in rep.items()}
     if resident168:resident["168"]=resident168
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
@@ -508,6 +530,7 @@ def capture_once(epoch,ref):
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
+    if closed166:s.need(proof["inspect"]()==closed166,"terminal guard or archive changed during capture")
     for v in peers.values():
         m=s.show(v["unit"]);t=s.show(v["timer"])
         s.need(m["InvocationID"]==v["invocation_id"] and m["ActiveState"]=="active" and not m["Job"] and
@@ -515,7 +538,7 @@ def capture_once(epoch,ref):
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
-        fits=avail>=need and mem["MemAvailable:"]>=needmem,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
+        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed166,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,

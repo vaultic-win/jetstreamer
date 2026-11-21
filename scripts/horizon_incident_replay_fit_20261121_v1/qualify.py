@@ -66,6 +66,11 @@ def main():
         p=here/name;b=p.read_bytes()
         s.need(b==git("show",commit+":scripts/horizon_incident_replay_fit_20261121_v1/"+name),"unpublished qualification source")
         src[name]=digest(b)
+    closure_path=here/"closure.py"
+    source=git("show",commit+":scripts/horizon_epoch166_retry10_delivery_20261121_v1/closure.py")
+    s.need(closure_path.read_bytes()==source,"different terminal registration source")
+    src["closure.py"]=digest(source)
+    _,_,rejoin=m["profile145"](here,rejoin=True)
     _,_,binding=m["profile145"](here)
     _,_,post_binding=m["profile145"](here,True)
     rejected(lambda:m["fleet_head"](dict(fleet,sha256="0"*64)))
@@ -83,9 +88,9 @@ def main():
            observed["available_HOME_bytes"]>=observed["complete_required_HOME_bytes"] and
            observed["available_memory_bytes"]>=observed["required_available_memory_bytes"],"native capacity failed")
     booking168=observed["bookings"]["168"]
-    guard168=m["bound"](booking168["guard"])
+    guard168=m["bound"](booking168["measured_guard"])
     s.need(guard168["producer_invocation_id"]==observed["normal168"]["actor"]["producer_invocation_id"] and
-           guard168["root_physical_observation"]["maximum_physical_bytes"]==booking168["cap"],"unbound 168 sample")
+           guard168["root_physical_observation"]["maximum_physical_bytes"]==booking168["cap_bytes"],"unbound 168 sample")
     if booking168["measurement"]=="two complete native whole-tree walks":
         physical=guard168["root_physical_observation"]
         s.need(booking168["physical_bytes"]==min(physical[k]["physical_bytes"] for k in ("first","second"))
@@ -106,8 +111,22 @@ def main():
     baseline=floor(raw,optional,books,170,peer,{})
     realized=floor(raw,optional,grown,170,peer,{"170":dict(prestart_remaining=older["remaining_bytes"],floor=baseline[1])})
     s.need(realized[0]+amount==baseline[0] and realized[1]==baseline[1],"own growth changes protected unrelated claims")
+    incumbent=observed["replacements"]["166"]
+    others={k:v for k,v in observed["replacements"].items() if k!="166"}
+    paid={"166":incumbent["prestart_remaining"]}
+    baseline=floor(raw,optional,books,145,peer,observed["replacements"],observed["active168_guard_floor"])
+    transitioned=floor(raw,optional,books,145,peer,others,observed["active168_guard_floor"],paid)
+    # The obsolete 166 guard floor may be removed once the exact guard drains.
+    # Keep the complete original aggregate when its remaining native floors do not dominate.
+    s.need(baseline[0]==max(transitioned[0],incumbent["floor"]) and transitioned[2]==baseline[2],
+           "closed 166 physical storage was credited twice")
+    term=runpy.run_path(str(closure_path))
+    s.need(not term["DONE"].exists() and not (term["T"]/"TERMINAL_SUCCESS.json").exists() and
+           observed["closed_recovered166"] is None and term["IID"]==incumbent["producer_invocation_id"],
+           "active generation registered as closed")
+    rejected(lambda:term["expected_timer"]({"Id":"foreign"}))
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,closed166_budget_conserved=True,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:
