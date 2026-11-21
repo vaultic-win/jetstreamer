@@ -46,8 +46,13 @@ class PostPhaseTest(unittest.TestCase):
     def test_expected_reader_and_semantic_predecessor(self):
         if "POST_PHASE_UNDER_TEST" in os.environ:
             self.assertTrue(phase["TIMEOUT_SUCCESSOR"])
-            self.assertEqual(phase["BOOTSTRAP"], "d37f36f898a44932a19fd50d7014a6fe")
-            self.assertEqual(phase["ADVANCING"], "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76")
+            if phase["RETRIED_SEMANTIC"]:
+                self.assertEqual(phase["BOOTSTRAP"], "e6551a0bb8a14b989902e15c9ecc0751")
+                self.assertEqual(phase["ADVANCING"], "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0")
+                self.assertEqual(phase["ADVANCING_NAME"], "V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json")
+            else:
+                self.assertEqual(phase["BOOTSTRAP"], "d37f36f898a44932a19fd50d7014a6fe")
+                self.assertEqual(phase["ADVANCING"], "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76")
             self.assertEqual(phase["PIPE"].parent.name, "public-rseek-reconnect-56bf2bf0937f")
 
     def test_full_native_read_and_foreign_command(self):

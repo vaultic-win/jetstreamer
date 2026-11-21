@@ -7,7 +7,12 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(any(incident_focused145_only, incident_focused_post145_only))]
+#[cfg(incident_retry_post145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v15/post-stop-fit";
+#[cfg(all(
+    any(incident_focused145_only, incident_focused_post145_only),
+    not(incident_retry_post145_only)
+))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14/post-stop-fit";
 #[cfg(all(incident_timeout_post145_only, not(incident_focused_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v11/post-stop-fit";

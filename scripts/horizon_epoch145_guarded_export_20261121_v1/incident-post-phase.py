@@ -9,7 +9,8 @@ ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
-TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9")
+RETRIED_SEMANTIC = VERSION == "tools-v10"
+TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
 IMAGE = PKG / "export145"
@@ -33,6 +34,10 @@ if TIMEOUT_SUCCESSOR:
     BOOTSTRAP = "d37f36f898a44932a19fd50d7014a6fe"
     ADVANCING = "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76"
     ADVANCING_NAME = "V5C_ACTUAL_ADVANCING_WORKER.json"
+if RETRIED_SEMANTIC:
+    BOOTSTRAP = "e6551a0bb8a14b989902e15c9ecc0751"
+    ADVANCING = "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0"
+    ADVANCING_NAME = "V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json"
 
 
 def argv(pid):
