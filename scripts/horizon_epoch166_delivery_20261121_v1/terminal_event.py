@@ -160,15 +160,23 @@ def accepted(runtime, reports, expected, changes, checked_head, now, field="term
         need(fleet["owner"] == "/root" and fleet["sampled_at_utc"] == sampled, "wrong root cadence")
         if not 0 <= now-fleet["recorded_unix_seconds"] <= 2400 or not fleet.get(field):
             return None
-        need(fleet[field] == expected, "different 166 terminal in fleet")
+        need(fleet[field] == expected, "different local terminal in fleet")
         report_dir = reports / f"cycle{tag}-live166167170-19-{day}-v1"
         if not report_dir.exists():
             return None
         changes.watch(report_dir)
         rp = report_dir / "COMPLETED.json"
-        if field=="recovered166_local_commit" and fleet["authenticated_status_audit"]["path"]==str(report_dir/"after-recovered166"/rp.name):
-            changes.watch(report_dir/"after-recovered166")
-            rp=report_dir/"after-recovered166"/rp.name
+        if field in ("recovered166_local_commit", "metered168_local_commit"):
+            registered = Path(fleet["authenticated_status_audit"]["path"])
+            for name, required in (("after-recovered166", ("recovered166_local_commit",)),
+                                   ("after-metered168", ("metered168_local_commit",)),
+                                   ("after-166-168", ("recovered166_local_commit", "metered168_local_commit"))):
+                candidate = report_dir / name / rp.name
+                if registered == candidate:
+                    need(all(fleet.get(key) for key in required), "unregistered terminal status directory")
+                    changes.watch(candidate.parent)
+                    rp = candidate
+                    break
         need(fleet["authenticated_status_audit"]["path"] == str(rp), "crossed cadence report")
         if not rp.exists():
             return None

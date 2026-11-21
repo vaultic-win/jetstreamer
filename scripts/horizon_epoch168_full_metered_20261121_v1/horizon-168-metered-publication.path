@@ -1,0 +1,9 @@
+[Unit]
+Description=Wait for the original epoch 168 committed terminal receipt
+
+[Path]
+PathExists=/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-delivery-20261121-v1/TERMINAL_SUCCESS.json
+Unit=horizon-168-metered-publication.service
+
+[Install]
+WantedBy=multi-user.target
