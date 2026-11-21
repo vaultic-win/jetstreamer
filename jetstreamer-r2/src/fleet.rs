@@ -176,6 +176,7 @@ mod singleton209_delivery;
 mod singleton209_peer223;
 mod singleton209_prepare;
 mod singleton211;
+mod full266;
 mod singleton227;
 mod singleton227_admission;
 mod singleton227_capture;
@@ -1193,6 +1194,9 @@ fn validate_same_sample_admission(
     if prefix144::namespace(claim) {
         return prefix144::admission(previous, plan, claim, guard, guard_plan, now);
     }
+    if full266::namespace(claim) {
+        return full266::transition(previous, plan, claim, guard, guard_plan, now);
+    }
     if singleton211::namespace(claim) {
         return singleton211::transition(previous, plan, claim, guard, guard_plan, now);
     }
@@ -1539,6 +1543,10 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
+    if full266::namespace(claim) || receipt["schema"] == full266::bridge::SCHEMA {
+        full266::claim(claim,receipt)?;
+        return Ok(());
+    }
     if singleton211::namespace(claim) || receipt["schema"] == singleton211::SCHEMA {
         return singleton211::launch(claim, receipt);
     }
@@ -3641,6 +3649,9 @@ pub(super) async fn run() -> Result<()> {
                     singleton227::same_command(&current["ExecStart"], &launch),
                     "capped 227 live command changed"
                 );
+            }
+            if full266::namespace(claim) {
+                full266::live(claim,current)?;
             }
             if singleton211::namespace(claim) {
                 singleton211::live(claim, current)?;

@@ -55,6 +55,8 @@ fn staged_delivery_selected(config: &Value) -> Result<bool> {
     );
     Ok(on)
 }
+#[path="horizon266_entry_registration.rs"]
+mod full266;
 const SEALER: &str =
     "/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer";
 const SEALER_SHA: &str = "faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a";
@@ -86,6 +88,8 @@ struct Plan {
     native261_handoff: Option<Bound>,
     #[serde(default)]
     singleton211_handoff: Option<Bound>,
+    #[serde(default)]
+    full266_entries: Option<Bound>,
     state_directory: PathBuf,
     deployment: PathBuf,
 }
@@ -594,7 +598,23 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
             "handoff owner/range differs"
         );
     }
-    singleton211_pass_through(p, config)?;
+    let mut peers=config.clone();
+    if let Some(b)=&p.full266_entries {
+        let proof=full266::validate(&json!(b))?;
+        let rows=config["diagnostic_replays"].as_array().context("266 diagnostic census")?;
+        let matched:Vec<_>=rows.iter().filter(|v|v["range"]=="266-266").collect();
+        ensure!(matched.len()==1 && matched[0]==&proof["tuple"] && p.native266_handoff.is_none(),"different original 266 replay tuple");
+        for field in ["replays","native_input_diagnostics"] {
+            for row in config[field].as_array().into_iter().flatten() {
+                let scratch=Path::new(string(row,"scratch_path")?);
+                ensure!(row["epoch"]!=266 && row["producer_unit"]!=full266::UNIT && row["controller_unit"]!=full266::UNIT &&
+                    row["unit"]!=full266::UNIT && !scratch.starts_with(full266::ROOT) && !Path::new(full266::ROOT).starts_with(scratch),
+                    "duplicate original 266 owner");
+            }
+        }
+        peers["diagnostic_replays"]=json!(rows.iter().filter(|row|row["range"]!="266-266").collect::<Vec<_>>());
+    }
+    singleton211_pass_through(p, &peers)?;
     ensure!(
         config
             .get("singleton247_finalization")
@@ -684,6 +704,14 @@ fn run(args: &[String]) -> Result<()> {
     let previous: Value = serde_json::from_slice(&previous_bytes)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     due(&config, &previous, now)?; // No unit/resource reads before the original clock.
+    if let Some(b)=&p.full266_entries {
+        let proof=full266::validate(&json!(b))?; let m=properties(full266::UNIT)?;
+        if m["ActiveState"]=="active" {
+            let pid=proof["pid"].as_u64().context("266 PID")?;
+            ensure!(m["InvocationID"]==proof["iid"] && m["MainPID"]==pid.to_string() && m["NRestarts"]=="0","266 due census changed");
+            full266::mapped_node(pid)?;
+        }
+    }
     let mut live = Vec::new();
     let mut omitted = Vec::new();
     let mut census = Vec::new();
@@ -711,7 +739,7 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty()
@@ -765,7 +793,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -1161,6 +1189,7 @@ mod full211_offline_integration {
             native261_handoff: None,
             native212_handoff: None,
             native266_handoff: None,
+            full266_entries: None,
             singleton211_handoff: Some(serde_json::from_value(a["handoff"].clone()).unwrap()),
             state_directory: state.path().into(),
             deployment: "/var/lib/jetstreamer/horizon-terminal-aware-cycle-offline-fixture".into(),
