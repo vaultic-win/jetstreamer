@@ -16,11 +16,13 @@ T=R/"epoch166-retry10-terminal-20261121-v1"
 BOOK=16<<20
 MEM=810658050048
 FULL168=R/"epoch168-current-delivery-20261121-v1"
-# Both publication controllers retain their epoch-specific, independently sealed inputs.
-FLEET_FIELDS={166:"recovered166_local_commit",168:"metered168_local_commit"}
-CLOSURES={166:"closed_recovered166",168:"closed_metered168"}
-TERMINALS={166:T,168:FULL168}
-PACKAGES={166:D/"capacity-tools-v2",168:FULL168/"capacity-tools"}
+FLEET_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",168:"metered168_local_commit",170:"recovered170_local_commit"}
+CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered168",170:"closed_recovered170"}
+TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170)}}
+PACKAGES={166:D/"capacity-tools-v3",168:FULL168/"capacity-tools-v2",**{e:TERMINALS[e]/"capacity-tools" for e in (167,170)}}
+CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30}
+# Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
+PRESTART={166:169028829184,167:177601941504,170:230591926272}
 
 def need(ok,why):
     if not ok:raise ValueError(why)
@@ -44,8 +46,8 @@ def closing(value,fleet):
         registered=fleet.get(field)
         proof=value.get(CLOSURES[epoch])
         need((registered is None)==(proof is None),"fleet and native closure differ")
-        if proof:
-            need(proof["terminal"]==registered,"different epoch terminal")
+        if proof is not None:
+            need(isinstance(proof,dict) and proof.get("terminal")==registered and isinstance(registered,dict) and proof.get("resource_credit_bytes")==0,"different epoch terminal")
             result[epoch]=proof
     return result
 
@@ -58,15 +60,17 @@ def validate(value,fleet,fr,tr,epoch=166):
          value["resource_credit_bytes"]==value["stopped_generation_resident_credit_bytes"]==0 and
          value["replay_launch_authorized"] is False and 0<=time.time()-value["recorded_unix_seconds"]<=180,
          "different joined reservation or population")
+    need(value["closed_prestart_remaining"]=={str(e):PRESTART[e] for e in closed if e in PRESTART},
+         "closed prepaid allowances differ from the original admissions")
     for e in closed:
         key=str(e);booking=value["bookings"][key]
         need(key not in value["joined_resident_lower_bounds"] and key not in value["replacements"] and
              not any(row["epoch"]==e for group in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for row in fleet[group]) and
-             (e!=166 or key not in fleet["original_disk_guard_recovery_workers"]) and
+             (e not in PRESTART or key not in fleet["original_disk_guard_recovery_workers"]) and
              (e!=168 or value["normal168"] is None and value["active168_guard_floor"]==0 and
               value["registered_host_equation"]["retained_168_remaining"]==booking["remaining_bytes"]) and
              booking["measurement"]=="two complete stopped-tree walks" and booking["physical_bytes"]>0 and
-             booking["remaining_bytes"]+booking["physical_bytes"]==booking["cap_bytes"]==288<<30,"closed booking or owner changed")
+             booking["remaining_bytes"]+booking["physical_bytes"]==booking["cap_bytes"]==CAPS[e],"closed booking or owner changed")
     memory=MEM-sum(p["resident"] for p in value["survivors"].values())-sum(value["joined_resident_lower_bounds"].values())
     need(value["required_available_memory_bytes"]==memory,"different complete memory equation")
     # Each closed archive may be verified concurrently on its own retained CPU/RAM
@@ -81,17 +85,20 @@ def wait_for_145_probe():
     # for that exact process to exit, then discard every earlier fit measurement.
     unit="horizon-holding-export145-20261121-v1.service"
     scope=Path("/sys/fs/cgroup/system.slice")/unit
-    manager,worker=3944205,3944778
-    iid="dc043eb78c4a4349b0098760dc764a1f"
-    image=R/"epoch145-semantic-continuity-20261121-v1/tools-v5b/export145"
-    for pid in (manager,worker):
+    evidence=R/"epoch145-semantic-continuity-20261121-v1/V5C_ACTUAL_ADVANCING_WORKER.json"
+    data,ref=read(evidence,0o400)
+    need(ref["sha256"]=="6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76","foreign 145 advancing witness")
+    witness=json.loads(data);sample=witness["observations"][-1];iid=witness["invocation_id"]
+    manager,worker=sample["parent_pid"],sample["child_pid"]
+    image=evidence.parent/"tools-v5c/export145"
+    for pid,ticks in ((manager,sample["parent_ticks"]),(worker,sample["child_ticks"])):
         proc=Path("/proc")/str(pid)
-        need((proc/"exe").samefile(image) and (proc/"cgroup").read_text().strip()=="0::/system.slice/"+unit and
+        need(int((proc/"stat").read_text().rsplit(")",1)[1].split()[19])==ticks and (proc/"exe").samefile(image) and (proc/"cgroup").read_text().strip()=="0::/system.slice/"+unit and
              ("INVOCATION_ID="+iid).encode() in (proc/"environ").read_bytes().split(b"\0"),"foreign 145 verifier")
     candidates=set(map(int,(scope/"cgroup.procs").read_text().split()))-{manager,worker}
     if not candidates:return
-    original=R/"incident-replay-fit-20261121-v1/tools-v6/post-stop-fit"
-    need(read(original,0o555)[1]["sha256"]=="f16e961612d5c74727fb62a9be280dbb298ebe937cc6c57e50c93839e603609f","different 145 internal provider")
+    original=R/"incident-replay-fit-20261121-v1/tools-v10/post-stop-fit"
+    need(read(original,0o555)[1]["sha256"]=="d5ed981b98ad6fc2c54843667852e9d3c3567c764398b644afac00231cd2940d","different 145 internal provider")
     for pid in candidates:
         try:
             proc=Path("/proc")/str(pid)
@@ -116,7 +123,7 @@ def capture_provider(provider,path,digest):
         if result.returncode==0:return result.stdout
         if attempt==2 or b"foreign 145 descendants" not in result.stderr and b"capacity generation changed during collection" not in result.stderr:
             raise RuntimeError(result.stderr.decode(errors="replace")[-1800:])
-        wait_for_145_probe()
+        if b"foreign 145 descendants" in result.stderr:wait_for_145_probe()
 
 def capture(path,sha,epoch=166):
     terminal=TERMINALS[epoch]/"TERMINAL_SUCCESS.json"
@@ -147,12 +154,11 @@ def capture(path,sha,epoch=166):
                 publication_cpu_quota_micros=1000000,publication_memory_bytes=2<<30,complete_cpu_quota_micros=64000000,
                 complete_memory_plus_reserve_bytes=MEM,resource_credit_bytes=0,all_existing_commitments_retained=True,
                 full_capacity_provider=pr,complete_captures=refs,source_booking=b["bookings"][str(epoch)],funded_extra_home_bytes=len(closing(b,fleet))*BOOK,
-                charged_to_original_epoch=epoch,closed_recovered166=b.get(CLOSURES[166]),closed_metered168=b.get(CLOSURES[168]))
+                charged_to_original_epoch=epoch,**{field:b.get(field) for field in CLOSURES.values()})
 
 if __name__=="__main__":
     need(os.geteuid()==0 and __debug__ and sys.flags.isolated and len(sys.argv)==3,"expected FLEET SHA256")
     path=Path(__file__).resolve(strict=True)
-    selected=168 if path==PACKAGES[168]/"publication-fit" else 166
-    installed=PACKAGES[selected]/"publication-fit"
-    need(path in (installed,D/"capacity-tools/publication-fit") and path.samefile(installed),"unregistered publication capacity image")
+    selected=next((e for e,pkg in PACKAGES.items() if path==pkg/"publication-fit"),None)
+    need(selected is not None,"unregistered publication capacity image")
     print(json.dumps(capture(Path(sys.argv[1]),sys.argv[2],selected),sort_keys=True))

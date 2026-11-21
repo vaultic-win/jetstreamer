@@ -269,8 +269,11 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def profile145(here, post=False, rejoin=False, timeout_rejoin=False):
-    if timeout_rejoin:
+def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False):
+    if recovery_post:
+        s.need(not post and not rejoin and not timeout_rejoin, "ambiguous 145 post-recovery profile")
+        profile,directory="profile145-recovery-post.json","tools-v8"
+    elif timeout_rejoin:
         s.need(not post and not rejoin, "ambiguous 145 recovery profile")
         profile,directory="profile145-timeout-rejoin.json","tools-v5c"
     elif post and rejoin:
@@ -281,7 +284,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False):
         profile,directory="profile145-post.json","tools-v6"
     else:
         profile,directory="profile145.json","tools-v5"
-    name="incident-post-phase.py" if post else "incident-phase.py"
+    name="incident-post-phase.py" if post or recovery_post else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
     seal,sr=s.read(package/"deployment-seal-receipt.json",cfg["seal_sha256"])
@@ -322,8 +325,10 @@ def phase145(epoch):
     rejoin=rp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",rp)
     timeout_image=base/"tools-v5c/export145"
     timeout_rejoin=timeout_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",timeout_image)
-    if timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin)
+    recovery_post_image=base/"tools-v8/export145"
+    recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
+    if recovery_post or timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
+        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin,recovery_post)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")
@@ -370,6 +375,46 @@ def metered168_terminal(fleet,rows):
            not fit.members(s.U) and s.show(s.U)["ActiveState"]=="inactive",
            "metered 168 closure does not match the original full booking")
     return terminal
+
+REPLACEMENT_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",170:"recovered170_local_commit"}
+
+def peer_closures():
+    directory=R/"epoch167170-original-terminal-20261121-v1/closure-tools"
+    loader["load_package"](directory,"490a3992bac903fcf2e0660d05c4d518679c6e0685283bce1f98103868556167")
+    return runpy.run_path(str(directory/"peer_closures.py"))
+
+def replacement_terminals(fleet,rows):
+    result={}
+    for epoch,field in REPLACEMENT_FIELDS.items():
+        if fleet.get(field) is None:continue
+        if epoch==166:
+            proof=runpy.run_path(str(Path(__file__).with_name("closure.py")))["inspect"]()
+        else:
+            proof=peer_closures()["authority"](epoch).inspect()
+        s.need(proof["terminal"]==fleet[field] and proof["resource_credit_bytes"]==0 and epoch not in rows
+               and str(epoch) not in fleet["original_disk_guard_recovery_workers"],"closed producer still registered or foreign")
+        result[epoch]=proof
+    return result
+
+def closed_allowance(epoch,proof,stop,root,run,cap,extension):
+    d=R/DIRS[epoch]
+    ad=s.bound(proof["admission"],d/"ACTUAL_ADMISSION_AND_PROTECTION.json")
+    intent=s.bound(ad["intent"],d/"START_INTENT.json")
+    plan=s.bound(ad["actual_guard_plan"],d/"ACTUAL_GUARD_PLAN.json")
+    pre=intent["prestart"];book=pre["bookings"][str(epoch)]
+    identity="horizon-qualify-"+UNITS[epoch]+".service"
+    s.need(pre["schema"]=="horizon-incident-replay-fit-v1" and pre["epoch"]==intent["epoch"]==ad["epoch"]==epoch
+           and pre["fits"] is True and pre["candidate"] is None and pre["resource_credit_bytes"]==0
+           and ad["predecessor_stop"]==intent["predecessor_stop"]==stop["stop_completion"]
+           and ad["producer_invocation_id"]==proof["producer_invocation_id"]==plan["invocation_id"]
+           and ad["producer_unit"]==intent["producer_unit"]==plan["unit"]==identity
+           and book["root"]==plan["worker_root"]==str(root) and book["run"]==str(run) and book["stable_root"]==STABLE[epoch]
+           and book["cap_bytes"]==plan["maximum_root_physical_bytes"]==cap and 0<=book["remaining_bytes"]<=cap
+           and book["physical_bytes"]+book["remaining_bytes"]==cap,"closed producer prestart allowance changed")
+    if epoch==170:
+        s.need(cap==384*G and extension and extension["accepted"]==intent["booking"] and
+               s.bound(intent["booking"],d/"ACCEPTED_384_BOOKING.json")["prestart"]==pre,"missing original extended 170 funding")
+    return book["remaining_bytes"]
 
 def closed168_tree():
     stable=bound(STABLE[167])["normal168"]
@@ -489,13 +534,8 @@ def capture_once(epoch,ref):
     s.need((136 in rows)==c136["occupied"],"136 registration drift")
     phase=phase145(epoch)
     extension=extensions["funding"](s,epoch)
-    closed166=None
+    closed=replacement_terminals(f,rows)
     closed_prepaid={}
-    if f.get("recovered166_local_commit"):
-        proof=runpy.run_path(str(Path(__file__).with_name("closure.py")))
-        closed166=proof["inspect"]()
-        s.need(closed166["terminal"]==f["recovered166_local_commit"] and 166 not in rows and
-               "166" not in f["original_disk_guard_recovery_workers"],"closed producer still registered")
     rep={};books={}
     for e in sorted(ORIGINAL):
         row=stopped[str(e)]
@@ -510,16 +550,9 @@ def capture_once(epoch,ref):
         s.need(run.is_relative_to(root) and plan["maximum_root_physical_bytes"]==CAPS[e] and
                plan["invocation_id"]==original["iid"],"different original booked tree")
         effective=extension["cap_bytes"] if e==170 and extension else CAPS[e]
-        terminal=closed166 if e==166 else None
+        terminal=closed.get(e)
         if terminal:
-            ad=bound(terminal["admission"])
-            intent=s.bound(ad["intent"],R/DIRS[e]/"START_INTENT.json")
-            pre=intent["prestart"];b=pre["bookings"]["166"]
-            s.need(pre["schema"]=="horizon-incident-replay-fit-v1" and pre["epoch"]==166 and pre["fits"] and
-                   ad["predecessor_stop"]==intent["predecessor_stop"]==row["stop_completion"] and pre["candidate"] is None and
-                   b["root"]==str(root) and b["cap_bytes"]==CAPS[e] and 0<=b["remaining_bytes"]<=CAPS[e],
-                   "closed epoch 166 booking changed")
-            closed_prepaid["166"]=b["remaining_bytes"]
+            closed_prepaid[str(e)]=closed_allowance(e,terminal,row,root,run,effective,extension)
         a=native_actor(e,epoch,root,run,row,terminal)
         if a:rep[str(e)]=a
         if a and a["physical"] is not None:
@@ -586,7 +619,7 @@ def capture_once(epoch,ref):
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
     if closed168:s.need(metered168_terminal(f,rows)==closed168,"metered 168 terminal changed during capture")
-    if closed166:s.need(proof["inspect"]()==closed166,"terminal guard or archive changed during capture")
+    s.need(replacement_terminals(f,rows)==closed,"terminal guard or archive changed during capture")
     for v in peers.values():
         m=s.show(v["unit"]);t=s.show(v["timer"])
         s.need(m["InvocationID"]==v["invocation_id"] and m["ActiveState"]=="active" and not m["Job"] and
@@ -594,7 +627,7 @@ def capture_once(epoch,ref):
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
-        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed166,closed_metered168=closed168,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
+        fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed.get(166),closed_indexed167=closed.get(167),closed_recovered170=closed.get(170),closed_prestart_remaining=closed_prepaid,closed_metered168=closed168,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,

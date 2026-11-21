@@ -37,7 +37,14 @@ def fork_control(m,fleet):
                g["producer"]["pid"]==before["producer_pid"] and g["trip_reason"] is None for g in [bootstrap,historical])
            and first["timer"]["InvocationID"]==w["worker_guard"]["timer"]["InvocationID"]==before["timer_invocation_id"],
            "normal node-to-worker guard chain differs")
-    observed=m["capture"](145,fleet)
+    for attempt in range(3):
+        try:
+            observed=m["capture"](145,fleet)
+            break
+        except ValueError as ex:
+            if str(ex)!="foreign 145 descendants" or attempt==2:raise
+            runpy.run_path(str(Path(__file__).with_name("publication-fit")))["wait_for_145_probe"]()
+
     import time
     deadline=time.monotonic()+25
     while True:
@@ -79,6 +86,15 @@ def main():
            "new 145 verifier adapter targets another predecessor")
     rejected(lambda:m["profile145"](here,post=True,timeout_rejoin=True))
     rejected(lambda:m["profile145"](here,rejoin=True,timeout_rejoin=True))
+    _,post8,post8_binding=m["profile145"](here,recovery_post=True)
+    adapter8=runpy.run_path(str(post8))
+    s.need(adapter8["TIMEOUT_SUCCESSOR"] and adapter8["BOOTSTRAP"]=="d37f36f898a44932a19fd50d7014a6fe"
+           and adapter8["ADVANCING"]=="6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76"
+           and adapter8["PIPE"].parent.name=="public-rseek-reconnect-56bf2bf0937f","foreign 145 successor post adapter")
+    for name in ("qualify_four_prices.py","publication-fit"):
+        data=(here/name).read_bytes()
+        s.need(data==git("show",commit+":scripts/horizon_epoch166_retry10_delivery_20261121_v1/"+name),"different four-price source")
+        src[name]=digest(data)
     _,_,rejoin=m["profile145"](here,rejoin=True)
     _,_,current_post=m["profile145"](here,post=True,rejoin=True)
     _,_,binding=m["profile145"](here)
@@ -94,6 +110,12 @@ def main():
         for key,value in [("InvocationID","0"*32),("ActiveState","active"),("MainPID","1"),("ExecMainStatus","0")]:
             rejected(lambda:ext["failed_verifier"](s,dict(mgr,**{key:value}),mgr["InvocationID"]))
         rejected(lambda:ext["failed_verifier"](s,mgr,"f"*32))
+    elif mgr["InvocationID"]=="d37f36f898a44932a19fd50d7014a6fe":
+        original,_=s.read(D/"native-0581394abb5a44b98358e7f72f141302.json","e6b2eca697f54ea89d3bb2222521a92a56d90ff18c04a8daca26b443dab11baf")
+        closure=original["closed_verifier145"];phase=observed["phase145"]
+        s.need(phase["invocation_id"]==mgr["InvocationID"] and phase["stage"]=="leased-worker" and
+               phase["window"]["failed_predecessor"]==closure["failure"] and phase["window"]["prior_started"]==closure["recovery"] and
+               phase["window"]["leases_parent"] and phase["window"]["leases_worker"],"foreign advancing timeout recovery")
     else:
         original,_=s.read(D/"native-462833a6aba74481af5e276512bdcad4.json",
                            "3d9b77551ceafa52ca0fef30f957b7aba6053f55c84e320cf2632067b85c6ec0")
@@ -162,8 +184,10 @@ def main():
     s.need(raw==raw168+(observed["epoch170_extension"]["extra_bytes"] if observed["epoch170_extension"] else 0) and
            eq["retained_168_remaining"]==t["cap"]-t["physical_bytes"] and
            floor(raw,optional,books,145,peer,others,0,paid)[0]<=baseline[0],"closed metered booking changed original equation")
+    adapter=runpy.run_path(str(here/"publication-fit"))
+    four=runpy.run_path(str(here/"qualify_four_prices.py"))["trials"](m,adapter,observed,f)
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_timeout_rejoin_registration=timeout_rejoin,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,four_publication_prices=four,phase145_recovery_post_registration=post8_binding,phase145_timeout_rejoin_registration=timeout_rejoin,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:
