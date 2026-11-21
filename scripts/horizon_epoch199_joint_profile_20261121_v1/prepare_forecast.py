@@ -73,8 +73,9 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
     semantic=ROOT/'epoch145-semantic-continuity-20261121-v1'
     original=semantic/'V5C_ACTUAL_ADVANCING_WORKER.json'
     successor=semantic/'V5D_ACTUAL_ADVANCING_WORKER.json'
+    retry=semantic/'V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json'
     old_worker=previous_model['actual_145_worker']
-    assert old_worker==bound(original) or (successor.exists() and old_worker==bound(successor))
+    assert old_worker in [bound(p) for p in (original,successor,retry) if p.exists()]
     if fit_path is None:
         inherited=previous_model.get('conditional_transition',{}).get('sources',{}).get('native_capacity')
         if inherited:
@@ -110,6 +111,9 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
     closed_window = utc(stamp)+dt.timedelta(seconds=1800) <= dt.datetime.now(dt.timezone.utc)
     cadence, controller_hash = (CADENCE, SEAL) if closed_window else active_controller()
     terminal = ROOT/'epoch145-guarded-export-20261121-v1/state/d37f36f898a44932a19fd50d7014a6fe/failed.json'
+    first_successor=successor
+    if retry.exists():
+        successor=retry
     successor_ref=bound(successor) if not closed_window and successor.exists() else None
     names_to_copy=('forecast_routes.py','forecast_evidence.py')
     source_hashes={name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
@@ -156,6 +160,17 @@ for key,item in paid['conditional_statuses_verified'].items():
         assert build['old_failure']==authentic_failure and actual['image']==build['verifier_sha256']
         assert bound(semantic/'tools-v5d/deployment-seal-receipt.json')['sha256']=='8d24b10c8df29a469ae0bb26a3605618289a8feae23565d28d792791bba58bfb'
         assert actual['image']=='3d60de86d45a497bcd1b9836c485ffab4ce1da19cb6d989d56c9d3b92ad60066'
+        if successor==retry:
+            assert successor_ref['sha256']=='3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0'
+            manager=checked(proof['manager'])
+            intent=checked(manager['intent'])
+            assert manager['intent']['sha256']=='90634731ae1f0c815b9dfc8d18c118c641f7b8961d39b744f27379a489899dfd'
+            assert intent['previous_advancement']==bound(first_successor) and intent['old']==checked(intent['previous_advancement'])['invocation_id']
+            authentic_failure=intent['failure']
+            assert authentic_failure['sha256']=='04c96683252ad3815d906d43dbbfb2f80d3ebcf542d7e671f28119f74767b107'
+            stopped=checked(authentic_failure)
+            assert stopped['iid']==intent['old'] and stopped['error'].strip().endswith('ValueError: foreign qualifier unit')
+            assert checked(intent['fit'])['phase145']['failure']==authentic_failure
         plan=replace(plan,original.name,successor.name)
         plan=replace(plan,'6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76',successor_ref['sha256'])
         plan=replace(plan,'34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d',actual['image'])

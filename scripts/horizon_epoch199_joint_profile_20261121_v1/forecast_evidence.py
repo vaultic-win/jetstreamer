@@ -50,10 +50,16 @@ def forecast_transition(routes, checked, bound, fref, prior, deadlines, replay_e
     phase=native['phase145']
     predecessor='d37f36f898a44932a19fd50d7014a6fe'
     if phase.get('ActiveState')=='failed':
-        assert phase['InvocationID']==predecessor and phase['MainPID']=='0'
+        generation=phase['InvocationID']
+        failures={predecessor:'6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29',
+                  '500c8d717a4147b087ff302b5afa7fc0':'04c96683252ad3815d906d43dbbfb2f80d3ebcf542d7e671f28119f74767b107'}
+        assert phase['failure']['sha256']==failures[generation] and phase['MainPID']=='0'
         assert not phase['source_checkpoint_exists'] and phase['resource_credit_bytes']==0
-        assert phase['failure']['sha256']=='6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29'
-        assert checked(phase['failure'])['iid']==predecessor and checked(phase['recovery'])['iid']==predecessor
+        assert checked(phase['failure'])['iid']==generation and checked(phase['recovery'])['iid']==generation
+        if generation!=predecessor:
+            manager=checked(checked(worker_ref)['manager'])
+            intent=checked(manager['intent'])
+            assert intent['failure']==phase['failure'] and intent['recovery']==phase['recovery']
     else:
         if phase['invocation_id']!=predecessor:
             expected=checked(worker_ref)
