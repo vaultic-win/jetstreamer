@@ -55,15 +55,8 @@ fn available_cpus(n: &mut Native, lane: Lane) -> Result<BTreeSet<u32>> {
         cpus_free.retain(|cpu| !reserved.contains(cpu));
     }
     if lane == Lane::Epoch228 {
-        let id = command_field(n, epoch228_peer::UNIT, "MainPID")?;
-        let status = fs::read_to_string(Path::new("/proc").join(id).join("status"))?;
-        let mask = cpus(
-            status
-                .lines()
-                .find_map(|l| l.strip_prefix("Cpus_allowed_list:"))
-                .context("266 affinity")?,
-        )?;
-        ensure!(mask == cpus("32-39")?, "266 CPU envelope changed");
+        // The original 266 CPU allocation remains reserved after the witnessed exit.
+        let mask = cpus("32-39")?;
         cpus_free.retain(|cpu| !mask.contains(cpu));
     }
     ensure!(cpus_free.len() >= 8, "eight disjoint replay CPUs");
