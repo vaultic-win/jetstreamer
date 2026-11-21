@@ -99,7 +99,7 @@ fn memory() -> Result<(u64, u64)> {
     };
     Ok((get("MemTotal:")?, get("MemAvailable:")?))
 }
-fn cores() -> Result<u64> {
+pub(super) fn cores() -> Result<u64> {
     let mut set = std::mem::MaybeUninit::<libc::cpu_set_t>::zeroed();
     ensure!(
         unsafe {
