@@ -3,6 +3,7 @@
 mod process_references;
 #[path = "../horizon_retry4_170_scratch_retire_20261118_v1/src/stopped_tree.rs"]
 mod stopped_tree;
+mod terminal9;
 
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -215,21 +216,30 @@ fn gates(p: &Value, protected: &Value) -> Result<Value> {
         a["producer_invocation_id"] == ORIGINAL
             && gp["invocation_id"] == ORIGINAL
             && gp["maximum_root_physical_bytes"] == 309237645312u64
-            && gp["minimum_free_bytes"] == 6829053656882u64
-            && live["InvocationID"] == ORIGINAL
-            && live["ActiveState"] == "active"
-            && live["SubState"] == "running"
-            && live["NRestarts"] == "0"
-            && Some(live["MainPID"].parse::<u64>()?) == a["producer_pid"].as_u64(),
-        "original guarded worker identity changed"
+            && gp["minimum_free_bytes"] == 6829053656882u64,
+        "foreign original replay or guard plan"
     );
-    let t = unit("horizon-guard-replacement-170-local3retry9-20261110-v1.timer")?;
-    ensure!(
-        t["ActiveState"] == "active"
-            && matches!(t["SubState"].as_str(), "waiting" | "running")
-            && t["Triggers"] == "horizon-guard-replacement-170-local3retry9-20261110-v1.service",
-        "guard timer changed"
-    );
+    let stopped = if live["ActiveState"] == "inactive" {
+        Some(terminal9::verify(p, target, &a, &gp)?)
+    } else {
+        ensure!(
+            live["InvocationID"] == ORIGINAL
+                && live["ActiveState"] == "active"
+                && live["SubState"] == "running"
+                && live["NRestarts"] == "0"
+                && Some(live["MainPID"].parse::<u64>()?) == a["producer_pid"].as_u64(),
+            "original guarded worker identity changed"
+        );
+        let t = unit("horizon-guard-replacement-170-local3retry9-20261110-v1.timer")?;
+        ensure!(
+            t["ActiveState"] == "active"
+                && matches!(t["SubState"].as_str(), "waiting" | "running")
+                && t["Triggers"]
+                    == "horizon-guard-replacement-170-local3retry9-20261110-v1.service",
+            "guard timer changed"
+        );
+        None
+    };
     let fresh = bound(&protected["fresh"])?;
     let productive = Path::new(string(&fresh["fresh_subtree"], "path")?);
     ensure!(
@@ -256,9 +266,11 @@ fn gates(p: &Value, protected: &Value) -> Result<Value> {
                 .is_some_and(|p| !Path::new(p).starts_with(target))),
         "witness in scope"
     );
-    Ok(
-        json!({"original_iid":ORIGINAL,"old_iid":p["iid"],"fresh_subtree":productive,"witnesses":members}),
-    )
+    let mut anchors = json!({"original_iid":ORIGINAL, "old_iid":p["iid"], "fresh_subtree":productive, "witnesses":members});
+    if let Some(closed) = stopped {
+        anchors["closed_retry9"] = closed;
+    }
+    Ok(anchors)
 }
 fn scan(target: &Path) -> Result<Value> {
     let v = process_references::scan(Path::new("/proc"), target)?;
@@ -295,14 +307,25 @@ fn run() -> Result<()> {
         "invalid mode/owner"
     );
     let base = Path::new(BASE);
-    let elf = base.join("tools/retire");
+    let post_stop = anchors.get("closed_retry9").is_some();
+    let elf = base.join(if post_stop {
+        "post-stop-tools/retire"
+    } else {
+        "tools/retire"
+    });
     let image = sha(&read(&elf, 32 << 20)?);
     ensure!(
         fs::read_link("/proc/self/exe")? == elf && image == sha(&fs::read("/proc/self/exe")?),
         "sealed image required"
     );
     let conf = sha(include_bytes!("profiles.json"));
-    let dir: PathBuf = base.join("state").join(attempt);
+    let dir: PathBuf = base
+        .join(if post_stop {
+            "post-stop-state"
+        } else {
+            "state"
+        })
+        .join(attempt);
     let checkpath = dir.join("CHECK.json");
     let ledgerpath = dir.join("LEDGER.json");
     let process = scan(target)?;
