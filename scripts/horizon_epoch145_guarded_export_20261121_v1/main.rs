@@ -15,6 +15,7 @@ pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
 mod recover;
 mod source_lease;
+mod stable;
 
 use anyhow::{Context, Result, ensure};
 use capacity::{BYTES, RUNTIME, UNIT};
@@ -75,7 +76,7 @@ fn verify_cgroup() -> Result<String> {
 }
 fn check_self(sha: &str) -> Result<()> {
     privilege()?;
-    let path = Path::new(BASE).join("deployment-v2/export145");
+    let path = Path::new(BASE).join("deployment-v3/export145");
     let this = fs::metadata("/proc/self/exe")?;
     let disk = fs::metadata(&path)?;
     ensure!(

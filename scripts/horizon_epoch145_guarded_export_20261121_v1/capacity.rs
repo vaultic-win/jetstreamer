@@ -248,7 +248,7 @@ fn temporal(start: u64, completed: u64, now: u64) -> Result<()> {
     }
     Ok(())
 }
-fn newest_sample(plan_ref: &Value) -> Result<(u64, u64)> {
+fn newest_sample(plan_ref: &Value) -> Result<(u64, u64, Option<Value>)> {
     let plan = jsonref(plan_ref)?;
     let dir = Path::new(
         plan["receipt_directory"]
@@ -298,14 +298,20 @@ fn newest_sample(plan_ref: &Value) -> Result<(u64, u64)> {
     )?;
     let cap = n(&plan, "maximum_root_physical_bytes")?;
     let min = n(&o["first"], "physical_bytes")?.min(n(&o["second"], "physical_bytes")?);
-    let realized = if o["first"]["vanished_entries"] == 0 && o["second"]["vanished_entries"] == 0 {
-        min
-    } else {
-        0
-    };
+    let (realized, subset) =
+        if o["first"]["vanished_entries"] == 0 && o["second"]["vanished_entries"] == 0 {
+            (min, None)
+        } else {
+            let root = Path::new(plan["worker_root"].as_str().context("worker root")?);
+            let (observed, proof) = crate::stable::measure(root)?;
+            // No whole-walk credit from either unstable sample. Each subset
+            // file is independently pinned and refetched from the admitted root.
+            (observed.min(min), Some(proof))
+        };
     Ok((
         n(&plan, "minimum_free_bytes")?,
         cap.checked_sub(realized).context("root exceeds cap")?,
+        subset,
     ))
 }
 
@@ -319,20 +325,28 @@ pub struct Fit {
 }
 impl Fit {
     pub fn current(&self, needed: u64) -> Result<Value> {
-        let (a, ra) = newest_sample(&self.g169)?;
-        let (b, rb) = newest_sample(&self.g172)?;
+        let (a, ra, sa) = newest_sample(&self.g169)?;
+        let (b, rb, sb) = newest_sample(&self.g172)?;
         let protected = (self.base.max(a) + ra + 16 * G).max(b) + rb + META;
         let free = home()?.0;
         let available = meminfo("MemAvailable:")?;
         ensure!(
-            available >= self.memfloor
-                && free >= protected.checked_add(needed).context("disk sum")?,
-            "resource gate: HOME {free} needs {} (protected {protected}, new bytes {needed}); RAM {available} needs {}",
-            protected + needed,
+            available >= self.memfloor,
+            "RAM {available} needs {}",
             self.memfloor
         );
+        let required = protected.checked_add(needed).context("disk sum")?;
+        if free < required && (sa.is_some() || sb.is_some()) {
+            return Err(anyhow::Error::new(GuardInFlight).context(format!(
+                "changing-root subset HOME {free} needs {required}; 169={sa:?}, 172={sb:?}"
+            )));
+        }
+        ensure!(
+            free >= required,
+            "HOME {free} needs {required} (protected {protected}, new bytes {needed})"
+        );
         Ok(
-            json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":self.memfloor,"169_unspent":ra,"172_unspent":rb}),
+            json!({"free_bytes":free,"protected_bytes":protected,"needed":needed,"available_memory":available,"required_memory":self.memfloor,"169_unspent":ra,"172_unspent":rb,"169_subset":sa,"172_subset":sb}),
         )
     }
     /// Used only before the source barrier or while the worker is stopped.
@@ -343,9 +357,9 @@ impl Fit {
             match self.current(needed) {
                 Err(e)
                     if e.is::<GuardInFlight>()
-                        && start.elapsed() < std::time::Duration::from_secs(35) =>
+                        && start.elapsed() < std::time::Duration::from_secs(90) =>
                 {
-                    std::thread::sleep(std::time::Duration::from_millis(250))
+                    std::thread::sleep(std::time::Duration::from_secs(1))
                 }
                 result => return result,
             }
@@ -491,7 +505,18 @@ pub fn capture(b: &Bound) -> Result<Fit> {
         meminfo("MemTotal:")? >= HOST_MEMORY && before >= HOST_MEMORY - rss,
         "full memory does not fit"
     );
-    let evidence = json!({"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    let mut subset_samples = Vec::new();
+    for plan in [&g169, &ad["actual_guard_plan"]] {
+        let cfg = jsonref(plan)?;
+        let root = Path::new(cfg["worker_root"].as_str().context("guard root")?);
+        let (bytes, sample) = crate::stable::measure(root)?;
+        ensure!(
+            bytes <= n(&cfg, "maximum_root_physical_bytes")?,
+            "stable subset exceeds native cap"
+        );
+        subset_samples.push(sample);
+    }
+    let evidence = json!({"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
         evidence,
         names,
