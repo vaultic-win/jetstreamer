@@ -36,6 +36,7 @@ mod checkpoint_continuation144;
 mod checkpoint_continuation203;
 mod epoch141_original_entry;
 mod epoch163_first_output128;
+mod epoch167_local_index;
 mod epoch207_singleton;
 mod epoch223_qualification;
 mod epoch224_qualification;
@@ -5300,7 +5301,7 @@ fn usage(program: &str) -> String {
          \x20      [--recover-staged-only | --recover-staged-cohort-only |\n\
          \x20       --recover-unreceipted-root-cohort-only]\n\
          \x20      [--source-cohort-receipt=PATH | --unreceipted-recovery-evidence=PATH]\n\
-         \x20      [--publish-through-epoch=N]\n\
+         \x20      [--publish-through-epoch=N] [--require-local-slot-ranges=167]\n\
          Read-only source diagnostic: {program} --probe-successor-boundary=SLOT\n\
          SLOT must be a nonzero epoch boundary; no other arguments are accepted.\n\
          This runs the production boundary reader with a 60-second total timeout,\n\
@@ -19954,6 +19955,7 @@ async fn main() {
     let mut range_info: Option<(u64, u64)> = None;
     let mut replay_scratch: Option<PathBuf> = None;
     let mut root_checkpoint_cohort = false;
+    let mut require_local_epoch167_index = false;
     let mut epoch207_singleton_preflight = false;
     let mut private_singleton_preflight = false;
     let mut recover_staged_only = false;
@@ -20097,6 +20099,11 @@ async fn main() {
                 exit(2);
             }
             epoch207_singleton_preflight = true;
+        } else if arg == "--require-local-slot-ranges=167" {
+            if std::mem::replace(&mut require_local_epoch167_index, true) {
+                eprintln!("duplicate --require-local-slot-ranges=167");
+                exit(2);
+            }
         } else if arg == "--root-checkpoint-cohort" {
             if root_checkpoint_cohort {
                 eprintln!("duplicate --root-checkpoint-cohort option");
@@ -20401,6 +20408,18 @@ async fn main() {
             "cohort manifest options require --root-checkpoint-cohort or --recover-staged-cohort-only"
         );
         exit(2);
+    }
+    if require_local_epoch167_index {
+        if !root_checkpoint_cohort || (start_epoch, end_epoch) != (167, 167) {
+            eprintln!(
+                "--require-local-slot-ranges=167 requires the verified epoch 167 singleton cohort"
+            );
+            exit(2);
+        }
+        if let Err(error) = epoch167_local_index::verify().await {
+            eprintln!("epoch 167 local index rejected: {error}");
+            exit(1);
+        }
     }
     if !recover_staged_cohort_only && source_cohort_receipt.is_some() {
         eprintln!("--source-cohort-receipt requires --recover-staged-cohort-only");
