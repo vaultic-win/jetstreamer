@@ -80,8 +80,13 @@ def prepare(mode, fleet, paid, fit_path, fit_hash):
         out = paths['out']
         predecessor = head_ref
     else:
-        stamp = head['sampled_at_utc']
+        # A late rescue can start after its configured slot. Status and lock
+        # directories use the configured slot; the successor uses actual sample time.
+        observed=checked(head['observer'])
+        assert observed['recorded_at_utc']==head['sampled_at_utc']
+        stamp = observed['cadence']['configured_not_before_utc']
         out = fleet.parent
+        assert names(stamp)['out']==out and utc(stamp)<=utc(head['sampled_at_utc'])
         predecessor = head['previous_Root_operational_review']
         cursor=head_ref
         while cursor != previous_model['native_fleet']:
@@ -148,6 +153,20 @@ def verify_live():
             state_check=replace(state_check,'baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943',terminal_ref['sha256'])
             state_check=replace(state_check,"'subprocess.TimeoutExpired:' in failure['error'] and 'timed out after 10 seconds' in failure['error']", "'ValueError: cadence publisher absent' in failure['error']")
             state_check=replace(state_check,'verify_stopped()', 'verify_live()',2)
+            if utc(stamp).timestamp()>stopped['at']+7200:
+                state_check += '''# The two-hour repair needs the current cadence registration and accepted head.
+# A stopped verifier could not consume that interval during the publisher outage.
+recovery_cursor=fref
+while True:
+    recovery_head=checked(recovery_cursor)
+    predecessor_ref=recovery_head['previous_Root_operational_review']
+    if checked(predecessor_ref)['recorded_unix_seconds']<=failure['at']:
+        break
+    recovery_cursor=predecessor_ref
+funded_window_ms=max(failure['at']*1000,recovery_head['recorded_unix_seconds']*1000)
+repair_gate=max(funded_window_ms+budget,head['recorded_unix_seconds']*1000+preceding_recovery_ms)
+'''
+
             plan=replace(plan,'The replacement verifier is processing the retained candidate. Budget both complete semantic passes and publication from the actual funded start.','The 145 verifier stopped on the registered cadence publisher before either semantic checkpoint. Allow the previously qualified repair window, both complete semantic reads on the retained inode, and the original publication stages.')
         plan=plan[:start]+state_check+plan[end:]
     left = plan.index('for n in (199,200):')
@@ -252,5 +271,6 @@ if __name__ == '__main__':
     from evidence import bound,checked,sealed
     ref=bound(args.fleet)
     fleet=checked(ref)
-    due=sealed(fleet['sole_next_observer'])['not_before_utc'] if args.mode=='next' else fleet['sampled_at_utc']
+    due=(sealed(fleet['sole_next_observer'])['not_before_utc'] if args.mode=='next' else
+         checked(fleet['observer'])['cadence']['configured_not_before_utc'])
     print(json.dumps(dict(previous=ref, due=due, plan=bound(directory/'plan.py'), apply=bound(directory/'apply.py'))))
