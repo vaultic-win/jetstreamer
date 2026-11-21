@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import signal
 import stat
 import subprocess
 import sys
@@ -18,7 +19,8 @@ FIT=p.R/"incident-replay-fit-20261121-v1/tools-v4/post-stop-fit"
 GUARD=p.GUARD/"tools/guard"
 ALIAS=Path("/run/horizon-recovered170")
 C=D/"controller"
-SESSION=D/"controller-v2"
+SESSION=D/"controller-v3"
+hold=SimpleNamespace(**runpy.run_path(str(Path(__file__).resolve().with_name("hold145.py"))))
 ORIGINAL_SEAL="e5da777707c6ff70923de35b763ba939e9f275a59e9315c10f0b17ebb90e2941"
 LOCK=Path("/run/horizon-epoch171-to136-g1.operation.lock")
 UPLOAD=p.R/"epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2"
@@ -82,9 +84,10 @@ def wait_for_145_window():
         time.sleep(.20)
     raise ValueError("145 verifier did not leave a proven self-check interval")
 
-def fit(fleet,seal_sha):
+def fit(fleet,seal_sha,stage=None):
     sr=member(FIT,seal_sha)
-    wait_for_145_window()
+    if stage is None:wait_for_145_window()
+    else:hold.check(stage)
     proc=subprocess.run([FIT,"170",fleet["path"],fleet["sha256"]],capture_output=True,timeout=150)
     if proc.returncode and not proc.stdout:
         raise ValueError("170 capacity capture failed: "+proc.stderr.decode(errors="replace")[-900:])
@@ -218,20 +221,31 @@ def start(fleet,seal):
            not (D/"START_INTENT.json").exists() and not (D/"barrier/allow").exists() and not list((D/"guard-receipts").iterdir()) and
            not list((p.RUN/"private").iterdir()) and (p.RUN/"producer.log").stat().st_size==0,"prior attempt or occupied successor")
     inv=inventory();pre=fit(fleet,seal);ext=pre["epoch170_extension"]
+    def interrupted(signum,frame):raise TimeoutError("independent 145 thaw deadline")
+    original=signal.signal(signal.SIGTERM,interrupted)
+    try:
+        stage=hold.begin()
+        try:return activate(fleet,seal,obj,pr,profile,pref,controller,session,inv,pre,ext,stage)
+        finally:hold.finish(stage)
+    finally:signal.signal(signal.SIGTERM,original)
+
+def activate(fleet,seal,obj,pr,profile,pref,controller,session,inv,pre,ext,stage):
+    hold.check(stage)
     book=p.record(D/"ACCEPTED_384_BOOKING.json",dict(epoch=170,cap_bytes=p.CAP,extra_bytes=96<<30,retired=ext["retired"],guard=ext["guard"],prestart=pre))
     floor=min(pre["available_HOME_bytes"],pre["protected_raw_floor_bytes"]+(128<<20))
     intent=p.record(D/"START_INTENT.json",dict(schema="horizon-170-recovery-start-intent-v1",epoch=170,producer_unit=p.UNIT,timer_unit=p.TIMER,
             prepared=pr,fleet=fleet,prestart=pre,armed_floor=floor,authenticated_inventory=inv,stable_root=obj["stable_root"],
-            predecessor_stop=obj["predecessor_stop"],controller=controller,actual_session=session,booking=book,recorded_unix_seconds=int(time.time()),resource_credit_bytes=0))
+            predecessor_stop=obj["predecessor_stop"],controller=controller,actual_session=session,verifier_hold=p.read(stage/"HELD.json")[1],booking=book,recorded_unix_seconds=int(time.time()),resource_credit_bytes=0))
     argv=args(profile,pref);p.record(D/"PRODUCER_ARGV.json",argv);iid=None
     try:
         run(argv);held=wait_actor(True);iid=held["producer_invocation_id"];p.record(D/"NATIVE_GATED.json",held)
         q,_=p.read(p.GUARD/"GUARD_QUALIFIED.json");plan=configure_guard(held,floor,q["contract"],q["guard"]["sha256"])
         first,_=wait_guard(held,plan);fr=p.record(D/"FIRST_GUARD.json",first)
-        post=fit(fleet,seal);p.need(post["candidate"]["producer_invocation_id"]==iid and
+        post=fit(fleet,seal,stage);p.need(post["candidate"]["producer_invocation_id"]==iid and
               post["protected_raw_floor_bytes"]<=floor and observe(True,iid)==held,"post-guard protection changed")
         postref=p.record(D/"POST_GUARD_CAPACITY.json",post)
         p.record(D/"AUTHORIZED_GATED_PAYLOAD.json",dict(**held,first_guard=fr,plan=plan,capacity=postref,intent=intent))
+        hold.check(stage)
         permit=D/"barrier/allow"
         temp=D/"barrier"/("."+iid)
         with temp.open("xb") as f:os.fchmod(f.fileno(),0o444);f.write(iid.encode());f.flush();os.fsync(f.fileno())
@@ -240,6 +254,7 @@ def start(fleet,seal):
         p.record(D/"ACTUAL_PRODUCER_NATIVE.json",actor)
         proof,_=wait_guard(actor,plan,after=first["guard_invocation"])
         p.need(proof["timer"]["InvocationID"]==first["timer"]["InvocationID"],"timer replaced at exec")
+        hold.check(stage)
         return p.record(D/"ACTUAL_ADMISSION_AND_PROTECTION.json",dict(**actor,epoch=170,timer_unit=p.TIMER,timer_invocation_id=proof["timer"]["InvocationID"],
                 actual_guard_plan=plan,first_guard=fr,post_guard_capacity=postref,bootstrap_only=True,transaction_replay_claimed=False,
                 fleet=fleet,intent=intent,stable_root=obj["stable_root"],predecessor_stop=obj["predecessor_stop"],source=pr,resource_credit_bytes=0))
