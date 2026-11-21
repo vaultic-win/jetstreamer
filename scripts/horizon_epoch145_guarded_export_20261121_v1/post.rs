@@ -104,7 +104,7 @@ fn run_child(
     fit: &capacity::Fit,
     lease: &source_lease::ReadLease,
 ) -> Result<()> {
-    fit.topology()?;
+    fit.await_topology()?;
     fit.await_current(0)?;
     lease.check()?;
     let parent = std::process::id();
@@ -327,8 +327,16 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     Ok((full, pipe, qualified))
 }
 
-pub fn full(fleet: Bound, sha: &str) -> Result<()> {
-    check_image(sha, &Path::new(ROOT).join("post-tools/export145"))?;
+pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
+    let image = if joint {
+        joint::IMAGE.into()
+    } else {
+        Path::new(ROOT).join("post-tools/export145")
+    };
+    check_image(sha, &image)?;
+    if joint {
+        joint::route(sha)?;
+    }
     let iid = verify_cgroup()?;
     let _lock = lock()?;
     pending()?;
@@ -376,8 +384,8 @@ pub fn full(fleet: Bound, sha: &str) -> Result<()> {
         !archive.with_extension("jet.sha256").try_exists()?,
         "unexpected readiness marker"
     );
-    let fit = capacity::capture(&fleet)?;
-    fit.topology()?;
+    let fit = capacity::capture_phase(&fleet, joint)?;
+    fit.await_topology()?;
     let first = fit.await_current(0)?;
     source_lease::arm_break_signal()?;
     let lease = source_lease::ReadLease::acquire(
@@ -501,7 +509,7 @@ pub fn full(fleet: Bound, sha: &str) -> Result<()> {
         "archive_identity":identity,"archive_sha256":expected,"pipeline":pipeline,"report":report_binding,"argv":argv,"exit_code":0,
         "current_branch_qualification":"8f4a045a212e7e20d7cbaa4dcaf9f1d2a9ced828ded1b0a44fb9084b812235c1","r2_mutations":false}))?,
     )?;
-    fit.topology()?;
+    fit.await_topology()?;
     fit.await_current(0)?;
     lease.check()?;
     // Publish the canonical checksum privately only after the full and plugin scans.

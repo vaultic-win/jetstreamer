@@ -169,9 +169,17 @@ fn owner_command() -> Result<Command> {
     Ok(c)
 }
 
-pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str) -> Result<()> {
+pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str, joint: bool) -> Result<()> {
     let root = Path::new(ROOT);
-    check_image(sha, &root.join("network-tools/export145"))?;
+    let image = if joint {
+        joint::IMAGE.into()
+    } else {
+        root.join("network-tools/export145")
+    };
+    check_image(sha, &image)?;
+    if joint {
+        joint::route(sha)?;
+    }
     let iid = verify_cgroup()?;
     ensure!(
         custody::hex(full_iid, 32) && full_iid != iid,
@@ -185,8 +193,8 @@ pub(super) fn publish(fleet: Bound, full_iid: &str, sha: &str) -> Result<()> {
     let archive = Path::new(OUTPUT).join("epoch-145.jet");
     let (plan, hash) = local(&full, full_iid, &archive)?;
     let exe = uploader(root)?;
-    let fit = capacity::capture(&fleet)?;
-    fit.topology()?;
+    let fit = capacity::capture_phase(&fleet, joint)?;
+    fit.await_topology()?;
     let first = fit.await_current(0)?;
     source_lease::arm_break_signal()?;
     let acquire =

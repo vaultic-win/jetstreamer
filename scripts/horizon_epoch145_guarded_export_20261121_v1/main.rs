@@ -13,6 +13,8 @@ mod model;
 mod native;
 pub use jetstreamer_node::{archive_checksum, segment_manifest};
 mod capacity;
+mod joint;
+mod joint_candidate;
 mod post;
 mod publication;
 mod publication_tree;
@@ -584,6 +586,14 @@ fn main() {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        [_, mode, fleet, digest, sha, tail @ ..] if mode == "joint-fit" => joint::inspect(
+            Bound {
+                path: fleet.into(),
+                sha256: digest.clone(),
+            },
+            sha,
+            tail,
+        ),
         [_, mode, path, digest, full, sha] if mode == "publish" => publication::publish(
             Bound {
                 path: path.into(),
@@ -591,6 +601,7 @@ fn run() -> Result<()> {
             },
             full,
             sha,
+            cfg!(joint145_only),
         ),
         [_, mode, path, digest, sha] if mode == "post-full" => post::full(
             Bound {
@@ -598,8 +609,11 @@ fn run() -> Result<()> {
                 sha256: digest.clone(),
             },
             sha,
+            cfg!(joint145_only),
         ),
+        #[cfg(not(joint145_only))]
         [_, mode, sha, parent, fd] if mode == "worker" => child(sha, parent.parse()?, fd.parse()?),
+        #[cfg(not(joint145_only))]
         [_, mode, path, digest, sha] if mode == "preflight" || mode == "run" => supervise(
             Bound {
                 path: path.into(),

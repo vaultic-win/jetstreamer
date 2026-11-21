@@ -104,7 +104,7 @@ pub fn home() -> Result<(u64, u64)> {
         v.f_frsize,
     ))
 }
-fn peer_names(fleet: &Value, ad: &Value) -> Result<BTreeSet<String>> {
+fn peer_names(fleet: &Value, ad: &Value, joint: bool) -> Result<BTreeSet<String>> {
     let mut names = BTreeSet::new();
     let mut epochs = BTreeSet::new();
     for field in [
@@ -115,6 +115,13 @@ fn peer_names(fleet: &Value, ad: &Value) -> Result<BTreeSet<String>> {
         for v in fleet[field].as_array().context("fleet census")? {
             let epoch = n(v, "epoch")?;
             let name = v["unit"]["Id"].as_str().context("native owner")?;
+            if epoch == 136 && joint {
+                ensure!(
+                    name == crate::joint_candidate::UNIT,
+                    "unrecognized 136 fleet entry"
+                );
+                continue;
+            }
             if epoch == 172 {
                 ensure!(
                     v["unit"]["InvocationID"] == ad["producer_invocation_id"],
@@ -133,7 +140,7 @@ fn peer_names(fleet: &Value, ad: &Value) -> Result<BTreeSet<String>> {
     );
     Ok(names)
 }
-fn active(patterns: &[&str]) -> Result<BTreeSet<String>> {
+pub(super) fn active(patterns: &[&str]) -> Result<BTreeSet<String>> {
     let mut args = vec![
         "list-units",
         "--state=running,activating,reloading,deactivating",
@@ -147,7 +154,7 @@ fn active(patterns: &[&str]) -> Result<BTreeSet<String>> {
         .map(|v| Ok(v["unit"].as_str().context("unit census row")?.to_string()))
         .collect()
 }
-fn native_values(unit: &str) -> Result<Value> {
+pub(super) fn native_values(unit: &str) -> Result<Value> {
     ensure!(
         unit.starts_with("horizon-")
             && unit.ends_with(".service")
@@ -336,6 +343,7 @@ fn newest_sample(plan_ref: &Value) -> Result<(u64, u64, Option<Value>)> {
 pub struct Fit {
     pub evidence: Value,
     pub names: BTreeSet<String>,
+    pub joint: bool,
     owners: Vec<(u32, u64, String)>,
     pub base: u64,
     pub memfloor: u64,
@@ -344,6 +352,25 @@ pub struct Fit {
 }
 impl Fit {
     pub fn current(&self, needed: u64) -> Result<Value> {
+        let mut sample = self.existing(needed)?;
+        if self.joint {
+            let candidate = crate::joint_candidate::observe()?;
+            if candidate.occupied || candidate.armed {
+                let required = n(&sample, "protected_bytes")?
+                    .max(candidate.floor)
+                    .checked_add(needed)
+                    .and_then(|s| s.checked_add(candidate.remaining()))
+                    .context("joint HOME overflow")?;
+                ensure!(
+                    n(&sample, "free_bytes")? >= required,
+                    "charged concurrent 136 growth exceeds free HOME"
+                );
+                sample["joint136"] = candidate.json(n(&sample, "protected_bytes")?)?;
+            }
+        }
+        Ok(sample)
+    }
+    pub fn existing(&self, needed: u64) -> Result<Value> {
         let (a, ra, sa) = newest_sample(&self.g169)?;
         let (b, rb, sb) = newest_sample(&self.g172)?;
         let protected = (self.base.max(a) + ra + 16 * G).max(b) + rb + META;
@@ -370,6 +397,35 @@ impl Fit {
     }
     /// Used only before the source barrier or while the worker is stopped.
     /// Other current guard failures remain terminal immediately.
+    pub fn await_topology(&self) -> Result<()> {
+        let start = std::time::Instant::now();
+        loop {
+            match self.topology() {
+                Err(e)
+                    if self.joint
+                        && (e.is::<GuardInFlight>() || e.is::<TopologyTimeout>())
+                        && start.elapsed() < std::time::Duration::from_secs(75) =>
+                {
+                    std::thread::sleep(std::time::Duration::from_secs(1))
+                }
+                r => return r,
+            }
+        }
+    }
+    pub fn await_existing(&self) -> Result<Value> {
+        let start = std::time::Instant::now();
+        loop {
+            match self.existing(0) {
+                Err(e)
+                    if e.is::<GuardInFlight>()
+                        && start.elapsed() < std::time::Duration::from_secs(90) =>
+                {
+                    std::thread::sleep(std::time::Duration::from_secs(1))
+                }
+                r => return r,
+            }
+        }
+    }
     pub fn await_current(&self, needed: u64) -> Result<Value> {
         let start = std::time::Instant::now();
         loop {
@@ -385,10 +441,7 @@ impl Fit {
         }
     }
     pub fn topology(&self) -> Result<()> {
-        ensure!(
-            active(&["horizon-qualify*.service"])? == self.names,
-            "replay topology changed"
-        );
+        validate_roster(&self.names, self.joint)?;
         for (pid, ticks, unit) in &self.owners {
             ensure!(
                 crate::native::ticks(*pid)? == *ticks
@@ -401,7 +454,32 @@ impl Fit {
     }
 }
 
+fn validate_roster(names: &BTreeSet<String>, joint: bool) -> Result<()> {
+    let actual = active(&["horizon-qualify*.service"])?;
+    if joint {
+        let mut expected = names.clone();
+        if crate::joint_candidate::observe()?.occupied {
+            expected.insert(crate::joint_candidate::UNIT.into());
+        }
+        if expected != actual {
+            if expected
+                .symmetric_difference(&actual)
+                .all(|u| u == crate::joint_candidate::UNIT)
+            {
+                return Err(GuardInFlight.into());
+            }
+            anyhow::bail!("unexpected simultaneous replay topology");
+        }
+    } else {
+        ensure!(&actual == names, "replay topology changed");
+    }
+    Ok(())
+}
+
 pub fn capture(b: &Bound) -> Result<Fit> {
+    capture_phase(b, false)
+}
+pub fn capture_phase(b: &Bound, joint: bool) -> Result<Fit> {
     ensure!(
         b.path
             .file_name()
@@ -421,11 +499,19 @@ pub fn capture(b: &Bound) -> Result<Fit> {
     );
     let ad = session172()?;
     let post = jsonref(&ad["post_guard_capacity"])?;
-    let names = peer_names(&fleet, &ad)?;
-    ensure!(
-        names == active(&["horizon-qualify*.service"])?,
-        "unexpected native replay census"
-    );
+    let names = peer_names(&fleet, &ad, joint)?;
+    let start = std::time::Instant::now();
+    loop {
+        match validate_roster(&names, joint) {
+            Err(e) if joint && e.is::<GuardInFlight>() && start.elapsed().as_secs() < 60 => {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+            r => {
+                r?;
+                break;
+            }
+        }
+    }
     let holding = active(&[
         "horizon-*holding*.service",
         "horizon-*park*.service",
@@ -564,9 +650,10 @@ pub fn capture(b: &Bound) -> Result<Fit> {
         crate::native::ticks(pid)?,
         ad["producer_unit"].as_str().context("172 unit")?.to_owned(),
     ));
-    let evidence = json!({"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
+    let evidence = json!({"joint136_enabled":joint,"fleet":b,"capture":now,"existing_total_memory":HOST_MEMORY,"charged_cpu_micros":64_000_000,"auxiliary":aux,"temporary":inputs["temporary_workers"],"five_peer_resident_lower_bound":rss,"independent_root_subsets":subset_samples,"reservation_baseline":base,"172_admission_sha256":E172_ADMISSION,"holding_transfer_cpu_micros":1_000_000,"holding_transfer_memory":2*G});
     Ok(Fit {
         evidence,
+        joint,
         names,
         owners,
         base,
