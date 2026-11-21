@@ -21,17 +21,18 @@ need=C['need']
 STATE=B/'transition-state'
 CAP=HERE/'transition_event.py'
 UNIT='horizon-199200-phase-checkpoint.service'
+FOCUSED=B.parent/'epoch169-focused-terminal-20261121-v1/TERMINAL_GUARD_DRAINED.json'
 
 def sh(*args):
     return subprocess.check_output(['/usr/bin/systemctl',*args],text=True,timeout=25)
 
 def evidence():
     meta=(HERE/'deployment-seal-receipt.json').lstat()
-    need(HERE==B/'phase-transition-v1' and meta.st_uid==0 and meta.st_nlink==1 and meta.st_mode&0o222==0,'unsealed transition install')
+    need(HERE==B/'phase-transition-v2' and meta.st_uid==0 and meta.st_nlink==1 and meta.st_mode&0o222==0,'unsealed transition install')
     seal=json.loads((HERE/'deployment-seal-receipt.json').read_bytes())
     need(seal['destination']==str(HERE) and all(hashlib.sha256((HERE/m['name']).read_bytes()).hexdigest()==m['sha256'] for m in seal['members']),'changed transition provider')
     _,event=F['helpers']()
-    proof,_=event['document'](STATE/'BRANCH.json',0o400)
+    proof,_=event['document'](STATE/'BRANCH_V2.json',0o400)
     need(proof['origin']=='origin/account-updates' and proof['package_seal']==hashlib.sha256((HERE/'deployment-seal-receipt.json').read_bytes()).hexdigest() and proof['merged_source_files']=={m['name']:m['sha256'] for m in seal['members']} and re.fullmatch('[a-f0-9]{40}',proof['contained_commit']),'production source lacks branch binding')
     # On this host a current head can move without disturbing immutable deployed sources.
     repo='/home/sol/workspace/jetstreamer'
@@ -96,7 +97,10 @@ def registered_head(event):
             actual={str(e):event['document'](F['REG']/f'{e}.json',0o400)[1] for e in F['FIELD'] if (F['REG']/f'{e}.json').exists()}
             declared=f.get('epoch199200_exclusive_phase_transfers',{})
             need(all(actual.get(k)==v for k,v in declared.items()),'unregistered or conflicting grant in the accepted root fleet')
-            if actual==declared:
+            diagnostic=event['document'](FOCUSED,0o400)[1] if FOCUSED.exists() else None
+            published=f.get('focused169_guard_retirement')
+            need(published is None or published==diagnostic,'conflicting focused guard retirement')
+            if actual==declared and diagnostic==published:
                 return fr
             changes.wait()
     finally:
@@ -109,7 +113,7 @@ def checkpoint():
     with (STATE/'checkpoint.lock').open('a+b') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         path=STATE/('event-'+iid+'.json')
-        reasons=[]
+        reasons=['original focused 169 guard retired'] if FOCUSED.exists() else []
         for e in F['FIELD']:
             d=F['delivery'](e)
             if (d/'event-state/INTENT.json').is_file():reasons.append(f'accepted publisher {e}')

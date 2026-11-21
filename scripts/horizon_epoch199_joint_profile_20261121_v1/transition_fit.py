@@ -16,10 +16,10 @@ need=T['need']
 R=Path('/var/lib/jetstreamer/horizon_runtime_data')
 B=R/'epoch199-delivery-recovery-20261121-v1'
 REG=B/'phase-handoffs'
-NATIVE=R/'incident-replay-fit-20261121-v1/tools-v12'
-SEAL='121a3b184d8f0326e8b4aa4ca15cc39014eac39d485f3681a6e774d2524d9b84'
-PUB='3c30f24d37e4848c65a59f6feccc46bd0430ee3e4082816e983129d9ae2ba5b6'
-PROVIDER='08ae74eb92b63c51873bdd8e08ab50f2ea9edd3dcf0948a9b11433e2d77bdaf5'
+NATIVE=R/'incident-replay-fit-20261121-v1/tools-v13'
+SEAL='ad9409085ca6e2d73f532b81a889cc0ffadbcbdede649f1d02de663ca4c44bd2'
+PUB='d7546f60d063503c98114efd5680989f951e0c4ec48348b6a6fb6b46f0892b46'
+PROVIDER='20408e1d3ecdd8412a897d7da835ac0d4819f5fd0529cad3f38fe698a70f396b'
 EVENT=R/'epoch166-retry10-delivery-20261121-v1/event-tools-current/terminal_event.py'
 EVENT_SHA='2f04ec0a5825d98d39add39ad961d2dc71ea8aa94df8261adb6a3782bd737e43'
 PATTERN=re.compile(r'root(\d{6})-live166167170-(\d{8})-v1')
@@ -124,5 +124,6 @@ def capture(required_head=None):
         records.append(dict(native=fit,sha256=hashlib.sha256(raw).hexdigest(),projection=effective,summary=summary))
     a,b=records
     need(head(event)[1]==fr and pub['identity'](a['native'])==pub['identity'](b['native']) and a['native']['phase145']==b['native']['phase145'] and a['native']['candidate136']==b['native']['candidate136'] and a['native']['status_registration']==b['native']['status_registration'] and pub['closing'](a['native'],fleet)==pub['closing'](b['native'],fleet),'fleet or actor changed between captures')
+    need(a['native']['closed_focused169']==b['native']['closed_focused169'] and a['native']['bookings'].get('169')==b['native']['bookings'].get('169'),'focused diagnostic closure or physical retention changed between captures')
     gaps={k:max(a['summary']['gaps'][k],b['summary']['gaps'][k]) for k in b['summary']['gaps']}
     return dict(schema='horizon-199200-exclusive-capacity-v1',fleet=fr,ordinary_provider_seal=SEAL,registered_transfers=registered,boot_id=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),records=records,gaps=gaps,fits=not any(gaps.values()) and bool(registered),observed_unix_seconds=int(time.time()))
