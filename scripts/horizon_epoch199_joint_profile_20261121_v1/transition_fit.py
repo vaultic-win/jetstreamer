@@ -16,10 +16,12 @@ need=T['need']
 R=Path('/var/lib/jetstreamer/horizon_runtime_data')
 B=R/'epoch199-delivery-recovery-20261121-v1'
 REG=B/'phase-handoffs'
-NATIVE=R/'incident-replay-fit-20261121-v1/tools-v15'
-SEAL='7f887c933698d424cd69244dede860f62cea2759a83f9edacc96f09c60c75eb6'
+NATIVE=R/'incident-replay-fit-20261121-v1/tools-v17'
+SEAL='039534af05bc3bd1f0d54d196cbef5a13b89d24697d8789216faf7bde90f20b7'
 PUB='5743c86021735c2e4be9e325e0eb11fcb6d0009477c5431192622bb455e406b6'
-PROVIDER='ef38a9640e35d60d2257d59d0cee5641f3a35df4d76365d336a741cf480490ea'
+PROVIDER='924c72177d61b8340f8ff75caba72d4cfe5228df4b27111e56d2656a9d8d2aa8'
+TIMER_CAPTURE=R/'epoch166-retry10-delivery-20261121-v1/capacity-tools-bounded/publication-fit'
+TIMER_CAPTURE_SHA='729ceda384e4def082967e24758f2e58f18f2d068ad41bae5358cf9cb60b5fb0'
 EVENT=R/'epoch166-retry10-delivery-20261121-v1/event-tools-current/terminal_event.py'
 EVENT_SHA='2f04ec0a5825d98d39add39ad961d2dc71ea8aa94df8261adb6a3782bd737e43'
 PATTERN=re.compile(r'root(\d{6})-live166167170-(\d{8})-v1')
@@ -37,7 +39,10 @@ def helpers():
     members={r['name']:r['sha256'] for r in seal['members']}
     need(seal['destination']==str(NATIVE) and members['post-stop-fit']==PROVIDER and members['publication-fit']==PUB,'different complete provider')
     pin(NATIVE/'post-stop-fit',PROVIDER)
-    return runpy.run_path(str(pin(NATIVE/'publication-fit',PUB))),runpy.run_path(str(pin(EVENT,EVENT_SHA)))
+    pin(NATIVE/'publication-fit',PUB)
+    adapter=runpy.run_path(str(pin(TIMER_CAPTURE,TIMER_CAPTURE_SHA)))
+    need(adapter['POST_PROVIDER']==NATIVE/'post-stop-fit' and adapter['bounded_provider'](dict(path=str(adapter['TIMER_PROVIDER']),sha256=adapter['TIMER_PROVIDER_SHA']))==dict(path=str(NATIVE/'post-stop-fit'),sha256=PROVIDER),'different timer-aware capture')
+    return adapter,runpy.run_path(str(pin(EVENT,EVENT_SHA)))
 
 def bound(event,ref,mode,where=None):
     p=Path(ref['path'])

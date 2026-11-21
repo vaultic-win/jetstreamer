@@ -115,8 +115,8 @@ def main():
     assert 'PathChanged='+str(F['R']/'epoch169-focused-terminal-20261121-v1/TERMINAL_GUARD_DRAINED.json') in units[U['PATH']]
     five_fleet=F['bound'](event,full['fleet'],0o600)
     assert five['source_commit']=='c777aed01c50c69725adb60d0341a278c495e593' and full['fits'] and full['closed_full172'] is None
-    current=T['scenarios'](full,ledger,five_fleet,prior,ram,64,set())
-    assert len(current)==32 and current[0]['complete_protected_HOME_bytes']==full['complete_required_HOME_bytes'] and current[0]['gaps']['disk']>0
+    five_source_scenarios=T['scenarios'](full,ledger,five_fleet,prior,ram,64,set())
+    assert len(five_source_scenarios)==32 and five_source_scenarios[0]['complete_protected_HOME_bytes']==full['complete_required_HOME_bytes'] and five_source_scenarios[0]['gaps']['disk']>0
     bridge=F['NATIVE'].parent/'tools-v14'
     bridge_sha='4cf6d3ba5f3891bd950fdf9feda3915c2a3c199d813402b8aef50fbf2adb6435'
     bridge_seal=dict(path=str(bridge/'deployment-seal-receipt.json'),sha256='86fdbaec0d37065e568f1aec19474f116162d94c161982479f1a96401b700500')
@@ -152,9 +152,9 @@ def main():
         return dict(fleet=native['fleet'],phase=native['phase145'],populations=64,transfers=len(prices),checkpoint_scenarios=len(exact))
     captures=dict(stopped=price_capture(eight['fit']),resumed=price_capture(actual['fresh_fit']))
     nine_sha='45a6b4627bba3fc9b242d9c7030fc9c817f49466932a9fb067f24ed1bf5a800e'
-    nine=json.loads(F['pin'](F['NATIVE']/'qualification.json',nine_sha).read_bytes())
+    nine=json.loads(F['pin'](F['NATIVE'].parent/'tools-v15/qualification.json',nine_sha).read_bytes())
     assert nine['schema']=='horizon-145-nine-phase-native-qualification-v1' and nine['predecessor']==bridge_seal
-    assert nine['members']['post-stop-fit']==F['PROVIDER'] and nine['members']['publication-fit']==F['PUB']
+    assert nine['members']['post-stop-fit']=='ef38a9640e35d60d2257d59d0cee5641f3a35df4d76365d336a741cf480490ea' and nine['members']['publication-fit']==F['PUB']
     assert nine['refused_crossed_modes']==13 and nine['resource_credit_bytes']==0
     assert set(nine['registrations'])==set(eight['registrations'])|{'retry-post'}
     for name,previous in eight['registrations'].items():
@@ -170,7 +170,36 @@ def main():
     previous_pub=runpy.run_path(str(F['pin'](bridge/'publication-fit',eight['members']['publication-fit'])))
     for name in ('identity','closing','validate'):
         assert ast.dump(ast.parse(inspect.getsource(pub[name])))==ast.dump(ast.parse(inspect.getsource(previous_pub[name])))
-    return dict(schema='horizon-199-phase-transition-qa-v3',nine_phase_qualification=nine_sha,
-                retry_post_seal=post['seal'],nine_registered_modes=sorted(nine['registrations']),refused_crossed_modes=nine['refused_crossed_modes'],eight_phase_qualification=bridge_sha,v14_retry_start=actual_ref,provider_captures=captures,focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
+    # Bind the original checkpoint modes through timer recovery and its real post verifier.
+    timer_qualifications = {}
+    previous_dir = F['NATIVE'].parent / 'tools-v15'
+    previous = nine
+    for generation, digest, added, phase in (
+        ('tools-v16', '32537b525247db295fa5c7d523fdb45a840d0c69377d7659ea0647f15c9f439c', 'timer-semantic', 'tools-v5e'),
+        ('tools-v17', '8ef798bc5e5574ee6ac43a05dc60243da7697d426f71e6c2417a599b565c4614', 'timer-post', 'tools-v11'),
+    ):
+        base = F['NATIVE'].parent / generation
+        current = json.loads(F['pin'](base / 'qualification.json', digest).read_bytes())
+        F['bound'](event, current['predecessor'], 0o444, previous_dir / 'deployment-seal-receipt.json')
+        assert set(current['registrations']) == set(previous['registrations']) | {added}
+        for name, old in previous['registrations'].items():
+            new = current['registrations'][name]
+            assert all(old[k] == new[k] for k in ('seal', 'image', 'build', 'adapter'))
+        registration = current['registrations'][added]
+        assert current['phase_seals'][added] == registration['seal']
+        expected = F['R'] / 'epoch145-semantic-continuity-20261121-v1' / phase
+        F['bound'](event, registration['seal'], 0o444, expected / 'deployment-seal-receipt.json')
+        F['bound'](event, registration['build'], 0o444)
+        assert current['refused_crossed_modes'] > previous['refused_crossed_modes']
+        assert current['members']['publication-fit'] == F['PUB'] and current['resource_credit_bytes'] == 0
+        captures[added] = price_capture(current['fit'])
+        timer_qualifications[added] = dict(qualification=digest, seal=registration['seal'])
+        previous, previous_dir = current, base
+    assert current['members']['post-stop-fit'] == F['PROVIDER']
+    observed = current['fit']['phase145']
+    assert observed['stage'] == 'leased-worker' and observed['invocation_id'] == 'a99ed8b51e8a482b805b8a36a11b2700'
+    assert observed['window']['continuity_seal'] == current['registrations']['timer-semantic']['seal']
+    return dict(schema='horizon-199-phase-transition-qa-v4',timer_qualifications=timer_qualifications,current_registered_modes=sorted(current['registrations']),current_crossed_modes=current['refused_crossed_modes'],nine_phase_qualification=nine_sha,
+                retry_post_seal=post['seal'],nine_registered_modes=sorted(nine['registrations']),refused_crossed_modes=nine['refused_crossed_modes'],eight_phase_qualification=bridge_sha,v14_retry_start=actual_ref,provider_captures=captures,focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=five_source_scenarios,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
 if __name__=='__main__':
     print(json.dumps(main(),sort_keys=True))

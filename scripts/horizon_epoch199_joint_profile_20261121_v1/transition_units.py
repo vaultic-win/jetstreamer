@@ -7,7 +7,7 @@ C=runpy.run_path(str(HERE/'contract.py'))
 B=C['B']
 STATE=B/'transition-state'
 REG=B/'phase-handoffs'
-ENTRY=B/'phase-transition-v3/transition_event.py'
+ENTRY=B/'phase-transition-v4/transition_event.py'
 CHECK='horizon-199200-phase-checkpoint.service'
 PATH=CHECK.replace('.service','.path')
 DELIVERY={e:B.parent/(f'epoch{e}-current-delivery-20261121-v1' if e!=166 else 'epoch166-retry10-delivery-20261121-v1') for e in (166,167,168,170,172)}

@@ -28,11 +28,11 @@ def sh(*args):
 
 def evidence():
     meta=(HERE/'deployment-seal-receipt.json').lstat()
-    need(HERE==B/'phase-transition-v3' and meta.st_uid==0 and meta.st_nlink==1 and meta.st_mode&0o222==0,'unsealed transition install')
+    need(HERE==B/'phase-transition-v4' and meta.st_uid==0 and meta.st_nlink==1 and meta.st_mode&0o222==0,'unsealed transition install')
     seal=json.loads((HERE/'deployment-seal-receipt.json').read_bytes())
     need(seal['destination']==str(HERE) and all(hashlib.sha256((HERE/m['name']).read_bytes()).hexdigest()==m['sha256'] for m in seal['members']),'changed transition provider')
     _,event=F['helpers']()
-    proof,_=event['document'](STATE/'BRANCH_V3.json',0o400)
+    proof,_=event['document'](STATE/'BRANCH_V4.json',0o400)
     need(proof['origin']=='origin/account-updates' and proof['package_seal']==hashlib.sha256((HERE/'deployment-seal-receipt.json').read_bytes()).hexdigest() and proof['merged_source_files']=={m['name']:m['sha256'] for m in seal['members']} and re.fullmatch('[a-f0-9]{40}',proof['contained_commit']),'production source lacks branch binding')
     # On this host a current head can move without disturbing immutable deployed sources.
     repo='/home/sol/workspace/jetstreamer'
