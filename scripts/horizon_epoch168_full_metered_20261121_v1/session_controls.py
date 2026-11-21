@@ -7,6 +7,8 @@ import tempfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import fit
+import incident
+import time
 import session
 import same_five
 
@@ -36,6 +38,28 @@ def run():
         try: fit.select(pre,post,110)
         except ValueError: continue
         raise AssertionError("accepted altered proof "+name)
+    fleet={"path":"fixture","sha256":"c"*64}
+    booked={e:dict(cap_bytes=cap,remaining_bytes=cap-1024,physical_bytes=1024) for e,cap in incident.CAPS.items()}
+    booked["168"]["root"]=str(incident.s.TREE)
+    floor=8297502499408
+    required=floor+booked["168"]["remaining_bytes"]
+    sample=dict(schema="horizon-incident-replay-fit-v1",epoch=168,fleet=fleet,fits=True,
+        actual_original_stops={e:{"guard_timer_retirement":incident.TIMER_DRAIN} for e in ("166","167","170")},
+        survivors={"169":{},"172":{}},candidate=None,normal168=None,bookings=booked,complete_required_HOME_bytes=required,
+        protected_raw_floor_bytes=floor,available_HOME_bytes=required,complete_cpu_quota_micros=64_000_000,
+        complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=100,available_memory_bytes=100,
+        candidate136=dict(cap=72*fit.G,remaining=72*fit.G,occupied=False),recorded_unix_seconds=int(time.time()),
+        stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0)
+    assert incident.capacity(sample,fleet,None)
+    actor={"producer_pid":5,"producer_invocation_id":"a"*32}
+    post=dict(sample,candidate=actor,normal168={"stage":"gated","actor":actor})
+    assert incident.capacity(post,fleet,actor)
+    for bad in (dict(sample,actual_original_stops={}),dict(sample,candidate=actor),dict(sample,survivors={}),
+                dict(sample,stopped_generation_resident_credit_bytes=1),dict(sample,recorded_unix_seconds=0),
+                dict(sample,candidate136=dict(sample["candidate136"],remaining=0)),dict(sample,complete_required_HOME_bytes=floor)):
+        try: incident.capacity(bad,fleet,None)
+        except ValueError: pass
+        else: raise AssertionError("accepted foreign or incomplete incident state")
     with tempfile.TemporaryDirectory() as td:
         d=Path(td); a=d/"source";b=d/"dest"
         a.write_bytes(b"first");b.write_bytes(b"other")

@@ -15,18 +15,19 @@ import time
 import uuid
 
 HERE=Path(__file__).resolve().parent
-if __name__=="__main__" and (HERE != Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3") or not sys.flags.isolated):
+if __name__=="__main__" and (HERE != Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v4") or not sys.flags.isolated):
     raise SystemExit("use the sealed root session with python3 -IB")
 sys.path.insert(0,str(HERE))
 import fit
+import incident
 import status168 as s
 
 D=s.D
 BACKING=Path("/home/sol/.jetstreamer-private/horizon-root-runtime-data")/D.name
 OP_LOCK="/run/horizon-epoch171-to136-g1.operation.lock"
-PACKAGE=D/"session-v3"
+PACKAGE=D/"session-v4"
 SEALER="e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
-INPUTS=("session.py","fit.py","status168.py","overlap.py","same_five.py","same-five-image.json")
+INPUTS=("session.py","fit.py","status168.py","overlap.py","same_five.py","same-five-image.json","incident.py","incident-fit.json")
 
 
 def sync(directory):
@@ -74,7 +75,7 @@ def record(name,obj):
 
 def controller(sealref):
     s.need(os.geteuid()==0 and HERE==PACKAGE and sys.flags.isolated,"use root isolated sealed epoch 168 session")
-    artifact,ar=s.read(D/"SESSION_DEPLOYMENT_V3.json")
+    artifact,ar=s.read(D/"SESSION_DEPLOYMENT_V4.json")
     seal=s.bound(sealref,HERE/"deployment-seal-receipt.json")
     s.need(artifact["seal"]==sealref and artifact["source_commit"] and artifact["branch"]=="account-updates"
            and seal["sealer_sha256"]==SEALER and seal["destination"]==str(HERE)
@@ -99,6 +100,56 @@ def paths(j,production):
     return ({p.relative_to(s.RUN) for p in files},{p.relative_to(s.RUN) for p in dirs})
 
 
+def stable_root():
+    witness=s.bound(incident.ROOTS,D/"STABLE_167_168_ROOTS_BEFORE_DATA_WITNESS.json")
+    row=witness["normal168"]
+    st=s.RUN.lstat()
+    s.need(witness["preserved_witness_files"]==12 and row["path"]==str(s.RUN)
+           and s.RUN.resolve(strict=True)==s.RUN and stat.S_ISDIR(st.st_mode)
+           and (st.st_dev,st.st_ino)==(row["device"],row["inode"])
+           and not (D/"prepared-run").exists(),"different permanent normal 168 directory")
+    return dict(device=st.st_dev,inode=st.st_ino)
+
+
+def append_log(archive=None):
+    identity=stable_root()
+    for unit in (s.U,s.GUARD+".service",s.T):
+        m=s.show(unit)
+        s.need(m["ActiveState"] in ("failed","inactive") and m.get("MainPID","0") in ("","0") and
+               not m["Job"] and not fit.members(unit),"168 log still in use")
+    witness=s.bound(incident.ROOTS,D/"STABLE_167_168_ROOTS_BEFORE_DATA_WITNESS.json")
+    prior=witness["closed_168_intent"]
+    prior_path=Path(prior["path"])
+    s.need(prior_path.parent.parent==D and prior_path.parent.name.startswith("abandoned-gate-") and
+           s.bound(prior,prior_path)["run_tree"]==stable_root(),"wrong abandoned 168 generation")
+    fd=os.open(s.LOG,os.O_RDWR|os.O_NOFOLLOW|os.O_NONBLOCK)
+    with os.fdopen(fd,"r+b") as log:
+        m=os.fstat(fd)
+        s.need(stat.S_ISREG(m.st_mode) and (m.st_dev,m.st_ino,m.st_nlink,stat.S_IMODE(m.st_mode))==
+               (64512,103350639,1,0o600) and (m.st_uid,m.st_gid) in ((1001,1003),(0,0))
+               and s.LOG.resolve(strict=True)==s.LOG and os.path.samestat(m,s.LOG.lstat()),"wrong original 168 log")
+        fcntl.fcntl(fd,fcntl.F_SETLEASE,fcntl.F_WRLCK)
+        try:
+            if m.st_size:
+                s.need(archive is not None and (m.st_uid,m.st_gid)==(0,0) and m.st_size<=16<<20,
+                       "unexpected contents in held gate log")
+                data=log.read(m.st_size+1)
+                s.need(len(data)==m.st_size,"gate log changed")
+                put(archive/"producer.log",data,0o400)
+                os.ftruncate(fd,0)
+            if (m.st_uid,m.st_gid)!=(0,0):
+                os.fchown(fd,0,0)
+            os.fsync(fd)
+            final=os.fstat(fd)
+            s.need(final.st_size==0 and (final.st_uid,final.st_gid)==(0,0)
+                   and os.path.samestat(final,s.LOG.lstat()) and stable_root()==identity,
+                   "different observer log after preparation")
+        finally:
+            fcntl.fcntl(fd,fcntl.F_SETLEASE,fcntl.F_UNLCK)
+    return record("OBSERVER_LOG_V4.json",dict(path=str(s.LOG),device=m.st_dev,inode=m.st_ino,
+                  stable_root=incident.ROOTS,previous_intent=prior,uid=0,gid=0,mode=0o600))
+
+
 def ready_tree(root,j,p):
     files,dirs=paths(j,p)
     prep=s.read(D/"PREPARED.json",s.PREPARED)[0]
@@ -106,7 +157,8 @@ def ready_tree(root,j,p):
            and {Path("."),*(x.relative_to(root) for x in root.rglob("*"))}==files|dirs,"different staged normal tree")
     for n in files|dirs:
         m=(root/n).lstat()
-        s.need(m.st_uid==1001 and m.st_gid==1003 and ((n in dirs and stat.S_ISDIR(m.st_mode)
+        owner=(0,0) if n==Path("producer.log") else (1001,1003)
+        s.need((m.st_uid,m.st_gid)==owner and (n!=Path("producer.log") or (m.st_dev,m.st_ino)==(64512,103350639)) and ((n in dirs and stat.S_ISDIR(m.st_mode)
                and stat.S_IMODE(m.st_mode)==0o700) or (n in files and stat.S_ISREG(m.st_mode) and
                stat.S_IMODE(m.st_mode)==0o600 and m.st_size==0 and m.st_nlink==1)), "occupied 168 staging tree")
     return dict(device=root.stat().st_dev,inode=root.stat().st_ino)
@@ -148,13 +200,13 @@ def wait_for(predicate,seconds,recheck,interval=.3):
 
 
 def prepared(j,p):
-    s.need(not s.RUN.exists() and (D/"barrier/allow").exists() is False and not any((D/"guard-receipts").iterdir())
+    s.need(not (D/"barrier/allow").exists() and not (D/"START_INTENT.json").exists()
+           and not (D/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists() and not any((D/"guard-receipts").iterdir())
            and all(s.show(n)["LoadState"]=="not-found" for n in (s.U,s.T,s.GUARD+".service")),
            "different or already-partially-created 168 admission")
-    identity=ready_tree(D/"prepared-run",j,p)
-    s.need(s.same_file(BACKING,D) and s.same_file(BACKING/"prepared-run",D/"prepared-run")
-           and s.TREE.resolve(strict=True)==s.TREE and s.TREE.stat().st_dev==identity["device"],
-           "wrong HOME backing for normal 168")
+    identity=stable_root()
+    s.need(ready_tree(s.RUN,j,p)==identity and s.same_file(BACKING,D) and
+           s.TREE.resolve(strict=True)==s.TREE and s.TREE.stat().st_dev==identity["device"],"wrong 168 backing")
     return identity
 
 
@@ -198,22 +250,9 @@ def recover(reg):
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and not fit.members(n),"previous 168 not drained")
         if m["ActiveState"]=="failed": subprocess.run(["/usr/bin/systemctl","reset-failed",n],check=True,timeout=15)
     archive=D/("abandoned-gate-"+intent["token"]);archive.mkdir(mode=0o700,exist_ok=True)
-    if s.RUN.exists():
-        m=s.RUN.lstat()
-        s.need((m.st_dev,m.st_ino)==(intent["run_tree"]["device"],intent["run_tree"]["inode"])
-               and s.RUN.resolve(strict=True)==s.RUN,"foreign previous run path")
-        log=s.RUN/"producer.log";saved=BACKING/archive.name/"producer.log"
-        if log.exists() and log.lstat().st_size:
-            m=log.lstat()
-            s.need(stat.S_ISREG(m.st_mode) and m.st_uid==1001 and m.st_nlink==1,"wrong gate log")
-            move(log,saved)
-        if not log.exists() and saved.exists():
-            with log.open("xb") as f:
-                os.fchown(f.fileno(),1001,1003);os.fchmod(f.fileno(),0o600);os.fsync(f.fileno())
-            sync(s.RUN)
-        s.need(ready_tree(s.RUN,j,reg.p)==intent["run_tree"] and not (D/"prepared-run").exists(),"occupied or foreign previous gate tree")
-        move(s.RUN,BACKING/"prepared-run")
-    s.need(ready_tree(D/"prepared-run",j,reg.p)==intent["run_tree"],"different staged root on recovery")
+    s.need(stable_root()==intent["run_tree"],"previous gate used a different permanent root")
+    append_log(archive)
+    s.need(ready_tree(s.RUN,j,reg.p)==intent["run_tree"],"occupied or foreign previous gate tree")
     # Move the intent last. Its presence lets an interrupted cleanup resume against the same generation.
     for n in ("SESSION_PRODUCER_ARGV.json","NATIVE_GATED.json","ACTUAL_GUARD_PLAN.json","SESSION_GUARD_ARGV.json",
               "FIRST_GUARD.json","POST_GUARD_CAPACITY.json","AUTHORIZED_GATED_PAYLOAD.json","guard.stdout","guard.stderr"):
@@ -258,10 +297,8 @@ def launch(reg,deployment,fleetref):
     if recover(reg): return s.read(D/"ACTUAL_ADMISSION_AND_PROTECTION.json")[1]
     j,argv=reg.p.normal_spec()
     tree=prepared(j,reg.p)
-    pre=fit.capture(fleetref)
-    fit.select(pre)
     inventory_ref=inventory()
-    pre=fit.capture(fleetref)
+    pre=incident.capture(fleetref)
     floor=fit.select(pre)
     floor=min(pre["available_HOME_bytes"],floor+(128<<20))
     token=uuid.uuid4().hex
@@ -274,9 +311,7 @@ def launch(reg,deployment,fleetref):
     ir=record("START_INTENT.json",intent)
     try:
         record("SESSION_PRODUCER_ARGV.json",argv)
-        move(BACKING/"prepared-run",s.RUN)
-        s.need(ready_tree(s.RUN,j,reg.p)==tree and fit.phase145()==(pre["phase145"],True)
-               and fit.status_ready()==pre["status_registration"],"prestart authority changed")
+        s.need(ready_tree(s.RUN,j,reg.p)==tree and incident.unchanged(pre),"prestart authority changed")
         subprocess.run(argv,check=True,timeout=30)
         u,actor=wait_for(lambda:s.native_actor(intent),10,lambda:None)
         generation=actor["producer_invocation_id"]
@@ -295,7 +330,7 @@ def launch(reg,deployment,fleetref):
             s.identity(s.native_actor(intent)[1],actor)
         first=wait_for(lambda:native_first(actor,pr),70,still_held)
         fr=record("FIRST_GUARD.json",first)
-        post=fit.capture(fleetref,actor)
+        post=incident.capture(fleetref,actor)
         fit.select(pre,post,floor)
         cr=record("POST_GUARD_CAPACITY.json",post)
         record("AUTHORIZED_GATED_PAYLOAD.json",dict(**actor,epoch=168,first_guard=fr,actual_guard_plan=pr,
@@ -303,9 +338,7 @@ def launch(reg,deployment,fleetref):
                   registered_status=pre["status_registration"],authenticated_inventory=inventory_ref,archive_publication_authorized=False,r2_mutations=False))
         still_held()
         latest=native_first(actor,pr)
-        s.need(latest["timer"]["InvocationID"]==t["InvocationID"] and fit.phase145()==(pre["phase145"],True)
-               and fit.status_ready()==pre["status_registration"] and
-               fit.membership(post["incumbents"],actor,post["candidate136"])==pre["population"],"late membership change")
+        s.need(latest["timer"]["InvocationID"]==t["InvocationID"] and incident.unchanged(post,actor),"late membership change")
         put(D/"barrier/allow",generation.encode(),0o444)
         wait_for(lambda:s.native_actor(intent,node=True),20,lambda: None)
         wait_for(reg.main,20,lambda: None)
@@ -334,7 +367,7 @@ def worker(wait):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode",choices=("preflight","start","record-worker"))
+    parser.add_argument("mode",choices=("prepare-log","preflight","start","record-worker"))
     parser.add_argument("session_seal_sha")
     parser.add_argument("--fleet",type=Path)
     parser.add_argument("--fleet-sha")
@@ -343,11 +376,15 @@ def main():
     reg,deployment=controller(s.ref(PACKAGE/"deployment-seal-receipt.json",args.session_seal_sha))
     with open(OP_LOCK,"a+b") as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        if args.mode=="record-worker": result=worker(20)
+        if args.mode=="prepare-log":
+            s.need(s.inspect() is None and not (D/"barrier/allow").exists(),"168 session already active")
+            result=append_log()
+            prepared(reg.p.normal_spec()[0],reg.p)
+        elif args.mode=="record-worker": result=worker(20)
         else:
             s.need(args.fleet and args.fleet_sha,"supply fresh root fleet path and digest")
             fleet=s.ref(args.fleet,args.fleet_sha)
-            result=fit.capture(fleet) if args.mode=="preflight" else launch(reg,deployment,fleet)
+            result=incident.capture(fleet) if args.mode=="preflight" else launch(reg,deployment,fleet)
     if args.mode=="start" and not (D/"FIRST_PROTECTED_WORKER.json").exists():
         # The producer now owns its paid reservation. Monitoring can be resumed with record-worker.
         result=dict(admission=result,first_worker=worker(300))

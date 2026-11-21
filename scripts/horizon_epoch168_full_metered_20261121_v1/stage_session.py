@@ -61,17 +61,35 @@ def verifier_profile(seal_path,seal_sha,image_sha,build_sha):
                 seal=dict(path=str(seal_path),sha256=seal_sha))
 
 
-def stage(commit,seal_path,seal_sha,image_sha,build_sha):
+def incident_profile(seal_sha):
+    package=D.parent/"incident-replay-fit-20261121-v1/tools"
+    seal_path=package/"deployment-seal-receipt.json"
+    require(seal_path.resolve(strict=True)==seal_path and seal_path.stat().st_uid==0 and
+            re.fullmatch("[0-9a-f]{64}",seal_sha) and digest(seal_path)==seal_sha,"different incident provider seal")
+    seal=json.loads(seal_path.read_bytes())
+    require(seal["schema"]=="jetstreamer-sealed-deployment-receipt-v1" and seal["sealer_sha256"]==SELF and
+            seal["destination"]==str(package) and not seal["remote_mutations"],"foreign incident provider")
+    members={r["name"]:r["sha256"] for r in seal["members"]}
+    require({"post-stop-fit","retire-original-timers.py"}<=members.keys(),"incomplete incident provider")
+    for name,expected in members.items():
+        p=package/name
+        require(Path(name).name==name and p.resolve(strict=True)==p and p.is_file() and p.stat().st_uid==0
+                and not p.stat().st_mode & 0o022 and digest(p)==expected,"changed incident member")
+    return dict(seal=dict(path=str(seal_path),sha256=seal_sha),sealer_sha256=SELF,
+                image=dict(path=str(package/"post-stop-fit"),sha256=members["post-stop-fit"]))
+
+
+def stage(commit,seal_path,seal_sha,image_sha,build_sha,incident_seal):
     require(os.geteuid()==0 and re.fullmatch("[0-9a-f]{40}",commit),"root and refetched source commit required")
     os.umask(0o077)
     git=["/usr/bin/git","--no-replace-objects","-c","safe.directory="+str(REPO),"-C",str(REPO)]
     remote=subprocess.check_output([*git,"remote","get-url","origin"],text=True).strip()
     require(remote=="git@github-matt-vaultic:vaultic-win/jetstreamer.git","wrong campaign remote")
     subprocess.run([*git,"merge-base","--is-ancestor",commit,"refs/remotes/origin/account-updates"],check=True)
-    source=D/"session-source-v3";source.mkdir(mode=0o700,exist_ok=True)
-    dest=D/"session-v3"
+    source=D/"session-source-v4";source.mkdir(mode=0o700,exist_ok=True)
+    dest=D/"session-v4"
     rows=[]
-    for name in ("session.py","fit.py","status168.py","overlap.py","same_five.py"):
+    for name in ("session.py","fit.py","status168.py","overlap.py","same_five.py","incident.py"):
         raw=subprocess.check_output([*git,"cat-file","blob",commit+":"+MODULE+name])
         write(source/name,raw)
         rows.append(dict(name=name,source=str(source/name),sha256=digest(source/name),mode=0o444))
@@ -80,7 +98,10 @@ def stage(commit,seal_path,seal_sha,image_sha,build_sha):
     profile=source/"same-five-image.json"
     write(profile,encode(verifier_profile(seal_path,seal_sha,image_sha,build_sha)))
     rows.append(dict(name=profile.name,source=str(profile),sha256=digest(profile),mode=0o444))
-    plan=D/"SESSION_SEAL_PLAN_V3.json"
+    incident=source/"incident-fit.json"
+    write(incident,encode(incident_profile(incident_seal)))
+    rows.append(dict(name=incident.name,source=str(incident),sha256=digest(incident),mode=0o444))
+    plan=D/"SESSION_SEAL_PLAN_V4.json"
     write(plan,encode(dict(schema="jetstreamer-sealed-deployment-plan-v1",destination=str(dest),members=rows)))
     require(digest(SEALER)==SELF,"different normal sealer")
     if not dest.exists():
@@ -94,7 +115,7 @@ def stage(commit,seal_path,seal_sha,image_sha,build_sha):
     result=dict(schema="horizon-168-normal-session-deployment-v1",branch="account-updates",source_commit=commit,
                 seal=dict(path=str(seal),sha256=digest(seal)),members={r["name"]:r["sha256"] for r in rows},
                 production_launch=False,archive_publication_authorized=False,r2_mutations=False)
-    write(D/"SESSION_DEPLOYMENT_V3.json",encode(result))
+    write(D/"SESSION_DEPLOYMENT_V4.json",encode(result))
     print(json.dumps(result,sort_keys=True))
 
 
