@@ -10,7 +10,7 @@ const ORIGINAL: &str = "de6780b860b3467bae21fbd19176ca14";
 const LEAF: &str = ".tmp36MvkN";
 const VIEW: &str =
     "/home/sol/.jetstreamer-private/epoch145-prefix-extract-materialized-view-20261121-v1";
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-materialized-recovery-20261121-v1/tools/export145";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-materialized-recovery-20261121-v1/tools-v2/export145";
 const ALLOC: &str = "95b714939cf8837d26ce612d7ddd37fe99e32273c9afb86aa2952e397cd601bd";
 const POST_ALLOC: &str = "bb66d17aa06f51157fc90d6f6258086640b51dc42a388c7c7e2cccfd648192f8";
 const VALID: &str = "02806450a410c6721f4e7dcdbc5c9875cce99e21962fa12d0e6a18f96b05f33b";
