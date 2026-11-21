@@ -96,7 +96,11 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         s["unit"] == p.unit && s["mode"] == p.mode && std::env::current_dir()? == p.root,
         "wrong held producer"
     );
-    inputs()?;
+    if p.lane == Lane::Epoch228 {
+        epoch228::verify_payload(p, &s)?;
+    } else {
+        inputs()?;
+    }
     mounted(p, &s)?;
     let token = p.state.join(format!("token-{iid}.json"));
     let end = Instant::now() + Duration::from_secs(240);
@@ -121,11 +125,15 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         .iter()
         .map(|v| v.as_str().context("argv"))
         .collect::<Result<Vec<_>>>()?;
-    ensure!(
-        argv.first() == Some(&format!("{SNAPROOT}/jetstreamer-node").as_str())
-            && argv.get(1) == Some(&"266"),
-        "foreign node"
-    );
+    if p.lane == Lane::Epoch228 {
+        epoch228::verify_payload(p, &s)?;
+    } else {
+        ensure!(
+            argv.first() == Some(&format!("{SNAPROOT}/jetstreamer-node").as_str())
+                && argv.get(1) == Some(&"266"),
+            "foreign node"
+        );
+    }
     let err = Command::new(argv[0]).args(&argv[1..]).exec();
     Err(err.into())
 }
@@ -218,7 +226,16 @@ fn guard_once(p: &Profile, s: &Value) -> Result<Value> {
             return Ok(pressure);
         }
     }
-    let guard = Bound::new(GUARD, GUARD_SHA);
+    if p.lane == Lane::Epoch228 && p.mode == "pilot" && m["ActiveState"] == "active" {
+        let available = live::resources_at(&p.root)?.2;
+        if available < 8 << 30 {
+            let pressure = json!({"loop_available":available});
+            stop(p, s, "private-filesystem-floor", &pressure)?;
+            return Ok(pressure);
+        }
+    }
+    let (exe, sha) = p.lane.guard();
+    let guard = Bound::new(exe, sha);
     guard.artifact()?;
     let plan = binding(&s["guard_plan"])?;
     plan.sealed()?;

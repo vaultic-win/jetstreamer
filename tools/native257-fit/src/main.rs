@@ -2,6 +2,13 @@ use anyhow::{Result, ensure};
 use std::path::Path;
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).is_some_and(|op| op == "epoch228-full") {
+        println!(
+            "{}",
+            horizon_singleton211_launch::native266_full::dispatch228(&args[2..])?
+        );
+        return Ok(());
+    }
     if args.get(1).is_some_and(|op| op == "epoch266-full") {
         let result = horizon_singleton211_launch::native266_full::dispatch(&args[2..])?;
         println!("{result}");

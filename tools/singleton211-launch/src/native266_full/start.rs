@@ -12,7 +12,10 @@ fn cmd(n: &mut Native, exe: &str, a: &[&str]) -> Result<()> {
     n.run(exe, a)?;
     Ok(())
 }
-fn original_plan(p: &Profile, cap: u64) -> Result<Value> {
+fn original_plan(p: &Profile, cap: u64, review: &Value) -> Result<Value> {
+    if p.lane == Lane::Epoch228 {
+        return epoch228::plan(p, cap, review);
+    }
     let packet = gate::inputs()?;
     let files = rows(&packet, "files")?;
     let manifest = Bound::new(Path::new(SNAPROOT).join(MAN), MAN_SHA);
@@ -121,16 +124,29 @@ fn scratch(n: &mut Native, p: &Profile, cap: u64, s: &mut Value) -> Result<()> {
     );
     chown(&p.root, Some(1000), Some(1000))?;
     fs::set_permissions(&p.root, fs::Permissions::from_mode(0o700))?;
-    for rel in [
-        "output",
-        "state",
-        "tmp",
-        "var-tmp",
-        "tmp/isolated-empty-gcloud",
-        "output/compact-indexes",
-        "output/compact-indexes/265",
-        "output/compact-indexes/266",
-    ] {
+    let dirs: &[&str] = if p.lane == Lane::Epoch228 {
+        &[
+            "output",
+            "ledger",
+            "scratch",
+            "state",
+            "tmp",
+            "var-tmp",
+            "tmp/isolated-empty-gcloud",
+        ]
+    } else {
+        &[
+            "output",
+            "state",
+            "tmp",
+            "var-tmp",
+            "tmp/isolated-empty-gcloud",
+            "output/compact-indexes",
+            "output/compact-indexes/265",
+            "output/compact-indexes/266",
+        ]
+    };
+    for rel in dirs {
         let path = p.root.join(rel);
         dir(&path, 0o700)?;
         chown(&path, Some(1000), Some(1000))?;
@@ -172,10 +188,17 @@ fn static_units(n: &mut Native, p: &Profile, r: &Bound, spec: &Bound, fit: &Valu
         s.replace("@ROOT@", p.root.to_str().unwrap())
             .replace("@STATE@", p.state.to_str().unwrap())
             .replace("@MODE@", &p.mode)
+            .replace("@COMMAND@", p.lane.command())
+            .replace("@EPOCH@", &p.lane.epoch().to_string())
             .replace("@IMAGE@", image)
             .replace("@GUARD@", &p.guard)
     };
-    let producer = replace(include_str!("producer.service.in"))
+    let template = if p.lane == Lane::Epoch228 {
+        include_str!("epoch228.service.in")
+    } else {
+        include_str!("producer.service.in")
+    };
+    let producer = replace(template)
         .replace("@MEMORY@", &num(&fit["winner"], "memory")?.to_string())
         .replace("@CPUS@", &cpus)
         .replace("@SPEC@", &spec.sha256);
@@ -277,6 +300,9 @@ fn release(
     let iid = text(owner, "InvocationID")?;
     let pid = text(owner, "MainPID")?.parse::<u64>()?;
     let memory = num(&fit["winner"], "memory")?;
+    if p.lane == Lane::Epoch228 {
+        epoch228::kernel(p, owner, fit)?;
+    }
     ensure!(
         hex(iid, 32)
             && pid > 1
@@ -298,7 +324,7 @@ fn release(
     ensure!(
         argv == [
             argpath(&image.path)?.as_bytes(),
-            b"epoch266-full",
+            p.lane.command().as_bytes(),
             b"wait",
             p.mode.as_bytes(),
             argpath(&spec.path)?.as_bytes(),
@@ -316,19 +342,26 @@ fn release(
     } else {
         num(fit, "protected_floor")?
     };
+    let (guard_exe, guard_sha) = p.lane.guard();
+    let narrow = p.lane == Lane::Epoch228 && p.mode == "pilot";
+    let (filesystem, cap) = if narrow {
+        ("/", 585_388_447_855u64)
+    } else {
+        (V, cap)
+    };
     let g = save_json(
         &p.state,
         "guard-plan.json",
-        &json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":p.unit,"invocation_id":iid,"filesystem":V,"worker_root":p.root,"receipt_directory":p.state.join("receipts"),"minimum_free_bytes":floor,"maximum_root_physical_bytes":cap,"maximum_worker_vmas":3500000}),
+        &json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":p.unit,"invocation_id":iid,"filesystem":filesystem,"worker_root":p.root,"receipt_directory":p.state.join("receipts"),"minimum_free_bytes":floor,"maximum_root_physical_bytes":cap,"maximum_worker_vmas":3500000}),
     )?;
     let check = n.run(
-        GUARD,
+        guard_exe,
         &[
             argpath(&g.path)?,
             "--plan-sha256",
             &g.sha256,
             "--self-sha256",
-            GUARD_SHA,
+            guard_sha,
             "--validate-plan-only",
         ],
     )?;
@@ -359,7 +392,8 @@ fn release(
         );
         text(&v, "guard_iid")?
     } else {
-        validate_sample(
+        validate_sample_for(
+            guard_sha,
             &v,
             &p.unit,
             iid,
@@ -443,7 +477,7 @@ fn release(
         }
         cmd(n, "/usr/bin/systemctl", &["stop", &p.timer])?;
         return Ok(
-            json!({"schema":"horizon266-native-full-stop-qualification-v1","mode":p.mode,"unit":p.unit,"iid":iid,"pid":pid,"spec":spec,"guard":g,"first_guard":original,"guard_pid1":journal,"terminal":terminal,"drained":true,"entry_replay":false,"image":image}),
+            json!({"schema":format!("horizon{}-native-full-stop-qualification-v1",p.lane.epoch()),"mode":p.mode,"unit":p.unit,"iid":iid,"pid":pid,"spec":spec,"guard":g,"first_guard":original,"guard_pid1":journal,"terminal":terminal,"drained":true,"entry_replay":false,"image":image}),
         );
     }
     let timer = n.show(&p.timer)?;
@@ -452,6 +486,7 @@ fn release(
         "guard timer"
     );
     let held = funding::elect(
+        p.lane,
         n,
         r,
         Some((p, owner, (memory, num(&fit["winner"], "root")?))),
@@ -471,6 +506,9 @@ fn release(
             && command_field(n, &p.timer, "InvocationID")? == text(&timer, "InvocationID")?,
         "release owner changed"
     );
+    if p.lane == Lane::Epoch228 {
+        epoch228::kernel(p, &n.show(&p.unit)?, &held)?;
+    }
     let h = save_json(&p.state, "held-fit.json", &held)?;
     let token = public(
         &p.state,
@@ -478,16 +516,18 @@ fn release(
         &json!({"iid":iid,"pid":pid,"unit":p.unit,"spec":spec,"guard":g,"first_guard":original,"held_fit":h,"timer_iid":timer["InvocationID"],"guard_pid1":journal,"expires":now()?+25}),
     )?;
     let until = Instant::now() + Duration::from_secs(25);
-    let mapped = Path::new(SNAPROOT).join("jetstreamer-node");
+    let packet = spec.sealed()?;
+    let mapped = Path::new(packet["argv"][0].as_str().context("node argv")?);
     while fs::read_link(format!("/proc/{pid}/exe"))? != mapped {
         ensure!(Instant::now() < until, "native node did not exec");
         std::thread::sleep(Duration::from_millis(50));
     }
     Ok(
-        json!({"schema":"horizon266-first-full-native-node-handoff-v1","unit":p.unit,"iid":iid,"pid":pid,"spec":spec,"timer":timer["InvocationID"],"token":token,"guard":g,"first_guard":original,"held_fit":h,"entry_replay_proven":false,"publication_authorized":false}),
+        json!({"schema":format!("horizon{}-first-full-native-node-handoff-v1",p.lane.epoch()),"unit":p.unit,"iid":iid,"pid":pid,"spec":spec,"timer":timer["InvocationID"],"token":token,"guard":g,"first_guard":original,"held_fit":h,"entry_replay_proven":false,"publication_authorized":false}),
     )
 }
-pub(super) fn validate_sample(
+pub(super) fn validate_sample_for(
+    guard_sha: &str,
     v: &Value,
     u: &str,
     iid: &str,
@@ -497,7 +537,7 @@ pub(super) fn validate_sample(
 ) -> Result<()> {
     ensure!(
         v["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
-            && v["guard_sha256"] == GUARD_SHA
+            && v["guard_sha256"] == guard_sha
             && v["producer_stop_enabled"] == true
             && v["producer_invocation_id"] == iid
             && v["plan_sha256"] == g.sha256
@@ -515,10 +555,17 @@ pub(super) fn validate_sample(
     );
     Ok(())
 }
-pub(super) fn run(n: &mut Native, r: &Value, review: &Bound, image: &Bound) -> Result<Value> {
-    Bound::new(GUARD, GUARD_SHA).artifact()?;
+pub(super) fn run(
+    lane: Lane,
+    n: &mut Native,
+    r: &Value,
+    review: &Bound,
+    image: &Bound,
+) -> Result<Value> {
+    let (exe, sha) = lane.guard();
+    Bound::new(exe, sha).artifact()?;
     for mode in MODES {
-        let p = Profile::new(mode)?;
+        let p = Profile::new(lane, mode)?;
         let output = p.state.join(if mode == "pilot" {
             "handoff.json"
         } else {
@@ -546,14 +593,14 @@ pub(super) fn run(n: &mut Native, r: &Value, review: &Bound, image: &Bound) -> R
             }
             continue;
         }
-        let fit = funding::elect(n, r, None)?;
+        let fit = funding::elect(lane, n, r, None)?;
         ensure!(fit["winner"].is_object(), "no complete finite fit {fit}");
         let cap = if mode == "pilot" {
             num(&fit["winner"], "root")?
         } else {
             256 << 20
         };
-        let mut s = original_plan(&p, cap)?;
+        let mut s = original_plan(&p, cap, r)?;
         scratch(n, &p, cap, &mut s)?;
         s["review"] = json!(review);
         let spec = public(&p.state, "spec.json", &s)?;
@@ -581,7 +628,7 @@ pub(super) fn run(n: &mut Native, r: &Value, review: &Bound, image: &Bound) -> R
             }
         }
     }
-    bound_at(&Profile::new("pilot")?.state.join("handoff.json"))?.sealed()
+    bound_at(&Profile::new(lane, "pilot")?.state.join("handoff.json"))?.sealed()
 }
 #[cfg(test)]
 mod tests {
@@ -596,7 +643,7 @@ mod tests {
         let peer = funding::OWNERS[1];
         let g = Bound::new(text(s, "plan").unwrap(), text(s, "plan_sha256").unwrap());
         let pid = num(&s["producer"], "pid").unwrap();
-        validate_sample(s, peer.0, peer.1, pid, &g, None).unwrap();
+        validate_sample_for(GUARD_SHA, s, peer.0, peer.1, pid, &g, None).unwrap();
         let cases = [
             ("guard_sha256", json!("0".repeat(64))),
             ("trip_reason", json!("filesystem-floor")),
@@ -606,14 +653,15 @@ mod tests {
         for (k, v) in cases {
             let mut bad = s.clone();
             bad[k] = v;
-            assert!(validate_sample(&bad, peer.0, peer.1, pid, &g, None).is_err());
+            assert!(validate_sample_for(GUARD_SHA, &bad, peer.0, peer.1, pid, &g, None).is_err());
         }
-        assert!(validate_sample(s, peer.0, peer.1, pid + 1, &g, None).is_err());
+        assert!(validate_sample_for(GUARD_SHA, s, peer.0, peer.1, pid + 1, &g, None).is_err());
         let historical = &records[1]["sample"];
         assert_eq!(historical["trip_reason"], "filesystem-floor");
         assert_ne!(historical["guard_sha256"], GUARD_SHA);
         assert!(
-            validate_sample(
+            validate_sample_for(
+                GUARD_SHA,
                 historical,
                 peer.0,
                 peer.1,

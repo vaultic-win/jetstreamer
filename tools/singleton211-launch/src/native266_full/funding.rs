@@ -41,7 +41,7 @@ pub(super) fn cpus(text: &str) -> Result<BTreeSet<u32>> {
     ensure!(!out.is_empty(), "empty CPU range");
     Ok(out)
 }
-fn available_cpus(n: &mut Native) -> Result<BTreeSet<u32>> {
+fn available_cpus(n: &mut Native, lane: Lane) -> Result<BTreeSet<u32>> {
     let mut cpus_free = cpus(&fs::read_to_string("/sys/devices/system/cpu/online")?)?;
     for (unit, _, _) in OWNERS {
         let pid = command_field(n, unit, "MainPID")?.parse::<u32>()?;
@@ -54,10 +54,22 @@ fn available_cpus(n: &mut Native) -> Result<BTreeSet<u32>> {
         )?;
         cpus_free.retain(|cpu| !reserved.contains(cpu));
     }
+    if lane == Lane::Epoch228 {
+        let id = command_field(n, epoch228_peer::UNIT, "MainPID")?;
+        let status = fs::read_to_string(Path::new("/proc").join(id).join("status"))?;
+        let mask = cpus(
+            status
+                .lines()
+                .find_map(|l| l.strip_prefix("Cpus_allowed_list:"))
+                .context("266 affinity")?,
+        )?;
+        ensure!(mask == cpus("32-39")?, "266 CPU envelope changed");
+        cpus_free.retain(|cpu| !mask.contains(cpu));
+    }
     ensure!(cpus_free.len() >= 8, "eight disjoint replay CPUs");
     Ok(cpus_free.into_iter().take(8).collect())
 }
-fn discharge() -> Result<Bound> {
+pub(super) fn discharge() -> Result<Bound> {
     let b = Bound::new(
         RELEASE,
         "e06ae0ed57a2a10356efb35c6305beb4b70be45a7303e171261d35111f16d5a5",
@@ -170,6 +182,7 @@ fn manager_units(n: &mut Native) -> Result<BTreeSet<String>> {
         .collect())
 }
 fn candidates(
+    lane: Lane,
     hard: u64,
     total: u64,
     avail: u64,
@@ -180,8 +193,12 @@ fn candidates(
 ) -> Result<Value> {
     let mut all = Vec::new();
     let mut chosen = Value::Null;
-    for root in ROOTS {
-        for memory in MEMORY {
+    let (roots, memories): (&[u64], &[u64]) = match lane {
+        Lane::Epoch266 => (&ROOTS, &MEMORY),
+        Lane::Epoch228 => (&[epoch228::ROOT_BYTES], &[epoch228::MEMORY]),
+    };
+    for &root in roots {
+        for &memory in memories {
             if allowed.is_some_and(|p| p != (memory, root)) {
                 continue;
             }
@@ -205,6 +222,7 @@ fn candidates(
     Ok(json!({"options":all,"winner":chosen}))
 }
 pub(super) fn elect(
+    lane: Lane,
     n: &mut Native,
     r: &Value,
     held: Option<(&Profile, &Value, (u64, u64))>,
@@ -233,8 +251,11 @@ pub(super) fn elect(
             && launch["unit"]["InvocationID"] == OWNERS[2].1,
         "original 247/228 funding"
     );
-    let discharged = discharge()?;
     let first_disk_qa = stopped::original(n)?;
+    let (credit, basis) = match lane {
+        Lane::Epoch266 => (191932891136, json!(discharge()?)),
+        Lane::Epoch228 => (epoch228::ASSIGNED, epoch228::funding(n, r, &f, &ledger)?),
+    };
     let mut allowed = OWNERS
         .iter()
         .map(|(u, _, _)| u.to_string())
@@ -249,7 +270,7 @@ pub(super) fn elect(
         serde_json::from_value(ledger["reservations"].clone())?;
     native266_peer::guard(n, &originating, &nominal)?;
     allowed.insert("horizon-native266-protective-v1.service".into());
-    allowed.insert(CTRL.into());
+    allowed.insert(lane.controller().into());
     if let Some((p, m, _)) = held {
         allowed.insert(p.unit.clone());
         allowed.insert(p.guard.clone());
@@ -261,6 +282,13 @@ pub(super) fn elect(
             "held producer identity"
         );
     }
+    let peer266 = if lane == Lane::Epoch228 {
+        allowed.insert(epoch228_peer::UNIT.into());
+        allowed.insert(epoch228_peer::SERVICE.into());
+        Some(epoch228_peer::verify(n, r)?)
+    } else {
+        None
+    };
     let census = manager_units(n)?;
     ensure!(
         census.is_subset(&allowed),
@@ -282,6 +310,9 @@ pub(super) fn elect(
         }
         let m = Value::Object(fields);
         let amount = live::finite_owner(&m, u, iid, *cap)?;
+        if lane == Lane::Epoch228 && idx == 2 {
+            epoch228::mapped_command(&m, &book)?;
+        }
         let previous = if idx == 2 {
             &launch["unit"]
         } else {
@@ -317,12 +348,29 @@ pub(super) fn elect(
     let floor = num(&book, "required_free")?
         .checked_add(penalty)
         .context("retained disk growth")?;
+    let floor = if let Some(peer) = &peer266 {
+        floor
+            .max(num(peer, "original_floor")?)
+            .checked_add(epoch228_peer::EXCLUSIVE_DISK)
+            .context("joint 266 floor overflow")?
+    } else {
+        floor
+    };
     let (total, avail, free) = live::resources_at(Path::new(V))?;
     let free = free.min(num(&firing, "free")?);
     let hard = num(&book, "hard_memory_obligation")?
-        .checked_sub(191932891136)
+        .checked_sub(credit)
         .context("discharge underflow")?;
-    let mut result = candidates(hard, total, avail, curr, free, floor, held.map(|v| v.2))?;
+    let mut result = candidates(
+        lane,
+        hard,
+        total,
+        avail,
+        curr,
+        free,
+        floor,
+        held.map(|v| v.2),
+    )?;
     ensure!(
         manager_units(n)?.is_subset(&allowed),
         "new owner during admission"
@@ -335,17 +383,30 @@ pub(super) fn elect(
             "peer changed during admission"
         );
     }
-    result["schema"] = json!("horizon266-native-full-capacity-election-v1");
+    result["schema"] = json!(format!(
+        "horizon{}-native-full-capacity-election-v1",
+        lane.epoch()
+    ));
+    if let Some(peer) = peer266 {
+        ensure!(
+            epoch228_peer::verify(n, r)? == peer,
+            "266 changed across election"
+        );
+        result["concurrent_266"] = peer;
+    }
     result["retained_attempt_one"] = first_disk_qa;
     result["fleet"] = json!(fleet);
     result["peer_envelopes"] = json!(peer_rows);
-    result["cold_discharge"] = json!(discharged);
+    match lane {
+        Lane::Epoch266 => result["cold_discharge"] = basis,
+        Lane::Epoch228 => result["epoch251_assignment"] = basis,
+    }
     result["epoch228_held_fit"] = book["epoch228_held_fit"].clone();
     result["uploader_booking"] = json!(bound_at(Path::new(BOOK))?);
     result["full211_guard"] = firing;
     result["protected_floor"] = json!(floor + RECEIPTS);
     result["free"] = json!(free);
-    result["cpus"] = json!(available_cpus(n)?);
+    result["cpus"] = json!(available_cpus(n, lane)?);
     result["publication_authorized"] = json!(false);
     Ok(result)
 }
@@ -356,6 +417,7 @@ mod tests {
     fn reserves_uploader_two_qa_roots_and_the_residual_cold_owner() {
         let base = 1211435323392 - 191932891136;
         let all = candidates(
+            Lane::Epoch266,
             base,
             1212136964096,
             1047188426752,
@@ -374,6 +436,7 @@ mod tests {
         );
         assert!(
             candidates(
+                Lane::Epoch266,
                 base,
                 1212136964096,
                 0,

@@ -139,7 +139,8 @@ pub(super) fn closed(
             .contains(&reason),
         "different original guard stop intent"
     );
-    start::validate_sample(
+    start::validate_sample_for(
+        p.lane.guard().1,
         &s,
         &p.unit,
         iid,
@@ -152,7 +153,7 @@ pub(super) fn closed(
         &rr,
         "manager-stop-completion.json",
         &json!({
-            "schema":"horizon266-native-guard-cleared-manager-stop-v1","producer_invocation_id":iid,"guard_invocation_id":gid,
+            "schema":format!("horizon{}-native-guard-cleared-manager-stop-v1",p.lane.epoch()),"producer_invocation_id":iid,"guard_invocation_id":gid,
             "plan_sha256":plan.sha256,"intent":intent,"sample":sample,"reason":reason,"manager":manager
         }),
     )
@@ -184,7 +185,15 @@ fn raw_original() -> Result<(Bound, Bound, Bound)> {
         "9f10cb9d5ba14f28d55fd78c4ea90f2a9972a0f2ac774d37a5a921d57cfe3af2",
     );
     plan.sealed()?;
-    start::validate_sample(&s, UNIT, IID, 2782923, &plan, Some("filesystem-floor"))?;
+    start::validate_sample_for(
+        GUARD_SHA,
+        &s,
+        UNIT,
+        IID,
+        2782923,
+        &plan,
+        Some("filesystem-floor"),
+    )?;
     ensure!(
         s["guard_invocation_id"] == GID
             && i["sample"] == s

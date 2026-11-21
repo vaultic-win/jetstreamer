@@ -94,7 +94,7 @@ fn progress(row: &Value) -> Result<Option<(u64, u64, u64, u64)>> {
     )))
 }
 pub(super) fn witness(n: &mut Native) -> Result<Value> {
-    let p = Profile::new("pilot")?;
+    let p = Profile::new(Lane::Epoch266, "pilot")?;
     let b = bound_at(&p.state.join("handoff.json"))?;
     let h = b.sealed()?;
     let iid = text(&h, "iid")?;

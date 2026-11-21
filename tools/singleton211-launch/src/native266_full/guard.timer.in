@@ -1,5 +1,5 @@
 [Unit]
-Description=Epoch 266 private replay protective timer
+Description=Epoch @EPOCH@ private replay protective timer
 [Timer]
 OnActiveSec=1s
 OnUnitInactiveSec=20s

@@ -2,6 +2,8 @@
 use super::*;
 use std::os::unix::process::CommandExt;
 mod entries;
+mod epoch228;
+mod epoch228_peer;
 mod funding;
 mod gate;
 mod start;
@@ -24,8 +26,46 @@ const CONTROL_MEM: u64 = 256 << 20;
 const MAIN: &str = "01a1f8f4-293b-7a91-a36e-2e7658bba721";
 const MODES: [&str; 3] = ["qa-disk", "qa-memory", "pilot"];
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum Lane {
+    Epoch266,
+    Epoch228,
+}
+impl Lane {
+    fn epoch(self) -> u64 {
+        match self {
+            Self::Epoch266 => 266,
+            Self::Epoch228 => 228,
+        }
+    }
+    fn state(self) -> &'static str {
+        match self {
+            Self::Epoch266 => STATE,
+            Self::Epoch228 => epoch228::STATE,
+        }
+    }
+    fn controller(self) -> &'static str {
+        match self {
+            Self::Epoch266 => CTRL,
+            Self::Epoch228 => epoch228::CTRL,
+        }
+    }
+    fn command(self) -> &'static str {
+        match self {
+            Self::Epoch266 => "epoch266-full",
+            Self::Epoch228 => "epoch228-full",
+        }
+    }
+    fn guard(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Epoch266 => (GUARD, GUARD_SHA),
+            Self::Epoch228 => (epoch228::GUARD, epoch228::GUARD_SHA),
+        }
+    }
+}
 #[derive(Clone)]
 struct Profile {
+    lane: Lane,
     mode: String,
     unit: String,
     guard: String,
@@ -34,7 +74,7 @@ struct Profile {
     state: PathBuf,
 }
 impl Profile {
-    fn new(mode: &str) -> Result<Self> {
+    fn new(lane: Lane, mode: &str) -> Result<Self> {
         ensure!(MODES.contains(&mode), "unknown epoch 266 operation");
         let suffix = if mode == "pilot" {
             String::new()
@@ -42,7 +82,31 @@ impl Profile {
             format!("-{mode}{}", if mode == "qa-disk" { "-a2" } else { "" })
         };
         let g = format!("horizon-266-general-protective{suffix}-v1");
+        if lane == Lane::Epoch228 {
+            let g = format!("horizon-228-root-tail-protective{suffix}-v1");
+            let (unit, root) = if mode == "pilot" {
+                (
+                    "horizon-qualify-228-demotion-root-tail-16d4b158-v1.service".into(),
+                    "qualification-228-demotion-root-tail-v1".into(),
+                )
+            } else {
+                (
+                    format!("horizon-qualify-228-general{suffix}-v1.service"),
+                    format!("qualification-228-general{suffix}-v1"),
+                )
+            };
+            return Ok(Self {
+                lane,
+                mode: mode.into(),
+                unit,
+                guard: format!("{g}.service"),
+                timer: format!("{g}.timer"),
+                root: Path::new("/home/ubuntu/.jetstreamer-private").join(root),
+                state: Path::new(lane.state()).join(mode),
+            });
+        }
         Ok(Self {
+            lane,
             mode: mode.into(),
             unit: format!("horizon-qualify-266-general{suffix}-v1.service"),
             guard: format!("{g}.service"),
@@ -125,13 +189,19 @@ fn digest_file(p: &str, sha: &str) -> Result<Value> {
 }
 
 pub fn dispatch(args: &[String]) -> Result<Value> {
+    controller(Lane::Epoch266, args)
+}
+pub fn dispatch228(args: &[String]) -> Result<Value> {
+    controller(Lane::Epoch228, args)
+}
+fn controller(lane: Lane, args: &[String]) -> Result<Value> {
     original_boot()?;
     if matches!(
         args.first().map(String::as_str),
         Some("wait" | "guard" | "failsafe")
     ) {
         ensure!(args.len() == 4, "expected mode, bound path and digest");
-        let prof = Profile::new(&args[1])?;
+        let prof = Profile::new(lane, &args[1])?;
         let b = Bound::new(&*args[2], &args[3]);
         if args[0] == "wait" {
             gate::wait(&prof, &b)
@@ -149,18 +219,19 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
         let r = review.sealed()?;
         let image = own_image(&r)?;
         ensure!(
-            r["schema"] == "horizon266-first-entry-native-review-v1" && r["Main_accepted"] == true,
+            r["schema"] == format!("horizon{}-first-entry-native-review-v1", lane.epoch())
+                && r["Main_accepted"] == true,
             "epoch 266 review"
         );
         ensure!(
-            r["root"] == STATE
-                && r["producer_epoch"] == 266
+            r["root"] == lane.state()
+                && r["producer_epoch"] == lane.epoch()
                 && r["publication_authorized"] == false,
             "entry qualification scope"
         );
         let out = PathBuf::from(&args[3]);
         ensure!(
-            out.starts_with(STATE) && out.parent() == Some(Path::new(STATE)),
+            out.parent() == Some(Path::new(lane.state())),
             "evidence namespace"
         );
         trusted_parents(&out)?;
@@ -171,15 +242,19 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
             deadline: Some(mono()? + 900_000_000),
         };
         if args[0] == "entries" {
+            ensure!(
+                lane == Lane::Epoch266,
+                "use the archive parent receipts for epoch 228"
+            );
             return entries::witness(&mut n);
         }
-        let first = funding::elect(&mut n, &r, None)?;
+        let first = funding::elect(lane, &mut n, &r, None)?;
         save_json(&out, "initial-election.json", &first)?;
         if args[0] == "elect" {
             return Ok(first);
         }
         ensure!(args[0] == "run", "unknown epoch 266 controller operation");
-        let manager = n.show(CTRL)?;
+        let manager = n.show(lane.controller())?;
         ensure!(
             text(&manager, "MainPID")?.parse::<u32>()? == std::process::id()
                 && text(&manager, "MemoryMax")?.parse::<u64>()? == CONTROL_MEM
@@ -188,7 +263,7 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
                 && manager["MemorySwapMax"] == "0",
             "control must run in booked PID1 envelope"
         );
-        start::run(&mut n, &r, &review, &image)
+        start::run(lane, &mut n, &r, &review, &image)
     }
 }
 fn rows<'a>(v: &'a Value, k: &str) -> Result<&'a Vec<Value>> {
