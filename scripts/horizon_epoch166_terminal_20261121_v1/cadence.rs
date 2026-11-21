@@ -10,6 +10,9 @@ use std::{
     },
 };
 
+#[path = "metered168.rs"]
+mod metered168;
+
 const BASE: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const NATIVE: &str = "/usr/local/lib/jetstreamer/horizon-observer-exit-census-20261107-v1/jetstreamer-horizon-observe";
 const NATIVE_SHA: &str = "6b06665ac4dd0654f6684f4fd178787c37e30af332a657c6c5a6502c2f3e2ab8";
@@ -158,12 +161,22 @@ fn project(f: &Value, cfg: &Value, live: &Value) -> Result<Value> {
             expected.insert(136);
         }
     }
+    let (boot, worker) = metered168::roster(f, cfg)?;
+    let mut expected_replays = BTreeSet::from([166, 167, 170, 172]);
+    if worker {
+        expected_replays.insert(168);
+    }
+    let expected_boots = if boot {
+        BTreeSet::from([168])
+    } else {
+        BTreeSet::new()
+    };
     ensure!(
-        epochs(f, "actual_executing_replays")? == BTreeSet::from([166, 167, 170, 172])
+        epochs(f, "actual_executing_replays")? == expected_replays
             && private == expected
-            && rows(f, "actual_active_bootstraps")?.is_empty()
+            && epochs(f, "actual_active_bootstraps")? == expected_boots
             && f["active_private_diagnostic_count"] == private.len()
-            && f["active_producer_count"] == 4 + private.len()
+            && f["active_producer_count"] == 4 + private.len() + usize::from(boot || worker)
             && f["additional_independent166_DATA_cap_bytes"] == live["reserved_disk_bytes"],
         "166 retirement needs its original primary peers and registered diagnostics"
     );
@@ -365,9 +378,20 @@ pub fn select(path: &Path, dispatch: bool) -> Result<Value> {
             }
             effective = materialize(path, &projected, &decision)?;
         } else {
+            let (boot, worker) = metered168::roster(&f, &cfg)?;
+            let mut survivors = BTreeSet::from([167, 170, 172]);
+            if worker {
+                survivors.insert(168);
+            }
+            let expected_boots = if boot {
+                BTreeSet::from([168])
+            } else {
+                BTreeSet::new()
+            };
             ensure!(
                 f["terminal166_local_commit"] == reference
-                    && epochs(&f, "actual_executing_replays")? == BTreeSet::from([167, 170, 172]),
+                    && epochs(&f, "actual_active_bootstraps")? == expected_boots
+                    && epochs(&f, "actual_executing_replays")? == survivors,
                 "scheduled roster already omitted 166 without its bound local disposition"
             );
             effective = path.to_owned();
