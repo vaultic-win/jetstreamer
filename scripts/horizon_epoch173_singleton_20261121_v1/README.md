@@ -4,4 +4,4 @@ The standard epoch 173 node reads the sealed GCS bootstrap at slot 74,735,808 th
 
 In the bounded startup qualification, the ordinary node accepted the entire 2,341,977,058-byte bootstrap at generation 1634787554356719. It bound the final account root at slot 75,167,662 and selected solana-v1.5.6 for slots 74,735,809 through 75,167,999, including the final 337 slots. The fixture’s 2 MiB file ceiling stopped the private worker copy before execution. Both inputs kept their original inodes.
 
-Production replay requires a funded actor, a current full-fleet fit, the normal worker and guard startup sequence, and status registration. The existing archive verification and publication procedures apply after full replay.
+The deployed standalone guard accepted the 288 GiB whole-tree cap and 3,500,000 worker VMA limit for this service. At admission, bind the new actor invocation and freshly computed free-space floor. Keep the payload behind the startup gate until the real timer-driven guard succeeds, the post-guard complete fit passes, and the controller registers the new owner and status. The existing archive verification and publication procedures apply after full replay.

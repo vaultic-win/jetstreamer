@@ -90,5 +90,29 @@
     "worker_started": false,
     "full_epoch_replayed": false,
     "archive_created": false
+  },
+  "guard_profile": {
+    "executable": "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard",
+    "sha256": "b2271db6f25696612c388297db3a10852f7911560887f67dcb404392d91f7016",
+    "plan_schema": "jetstreamer-horizon-standalone-guard-plan-v1",
+    "producer_unit": "horizon-qualify-173-full-local-20261121-v1.service",
+    "filesystem": "/home/sol",
+    "worker_root": "/home/sol/.jetstreamer-private/epoch173-standard-lane-20261110-v1",
+    "maximum_worker_vmas": 3500000,
+    "maximum_root_physical_bytes": 309237645312,
+    "timer_on_active_seconds": 1,
+    "timer_on_unit_inactive_seconds": 5,
+    "timer_accuracy_seconds": 1,
+    "admission_fields": [
+      "current protected free-space floor including guard margin",
+      "new actor invocation ID",
+      "root-owned receipt directory"
+    ],
+    "qualification": {
+      "static_receipt_sha256": "ea21aa878bce89a1d6fc443c8e41bc8aa6ef848ddb93cdace6c6c44b861bf873",
+      "validated": true,
+      "samples": 0,
+      "protective_guard_proven": false
+    }
   }
 }
