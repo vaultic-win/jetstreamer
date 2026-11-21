@@ -1,6 +1,7 @@
 //! Exact retirement of closed epoch223 duplicate CID indexes.
 //! Retains a full independently verified copy and every partial archive.
 //! Closed profile registry; no recursive removal, service mutation or R2 routes.
+mod closed_owners;
 mod process_references;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
@@ -24,11 +25,42 @@ use std::{
 const DEV: u64 = 66305;
 const LIMIT: u64 = 8 << 20;
 const FLOOR: u64 = 3_908_104_436_088;
-const IMAGE: &str = "/var/lib/jetstreamer/horizon223-duplicate-index-retirer-20261120-v3/epoch223-duplicate-index-retire";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon223-duplicate-index-retirer-20261121-v4/epoch223-duplicate-index-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const SURVEY_SEAL_SHA: &str = "5bf563acabd1702013328ded7d219f90f34a7a20bbe6a076b8edab47c73c589d";
 const SURVEY_SUMS_SHA: &str = "9367b3f35f60cf92b60b0ec92bd892eb7f3407ea3fc5ce22b18c6d407634046a";
-const PROTECTED: &str = "horizon-qualify-250-reboot-20261117-v1.service";
+const PROTECTED: [(&str, &str); 4] = [
+    (
+        "horizon-singleton-211-capped-4aeca563-v1.service",
+        "49ea83a3a5e94e99af51153d2fd79e92",
+    ),
+    (
+        "horizon-qualify-251-replacement-20261118-v1.service",
+        "cd2477bfec7f4e498545762c633e7bb0",
+    ),
+    (
+        "horizon-qualify-265-replacement-20261119-v3.service",
+        "182de64d33674f95b7758d410eb1812b",
+    ),
+    (
+        "horizon-upload-247-staged-680e1173-v1.service",
+        "3e08307874db424886cd8c46b3ecfba6",
+    ),
+];
+const CLOSED: [&str; 12] = [
+    "archive-223-tail-reread-1743245a-v3.service",
+    "horizon-qualify-223-v1625-tail-1743245a-v3.service",
+    "horizon-qualify-223-singleton-postcount-ad1d65a-v1.service",
+    "horizon-qualify-223-v1620-warmup-resource-d15ee08b-v1.service",
+    "horizon-import-233-committed-v2.service",
+    "horizon-import-233-common-mount-probe-v2.service",
+    "horizon-import-239-current-20261117-v2.service",
+    "horizon-import-239-current-20261117-v3.service",
+    "horizon-import-239-namespace-probe-20261117-v2.service",
+    "horizon-import-239-namespace-probe-20261117-v3.service",
+    "horizon-import-244-current-20261117-v1.service",
+    "horizon-import-244-namespace-probe-20261117-v1.service",
+];
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Bound {
@@ -259,7 +291,7 @@ struct Review {
     transitive_scripts_plans_and_user_units_reviewed: bool,
     staged_original_cache_consumers_absent: bool,
     evidence: Vec<Bound>,
-    protected250: BTreeMap<String, String>,
+    protected_owners: BTreeMap<String, BTreeMap<String, String>>,
     closed_units: Vec<ClosedUnit>,
 }
 #[derive(Deserialize)]
@@ -270,7 +302,9 @@ struct ClosedUnit {
 }
 fn profile(selection: &str) -> Result<Profile> {
     let all: Vec<Profile> = serde_json::from_str(include_str!("profiles.json"))?;
+    let extra: Vec<Profile> = serde_json::from_str(include_str!("new-profiles.json"))?;
     all.into_iter()
+        .chain(extra)
         .find(|p| p.selection == selection)
         .context("unregistered epoch")
 }
@@ -307,33 +341,31 @@ fn validate_plan(p: &Plan, r: &Review, q: &Profile) -> Result<()> {
         "copies are not independent"
     );
     ensure!(
-        r.protected250.get("Id").map(String::as_str) == Some(PROTECTED)
-            && r.protected250.get("ActiveState").map(String::as_str) == Some("active")
-            && r.protected250.get("SubState").map(String::as_str) == Some("running"),
-        "protected250 must be the running invocation"
+        r.protected_owners.len() == PROTECTED.len(),
+        "incomplete accepted live roster"
     );
-    ensure!(
-        r.protected250
-            .get("MainPID")
-            .context("protected PID")?
-            .parse::<u32>()?
-            > 0
-            && r.protected250
-                .get("InvocationID")
-                .is_some_and(|s| s.len() == 32),
-        "protected250 identity"
-    );
-    for key in [
-        "ControlGroup",
-        "ExecStart",
-        "FragmentPath",
-        "DropInPaths",
-        "NRestarts",
-        "LoadState",
-    ] {
+    for (name, iid) in PROTECTED {
+        let row = r
+            .protected_owners
+            .get(name)
+            .context("missing protected owner")?;
         ensure!(
-            r.protected250.contains_key(key),
-            "protected property missing {key}"
+            row.get("Id").map(String::as_str) == Some(name)
+                && row.get("InvocationID").map(String::as_str) == Some(iid)
+                && row.get("ActiveState").map(String::as_str) == Some("active")
+                && row.get("SubState").map(String::as_str) == Some("running")
+                && row.get("NRestarts").map(String::as_str) == Some("0")
+                && row.get("MainPID").context("PID")?.parse::<u32>()? > 0
+                && [
+                    "ExecStart",
+                    "MemoryMax",
+                    "ControlGroup",
+                    "DropInPaths",
+                    "FragmentPath"
+                ]
+                .iter()
+                .all(|k| row.contains_key(*k)),
+            "protected owner identity"
         );
     }
     let mut units = BTreeSet::new();
@@ -342,7 +374,7 @@ fn validate_plan(p: &Plan, r: &Review, q: &Profile) -> Result<()> {
             u.unit.ends_with(".service")
                 && !u.unit.contains('/')
                 && units.insert(&u.unit)
-                && u.unit != PROTECTED,
+                && !PROTECTED.iter().any(|(n, _)| *n == u.unit),
             "closed unit selection"
         );
         for (key, want) in [
@@ -374,6 +406,21 @@ fn validate_plan(p: &Plan, r: &Review, q: &Profile) -> Result<()> {
         ensure!(
             u.properties["TriggeredBy"].is_empty(),
             "closed unit retains triggers"
+        );
+    }
+    for name in CLOSED {
+        let row = r
+            .closed_units
+            .iter()
+            .find(|u| u.unit == name)
+            .context("missing original/import reader")?;
+        ensure!(
+            row.properties.get("LoadState").map(String::as_str) == Some("masked")
+                && row
+                    .properties
+                    .get("ExecStart")
+                    .is_some_and(String::is_empty),
+            "reader still launchable"
         );
     }
     for required in [&q.owner_unit, &q.preserved_owner_unit] {
@@ -511,6 +558,14 @@ fn original(e: &OriginalEvidence) -> Result<Value> {
     Ok(serde_json::from_slice(&raw)?)
 }
 fn original_owner(q: &Profile, retained: bool) -> Result<Value> {
+    if !retained
+        && matches!(
+            q.selection.as_str(),
+            "tail-1743245a-v3" | "singleton-223-postcount"
+        )
+    {
+        return closed_owners::owner(q);
+    }
     let (e, unit, iid, plan) = if retained {
         (
             &q.preserved_owner_receipt,
@@ -577,6 +632,7 @@ fn original_owner(q: &Profile, retained: bool) -> Result<Value> {
     )
 }
 fn archive_protection(q: &Profile) -> Result<Value> {
+    closed_owners::archive_custody()?;
     for item in &q.protected_archives {
         exact(&item.path, &item.identity)?;
     }
@@ -848,15 +904,37 @@ fn compare(actual: &BTreeMap<String, String>, expected: &BTreeMap<String, String
     Ok(())
 }
 fn manager_closure(r: &Review) -> Result<Value> {
-    let live = show(PROTECTED)?;
-    compare(&live, &r.protected250)?;
+    let mut live = BTreeMap::new();
+    for (name, _) in PROTECTED {
+        let actual = show(name)?;
+        compare(&actual, &r.protected_owners[name])?;
+        live.insert(name, actual);
+    }
     let mut closed = BTreeMap::new();
     for unit in &r.closed_units {
         let m = show(&unit.unit)?;
         compare(&m, &unit.properties)?;
+        ensure!(
+            !Path::new("/sys/fs/cgroup/system.slice")
+                .join(&unit.unit)
+                .exists(),
+            "closed reader cgroup"
+        );
+        if CLOSED.contains(&unit.unit.as_str()) {
+            verify_empty_commands(
+                &unit.unit,
+                &[
+                    "ExecStart",
+                    "ExecStartPre",
+                    "ExecStartPost",
+                    "ExecStop",
+                    "ExecStopPost",
+                ],
+            )?;
+        }
         closed.insert(unit.unit.clone(), m);
     }
-    Ok(json!({"protected250":live,"closed":closed}))
+    Ok(json!({"protected_owners":live,"closed":closed}))
 }
 fn controller(mode: &str, q: &Profile, b: &Value, args: &[String]) -> Result<(String, PathBuf)> {
     let unit = format!(
@@ -1139,6 +1217,7 @@ fn scan_staged(
 }
 fn staged_closure(q: &Profile, own: &Path) -> Result<Value> {
     let mut roots: Vec<PathBuf> = [
+        "/home/ubuntu/.jetstreamer-private/systemd-staging",
         "/etc/systemd/system",
         "/run/systemd/system",
         "/run/systemd/transient",
@@ -1201,8 +1280,26 @@ fn all_process_closure(q: &Profile) -> Result<Value> {
     Ok(json!({"original":process_closure(q)?,"retained":process_closure(&retained_scope(q)?)?}))
 }
 fn all_staged_closure(q: &Profile, own: &Path) -> Result<Value> {
+    let reader = Path::new(IMAGE).with_file_name("readers.py");
+    file_bytes(&reader, &sha(include_bytes!("readers.py")), 0, None, true)?;
+    let output = Command::new("/usr/bin/timeout")
+        .args(["45", "/usr/bin/python3", "-I", "-B"])
+        .arg(reader)
+        .arg("--verify-closed")
+        .arg(own)
+        .output()?;
+    ensure!(
+        output.status.success() && output.stdout.len() < 65536,
+        "current staged/indirect reader closure failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let indirect: Value = serde_json::from_slice(&output.stdout)?;
+    ensure!(
+        indirect["all_readers_closed"] == true,
+        "reader closure missing"
+    );
     Ok(
-        json!({"original":staged_closure(q,own)?,"retained":staged_closure(&retained_scope(q)?,own)?}),
+        json!({"original":staged_closure(q,own)?,"retained":staged_closure(&retained_scope(q)?,own)?,"indirect":indirect}),
     )
 }
 fn siblings(q: &Profile) -> Result<BTreeMap<String, Stamp>> {
@@ -1354,6 +1451,13 @@ fn run() -> Result<()> {
         sha256: a[3].clone(),
     };
     let p: Plan = serde_json::from_value(bound(&plan_ref)?)?;
+    ensure!(
+        matches!(
+            p.selection.as_str(),
+            "tail-1743245a-v3" | "singleton-223-postcount"
+        ),
+        "only the two newly closed original profiles are supported in v4"
+    );
     let q = profile(&p.selection)?;
     let review: Review = serde_json::from_value(bound(&p.main_review)?)?;
     validate_plan(&p, &review, &q)?;
