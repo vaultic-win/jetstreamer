@@ -60,6 +60,57 @@ impl RequestBudget {
         }
     }
 
+    async fn open_range<'a>(
+        &'a self,
+        client: &Client,
+        url: &Url,
+        range: &str,
+        etag: Option<&str>,
+        attempt: u32,
+    ) -> io::Result<Option<(reqwest::Response, SemaphorePermit<'a>)>> {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
+        }
+        let permit = self.acquire().await;
+        let mut request = client
+            .get(url.clone())
+            .header(header::ACCEPT_ENCODING, "identity")
+            .header(header::RANGE, range)
+            .timeout(Duration::from_secs(180));
+        if let Some(tag) = etag {
+            request = request.header(header::IF_MATCH, tag);
+        }
+        let response = request.send().await;
+        let response = match response {
+            Err(_) if attempt < 2 => return Ok(None),
+            Err(error) => {
+                return Err(io::Error::other(format!(
+                    "public archive transport: {error}"
+                )));
+            }
+            Ok(response)
+                if response.status() == StatusCode::TOO_MANY_REQUESTS
+                    || (response.status() == StatusCode::SERVICE_UNAVAILABLE
+                        && response.headers().contains_key(header::RETRY_AFTER)) =>
+            {
+                self.defer(response.headers().get(header::RETRY_AFTER), attempt)?;
+                if attempt == 2 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::WouldBlock,
+                        format!(
+                            "public archive temporarily unavailable: {} at {range}",
+                            response.status()
+                        ),
+                    ));
+                }
+                return Ok(None);
+            }
+            Ok(response) if attempt < 2 && response.status().is_server_error() => return Ok(None),
+            Ok(response) => response,
+        };
+        Ok(Some((response, permit)))
+    }
+
     fn defer(&self, retry_after: Option<&header::HeaderValue>, attempt: u32) -> io::Result<()> {
         let delay = if let Some(value) = retry_after {
             let text = value.to_str().map_err(io::Error::other)?;
@@ -89,6 +140,121 @@ impl RequestBudget {
 
 fn read_ahead(workers: usize) -> usize {
     (TOTAL_READ_AHEAD / workers.max(1)).clamp(1, MAX_READ)
+}
+
+/// A public strong validator observed once while loading the ordinary epoch layout.
+/// It permits resuming interrupted rseek reads against the same representation.
+pub(super) struct HttpRecovery {
+    object: Object,
+    url: Url,
+    client: Client,
+    budget: RequestBudget,
+}
+
+impl HttpRecovery {
+    pub(super) async fn discover(
+        client: &Client,
+        base: &Url,
+        epoch: u64,
+    ) -> io::Result<Option<Arc<Self>>> {
+        let key = format!("epoch-{epoch}.jet");
+        let url = base.join(&key).map_err(io::Error::other)?;
+        let budget = RequestBudget::new();
+        let mut attempt = 0;
+        let response = loop {
+            if let Some((response, _permit)) = budget
+                .open_range(client, &url, "bytes=0-0", None, attempt)
+                .await?
+            {
+                break response.error_for_status().map_err(io::Error::other)?;
+            }
+            attempt += 1;
+        };
+        let Some(etag) = response
+            .headers()
+            .get(header::ETAG)
+            .and_then(|h| h.to_str().ok())
+            .filter(|tag| strong_etag(tag))
+        else {
+            // Legacy sources without a validator retain the uninterrupted rseek path.
+            return Ok(None);
+        };
+        let bytes = response
+            .headers()
+            .get(header::CONTENT_RANGE)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.strip_prefix("bytes 0-0/"))
+            .and_then(|s| s.parse::<u64>().ok())
+            .filter(|n| *n > 0);
+        let bytes = bytes
+            .filter(|_| response.status() == StatusCode::PARTIAL_CONTENT)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid public archive identity probe",
+                )
+            })?;
+        log::debug!(target: "jetstreamer_horizon_range", "horizon_http_identity epoch={epoch} bytes={bytes} etag={etag}");
+        Ok(Some(Arc::new(Self {
+            object: Object {
+                epoch,
+                key,
+                etag: etag.to_owned(),
+                bytes,
+            },
+            url: response.url().clone(),
+            client: client.clone(),
+            budget,
+        })))
+    }
+
+    pub(super) fn request(&self) -> reqwest::RequestBuilder {
+        self.client
+            .get(self.url.clone())
+            .header(header::IF_MATCH, &self.object.etag)
+            .header(header::ACCEPT_ENCODING, "identity")
+    }
+
+    pub(super) fn len(&self) -> u64 {
+        self.object.bytes
+    }
+
+    pub(super) async fn resume(&self, mut offset: u64, remaining: &mut [u8]) -> io::Result<()> {
+        if offset
+            .checked_add(remaining.len() as u64)
+            .is_none_or(|end| end > self.len())
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "resume exceeds original archive",
+            ));
+        }
+        log::warn!(target: "jetstreamer_horizon_range",
+            "resuming epoch {} at byte {offset} ({} unread bytes in this range)", self.object.epoch, remaining.len());
+        for part in remaining.chunks_mut(MAX_READ) {
+            Reader::fetch(
+                &self.budget,
+                &self.client,
+                &self.url,
+                &self.object,
+                offset,
+                part,
+            )
+            .await?;
+            offset += part.len() as u64;
+        }
+        Ok(())
+    }
+}
+
+fn strong_etag(tag: &str) -> bool {
+    let bytes = tag.as_bytes();
+    bytes.len() >= 3
+        && bytes.first() == Some(&b'"')
+        && bytes.last() == Some(&b'"')
+        && bytes[1..bytes.len() - 1]
+            .iter()
+            .all(|b| b.is_ascii_graphic() && *b != b'"')
 }
 
 /// The immutable public origin and canonical archive identities of one audit.
@@ -128,15 +294,9 @@ impl PinnedArchives {
         let manifest: Manifest = serde_json::from_reader(file)?;
         let mut objects = BTreeMap::new();
         for object in manifest.objects {
-            let etag = object.etag.as_bytes();
             if object.key != format!("epoch-{}.jet", object.epoch)
                 || object.bytes == 0
-                || etag.len() < 3
-                || etag.first() != Some(&b'"')
-                || etag.last() != Some(&b'"')
-                || !etag[1..etag.len() - 1]
-                    .iter()
-                    .all(|b| b.is_ascii_graphic() && *b != b'"')
+                || !strong_etag(&object.etag)
                 || objects.insert(object.epoch, object).is_some()
             {
                 return Err(io::Error::other("invalid or duplicate archive identity"));
@@ -224,44 +384,11 @@ impl Reader {
         let range = format!("bytes={start}-{end}");
         let expected = format!("bytes {start}-{end}/{}", object.bytes);
         for attempt in 0..3 {
-            if attempt > 0 {
-                tokio::time::sleep(Duration::from_secs(1 << attempt)).await;
-            }
-            let _permit = budget.acquire().await;
-            let response = client
-                .get(url.clone())
-                .header(header::IF_MATCH, &object.etag)
-                .header(header::ACCEPT_ENCODING, "identity")
-                .header(header::RANGE, &range)
-                .timeout(Duration::from_secs(180))
-                .send()
-                .await;
-            let mut response = match response {
-                Err(_) if attempt < 2 => continue,
-                Err(error) => {
-                    return Err(io::Error::other(format!(
-                        "public archive transport: {error}"
-                    )));
-                }
-                Ok(response)
-                    if response.status() == StatusCode::TOO_MANY_REQUESTS
-                        || (response.status() == StatusCode::SERVICE_UNAVAILABLE
-                            && response.headers().contains_key(header::RETRY_AFTER)) =>
-                {
-                    budget.defer(response.headers().get(header::RETRY_AFTER), attempt)?;
-                    if attempt == 2 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::WouldBlock,
-                            format!(
-                                "public archive temporarily unavailable: {} at {range}",
-                                response.status()
-                            ),
-                        ));
-                    }
-                    continue;
-                }
-                Ok(response) if attempt < 2 && response.status().is_server_error() => continue,
-                Ok(response) => response,
+            let Some((mut response, _permit)) = budget
+                .open_range(client, url, &range, Some(&object.etag), attempt)
+                .await?
+            else {
+                continue;
             };
             let headers = response.headers();
             if response.url() != url

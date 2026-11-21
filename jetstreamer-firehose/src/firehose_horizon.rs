@@ -201,7 +201,8 @@ where
         pins.set_worker_count(threads);
     }
     let client = horizon_client(&src)?;
-    let layout = load_layout(&src, epoch, &client).await?;
+    let observed = HttpIdentities::default();
+    let layout = load_layout(&src, epoch, &client, &observed).await?;
     if layout.index.is_empty() || slot_range.is_empty() {
         return Ok((0..threads).map(&make_visitor).collect());
     }
@@ -246,11 +247,12 @@ where
     let ranges = generate_subranges(&slots, threads as u64);
     let client = horizon_client(&src)?;
     let cache = Mutex::new(HashMap::<u64, Weak<OnceCell<EpochLayout>>>::new());
+    let observed = HttpIdentities::default();
     let tasks = ranges.into_iter().enumerate().map(|(id, range)| {
         log::debug!(target: "jetstreamer_horizon_range",
             "horizon_worker id={id} first_slot={} end_slot_exclusive={}", range.start, range.end);
         let mut visitor = make_visitor(id);
-        let (src, client, cache) = (&src, &client, &cache);
+        let (src, client, cache, observed) = (&src, &client, &cache, &observed);
         async move {
             let mut start = range.start;
             while start < range.end {
@@ -273,7 +275,7 @@ where
                     }
                 };
                 let layout = cell
-                    .get_or_try_init(|| load_layout(src, epoch, client))
+                    .get_or_try_init(|| load_layout(src, epoch, client, observed))
                     .await?;
                 let header_end = layout
                     .header
@@ -312,6 +314,7 @@ fn horizon_client(src: &JetSource) -> Result<Client, HorizonFirehoseError> {
 }
 
 struct EpochLayout {
+    http_recovery: Option<Arc<pinned::HttpRecovery>>,
     header: FileHeader,
     index: Arc<[BucketIndexEntry]>,
 }
@@ -324,12 +327,26 @@ impl EpochLayout {
     }
 }
 
+// Layouts are evicted between visitors. Keep the much smaller per-epoch
+// validator through the invocation so later visitors cannot join a new object.
+type HttpIdentity = Arc<OnceCell<Option<Arc<pinned::HttpRecovery>>>>;
+type HttpIdentities = Mutex<HashMap<u64, HttpIdentity>>;
+
 async fn load_layout(
     src: &JetSource,
     epoch: u64,
     client: &Client,
+    identities: &HttpIdentities,
 ) -> Result<EpochLayout, HorizonFirehoseError> {
-    let mut probe = open_jet_stream(src, epoch, client, None).await?;
+    let http_recovery = if let JetSource::HttpBase(base) = src {
+        let cell = identities.lock().await.entry(epoch).or_default().clone();
+        cell.get_or_try_init(|| pinned::HttpRecovery::discover(client, base, epoch))
+            .await?
+            .clone()
+    } else {
+        None
+    };
+    let mut probe = open_jet_stream(src, epoch, client, None, http_recovery.clone()).await?;
     let total_len = probe.len();
     if total_len < FOOTER_LEN as u64 {
         return Err(HorizonFirehoseError::Truncated);
@@ -357,7 +374,11 @@ async fn load_layout(
     if let RangeReader::Pinned(reader) = &probe {
         reader.log_verified_layout();
     }
-    Ok(EpochLayout { header, index })
+    Ok(EpochLayout {
+        header,
+        index,
+        http_recovery,
+    })
 }
 
 async fn stream_chunk<V: SlotVisitor + Send + 'static>(
@@ -419,7 +440,8 @@ async fn stream_chunk<V: SlotVisitor + Send + 'static>(
         let first = index[chunk.start];
         let last = index[chunk.end - 1];
         let span = first.offset..last.offset + last.len;
-        let mut s = open_jet_stream(src, epoch, client, Some(span)).await?;
+        let mut s =
+            open_jet_stream(src, epoch, client, Some(span), layout.http_recovery.clone()).await?;
         for b in chunk {
             let e = index[b];
             let mut buf = if compact {
@@ -546,6 +568,7 @@ async fn open_jet_stream(
     epoch: u64,
     client: &Client,
     worker_span: Option<Range<u64>>,
+    recovery: Option<Arc<pinned::HttpRecovery>>,
 ) -> Result<RangeReader, HorizonFirehoseError> {
     let stream = match src {
         JetSource::HttpPinned(inventory) => {
@@ -576,15 +599,30 @@ async fn open_jet_stream(
             let url = base
                 .join(&format!("epoch-{epoch}.jet"))
                 .map_err(|e| HorizonFirehoseError::Url(e.to_string()))?;
-            let req_url = url.to_string();
-            let c = client.clone();
-            let seekable = Seekable::new(move || c.get(req_url.clone())).await;
+            let client = client.clone();
+            let observed = recovery.clone();
+            let mut seekable = Seekable::new(move || match &observed {
+                Some(identity) => identity.request(),
+                None => client.get(url.clone()),
+            })
+            .await;
+            if let Some(identity) = &recovery {
+                if seekable.file_size.is_some_and(|len| len != identity.len()) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "ordinary archive length changed",
+                    )
+                    .into());
+                }
+                seekable.file_size = Some(identity.len());
+            }
             EpochStream::new(BufReader::with_capacity(1 << 20, seekable))
         }
     };
     Ok(RangeReader::Seekable {
         stream,
         position: 0,
+        recovery,
     })
 }
 
@@ -610,7 +648,11 @@ impl RawBucket {
 }
 
 enum RangeReader {
-    Seekable { stream: EpochStream, position: u64 },
+    Seekable {
+        stream: EpochStream,
+        position: u64,
+        recovery: Option<Arc<pinned::HttpRecovery>>,
+    },
     Pinned(pinned::Reader),
 }
 impl RangeReader {
@@ -637,17 +679,64 @@ async fn read_range_into(
     try_resize_read_buffer(buf, len)?;
     match stream {
         RangeReader::Pinned(reader) => reader.read_at(offset, buf).await?,
-        RangeReader::Seekable { stream, position } => {
+        RangeReader::Seekable {
+            stream,
+            position,
+            recovery,
+        } => {
             if *position != offset {
                 stream.seek(io::SeekFrom::Start(offset)).await?;
             }
-            stream.read_exact(buf).await?;
-            *position = offset
+            let end = offset
                 .checked_add(len as u64)
                 .ok_or_else(|| io::Error::other("range overflow"))?;
+            if let Some(identity) = recovery {
+                let mut filled = 0;
+                while filled < len {
+                    match stream.read(&mut buf[filled..]).await {
+                        Ok(0) => break,
+                        Ok(n) => filled += n,
+                        Err(e) if resumable_http_error(&e) => break,
+                        Err(e) => return Err(e),
+                    }
+                }
+                if filled < len {
+                    // The decoder receives a bucket only after read_range_into succeeds.
+                    // BufReader can read ahead, so resume at bytes delivered to this
+                    // buffer, then reset rseek's buffered position for the next bucket.
+                    identity
+                        .resume(offset + filled as u64, &mut buf[filled..])
+                        .await?;
+                    stream.seek(io::SeekFrom::Start(end)).await?;
+                }
+            } else {
+                stream.read_exact(buf).await?;
+            }
+            *position = end;
         }
     }
     Ok(())
+}
+
+fn resumable_http_error(e: &io::Error) -> bool {
+    if let Some(http) = e
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<reqwest::Error>())
+    {
+        return http.status().map_or_else(
+            || http.is_connect() || http.is_timeout() || http.is_body() || http.is_decode(),
+            |code| matches!(code.as_u16(), 408 | 429 | 500 | 502 | 503 | 504),
+        );
+    }
+    // rseek 0.4.1 erases the reqwest body error to io::ErrorKind::Other.
+    matches!(
+        e.kind(),
+        io::ErrorKind::Other
+            | io::ErrorKind::UnexpectedEof
+            | io::ErrorKind::TimedOut
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+    )
 }
 
 fn try_resize_read_buffer(buf: &mut Vec<u8>, len: usize) -> io::Result<()> {
@@ -762,6 +851,87 @@ mod tests {
                 BlockNotification::Skipped(_) => self.skipped += 1,
                 BlockNotification::Block(_) => self.blocks += 1,
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn ordinary_http_reconnects_at_the_first_undelivered_byte() {
+        use std::time::Duration;
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        const BODY: &[u8] = b"0123456789abcdefghijklmnopqrstuv";
+        for wrong_etag in [false, true] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let base: Url = format!("http://{}/", listener.local_addr().unwrap())
+                .parse()
+                .unwrap();
+            let server = tokio::spawn(async move {
+                let steps = [(0, 0), (0, 0), (0, 31), (6, 13), (14, 31)];
+                let count = if wrong_etag { 4 } else { steps.len() };
+                for (i, &(start, end)) in steps[..count].iter().enumerate() {
+                    let (mut stream, _) = listener.accept().await.unwrap();
+                    let mut lines = BufReader::new(&mut stream).lines();
+                    assert_eq!(
+                        lines.next_line().await.unwrap().unwrap(),
+                        "GET /epoch-5.jet HTTP/1.1"
+                    );
+                    let mut range = None;
+                    let mut condition = None;
+                    while let Some(line) = lines.next_line().await.unwrap() {
+                        if line.is_empty() {
+                            break;
+                        }
+                        let (k, v) = line.split_once(": ").unwrap();
+                        if k.eq_ignore_ascii_case("range") {
+                            range = Some(v.to_owned());
+                        }
+                        if k.eq_ignore_ascii_case("if-match") {
+                            condition = Some(v.to_owned());
+                        }
+                    }
+                    assert_eq!(range, Some(format!("bytes={start}-{end}")));
+                    assert_eq!(condition.as_deref(), (i != 0).then_some("\"original\""));
+                    let tag = if i == 3 && wrong_etag {
+                        "changed"
+                    } else {
+                        "original"
+                    };
+                    let head = format!(
+                        "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nContent-Range: bytes {start}-{end}/32\r\nETag: \"{tag}\"\r\nConnection: close\r\n\r\n",
+                        end - start + 1
+                    );
+                    stream.write_all(head.as_bytes()).await.unwrap();
+                    let sent_end = if i == 2 { 6 } else { end + 1 };
+                    stream.write_all(&BODY[start..sent_end]).await.unwrap();
+                    stream.flush().await.unwrap();
+                    if i == 2 {
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                    stream.shutdown().await.unwrap();
+                }
+            });
+            let client = Client::builder().no_proxy().build().unwrap();
+            tokio::time::timeout(Duration::from_secs(8), async {
+                let identity = pinned::HttpRecovery::discover(&client, &base, 5)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let mut stream =
+                    open_jet_stream(&JetSource::HttpBase(base), 5, &client, None, Some(identity))
+                        .await
+                        .unwrap();
+                let first = read_range(&mut stream, 0, 14).await;
+                if wrong_etag {
+                    assert!(first.unwrap_err().to_string().contains("identity mismatch"));
+                } else {
+                    assert_eq!(first.unwrap(), BODY[..14]);
+                    assert_eq!(read_range(&mut stream, 14, 18).await.unwrap(), BODY[14..]);
+                }
+                server.await.unwrap();
+            })
+            .await
+            .expect("bounded ordinary HTTP fixture");
         }
     }
 
