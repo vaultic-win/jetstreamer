@@ -33,7 +33,7 @@ pub(in crate::fleet) fn predecessor(
         .as_ref()
         .context("native bootstrap event binding")?;
     let o = owner(p)?.context("native bootstrap event needs registered ownership")?;
-    let running = event["schema"] == c::SCHEMA;
+    let running = event["schema"] == c::SCHEMA || EPOCH==266 && event["schema"]==native266_recovery::SCHEMA;
     let start = if running {
         ensure!(
             o.evidence.first() == Some(b),
@@ -67,7 +67,9 @@ pub(in crate::fleet) fn predecessor(
         "native bootstrap event substituted resource observer or prior fleet"
     );
     let old = prior(previous)?;
-    if running {
+    let direct = EPOCH==266 && !running && owner(&old)?.is_none() && sealed(&o.evidence[0])?["schema"] == native266_recovery::SCHEMA;
+    if direct { ensure!(event["running_origin"]==private157::binding(&o.evidence[0]) && event["sampled_at_utc"]==sampled,"different directly recovered terminal"); }
+    if running || direct {
         ensure!(
             owner(&old)?.is_none()
                 && p.pipeline_claims.len() == old.pipeline_claims.len() + 1
@@ -97,7 +99,7 @@ pub(in crate::fleet) fn predecessor(
         );
     }
     let mut expected = old.tracked_units.iter().cloned().collect::<BTreeSet<_>>();
-    if running {
+    if running || direct {
         expected.insert(c::UNIT.to_owned());
     }
     ensure!(
@@ -138,7 +140,8 @@ pub(in crate::fleet) fn predecessor(
             ensure!(
                 n.evidence.contains(b)
                     && g.evidence.iter().all(|v| n.evidence.contains(v))
-                    && n.evidence.iter().all(|v| v == b || g.evidence.contains(v))
+                    && n.evidence.iter().all(|v| v == b || g.evidence.contains(v) || direct && v==&o.evidence[0])
+                    && (!direct || n.evidence.contains(&o.evidence[0]))
                     && (if running {
                         matches!(
                             g.state.as_str(),
@@ -148,7 +151,7 @@ pub(in crate::fleet) fn predecessor(
                                 | "failed-needs-repair"
                         ) && n.state == "blocked-qualification"
                     } else {
-                        g.state == "blocked-qualification"
+                        (g.state == "blocked-qualification" || direct && matches!(g.state.as_str(),"not-yet-staged"|"staged-admissible"|"failed-needs-repair"))
                             && n.state
                                 == if event["native_input_qualified"] == true {
                                     "blocked-qualification"
@@ -298,7 +301,9 @@ pub(in crate::fleet) fn census_check(
     let event = p.metadata_event.as_ref().map(bound_json).transpose()?;
     let origin = sealed(&owner.evidence[0])?;
     let initial = p.metadata_event.as_ref() == owner.evidence.first();
-    if !initial {
+    let direct = EPOCH==266 && self::owner(&prior(previous)?)?.is_none() && origin["schema"] == native266_recovery::SCHEMA
+        && event.as_ref().is_some_and(|e|e["schema"]==terminal::SCHEMA && e["running_origin"]==private157::binding(&owner.evidence[0]));
+    if !initial && !direct {
         ensure!(
             self::owner(&prior(previous)?)? == Some(owner),
             "native bootstrap previous fleet changed ownership"
@@ -325,7 +330,9 @@ pub(in crate::fleet) fn census_check(
                 == private157::binding(predecessor),
             "native bootstrap predecessor mismatch"
         );
-        native265_capture::peers(previous, current, c::UNIT)?;
+        if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA {
+            native266_recovery::peers(previous,current,c::UNIT)?;
+        } else { native265_capture::peers(previous, current, c::UNIT)?; }
     }
     if active {
         ensure!(
