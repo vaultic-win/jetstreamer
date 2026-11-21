@@ -16,10 +16,9 @@ pub(super) fn publish(
 ) -> Result<()> {
     let (bootstrap_slot, checkpoint_slot, slot) = match epoch {
         168 => (72_575_704, 73_007_829, 73_007_999),
-        166 | 167 | 170 => {
-            let shift = (epoch - 166) * 432_000;
-            (71_711_708 + shift, 72_143_703 + shift, 72_143_999 + shift)
-        }
+        166 => (71_711_708, 72_143_703, 72_143_999),
+        167 => (72_143_703, 72_575_704, 72_575_999),
+        170 => (73_439_777, 73_871_796, 73_871_999),
         _ => anyhow::bail!("unsupported native fixture"),
     };
     let private = |path: &Path| {

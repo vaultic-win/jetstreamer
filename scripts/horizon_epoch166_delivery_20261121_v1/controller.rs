@@ -16,7 +16,15 @@ use std::{
 };
 
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-#[cfg(not(any(feature = "retry10", feature = "metered168")))]
+#[cfg(any(feature = "source167", feature = "retry170"))]
+mod peer_profile;
+
+#[cfg(not(any(
+    feature = "retry10",
+    feature = "metered168",
+    feature = "source167",
+    feature = "retry170"
+)))]
 mod deployment {
     pub(super) const DELIVERY: &str = "epoch166-committed-delivery-20261121-v1";
     pub(super) const WITNESS: &str = "epoch166-terminal-20261121-v1";
@@ -75,9 +83,22 @@ mod deployment {
     pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
 }
 
+#[cfg(any(feature = "source167", feature = "retry170"))]
+mod deployment {
+    pub(super) use super::peer_profile::{DELIVERY, GENERATION, LIVE, ORIGIN, UNIT};
+    pub(super) const WITNESS: &str = DELIVERY;
+    pub(super) const FLEET_FIELD: &str = super::peer_profile::controller::FIELD;
+    pub(super) const FIT_PATH: &str = super::peer_profile::controller::FIT;
+    pub(super) const RECEIVER_PATH: &str = super::peer_profile::controller::RECEIVER;
+    pub(super) const RECEIVER: &str = env!("HORIZON_HELD_RECEIVER_SHA256");
+    pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
+    pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
+}
+#[cfg(any(feature = "source167", feature = "retry170"))]
+use peer_profile::EPOCH;
 #[cfg(feature = "metered168")]
 const EPOCH: u64 = 168;
-#[cfg(not(feature = "metered168"))]
+#[cfg(not(any(feature = "metered168", feature = "source167", feature = "retry170")))]
 const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
@@ -175,6 +196,11 @@ fn put(path: &Path, doc: &Value) -> Result<Value> {
     Ok(binding(path, &sha(&bytes)))
 }
 fn validate_terminal(live: &Value, live_ref: &Value, t: &Value, boot: &str) -> Result<()> {
+    #[cfg(any(feature = "source167", feature = "retry170"))]
+    ensure!(
+        live["schema"] == peer_profile::LIVE_SCHEMA,
+        "wrong singleton live schema"
+    );
     let event = &t["manager_terminal"];
     ensure!(
         live["epoch"] == EPOCH
@@ -344,6 +370,21 @@ fn main() -> Result<()> {
         1 << 20,
     )?;
     validate_terminal(&live, &live_ref, &terminal, boot)?;
+    #[cfg(any(feature = "source167", feature = "retry170"))]
+    {
+        let tool = rt
+            .join(WITNESS)
+            .join("terminal-tools")
+            .join(peer_profile::controller::TERMINAL);
+        program(&tool, peer_profile::controller::TERMINAL_SHA)?;
+        let inspected = Command::new(&tool).arg("inspect").output()?;
+        ensure!(
+            inspected.status.success()
+                && inspected.stdout.len() <= 1 << 20
+                && serde_json::from_slice::<Value>(&inspected.stdout)? == terminal,
+            "original terminal inspector differs"
+        );
+    }
     let output = source(&live, &terminal)?;
     let fleet_path = Path::new(fleet_path);
     ensure!(
@@ -395,6 +436,8 @@ fn main() -> Result<()> {
     dispatch.arg("-IB").arg(receiver);
     #[cfg(feature = "metered168")]
     dispatch.arg("--metered168");
+    #[cfg(any(feature = "source167", feature = "retry170"))]
+    dispatch.arg(peer_profile::controller::FLAG);
     Err(dispatch
         .arg(native)
         .arg(NATIVE)
@@ -418,6 +461,12 @@ mod tests {
         let (terminal, term_ref) = read_json(&auth.join("TERMINAL_SUCCESS.json"), 0o400, 1 << 20)?;
         let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         validate_terminal(&live, &live_ref, &terminal, boot.trim())?;
+        #[cfg(any(feature = "source167", feature = "retry170"))]
+        {
+            let mut changed = live.clone();
+            changed["schema"] = json!(format!("horizon-{EPOCH}-live-to-terminal-witness-v1"));
+            assert!(validate_terminal(&changed, &live_ref, &terminal, boot.trim()).is_err());
+        }
         let out = source(&live, &terminal)?;
         for (k, v) in [
             ("transaction_id", json!("")),

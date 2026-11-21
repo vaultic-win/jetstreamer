@@ -18,7 +18,14 @@ r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 retry10 = "--retry10" in sys.argv[5:]
 metered168 = "--metered168" in sys.argv[5:]
-if metered168:
+peer = next((flag for flag in ("--source167", "--retry170") if flag in sys.argv[5:]), None)
+if peer:
+    sys.argv.remove(peer)
+    number = 167 if peer == "--source167" else 170
+    live_root, original_sha, _, producer = r.PEERS[number]
+    publication_unit = ("horizon-publish-167-source-index-committed.service" if number == 167
+                        else "horizon-publish-170-retry10-committed.service")
+elif metered168:
     sys.argv.remove("--metered168")
     live_root, original_sha, producer = r.METERED_ROOT, r.METERED_LIVE, r.METERED
     publication_unit = "horizon-publish-168-metered-committed.service"
@@ -53,7 +60,7 @@ epoch = producer.epoch
 real_fingerprint = live["manifest_fingerprint"].split(":")[1]
 terminal_hash = "0297738fbe936f2a420f581164a059a3212707b53c02218279601c14501b7723"
 fixture_cmd = ["fixture"]
-if metered168:
+if metered168 or peer:
     fixture_cmd = ["fixture-epoch", str(epoch)]
     witness = live["independent_boundary"]
     data = Path(witness["path"]).read_bytes()
@@ -119,11 +126,29 @@ wrong=copy.deepcopy(terminal);wrong["committed_receipt"]["sha256"]="ff"*32
 put(term_path,wrong,0o400);denied("wrong-receipt-digest",run,"terminal archive, sidecar or receipt changed")
 wrong=copy.deepcopy(terminal);wrong["producer_invocation_id"]="ff"*16
 put(term_path,wrong,0o400);denied("wrong-producer",run,"terminal authority or original producer differs")
-if retry10 or metered168:
+if retry10 or metered168 or peer:
     wrong=copy.deepcopy(terminal)
     wrong.update(producer_invocation_id=r.ORIGINAL.invocation_id, producer_unit=r.ORIGINAL.unit)
     wrong["manager_terminal"].update(INVOCATION_ID=r.ORIGINAL.invocation_id,UNIT=r.ORIGINAL.unit)
     put(term_path,wrong,0o400);denied("predecessor-producer",run,"terminal authority or original producer differs")
+if peer:
+    other = r.PEERS[170 if epoch == 167 else 167][3]
+    wrong = copy.deepcopy(terminal)
+    wrong.update(producer_unit=other.unit, producer_invocation_id=other.invocation_id)
+    wrong["manager_terminal"].update(UNIT=other.unit, INVOCATION_ID=other.invocation_id)
+    put(term_path, wrong, 0o400)
+    denied("other-peer", run, "terminal authority or original producer differs")
+    # Rebind both hashes so that this check specifically reaches the schema gate.
+    original_live_bytes = live_path.read_bytes()
+    wrong_live = {**live, "schema": f"horizon-{epoch}-live-to-terminal-witness-v1"}
+    put(live_path, wrong_live, 0o600)
+    live_hash = r.sha(live_path.read_bytes())
+    wrong = copy.deepcopy(terminal)
+    wrong["live"]["sha256"] = live_hash
+    put(term_path, wrong, 0o400)
+    denied("old-live-schema", run, "terminal authority or original producer differs")
+    live_path.write_bytes(original_live_bytes)
+    live_hash = r.sha(original_live_bytes)
 put(term_path,terminal,0o400)
 with lock.open("rb") as held:
     fcntl.flock(held, fcntl.LOCK_EX|fcntl.LOCK_NB)
