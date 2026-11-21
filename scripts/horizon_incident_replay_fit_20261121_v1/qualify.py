@@ -82,6 +82,14 @@ def main():
            set(observed["bookings"])=={"166","167","168","170"} and
            observed["available_HOME_bytes"]>=observed["complete_required_HOME_bytes"] and
            observed["available_memory_bytes"]>=observed["required_available_memory_bytes"],"native capacity failed")
+    booking168=observed["bookings"]["168"]
+    guard168=m["bound"](booking168["guard"])
+    s.need(guard168["producer_invocation_id"]==observed["normal168"]["actor"]["producer_invocation_id"] and
+           guard168["root_physical_observation"]["maximum_physical_bytes"]==booking168["cap"],"unbound 168 sample")
+    if booking168["measurement"]=="two complete native whole-tree walks":
+        physical=guard168["root_physical_observation"]
+        s.need(booking168["physical_bytes"]==min(physical[k]["physical_bytes"] for k in ("first","second"))
+               and all(physical[k]["vanished_entries"]==0 for k in ("first","second")),"168 booking/sampled bytes differ")
     floor=m["disk_budget"];raw=observed["original_aggregate_HOME_bytes"];books=observed["bookings"];peer=observed["survivors"];optional=observed["candidate136"]
     for epoch in (145,166,167,168,170):
         required,protected,delta=floor(raw,optional,books,epoch,peer,observed["replacements"],observed["active168_guard_floor"])

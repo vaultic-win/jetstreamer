@@ -462,16 +462,16 @@ def capture_once(epoch,ref):
         books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=effective,physical_bytes=physical,measurement=measurement,
                             remaining_bytes=effective-physical,historical_realized_bytes=hist)
     extra=s.inspect()
-    floor168=0;resident168=0
+    floor168=0;resident168=0;guard168=None
     tree_measurement="two complete stopped-tree walks"
     if extra:
         s.need(extra["ordinary_canonical"] or epoch==168,"foreign pending normal 168")
         a=extra.get("actor")
         if a and extra["stage"]=="gated":
             _,pref=s.read(s.D/"ACTUAL_GUARD_PLAN.json");s.read(s.D/"FIRST_GUARD.json")
-            _,sample=s.receipt(a,pref,False)
+            guard168,sample=s.receipt(a,pref,False)
         elif a:
-            ad=bound(extra["admission"]);_,sample=s.receipt(a,ad["actual_guard_plan"],False)
+            ad=bound(extra["admission"]);guard168,sample=s.receipt(a,ad["actual_guard_plan"],False)
             plan=bound(ad["actual_guard_plan"]);floor168=plan["minimum_free_bytes"]
             ids=[a["producer_pid"]]
             if extra.get("first_worker"):ids.append(bound(extra["first_worker"])["worker_pid"])
@@ -496,6 +496,7 @@ def capture_once(epoch,ref):
     if 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
+    if guard168:books["168"]["guard"]=guard168["receipt"]
     population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
     raw+=extension["extra_bytes"] if extension else 0
