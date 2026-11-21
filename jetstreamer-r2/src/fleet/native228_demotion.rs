@@ -218,12 +218,13 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
             "228 independent fit"
         );
     }
+    let pid_text = pid.to_string();
     ensure!(
         held["producer"]["InvocationID"] == *iid
-            && held["producer"]["MainPID"] == pid.to_string()
+            && held["producer"]["MainPID"].as_str() == Some(pid_text.as_str())
             && launch["producer"]["InvocationID"] == *iid
             && launch["producer"]["ExecStart"] == v["expected_exec_start"]
-            && launch["producer"]["MainPID"] == pid.to_string()
+            && launch["producer"]["MainPID"].as_str() == Some(pid_text.as_str())
             && launch["controller"] == v["controller"]
             && launch["initial_fit"] == admission["initial_fit"],
         "228 held/lifetime tuple"
@@ -267,12 +268,13 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
 pub(super) fn live(c: &PipelineClaim, current: &Value) -> Result<()> {
     claim(c)?;
     let v = native228::immutable_json(&c.evidence[0])?;
+    let pid_text = v["main_pid"].as_u64().context("pid")?.to_string();
     ensure!(
         current["Id"] == UNIT
             && current["InvocationID"] == c.invocation_id
             && current["ActiveState"] == "active"
             && current["SubState"] == "running"
-            && current["MainPID"] == v["main_pid"].as_u64().context("pid")?.to_string()
+            && current["MainPID"].as_str() == Some(pid_text.as_str())
             && current["NRestarts"] == "0"
             && pipeline_status::same_exec_start(
                 &c.expected_exec_start,
@@ -434,36 +436,6 @@ pub(super) fn terminal_owner(u: &Value, iid: &str) -> Result<()> {
     );
     Ok(())
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn selected_worker_cannot_borrow_previous_harness() {
-        assert!(
-            native228::scope("private-cold-snapshot-verification", UNIT)
-                && native228::scope("private-cold-snapshot-verification", native228::UNIT)
-        );
-        assert!(
-            !native228::scope("producer-finalization", UNIT)
-                && !native228::scope(
-                    "private-cold-snapshot-verification",
-                    "horizon-228-anything.service"
-                )
-        );
-        let c = PipelineClaim {
-            epoch: 228,
-            phase: "private-cold-snapshot-verification".into(),
-            unit: UNIT.into(),
-            invocation_id: "a".repeat(32),
-            expected_exec_start: native228::command(),
-            evidence: vec![],
-        };
-        assert!(format_ok(&c, &json!({"schema":native228::SCHEMA})).is_err());
-        assert!(original_dir(Path::new("/tmp/origin.json"), "origin.json").is_err());
-        assert!(terminal(&json!({"schema":native228_terminal::SCHEMA})).is_err());
-    }
-}
-
 /// Keep the entire prior census, including dual-role replay managers. A
 /// separately registered periodic guard may have completed another firing.
 pub(super) fn peers(f: &Value, current: &BTreeMap<String, Value>, c: &PipelineClaim) -> Result<()> {
@@ -600,4 +572,34 @@ pub(super) fn peers(f: &Value, current: &BTreeMap<String, Value>, c: &PipelineCl
         adjusted["unit_census"][&name]["InvocationID"] = next["InvocationID"].clone();
     }
     native265_capture::peers(&adjusted, current, UNIT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn selected_worker_cannot_borrow_previous_harness() {
+        assert!(
+            native228::scope("private-cold-snapshot-verification", UNIT)
+                && native228::scope("private-cold-snapshot-verification", native228::UNIT)
+        );
+        assert!(
+            !native228::scope("producer-finalization", UNIT)
+                && !native228::scope(
+                    "private-cold-snapshot-verification",
+                    "horizon-228-anything.service"
+                )
+        );
+        let c = PipelineClaim {
+            epoch: 228,
+            phase: "private-cold-snapshot-verification".into(),
+            unit: UNIT.into(),
+            invocation_id: "a".repeat(32),
+            expected_exec_start: native228::command(),
+            evidence: vec![],
+        };
+        assert!(format_ok(&c, &json!({"schema":native228::SCHEMA})).is_err());
+        assert!(original_dir(Path::new("/tmp/origin.json"), "origin.json").is_err());
+        assert!(terminal(&json!({"schema":native228_terminal::SCHEMA})).is_err());
+    }
 }
