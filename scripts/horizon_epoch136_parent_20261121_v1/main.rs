@@ -320,6 +320,14 @@ fn shape(full: &Value, payload: &Value, r: &Value, a: &Value, wp: &Value) -> Res
 }
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "inspect-status") {
+        ensure!(
+            args.len() == 3 && unsafe { libc::geteuid() } == 0,
+            "parent136 inspect-status FLEET SHA"
+        );
+        println!("{}", status::inspect_head(&args[1], &args[2])?);
+        return Ok(());
+    }
     if args.first().is_some_and(|a| a == "dispatch") {
         ensure!(
             args.len() == 6 && unsafe { libc::geteuid() } == 0,

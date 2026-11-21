@@ -5,8 +5,9 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
 use std::process::{Command, Stdio};
 
-const BRIDGE_PKG: &str = "/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/observer-package";
-const BRIDGE_SEAL: &str = "412c2d23437cdf3af6c5783f83489767709d5ab970420ade2c44bbc4dbbbe043";
+const BRIDGE_PKG: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/active-delivery-eta-20261121-v1/publisher-v1";
+const BRIDGE_SEAL: &str = "d7bb6adb2390bcc534915cb4e78b0e3743ca5de62f481302dac226207bb44e33";
 pub fn take_lock(path: &Path, create: bool) -> Result<File> {
     let file = OpenOptions::new()
         .read(true)
@@ -41,6 +42,28 @@ fn verify_bridge() -> Result<()> {
             && s["remote_mutations"] == false,
         "status adapter seal"
     );
+    let publisher = "horizon-archive-status-cadence-after172-20261120-v1.service";
+    let unit = native(publisher)?;
+    let pid: i32 = text(&unit["MainPID"])?.parse()?;
+    let lock = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/stable-cadence-controller-20261120-v1/consumer.lock",
+    );
+    ensure!(
+        pid > 0
+            && unit["ActiveState"] == "active"
+            && unit["SubState"] == "running"
+            && unit["NRestarts"] == "0"
+            && unit["Job"] == ""
+            && fs::read_link(proc_path(pid, "fd/255"))? == pkg.join("consume")
+            && same_inode(&proc_path(pid, "fd/255"), &pkg.join("consume"))?
+            && same_inode(&proc_path(pid, "fd/9"), lock)?
+            && fs::read_to_string(proc_path(pid, "fdinfo/9"))?
+                .lines()
+                .any(|line| line.starts_with("lock:")
+                    && line.contains("FLOCK")
+                    && line.contains("WRITE")),
+        "active status publisher does not own this bridge and the cadence lock"
+    );
     for m in s["members"].as_array().context("sealed modules")? {
         let name = text(&m["name"])?;
         if name.ends_with(".py") {
@@ -61,6 +84,10 @@ pub fn check_registration_environment() -> Result<()> {
         "cannot load authenticated status client"
     );
     Ok(())
+}
+pub fn inspect_head(path: &str, digest: &str) -> Result<Value> {
+    verify_bridge()?;
+    bridge("head", &json!({"fleet": {"path": path, "sha256": digest}}))
 }
 fn bridge(op: &str, body: &Value) -> Result<Value> {
     bridge_timeout(op, body, 14)

@@ -17,8 +17,8 @@ parser.add_argument("fleet", type=Path)
 parser.add_argument("digest")
 parser.add_argument("fixture_parent", type=Path)
 a = parser.parse_args()
-pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/public-audit73-observer-20261121-v1/observer-package")
-assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest() == "412c2d23437cdf3af6c5783f83489767709d5ab970420ade2c44bbc4dbbbe043"
+pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/active-delivery-eta-20261121-v1/publisher-v1")
+assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest() == "d7bb6adb2390bcc534915cb4e78b0e3743ca5de62f481302dac226207bb44e33"
 sys.path.insert(0,str(pkg))
 import status
 from cycle import load_fleet
