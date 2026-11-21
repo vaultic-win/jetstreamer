@@ -211,3 +211,20 @@ writer within the 64-core total and leaves 4.75 standard cores reserved.
 The 145 guard computes remaining candidate disk from the protected physical
 root. The sealed helper also requires the original admission free-space
 floor on its post-prefire call.
+
+Run the fixed writer service from the host using the normally sealed controller
+and current fleet bindings.
+
+```sh
+run-writer preflight PLAN PLAN_SHA FLEET FLEET_SHA
+```
+
+This diagnostic runs at the writer's quarter-CPU, 512-MiB, 64-task limits.
+Read systemd's journal for the resulting JSON. For an admitted schedule, first
+have the qualified parent prepare the immutable copies of this fleet and the
+historical download receipt, and have the launch and registration handlers
+ready. Use the same arguments with `session` in the coordinated admission
+window. The writer rechecks the full fit and fences, writes the request, and
+waits for the parent. The registering process enters the writer's mount
+namespace, so that namespace also projects the immutable initial fleet at its
+original path. The worker and its guard retain their own service limits.
