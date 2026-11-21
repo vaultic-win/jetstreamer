@@ -61,6 +61,13 @@ def run(fleet,head,provider,provider_seal):
     mem=int(Path('/proc/meminfo').read_text().splitlines()[0].split()[1])*1024
     gaps=C['price'](fit,mem,os.sysconf('SC_NPROCESSORS_ONLN'))
     need(not any(gaps.values()),'unfunded 199-200 reservation '+json.dumps(gaps,sort_keys=True))
+    protect(fit)
+
+def protect(fit, authorization=None):
+    # Every admitted provider enters the same qualified whole-tree guard.
+    need(os.geteuid()==0 and sys.flags.isolated and __debug__, 'isolated root required')
+    C['check_sources']()
+    need(hashlib.sha256(NATIVE.read_bytes()).hexdigest()==C['GUARD_SHA'],'different native guard')
     iid=os.environ['INVOCATION_ID']
     me=owner(iid)
     need(me['Slice']==AUX,'unbounded reservation service')
@@ -71,6 +78,7 @@ def run(fleet,head,provider,provider_seal):
     need(quota==8*period,'aggregate CPU not exactly eight')
     out=B/('guard-'+iid);out.mkdir(mode=0o700)
     save(out/'FIT.json',fit)
+    if authorization is not None:save(out/'EXCLUSIVE_TRANSITION.json',authorization)
     plan=C['monitor'](iid,fit['complete_required_HOME_bytes'],out)
     path=out/'PLAN.json';save(path,plan)
     counter=0
