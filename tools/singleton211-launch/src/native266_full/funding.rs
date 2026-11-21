@@ -349,6 +349,29 @@ pub(super) fn elect(
     } else {
         floor
     };
+    let transfer = peer266
+        .as_ref()
+        .map(|peer| epoch228_storage::assignment(n, &book, peer))
+        .transpose()?;
+    let floor = if let Some(source) = &transfer {
+        // Both historical bookings include the same complete cold root. Transfer its
+        // scratch allowance once, after joining their floors. Live guard limits and
+        // independent minimum-free reservations are absolute constraints.
+        let mut independent = num(source, "source_floor")?;
+        for row in rows(&ledger, "reservations")? {
+            independent = independent.max(num(row, "minimum_free_bytes")?);
+        }
+        for (u, _, _) in &OWNERS[..2] {
+            let guard = binding(&book["guards"][*u])?.json()?;
+            independent = independent.max(num(&guard, "minimum_free_bytes")?);
+        }
+        floor
+            .checked_sub(num(source, "assigned_scratch_bytes")?)
+            .context("228 transfer underflow")?
+            .max(independent)
+    } else {
+        floor
+    };
     let (total, avail, free) = live::resources_at(Path::new(V))?;
     let free = free.min(num(&firing, "free")?);
     let hard = num(&book, "hard_memory_obligation")?
@@ -385,6 +408,11 @@ pub(super) fn elect(
             epoch228_peer::verify(n, r)? == peer,
             "266 changed across election"
         );
+        ensure!(
+            Some(epoch228_storage::assignment(n, &book, &peer)?) == transfer,
+            "original 228 changed during election"
+        );
+        result["epoch228_scratch_assignment"] = transfer.context("missing 228 reservation")?;
         result["concurrent_266"] = peer;
     }
     result["retained_attempt_one"] = first_disk_qa;

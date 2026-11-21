@@ -4,6 +4,7 @@ use std::os::unix::process::CommandExt;
 mod entries;
 mod epoch228;
 mod epoch228_peer;
+mod epoch228_storage;
 mod funding;
 mod gate;
 mod start;
