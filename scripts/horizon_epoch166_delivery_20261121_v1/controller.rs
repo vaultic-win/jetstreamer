@@ -390,6 +390,11 @@ fn write_admission(
 }
 
 fn provider_path(runtime: &Path) -> PathBuf {
+    if cfg!(feature = "bounded_reader") && cfg!(feature = "paid145_fit") {
+        return runtime
+            .join(DELIVERY)
+            .join("capacity-tools-bounded/publication-fit");
+    }
     if cfg!(feature = "paid145_fit") {
         return runtime
             .join(DELIVERY)
@@ -525,6 +530,16 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(feature = "bounded_reader", feature = "paid145_fit"))]
+    #[test]
+    fn bounded_reader_selects_its_epochs_capacity_provider() {
+        let root = Path::new("/fleet");
+        assert_eq!(
+            provider_path(root),
+            root.join(DELIVERY).join("capacity-tools-bounded/publication-fit")
+        );
+    }
+
     #[cfg(any(
         feature = "five_source_fit",
         feature = "focused169_fit",
