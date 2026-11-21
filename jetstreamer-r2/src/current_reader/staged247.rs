@@ -64,11 +64,39 @@ const PUBLISHED_VERIFIER: &str =
 const PUBLISHED_QUALIFICATION: &str =
     "/var/lib/jetstreamer/horizon247-public-reader-fadfe2d4-v1/main-acceptance.json";
 pub(super) const PUBLISHED_READER: &str = "fadfe2d4a3784ba0f955d1b7a26a15f57ff593e0";
+const LIMITED_PLAN: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-247-plan.json";
+const LIMITED_PIPELINE: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/horizon_pipeline";
+const LIMITED_VERIFIER: &str =
+    "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/verify_archive";
+const LIMITED_QUALIFICATION: &str =
+    "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/main-acceptance.json";
+pub(super) const LIMITED_READER: &str = "58709604dfa4c97336c2e1f6fac53b862ed6f17f";
+#[path = "staged247_published.rs"]
+mod published_owner;
 pub(super) fn published_reader(plan: &Plan) -> bool {
-    plan.reader_commit == PUBLISHED_READER
-        && plan.qualification.path == Path::new(PUBLISHED_QUALIFICATION)
-        && plan.pipeline.path == Path::new(PUBLISHED_PIPELINE)
-        && plan.full_verifier.path == Path::new(PUBLISHED_VERIFIER)
+    [
+        (
+            PUBLISHED_READER,
+            PUBLISHED_QUALIFICATION,
+            PUBLISHED_PIPELINE,
+            PUBLISHED_VERIFIER,
+        ),
+        (
+            LIMITED_READER,
+            LIMITED_QUALIFICATION,
+            LIMITED_PIPELINE,
+            LIMITED_VERIFIER,
+        ),
+    ]
+    .iter()
+    .any(|(rev, acceptance, pipeline, verifier)| {
+        plan.reader_commit == *rev
+            && plan.qualification.path == Path::new(acceptance)
+            && plan.pipeline.path == Path::new(pipeline)
+            && plan.full_verifier.path == Path::new(verifier)
+    })
 }
 pub(super) const BUDGET: u64 = 64 << 20;
 const LOG: &str =
@@ -258,7 +286,7 @@ fn drained(unit: &str, iid: &str) -> Result<()> {
 }
 // Both successors follow the same registered staged uploader.
 fn requires_staged_terminal(plan: &Path) -> bool {
-    [BENCH_PLAN, BOUNDED_PLAN, PUBLISHED_PLAN]
+    [BENCH_PLAN, BOUNDED_PLAN, PUBLISHED_PLAN, LIMITED_PLAN]
         .iter()
         .any(|p| plan == Path::new(p))
 }
@@ -302,6 +330,15 @@ fn public_plan(path: &Path, original: &Value, next: &Value) -> Result<()> {
                 ("qualification", PUBLISHED_QUALIFICATION),
             ],
         )
+    } else if path == Path::new(LIMITED_PLAN) {
+        (
+            LIMITED_READER,
+            &[
+                ("pipeline", LIMITED_PIPELINE),
+                ("full_verifier", LIMITED_VERIFIER),
+                ("qualification", LIMITED_QUALIFICATION),
+            ],
+        )
     } else {
         ensure!(
             path == Path::new(BOUNDED_PLAN),
@@ -343,7 +380,8 @@ pub(crate) fn config(c: &crate::Config) -> Result<()> {
                 CURRENT_PLAN,
                 BENCH_PLAN,
                 BOUNDED_PLAN,
-                PUBLISHED_PLAN
+                PUBLISHED_PLAN,
+                LIMITED_PLAN
             ]
             .iter()
             .any(|registered| p == Path::new(registered)))
@@ -463,6 +501,7 @@ pub(crate) struct Retained {
     log_sha256: String,
     failed_manager_event: Value,
     staged_manager_event: Option<Value>,
+    published_manager_event: Option<Value>,
 }
 impl Retained {
     pub(crate) fn open(plan: &Path) -> Result<Self> {
@@ -519,6 +558,11 @@ impl Retained {
         } else {
             None
         };
+        let published_manager_event = if plan == Path::new(LIMITED_PLAN) {
+            Some(published_owner::terminal()?)
+        } else {
+            None
+        };
         saved_inputs()?;
         let (bytes, log) = read_private(Path::new(LOG), 16 << 20)?;
         ensure!(
@@ -530,6 +574,7 @@ impl Retained {
             log,
             failed_manager_event,
             staged_manager_event,
+            published_manager_event,
             log_sha256: format!("{:x}", Sha256::digest(&bytes)),
             complete: Arc::new(AtomicBool::new(false)),
             _lock: Arc::new(file),
@@ -585,6 +630,10 @@ impl Retained {
         if let Some(event) = &self.staged_manager_event {
             proof["prior_staged_uploader"] =
                 json!({"unit":staged::UNIT, "invocation_id":staged::IID, "systemd_failure":event});
+        }
+        if let Some(event) = &self.published_manager_event {
+            published_owner::check_drained()?;
+            proof["prior_published_uploader"] = event.clone();
         }
         Ok(proof)
     }
@@ -795,6 +844,40 @@ mod tests {
             next[key] = json!({"path":path,"sha256":"a".repeat(64)});
         }
         let path = Path::new(PUBLISHED_PLAN);
+        assert!(requires_staged_terminal(path));
+        assert!(requires_staged_terminal(Path::new(BENCH_PLAN)));
+        assert!(!requires_staged_terminal(Path::new(CURRENT_PLAN)));
+        public_plan(path, &original, &next).unwrap();
+        assert!(public_plan(Path::new(BENCH_PLAN), &original, &next).is_err());
+        for (pointer, wrong) in [
+            ("/pipeline/path", json!(BENCH_PIPELINE)),
+            ("/full_verifier/path", json!(BENCH_VERIFIER)),
+            ("/qualification/path", json!(BENCH_QUALIFICATION)),
+            ("/reader_commit", json!(BENCH_READER)),
+            ("/threads", json!(1)),
+            ("/epoch_expectations/247", json!("foreign")),
+        ] {
+            let mut other = next.clone();
+            *other.pointer_mut(pointer).unwrap() = wrong;
+            assert!(public_plan(path, &original, &other).is_err());
+        }
+        next["features"] = json!(["other"]);
+        assert!(public_plan(path, &original, &next).is_err());
+    }
+
+    #[test]
+    fn limited_reader_preserves_the_original_two_worker_layout_and_predecessor() {
+        let original = json!({"reader_commit":BENCH_READER, "threads":2, "epoch_expectations":{"247":"original"}});
+        let mut next = original.clone();
+        next["reader_commit"] = json!(LIMITED_READER);
+        for (key, path) in [
+            ("pipeline", LIMITED_PIPELINE),
+            ("full_verifier", LIMITED_VERIFIER),
+            ("qualification", LIMITED_QUALIFICATION),
+        ] {
+            next[key] = json!({"path":path,"sha256":"a".repeat(64)});
+        }
+        let path = Path::new(LIMITED_PLAN);
         assert!(requires_staged_terminal(path));
         assert!(requires_staged_terminal(Path::new(BENCH_PLAN)));
         assert!(!requires_staged_terminal(Path::new(CURRENT_PLAN)));
