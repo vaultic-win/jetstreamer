@@ -50,7 +50,7 @@ def run(package,work,fleet_path,fixture,fit_program):
     need(projected==dict(cfg,replays=[r for r in cfg["replays"] if r!=original]) and len(cfg["replays"])==len(projected["replays"])+1,
          "other native rows changed")
     rejected("foreign-observer",lambda:recovered166.projected(cfg,dict(original,expected_producer_invocation_id=old["InvocationID"])))
-    tmp=work/"project";evidence.ensure_dir(tmp);fake_ref=put(tmp/"fleet.json",fleet)
+    tmp=work/"project";evidence.ensure_dir(tmp);fake_ref=put(tmp/"fleet.json",dict(native_predecessor=current,observer=fleet["observer"]))
     selected,path=recovered166.select_config(cfg,Path(fleet["sole_next_observer"]["path"]),fake_ref,fleet,proof)
     need(selected==projected==evidence.sealed(evidence.bound(path)) and recovered166.select_config(cfg,Path(fleet["sole_next_observer"]["path"]),fake_ref,fleet,proof)==(selected,path),"normal projected schedule was not repeatable")
     out=work/"native";reports=work/"reports";evidence.ensure_dir(out);evidence.ensure_dir(reports)
@@ -73,13 +73,27 @@ def run(package,work,fleet_path,fixture,fit_program):
     real_report=evidence.checked(fleet["authenticated_status_audit"])
     report=dict(real_report,sampled_at_utc=stamp.strftime("%Y-%m-%dT%H:%M:%SZ"),receipts=dict(real_report["receipts"],**{"166":status_ref}))
     repref=put(rd/"COMPLETED.json",report)
-    accepted=dict(fleet,recorded_unix_seconds=int(stamp.timestamp()),sampled_at_utc=report["sampled_at_utc"],authenticated_status_audit=repref,
+    participating={k:fleet[k] for k in ("owner","observer","original_disk_guard_recovery_workers","actual_executing_replays","actual_active_bootstraps",
+                                         "actual_active_private_diagnostics","epochs","all_active_status_reports_authenticated_readback","authenticated_status_count")}
+    accepted=dict(participating,recorded_unix_seconds=int(stamp.timestamp()),sampled_at_utc=report["sampled_at_utc"],authenticated_status_audit=repref,
                   effective_status_receipts=report["receipts"],recovered166_local_commit=termref)
     forest=copy.deepcopy(accepted);forest[recovered.FIELD].pop("166");forest["actual_executing_replays"]=[r for r in forest["actual_executing_replays"] if r["epoch"]!=166]
     fixed=SimpleNamespace(recovered166=proof,fleet=fleet,recovered166_history=None,next_cfg=projected)
     recovered166.install(forest,fixed)
     need(forest[closure.FIELD]==termref and forest["historical_recovered166_worker"]==fleet[recovered.FIELD]["166"] and
          [r for r in forest["epochs"] if r["epoch"]==166][0]["no_live_producer_claimed"],"missing accepted terminal fleet")
+    validation=runpy.run_path(str(fit_program))["validate"]
+    provider=evidence.checked(evidence.bound(work.parent/"whole-fit.json"))
+    hypothetical=copy.deepcopy(provider)
+    del hypothetical["replacements"]["166"],hypothetical["population"][closure.UNIT],hypothetical["joined_resident_lower_bounds"]["166"]
+    hypothetical.update(closed_recovered166=proof)
+    hypothetical["bookings"]["166"]["measurement"]="two complete stopped-tree walks"
+    testref=dict(path="/fixture/closed-fleet",sha256="c"*64)
+    hypothetical["fleet"]=testref
+    need(validation(hypothetical,forest,testref,termref)==hypothetical["complete_required_HOME_bytes"]+(16<<20),"publication retained floor changed")
+    rejected("closed-rss-credit",lambda:validation(dict(hypothetical,joined_resident_lower_bounds={"166":1}),forest,testref,termref))
+    rejected("unpriced-participant",lambda:validation(dict(hypothetical,population={}),forest,testref,termref))
+    rejected("underfunded-event",lambda:validation(dict(hypothetical,available_HOME_bytes=hypothetical["complete_required_HOME_bytes"]),forest,testref,termref))
     fleet_ref=put(fdir/event.FLEET_NAME,forest)
     changes=event.Changes()
     def verify(f,report,terminal):return retry10_event.status_evidence(f,report,terminal,archive)
