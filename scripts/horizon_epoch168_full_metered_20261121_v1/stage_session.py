@@ -48,8 +48,8 @@ def stage(commit):
     remote=subprocess.check_output([*git,"remote","get-url","origin"],text=True).strip()
     require(remote=="git@github-matt-vaultic:vaultic-win/jetstreamer.git","wrong campaign remote")
     subprocess.run([*git,"merge-base","--is-ancestor",commit,"refs/remotes/origin/account-updates"],check=True)
-    source=D/"session-source";source.mkdir(mode=0o700,exist_ok=True)
-    dest=D/"session-v1"
+    source=D/"session-source-v2";source.mkdir(mode=0o700,exist_ok=True)
+    dest=D/"session-v2"
     rows=[]
     for name in ("session.py","fit.py","status168.py","overlap.py"):
         raw=subprocess.check_output([*git,"cat-file","blob",commit+":"+MODULE+name])
@@ -57,7 +57,7 @@ def stage(commit):
         rows.append(dict(name=name,source=str(source/name),sha256=digest(source/name),mode=0o444))
     require(subprocess.check_output([*git,"cat-file","blob",commit+":"+MODULE+"stage_session.py"])==Path(__file__).read_bytes(),
             "different deployment program")
-    plan=D/"SESSION_SEAL_PLAN.json"
+    plan=D/"SESSION_SEAL_PLAN_V2.json"
     write(plan,encode(dict(schema="jetstreamer-sealed-deployment-plan-v1",destination=str(dest),members=rows)))
     require(digest(SEALER)==SELF,"different normal sealer")
     if not dest.exists():
@@ -71,7 +71,7 @@ def stage(commit):
     result=dict(schema="horizon-168-normal-session-deployment-v1",branch="account-updates",source_commit=commit,
                 seal=dict(path=str(seal),sha256=digest(seal)),members={r["name"]:r["sha256"] for r in rows},
                 production_launch=False,archive_publication_authorized=False,r2_mutations=False)
-    write(D/"SESSION_DEPLOYMENT.json",encode(result))
+    write(D/"SESSION_DEPLOYMENT_V2.json",encode(result))
     print(json.dumps(result,sort_keys=True))
 
 

@@ -7,10 +7,11 @@ import stat
 import status168 as s
 
 BASE=s.ROOT/"epoch145-semantic-continuity-20261121-v1"
-IMAGE=BASE/"tools-v2/export145"
-# Pinned after the corrected fleet-reader and pending-generation native qualification.
-IMAGE_SHA="8efb708477497268d21e14bc988edb609b11681e60aafdf7c695ccfee6d4c5b2"
-SEAL_SHA="b8821731cfa1e28fa751d1c762e0764805b10a8cc4532f3c6a76f6a233413d50"
+IMAGE=BASE/"tools-v3/export145"
+# The v3 verifier checks both original epoch 172 executable inodes.
+IMAGE_SHA="e731a521cbcec391ceff90ace6a3b17095a6c771a9a5224be7d850ec5967f01f"
+SEAL_SHA="e048a2694aebe57fd9018fd9cc22fd3047c397102efa394c1fa7f589be29ac53"
+BUILD_SHA="6a90bb92f8353737d82ab752a2059a1b8eeeb6d111df1634717510cc01a48926"
 HISTORY=s.ref(s.ROOT/"root084959-live166167170-20261121-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json",
               "350020d2dcef311ec3a469250273b8a8bc79286d8bf4b96a6c2db8f7c994ee57")
 ROOT=Path("/home/sol/.jetstreamer-private")
@@ -37,6 +38,18 @@ def leases(pid,objects):
     return actual
 
 
+def qualified_image():
+    seal,sealref=s.read(IMAGE.parent/"deployment-seal-receipt.json",SEAL_SHA)
+    build,buildref=s.read(IMAGE.parent/"build-proof.json",BUILD_SHA)
+    members={row["name"]:row["sha256"] for row in seal["members"]}
+    s.need(seal["destination"]==str(IMAGE.parent) and members.get("export145")==IMAGE_SHA
+           and members.get("build-proof.json")==BUILD_SHA
+           and build["content_hashes"]["export145"]["sha256"]==IMAGE_SHA,"foreign 145 continuity seal or build")
+    with IMAGE.open("rb") as f:
+        s.need(hashlib.file_digest(f,"sha256").hexdigest()==IMAGE_SHA,"different available 145 executable")
+    return sealref,buildref
+
+
 def inspect(stable,manager,unit,children):
     if str(IMAGE)!=stable["exe"]:
         return None
@@ -50,11 +63,7 @@ def inspect(stable,manager,unit,children):
            and s.same_file(proc/"exe",IMAGE) and s.process(pid)[1:]==(stable["start_ticks"],"0::/system.slice/"+unit)
            and (stable["holding_lock"]["device"],stable["holding_lock"]["inode"])==(64512,95818311)
            and stable["holding_lock"]["fds"],"different recovery manager")
-    seal,_=s.read(IMAGE.parent/"deployment-seal-receipt.json",SEAL_SHA)
-    s.need(seal["destination"]==str(IMAGE.parent) and any(x["name"]=="export145" and x["sha256"]==IMAGE_SHA
-           for x in seal["members"]),"foreign 145 continuity seal")
-    with IMAGE.open("rb") as f:
-        s.need(hashlib.file_digest(f,"sha256").hexdigest()==IMAGE_SHA,"different available 145 executable")
+    sealref,buildref=qualified_image()
     if len(children)!=2 or pid not in children: return None
     child=next(p for p in children if p!=pid);cproc=Path(f"/proc/{child}")
     ppid,ticks,group=s.process(child)
@@ -85,7 +94,7 @@ def inspect(stable,manager,unit,children):
     a=leases(pid,objects);b=leases(child,objects)
     s.need(s.process(child)==(ppid,ticks,group) and s.process(pid)[1]==stable["start_ticks"],"145 census changed")
     return dict(mode="recover-full-output",native_child=dict(pid=child,start_ticks=ticks),
-                recovery=startref,continuity_seal=s.ref(IMAGE.parent/"deployment-seal-receipt.json",SEAL_SHA),
+                recovery=startref,continuity_seal=sealref,continuity_build=buildref,
                 leases_parent=a,leases_worker=b)
 
 
