@@ -44,7 +44,7 @@ class Storage:
         return etag
 
 
-def run(work):
+def run(work, check_private=None):
     need(bound(HEAD)['sha256']=='adc16f718a5d6780c93d60713978416c3f1272eb4f19731557e35f7ac309a771','wrong native fleet fixture')
     head = checked(bound(HEAD))
     prev = head['previous_Root_operational_review']
@@ -294,6 +294,8 @@ def run(work):
                 need(accepted[pair.FIELDS[e]]==simulator[e]['terminal'] and pair.preceding(accepted,e) is None
                      and caps['retained_local_commit_bookings'][str(e)]['retained_cap_bytes']=={166:288,167:512,168:288,170:384,172:288}[e]<<30,
                      'registered a retired owner or lost its booking')
+            if check_private is not None:
+                check_private(c,sr,audit,hr,head['sole_next_observer'],preselected,accepted,out)
             passes.append(dict(order=list(order),closed=list(active),report=sr,survivors=sorted(rows.keys()-set(active)),
                                conditional_puts=list(store.writes),retained=hr))
         need(store.writes==list(order),'duplicate or unrelated conditional put')

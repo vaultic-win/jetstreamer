@@ -526,12 +526,17 @@ def retry_cycle(path,sha,sample_sha):
         if not (route.T/'TERMINAL_SUCCESS.json').exists() and worker_gone(first):
             wait_terminal(epoch,first,deadline)
     select_cycle(c,cfg,selected)
-    need(c.histories,'no authenticated terminal transition in successful native sample')
+    import focused169_completion
+    private = focused169_completion.capture(fleet)
+    newly_retired = private and focused169_completion.FIELD not in fleet
+    need(c.histories or newly_retired,'no authenticated terminal transition in successful native sample')
     # Every retry must add at least one new authenticated transition.
     retry = paths['out']/('POST_LOCAL_RETRY_'+'_'.join(str(e) for e in sorted(c.histories))+'.json')
+    if newly_retired:
+        retry=retry.with_name(retry.stem+'_FOCUSED169.json')
     ensure_dir(paths['out'])
     need(not retry.exists(),'this terminal subset already retried')
-    durable(retry,dict(fleet=ref,sample=sample,terminals={str(e):c.commits[e]['terminal'] for e in c.histories}))
+    durable(retry,dict(fleet=ref,sample=sample,terminals={str(e):c.commits[e]['terminal'] for e in c.histories},focused169_terminal=private if newly_retired else None))
 
 
 if __name__=='__main__':
