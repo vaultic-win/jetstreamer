@@ -5,6 +5,7 @@ edition="2024"
 [workspace]
 [features]
 preparation=[]
+incident-recovery=[]
 epoch207-native-main-guard=[]
 epoch209-native-main-guard=[]
 epoch209-singleton-guard=[]

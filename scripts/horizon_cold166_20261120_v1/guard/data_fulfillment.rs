@@ -20,6 +20,10 @@ use std::{
 #[cfg(not(feature = "preparation"))]
 use std::io::Write;
 
+#[cfg(feature = "incident-recovery")]
+#[path = "../../horizon_epoch166_guard_recovery_20261121_v1/incident_guard.rs"]
+pub(crate) mod incident;
+
 pub(super) const COLD_UNIT: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
 pub(super) const COLD_ROOT: &str =
     "/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1";
@@ -1157,6 +1161,10 @@ fn point(free: u64, fulfilled: u64, maximum: u64) -> Result<(u64, u64)> {
 /// Every error must become a guard trip before the caller returns from a live invocation.
 #[cfg(not(feature = "preparation"))]
 pub(super) fn observe(binding: &Value, s: &Scope<'_>) -> Result<Observation> {
+    #[cfg(feature = "incident-recovery")]
+    if incident::is_route(s.unit) {
+        return incident::observe(binding, s);
+    }
     scope(s)?;
     if s.unit == COLD_UNIT {
         cold_roots()?;
@@ -1502,20 +1510,24 @@ pub(super) fn run_qualification(args: &[String]) -> Result<()> {
         path: args[6].clone().into(),
         sha256: args[8].clone(),
     };
-    ensure!(
-        image
-            == Path::new(
-                "/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-20261120-v1/guard-v1/guard"
-            ),
-        "cold witness requires the normally deployed independent guard"
-    );
-    cold_roots()?;
+    #[cfg(not(feature = "incident-recovery"))]
+    let roots_proof = {
+        ensure!(image == Path::new("/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-20261120-v1/guard-v1/guard"),
+            "cold witness requires the normally deployed independent guard");
+        cold_roots()?;
+        json!({"path":COLD_ROOTS,"sha256":COLD_ROOTS_SHA})
+    };
+    #[cfg(feature = "incident-recovery")]
+    let roots_proof = incident::qualification_roots(&image)?;
     let started = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let mut receipt = qualify(&seed, &seal, Path::new("/home/sol"))?;
     receipt["recorded_unix_seconds"] =
         json!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+    #[cfg(not(feature = "incident-recovery"))]
     cold_roots()?;
-    receipt["independent_roots_receipt"] = json!({"path":COLD_ROOTS,"sha256":COLD_ROOTS_SHA});
+    #[cfg(feature = "incident-recovery")]
+    ensure!(incident::qualification_roots(&image)? == roots_proof, "successor root identity changed");
+    receipt["independent_roots_receipt"] = roots_proof;
     receipt["started_unix_seconds"] = json!(started);
     receipt["native_identity"] = json!({"executable":image,"executable_sha256":args[12],"pid":std::process::id(),"systemd_invocation_id":iid});
     let output = Path::new(&args[10]);

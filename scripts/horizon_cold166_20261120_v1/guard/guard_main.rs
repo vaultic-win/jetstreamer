@@ -709,6 +709,9 @@ fn run() -> Result<()> {
     ensure!(sha(&bytes) == args[3], "guard plan digest mismatch");
     let plan: Plan = serde_json::from_slice(&bytes)?;
     validate_plan(&plan)?;
+    #[cfg(feature = "incident-recovery")]
+    data_fulfillment::incident::validate(&plan)?;
+    #[cfg(not(feature = "incident-recovery"))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT
             && plan.worker_root == Path::new(data_fulfillment::COLD_ROOT)

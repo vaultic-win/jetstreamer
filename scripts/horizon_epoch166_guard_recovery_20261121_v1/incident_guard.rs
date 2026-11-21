@@ -1,0 +1,206 @@
+//! Preserve the original twelve-inode allocation proof and the absolute guard floor after a cold restart.
+use super::*;
+use crate::Plan;
+
+const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
+const HOME: &str = "/home/sol/.jetstreamer-private";
+const MIN_FLOOR: u64 = 8_297_502_499_408;
+
+struct Lane {
+    unit: &'static str,
+    tree: &'static str,
+    runtime: &'static str,
+    cap: u64,
+}
+
+const LANES: &[Lane] = &[
+    Lane {
+        unit: "horizon-qualify-166-independent-recovery-20261121-v1.service",
+        tree: "epoch166-independent-cold-20261120-v1",
+        runtime: "epoch166-independent-cold-recovery-20261121-v1",
+        cap: CAP,
+    },
+    Lane {
+        unit: "horizon-qualify-167-source-index-v1-20261121.service",
+        tree: "epoch167-standard-lane-20261109-v1",
+        runtime: "epoch167-source-index-recovery-20261121-v1",
+        cap: 512 << 30,
+    },
+    Lane {
+        unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
+        tree: "epoch170-standard-lane-20261109-v1",
+        runtime: "epoch170-retry10-recovery-20261121-v1",
+        cap: CAP,
+    },
+];
+
+pub(crate) fn is_route(unit: &str) -> bool {
+    LANES.iter().any(|r| r.unit == unit)
+}
+
+pub(crate) fn validate(p: &Plan) -> Result<()> {
+    let lane = LANES
+        .iter()
+        .find(|r| r.unit == p.unit)
+        .context("unknown recovery guard unit")?;
+    ensure!(
+        p.worker_root == Path::new(HOME).join(lane.tree)
+            && p.receipt_directory == Path::new(RUNTIME).join(lane.runtime).join("guard-receipts")
+            && p.filesystem == Path::new("/home/sol")
+            && p.minimum_free_bytes >= MIN_FLOOR
+            && p.maximum_root_physical_bytes == Some(lane.cap)
+            && p.maximum_worker_vmas == 3_500_000
+            && p.data_fulfillment.is_some()
+            && p.bounded_canary.is_none()
+            && p.bounded_measurement.is_none()
+            && p.native_main.is_none(),
+        "recovery unit, tree, physical cap, floor, receipt path or DATA proof differs"
+    );
+    Ok(())
+}
+
+// Check the hash-bound original namespace receipts and reopen the directories from / without symlinks.
+// Once replay is running the sizes and times of these private output directories legitimately change.
+pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
+    ensure!(image == Path::new(IMAGE), "use the sealed incident guard");
+    let receipts = [
+        (
+            "epoch166-independent-cold-recovery-20261121-v1/ROOTS_BEFORE_WITNESS.json",
+            "cc7d780afe3d0180de6785cdad4f1e38e70feb82df1c95d21ab342c5974782e2",
+        ),
+        (
+            "epoch168-full-metered-20261121-v1/STABLE_167_168_ROOTS_BEFORE_DATA_WITNESS.json",
+            "57d99faeaed6817dc1afc29dec368039ae4cb4f1cbad28df2075b894d397321d",
+        ),
+        (
+            "epoch170-ancestor-accounts-20261121-v1/RETRY10_ROOT_PRECREATED.json",
+            "dfde6272e53a73ab669a56fe273a72c183c1871be5406b951c22452349bdf7a0",
+        ),
+    ];
+    let mut refs = Vec::new();
+    for (name, sha) in receipts {
+        let r = Bound {
+            path: Path::new(RUNTIME).join(name),
+            sha256: sha.to_owned(),
+        };
+        bound(&r)?;
+        refs.push(r);
+    }
+    for (rel, ino) in [
+        (
+            "epoch166-independent-cold-20261120-v1/replacement-local3retry10-20261121-v1",
+            93782017,
+        ),
+        (
+            "epoch167-standard-lane-20261109-v1/replacement-source-index-v1-20261121",
+            107675649,
+        ),
+        (
+            "epoch167-standard-lane-20261109-v1/replacement-source-index-rollback-v1-20261121",
+            107675650,
+        ),
+        (
+            "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1",
+            103350354,
+        ),
+        (
+            "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1",
+            113710084,
+        ),
+    ] {
+        let path = Path::new(HOME).join(rel);
+        let mut dir = root_directory()?;
+        for part in safe_components(&path)? {
+            dir = openat(&dir, part, true)?;
+        }
+        let m = dir.metadata()?;
+        ensure!(
+            m.dev() == 64512
+                && m.ino() == ino
+                && m.uid() == 1001
+                && m.gid() == 1003
+                && m.mode() & 0o7777 == 0o700,
+            "precreated successor root changed: {rel}"
+        );
+    }
+    Ok(json!({"schema":"horizon-incident-native-successor-roots-v1","receipts":refs}))
+}
+
+pub(super) fn observe(binding: &Value, scope: &Scope<'_>) -> Result<Observation> {
+    let image = fs::read_link("/proc/self/exe")?;
+    let roots = qualification_roots(&image)?;
+    let b: Binding = serde_json::from_value(binding.clone())?;
+    let contract: Contract =
+        serde_json::from_value(sealed(&b.contract, &b.deployment_seal, "contract.json")?)?;
+    let witness = bound(&contract.qualified_native_witness)?;
+    ensure!(
+        witness["independent_roots_receipt"] == roots,
+        "witness does not bind the restored namespaces"
+    );
+    let mut result = observe_allocation(
+        binding,
+        scope.filesystem,
+        scope.initial_available_bytes,
+        &image,
+        scope.guard_sha256,
+    )?;
+    ensure!(
+        qualification_roots(&image)? == roots,
+        "restored namespace changed during allocation"
+    );
+    // The shared post-stop fit already derives an absolute free-space requirement.
+    // Adding the observed legacy fulfillment to free space would charge it twice.
+    result.evidence["measured_legacy_fulfillment_bytes"] = json!(result.fulfilled_bytes);
+    result.fulfilled_bytes = 0;
+    result.available_plus_fulfilled_bytes = result.conservative_available_bytes;
+    result.effective_required_free_bytes = scope.raw_floor;
+    result.evidence["fulfilled_bytes"] = json!(0);
+    result.evidence["available_plus_fulfilled_bytes"] = json!(result.conservative_available_bytes);
+    result.evidence["effective_required_free_bytes"] = json!(scope.raw_floor);
+    result.evidence["enforced_raw_minimum_free_bytes"] = json!(scope.raw_floor);
+    result.evidence["successor_roots"] = roots;
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires the original root-owned namespace evidence on dev-samjohnson"]
+    fn original_namespace_receipts_and_all_precreated_roots() {
+        let roots = qualification_roots(Path::new(IMAGE)).unwrap();
+        assert_eq!(roots["receipts"].as_array().unwrap().len(), 3);
+        assert!(qualification_roots(Path::new("/tmp/guard")).is_err());
+    }
+
+    #[test]
+    fn incident_unit_root_cap_floor_and_receipt_directory_are_inseparable() {
+        for lane in LANES {
+            let mut p: Plan = serde_json::from_value(json!({
+                "schema":"jetstreamer-horizon-standalone-guard-plan-v1", "unit":lane.unit,
+                "invocation_id":"a".repeat(32), "filesystem":"/home/sol", "minimum_free_bytes":MIN_FLOOR,
+                "worker_root":Path::new(HOME).join(lane.tree), "maximum_worker_vmas":3500000,
+                "maximum_root_physical_bytes":lane.cap,
+                "receipt_directory":Path::new(RUNTIME).join(lane.runtime).join("guard-receipts"),
+                "data_fulfillment":{"contract":"placeholder"}})).unwrap();
+            validate(&p).unwrap();
+            p.minimum_free_bytes -= 1;
+            assert!(validate(&p).is_err());
+            p.minimum_free_bytes += 1;
+            p.maximum_root_physical_bytes = Some(lane.cap + 1);
+            assert!(validate(&p).is_err());
+            p.maximum_root_physical_bytes = Some(lane.cap);
+            p.worker_root.push("new-epoch-only");
+            assert!(validate(&p).is_err());
+            p.worker_root.pop();
+            p.receipt_directory.push("sibling");
+            assert!(validate(&p).is_err());
+            p.receipt_directory.pop();
+            p.data_fulfillment = None;
+            assert!(validate(&p).is_err());
+        }
+    }
+}
