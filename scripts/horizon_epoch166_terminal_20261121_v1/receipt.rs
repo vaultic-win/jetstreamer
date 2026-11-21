@@ -305,8 +305,20 @@ mod tests {
 
     #[cfg(feature = "metered168")]
     #[test]
-    #[ignore = "requires the actual epoch 168 witness and a private fixture directory"]
+    #[ignore = "requires the actual producer witness and a private fixture directory"]
     fn metered168_committed_inode_fixture() -> Result<()> {
+        generation_inode_fixture()
+    }
+
+    #[cfg(any(feature = "metered168", feature = "source167", feature = "retry170"))]
+    #[test]
+    #[ignore = "requires the anchored RPC proof and original producer witness"]
+    fn finalized_generation_committed_inode_fixture() -> Result<()> {
+        generation_inode_fixture()
+    }
+
+    #[cfg(any(feature = "metered168", feature = "source167", feature = "retry170"))]
+    fn generation_inode_fixture() -> Result<()> {
         let live = checked_live()?;
         let expected = generation::boundary(&live)?;
         let checkpoint = &live["checkpoint"];
@@ -319,16 +331,21 @@ mod tests {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let gate = json!({"kind":"sealed-root-checkpoint-cohort","version":1,
             "verified_manifest_checkpoints":[{"slot":checkpoint["slot"],"accounts_hash":b58_hash(&checkpoint["accounts_hash"])?}],
-            "members":[{"epoch":168,"bootstrap":{"slot_complete":true,"slot":bootstrap["slot"],"accounts_hash":b58_hash(&bootstrap["accounts_hash"])?},
+            "members":[{"epoch":EPOCH,"bootstrap":{"slot_complete":true,"slot":bootstrap["slot"],"accounts_hash":b58_hash(&bootstrap["accounts_hash"])?},
                 "terminal":{"slot_complete":true,"slot":expected.last_block,"last_blockhash":expected.last_block_hash}}]});
-        let ctx = json!({"schema":"jetstreamer-root-checkpoint-gate-context-v1","manifest_fingerprint":fingerprint,"epochs":[168],"gate":gate});
-        let r = json!({"schema":"jetstreamer-root-cohort-publication-receipt-v2","epochs":[168],"manifest_fingerprint":live["manifest_fingerprint"],
+        let ctx = json!({"schema":"jetstreamer-root-checkpoint-gate-context-v1","manifest_fingerprint":fingerprint,"epochs":[EPOCH],"gate":gate});
+        let r = json!({"schema":"jetstreamer-root-cohort-publication-receipt-v2","epochs":[EPOCH],"manifest_fingerprint":live["manifest_fingerprint"],
             "root_checkpoint_gate":gate,"publication_context_base64":STANDARD.encode(serde_json::to_vec(&ctx)?)});
         let mut foreign = live.clone();
         foreign["independent_boundary"]["sha256"] = json!("0".repeat(64));
         assert!(generation::boundary(&foreign).is_err());
         assert!(super::gate(&live, &r, &BOUNDARY166).is_err());
-        committed_inode_fixture("TERMINAL168_PRIVATE_FIXTURE", live, r, &expected)
+        committed_inode_fixture(
+            &format!("TERMINAL{EPOCH}_PRIVATE_FIXTURE"),
+            live,
+            r,
+            &expected,
+        )
     }
 
     fn committed_inode_fixture(

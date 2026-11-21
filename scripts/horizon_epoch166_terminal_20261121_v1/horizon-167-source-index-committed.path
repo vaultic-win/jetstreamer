@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the original source-index batch receipt for epoch 167
+
+[Path]
+PathExistsGlob=/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-source-index-v1-20261121/private/destination-fd90fb412d332b37025714f31125e4cf59dd48685725abdaf0a06d2e1bd1689d/evidence/archive-batches/destination-000000000000fc00-00000000066b0003/batch-*.json
+Unit=horizon-167-source-index-committed.service
+
+[Install]
+WantedBy=multi-user.target
