@@ -412,8 +412,9 @@ the normal work-conserving backfill path rather than waiting for another status 
   round-trip experiment. Keep unsupported healthy producers running while developing that route
   against isolated work. No arbitrary live-mmap eviction or unqualified process serialization.
 - Maintain one disjoint next candidate in a dormant, no-trigger state whenever missing compatible
-  work remains. Preflight its manifest, immutable package, cached input, isolated GCloud identity,
-  controller configuration, hashes, and capability evidence while current lanes run. Preparation
+  work remains. Preflight its manifest, immutable package, cached input, controller configuration,
+  hashes and capability evidence while current lanes run. Check the lane's isolated GCloud identity
+  when the planned operation reads GCS. Preparation
   is not launch authority.
 - When a lane completes cleanly or leaves the fleet, treat that terminal transition as an event,
   not a reason to wait for the next routine poll. Recompute fresh admission and backfill promptly up

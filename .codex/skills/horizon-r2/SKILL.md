@@ -801,7 +801,13 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   reload. If that delays an already-due check, run only the oneshot monitor immediately and confirm
   that `OnUnitActiveSec` has re-anchored the next interval; never restart the producer to repair its
   monitor schedule.
-- A hardened adaptive lane may use an isolated `CLOUDSDK_CONFIG` under its private lane root.
+- Determine whether the planned producer needs GCS. For a sealed root-checkpoint cohort, the node
+  can read the pinned bootstrap from `--snapshot-archive`, the checkpoint hashes from the sealed
+  manifest, and genesis from the destination. When all three inputs have been verified and the
+  deployed startup path has exercised them without GCS access, keep the lane's private
+  configuration directory in place and proceed to resource admission. A credential refresh is
+  needed when a selected step actually reads GCS, including a download or a new source inventory.
+- A hardened adaptive lane that reads GCS may use an isolated `CLOUDSDK_CONFIG` under its private lane root.
   Refreshing the interactive user's default GCloud configuration does not refresh those copies.
   Before retrying a producer after authentication changes, update the isolated configuration with
   a consistent, permission-preserving copy of the refreshed credential databases, then perform a
@@ -985,7 +991,9 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
   The checked-in adaptive controller exposes this input as repeated
   `--cohort-bootstrap=EPOCH_OR_RANGE=/ABSOLUTE/PATH`. Require the range to name one exact managed
   cohort and the archive to be a singly linked, root-owned, non-writable direct member of the sealed
-  deployment with an exact `SHA256SUMS` entry. Review the planning report's `cohort_bootstraps`
+  deployment with an exact `SHA256SUMS` entry. The controller also supports a bootstrap in a
+  separately sealed deployment when it verifies that member against its source deployment's
+  checksums and binds the file read-only into the lane. Review the planning report's `cohort_bootstraps`
   mapping before execute mode; the controller binds the path and digest into its configuration and
   exact adoption arguments, while the parent performs the manifest filename, slot, size, CRC32C,
   MD5, SHA-256, and file-identity checks. Do not pass this option to a controller or parent that
