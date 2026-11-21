@@ -794,7 +794,9 @@ lease: if ranges overlap accidentally, stop the duplicate producer rather than r
 - Before starting a recurring status timer, initialize its last-observed state to the replay's
   authoritative launch time and validate the monitor once manually. A timer that exists without
   this state is not monitoring the replay; diagnose monitor failures without restarting a healthy
-  producer. First respect each live producer's identity contract: epoch 225 extraction's raw actor
+  producer. For new watchers, use the [unit installation procedure](references/host-utilization.md)
+  to keep the manager available to guards with short query timeouts.
+  First respect each live producer's identity contract: epoch 225 extraction's raw actor
   snapshot forbids global `daemon-reload` throughout its live lifetime. After a permitted
   `systemctl daemon-reload` while monotonic monitor timers are active, re-observe
   every timer's next deadline: systemd can move a pending `OnActiveSec` deadline relative to the

@@ -91,7 +91,18 @@ another lane:
 - I/O pressure, major faults, memory pressure, and any current verifier, uploader, or snapshot
   activity that materially contends with replay.
 
-Linking a dormant systemd unit triggers a manager reload, which can clear the display-only
+On a busy host, a global systemd reload can block read-only manager queries long enough
+to terminate a guarded verifier. On dev-samjohnson, an eight-second `systemctl show`
+timed out during watcher installation and epoch 145 lost its in-memory verification progress.
+For a new, previously unloaded unit, install the qualified files in the unit search path
+and inspect `LoadState`, `FragmentPath`, `NeedDaemonReload` and the effective `Paths` or
+`ExecStart`. When the manager has loaded the intended definition, start the intended
+unit directly. If boot persistence is required, use `systemctl --no-reload enable UNIT`
+and verify the resulting link. Check the trigger condition before starting a path unit.
+An already-present marker dispatches its service immediately. A changed definition that
+is already loaded needs a suitable reload window or a separately qualified new unit.
+
+Linking a dormant systemd unit with the default reload can clear the display-only
 timestamps and PID embedded in `ExecStart` while the invocation and authoritative `MainPID`
 remain live. Use the reviewed command-identity comparison for that case: exact executable,
 arguments and `ignore_errors`, alongside unchanged invocation ID, `MainPID`, state and restart
