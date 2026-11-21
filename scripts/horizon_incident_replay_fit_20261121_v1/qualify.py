@@ -54,7 +54,7 @@ def fork_control(m,fleet):
 
 def main():
     if os.geteuid() or not sys.flags.isolated or not __debug__:raise ValueError("native isolated root session required")
-    here=Path(__file__).resolve().parent;repo=here.parent.parent
+    here=Path(__file__).resolve().parent;repo=Path(sys.argv[4]).resolve(strict=True)
     path=here/"post-stop-fit"
     m=runpy.run_path(str(path));s=m["s"];D=m["D"]
     fleet=s.ref(Path(sys.argv[1]),sys.argv[2]);commit=sys.argv[3]
@@ -64,8 +64,9 @@ def main():
     src={}
     for name in ("post-stop-fit","retire-original-timers.py","incident_extensions.py","qualify.py"):
         p=here/name;b=p.read_bytes()
-        s.need(b==git("show",commit+":"+str(p.relative_to(repo))),"unpublished qualification source")
+        s.need(b==git("show",commit+":scripts/horizon_incident_replay_fit_20261121_v1/"+name),"unpublished qualification source")
         src[name]=digest(b)
+    cfg,adapter,binding=m["profile145"](here)
     rejected(lambda:m["fleet_head"](dict(fleet,sha256="0"*64)))
     if fleet!=m["PREV"]:rejected(lambda:m["fleet_head"](m["PREV"]))
     rejected(lambda:m["capture"](171,fleet))
@@ -77,9 +78,14 @@ def main():
            observed["available_memory_bytes"]>=observed["required_available_memory_bytes"],"native capacity failed")
     floor=m["disk_budget"];raw=observed["original_aggregate_HOME_bytes"];books=observed["bookings"];peer=observed["survivors"];optional=observed["candidate136"]
     for epoch in (145,166,167,168,170):
-        required,protected,delta=floor(raw,optional,books,epoch,peer,{})
+        required,protected,delta=floor(raw,optional,books,epoch,peer,observed["replacements"],observed["active168_guard_floor"])
         allowance=books.get(str(epoch),{}).get("remaining_bytes",0)
         s.need(required==protected+allowance and protected>=8297502499408 and delta>=0,"unfunded candidate")
+    normal=observed["normal168"]
+    s.need(normal and normal["admission"] and normal["first_worker"] and normal["ordinary_canonical"] and
+           {"166","167"}<=observed["replacements"].keys() and observed["joined_resident_lower_bounds"]["168"]>0 and
+           observed["active168_guard_floor"]==m["bound"](m["bound"](normal["admission"])["actual_guard_plan"])["minimum_free_bytes"] and
+           observed["protected_raw_floor_bytes"]>=observed["active168_guard_floor"],"missing admitted 168 protection")
     # A replacement's new bytes consume its own prepaid interval exactly once.
     older=books["170"];grown=dict(books);amount=1<<20
     grown["170"]=dict(older,remaining_bytes=older["remaining_bytes"]-amount,physical_bytes=older["physical_bytes"]+amount)
@@ -87,7 +93,7 @@ def main():
     realized=floor(raw,optional,grown,170,peer,{"170":dict(prestart_remaining=older["remaining_bytes"],floor=baseline[1])})
     s.need(realized[0]+amount==baseline[0] and realized[1]==baseline[1],"own growth changes protected unrelated claims")
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,phase145_registration=binding,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork)
     target=D/name
     with target.open("xb") as f:

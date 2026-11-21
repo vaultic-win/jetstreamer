@@ -268,6 +268,19 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
+def profile145(here):
+    cfg,ref=s.read(here/"profile145.json")
+    v5=R/"epoch145-semantic-continuity-20261121-v1/tools-v5"
+    seal,sr=s.read(v5/"deployment-seal-receipt.json",cfg["seal_sha256"])
+    build,br=s.read(v5/"build-proof.json",cfg["build_sha256"])
+    rows={x["name"]:x["sha256"] for x in seal["members"]}
+    adapter=v5/"incident-phase.py";image=v5/"export145"
+    s.need(seal["destination"]==str(v5) and rows[adapter.name]==cfg["adapter_sha256"] and
+           rows[image.name]==build["verifier_sha256"]==cfg["image_sha256"] and rows["build-proof.json"]==br["sha256"],
+           "different native 145 adapter, verifier or build")
+    fit.binary(adapter,cfg["adapter_sha256"]);fit.binary(image,cfg["image_sha256"])
+    return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
+
 def phase145(epoch):
     m=s.show(fit.A145);ps=fit.members(fit.A145)
     if not ps:
@@ -283,13 +296,7 @@ def phase145(epoch):
     current=Path(__file__).resolve()
     fp=R/"epoch145-semantic-continuity-20261121-v1/tools-v5/export145"
     if fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,_=s.read(current.with_name("profile145.json"))
-        v5=fp.parent
-        receipt,_=s.read(v5/"deployment-seal-receipt.json",cfg["seal_sha256"])
-        adapter=v5/"incident-phase.py"
-        s.need(any(x["name"]==adapter.name and x["sha256"]==cfg["adapter_sha256"] for x in receipt["members"]),
-               "different 145 native phase adapter")
-        fit.binary(adapter,cfg["adapter_sha256"])
+        cfg,adapter,_=profile145(current.parent)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")
@@ -387,7 +394,7 @@ def registered_status():
            x["sha256"]==hashlib.sha256(script.read_bytes()).hexdigest() for x in seal["members"]),"unsealed status package")
     return dict(registration=registration,consumer_seal=sr,invocation_id=m["InvocationID"],pid=pid,start_ticks=s.process(pid)[1])
 
-def disk_budget(raw,c136,booking,epoch,peers,replacements):
+def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0):
     # The original aggregate includes a full independent-166 allowance and standard
     # peer allowances measured net of the original, single physical baseline.
     # Charge any newly unfulfilled baseline. Never count closed-file reclamation twice.
@@ -400,7 +407,7 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements):
     # commitments and every incumbent's absolute native trip threshold stay protected.
     allowance=booking.get(str(epoch),{}).get("remaining_bytes",0)
     absolute=max([8297502499408,*[x["guard"]["floor"] for x in peers.values()],
-                  *[x["floor"] for k,x in replacements.items() if int(k)!=epoch],c136.get("guard_floor",0)])
+                  *[x["floor"] for k,x in replacements.items() if int(k)!=epoch],c136.get("guard_floor",0),guard168_floor if epoch!=168 else 0])
     protected=max(required-allowance,absolute)
     return protected+allowance,protected,deficit
 
@@ -444,6 +451,8 @@ def capture_once(epoch,ref):
         books[str(e)]=dict(root=str(root),stable_root=STABLE[e],run=str(run),cap_bytes=effective,physical_bytes=physical,measurement=measurement,
                             remaining_bytes=effective-physical,historical_realized_bytes=hist)
     extra=s.inspect()
+    floor168=0;resident168=0
+    tree_measurement="two complete stopped-tree walks"
     if extra:
         s.need(extra["ordinary_canonical"] or epoch==168,"foreign pending normal 168")
         a=extra.get("actor")
@@ -452,20 +461,36 @@ def capture_once(epoch,ref):
             _,sample=s.receipt(a,pref,False)
         elif a:
             ad=bound(extra["admission"]);_,sample=s.receipt(a,ad["actual_guard_plan"],False)
+            plan=bound(ad["actual_guard_plan"]);floor168=plan["minimum_free_bytes"]
+            ids=[a["producer_pid"]]
+            if extra.get("first_worker"):ids.append(bound(extra["first_worker"])["worker_pid"])
+            ps=[]
+            for pid in ids:
+                _,ticks,_=s.process(pid);m=Path(f"/proc/{pid}/exe").stat();ps.append([pid,ticks,m.st_dev,m.st_ino])
+            resident168=joined_resident(dict(a,admission=extra["admission"],processes=ps))
         if a:
             o=sample["root_physical_observation"]
-            s.need(all(o[k]["vanished_entries"]==0 for k in ("first","second")),"unstable normal 168 allocation")
-            tree=dict(physical_bytes=min(o[k]["physical_bytes"] for k in ("first","second")),root=str(s.TREE),cap=fit.CAP)
+            s.need(o["maximum_physical_bytes"]==fit.CAP and not o["exceeds_budget"] and
+                   all(0<=o[k]["physical_bytes"]<=fit.CAP for k in ("first","second")),"168 whole tree exceeds booking")
+            if all(o[k]["vanished_entries"]==0 for k in ("first","second")):
+                physical=min(o[k]["physical_bytes"] for k in ("first","second"))
+                tree_measurement="two complete native whole-tree walks"
+            else:
+                physical=tree_size(s.TREE,fit.CAP,s.RUN)
+                s.need(physical==tree_size(s.TREE,fit.CAP,s.RUN),"retained 168 allocation changed during walk")
+                tree_measurement="two retained-tree walks excluding active run"
+            tree=dict(physical_bytes=physical,root=str(s.TREE),cap=fit.CAP)
         else:tree=fit.measure_tree()
     else:tree=fit.measure_tree()
     if 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
-    books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],
+    books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
     population=census(peers,rep,extra,c136,epoch,stopped)
     raw,ledger_proof=fit.floor(f,ledger,tree,peers)
     raw+=extension["extra_bytes"] if extension else 0
-    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep)
+    need,protected,deficit=disk_budget(raw,c136,books,epoch,peers,rep,floor168)
     resident={e:joined_resident(v) for e,v in rep.items()}
+    if resident168:resident["168"]=resident168
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
@@ -483,7 +508,7 @@ def capture_once(epoch,ref):
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
-        candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,
+        candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,active168_guard_floor=floor168,
         population=population,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
 def capture(epoch,ref):
