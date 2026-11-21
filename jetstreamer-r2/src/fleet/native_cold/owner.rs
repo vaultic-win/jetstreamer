@@ -242,6 +242,9 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
         "intent.json",
     )?;
     let v = sealed(b)?;
+    if EPOCH == 266 && v["schema"] == native266_recovery::SCHEMA {
+        return native266_recovery::claim(c,&v);
+    }
     let sb = binding(&v["capture_spec"])?;
     let s: Spec = serde_json::from_value(sealed(&sb)?)?;
     ensure!(
