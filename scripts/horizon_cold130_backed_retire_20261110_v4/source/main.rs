@@ -195,7 +195,9 @@ fn own(execute: bool) -> Result<Value> {
 }
 fn open_output() -> Result<File> {
     let path = if fs::read_link("/proc/self/exe")? == Path::new(prior_boot::IMAGE) {
-        Path::new("/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement")
+        Path::new(
+            "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retirement",
+        )
     } else {
         Path::new(OUT)
     };
