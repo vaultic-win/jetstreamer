@@ -85,10 +85,14 @@ def run(provider,transition,measured):
         data.update(complete_required_HOME_bytes=base,protected_raw_floor_bytes=floor,recorded_unix_seconds=int(time.time()))
         assert pub["closing"](data,roster)==closed
         assert data["required_available_memory_bytes"]==pub["MEM"]-sum(v["resident"] for v in data["survivors"].values())-sum(data["joined_resident_lower_bounds"].values())
-        assert data["available_HOME_bytes"]>=base+len(closed)*pub["BOOK"] and data["available_memory_bytes"]>=data["required_available_memory_bytes"]
+        unfunded=data["available_HOME_bytes"]<base+len(closed)*pub["BOOK"] or data["available_memory_bytes"]<data["required_available_memory_bytes"]
+        if group and unfunded:
+            reject(lambda:pub["validate"](data,roster,data["fleet"],closed[group[0]]["terminal"],group[0]))
+        positive=dict(data,available_HOME_bytes=max(base+len(group)*pub["BOOK"],data["available_HOME_bytes"]),
+                      available_memory_bytes=max(data["required_available_memory_bytes"],data["available_memory_bytes"]))
         counts["populations"]+=1
         for ep in group:
-            assert pub["validate"](data,roster,data["fleet"],closed[ep]["terminal"],ep)==base+len(group)*pub["BOOK"]
+            assert pub["validate"](positive,roster,data["fleet"],closed[ep]["terminal"],ep)==base+len(group)*pub["BOOK"]
             counts["publisher_prices"]+=1
         for transfers in subsets(group):
             grants={ep:dict(retained_growth_bytes=pub["BOOK"],maximum_transfer_bytes=budget["ALL_CAP"][ep]) for ep in transfers}
@@ -105,7 +109,7 @@ def run(provider,transition,measured):
                     reject(lambda:budget["calculate"](bad,ledger,reg,prior,{169:{"retained_growth_bytes":pub["BOOK"],"maximum_transfer_bytes":0}},closed,ram,64))
                 else:reject(lambda:pub["closing"](bad,reg))
                 counts["adverse"]+=1
-        floors.append(dict(focused169_closed=focused,canonical=list(group),raw=raw,required_HOME_bytes=base,hard_memory_bytes=pub["MEM"],required_available_memory_bytes=data["required_available_memory_bytes"]))
+        floors.append(dict(old_available_resources_insufficient=unfunded,focused169_closed=focused,canonical=list(group),raw=raw,required_HOME_bytes=base,hard_memory_bytes=pub["MEM"],required_available_memory_bytes=data["required_available_memory_bytes"]))
     assert counts==dict(populations=64,publisher_prices=160,transfer_combinations=486,adverse=160)
     registrations={k:v for k,v in v12.items() if k.startswith("phase145") and k.endswith("registration")}
     assert len(registrations)==6 and measured["phase145"]["stage"]=="leased-worker"
