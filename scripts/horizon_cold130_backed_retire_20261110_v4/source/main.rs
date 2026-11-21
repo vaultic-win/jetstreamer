@@ -214,7 +214,7 @@ fn open_output() -> Result<File> {
     );
     Ok(fd)
 }
-fn run(p: &Value, execute: bool) -> Result<()> {
+fn validate_plan(p: &Value) -> Result<(Value, Value)> {
     scope(p)?;
     canonical::validate(p)?;
     ensure!(
@@ -229,6 +229,10 @@ fn run(p: &Value, execute: bool) -> Result<()> {
     closure::holding_lineage(p, &c)?;
     let review = bound(&p["indirect_consumers_review"])?;
     closure::validate_review_shape(&review)?;
+    Ok((review, c))
+}
+fn run(p: &Value, execute: bool) -> Result<()> {
+    let (review, c) = validate_plan(p)?;
     let native = own(execute)?;
     let _lock = lock()?;
     let historical = if prior_boot::alternative(&review)? {
@@ -250,6 +254,36 @@ fn run(p: &Value, execute: bool) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--review-reader-fence") {
+        ensure!(
+            args.len() == 6 && args[4] == "--self-sha256",
+            "--review-reader-fence PLAN PLAN_SHA --self-sha256 ELF_SHA"
+        );
+        let img = fs::read_link("/proc/self/exe")?;
+        ensure!(
+            unsafe { libc::geteuid() } == 0
+                && prior_boot::is_image(&img)
+                && sha(&raw(&img, 32 << 20, true)?) == args[5],
+            "sealed class reviewer required"
+        );
+        let p = bound_with_limit(&json!({"path":args[2],"sha256":args[3]}), 2 << 20, true)?;
+        let (review, c) = validate_plan(&p)?;
+        ensure!(
+            prior_boot::alternative(&review)?,
+            "explicit prior-boot review required"
+        );
+        let f = prior_boot::Fence::take()?;
+        f.evidence()?;
+        current_readers::controller()?;
+        prior_boot::remote_state(&p["current_authenticated_remote"], &c)?;
+        let actual = closure::census(&p)?;
+        f.evidence()?;
+        println!(
+            "{}",
+            json!({"stage":"full-reader-fence-before-deep-read","consumers":actual,"source_bytes_hashed":0,"retirement_check_receipt":false,"local_removal_performed":false,"remote_mutations":false})
+        );
+        return Ok(());
+    }
     if args.get(1).map(String::as_str) == Some("--sample-scheduler-routes") {
         ensure!(
             args.len() == 4 && args[2] == "--self-sha256",

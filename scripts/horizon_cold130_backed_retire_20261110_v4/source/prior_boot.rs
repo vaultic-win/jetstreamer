@@ -17,7 +17,7 @@ pub(super) fn is_image(path: &Path) -> bool {
     path == Path::new(IMAGE)
         || path
             == Path::new(
-                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v4/retire",
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v5/retire",
             )
 }
 pub(super) fn holding_transition() -> Result<File> {
@@ -393,7 +393,7 @@ pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()
     let disjoint = crate::current_readers::canonical_classes()?;
     println!(
         "{}",
-        json!({"stage":"live-local-canonical-watchers","classes":disjoint,"archive_root":"/home/sol/horizon","canonical_body_currently_present":false})
+        json!({"stage":"live-local-canonical-watchers","classes":disjoint,"archive_root":"/home/sol/horizon","canonical_body_currently_present":Path::new("/home/sol/horizon/epoch-130.jet").exists()})
     );
     println!(
         "{}",
