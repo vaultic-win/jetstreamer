@@ -40,6 +40,9 @@ METERED_ROOT = ROOT.parent / "epoch168-current-delivery-20261121-v1"
 METERED_LIVE = "11c7cbb269258849d637259fad7a005f3e1255fbeaac99e3239f089495164ac7"
 METERED_LOCK = (64512, 109323419)
 PEERS = {
+    172: (ROOT.parent / "epoch172-current-delivery-20261121-v1",
+          "4d4e760ba2d4cb53368cfc7c616044f789f82f66934499ad91e5797f41cf6dc2", (64512, 115671412),
+          Producer(172, "horizon-qualify-172-full-half-core-20261120-v1.service", "0e17b745938546608b0bdc52815151d0")),
     167: (ROOT.parent / "epoch167-current-delivery-20261121-v1",
           "f9b3e1fbdddfd983f1589ead46439a5bde07762cfc6151a8cfbb6f5580e818be", (64512, 113979804),
           Producer(167, "horizon-qualify-167-source-index-v1-20261121.service", "0876e9944c784b41afeff1b666539ead")),
@@ -232,6 +235,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     profile = parser.add_mutually_exclusive_group()
     profile.add_argument("--metered168", action="store_true")
+    profile.add_argument("--full172", dest="peer", action="store_const", const=172)
     profile.add_argument("--source167", dest="peer", action="store_const", const=167)
     profile.add_argument("--retry170", dest="peer", action="store_const", const=170)
     parser.add_argument("native", type=Path)

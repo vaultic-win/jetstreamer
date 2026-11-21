@@ -18,13 +18,14 @@ r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 retry10 = "--retry10" in sys.argv[5:]
 metered168 = "--metered168" in sys.argv[5:]
-peer = next((flag for flag in ("--source167", "--retry170") if flag in sys.argv[5:]), None)
+peers = {"--source167": (167, "horizon-publish-167-source-index-committed.service"),
+         "--retry170": (170, "horizon-publish-170-retry10-committed.service"),
+         "--full172": (172, "horizon-publish-172-full-committed.service")}
+peer = next((flag for flag in peers if flag in sys.argv[5:]), None)
 if peer:
     sys.argv.remove(peer)
-    number = 167 if peer == "--source167" else 170
+    number, publication_unit = peers[peer]
     live_root, original_sha, _, producer = r.PEERS[number]
-    publication_unit = ("horizon-publish-167-source-index-committed.service" if number == 167
-                        else "horizon-publish-170-retry10-committed.service")
 elif metered168:
     sys.argv.remove("--metered168")
     live_root, original_sha, producer = r.METERED_ROOT, r.METERED_LIVE, r.METERED
@@ -131,6 +132,16 @@ if retry10 or metered168 or peer:
     wrong.update(producer_invocation_id=r.ORIGINAL.invocation_id, producer_unit=r.ORIGINAL.unit)
     wrong["manager_terminal"].update(INVOCATION_ID=r.ORIGINAL.invocation_id,UNIT=r.ORIGINAL.unit)
     put(term_path,wrong,0o400);denied("predecessor-producer",run,"terminal authority or original producer differs")
+if epoch == 172:
+    for label, unit, iid in [
+        ("old172-hourly-trace", "horizon-qualify-172-trace-hourly-20261120-v1.service", "5a691c24655a4ff489531d8d7cc50254"),
+        ("old172-metered", "horizon-qualify-172-metered-hourly-20261120-g3.service", "e601435f204e427795f67e57c70b07b5"),
+    ]:
+        wrong = copy.deepcopy(terminal)
+        wrong.update(producer_unit=unit, producer_invocation_id=iid)
+        wrong["manager_terminal"].update(UNIT=unit, INVOCATION_ID=iid)
+        put(term_path, wrong, 0o400)
+        denied(label, run, "terminal authority or original producer differs")
 if peer:
     other = r.PEERS[170 if epoch == 167 else 167][3]
     wrong = copy.deepcopy(terminal)

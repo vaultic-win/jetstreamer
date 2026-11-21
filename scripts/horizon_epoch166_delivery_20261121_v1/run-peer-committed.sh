@@ -14,6 +14,7 @@ fit_sha=$5
 [[ $fleet_sha =~ ^[0-9a-f]{64}$ && $fit_sha =~ ^[0-9a-f]{64}$ ]]
 rt=/var/lib/jetstreamer/horizon_runtime_data
 delivery=$(dirname "$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")")
+quota=100%
 case "$delivery" in
     "$rt/epoch167-current-delivery-20261121-v1")
         epoch=167
@@ -21,6 +22,10 @@ case "$delivery" in
     "$rt/epoch170-current-delivery-20261121-v1")
         epoch=170
         unit=horizon-publish-170-retry10-committed.service ;;
+    "$rt/epoch172-current-delivery-20261121-v1")
+        epoch=172
+        quota=50%
+        unit=horizon-publish-172-full-committed.service ;;
     *) echo "unrecognized committed-source package location" >&2; exit 2 ;;
 esac
 pkg="$delivery/controller-tools"
@@ -32,7 +37,7 @@ test "$(stat -c %u "$socket")" = 1001
 (cd "$pkg" && sha256sum --check --strict --status SHA256SUMS)
 exec /usr/bin/systemd-run --quiet --unit="$unit" \
     -p Type=exec -p Restart=no -p KillMode=control-group -p UMask=0077 \
-    -p CPUQuota=100% -p CPUWeight=10 -p Nice=15 -p MemoryMax=2G -p MemorySwapMax=0 \
+    -p "CPUQuota=$quota" -p CPUWeight=10 -p Nice=15 -p MemoryMax=2G -p MemorySwapMax=0 \
     -p TasksMax=128 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=read-only \
     -p "ReadWritePaths=$repo/.git $delivery" -p "WorkingDirectory=$repo" \
     -p "BindReadOnlyPaths=$socket:/run/epoch${epoch}-publisher-ssh" \

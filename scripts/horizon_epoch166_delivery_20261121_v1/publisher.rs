@@ -37,14 +37,15 @@ struct PublicationProfile {
     boundaries_sha: &'static str,
 }
 
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 mod peer_profile;
 
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 const PROFILE: PublicationProfile = PublicationProfile {
     epoch: 166,
@@ -80,7 +81,7 @@ const PROFILE: PublicationProfile = PublicationProfile {
     boundaries: "producer-publication-inputs-20261121-v1/epoch-expectations/bindings.json",
     boundaries_sha: "c036debc456c8f27907825636c09b1939d3a82f0265bc3179a9eaecfdec0dab0",
 };
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 const PROFILE: PublicationProfile = PublicationProfile {
     epoch: peer_profile::EPOCH,
     producer: peer_profile::ORIGIN,
@@ -260,7 +261,7 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
     root_dir(&a.root)?;
     let live_path = a.root.join("LIVE.json");
     let live = document(&live_path, &a.live_sha, true)?;
-    #[cfg(any(feature = "source167", feature = "retry170"))]
+    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     ensure!(
         live["schema"] == peer_profile::LIVE_SCHEMA,
         "wrong singleton live schema"
@@ -487,6 +488,7 @@ fn admit(
 #[cfg(any(
     feature = "source167",
     feature = "retry170",
+    feature = "full172",
     feature = "transition_reader"
 ))]
 mod reader_transition;
@@ -495,12 +497,14 @@ fn prepare(a: &Authority, len: u64, floor: u64) -> Result<(PathBuf, String)> {
     #[cfg(any(
         feature = "source167",
         feature = "retry170",
+        feature = "full172",
         feature = "transition_reader"
     ))]
     let (qpath, qualification_sha, q) = reader_transition::current()?;
     #[cfg(not(any(
         feature = "source167",
         feature = "retry170",
+        feature = "full172",
         feature = "transition_reader"
     )))]
     let (qpath, qualification_sha, q) = {

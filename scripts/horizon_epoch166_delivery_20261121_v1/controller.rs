@@ -16,14 +16,15 @@ use std::{
 };
 
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 mod peer_profile;
 
 #[cfg(not(any(
     feature = "retry10",
     feature = "metered168",
     feature = "source167",
-    feature = "retry170"
+    feature = "retry170",
+    feature = "full172"
 )))]
 mod deployment {
     pub(super) const DELIVERY: &str = "epoch166-committed-delivery-20261121-v1";
@@ -113,7 +114,7 @@ mod deployment {
         reader_package!("publisher-tools/publisher", "publisher-tools-v2/publisher");
 }
 
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 mod deployment {
     pub(super) use super::peer_profile::{DELIVERY, GENERATION, LIVE, ORIGIN, UNIT};
     pub(super) const WITNESS: &str = DELIVERY;
@@ -124,15 +125,21 @@ mod deployment {
     pub(super) const PUBLISHER: &str = env!("HORIZON_HELD_PUBLISHER_SHA256");
     pub(super) const PUBLISHER_PATH: &str = "publisher-tools/publisher";
 }
-#[cfg(any(feature = "source167", feature = "retry170"))]
+#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 use peer_profile::EPOCH;
 #[cfg(feature = "metered168")]
 const EPOCH: u64 = 168;
-#[cfg(not(any(feature = "metered168", feature = "source167", feature = "retry170")))]
+#[cfg(not(any(
+    feature = "metered168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+)))]
 const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
 const MEMORY: u64 = 2 << 30;
+const PUBLICATION_CPU_MICROS: u64 = if EPOCH == 172 { 500_000 } else { 1_000_000 };
 
 fn sha(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -226,7 +233,7 @@ fn put(path: &Path, doc: &Value) -> Result<Value> {
     Ok(binding(path, &sha(&bytes)))
 }
 fn validate_terminal(live: &Value, live_ref: &Value, t: &Value, boot: &str) -> Result<()> {
-    #[cfg(any(feature = "source167", feature = "retry170"))]
+    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     ensure!(
         live["schema"] == peer_profile::LIVE_SCHEMA,
         "wrong singleton live schema"
@@ -303,7 +310,7 @@ fn capacity(
             && f["fleet"] == *fleet
             && f["terminal"] == *terminal
             && t.checked_sub(measured).is_some_and(|age| age <= 180)
-            && f["publication_cpu_quota_micros"] == 1_000_000
+            && f["publication_cpu_quota_micros"] == PUBLICATION_CPU_MICROS
             && f["publication_memory_bytes"] == MEMORY
             && f["complete_cpu_quota_micros"] == 64_000_000
             && f["complete_memory_plus_reserve_bytes"] == 810_658_050_048u64
@@ -338,7 +345,10 @@ fn service() -> Result<String> {
     for (key, val) in [
         ("InvocationID", iid.clone()),
         ("MainPID", std::process::id().to_string()),
-        ("CPUQuotaPerSecUSec", "1s".into()),
+        (
+            "CPUQuotaPerSecUSec",
+            if EPOCH == 172 { "500ms" } else { "1s" }.into(),
+        ),
         ("MemoryMax", MEMORY.to_string()),
         ("MemorySwapMax", "0".into()),
         ("KillMode", "control-group".into()),
@@ -400,7 +410,7 @@ fn main() -> Result<()> {
         1 << 20,
     )?;
     validate_terminal(&live, &live_ref, &terminal, boot)?;
-    #[cfg(any(feature = "source167", feature = "retry170"))]
+    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     {
         let tool = rt
             .join(WITNESS)
@@ -466,7 +476,7 @@ fn main() -> Result<()> {
     dispatch.arg("-IB").arg(receiver);
     #[cfg(feature = "metered168")]
     dispatch.arg("--metered168");
-    #[cfg(any(feature = "source167", feature = "retry170"))]
+    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     dispatch.arg(peer_profile::controller::FLAG);
     Err(dispatch
         .arg(native)
@@ -491,7 +501,7 @@ mod tests {
         let (terminal, term_ref) = read_json(&auth.join("TERMINAL_SUCCESS.json"), 0o400, 1 << 20)?;
         let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         validate_terminal(&live, &live_ref, &terminal, boot.trim())?;
-        #[cfg(any(feature = "source167", feature = "retry170"))]
+        #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
         {
             let mut changed = live.clone();
             changed["schema"] = json!(format!("horizon-{EPOCH}-live-to-terminal-witness-v1"));
@@ -548,7 +558,7 @@ mod tests {
         let good = json!({"schema":format!("horizon-{EPOCH}-publication-fit-v1"),"boot_id":"boot","observed_unix_seconds":100,
             "fleet":fleet,"terminal":terminal,"available_bytes":1000,"protected_bytes":1000,
             "complete_cpu_quota_micros":64000000,"complete_memory_plus_reserve_bytes":810658050048u64,
-            "publication_cpu_quota_micros":1000000,"publication_memory_bytes":MEMORY,"available_memory_bytes":800,
+            "publication_cpu_quota_micros":PUBLICATION_CPU_MICROS,"publication_memory_bytes":MEMORY,"available_memory_bytes":800,
             "required_available_memory_bytes":800,"all_existing_commitments_retained":true,"resource_credit_bytes":0});
         let check = |v: &Value, t| capacity(v, &fleet, &terminal, "boot", "iid", t);
         assert_eq!(check(&good, 280).unwrap()["invocation_id"], "iid");
