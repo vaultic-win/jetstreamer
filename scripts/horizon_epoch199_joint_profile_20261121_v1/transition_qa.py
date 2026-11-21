@@ -1,5 +1,7 @@
 """Exercise exact HOME nesting, transfer cardinality, funding thresholds and source bindings."""
+import ast
 import copy
+import inspect
 import hashlib
 import json
 import os
@@ -149,6 +151,26 @@ def main():
         assert len(exact)==32 and sorted(exact,key=order)==sorted(comparable,key=order)
         return dict(fleet=native['fleet'],phase=native['phase145'],populations=64,transfers=len(prices),checkpoint_scenarios=len(exact))
     captures=dict(stopped=price_capture(eight['fit']),resumed=price_capture(actual['fresh_fit']))
-    return dict(schema='horizon-199-phase-transition-qa-v3',eight_phase_qualification=bridge_sha,v14_retry_start=actual_ref,provider_captures=captures,focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
+    nine_sha='45a6b4627bba3fc9b242d9c7030fc9c817f49466932a9fb067f24ed1bf5a800e'
+    nine=json.loads(F['pin'](F['NATIVE']/'qualification.json',nine_sha).read_bytes())
+    assert nine['schema']=='horizon-145-nine-phase-native-qualification-v1' and nine['predecessor']==bridge_seal
+    assert nine['members']['post-stop-fit']==F['PROVIDER'] and nine['members']['publication-fit']==F['PUB']
+    assert nine['refused_crossed_modes']==13 and nine['resource_credit_bytes']==0
+    assert set(nine['registrations'])==set(eight['registrations'])|{'retry-post'}
+    for name,previous in eight['registrations'].items():
+        current_phase=nine['registrations'][name]
+        assert {k:v for k,v in current_phase.items() if k!='profile'}=={k:v for k,v in previous.items() if k!='profile'}
+        assert current_phase['profile']['sha256']==previous['profile']['sha256']
+    post=nine['registrations']['retry-post']
+    assert nine['phase_seals']['retry-post']==post['seal']
+    F['bound'](event,post['seal'],0o444,F['R']/'epoch145-semantic-continuity-20261121-v1/tools-v10/deployment-seal-receipt.json')
+    F['bound'](event,post['build'],0o444)
+    assert nine['fit']['phase145']['invocation_id']==actual['iid'] and nine['fit']['phase145']['stage']=='leased-worker'
+    captures['current_leased_worker']=price_capture(nine['fit'])
+    previous_pub=runpy.run_path(str(F['pin'](bridge/'publication-fit',eight['members']['publication-fit'])))
+    for name in ('identity','closing','validate'):
+        assert ast.dump(ast.parse(inspect.getsource(pub[name])))==ast.dump(ast.parse(inspect.getsource(previous_pub[name])))
+    return dict(schema='horizon-199-phase-transition-qa-v3',nine_phase_qualification=nine_sha,
+                retry_post_seal=post['seal'],nine_registered_modes=sorted(nine['registrations']),refused_crossed_modes=nine['refused_crossed_modes'],eight_phase_qualification=bridge_sha,v14_retry_start=actual_ref,provider_captures=captures,focused169_matrix=five['qualified_matrix'],focused169_cases=mat['counts'],qualified_five_source_native=qualification,current_scenarios=current,latest_native_recorded=full['recorded_unix_seconds'],source_native_fit=fit['fleet'],observed_native_fit_sha256='b0765f7b9c0f16b4708fef996c4c555f53a7f7521a677b910bbe618f750c5233',accepted_head_at_test=fr,original_169_172_nested_floor_reproduces=True,scenarios=rows,negative_controls=invalid,synthetic_one_byte_thresholds=[-1,0,1],test_grants_installed=False,publications_or_replays_started=0)
 if __name__=='__main__':
     print(json.dumps(main(),sort_keys=True))
