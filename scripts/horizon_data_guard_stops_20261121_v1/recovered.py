@@ -184,6 +184,66 @@ def freeze(c):
     return ref,v
 
 
+def startup_progress(work):
+    """Recover the native window after both counters reset at the first target slot."""
+    import datetime as dt
+    import hashlib
+    import re
+
+    if work['counter_resets'] != 2 or not work['sufficient_for_rates']:
+        return work
+    log = work['append_log_evidence']
+    offset, length = log['read_offset_bytes'], log['read_bytes']
+    need(0 <= offset and 0 < length <= 8 << 20 and offset+length == log['snapshot_length_bytes'],
+         'invalid frozen append interval')
+    path = Path(log['path'])
+    with path.open('rb') as f:
+        import os
+        m = os.fstat(f.fileno())
+        need(path.resolve() == path and (m.st_dev,m.st_ino) == (log['device'],log['inode'])
+             and stat.S_ISREG(m.st_mode) and m.st_nlink == 1 and m.st_uid == 0 and not m.st_mode & 0o077,
+             'changed frozen append identity')
+        f.seek(offset)
+        data = f.read(length)
+    need(len(data)==length and hashlib.sha256(data).hexdigest()==log['read_sha256'], 'frozen append bytes changed')
+    markers = []
+    for line in data.splitlines(keepends=True)[int(offset>0):]:
+        if not line.endswith(b'\n') or b'progress slot ' not in line:
+            continue
+        stamp = line[1:].split(b' ',1)[0].decode('ascii')
+        date = dt.datetime.fromisoformat(stamp.replace('Z','+00:00'))
+        seconds = int(date.timestamp())
+        if not work['since_unix_seconds'] <= seconds < work['until_unix_seconds']:
+            continue
+        match = re.search(rb'progress slot (\d+)/(\d+).*? txs=(\d+) accounts=(\d+)',line)
+        need(match is not None, 'invalid frozen progress marker')
+        slot, terminal, tx, accounts = map(int,match.groups())
+        markers.append(dict(realtime_microseconds=seconds*1000000+date.microsecond, slot=slot,
+                            terminal_slot=terminal, transactions=tx, account_updates=accounts))
+        if len(markers)==2:
+            break
+    if len(markers) != 2:
+        return work
+    first, start = markers
+    end = work['last']
+    if (first != work['first'] or start['slot']!=first['slot'] or start['transactions']!=0
+        or first['transactions']<=0 or start['account_updates']>=first['account_updates']
+        or first['terminal_slot']!=start['terminal_slot'] or end['terminal_slot']!=start['terminal_slot']):
+        return work
+    # These two decreases consume the native reset count for the entire sample.
+    elapsed = (end['realtime_microseconds']-start['realtime_microseconds'])/1e6
+    if elapsed < 60 or end['slot']<=start['slot'] or end['transactions']<=start['transactions']:
+        return work
+    clean = dict(work, first=start, counter_resets=0, matching_markers=work['matching_markers']-1,
+                 elapsed_seconds=elapsed, startup_counter_reset=first)
+    for field, delta, rate in [('slot','slot_delta','slots_per_second'),
+                               ('transactions','transaction_delta','transactions_per_second'),
+                               ('account_updates','account_update_delta','account_updates_per_second')]:
+        clean[delta] = end[field]-start[field]
+        clean[rate] = clean[delta]/elapsed
+    return clean
+
+
 def sample_rows(c, observed_lane):
     reference,capture=freeze(c)
     c.recovered_ref=reference
@@ -206,7 +266,9 @@ def sample_rows(c, observed_lane):
             first=checked(captured['first_worker'])
             need(all(s[k]['pid']==first['worker_pid'] and s[k]['matching_workers']==1 and s[k]['executable_beneath_bound_scratch']
                  for k in ('worker_before','worker_after')), 'different successor worker in coordinated sample')
-            work=s['useful_work']
+            work=startup_progress(s['useful_work']) if not previous.get('last_progress') else s['useful_work']
+            if work is not s['useful_work']:
+                advancing=observed_lane(dict(s,useful_work=work),cfg,actor['producer_invocation_id'],actor['producer_pid'])
             if advancing:
                 last=work['last'];prior=previous.get('last_progress')
                 need(epoch*432000<=work['first']['slot']<=last['slot']<=(epoch+1)*432000-1 and
@@ -291,6 +353,11 @@ def admission_status(epoch, predecessor, tag, raw):
     _, actor = current
     iid = actor['producer_invocation_id']
     path = admission_status_path(epoch, iid)
+    # A measured startup transition follows the completed bootstrap status from the same worker.
+    progress = path.parent / ('progress-' + predecessor['sha256'] + '.json')
+    measured = progress.exists()
+    if measured:
+        path = progress
     if not path.exists():
         return None
     ref = bound(path)
@@ -300,7 +367,7 @@ def admission_status(epoch, predecessor, tag, raw):
     admitted = bound(root/'ACTUAL_ADMISSION_AND_PROTECTION.json')
     first = bound(root/'FIRST_PROTECTED_WORKER.json')
     admitted_actor = checked(admitted)
-    need(event['schema']=='horizon-guarded-admission-status-v1' and event['epoch']==epoch
+    need(event['schema']==('horizon-measured-startup-status-v1' if measured else 'horizon-guarded-admission-status-v1') and event['epoch']==epoch
          and event['key']==key(epoch) and not event['archive_or_sidecar_mutations']
          and event['authenticated_readback'] and event['conditional_header']=='If-Match'
          and event['previous_receipt']==predecessor and event['before_status']==prior['after_status']
@@ -309,9 +376,15 @@ def admission_status(epoch, predecessor, tag, raw):
          and event['first_worker']==first and checked(first)['admission']==admitted
          and all(admitted_actor[k]==v for k,v in actor.items())
          and event['after_etag']==tag and set(event['after_status'])==FIELDS
-         and event['after_status']['epoch']==epoch and event['after_status']['phase']=='verification'
+         and event['after_status']['epoch']==epoch and event['after_status']['phase']==('replay' if measured else 'verification')
          and event['after_sha256']==digest(raw) and raw==body(event['after_status']),
          'unbound recovery admission status for '+str(epoch))
+    if measured:
+        need(prior['producer_invocation_id']==iid and prior['observer']==event['observer'], 'foreign bootstrap predecessor')
+        source=checked(prior['observer'])
+        lane=next(x for x in source['replays'] if x['range']==str(epoch))
+        window=startup_progress(lane['useful_work'])
+        need('startup_counter_reset' in window and window==event['measured_progress'], 'different startup evidence')
     return ref,event
 
 
