@@ -1,8 +1,11 @@
 //! Status-only cleanup after independently proved native 228 terminal success.
 use super::*;
 const UNIT: &str = "horizon-native-input-228-capped-1bfa8d51-v1.service";
+const DEMOTION: &str = "horizon-native-input-228-demotion-16d4b158-v1.service";
 pub(super) fn recognized(f: &Value, owners: &[(String, String)]) -> bool {
-    owners.len() == 1 && owners[0].0 == UNIT && f["metadata_event"].is_object()
+    owners.len() == 1
+        && matches!(owners[0].0.as_str(), UNIT | DEMOTION)
+        && f["metadata_event"].is_object()
 }
 pub(super) fn validate(
     current: &BTreeMap<String, Value>,
@@ -16,6 +19,17 @@ pub(super) fn validate(
         owners[0] == expected,
         "228 status owner differs from terminal proof"
     );
+    if expected.0 == DEMOTION {
+        for row in [
+            current
+                .get(DEMOTION)
+                .context("228 current demotion owner missing")?,
+            &f["unit_census"][DEMOTION],
+        ] {
+            fleet::native228_demotion_terminal_owner(row, &expected.1)?;
+        }
+        return Ok(());
+    }
     for u in [
         current.get(UNIT).context("228 current owner missing")?,
         &f["unit_census"][UNIT],

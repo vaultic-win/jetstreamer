@@ -638,7 +638,11 @@ fn exercise(n: &mut Native, r: &Value, source: &Bound) -> Result<Value> {
     for k in protect {
         origin[k] = json!(false);
     }
+    origin["fleet"] = r["fleet"].clone();
+    origin["observer"] = r["observer"].clone();
+    origin["resource_samples_taken"] = json!(0);
     let origin_ref = save_json(&n.root, "origin.json", &origin)?;
+    eprintln!("HORIZON228_ORIGIN_SHA256={}", origin_ref.sha256);
     let auth = current_owner(n, &worker)?;
     worker_sandbox(n, &auth, controller, &affinity)?;
     ensure!(
@@ -720,7 +724,8 @@ pub fn run(review: &Path, sha256: &str, evidence: &Path) -> Result<Value> {
     let result = exercise(&mut n, &r, &source);
     match &result {
         Ok(v) => {
-            save_json(evidence, "completion.json", v)?;
+            let b = save_json(evidence, "completion.json", v)?;
+            eprintln!("HORIZON228_COMPLETION_SHA256={}", b.sha256);
         }
         Err(e) => {
             save_json(

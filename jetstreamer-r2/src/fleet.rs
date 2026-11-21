@@ -64,6 +64,7 @@ mod native228;
 mod native228_admission;
 mod native228_capture;
 mod native228_collected;
+mod native228_demotion;
 mod native228_event;
 mod native228_full209;
 mod native228_peer209;
@@ -445,7 +446,16 @@ pub(super) fn capture_native228_input() -> Result<()> {
 pub(super) fn capture_native228_terminal() -> Result<()> {
     native228_terminal::capture()
 }
+pub(super) fn native228_demotion_terminal_owner(row: &Value, iid: &str) -> Result<()> {
+    native228_demotion::terminal_owner(row, iid)
+}
 pub(super) fn native228_terminal_status_identity(proof: &Value) -> Result<(String, String)> {
+    if proof["schema"] == native228_demotion::TERMINAL_SCHEMA {
+        return Ok((
+            native228_demotion::UNIT.into(),
+            native228_demotion::terminal(proof)?,
+        ));
+    }
     Ok((native228::UNIT.into(), native228_terminal::validate(proof)?))
 }
 pub(super) fn validate_warmup223_status_claim(value: &Value) -> Result<()> {
@@ -2870,9 +2880,11 @@ pub(super) async fn run() -> Result<()> {
                     sample,
                     started_seconds,
                 )?;
-            } else if event["schema"] == native228_terminal::SCHEMA {
+            } else if event["schema"] == native228_terminal::SCHEMA
+                || event["schema"] == native228_demotion::TERMINAL_SCHEMA
+            {
                 native228_terminal::predecessor(&previous, &plan, &event, sample, started_seconds)?;
-            } else if event["schema"] == native228::SCHEMA {
+            } else if native228::origin_schema(&event["schema"]) {
                 native228_event::event_predecessor(
                     &previous,
                     &plan,
@@ -3241,7 +3253,7 @@ pub(super) async fn run() -> Result<()> {
         native227_v1625_event::event_census(&previous, &before, claims[0])?;
     }
     if let Some(binding) = &plan.metadata_event
-        && bound_json(binding)?["schema"] == native228::SCHEMA
+        && native228::origin_schema(&bound_json(binding)?["schema"])
     {
         let previous = bound_json(
             plan.previous_fleet

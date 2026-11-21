@@ -27,7 +27,10 @@ pub(super) const PLAN_SHA: &str =
 pub(super) const SCRATCH: u64 = 300_000_000_000;
 pub(super) const MEMORY: u64 = 128u64 << 30;
 pub(super) fn scope(phase: &str, unit: &str) -> bool {
-    phase == "private-cold-snapshot-verification" && unit == UNIT
+    phase == "private-cold-snapshot-verification" && matches!(unit, UNIT | native228_demotion::UNIT)
+}
+pub(super) fn origin_schema(v: &Value) -> bool {
+    v == SCHEMA || v == native228_demotion::SCHEMA
 }
 pub(super) fn command() -> String {
     format!(
@@ -113,6 +116,9 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
         !c.evidence.is_empty() && c.evidence.len() <= 4,
         "228 origin evidence count"
     );
+    if c.unit == native228_demotion::UNIT {
+        return native228_demotion::claim(c);
+    }
     let r = immutable_json(&c.evidence[0])?;
     checked(c, &r)?;
     let extras = ["guard", "admission", "guard_plan"]
@@ -145,6 +151,9 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
     Ok(())
 }
 pub(super) fn live(c: &PipelineClaim, current: &Value) -> Result<()> {
+    if c.unit == native228_demotion::UNIT {
+        return native228_demotion::live(c, current);
+    }
     claim(c)?;
     let r = bound_json(&c.evidence[0])?;
     ensure!(

@@ -16,7 +16,7 @@ fn origin_binding(
             && previous["sampled_at_utc"] == sampled
             && previous["observer_receipt"].as_str() == p.observer.path.to_str()
             && previous["observer_sha256"] == p.observer.sha256
-            && proof["schema"] == "jetstreamer-private-epoch228-native-input-running-v1"
+            && c::origin_schema(&proof["schema"])
             && proof["observer"] == private157::binding(&p.observer)
             && p.previous_fleet
                 .as_ref()
@@ -62,22 +62,35 @@ pub(super) fn event_predecessor(
         .as_u64()
         .context("228 event clock")?;
     let a = bound_json(&serde_json::from_value(proof["admission"].clone())?)?;
-    ensure!(
-        a["schema"] == "jetstreamer-private-epoch228-native-admission-v1"
-            && a["mode"] == "native-cold"
-            && a["admitted"] == true
-            && a["unit"] == c::UNIT
-            && a["private_run_root"] == c::ROOT
-            && a["candidate_incremental_peak_bytes"] == c::SCRATCH
-            && a["observer"] == proof["observer"]
-            && a["fleet"] == proof["fleet"]
-            && a["fresh_complete_census_passed"] == true
-            && a["older_producers_and_guards_preserved"] == true
-            && a["recorded_unix_seconds"]
-                .as_u64()
-                .is_some_and(|n| n <= clock && clock - n <= 900),
-        "228 event lacks exact fresh native admission"
-    );
+    let unit = if proof["schema"] == native228_demotion::SCHEMA {
+        ensure!(
+            a["schema"] == "epoch228-demotion-cold-admission-v1"
+                && a["fleet"] == proof["fleet"]
+                && a["unit"] == native228_demotion::UNIT
+                && a["issued_unix_seconds"] == clock
+                && a["producer_only_no_entries"] == true,
+            "228 demotion owner differs from original funding"
+        );
+        native228_demotion::UNIT
+    } else {
+        ensure!(
+            a["schema"] == "jetstreamer-private-epoch228-native-admission-v1"
+                && a["mode"] == "native-cold"
+                && a["admitted"] == true
+                && a["unit"] == c::UNIT
+                && a["private_run_root"] == c::ROOT
+                && a["candidate_incremental_peak_bytes"] == c::SCRATCH
+                && a["observer"] == proof["observer"]
+                && a["fleet"] == proof["fleet"]
+                && a["fresh_complete_census_passed"] == true
+                && a["older_producers_and_guards_preserved"] == true
+                && a["recorded_unix_seconds"]
+                    .as_u64()
+                    .is_some_and(|n| n <= clock && clock - n <= 900),
+            "228 event lacks exact fresh native admission"
+        );
+        c::UNIT
+    };
     let old: Plan = serde_json::from_value(bound_json(&BoundFile {
         path: previous["plan"]
             .as_str()
@@ -91,12 +104,12 @@ pub(super) fn event_predecessor(
     let claims = p
         .pipeline_claims
         .iter()
-        .filter(|s| s.unit == c::UNIT)
+        .filter(|s| s.unit == unit)
         .collect::<Vec<_>>();
     ensure!(
         claims.len() == 1
             && p.pipeline_claims.len() == old.pipeline_claims.len() + 1
-            && !old.pipeline_claims.iter().any(|s| s.unit == c::UNIT)
+            && !old.pipeline_claims.iter().any(|s| s.unit == unit)
             && old
                 .pipeline_claims
                 .iter()
@@ -111,7 +124,7 @@ pub(super) fn event_predecessor(
         "228 event origin differs from its registered owner"
     );
     let mut tracked = old.tracked_units.iter().cloned().collect::<BTreeSet<_>>();
-    tracked.insert(c::UNIT.into());
+    tracked.insert(unit.into());
     ensure!(
         tracked == p.tracked_units.iter().cloned().collect()
             && p.schema == old.schema
@@ -182,9 +195,13 @@ pub(super) fn event_census(
     );
     let mut view = current.clone();
     let native = view
-        .remove(c::UNIT)
+        .remove(&claim.unit)
         .context("228 new native owner missing")?;
-    singleton227_admission::owners(previous, &view)?;
+    if claim.unit == native228_demotion::UNIT {
+        native228_demotion::peers(previous, &view, claim)?;
+    } else {
+        singleton227_admission::owners(previous, &view)?;
+    }
     c::live(claim, &native)?;
     Ok(())
 }

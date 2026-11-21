@@ -155,7 +155,13 @@ pub(super) fn predecessor(
     sampled: &str,
     now: u64,
 ) -> Result<()> {
-    validate(proof)?;
+    let unit = if proof["schema"] == native228_demotion::TERMINAL_SCHEMA {
+        native228_demotion::terminal(proof)?;
+        native228_demotion::UNIT
+    } else {
+        validate(proof)?;
+        c::UNIT
+    };
     let recorded = proof["recorded_unix_seconds"]
         .as_u64()
         .context("228 proof capture clock")?;
@@ -186,7 +192,7 @@ pub(super) fn predecessor(
     ensure!(
         old.pipeline_claims
             .iter()
-            .filter(|claim| claim.unit == c::UNIT
+            .filter(|claim| claim.unit == unit
                 && claim.invocation_id == proof["invocation_id"]
                 && claim
                     .evidence
@@ -242,6 +248,15 @@ pub(super) fn census_check(p: &Plan, current: &BTreeMap<String, Value>) -> Resul
         return Ok(());
     };
     let proof = bound_json(b)?;
+    if proof["schema"] == native228_demotion::TERMINAL_SCHEMA {
+        let iid = native228_demotion::terminal(&proof)?;
+        return native228_demotion::terminal_owner(
+            current
+                .get(native228_demotion::UNIT)
+                .context("228 terminal owner missing")?,
+            &iid,
+        );
+    }
     if proof["schema"] != SCHEMA {
         return Ok(());
     }

@@ -93,6 +93,12 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon-227-native-test-optimized-v1/native-input-test",
                 "1446cd728b4408208f125d073ecc52b1ae4205df095747dad7e91f3581ce4bf3",
             ),
+            228 if self.unit == "horizon-native-input-228-demotion-16d4b158-v1.service" => (
+                "horizon-native-input-228-demotion-16d4b158-v1.service",
+                "/home/ubuntu/.jetstreamer-private/native-input228-v1620-demotion-v1",
+                "/var/lib/jetstreamer/horizon228-demotion-bank-9d2fd8d4-v158-v2-qualified/worker",
+                "16d4b15881979bb7d65a0f49408580d4508b451a5953f35cbb60505d2e3cee00",
+            ),
             228 => (
                 "horizon-native-input-228-capped-1bfa8d51-v1.service",
                 "/home/ubuntu/.jetstreamer-private/native-input228-v1620-capped-v1/scratch",
@@ -838,6 +844,19 @@ mod tests {
         ] {
             assert_eq!(unavailable[field], false);
         }
+    }
+    #[test]
+    fn native228_demotion_requires_original_worker_and_scratch() {
+        let mut n: NativeConfig = serde_json::from_value(serde_json::json!({
+            "epoch":228,"unit":"horizon-native-input-228-demotion-16d4b158-v1.service",
+            "expected_invocation_id":"a".repeat(32),"main_pid":42,
+            "scratch_path":"/home/ubuntu/.jetstreamer-private/native-input228-v1620-demotion-v1",
+            "executable":"/var/lib/jetstreamer/horizon228-demotion-bank-9d2fd8d4-v158-v2-qualified/worker",
+            "executable_sha256":"16d4b15881979bb7d65a0f49408580d4508b451a5953f35cbb60505d2e3cee00"
+        })).unwrap();
+        n.validate().unwrap();
+        n.unit="horizon-native-input-228-capped-1bfa8d51-v1.service".into();
+        assert!(n.validate().is_err());
     }
     #[test]
     fn native228_cannot_use_the_neighboring_native_harness() {
