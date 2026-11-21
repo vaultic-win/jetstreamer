@@ -270,3 +270,46 @@ def forecast(c,epoch,old,prior):
     need(remaining>0,'replacement forecast expired; reconcile actual replay')
     return dict(old,sampled_at_utc=c.stamp,elapsed_execution_millis=elapsed,estimated_remaining_millis=remaining,
                 phase=row['phase'],jet_size_bytes=size),archive
+
+
+def admission_status_path(epoch, iid):
+    from evidence import STATUS_ROOT
+    import re
+
+    need(epoch in ROUTES and re.fullmatch('[0-9a-f]{32}', iid), 'unexpected recovery identity')
+    return STATUS_ROOT / f'event-{epoch}-guarded-admission-{iid}' / 'RECEIPT.json'
+
+
+def admission_status(epoch, predecessor, tag, raw):
+    """Adopt the single authenticated repair-to-producer status from the actual admission."""
+    from evidence import digest
+    from status import body, key, FIELDS
+
+    current = native(epoch)
+    if current is None:
+        return None
+    _, actor = current
+    iid = actor['producer_invocation_id']
+    path = admission_status_path(epoch, iid)
+    if not path.exists():
+        return None
+    ref = bound(path)
+    event = checked(ref)
+    prior = checked(predecessor)
+    root = BASE / ROUTES[epoch][1]
+    admitted = bound(root/'ACTUAL_ADMISSION_AND_PROTECTION.json')
+    first = bound(root/'FIRST_PROTECTED_WORKER.json')
+    admitted_actor = checked(admitted)
+    need(event['schema']=='horizon-guarded-admission-status-v1' and event['epoch']==epoch
+         and event['key']==key(epoch) and not event['archive_or_sidecar_mutations']
+         and event['authenticated_readback'] and event['conditional_header']=='If-Match'
+         and event['previous_receipt']==predecessor and event['before_status']==prior['after_status']
+         and event['before_sha256']==prior['after_sha256'] and event['before_etag']==prior['after_etag']
+         and event['actor']==actor and event['producer_invocation_id']==iid and event['admission']==admitted
+         and event['first_worker']==first and checked(first)['admission']==admitted
+         and all(admitted_actor[k]==v for k,v in actor.items())
+         and event['after_etag']==tag and set(event['after_status'])==FIELDS
+         and event['after_status']['epoch']==epoch and event['after_status']['phase']=='verification'
+         and event['after_sha256']==digest(raw) and raw==body(event['after_status']),
+         'unbound recovery admission status for '+str(epoch))
+    return ref,event
