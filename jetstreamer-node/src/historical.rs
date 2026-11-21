@@ -212,6 +212,11 @@ const SOLANA_V1_8_11_RUST_TOOLCHAIN: &str = "rustc 1.52.1 (9bc8c42bb 2021-05-09)
 const SOLANA_V1_8_11_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 fn backend_supports_entry_batches(backend_id: &str) -> bool {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if backend_id == crate::epoch228_demotion::BACKEND {
+        return true;
+    }
+
     matches!(
         backend_id,
         SOLANA_V1_0_7_BACKEND_ID
@@ -1397,6 +1402,11 @@ impl HistoricalRuntimeClient {
         // worker only the private, digest-bound copy. This closes the path
         // replacement window between parent admission and worker loading.
         let bound_executable = bind_worker_executable(&executable, private_work_dir.path())?;
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        if profile.backend_id == crate::epoch228_demotion::BACKEND {
+            crate::epoch228_demotion::validate_worker_digest(bound_executable.sha256)
+                .map_err(|message| io::Error::new(io::ErrorKind::InvalidInput, message))?;
+        }
         let (ledger_path, initial_state, expected_source) = match initialization {
             HistoricalInitialization::SnapshotArchive(initialization) => {
                 let ledger_path = canonical_directory(&initialization.ledger_path, "ledger")?;
@@ -5757,6 +5767,38 @@ mod tests {
 
     fn valid_handshake() -> protocol::Handshake {
         valid_handshake_for(SOLANA_V1_0_24_CANDIDATE)
+    }
+
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    #[test]
+    fn epoch228_private_handshake_rejects_old_workers_foreign_profiles_and_identity_drift() {
+        let selection =
+            crate::epoch228_demotion::select(98_496_000..98_928_279, true, true).unwrap();
+        let candidate = crate::epoch228_demotion::worker_profile(selection.descriptor).unwrap();
+        let correct = valid_handshake_for(candidate);
+        verify_handshake(candidate, &correct).unwrap();
+        assert!(verify_handshake(SOLANA_V1_6_20_CANDIDATE, &correct).is_err());
+        for backend in [
+            "solana-v1.6.20",
+            "solana-v1.6.25",
+            "solana-v1.6.20-epoch223-called-program-demotion-candidate",
+        ] {
+            let mut wrong = correct.clone();
+            wrong.backend_id = backend.into();
+            assert!(verify_handshake(candidate, &wrong).is_err());
+        }
+        for field in 0..6 {
+            let mut wrong = correct.clone();
+            match field {
+                0 => wrong.protocol_version += 1,
+                1 => wrong.solana_tag = "v1.6.25".into(),
+                2 => wrong.solana_commit = "0".repeat(40),
+                3 => wrong.rust_toolchain = "foreign".into(),
+                4 => wrong.target = "foreign".into(),
+                _ => wrong.required_genesis_hash = "foreign".into(),
+            }
+            assert!(verify_handshake(candidate, &wrong).is_err());
+        }
     }
 
     #[test]

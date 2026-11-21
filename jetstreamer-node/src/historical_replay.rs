@@ -303,6 +303,10 @@ impl HistoricalReplay {
         progress: Arc<ReplayProgress>,
         live_start_slot: Slot,
     ) -> Result<Self, String> {
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        let mut client = client;
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        crate::epoch228_demotion::initialize(&mut client)?;
         let current_slot = client.initialized().slot;
         let initialized_source = client.initialized().source;
         let checkpoint_slots: BTreeSet<Slot> = snapshot_verifier
@@ -1069,6 +1073,8 @@ impl HistoricalReplay {
                 apply_runtime_reconstructed_metadata(scheduled, actual);
             }
         }
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        crate::epoch228_demotion::outcomes(entry, outcomes)?;
         Ok(())
     }
 
@@ -1105,6 +1111,8 @@ impl HistoricalReplay {
             &checkpoint.writes,
         )?;
         let summary = HistoricalCheckpointSummary::try_from(&checkpoint)?;
+        #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+        crate::epoch228_demotion::checkpoint(&checkpoint)?;
         self.verify_checkpoint(&checkpoint);
         self.emit_writes(checkpoint.writes);
         state.emitted_write_versions = emitted_write_versions;

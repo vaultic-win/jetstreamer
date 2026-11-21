@@ -1,3 +1,5 @@
+#[cfg(feature = "epoch228-called-program-demotion-qualification")]
+mod epoch228_demotion;
 #[cfg(all(
     feature = "epoch163-first-output128-diagnostic",
     any(
@@ -5668,6 +5670,10 @@ fn select_runtime_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if focused_qualification && epoch228_demotion::selected(&range) {
+        return epoch228_demotion::select(range, focused_qualification, allow_candidate_runtime);
+    }
     if focused_qualification
         || epoch207_singleton::selected(&range)
         || singletons209_212::selected(&range)
@@ -5684,6 +5690,17 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
     allow_candidate_runtime: bool,
     focused_qualification: bool,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if focused_qualification && epoch228_demotion::selected(&output_range) {
+        if replay_start != epoch228_demotion::BOOTSTRAP + 1 {
+            return Err("private epoch 228 requires its exact cold replay start".into());
+        }
+        return epoch228_demotion::select(
+            output_range,
+            focused_qualification,
+            allow_candidate_runtime,
+        );
+    }
     if focused_qualification
         || epoch207_singleton::selected(&output_range)
         || singletons209_212::selected(&output_range)
@@ -5705,6 +5722,10 @@ fn select_runtime_with_snapshot_warmup_for_invocation(
 fn runtime_span_selection(
     span: &compatibility::RuntimeSpan,
 ) -> Result<compatibility::RuntimeSelection, String> {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if epoch228_demotion::selected(&span.slots) {
+        return epoch228_demotion::select(span.slots.clone(), true, true);
+    }
     let compatibility::EraBackend::Available(descriptor) = span.execution.backend else {
         return Err(format!(
             "runtime span {}..{} unexpectedly retained unsupported era {}",
@@ -7782,6 +7803,10 @@ fn build_multi_runtime_provenance(
 fn historical_worker_profile(
     descriptor: &compatibility::RuntimeDescriptor,
 ) -> Result<historical::WorkerProfile, String> {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if descriptor.identity.name == epoch228_demotion::BACKEND {
+        return epoch228_demotion::worker_profile(descriptor);
+    }
     let profile = match descriptor.backend {
         compatibility::RuntimeBackend::SolanaV1_0_7 => historical::SOLANA_V1_0_7_CANDIDATE,
         compatibility::RuntimeBackend::SolanaV1_0_8 => historical::SOLANA_V1_0_8_CANDIDATE,
@@ -11969,6 +11994,31 @@ async fn run_geyser_replay(
             ledger_dir,
         )?;
     }
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    {
+        if carried_state.is_some()
+            || audited_cohort_bootstrap.is_some()
+            || verification_end_inclusive.is_some()
+            || snapshot_export.is_some()
+            || retain_runtime_state
+            || checkpoint_restart.is_some()
+            || tail_comparison
+            || prefix_preflight
+        {
+            return Err(
+                "private epoch 228 cannot borrow cohort, recovery, handoff or another diagnostic"
+                    .into(),
+            );
+        }
+        epoch228_demotion::launch(
+            epoch,
+            epoch,
+            qualification.map(|p| (p.bootstrap_slot, p.end_inclusive)),
+            false,
+            false,
+            Some((ledger_dir, &horizon_output, replay_scratch_dir)),
+        )?;
+    }
     #[cfg(feature = "epoch141-original-entry-qualification")]
     epoch141_original_entry::validate_execution(
         epoch,
@@ -12514,6 +12564,8 @@ async fn run_geyser_replay(
                                 )
                             }
                         };
+                    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+                    let initialization = epoch228_demotion::bind_initialization(initialization)?;
                     let spawn = historical::WorkerSpawn {
                         executable,
                         initialization,
@@ -14942,6 +14994,10 @@ fn qualification_expectations(
     bootstrap: compatibility::BootstrapState,
     resume: Option<&qualification_checkpoint_resume::ValidatedResume>,
 ) -> Result<BTreeMap<Slot, BankHashExpectation>, String> {
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if plan.epoch == 228 {
+        return epoch228_demotion::expectations(expected, plan, snapshot_archive, bootstrap);
+    }
     let (snapshot_slot, snapshot_expectation) =
         snapshot_path_expectation(snapshot_archive, bootstrap)?;
     if snapshot_slot != plan.bootstrap_slot {
@@ -19646,6 +19702,24 @@ async fn main() {
         eprintln!("error: {error}");
         exit(2);
     }
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    {
+        if let Err(error) = epoch228_demotion::entrypoint(&probe_args) {
+            eprintln!("error: {error}");
+            exit(2);
+        }
+        if probe_args.first().map(String::as_str) == Some("--epoch228-demotion-capability") {
+            match epoch228_demotion::capability() {
+                Ok(report) => println!("{report}"),
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    exit(2);
+                }
+            }
+            return;
+        }
+    }
+
     if epoch223_qualification::private_build_enabled()
         && let Err(error) = epoch223_qualification::validate_entrypoint(&probe_args)
     {
@@ -20586,6 +20660,26 @@ async fn main() {
             .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
     ) {
         eprintln!("{error}");
+        exit(2);
+    }
+    #[cfg(feature = "epoch228-called-program-demotion-qualification")]
+    if let Err(error) = epoch228_demotion::launch(
+        start_epoch,
+        end_epoch,
+        qualification.map(|p| (p.bootstrap_slot, p.end_inclusive)),
+        root_checkpoint_cohort,
+        recover_staged_only
+            || recover_staged_cohort_only
+            || recover_unreceipted_root_cohort_only
+            || inherited_epoch_lease,
+        horizon_output
+            .as_deref()
+            .zip(replay_scratch.as_deref())
+            .map(|(output, scratch)| (dest_dir.as_path(), output, scratch)),
+    )
+    .and_then(|_| epoch228_demotion::fresh_filesystem(&dest_dir))
+    {
+        eprintln!("error: {error}");
         exit(2);
     }
     if epoch223_qualification::private_build_enabled()
