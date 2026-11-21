@@ -14,6 +14,15 @@ from scripts import refresh_idle_gcloud_lane_configs as refresh
 
 
 class IdleGCloudRefreshTests(unittest.TestCase):
+    def test_large_proc_map_finds_path_across_read_boundaries(self) -> None:
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / "maps"
+            target = b"/private/lane/config/gcloud"
+            path.write_bytes(b" " * (64 * 1024 - 4) + target + b" " * (64 * 1024))
+            self.assertTrue(refresh.proc_file_contains(path, target))
+            self.assertFalse(refresh.proc_file_contains(path, target + b"-other"))
+            self.assertFalse(refresh.proc_file_contains(path.with_name("gone"), target))
+
     def test_direct_cli_help_is_cwd_independent(self) -> None:
         with TemporaryDirectory() as temporary:
             completed = subprocess.run(

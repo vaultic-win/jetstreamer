@@ -365,6 +365,23 @@ def _read_link(path: Path) -> str | None:
         raise RefreshError(f"cannot inspect process link {path}: {error}") from error
 
 
+def proc_file_contains(path: Path, needle: bytes) -> bool:
+    """Search even a large process map without allocating a copy of it."""
+    try:
+        with path.open("rb", buffering=0) as source:
+            tail = b""
+            while chunk := source.read(64 * 1024):
+                block = tail + chunk
+                if needle in block:
+                    return True
+                tail = block[-(len(needle) - 1):] if len(needle) > 1 else b""
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+    except OSError as error:
+        raise RefreshError(f"cannot inspect process evidence {path}: {error}") from error
+    return False
+
+
 def process_references(target: Path, proc_root: Path = Path("/proc")) -> list[str]:
     needle = os.fsencode(str(target))
     matches: list[str] = []
@@ -378,8 +395,7 @@ def process_references(target: Path, proc_root: Path = Path("/proc")) -> list[st
             continue
         pid = int(process.name)
         for label in ("cmdline", "environ", "maps"):
-            content = _read_proc(process / label)
-            if content is not None and needle in content and not (label == "cmdline" and pid in ancestors):
+            if not (label == "cmdline" and pid in ancestors) and proc_file_contains(process / label, needle):
                 matches.append(f"pid {pid} {label}")
         for label in ("cwd", "root", "exe"):
             value = _read_link(process / label)
