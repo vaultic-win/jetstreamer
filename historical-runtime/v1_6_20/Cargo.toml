@@ -4,9 +4,13 @@ members = [
     "worker",
 ]
 exclude = [
+    "vendor/solana-program-1.6.20",
     "vendor/solana-bpf-loader-program-1.6.20",
     "vendor/solana-runtime-1.6.20",
 ]
+
+[patch."https://github.com/solana-labs/solana.git"]
+solana-program = { path = "vendor/solana-program-1.6.20" }
 
 [profile.release]
 lto = true
