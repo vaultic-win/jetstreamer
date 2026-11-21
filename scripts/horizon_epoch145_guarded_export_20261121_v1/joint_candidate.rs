@@ -4,7 +4,7 @@ use super::*;
 use std::collections::BTreeSet;
 
 pub const UNIT: &str = "horizon-qualify-136-actual-20261120-g1.service";
-const BASE136: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1";
+pub(super) const BASE136: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1";
 const WRITER: &str = "horizon-admit-136-actual-20261120-g1.service";
 const TIMER: &str = "horizon-guard-136-actual-20261120-g1.timer";
 const GUARD: &str = "horizon-guard-136-actual-20261120-g1.service";
@@ -13,7 +13,7 @@ const GUARD_IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry9-recovery-20261120-v1/guard-v1/guard";
 const HELPER: &str = "93162c6910f01149cb50eccdfa742e5a732658dd8ac17865a5f2eaef526c0594";
 const NODE: &str = "bf702870fa328cf3fc43dd12a3943cab059fb7b0aa4ea1d3753c6a09b940cd71";
-const WORKER: &str = "3ea95997d956de6a8c7fa431e679d496a5d3c31e15f8a104a8ddb0086646ea3d";
+pub(super) const WORKER: &str = "3ea95997d956de6a8c7fa431e679d496a5d3c31e15f8a104a8ddb0086646ea3d";
 pub const LIMIT: u64 = 72 << 30;
 const ROOT_CAP: u64 = 64 << 30;
 const ROOT136: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1/reproduction";
@@ -269,6 +269,27 @@ fn candidate_values(a: &Value, plan: &Value, base: &Path, cap: &Value) -> Result
     Ok(())
 }
 
+fn timer_trigger() -> Result<u64> {
+    let trigger = capacity::run(
+        "/usr/bin/busctl",
+        &[
+            "--system",
+            "--timeout=5s",
+            "get-property",
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1/unit/horizon_2dguard_2d136_2dactual_2d20261120_2dg1_2etimer",
+            "org.freedesktop.systemd1.Timer",
+            "LastTriggerUSecMonotonic",
+        ],
+        "8",
+    )?;
+    Ok(trigger
+        .strip_prefix("t ")
+        .and_then(|v| v.strip_suffix('\n'))
+        .context("timer trigger")?
+        .parse::<u64>()?)
+}
+
 pub fn observe() -> Result<Candidate> {
     let base = Path::new(BASE136);
     let ap = base.join("admission.json");
@@ -373,39 +394,23 @@ pub fn observe() -> Result<Candidate> {
             && g["invocation_id"] == iid
             && g["worker_root"] == ROOT136
             && g["minimum_free_bytes"] == floor
+            && g["filesystem"] == "/home/sol"
+            && g["maximum_worker_vmas"] == 3_500_000
             && g["maximum_root_physical_bytes"] == ROOT_CAP
             && g["receipt_directory"] == receipts.join("guard").to_str().unwrap(),
         "136 guard plan changed"
     );
-    let timer = show(TIMER, "Id,InvocationID,ActiveState,Triggers,Job")?;
-    let guard = show(
-        GUARD,
-        "Id,InvocationID,Type,Result,ExecMainStatus,ExecStart,NRestarts,ExecMainStartTimestampMonotonic,MainPID,ControlPID",
-    )?;
+    let timer_fields = "Id,InvocationID,ActiveState,Triggers,Job";
+    let guard_fields = "Id,InvocationID,Type,Result,ExecMainStatus,ExecStart,NRestarts,ExecMainStartTimestampMonotonic,MainPID,ControlPID";
+    let timer = show(TIMER, timer_fields)?;
+    let guard = show(GUARD, guard_fields)?;
     if (timer["ActiveState"] != "active" || guard["InvocationID"] == "")
         && live_writer
         && now <= num(&a, "launch_expires_unix_seconds")?
     {
         return Err(capacity::GuardInFlight.into());
     }
-    let trigger = capacity::run(
-        "/usr/bin/busctl",
-        &[
-            "--system",
-            "--timeout=5s",
-            "get-property",
-            "org.freedesktop.systemd1",
-            "/org/freedesktop/systemd1/unit/horizon_2dguard_2d136_2dactual_2d20261120_2dg1_2etimer",
-            "org.freedesktop.systemd1.Timer",
-            "LastTriggerUSecMonotonic",
-        ],
-        "8",
-    )?;
-    let trigger = trigger
-        .strip_prefix("t ")
-        .and_then(|v| v.strip_suffix('\n'))
-        .context("timer trigger")?
-        .parse::<u64>()?;
+    let trigger = timer_trigger()?;
     if trigger == 0
         || guard["MainPID"] != "0"
         || guard["ControlPID"] != "0"
@@ -453,6 +458,10 @@ pub fn observe() -> Result<Candidate> {
             && sample["guard_sha256"] == GUARD_SHA
             && sample["minimum_free_bytes"] == floor
             && sample["maximum_root_physical_bytes"] == ROOT_CAP
+            && sample["maximum_worker_vmas"] == 3_500_000
+            && sample["bounded_measurement"] == false
+            && sample["bounded_canary"].is_null()
+            && sample["native_main"].is_null()
             && sample["producer_stop_enabled"] == true
             && sample["trip_reason"].is_null()
             && sample["worker_observation_error"].is_null()
@@ -465,27 +474,22 @@ pub fn observe() -> Result<Candidate> {
                 .is_some_and(|d| d <= 120),
         "136 guard health or generation"
     );
-    let mut worker = None;
-    let mut node = None;
-    for p in members.iter().filter(|p| **p != pid) {
-        if same_image(*p, &base.join("tools/jetstreamer-node"))? && node.replace(*p).is_none() {
-            continue;
-        }
-        if same_image(
-            *p,
+    let root = Path::new(ROOT136);
+    let procgroup = format!("0::/system.slice/{UNIT}");
+    let census = |members: &BTreeSet<u32>| {
+        joint_worker::census(
+            members,
+            pid,
+            &procgroup,
+            root,
+            &base.join("tools/jetstreamer-node"),
             &base.join("tools/jetstreamer-historical-worker-v1-4-25"),
-        )? && worker.replace(*p).is_none()
-        {
-            continue;
-        }
-        // The admitted supervisor briefly runs native metadata commands. Never
-        // grant positive fit while a fourth or unknown image is present.
-        return Err(capacity::GuardInFlight.into());
-    }
-    ensure!(
-        worker.is_none() || node.is_some(),
-        "136 worker without admitted node"
-    );
+            WORKER,
+        )
+    };
+    let tree = census(&members)?;
+    let node = tree.node.as_ref().map(|p| p.pid);
+    let worker = tree.worker.as_ref().map(|p| p.pid);
     if node.is_some() || !live_writer {
         let rel = joint::receipt(&ready)?.1;
         ensure!(
@@ -501,15 +505,33 @@ pub fn observe() -> Result<Candidate> {
             "missing actual 136 writer release"
         );
     }
+    if let Some(w) = &tree.worker {
+        let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+        ensure!(hz > 0, "kernel process clock");
+        let guard_start = prop(&guard, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
+        if (u128::from(w.start_ticks) + 1) * 1_000_000 > u128::from(guard_start) * hz as u128 {
+            return Err(capacity::GuardInFlight.into());
+        }
+    }
     let actual = sample["workers"].as_array().context("136 worker census")?;
-    if (worker.is_some() && !(actual.len() == 1 && actual[0][0] == worker.unwrap()))
+    if (worker.is_some()
+        && !(actual.len() == 1
+            && actual[0][0] == worker.unwrap()
+            && actual[0][1]
+                .as_u64()
+                .is_some_and(|n| n > 0 && n <= 3_500_000)))
         || (worker.is_none() && !actual.is_empty())
     {
         return Err(capacity::GuardInFlight.into());
     }
-    let root = Path::new(ROOT136);
+    let rm = fs::symlink_metadata(root)?;
     ensure!(
-        fs::symlink_metadata(root)?.dev() == 64512 && root.canonicalize()? == root,
+        rm.is_dir()
+            && rm.uid() == 0
+            && rm.gid() == 0
+            && rm.mode() & 0o7777 == 0o711
+            && rm.dev() == 64512
+            && root.canonicalize()? == root,
         "136 charged root"
     );
     let (physical, proof) = stable::measure(root)?;
@@ -525,8 +547,16 @@ pub fn observe() -> Result<Candidate> {
         .map(str::parse::<u32>)
         .collect::<std::result::Result<BTreeSet<_>, _>>()?;
     if current_members != members
-        || show(TIMER, "InvocationID")?["InvocationID"] != timer["InvocationID"]
-        || show(GUARD, "InvocationID")?["InvocationID"] != gid
+        || census(&current_members)? != tree
+        || !same_image(pid, &base.join("tools/epoch136-actual-payload"))?
+        || fs::read_to_string(format!("/proc/{pid}/cgroup"))?.trim() != procgroup
+        || !{
+            let after = fs::symlink_metadata(root)?;
+            after.dev() == rm.dev() && after.ino() == rm.ino()
+        }
+        || show(TIMER, timer_fields)? != timer
+        || show(GUARD, guard_fields)? != guard
+        || timer_trigger()? != trigger
     {
         return Err(capacity::GuardInFlight.into());
     }
@@ -537,7 +567,7 @@ pub fn observe() -> Result<Candidate> {
         realized,
         identity: json!({"unit":UNIT,"invocation_id":iid,
       "pid":pid,"start_ticks":ticks,"admission":ab,"writer_invocation_id":a["writer_invocation_id"],"writer":w,
-      "guard_plan":gp,"guard_sample":sb,"node_pid":node,"worker_pid":worker,"positive_physical_subset":proof}),
+      "guard_plan":gp,"guard_sample":sb,"node_pid":node,"worker_pid":worker,"process_tree":tree,"positive_physical_subset":proof}),
     })
 }
 #[cfg(test)]

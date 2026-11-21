@@ -16,6 +16,7 @@ mod capacity;
 mod closed166;
 mod joint;
 mod joint_candidate;
+mod joint_worker;
 mod materialized;
 mod post;
 mod publication;

@@ -3,7 +3,7 @@
 use super::*;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools/export145";
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v2/export145";
 const ROOT: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1";
 const EXPORT: &str = "de6780b860b3467bae21fbd19176ca14";
 const EXPORT_IMAGE: &str = "b143476e50f508fe7f0fb3685dd04c8c321faf44c0e98a191810e181da2c0447";
@@ -134,6 +134,10 @@ fn phase(sha: &str, staged: &Bound) -> Result<Value> {
     let (known, hash) = match mode {
         "run" if iid == EXPORT => (old_root, EXPORT_IMAGE),
         "post-full" | "publish" if args[0] == IMAGE => (PathBuf::from(IMAGE), sha),
+        "post-full" | "publish" if args[0] == format!("{ROOT}/joint-tools/export145") => (
+            Path::new(ROOT).join("joint-tools/export145"),
+            "92e07a4f0531aa86c37cc4a6b916abcd11f9e2586143b2ddf26fa61822a50f63",
+        ),
         "post-full" => (
             Path::new(ROOT).join("post-tools/export145"),
             "c22e1758110a36165950c645f8dc8cefd44285d17efd4378eaaa0e36895ece42",
@@ -291,6 +295,7 @@ pub fn inspect(fleet: Bound, sha: &str, tail: &[String]) -> Result<()> {
         again.armed == c.armed
             && again.identity["invocation_id"] == c.identity["invocation_id"]
             && again.identity["admission"] == c.identity["admission"]
+            && again.identity["process_tree"] == c.identity["process_tree"]
             && phase(sha, &staged)? == first
             && incumbents(&body)? == six,
         "joint participants changed"

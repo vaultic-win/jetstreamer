@@ -24,7 +24,7 @@ struct OpenHow {
     mode: u64,
     resolve: u64,
 }
-fn beneath(root: &File, relative: &Path, flags: i32) -> io::Result<File> {
+pub(super) fn beneath(root: &File, relative: &Path, flags: i32) -> io::Result<File> {
     let name = CString::new(relative.as_os_str().as_bytes())?;
     const RESOLVE_NO_XDEV: u64 = 0x01;
     const RESOLVE_NO_SYMLINKS: u64 = 0x04;
