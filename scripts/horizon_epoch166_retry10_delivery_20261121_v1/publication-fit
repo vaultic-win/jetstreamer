@@ -16,11 +16,12 @@ T=R/"epoch166-retry10-terminal-20261121-v1"
 BOOK=16<<20
 MEM=810658050048
 FULL168=R/"epoch168-current-delivery-20261121-v1"
-FLEET_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",168:"metered168_local_commit",170:"recovered170_local_commit"}
-CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered168",170:"closed_recovered170"}
-TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170)}}
-PACKAGES={166:D/"capacity-tools-v3",168:FULL168/"capacity-tools-v2",**{e:TERMINALS[e]/"capacity-tools" for e in (167,170)}}
-CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30}
+FLEET_FIELDS={166:"recovered166_local_commit",167:"indexed167_local_commit",168:"metered168_local_commit",170:"recovered170_local_commit",172:"full172_local_commit"}
+CLOSURES={166:"closed_recovered166",167:"closed_indexed167",168:"closed_metered168",170:"closed_recovered170",172:"closed_full172"}
+TERMINALS={166:T,168:FULL168,**{e:R/f"epoch{e}-current-delivery-20261121-v1" for e in (167,170,172)}}
+PACKAGES={166:D/"capacity-tools-v4",168:FULL168/"capacity-tools-v3",172:TERMINALS[172]/"capacity-tools",
+          **{e:TERMINALS[e]/"capacity-tools-v2" for e in (167,170)}}
+CAPS={166:288<<30,167:512<<30,168:288<<30,170:384<<30,172:288<<30}
 # Exact unused allowances in the three authenticated, pre-launch START_INTENT receipts.
 PRESTART={166:169028829184,167:177601941504,170:230591926272}
 
@@ -69,6 +70,9 @@ def validate(value,fleet,fr,tr,epoch=166):
              (e not in PRESTART or key not in fleet["original_disk_guard_recovery_workers"]) and
              (e!=168 or value["normal168"] is None and value["active168_guard_floor"]==0 and
               value["registered_host_equation"]["retained_168_remaining"]==booking["remaining_bytes"]) and
+             (e!=172 or key not in value["survivors"] and value["registered_host_equation"]["retained_172_remaining"]==booking["remaining_bytes"]
+              and value["registered_host_equation"]["retained_172_plan"]==booking["plan"]
+              and fleet.get("full172_guard_retirement")==closed[172]["guard_retirement"]) and
              booking["measurement"]=="two complete stopped-tree walks" and booking["physical_bytes"]>0 and
              booking["remaining_bytes"]+booking["physical_bytes"]==booking["cap_bytes"]==CAPS[e],"closed booking or owner changed")
     memory=MEM-sum(p["resident"] for p in value["survivors"].values())-sum(value["joined_resident_lower_bounds"].values())
@@ -151,7 +155,7 @@ def capture(path,sha,epoch=166):
     return dict(schema=f"horizon-{epoch}-publication-fit-v1",fleet=fr,terminal=tr,boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
                 observed_unix_seconds=int(time.time()),available_bytes=b["available_HOME_bytes"],protected_bytes=validate(b,fleet,fr,tr,epoch),
                 available_memory_bytes=b["available_memory_bytes"],required_available_memory_bytes=b["required_available_memory_bytes"],
-                publication_cpu_quota_micros=1000000,publication_memory_bytes=2<<30,complete_cpu_quota_micros=64000000,
+                publication_cpu_quota_micros=500000 if epoch==172 else 1000000,publication_memory_bytes=2<<30,complete_cpu_quota_micros=64000000,
                 complete_memory_plus_reserve_bytes=MEM,resource_credit_bytes=0,all_existing_commitments_retained=True,
                 full_capacity_provider=pr,complete_captures=refs,source_booking=b["bookings"][str(epoch)],funded_extra_home_bytes=len(closing(b,fleet))*BOOK,
                 charged_to_original_epoch=epoch,**{field:b.get(field) for field in CLOSURES.values()})

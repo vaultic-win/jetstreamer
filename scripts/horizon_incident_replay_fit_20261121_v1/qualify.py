@@ -93,7 +93,7 @@ def main():
            and adapter8["PIPE"].parent.name=="public-rseek-reconnect-56bf2bf0937f","foreign 145 successor post adapter")
     for name in ("qualify_four_prices.py","publication-fit"):
         data=(here/name).read_bytes()
-        s.need(data==git("show",commit+":scripts/horizon_epoch166_retry10_delivery_20261121_v1/"+name),"different four-price source")
+        s.need(data==git("show",commit+":scripts/horizon_epoch166_retry10_delivery_20261121_v1/"+name),"different publication pricing source")
         src[name]=digest(data)
     _,_,rejoin=m["profile145"](here,rejoin=True)
     _,_,current_post=m["profile145"](here,post=True,rejoin=True)
@@ -185,9 +185,9 @@ def main():
            eq["retained_168_remaining"]==t["cap"]-t["physical_bytes"] and
            floor(raw,optional,books,145,peer,others,0,paid)[0]<=baseline[0],"closed metered booking changed original equation")
     adapter=runpy.run_path(str(here/"publication-fit"))
-    four=runpy.run_path(str(here/"qualify_four_prices.py"))["trials"](m,adapter,observed,f)
+    prices=runpy.run_path(str(here/"qualify_four_prices.py"))["trials"](m,adapter,observed,f)
     name="native-"+os.environ["INVOCATION_ID"]+".json"
-    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,four_publication_prices=four,phase145_recovery_post_registration=post8_binding,phase145_timeout_rejoin_registration=timeout_rejoin,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
+    receipt=dict(schema="horizon-incident-replay-fit-native-qualification-v1",source_commit=commit,source_sha256=src,fit=observed,five_publication_prices=prices,phase145_recovery_post_registration=post8_binding,phase145_timeout_rejoin_registration=timeout_rejoin,phase145_registration=binding,phase145_post_registration=post_binding,phase145_rejoin_registration=rejoin,phase145_current_post_registration=current_post,closed166_budget_conserved=True,closed168_booking_once=True,closure168_registration=registration168,
                  rejected=["wrong fleet digest","nonmember epoch","superseded incident fleet"],own_growth_conservation=True,worker_fork_control=fork,closed_verifier145=closure)
     target=D/name
     with target.open("xb") as f:

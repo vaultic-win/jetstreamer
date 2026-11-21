@@ -36,7 +36,12 @@ def trials(full, publication, measured, fleet):
         assert claim["sha256"]==terminal["local_archive"]["sha256"] and claim["receipt_sha256"]==terminal["committed_receipt"]["sha256"]
         assert claim["transaction_id"]==terminal["transaction_id"]
         assert result["native_batch"] == br and batch["epochs"] == [epoch] and result["receiver"]["canonical_writes"] == 0
-        if epoch in (167, 170):
+        if epoch == 172:
+            guard = runpy.run_path(str(delivery / "closure-tools/closure172.py"))["guard"]
+            original_live, _, admission, worker = guard.original()
+            assert live["admission"] == admission and live["first_protected_worker"] == worker
+            assert live["booked_tree"] == original_live["booked_tree"]
+        elif epoch in (167, 170):
             guard = peers["authority"](epoch).guard
         elif epoch == 168:
             guard = full["terminal168_profile"]()[0]["guard"]
@@ -44,6 +49,10 @@ def trials(full, publication, measured, fleet):
             guard = runpy.run_path(str(Path(full["CHILD"]).with_name("closure.py")))["ORIGINAL"]
         guard.validate_terminal(terminal, live, lr, live["admission"], live["first_protected_worker"])
         proof = dict(terminal=tr, admission=live["admission"], producer_invocation_id=guard.producer_id, resource_credit_bytes=0)
+        if epoch == 172:
+            # There is no production retirement yet. Use a fixture reference, separate
+            # from the original live authority and its still-running timer.
+            proof["guard_retirement"] = rr
         terminals[epoch] = proof
         artifacts[epoch] = dict(native_qualification=row, terminal=tr, batch=br)
         if epoch in publication["PRESTART"]:
@@ -58,7 +67,13 @@ def trials(full, publication, measured, fleet):
             prepaid[str(epoch)] = unused
 
     prices, rejected = [], []
-    for count in range(1, 5):
+    # Keep live 172 guard accounting on the original host equation as a comparator.
+    cap172 = measured["survivors"]["172"]["guard"]
+    evidence172 = terminals[172]
+    tree168 = measured["bookings"]["168"]
+    raw_tree168 = dict(cap=tree168["cap_bytes"],physical_bytes=tree168["physical_bytes"],root=tree168["root"])
+    ledger=full["bound"](full["fit"].BOOK)
+    for count in range(1, len(terminals)+1):
         for group in itertools.combinations(publication["FLEET_FIELDS"], count):
             data, roster = copy.deepcopy(measured), copy.deepcopy(fleet)
             for epoch in group:
@@ -66,16 +81,31 @@ def trials(full, publication, measured, fleet):
                 original = next(v for v in roster["actual_executing_replays"] if v["epoch"] == epoch)
                 roster["actual_executing_replays"].remove(original)
                 data["population"].pop(original["unit"]["Id"])
-                data["required_available_memory_bytes"] += data["joined_resident_lower_bounds"].pop(key)
+                if epoch == 172:
+                    incumbent = data["survivors"].pop(key)
+                    data["required_available_memory_bytes"] += incumbent["resident"]
+                    book = dict(cap_bytes=cap172["cap"], physical_bytes=cap172["cap"]-cap172["remaining"],
+                                remaining_bytes=cap172["remaining"], historical_realized_bytes=0,
+                                plan=cap172["plan"],retired_guard_floor=cap172["floor"])
+                    data["bookings"][key] = book
+                    roster["full172_guard_retirement"] = evidence172["guard_retirement"]
+                    _, eq = full["host_floor"](roster,ledger,raw_tree168,data["survivors"],book)
+                    data["registered_host_equation"]=eq
+                else:
+                    data["required_available_memory_bytes"] += data["joined_resident_lower_bounds"].pop(key)
                 if epoch == 168:
                     data["normal168"], data["active168_guard_floor"] = None, 0
-                else:
+                elif epoch != 172:
                     data["replacements"].pop(key)
                     roster["original_disk_guard_recovery_workers"].pop(key)
                     data["closed_prestart_remaining"][key] = prepaid[key]
                 data["bookings"][key]["measurement"] = "two complete stopped-tree walks"
                 data[publication["CLOSURES"][epoch]] = terminals[epoch]
                 roster[publication["FLEET_FIELDS"][epoch]] = terminals[epoch]["terminal"]
+            raw,eq=full["host_floor"](roster,ledger,raw_tree168,data["survivors"],data["bookings"].get("172"))
+            extension=data["epoch170_extension"]
+            assert raw+(extension["extra_bytes"] if extension else 0)==data["original_aggregate_HOME_bytes"]
+            assert eq==data["registered_host_equation"]
             required, protected, deficit = full["disk_budget"](data["original_aggregate_HOME_bytes"], data["candidate136"],
                 data["bookings"], 145, data["survivors"], data["replacements"], data["active168_guard_floor"], data["closed_prestart_remaining"])
             assert deficit == measured["historical_baseline_deficit_bytes"] and required == protected
@@ -100,6 +130,17 @@ def trials(full, publication, measured, fleet):
                     try:validate(value)
                     except (ValueError,KeyError):rejected.append([group,publisher,label])
                     else:raise ValueError("invalid price accepted: "+label)
-    assert len(prices)==32 and len(rejected)==192
+    assert len(prices)==80 and len(rejected)==480
+    # After genuine closure, a retained physical byte replaces exactly one
+    # corresponding future physical byte under the same full 172 cap.
+    peers = dict(measured["survivors"])
+    peers.pop("172")
+    book = dict(cap_bytes=cap172["cap"],remaining_bytes=cap172["remaining"],plan=cap172["plan"],retired_guard_floor=cap172["floor"])
+    a, _ = full["host_floor"](fleet,ledger,raw_tree168,peers,book)
+    b, _ = full["host_floor"](fleet,ledger,raw_tree168,peers,dict(book,remaining_bytes=book["remaining_bytes"]-1))
+    assert a == b+1
+    try:full["host_floor"](fleet,ledger,raw_tree168,measured["survivors"],book)
+    except ValueError:pass
+    else:raise ValueError("a live and closed full 172 were both charged")
     return dict(native_fixtures=artifacts,original_prestart_remaining=prepaid,prices=prices,rejected=rejected,
                 projected_closures=True,available_resources_for_positive_controls="raised to exact sufficient thresholds",r2_writes=0)
