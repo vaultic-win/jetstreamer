@@ -25,7 +25,7 @@ use std::{
 const DEV: u64 = 66305;
 const LIMIT: u64 = 8 << 20;
 const FLOOR: u64 = 3_908_104_436_088;
-const IMAGE: &str = "/var/lib/jetstreamer/horizon223-duplicate-index-retirer-20261121-v4/epoch223-duplicate-index-retire";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon223-duplicate-index-retirer-20261121-v5/epoch223-duplicate-index-retire";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
 const SURVEY_SEAL_SHA: &str = "5bf563acabd1702013328ded7d219f90f34a7a20bbe6a076b8edab47c73c589d";
 const SURVEY_SUMS_SHA: &str = "9367b3f35f60cf92b60b0ec92bd892eb7f3407ea3fc5ce22b18c6d407634046a";
