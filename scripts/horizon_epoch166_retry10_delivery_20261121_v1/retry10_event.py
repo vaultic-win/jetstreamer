@@ -93,7 +93,7 @@ def bound_fit(profile, bindings):
     return programs[profile.fit.name]["sha256"]
 
 
-def main(profile=RECOVERED):
+def main(profile=RECOVERED, recover=False):
     authority = profile.authority
     state = profile.delivery / "event-state"
     def status(fleet, report, terminal):
@@ -108,6 +108,17 @@ def main(profile=RECOVERED):
     event.need(state.resolve(strict=True)==state and m.st_uid==m.st_gid==0 and stat.S_IMODE(m.st_mode)==0o700,"untrusted event state")
     with (state/"event.lock").open("a+b") as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if recover:
+            import publication_recovery
+            changes = event.Changes()
+            try:
+                def accepted():
+                    return event.accepted(event.R, event.REPORTS, original, changes, head, time.time(), authority.FIELD, status)
+                result = publication_recovery.service(profile, state, original, fit_sha, accepted, changes)
+                print(json.dumps(result), flush=True)
+            finally:
+                changes.close()
+            return
         if (state/"INTENT.json").exists():
             old,_=event.document(state/"INTENT.json",0o400)
             event.need(old["terminal"]==original and old["unit"]==profile.unit,"uncertain original submission differs")
@@ -136,7 +147,7 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--metered168"]:
         main(metered())
     elif len(sys.argv) == 3 and sys.argv[1] == "--current-reader" and sys.argv[2] in ("166", "167", "168", "170"):
-        main(current_reader(int(sys.argv[2])))
+        main(current_reader(int(sys.argv[2])), recover=True)
     elif len(sys.argv) == 1:
         main()
     else:

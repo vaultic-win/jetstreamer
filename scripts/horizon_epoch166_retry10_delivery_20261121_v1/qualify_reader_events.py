@@ -15,7 +15,7 @@ def load(ref, mode):
 
 
 def qualify(cadence, capacity, work):
-    profiles = {e: publication.current_reader(e) for e in event.COMPLETION_LABELS}
+    profiles = {e: publication.current_reader(e) for e in event.PUBLICATION_EPOCHS}
     prices = load(capacity, 0o400)["epochs"]
     controllers = {}
     refusals = []
@@ -76,7 +76,7 @@ def qualify(cadence, capacity, work):
         _, report_ref = event.document(saved, 0o600)
         terminals = {}
         for epoch in group:
-            field = profiles[epoch].authority.FIELD
+            field = event.report_labels()[epoch] + "_local_commit"
             receipt = load(report["receipts"][str(epoch)], 0o600)
             terminals[field] = receipt[field]
         candidate = dict(fleet, **terminals, authenticated_status_audit=report_ref,
@@ -87,7 +87,7 @@ def qualify(cadence, capacity, work):
         _, fleet_ref = event.document(path, 0o600)
         watcher = event.Changes()
         try:
-            for epoch in group:
+            for epoch in (e for e in group if e in profiles):
                 profile = profiles[epoch]
                 field = profile.authority.FIELD
                 terminal = terminals[field]
@@ -118,7 +118,7 @@ def qualify(cadence, capacity, work):
         finally:
             watcher.close()
     event.need({d["epoch"] for d in dispatches} == set(profiles) and len(checks) ==
-               sum(len(c["closed"]) for c in source["fixture_status_and_fleet_passes"]), "missing publication profile")
+               sum(len(set(c["closed"]) & set(profiles)) for c in source["fixture_status_and_fleet_passes"]), "missing publication profile")
     return dict(cadence=cadence, capacity=capacity, controllers=controllers, checked=checks,
                 crossed_program_refusals=refusals, fixture_dispatches=dispatches,
                 production_dispatches=0, r2_writes=0)

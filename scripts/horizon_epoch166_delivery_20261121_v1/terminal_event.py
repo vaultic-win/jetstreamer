@@ -40,13 +40,20 @@ EPOCHS = {136,137,141,145,159,161,163,166,167,168,169,170,171,172,173,185,186,19
 COMPLETION_LABELS = {166: "recovered166", 167: "indexed167", 168: "metered168", 170: "recovered170"}
 
 
+PUBLICATION_EPOCHS = (166, 167, 168, 170)
+
+
+def report_labels():
+    return {**COMPLETION_LABELS, 172: "full172"}
+
+
 def completion_report_dir(root, epochs):
     ordered = tuple(sorted(epochs))
     if not ordered:
         return root
-    need(len(set(ordered)) == len(ordered) and all(e in COMPLETION_LABELS for e in ordered),
+    need(len(set(ordered)) == len(ordered) and all(e in report_labels() for e in ordered),
          "unknown or duplicate local completion")
-    suffix = COMPLETION_LABELS[ordered[0]] if len(ordered) == 1 else "-".join(map(str, ordered))
+    suffix = report_labels()[ordered[0]] if len(ordered) == 1 else "-".join(map(str, ordered))
     return root / ("after-" + suffix)
 
 
@@ -55,7 +62,7 @@ def registered_report(root, fleet, field):
     base = root / "COMPLETED.json"
     if registered == str(base):
         return base
-    fields = {epoch: label + "_local_commit" for epoch, label in COMPLETION_LABELS.items()}
+    fields = {epoch: label + "_local_commit" for epoch, label in report_labels().items()}
     need(field in fields.values(), "crossed cadence report")
     committed = [epoch for epoch, key in fields.items() if fleet.get(key)]
     for size in range(1, len(committed) + 1):
