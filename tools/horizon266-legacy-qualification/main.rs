@@ -143,18 +143,18 @@ async fn qualify() -> ProbeResult<()> {
         base.as_str() == "https://files.old-faithful.net/" && base == index::get_index_base_url()?,
         "effective origins differ",
     )?;
-    let dir = Path::new("/run/horizon266-legacy-source/ledger");
-    let expected_bytes = fs::read("/run/horizon266-legacy-source/expected.json")?;
+    let dir = Path::new("/run/horizon266-legacy-source-v2/ledger");
+    let expected_bytes = fs::read("/run/horizon266-legacy-source-v2/expected.json")?;
     check(
         format!("{:x}", Sha256::digest(&expected_bytes))
             == "00dedd690ae9ed8e6f193dedfd17fb4c25d7fbc67ba8c9900ce32ac6b16c1196",
         "original acquired reference digest",
     )?;
     let expected: serde_json::Value = serde_json::from_slice(&expected_bytes)?;
-    let cg = Path::new("/sys/fs/cgroup/system.slice/horizon266-legacy-source-sample-v1.service");
+    let cg = Path::new("/sys/fs/cgroup/system.slice/horizon266-legacy-source-sample-v2.service");
     check(
         fs::read_to_string("/proc/self/cgroup")?.trim()
-            == "0::/system.slice/horizon266-legacy-source-sample-v1.service"
+            == "0::/system.slice/horizon266-legacy-source-sample-v2.service"
             && fs::read_to_string(cg.join("memory.max"))?.trim() == "1073741824"
             && fs::read_to_string(cg.join("memory.swap.max"))?.trim() == "0"
             && fs::read_to_string(cg.join("pids.max"))?.trim() == "96"
@@ -246,7 +246,7 @@ async fn qualify() -> ProbeResult<()> {
     }
     println!(
         "{}",
-        json!({"schema":"horizon266-legacy-source-sample-v1","invocation":env::var("INVOCATION_ID")?,
+        json!({"schema":"horizon266-legacy-source-sample-v2","argv":env::args().collect::<Vec<_>>(),"cwd":env::current_dir()?,"invocation":env::var("INVOCATION_ID")?,
         "epoch":266,"car_root":CAR_ROOT,"native_presence_start":map.start,"native_presence_end":map.end_inclusive,
         "present_count":map.states.iter().filter(|v|**v==SlotPresenceState::Present).count(),
         "samples":records,"expected":expected,"entry_replay":false,"full_car_verified":false})

@@ -48,6 +48,11 @@ def accept(phase,launch_path):
     if phase=='build':
         out=recipe['OUT']
         built=json.loads((out/'build.json').read_bytes())
+        plan=json.loads((recipe['BUILD_STAGE']/'plan.json').read_bytes())
+        require(built['compiler_argv']==plan['argv'] and built['compiler_cwd']==plan['cwd']
+                and plan['cwd']=='/tmp/horizon266-legacy-rustc-v2' and built['compiler_tmpdir']==plan['cwd']
+                and built['compiler_tmpfs_bytes']==specification['private_tmpfs_bytes'],
+                'actual compiler invocation or tmpfs differs')
         require(built['invocation']==iid and built['plan_sha256']==sha(recipe['BUILD_STAGE']/'plan.json') and
                 built['provenance_sha256']==sha(recipe['BUILD_STAGE']/'provenance.json') and
                 set(built['output_sha256'])=={'legacy-source','inputs.d','link.map'} and
@@ -66,7 +71,8 @@ def accept(phase,launch_path):
         trusted(expected_path)
         require(sha(expected_path)=='00dedd690ae9ed8e6f193dedfd17fb4c25d7fbc67ba8c9900ce32ac6b16c1196','expected digest')
         expected=json.loads(expected_path.read_bytes())
-        require(sample['schema']=='horizon266-legacy-source-sample-v1' and sample['invocation']==iid and
+        require(sample['schema']=='horizon266-legacy-source-sample-v2' and sample['invocation']==iid and
+                sample['argv']==[str(image)] and sample['cwd']==str(recipe['SERVICE']) and
                 sample['epoch']==266 and sample['car_root']==expected['car_root'] and sample['expected']==expected and
                 sample['native_presence_start']==114910769 and sample['native_presence_end']==115343999 and
                 sample['present_count']>=3 and sample['entry_replay'] is False and sample['full_car_verified'] is False,

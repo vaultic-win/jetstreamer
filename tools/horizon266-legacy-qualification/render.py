@@ -6,10 +6,10 @@ from pathlib import Path
 MIB=1024*1024
 V=Path('/var/lib/jetstreamer')
 CACHE=V/'horizon266-index-acquire-v1/cache/sealed'
-SERVICE=Path('/run/horizon266-legacy-source')
-BUILD_STAGE=Path('/run/horizon266-legacy-build')
-OUT=V/'horizon266-legacy-source-build-v1/result'
-IMAGE=V/'horizon266-legacy-source-probe-v1/legacy-source'
+SERVICE=Path('/run/horizon266-legacy-source-v2')
+BUILD_STAGE=Path('/run/horizon266-legacy-build-v2')
+OUT=V/'horizon266-legacy-source-build-v2/result'
+IMAGE=V/'horizon266-legacy-source-probe-v2/legacy-source'
 MEMBERS=[
     (265,'epoch-265-bafyreibgf4smruua7seioyolngrziiqsgeae3d4zmcvptg7m4xwzyafqwu-mainnet-slot-to-cid.index'),
     (266,'epoch-266-bafyreihxdx3dwzmgzbfpzo7z4n744c6cjnn63j3mg2mewkauxoa2tgxxqu-mainnet-slot-to-cid.index'),
@@ -19,7 +19,7 @@ def render(phase,cpu):
     if cpu<0:
         raise ValueError('negative CPU')
     build=phase=='build'
-    unit=f'horizon266-legacy-source-{phase}-v1.service'
+    unit=f'horizon266-legacy-source-{phase}-v2.service'
     cap=(2048 if build else 1024)*MIB
     tmp=(512 if build else 32)*MIB
     common=['Type=exec','User=ubuntu','Group=ubuntu','Restart=no','UMask=0077','KillMode=control-group',
@@ -32,7 +32,7 @@ def render(phase,cpu):
             'UnsetEnvironment=HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy AWS_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_S3_ENDPOINT JETSTREAMER_S3_ACCESS_KEY JETSTREAMER_S3_SECRET_KEY JETSTREAMER_S3_SESSION_TOKEN JETSTREAMER_VERSION']
     if build:
         props=['PrivateNetwork=yes','ProtectHome=read-only','RestrictAddressFamilies=AF_UNIX',
-               'LimitFSIZE=134217728','WorkingDirectory='+str(BUILD_STAGE),'ReadWritePaths='+str(OUT)]
+               'LimitFSIZE=134217728','WorkingDirectory=/tmp','ReadOnlyPaths='+str(BUILD_STAGE),'ReadWritePaths='+str(OUT)]
         command=['/usr/bin/python3','-I','-B',str(BUILD_STAGE/'build.py'),'--build']
     else:
         props=['ProtectHome=yes','RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX','LimitFSIZE=33554432',
