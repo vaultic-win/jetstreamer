@@ -299,8 +299,8 @@ def startup_progress(work):
         return work
     first, start = markers
     end = work['last']
-    if (first != work['first'] or start['slot']!=first['slot'] or start['transactions']!=0
-        or first['transactions']<=0 or start['account_updates']>=first['account_updates']
+    if (first != work['first'] or start['slot'] < first['slot']
+        or start['transactions'] >= first['transactions'] or start['account_updates'] >= first['account_updates']
         or first['terminal_slot']!=start['terminal_slot'] or end['terminal_slot']!=start['terminal_slot']):
         return work
     # These two decreases consume the native reset count for the entire sample.
