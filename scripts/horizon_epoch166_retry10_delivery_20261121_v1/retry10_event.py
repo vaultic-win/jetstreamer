@@ -59,12 +59,19 @@ def current_reader(epoch):
                        authority.T / "capacity-tools/publication-fit", units[epoch], authority)
 
 
-def five_source_reader(epoch):
+def versioned_reader(epoch, versions):
     prior = current_reader(epoch)
-    launcher = "controller-tools-v3" if epoch in (166, 168) else "controller-tools-v2"
-    capacity = {166: "capacity-tools-v4", 168: "capacity-tools-v3", 167: "capacity-tools-v2", 170: "capacity-tools-v2"}
-    return prior._replace(launch=prior.delivery / launcher / "run-committed.sh",
-                          fit=prior.delivery / capacity[epoch] / "publication-fit")
+    launcher, capacity = versions[epoch]
+    return prior._replace(launch=prior.delivery / f"controller-tools-v{launcher}" / "run-committed.sh",
+                          fit=prior.delivery / f"capacity-tools-v{capacity}" / "publication-fit")
+
+
+def five_source_reader(epoch):
+    return versioned_reader(epoch, {166: (3, 4), 167: (2, 2), 168: (3, 3), 170: (2, 2)})
+
+
+def focused169_reader(epoch):
+    return versioned_reader(epoch, {166: (4, 5), 167: (3, 3), 168: (4, 4), 170: (3, 3)})
 
 
 def status_evidence(fleet, report, terminal, archive, profile=RECOVERED):
@@ -101,7 +108,10 @@ def bound_fit(profile, bindings):
     return programs[profile.fit.name]["sha256"]
 
 
-def main(profile=RECOVERED, recover=False, predecessor=None):
+def main(profile=RECOVERED, recover=False, predecessor=None, *, predecessors=()):
+    if predecessor is not None:
+        event.need(not predecessors, "conflicting predecessor registrations")
+        predecessors = ((predecessor, "event-tools-current"),)
     authority = profile.authority
     state = profile.delivery / "event-state"
     def status(fleet, report, terminal):
@@ -123,8 +133,8 @@ def main(profile=RECOVERED, recover=False, predecessor=None):
                 def accepted():
                     return event.accepted(event.R, event.REPORTS, original, changes, head, time.time(), authority.FIELD, status)
                 allowed = {}
-                if predecessor:
-                    previous, _ = event.document(profile.delivery / "event-tools-current/programs.json", 0o444)
+                for predecessor, package in predecessors:
+                    previous, _ = event.document(profile.delivery / package / "programs.json", 0o444)
                     allowed[str(predecessor.launch)] = bound_fit(predecessor, previous)
                 result = publication_recovery.service(profile, state, original, fit_sha, accepted, changes, allowed)
                 print(json.dumps(result), flush=True)
@@ -163,7 +173,11 @@ if __name__ == "__main__":
     elif len(sys.argv) == 3 and sys.argv[1] == "--five-source-reader" and sys.argv[2] in ("166", "167", "168", "170"):
         epoch = int(sys.argv[2])
         main(five_source_reader(epoch), recover=True, predecessor=current_reader(epoch))
+    elif len(sys.argv) == 3 and sys.argv[1] == "--focused169-reader" and sys.argv[2] in ("166", "167", "168", "170"):
+        epoch = int(sys.argv[2])
+        main(focused169_reader(epoch), recover=True,
+             predecessors=[(current_reader(epoch), "event-tools-current"), (five_source_reader(epoch), "event-tools-five-v1")])
     elif len(sys.argv) == 1:
         main()
     else:
-        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader) {166,167,168,170}]")
+        sys.exit("usage: retry10_event.py [--metered168 | (--current-reader | --five-source-reader | --focused169-reader) {166,167,168,170}]")
