@@ -13,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
-const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools/export145";
+const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1/joint-tools-v2/export145";
 const EXPORTER: &str = "horizon-holding-export145-20261121-v1.service";
 const SEALER: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str> {

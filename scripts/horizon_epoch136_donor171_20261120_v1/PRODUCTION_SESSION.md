@@ -228,3 +228,16 @@ window. The writer rechecks the full fit and fences, writes the request, and
 waits for the parent. The registering process enters the writer's mount
 namespace, so that namespace also projects the immutable initial fleet at its
 original path. The worker and its guard retain their own service limits.
+
+
+The seven-compatible 145 provider is the normally sealed
+`epoch145-publication-20261121-v1/joint-tools-v2/export145`. Bind both its
+actual ELF SHA-256 and its deployment receipt in the new immutable writer plan.
+The provider qualifies a separately materialized historical worker by its
+staged executable, identity and contents. The 136 helper, node, source worker
+and original denial receipts retain their original pins. Use the existing
+parent and actor with the new controller projected at the helper's established
+path. An initial fit and a waiting-worker fit still require six authentic
+incumbents, the live compatible 145 phase and its common lock. The original v4
+encoding process is ineligible. A five-incumbent terminal-166 successor needs
+its own topology qualification before admission.
