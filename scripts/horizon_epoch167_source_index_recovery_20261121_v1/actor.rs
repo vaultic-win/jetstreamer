@@ -14,18 +14,21 @@ pub fn sample() -> Result<Value> {
             && m["CPUQuotaPerSecUSec"] == "9s"
             && m["MemoryMax"] == (68u64 << 30).to_string()
             && m["MemorySwapMax"] == "0",
-        "different 167 node limits or generation"
+        "different node limits or generation"
     );
     let p = Path::new("/proc").join(pid.to_string());
     let (_, ticks, group) = proc_row(pid)?;
-    let image = rt(PKG).join("deployment/jetstreamer-node");
+    let image = source::node();
     let bytes = fs::read(p.join("cmdline"))?;
     let args: Vec<&[u8]> = bytes.split(|x| *x == 0).filter(|s| !s.is_empty()).collect();
     let profile = source::profile()?;
     let argv = profile["producer_argv"]
         .as_array()
         .context("producer argv")?;
-    let start=argv.iter().position(|x|x=="/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/jetstreamer-node").context("node command")?;
+    let start = argv
+        .iter()
+        .position(|x| x == &json!(source::node_arg()))
+        .context("node command")?;
     ensure!(
         group == format!("0::/system.slice/{UNIT}")
             && same(&p.join("exe"), &image)?
@@ -36,7 +39,7 @@ pub fn sample() -> Result<Value> {
                     .map(|v| v.as_str().unwrap_or_default().as_bytes())
                     .collect::<Vec<_>>()
             && members(UNIT)?.contains(&pid),
-        "different live 167 node"
+        "different live node"
     );
     let meta = fs::metadata(image)?;
     Ok(
@@ -49,7 +52,7 @@ pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
         actual["invocation_id"] == actor["producer_invocation_id"]
             && actual["unit"] == UNIT
             && actual["worker_root"] == LANE
-            && actual["maximum_root_physical_bytes"] == 512u64 << 30,
+            && actual["maximum_root_physical_bytes"] == CAP,
         "different native guard plan"
     );
     let timer = native(TIMER)?;
@@ -147,7 +150,7 @@ pub fn worker() -> Result<Value> {
     let (parent, ticks, group) = proc_row(pid)?;
     let exe = fs::read_link(p.join("exe"))?;
     let owner = n(&a, "producer_pid")?;
-    let image = rt(PKG).join("deployment/jetstreamer-historical-worker-v1-5-6");
+    let image = source::worker_image();
     ensure!(
         parent == owner
             && group == format!("0::/system.slice/{UNIT}")
@@ -175,14 +178,14 @@ pub fn worker() -> Result<Value> {
     let logfile = run().join("producer.log");
     let log = fs::metadata(&logfile)?;
     let mut value = a.clone();
-    value["epoch"] = 167.into();
+    value["epoch"] = EPOCH.into();
     value["admission"] = ar;
     value["worker_pid"] = pid.into();
     value["worker_start_ticks"] = ticks.into();
     value["worker_sha256"] = ws.into();
     value["worker_guard"] = guard;
-    value["observer_row"] = json!({"range":"167","controller_unit":UNIT,"producer_unit":UNIT,"scratch_path":scratch,"expected_controller_invocation_id":a["producer_invocation_id"],"expected_producer_invocation_id":a["producer_invocation_id"],"worker_executable_basename":"historical-worker","append_log":{"device":log.dev(),"inode":log.ino(),"path":logfile}});
-    value["schema"] = "horizon-167-first-protected-worker-v1".into();
+    value["observer_row"] = json!({"range":EPOCH.to_string(),"controller_unit":UNIT,"producer_unit":UNIT,"scratch_path":scratch,"expected_controller_invocation_id":a["producer_invocation_id"],"expected_producer_invocation_id":a["producer_invocation_id"],"worker_executable_basename":"historical-worker","append_log":{"device":log.dev(),"inode":log.ino(),"path":logfile}});
+    value["schema"] = format!("horizon-{EPOCH}-first-protected-worker-v1").into();
     value["measured_transaction_replay"] = false.into();
     if base().join("FIRST_PROTECTED_WORKER.json").try_exists()? {
         let (old, b) = doc(&base().join("FIRST_PROTECTED_WORKER.json"), None)?;

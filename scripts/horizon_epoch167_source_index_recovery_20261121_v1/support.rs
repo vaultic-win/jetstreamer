@@ -1,18 +1,8 @@
 use super::*;
 
 pub const R: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-pub const BASE: &str = "epoch167-source-index-recovery-20261121-v1";
-pub const PKG: &str = "epoch167-local-index-successor-20261121-v1";
 pub const COMMON: &str = "incident-replay-guard-20261121-v1";
 pub const PROVIDER: &str = "incident-replay-fit-20261121-v1/tools/post-stop-fit";
-pub const PROFILE: &str = "b161542cd001c85245e115204698650ad0adf9de598f54b957f95f761b54d938";
-pub const UNIT: &str = "horizon-qualify-167-source-index-v1-20261121.service";
-pub const TIMER: &str = "horizon-guard-167-source-index-v1-20261121.timer";
-pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1";
-pub const ATTEMPT: &str = "replacement-source-index-v1-20261121";
-pub const INPUTS: &str = "/usr/local/lib/jetstreamer/horizon-standard-local-input167-20261110-v1";
-pub const SOURCE: &str = "snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst";
-pub const OLD: &str = "epoch167-retry8-recovery-20261120-v1";
 pub const SEALER: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 pub fn rt(s: &str) -> PathBuf {
     Path::new(R).join(s)

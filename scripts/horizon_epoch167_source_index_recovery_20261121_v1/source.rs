@@ -1,4 +1,28 @@
 use super::*;
+pub const BASE: &str = "epoch167-source-index-recovery-20261121-v1";
+pub const PKG: &str = "epoch167-local-index-successor-20261121-v1";
+pub const PROFILE: &str = "b161542cd001c85245e115204698650ad0adf9de598f54b957f95f761b54d938";
+pub const UNIT: &str = "horizon-qualify-167-source-index-v1-20261121.service";
+pub const TIMER: &str = "horizon-guard-167-source-index-v1-20261121.timer";
+pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1";
+pub const ATTEMPT: &str = "replacement-source-index-v1-20261121";
+pub const INPUTS: &str = "/usr/local/lib/jetstreamer/horizon-standard-local-input167-20261110-v1";
+pub const SOURCE: &str = "snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst";
+pub const OLD: &str = "epoch167-retry8-recovery-20261120-v1";
+
+pub const EPOCH: u64 = 167;
+pub const CAP: u64 = 512 << 30;
+pub const PREVIOUS_GUARD_ARGV: &str =
+    "4fbff52bb7cf7f7443cd7466289494b23c1b32c8c433e6ecf196356f6f8fc76f";
+pub fn node() -> PathBuf {
+    rt(PKG).join("deployment/jetstreamer-node")
+}
+pub fn worker_image() -> PathBuf {
+    rt(PKG).join("deployment/jetstreamer-historical-worker-v1-5-6")
+}
+pub fn node_arg() -> String {
+    "/usr/local/lib/jetstreamer/horizon-independent167-singleton-package-20261109-v1/jetstreamer-node".into()
+}
 
 pub fn profile() -> Result<Value> {
     Ok(doc(&rt(PKG).join("successor-profile.json"), Some(PROFILE))?.0)

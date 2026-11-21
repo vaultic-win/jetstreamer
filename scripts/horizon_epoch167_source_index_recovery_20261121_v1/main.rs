@@ -17,7 +17,12 @@ use std::{
 mod support;
 use support::*;
 mod actor;
+#[cfg_attr(
+    epoch166_recovery,
+    path = "../horizon_epoch166_guard_recovery_20261121_v1/source166.rs"
+)]
 mod source;
+use source::{ATTEMPT, BASE, CAP, EPOCH, LANE, OLD, PREVIOUS_GUARD_ARGV, TIMER, UNIT};
 const GUARD_SHA: &str = "07f6924ee1cf8d8311aa7bed6620dcf1af580a5546e948206af628c57aa3443b";
 const GSEAL: &str = "736a46ffcea86d0937518c728791a4843c57862e37c301bf81095fd5779aed1d";
 const CONTRACT: &str = "9dc683e3b5eef14b4ead27f626cc2421a31442ba1c85a376e98881938abd0ba2";
@@ -53,7 +58,7 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     let se = member(&path, fit_seal)?;
     let b = command(
         path.to_str().unwrap(),
-        &["167", st(fleet, "path")?, st(fleet, "sha256")?],
+        &[&EPOCH.to_string(), st(fleet, "path")?, st(fleet, "sha256")?],
         150,
     )?;
     let mut v: Value = serde_json::from_slice(&b)?;
@@ -63,7 +68,7 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
             && n(&v, "available_HOME_bytes")? >= n(&v, "complete_required_HOME_bytes")?
             && n(&v, "available_memory_bytes")? >= n(&v, "required_available_memory_bytes")?
             && n(&v, "protected_raw_floor_bytes")? >= 8_297_502_499_408u64,
-        "unfunded original 167 booking"
+        "unfunded original replay booking"
     );
     v["provider_seal"] = se;
     Ok(v)
@@ -76,7 +81,12 @@ fn require_missing() -> Result<Value> {
     );
     let b = command(
         p.to_str().unwrap(),
-        &["inventory", "/home/sol/horizon", "--epochs", "167-167"],
+        &[
+            "inventory",
+            "/home/sol/horizon",
+            "--epochs",
+            &format!("{EPOCH}-{EPOCH}"),
+        ],
         60,
     )?;
     let v: Value = serde_json::from_slice(&b)?;
@@ -85,9 +95,9 @@ fn require_missing() -> Result<Value> {
             && v["requested_epochs"] == 1
             && v["missing"] == 1
             && v["anomalies"] == 0
-            && v["entries"][0]["epoch"] == 167
+            && v["entries"][0]["epoch"] == EPOCH
             && v["entries"][0]["state"] == "missing",
-        "167 not missing"
+        "epoch not missing"
     );
     Ok(v)
 }
@@ -111,7 +121,7 @@ fn contract() -> Result<Value> {
 fn guarded(actor: &Value, floor: u64, binding: &Value) -> Result<(Value, Value)> {
     let pr = record(
         "ACTUAL_GUARD_PLAN.json",
-        &json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":actor["producer_invocation_id"],"worker_root":LANE,"filesystem":"/home/sol","minimum_free_bytes":floor,"maximum_root_physical_bytes":512u64<<30,"maximum_worker_vmas":3500000,"receipt_directory":base().join("guard-receipts"),"data_fulfillment":binding}),
+        &json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":actor["producer_invocation_id"],"worker_root":LANE,"filesystem":"/home/sol","minimum_free_bytes":floor,"maximum_root_physical_bytes":CAP,"maximum_worker_vmas":3500000,"receipt_directory":base().join("guard-receipts"),"data_fulfillment":binding}),
     )?;
     let p = pkg();
     let tail = [
@@ -128,11 +138,10 @@ fn guarded(actor: &Value, floor: u64, binding: &Value) -> Result<(Value, Value)>
         v["validated"] == true && v["unit"] == UNIT && v["producer_signaled"] == false,
         "guard static scope"
     );
-    let old = rt(OLD).join("launch-state/epoch167/ORIGINAL_GUARD_ARGV.json");
-    let (v, _) = doc(
-        &old,
-        Some("4fbff52bb7cf7f7443cd7466289494b23c1b32c8c433e6ecf196356f6f8fc76f"),
-    )?;
+    let old = rt(OLD).join(format!(
+        "launch-state/epoch{EPOCH}/ORIGINAL_GUARD_ARGV.json"
+    ));
+    let (v, _) = doc(&old, Some(PREVIOUS_GUARD_ARGV))?;
     let old: Vec<String> = serde_json::from_value(v)?;
     let mut argv = Vec::new();
     for item in old.iter().skip(1) {
@@ -217,7 +226,7 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
         .min(n(&before, "available_HOME_bytes")?);
     let own = record(
         "START_INTENT.json",
-        &json!({"schema":"horizon-167-recovery-start-intent-v1","epoch":167,"producer_unit":UNIT,"timer_unit":TIMER,"recorded_unix_seconds":now()?,"prepared":pr,"fleet":fleet,"prestart":before,"armed_floor":floor,"authenticated_inventory":inv,"predecessor_stop":baseline["predecessor_stop"],"stable_root":baseline["root"],"resource_credit_bytes":0}),
+        &json!({"schema":format!("horizon-{EPOCH}-recovery-start-intent-v1"),"epoch":EPOCH,"producer_unit":UNIT,"timer_unit":TIMER,"recorded_unix_seconds":now()?,"prepared":pr,"fleet":fleet,"prestart":before,"armed_floor":floor,"authenticated_inventory":inv,"predecessor_stop":baseline["predecessor_stop"],"stable_root":baseline["root"],"resource_credit_bytes":0}),
     )?;
     let profile = source::profile()?;
     let argv: Vec<String> = serde_json::from_value(profile["producer_argv"].clone())?;
@@ -238,16 +247,19 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
         let actor = actor::sample()?;
         record("ACTUAL_PRODUCER_NATIVE.json", &actor)?;
         let (plan, first) = guarded(&actor, floor, &binding)?;
+        #[cfg(epoch166_recovery)]
+        let after = source::post_guard_fit(&actor, &plan, &first, fleet, fit_seal)?;
+        #[cfg(not(epoch166_recovery))]
         let after = fit(fleet, fit_seal)?;
         ensure!(
             n(&after, "protected_raw_floor_bytes")? <= floor && actor::sample()? == actor,
-            "post-guard floor or 167 changed"
+            "post-guard floor or actor changed"
         );
         let post = record("POST_GUARD_CAPACITY.json", &after)?;
         source::index_selected()?;
         let (sample, _) = actor::guard(&actor, &plan)?;
         let mut ad = actor;
-        for (k,v) in json!({"schema":"horizon-167-source-index-admission-protection-v1","epoch":167,"timer_unit":TIMER,"timer_invocation_id":sample["timer"]["InvocationID"],"actual_guard_plan":plan,"first_guard":first,"post_guard_capacity":post,"fleet":fleet,"intent":own,"source":pr,"predecessor_stop":baseline["predecessor_stop"],"stable_root":baseline["root"],"bootstrap_only":true,"transaction_replay_claimed":false,"resource_credit_bytes":0}).as_object().unwrap(){ad[k]=v.clone()}
+        for (k,v) in json!({"schema":format!("horizon-{EPOCH}-source-index-admission-protection-v1"),"epoch":EPOCH,"timer_unit":TIMER,"timer_invocation_id":sample["timer"]["InvocationID"],"actual_guard_plan":plan,"first_guard":first,"post_guard_capacity":post,"fleet":fleet,"intent":own,"source":pr,"predecessor_stop":baseline["predecessor_stop"],"stable_root":baseline["root"],"bootstrap_only":true,"transaction_replay_claimed":false,"resource_credit_bytes":0}).as_object().unwrap(){ad[k]=v.clone()}
         record("ACTUAL_ADMISSION_AND_PROTECTION.json", &ad)
     })();
     if let Err(e) = &attempt {
@@ -278,7 +290,7 @@ fn dispatch() -> Result<Value> {
         return Ok(prep);
     }
     ensure!(
-        env::current_exe()? == base().join("tools/recover167"),
+        env::current_exe()? == base().join(format!("tools/recover{EPOCH}")),
         "use sealed recovery executable"
     );
     match a.as_slice() {
@@ -316,6 +328,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(epoch166_recovery))]
     #[test]
     fn original_stop_and_permanent_witness_roots() {
         let v = source::files().unwrap();
@@ -323,7 +336,7 @@ mod tests {
         assert_eq!(v["snapshot"]["length"], 2022614652u64);
         assert!(
             doc(
-                &rt(PKG).join("successor-profile.json"),
+                &rt(source::PKG).join("successor-profile.json"),
                 Some(&"f".repeat(64))
             )
             .is_err()
