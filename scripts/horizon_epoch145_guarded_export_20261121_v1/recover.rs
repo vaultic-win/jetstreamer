@@ -1,6 +1,6 @@
-//! Recover only the empty, already charged inode from the first private run.
+//! Recover only the empty, already charged inode from the last private run.
 use super::*;
-const OLD: &str = "81c627e75fb340bc991a31958938401f";
+const OLD: &str = "022092e08a1c4f05bacb9453faead223";
 const INODE: u64 = 103237059;
 fn receipt(name: &str, digest: &str) -> Result<Value> {
     custody::evidence(&Bound {
@@ -32,15 +32,15 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
     }
     let a = receipt(
         "allocated.json",
-        "e9c7751ba9f0ab1f1d201ba83c8199cefc1693cd67a54113f402a0d420849953",
+        "053fb2c0894bc74b069fb4a37aa2ae439129fb44b98d6e22b1ae842daebb5289",
     )?;
     let g = receipt(
         "post-allocation-guard.json",
-        "3643c4e122c60b08da27e861882b94badba80fd25ef5c1f980b738e267479bf9",
+        "5cac329a193875b76960cbe1f61b66cfc60d265bd3a90940231d1d1f60990f87",
     )?;
     let f = receipt(
         "failed.json",
-        "32ff8f869d5f2aaa5c00f87c7f08a1eb7ece07e163a98768a40a7ba3708c599d",
+        "9c774cd75a790d45411080c6c04231c0c72464a0dbd7616c95819ddf40e78382",
     )?;
     let p = root.join(".tmp36MvkN");
     ensure!(
@@ -53,10 +53,10 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
             && a["inode"] == INODE
             && g["inode"] == INODE
             && a["logical_bytes"] == 0
-            && a["pid"] == 3470300
+            && a["pid"] == 3476538
             && f["error"]
                 .as_str()
-                .is_some_and(|e| e.starts_with("stale or invalid native guard sample ")),
+                .is_some_and(|e| e.starts_with("resource gate: HOME ")),
         "predecessor custody or failure changed"
     );
     let events = capacity::run(
@@ -82,7 +82,7 @@ pub fn predecessor(root: &Path) -> Result<Option<PathBuf>> {
                 && v["EXIT_STATUS"] == "1"
         });
     ensure!(
-        ok && native::ticks(3470300).ok() != Some(357328155),
+        ok && native::ticks(3476538).ok() != Some(357388027),
         "predecessor still active or missing native termination"
     );
     check(&fs::symlink_metadata(&p)?)?;
