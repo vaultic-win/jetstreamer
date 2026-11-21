@@ -8,6 +8,7 @@ import subprocess
 import time
 
 import status168 as s
+import overlap
 
 R = s.ROOT
 D = s.D
@@ -174,19 +175,22 @@ def inventory(fleetref):
     for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics"):
         prior.extend(fleet[k])
     ids={row["epoch"] for row in prior}
-    s.need(len(ids)==len(prior) and ids-{136,168} in (set(CPUS),set(CPUS)-{166}) and 168 not in ids,
+    s.need(len(ids)==len(prior) and 172 in ids and ids<=set(CPUS)|{136},
            "unregistered fleet or duplicate prior 168")
-    closed=None
+    closed={}
     if 166 not in ids:
         terminal=R/"epoch166-terminal-20261121-v1/TERMINAL_SUCCESS.json"
-        t,closed=s.read(terminal)
+        t,closed["166"]=s.read(terminal)
         live,live_ref=s.read(terminal.with_name("LIVE.json"),"23817cd4c05aee995728b4413ff36c26ef72df5a9795df9691a2d699039d30fe")
         mgr=s.show(anchors["166"]["unit"])
-        s.need(fleet.get("terminal166_local_commit")==closed and t["live"]==live_ref and t["epoch"]==166
+        s.need(fleet.get("terminal166_local_commit")==closed["166"] and t["live"]==live_ref and t["epoch"]==166
                and t["producer_invocation_id"]==anchors["166"]["iid"] and t["source_admission"]==live["admission"]
                and t["terminal_166_disposition"]=="node-published-local-cohort" and t["resource_credit_bytes"]==0
                and t["reservation_ending_bytes"]==0 and mgr["ActiveState"]=="inactive" and mgr["Result"]=="success"
                and not members(anchors["166"]["unit"]) and t["local_archive"]["size"]>0,"unbound terminal 166")
+    for k in {167,169,170}-ids:
+        anchor=anchors[str(k)]
+        closed[str(k)]=overlap.retired(k,anchor,s.show(anchor["unit"]),members(anchor["unit"]))
     peers={}
     for row in prior:
         epoch=row["epoch"]
@@ -227,7 +231,12 @@ def floor(fleet,ledger,tree,peers):
     def base(unspent):
         return max(other+unspent,prior169,8297502499408+unspent)
     s.need(base(roots["remaining_standard_root_bytes"])==anchor["reservation_baseline"],"original fit does not reproduce")
-    a,b=peers["169"]["guard"],peers["172"]["guard"]
+    b=peers["172"]["guard"]
+    if "169" in peers:
+        a=peers["169"]["guard"]
+    else:
+        plan=s.bound(P169,Path(P169["path"]))
+        a=dict(floor=plan["minimum_free_bytes"],remaining=plan["maximum_root_physical_bytes"])
     complete=max(max(base(remaining),a["floor"])+a["remaining"]+16*G,b["floor"])+b["remaining"]+(128<<20)
     return complete,dict(retained_168_remaining=remaining,historical_168_remaining=roots["remaining_standard_root_bytes"],
         rebased_floor=base(remaining),original_base=anchor["reservation_baseline"],source=BOOK,shared_host=s.ref(ANCHOR,BASELINE))
@@ -283,7 +292,8 @@ def phase145():
             except FileNotFoundError:
                 continue
         stable["holding_lock"]=dict(path=str(lockpath),device=lock.st_dev,inode=lock.st_ino,fds=sorted(holding))
-        return stable,False
+        window=overlap.inspect(stable,m,A145,members(A145))
+        return dict(stable,window=window),window is not None
     # The publication producer writes this only after verified pair, checksum, public playback and final inventory.
     # A transient gap between recovery and publication cannot satisfy it.
     pub=R/"epoch145-publication-20261121-v1"
@@ -427,7 +437,7 @@ def capture(fleetref,own=None):
         candidate136_requires_standard169_loan_micros=4250000,normal_168_actor_quota_micros=9000000,
         normal_168_guard_quota_micros=250000,normal_168_actor_memory_bytes=68*G,
         normal_168_guard_memory_bytes=G,original_whole_tree=tree,booking=evidence,incumbents=peers,
-        retired166=closed,population=topo,phase145=phase,status_registration=ready,
+        retired166=closed.get("166"),retired_original_peers=closed,population=topo,phase145=phase,status_registration=ready,
         registered_population_compatible=bool(ready),fresh_phase_compatible=compatible,
         resource_fits=fits,eligible_with_168_alone=bool(fits and ready and compatible),
         replay_launch_authorized=False,r2_mutations=False)
@@ -439,7 +449,7 @@ def select(before,after=None,armed=None):
            and item["available_HOME_bytes"]>=item["complete_required_DATA_bytes"]
            and item["available_memory_bytes"]>=item["required_available_memory_bytes"],"168 capacity/phase/status admission denied")
     if after is not None:
-        for k in ("population","phase145","status_registration","fleet","retired166"):
+        for k in ("population","phase145","status_registration","fleet","retired_original_peers"):
             s.need(before[k]==after[k],"intervening change: "+k)
         s.need(armed is not None and item["standalone_guard_floor"]<=armed<=item["available_HOME_bytes"],
                "post-guard protected floor exceeds armed guard or available HOME")

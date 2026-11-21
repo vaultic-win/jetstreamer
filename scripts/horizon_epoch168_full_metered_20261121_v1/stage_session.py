@@ -51,7 +51,7 @@ def stage(commit):
     source=D/"session-source";source.mkdir(mode=0o700,exist_ok=True)
     dest=D/"session-v1"
     rows=[]
-    for name in ("session.py","fit.py","status168.py"):
+    for name in ("session.py","fit.py","status168.py","overlap.py"):
         raw=subprocess.check_output([*git,"cat-file","blob",commit+":"+MODULE+name])
         write(source/name,raw)
         rows.append(dict(name=name,source=str(source/name),sha256=digest(source/name),mode=0o444))

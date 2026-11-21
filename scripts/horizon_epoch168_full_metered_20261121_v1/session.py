@@ -26,7 +26,7 @@ BACKING=Path("/home/sol/.jetstreamer-private/horizon-root-runtime-data")/D.name
 OP_LOCK="/run/horizon-epoch171-to136-g1.operation.lock"
 PACKAGE=D/"session-v1"
 SEALER="e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
-INPUTS=("session.py","fit.py","status168.py")
+INPUTS=("session.py","fit.py","status168.py","overlap.py")
 
 
 def sync(directory):

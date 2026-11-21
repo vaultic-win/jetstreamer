@@ -14,12 +14,12 @@ def run():
              available_HOME_bytes=140,complete_required_DATA_bytes=100,available_memory_bytes=150,
              required_available_memory_bytes=130,population={"167":{"pid":10,"ticks":12},"169":{"timer":"a"*32}},
              phase145={"final":"verified-original"},status_registration={"sha256":"b"*64},fleet={"sha256":"c"*64},
-             retired166=None,standalone_guard_floor=100)
+             retired_original_peers={},standalone_guard_floor=100)
     assert fit.select(pre)==100 and fit.select(pre,dict(pre,standalone_guard_floor=101),110)==101
     changes=[("population",{"167":{"pid":10,"ticks":13},"169":{"timer":"a"*32}}),
              ("population",{"167":{"pid":10,"ticks":12},"169":{"timer":"d"*32}}),
              ("phase145",{"final":"another-generation"}),("status_registration",{}),
-             ("fleet",{}),("retired166",{"terminal":"new"}),("fresh_phase_compatible",False),
+             ("fleet",{}),("retired_original_peers",{"terminal":"new"}),("fresh_phase_compatible",False),
              ("registered_population_compatible",False),("standalone_guard_floor",111),("available_HOME_bytes",99),
              ("available_memory_bytes",129)]
     for name,value in changes:
