@@ -8,9 +8,9 @@ const POST: &str = "epoch145-publication-20261121-v1";
 const FLEET: &str = "ROOT_COMPLETE_OPERATIONAL_FLEET.json";
 #[cfg(not(feature = "cadence-rejoin"))]
 const FLEET_DIRECTORY: &str = "root131959-live166167170-20261121-v1";
-#[cfg(feature = "cadence-rejoin")]
+#[cfg(all(feature = "cadence-rejoin", not(feature = "timer-rejoin")))]
 const FLEET_DIRECTORY: &str = "root213922-live166167170-20261121-v1";
-#[cfg(feature = "cadence-rejoin")]
+#[cfg(all(feature = "cadence-rejoin", not(feature = "timer-rejoin")))]
 const HEAD: &str = "bc403aec3d9546b6ed39b58174c18c40606756722a3163044c6a704282a2b15e";
 #[cfg(not(feature = "cadence-rejoin"))]
 const HEAD: &str = "973b1d0d30142d26d524386c50429a5d121103dfce3190d476a6eb23fe1feadd";
@@ -64,7 +64,7 @@ mod generation {
     pub(super) const FOLLOW: &str = "follow-v5c";
 }
 
-#[cfg(feature = "cadence-rejoin")]
+#[cfg(all(feature = "cadence-rejoin", not(feature = "timer-rejoin")))]
 mod generation {
     pub(super) const SOURCE: &str = "e6551a0bb8a14b989902e15c9ecc0751";
     pub(super) const START: &str =
@@ -87,6 +87,36 @@ mod generation {
         "56bf2bf0937f1b90de8de0519c0a572b06a8ed62cb9e14bf9e9f0fa8021ed916";
     pub(super) const INSPECT: &str = "inspect-v5d";
     pub(super) const FOLLOW: &str = "follow-v5d";
+}
+
+// Each value is derived from the sealed worker, its accepted fleet and its
+// qualified post driver at build time. The deployment receipt binds that
+// input manifest alongside the native live-inspection result.
+#[cfg(feature = "timer-rejoin")]
+const FLEET_DIRECTORY: &str = env!("HORIZON_145_ACCEPTED_FLEET_DIRECTORY");
+#[cfg(feature = "timer-rejoin")]
+const HEAD: &str = env!("HORIZON_145_ACCEPTED_FLEET_SHA256");
+
+#[cfg(feature = "timer-rejoin")]
+mod generation {
+    pub(super) const SOURCE: &str = env!("HORIZON_145_SEMANTIC_INVOCATION");
+    pub(super) const START: &str =
+        "epoch145-semantic-continuity-20261121-v1/V5E_ACTUAL_ADVANCING_WORKER.json";
+    pub(super) const ADVANCING: &str = env!("HORIZON_145_ADVANCING_SHA256");
+    pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v11";
+    pub(super) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
+    pub(super) const STATE_PATH: &str = "epoch145-v5e-delivery-handoff-20261121-v1/state";
+    pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v17";
+    pub(super) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
+    pub(super) const PRIOR: &str = "e6551a0bb8a14b989902e15c9ecc0751";
+    pub(super) const IMAGE: &str =
+        "148804337a0c47093f67ae642fe01dc3a529cb07dbc809bfd9ab0ff9ca714a7c";
+    pub(super) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5e/export145";
+    pub(super) const PIPELINE: &str =
+        "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
+    pub(super) const INSPECT: &str = "inspect-v5e";
+    pub(super) const FOLLOW: &str = "follow-v5e";
 }
 
 pub fn handles(mode: &str) -> bool {
