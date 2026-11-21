@@ -104,7 +104,16 @@ def trials(full, publication, measured, fleet):
                 roster[publication["FLEET_FIELDS"][epoch]] = terminals[epoch]["terminal"]
             raw,eq=full["host_floor"](roster,ledger,raw_tree168,data["survivors"],data["bookings"].get("172"))
             extension=data["epoch170_extension"]
-            assert raw+(extension["extra_bytes"] if extension else 0)==data["original_aggregate_HOME_bytes"]
+            native_raw=raw+(extension["extra_bytes"] if extension else 0)
+            if 172 in group:
+                retained_169=measured["survivors"]["169"]["guard"]
+                # Reconstruct the unguarded 172 floor from each still-paid term.
+                nested=max(eq["rebased_floor"],retained_169["floor"])+retained_169["remaining"]+(16<<30)
+                assert raw==nested+cap172["remaining"]+(128<<20)
+                assert measured["original_aggregate_HOME_bytes"]-native_raw==max(0,cap172["floor"]-nested)
+            else:
+                assert native_raw==measured["original_aggregate_HOME_bytes"]
+            data["original_aggregate_HOME_bytes"]=native_raw
             assert eq==data["registered_host_equation"]
             required, protected, deficit = full["disk_budget"](data["original_aggregate_HOME_bytes"], data["candidate136"],
                 data["bookings"], 145, data["survivors"], data["replacements"], data["active168_guard_floor"], data["closed_prestart_remaining"])

@@ -114,11 +114,12 @@ def full172_booking(proof):
 
 def host_floor(fleet,ledger,tree,surviving,closed_booking):
     # The registered host equation includes 172 exactly once. Retain its actual unspent
-    # allowance and original floor inside the aggregate after its guarding timer drains.
+    # allowance. Its original trip threshold is recorded in the closed booking, while
+    # the complete 169/168/other host obligations survive through fit.floor().
     charged=surviving
     if closed_booking is not None:
         s.need("172" not in surviving,"172 charged as both a live and a closed producer")
-        charged={**surviving,"172":{"guard":{"floor":closed_booking["retired_guard_floor"],"remaining":closed_booking["remaining_bytes"]}}}
+        charged={**surviving,"172":{"guard":{"floor":0,"remaining":closed_booking["remaining_bytes"]}}}
     value,registration=fit.floor(fleet,ledger,tree,charged)
     if closed_booking is not None:
         registration=dict(registration,retained_172_remaining=closed_booking["remaining_bytes"],retained_172_plan=closed_booking["plan"])
