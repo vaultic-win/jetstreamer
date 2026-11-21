@@ -28,6 +28,15 @@ class Status:
         return json.loads(raw), {"path": str(path), "sha256": got}
 
     @staticmethod
+    def iid(value):
+        return len(value) == 32 and all(c in "0123456789abcdef" for c in value)
+
+    @staticmethod
+    def bound(binding, path):
+        Status.need(binding["path"] == str(path), "fixture receipt path")
+        return Status.read(path, binding["sha256"])[0]
+
+    @staticmethod
     def process(pid):
         p = Path("/proc") / str(pid)
         row = (p / "stat").read_text().rsplit(") ", 1)[1].split()
@@ -103,6 +112,29 @@ class PostPhaseTest(unittest.TestCase):
                 record("failed", {"iid": gen, "error": "incomplete"})
                 with self.assertRaisesRegex(ValueError, "unverified original paid archive promotion"):
                     fn(Status())
+                if phase["FOCUSED_SUCCESSOR"]:
+                    second = "a" * 32
+                    intent = save(base / "V5D_START_INTENT.json",
+                                  {"schema": "horizon-145-focused-census-recovery-intent-v1", "old": gen})
+                    manager = save(base / "V5D_ACTUAL_MANAGER.json", {"intent": intent, "new": {"InvocationID": second}})
+                    second_state = folder.parent / second
+                    second_state.mkdir()
+                    second_start = save(second_state / "recovery-started.json", {"iid": second, "r2_mutations": False})
+                    save(base / "V5D_ACTUAL_ADVANCING_WORKER.json",
+                         {"invocation_id": second, "start": second_start, "manager": manager})
+                    with self.assertRaisesRegex(ValueError, "ambiguous semantic predecessor"):
+                        fn(Status())
+                    (folder / "complete.json").unlink()
+                    second_frozen = save(second_state / "verified-frozen.json", {"iid": second, "r2_mutations": False})
+                    second_extraction = save(second_state / "extraction-complete.json",
+                        {"actor_iid": second, "original_export": original, "verified_frozen": second_frozen,
+                         "recovery_evidence": second_start, "archive_publication_authorized": False, "extraction": e})
+                    second_done = save(second_state / "complete.json",
+                        {"iid": second, "receipt": second_extraction, "recovered_from": original, "r2_mutations": False})
+                    self.assertEqual(fn(Status()), (second_done, e))
+                    save(base / "V5D_ACTUAL_MANAGER.json", {"intent": intent, "new": {"InvocationID": gen}})
+                    with self.assertRaisesRegex(ValueError, "fixture SHA"):
+                        fn(Status())
         finally:
             fn.__globals__.update(before)
 

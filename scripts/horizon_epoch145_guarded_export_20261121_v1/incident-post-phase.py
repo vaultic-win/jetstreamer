@@ -7,9 +7,11 @@ import sys
 
 ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
-TIMEOUT_SUCCESSOR = Path(__file__).resolve().parent.name == "tools-v8"
+VERSION = Path(__file__).resolve().parent.name
+FOCUSED_SUCCESSOR = VERSION == "tools-v9"
+TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9")
 if TIMEOUT_SUCCESSOR:
-    PKG = PKG.parent / "tools-v8"
+    PKG = PKG.parent / VERSION
 IMAGE = PKG / "export145"
 STATE = ROOT / "epoch145-guarded-export-20261121-v1/state"
 PUBLICATION = ROOT / "epoch145-publication-20261121-v1"
@@ -70,15 +72,26 @@ def generation(s, parent, mode, args, fleet, m, profile):
 
 
 def completion(s):
-    old = STATE / BOOTSTRAP
+    bootstrap = BOOTSTRAP
     advancing, _ = s.read(PKG.parent / ADVANCING_NAME, ADVANCING)
+    if FOCUSED_SUCCESSOR and (PKG.parent / "V5D_START_INTENT.json").exists():
+        intent, original = s.read(PKG.parent / "V5D_START_INTENT.json")
+        advancing, _ = s.read(PKG.parent / "V5D_ACTUAL_ADVANCING_WORKER.json")
+        bootstrap = advancing["invocation_id"]
+        s.need(s.iid(bootstrap) and bootstrap != BOOTSTRAP and intent["old"] == BOOTSTRAP and
+               intent["schema"] == "horizon-145-focused-census-recovery-intent-v1" and
+               not (STATE / BOOTSTRAP / "complete.json").exists(), "ambiguous semantic predecessor")
+        manager = s.bound(advancing["manager"], PKG.parent / "V5D_ACTUAL_MANAGER.json")
+        s.need(manager["intent"] == original and manager["new"]["InvocationID"] == bootstrap,
+               "different paid semantic recovery")
+    old = STATE / bootstrap
     start, start_ref = s.read(old / "recovery-started.json", advancing["start"]["sha256"])
     verified, vr = s.read(old / "verified-frozen.json")
     done, dr = s.read(old / "complete.json")
     extracted, er = s.read(old / "extraction-complete.json")
     e = extracted["extraction"]
     s.need(advancing["invocation_id"] == start["iid"] == verified["iid"] == done["iid"]
-           == extracted["actor_iid"] == BOOTSTRAP and done["receipt"] == er
+           == extracted["actor_iid"] == bootstrap and done["receipt"] == er
            and done["recovered_from"] == extracted["original_export"] == "de6780b860b3467bae21fbd19176ca14"
            and extracted["verified_frozen"] == vr and extracted["recovery_evidence"] == start_ref
            and verified["r2_mutations"] is False and start["r2_mutations"] is False

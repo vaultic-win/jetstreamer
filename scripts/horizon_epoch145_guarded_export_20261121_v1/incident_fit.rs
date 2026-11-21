@@ -7,11 +7,13 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_timeout_post145_only)]
+#[cfg(any(incident_focused145_only, incident_focused_post145_only))]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14/post-stop-fit";
+#[cfg(all(incident_timeout_post145_only, not(incident_focused_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v11/post-stop-fit";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v7/post-stop-fit";
-#[cfg(incident_timeout145_only)]
+#[cfg(all(incident_timeout145_only, not(incident_focused145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit";
 #[cfg(all(incident_rejoin145_only, not(incident_timeout145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
@@ -401,6 +403,14 @@ pub fn manager_timeout<'a>(stderr: &'a str, provider: &str) -> Option<&'a str> {
     registered.then_some(unit)
 }
 
+#[cfg(any(incident_focused145_only, incident_focused_post145_only))]
+pub fn missing_status_owner(trace: &str, provider: &str) -> bool {
+    let first = format!("Traceback (most recent call last):\n  File \"{provider}\", line ");
+    let frame = format!("  File \"{provider}\", line ");
+    trace.starts_with(&first) && trace.lines().any(|l| l.starts_with(&frame) && l.ends_with(", in registered_status"))
+        && trace.trim_end().ends_with("  File \"/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-20261121-v1/session-v3/status168.py\", line 34, in need\n    raise ValueError(message)\nValueError: cadence publisher absent")
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -430,6 +440,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         {
             return Err(anyhow::Error::new(capacity::TopologyTimeout)
                 .context(format!("sealed PID1 census timed out reading {unit}")));
+        }
+        #[cfg(any(incident_focused145_only, incident_focused_post145_only))]
+        if out.status.code() == Some(1)
+            && out.stdout.is_empty()
+            && missing_status_owner(&err, PROVIDER)
+        {
+            return Err(anyhow::Error::new(capacity::TopologyTimeout)
+                .context("registered status publisher is unavailable"));
         }
         if err.trim_end().ends_with("ValueError: superseded fleet") {
             let next = head(&fleet)?;

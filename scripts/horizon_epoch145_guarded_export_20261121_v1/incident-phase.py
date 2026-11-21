@@ -8,8 +8,9 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-TIMEOUT_REJOIN = VERSION == "tools-v5c"
-REJOIN = VERSION in ("tools-v5b", "tools-v5c")
+FOCUSED_REJOIN = VERSION == "tools-v5d"
+TIMEOUT_REJOIN = VERSION in ("tools-v5c", "tools-v5d")
+REJOIN = VERSION in ("tools-v5b", "tools-v5c", "tools-v5d")
 PKG = BASE / "epoch145-semantic-continuity-20261121-v1" / (VERSION if REJOIN else "tools-v5")
 IMAGE = PKG / "export145"
 STATE = BASE / "epoch145-guarded-export-20261121-v1/state"
@@ -24,6 +25,10 @@ if TIMEOUT_REJOIN:
     OLD = "dc043eb78c4a4349b0098760dc764a1f"
     OLD_FAILURE = "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943"
     OLD_RECOVERY = "e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f"
+if FOCUSED_REJOIN:
+    OLD = "d37f36f898a44932a19fd50d7014a6fe"
+    OLD_FAILURE = "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29"
+    OLD_RECOVERY = "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81"
 HOME = Path("/home/sol/.jetstreamer-private")
 OUTPUT = HOME / "epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN"
 SOURCE = HOME / "epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet"
@@ -76,6 +81,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     expected_failure = f["error"] == "stopped worker fresh-census deadline" if REJOIN else "exit status: 124" in f["error"]
     if TIMEOUT_REJOIN:
         expected_failure = f["error"].rstrip().endswith("'horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds")
+    if FOCUSED_REJOIN:
+        expected_failure = f["error"].rstrip().endswith("ValueError: cadence publisher absent")
     s.need(f["iid"] == OLD and expected_failure, "foreign original failure")
     state = STATE / generation
     parent = Path(f"/proc/{pid}")
@@ -111,6 +118,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
     started, started_ref = s.read(state / "recovery-started.json")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
                    "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
+    if FOCUSED_REJOIN:
+        predecessor = "failed_status_owner"
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
            and started["prior_frozen_recovery"][predecessor]["current_boot_failure"]["failure"] == failed

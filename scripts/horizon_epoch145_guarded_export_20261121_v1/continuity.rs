@@ -90,6 +90,10 @@ pub fn predecessor() -> Result<Value> {
         {
             evidence["failed_manager_query"] = crate::incident145::failed_manager_query()?;
         }
+        #[cfg(incident_focused145_only)]
+        {
+            evidence["failed_status_owner"] = crate::incident145::failed_status_owner()?;
+        }
         evidence
     };
     Ok(previous)

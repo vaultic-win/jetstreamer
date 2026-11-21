@@ -4,7 +4,10 @@ umask 077
 mode=$1
 fleet=$2
 pkg=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7
-if [[ $(dirname "$(realpath -e -- "$0")") == "${pkg%/*}/tools-v8" ]]; then pkg="${pkg%/*}/tools-v8"; fi
+case "$(dirname "$(realpath -e -- "$0")")" in
+    "${pkg%/*}/tools-v8") pkg="${pkg%/*}/tools-v8" ;;
+    "${pkg%/*}/tools-v9") pkg="${pkg%/*}/tools-v9" ;;
+esac
 pub=/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1
 output=/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1
 holding=/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1/transition.lock

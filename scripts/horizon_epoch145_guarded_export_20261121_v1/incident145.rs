@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_timeout145_only)]
+#[cfg(incident_focused145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5d/export145";
+#[cfg(all(incident_timeout145_only, not(incident_focused145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5c/export145";
 #[cfg(all(incident_rejoin145_only, not(incident_timeout145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5b/export145";
@@ -286,6 +288,96 @@ pub fn failed_manager_query() -> Result<Value> {
     Ok(
         json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,"prior_manager":manager,"original_candidate":id,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
     )
+}
+
+/// Bind the natural V5C failure to its original paid candidate and advancing worker.
+#[cfg(incident_focused145_only)]
+pub fn failed_status_owner() -> Result<Value> {
+    const IID: &str = "d37f36f898a44932a19fd50d7014a6fe";
+    let base = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1");
+    let state = Path::new(BASE).join("state").join(IID);
+    let failed = continuity::failure(IID)?;
+    ensure!(
+        failed["failure"]["sha256"]
+            == "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29",
+        "wrong original status failure"
+    );
+    let failure = custody::evidence(&serde_json::from_value(failed["failure"].clone())?)?;
+    let started = Bound {
+        path: state.join("recovery-started.json"),
+        sha256: "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81".into(),
+    };
+    let original = custody::evidence(&started)?;
+    let progress = Bound {
+        path: base.join("V5C_ACTUAL_ADVANCING_WORKER.json"),
+        sha256: "6235fbd8e36064d57a9cd6b7af2ad0d05ce8b41766134cde7be7337ebc133d76".into(),
+    };
+    let observed = custody::evidence(&progress)?;
+    let manager: Bound = serde_json::from_value(observed["manager"].clone())?;
+    let native = custody::evidence(&manager)?;
+    let paid = Path::new(OUTPUT).join(".tmp36MvkN");
+    let original_identity = retained_output(&state, &paid)?;
+    let trace = failure["error"]
+        .as_str()
+        .and_then(|t| t.strip_prefix("complete 145 capacity observation failed exit status: 1: "))
+        .context("missing original status error")?;
+    ensure!(
+        failure["iid"] == IID
+            && crate::incident_fit::missing_status_owner(
+                trace,
+                "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit"
+            )
+            && observed["start"] == json!(started)
+            && observed["invocation_id"] == IID
+            && manager.sha256 == "9e1ff569a5f6373a9f0d8a2c6339ce9a5d91bff92009f3e5ead9bb105f9d1f44"
+            && native["new"]["InvocationID"] == IID
+            && native["parent_pid"] == 4011654
+            && native["parent_start_ticks"] == 362077125u64
+            && original["image"]
+                == "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d"
+            && original["iid"] == IID
+            && original["file"] == json!(paid)
+            && original["r2_mutations"] == false
+            && original["prior_frozen_recovery"]["failed_preincident_verifier"]["original_candidate"]
+                == original_identity
+            && native::ticks(4011654).ok() != Some(362077125)
+            && native::ticks(4011889).ok() != Some(362079682),
+        "different paid verifier, original failure or frozen candidate"
+    );
+    verify_observed_pair(&observed, (4011654, 362077125), (4011889, 362079682))?;
+    Ok(
+        json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,"prior_manager":manager,
+              "original_candidate":original_identity,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
+    )
+}
+
+#[cfg(all(test, incident_focused145_only))]
+#[test]
+#[ignore = "requires the original terminal 145 verifier and guard artifacts"]
+fn preserves_the_actual_cadence_failure_and_frozen_inode() {
+    let prior = failed_status_owner().unwrap();
+    assert_eq!(prior["original_candidate"]["inode"], 103237059);
+    assert_eq!(prior["source_checkpoint_exists"], false);
+    let reference: Bound =
+        serde_json::from_value(prior["current_boot_failure"]["failure"].clone()).unwrap();
+    let failed = custody::evidence(&reference).unwrap();
+    let trace = failed["error"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("complete 145 capacity observation failed exit status: 1: ")
+        .unwrap();
+    let provider = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v10/post-stop-fit";
+    for (old, new) in [
+        (provider, "/other-provider"),
+        ("in registered_status", "in other"),
+        ("cadence publisher absent", "source corrupt"),
+        ("status168.py", "unregistered.py"),
+        ("raise ValueError(message)", "raise OtherError(message)"),
+    ] {
+        let other = trace.replace(old, new);
+        assert_ne!(other, trace);
+        assert!(!crate::incident_fit::missing_status_owner(&other, provider));
+    }
 }
 
 #[cfg(test)]

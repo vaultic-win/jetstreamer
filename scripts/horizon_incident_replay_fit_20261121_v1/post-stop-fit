@@ -334,8 +334,13 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
-def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False):
-    if recovery_post:
+def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
+    if focused is not None:
+        s.need(focused in ("semantic", "post") and not any((post, rejoin, timeout_rejoin, recovery_post)),
+               "ambiguous paid verifier profile")
+        profile,directory = (("profile145-focused-semantic.json", "tools-v5d") if focused == "semantic" else
+                             ("profile145-focused-post.json", "tools-v9"))
+    elif recovery_post:
         s.need(not post and not rejoin and not timeout_rejoin, "ambiguous 145 post-recovery profile")
         profile,directory="profile145-recovery-post.json","tools-v8"
     elif timeout_rejoin:
@@ -349,7 +354,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         profile,directory="profile145-post.json","tools-v6"
     else:
         profile,directory="profile145.json","tools-v5"
-    name="incident-post-phase.py" if post or recovery_post else "incident-phase.py"
+    name="incident-post-phase.py" if post or recovery_post or focused=="post" else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
     seal,sr=s.read(package/"deployment-seal-receipt.json",cfg["seal_sha256"])
@@ -367,7 +372,7 @@ def phase145(epoch):
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"]):
+        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"]):
             v.update(extensions["failed_verifier"](s,m,m["InvocationID"]))
         elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",
@@ -392,8 +397,11 @@ def phase145(epoch):
     timeout_rejoin=timeout_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",timeout_image)
     recovery_post_image=base/"tools-v8/export145"
     recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
-    if recovery_post or timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",fp):
-        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin,recovery_post)
+    image=Path("/proc")/m["MainPID"]/"exe"
+    focused_mode=next((mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"))
+                       if (candidate:=base/directory/"export145").exists() and s.same_file(image,candidate)),None)
+    if focused_mode or recovery_post or timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(image,fp):
+        cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin,recovery_post,focused_mode)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")

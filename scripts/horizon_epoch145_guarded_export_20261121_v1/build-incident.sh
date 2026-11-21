@@ -7,6 +7,11 @@ current="$base/current-nodes-136-169-20261120-g2"
 old="$current/tmp/early145-f3c1e61202f340f8a43902eb27fea7fc/source"
 d="$current/target/release"
 flavor="${2:-recovery}"
+focused=false
+if [[ $flavor == focused-rejoin || $flavor == focused-post ]]; then
+  focused=true
+  src=/home/sol/.jetstreamer-private/paid145-focused169-recovery-20261121-v1
+fi
 extra=()
 fixture=(incident145::tests::failed_145_pass_keeps_the_original_leased_objects_and_requires_restart materialized::tests::paid_inode_native_projection)
 case "$flavor" in
@@ -14,13 +19,15 @@ recovery) sources=(incident-phase.py run-incident.sh) ;;
 rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only)
         ;;
-timeout-rejoin) sources=(incident-phase.py run-incident.sh)
+timeout-rejoin|focused-rejoin) sources=(incident-phase.py run-incident.sh)
         extra=(--cfg incident_rejoin145_only --cfg incident_timeout145_only)
+        if $focused; then extra+=(--cfg incident_focused145_only); fixture+=(incident145::preserves_the_actual_cadence_failure_and_frozen_inode); fi
         fixture+=(incident145::tests::distinguishes_native_query_timeout_from_foreign_or_malformed_failures)
         ;;
-post|current-post|timeout-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
+post|current-post|timeout-post|focused-post) sources=(incident-post-phase.py run-incident-post.sh post-phase-test.py)
       extra=(--cfg incident_post145_only)
-      if [[ $flavor == timeout-post ]]; then extra+=(--cfg incident_timeout_post145_only); fi
+      if [[ $flavor == timeout-post || $flavor == focused-post ]]; then extra+=(--cfg incident_timeout_post145_only); fi
+      if $focused; then extra+=(--cfg incident_focused_post145_only); fi
       fixture=(publication_tree::tests::freezer_covers_uploader_and_grandchild post::tests::current_full_and_plugin_use_the_same_qualified_plan_as_delivery)
       ;;
 *) exit 2 ;;
@@ -30,12 +37,12 @@ out="$current/tmp/incident145-$INVOCATION_ID"
 cg="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"
 test "$(cat "$cg/cpu.max")" = '100000 100000'
 memory=1073741824
-if [[ $flavor == timeout-rejoin || $flavor == timeout-post ]]; then memory=805306368; fi
+if [[ $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then memory=805306368; fi
 test "$(cat "$cg/memory.max")" = "$memory"
 test "$(cat "$cg/memory.swap.max")" = '0'
 test "$(cat "$cg/pids.max")" = '128'
 test "$(findmnt -n -T "$current" -o SOURCE)" = /dev/loop4
-if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]]; then
+if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then
   # Keep the historical compiler/dependency cache immutable. Pay a new bounded
   # image on HOME for this generation and retain its exact products for sealing.
   provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v5/post-stop-fit
@@ -54,6 +61,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=d5ed981b98ad6fc2c54843667852e9d3c3567c764398b644afac00231cd2940d
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == d32722386d1511d8db85801e349dd645107b2f3c0043a7debebb22c9eae60085 ]]
   fi
+  if $focused; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14-bootstrap/post-stop-fit
+    signature=63538fb9ff385f34b9b7b592c6b61b296e649f7eb3a70de017d9edeb0326ad50
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 54083064203f8e64629ccfaf0b5411181bc90b0489028493795804ea757d27fe ]]
+  fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
   fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
@@ -65,7 +77,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     # A different provider is never excluded from the live 145 cgroup. Wait
     # out the read-only observer overlap and repeat the entire original fit.
     last=$(tail -1 "$q/fit-$probe.stderr")
-    [[ ( $flavor == current-post || $flavor == timeout-post ) && $probe -lt 5 &&
+    [[ ( $flavor == current-post || $flavor == timeout-post || $focused == true ) && $probe -lt 5 &&
        ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' ) ]] ||
        { cat "$q/fit-$probe.stderr" >&2; exit 1; }
     sleep "$((2+probe))"
@@ -89,7 +101,7 @@ else
 fi
 exec > "$q/build.log" 2>&1
 cp -R "$old" "$out/source"
-if [[ $flavor == timeout-rejoin || $flavor == timeout-post ]]; then
+if [[ $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then
   # The historical source layout also contains files from the epoch 166 fixture.
   # Take the entire small staged source tree from the same current checkout.
   revision=$(git -c safe.directory="$src" -C "$src" rev-parse --verify HEAD^{commit})
@@ -114,10 +126,12 @@ rustc --edition=2024 --test "${args[@]}" "$s/main.rs" -o "$out/tests"
 "$out/tests" --test-threads=1
 for name in "${fixture[@]}"; do "$out/tests" --ignored --exact "$name"; done
 "$out/tests" --ignored --exact incident_fit::tests::authenticates_the_actual_fleet_and_disallows_missing_members
-if [[ $flavor == timeout-post ]]; then
-  mkdir "$out/tmp/tools-v8"
-  cp "$s/incident-post-phase.py" "$out/tmp/tools-v8/"
-  POST_PHASE_UNDER_TEST="$out/tmp/tools-v8/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
+if [[ $flavor == timeout-post || $flavor == focused-post ]]; then
+  phase_package=tools-v8
+  if $focused; then phase_package=tools-v9; fi
+  mkdir "$out/tmp/$phase_package"
+  cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
+  POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
 elif [[ $flavor == post || $flavor == current-post ]]; then
   /usr/bin/python3 -IB "$s/post-phase-test.py"
 fi
@@ -126,7 +140,7 @@ sha256sum "$out/tests" "$out/export145" > "$q/artifacts"
 cat "$cg/memory.peak" > "$q/memory.peak"
 du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
-if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]]; then
+if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then
   mkdir -m0700 "$q/products"
   cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
   test "$(du -s -B1 "$q/products" | cut -f1)" -le 24117248

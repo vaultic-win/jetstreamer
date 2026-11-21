@@ -84,6 +84,7 @@ def held(s,unit,run,pid,proc,intent):
 
 FAILED_VERIFIER = "5e0e20bc974149f096ea4bab10b15e1b"
 FAILED_REJOIN = "dc043eb78c4a4349b0098760dc764a1f"
+FAILED_CADENCE = "d37f36f898a44932a19fd50d7014a6fe"
 VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
 
 
@@ -93,7 +94,7 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     import subprocess
 
     iid = manager["InvocationID"]
-    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN) and iid == expected and manager["Id"] == VERIFIER_UNIT
+    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE) and iid == expected and manager["Id"] == VERIFIER_UNIT
            and manager["ActiveState"] == manager["SubState"] == "failed"
            and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
            and manager["NRestarts"] == "0" and not manager["Job"]
@@ -104,13 +105,24 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         failure_sha = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
         start_sha = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
         image_sha = "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    elif expected == FAILED_CADENCE:
+        failure_sha = "6533e594be11534e7fb58ac0f1fd752ead37cfd114e36899a956970b8318bb29"
+        start_sha = "a3d623b47ea9612824d102714703b0d095db18e07bf8ce3570ec08331ad84e81"
+        image_sha = "34d90f2a5ae8a821109b2bbf99c5527d43c3eb141f68cea212109fc876f28c8d"
     else:
         failure_sha = "baa00ca8b52aca80b105bf5582f955af8a3f9e22ce662908ce7a75afccfb1943"
         start_sha = "e992566275e63b28a020c847c02637626b245161a2e39f843ac1da4d64793b2f"
         image_sha = "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
     failed, failure = s.read(state / "failed.json", failure_sha)
     started, recovery = s.read(state / "recovery-started.json", start_sha)
-    if expected == FAILED_VERIFIER:
+    if expected == FAILED_CADENCE:
+        s.need(failed["error"].startswith("complete 145 capacity observation failed exit status: 1: Traceback") and
+               failed["error"].rstrip().endswith("ValueError: cadence publisher absent") and
+               'tools-v10/post-stop-fit", line 456, in registered_status' in failed["error"] and
+               set(p.name for p in state.iterdir()) == {"recovery-started.json", "failed.json"} and
+               manager["Result"] == "exit-code" and not manager["ControlGroup"],
+               "unregistered failed status-publisher crossing")
+    elif expected == FAILED_VERIFIER:
         s.need(failed["error"] == "stopped worker fresh-census deadline", "unexpected census failure")
     else:
         s.need(set(p.name for p in state.iterdir()) == {"failed.json", "recovery-started.json"}
