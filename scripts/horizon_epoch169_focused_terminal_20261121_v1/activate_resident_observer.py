@@ -11,6 +11,11 @@ import time
 R=Path('/var/lib/jetstreamer/horizon_runtime_data')
 ROOT=R/'resident-observer-20261121-v1'
 OLD=R/'host-census-clock-recovery-20261121-v1/cadence-tools'
+READY_HANDOFF = len(sys.argv) > 1 and sys.argv[1] == '--ready-audit-retirement'
+if READY_HANDOFF:
+    sys.argv.pop(1)
+    OLD = ROOT / 'cadence-tools'
+    ROOT = R / 'ready-audit-cadence-20261121-v1'
 NEW=ROOT/'cadence-tools'
 UNIT='horizon-archive-status-cadence-after172-20261120-v1.service'
 PAID='horizon-holding-export145-20261121-v1.service'
@@ -104,7 +109,7 @@ def main():
     try:
         for u,command in commands.items():
             folder=Path('/run/systemd/system')/(u+'.d');folder.mkdir(mode=0o755,exist_ok=True)
-            p=folder/'zzz-qualified-resident-census.conf'
+            p=folder/('zzzz-ready-audit-retirement.conf' if READY_HANDOFF else 'zzz-qualified-resident-census.conf')
             with p.open('x') as out:
                 os.fchmod(out.fileno(),0o644)
                 if u==service:out.write('[Unit]\nDescription='+command+'\n')
@@ -133,7 +138,7 @@ def main():
         except (AssertionError,FileNotFoundError,ProcessLookupError):ctl('restart',UNIT)
         raise
     receipt=ROOT/'ACTIVE.json'
-    durable(receipt,dict(schema='qualified-native-rss-clock-handoff-v1',qualification=qref,head=head,
+    durable(receipt,dict(schema=('qualified-ready-audit-handoff-v1' if READY_HANDOFF else 'qualified-native-rss-clock-handoff-v1'),qualification=qref,head=head,
                          before=before,after=after,unchanged_timer=initial_timer,paid_boundary=boundary,
                          native_config=f['sole_next_observer'],dropins=list(changes.values()),new_observations=0))
     print(json.dumps(bound(receipt)))
