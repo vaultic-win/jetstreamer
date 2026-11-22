@@ -59,6 +59,13 @@ COLD167 = (
     Producer(167, "horizon-qualify-167-source-index-v3-20261122.service", "6e4b569b61d7420fb30a24a4ad0609dd"),
 )
 
+COLD170 = (
+    ROOT.parent / "epoch170-cold-delivery-20261122-v13",
+    "c73815d49529c42cc70f0e7ba11ab171f9b1ecdfb92c418afbe1b7631e57d898",
+    (64512, 113981960),
+    Producer(170, "horizon-qualify-170-replacement-local3retry13-20261122.service", "c44b5215f8d949159e7ce9cf911e9be1"),
+)
+
 
 def require(condition, message):
     if not condition:
@@ -134,7 +141,7 @@ def watcher():
 def authority(stack, root, expected_digest, producer=ORIGINAL):
     epoch, unit, iid = producer
     directory(root, 0)
-    live_mode = 0o400 if producer == COLD167[3] else 0o600
+    live_mode = 0o400 if producer in (COLD167[3], COLD170[3]) else 0o600
     raw_live = seal(stack, root / "LIVE.json", live_mode)
     require(sha(raw_live) == expected_digest, "live authority digest differs")
     live = json.loads(raw_live)
@@ -245,6 +252,7 @@ if __name__ == "__main__":
     profile = parser.add_mutually_exclusive_group()
     profile.add_argument("--metered168", action="store_true")
     profile.add_argument("--full172", dest="peer", action="store_const", const=172)
+    profile.add_argument("--cold170", action="store_true")
     profile.add_argument("--cold167", action="store_true")
     profile.add_argument("--source167", dest="peer", action="store_const", const=167)
     profile.add_argument("--retry170", dest="peer", action="store_const", const=170)
@@ -259,6 +267,8 @@ if __name__ == "__main__":
     try:
         if a.cold167:
             root, live_sha, lock_id, producer = COLD167
+        elif a.cold170:
+            root, live_sha, lock_id, producer = COLD170
         elif a.peer:
             root, live_sha, lock_id, producer = PEERS[a.peer]
         elif a.metered168:
