@@ -18,8 +18,11 @@ use std::{
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 #[cfg(all(feature = "cold167", not(feature = "source167")))]
 compile_error!("cold167 requires the source167 singleton profile");
+#[cfg(all(feature = "cold170", not(feature = "retry170")))]
+compile_error!("cold170 requires the retry170 singleton profile");
 #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
 #[cfg_attr(feature = "cold167", path = "cold167_profile.rs")]
+#[cfg_attr(feature = "cold170", path = "cold170_profile.rs")]
 mod peer_profile;
 
 #[cfg(not(any(
@@ -142,7 +145,7 @@ const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
 const MEMORY: u64 = 2 << 30;
-const WITNESS_MODE: u32 = if cfg!(feature = "cold167") {
+const WITNESS_MODE: u32 = if cfg!(any(feature = "cold167", feature = "cold170")) {
     0o400
 } else {
     0o600

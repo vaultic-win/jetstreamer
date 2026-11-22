@@ -121,8 +121,10 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     } else {
         rt("incident-replay-fit-20261121-v1/tools-v2/post-stop-fit")
     };
-    #[cfg(epoch166_retry11)]
+    #[cfg(all(epoch166_retry11, not(epoch166_after170)))]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-166-v2/post-stop-fit");
+    #[cfg(epoch166_after170)]
+    let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-166-after170-v1/post-stop-fit");
     #[cfg(epoch170_retry11)]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-170-v1/post-stop-fit");
     #[cfg(epoch170_retry12)]
@@ -162,6 +164,32 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     );
     v["provider_seal"] = se;
     Ok(v)
+}
+#[cfg(epoch166_after170)]
+fn fourth_lane_floor(price: &Value) -> Result<u64> {
+    let partial = &price["startup_nonexact_peer_floor"];
+    let protected = n(price, "protected_raw_floor_bytes")?;
+    let required = n(price, "complete_required_HOME_bytes")?;
+    let remaining = n(&price["bookings"]["166"], "remaining_bytes")?;
+    let observed_actor = &price["replacements"]["170"];
+    ensure!(
+        price["epoch"] == 166
+            && price["candidate"].is_null()
+            && price["fits"] == true
+            && partial["funded"] == true
+            && observed_actor["producer_invocation_id"] == "c44b5215f8d949159e7ce9cf911e9be1"
+            && protected >= n(observed_actor, "floor")?
+            && n(partial, "protected_raw_floor_bytes")? == protected
+            && n(partial, "complete_required_HOME_bytes")? == required
+            && protected.checked_add(remaining) == Some(required),
+        "incomplete peer reservations for the fourth replay lane"
+    );
+    let surplus = n(price, "available_HOME_bytes")?
+        .checked_sub(required)
+        .context("insufficient HOME for conservative peer bookings")?;
+    protected
+        .checked_add(surplus.min(10 << 30))
+        .context("armed peer floor overflow")
 }
 fn require_missing() -> Result<Value> {
     let p = rt("epoch145-publication-20261121-v1/uploader-tools/jetstreamer-r2");
@@ -475,7 +503,9 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
     ensure!(before["candidate"].is_null(), "candidate already active");
     #[cfg(any(epoch170_retry12, epoch170_retry13))]
     let floor = source::funded_guard_floor(&before)?;
-    #[cfg(not(any(epoch170_retry12, epoch170_retry13)))]
+    #[cfg(epoch166_after170)]
+    let floor = fourth_lane_floor(&before)?;
+    #[cfg(not(any(epoch170_retry12, epoch170_retry13, epoch166_after170)))]
     let floor = n(&before, "protected_raw_floor_bytes")?
         .checked_add(128 << 20)
         .context("guard slack")?
@@ -564,6 +594,8 @@ fn dispatch() -> Result<Value> {
                 "tools-v2/recover167"
             } else if cfg!(any(epoch170_retry11, epoch170_retry12, epoch170_retry13)) {
                 "tools/recover170"
+            } else if cfg!(epoch166_after170) {
+                "tools-v4/recover166"
             } else if cfg!(epoch166_retry11) {
                 "tools-v3/recover166"
             } else {
@@ -641,6 +673,27 @@ mod tests {
             )
             .is_err()
         );
+    }
+    #[cfg(epoch166_after170)]
+    #[test]
+    fn fourth_lane_preserves_the_actual_170_floor_and_166_allowance() {
+        let (mut price, _) = doc(
+            &rt("epoch170-retry13-rebook-20261122-v1/ADOPTED_WORKER_PEER166_FULL_PRICE_root221757-live166167170-20261122-v1.json"),
+            Some("df8311efaf97c80d55cbff73b18e8b696cf54097dd8085108ca1e64746b5667c"),
+        ).unwrap();
+        // The bootstrap-only quote from before conservative peer pricing cannot fund a start.
+        assert!(fourth_lane_floor(&price).is_err());
+        let protected = n(&price, "protected_raw_floor_bytes").unwrap();
+        let required = n(&price, "complete_required_HOME_bytes").unwrap();
+        price["startup_nonexact_peer_floor"] = json!({"protected_raw_floor_bytes": protected,
+            "complete_required_HOME_bytes":required,"funded":true});
+        price["available_HOME_bytes"] = json!(required + 12);
+        assert_eq!(fourth_lane_floor(&price).unwrap(), protected + 12);
+        price["available_HOME_bytes"] = json!(required - 1);
+        assert!(fourth_lane_floor(&price).is_err());
+        price["available_HOME_bytes"] = json!(required);
+        price["replacements"]["170"]["floor"] = json!(protected + 1);
+        assert!(fourth_lane_floor(&price).is_err());
     }
     #[test]
     fn common_guard_accepts_real_incident_binding_only() {

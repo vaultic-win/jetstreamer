@@ -39,6 +39,14 @@ def cold167():
     return _authority(167, profile, "epoch167-cold-delivery-20261122-v3")
 
 
+def cold170():
+    profile = Producer("cold170_local_commit",
+                       "c73815d49529c42cc70f0e7ba11ab171f9b1ecdfb92c418afbe1b7631e57d898",
+                       "42b38c626ae197806d115882585772bbbd915d000285192f24a3a26a379e76c0",
+                       0o444, 0o400)
+    return _authority(170, profile, "epoch170-cold-delivery-20261122-v13")
+
+
 def _authority(epoch, profile, directory):
     root = shared["R"] / directory
     live, _ = shared["document"](root / "LIVE.json", profile.witness_mode, profile.witness_sha256)
