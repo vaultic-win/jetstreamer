@@ -6,17 +6,27 @@ import stat
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
 LANE = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1')
 PREVIOUS_RUN = LANE / 'replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1'
-RUN = PREVIOUS_RUN / 'cold-retry11-20261122'
-NAME = '170-replacement-local3retry11-20261122'
-DIRECTORY = 'epoch170-retry11-rebook-20261122-v1'
+ATTEMPT = 12 if RETRY12 else 11
+RUN = PREVIOUS_RUN / f'cold-retry{ATTEMPT}-20261122'
+NAME = f'170-replacement-local3retry{ATTEMPT}-20261122'
+DIRECTORY = f'epoch170-retry{ATTEMPT}-rebook-20261122-v1'
 NEW = R / DIRECTORY
 OLD = R / 'epoch170-retry10-recovery-20261121-v1'
 CLEAN = R / 'epoch170-closed-accounts-20261122-v1'
-GUARD = R / 'epoch170-retry11-guard-20261122-v1'
+GUARD = R / f'epoch170-retry{ATTEMPT}-guard-20261122-v1'
 PRIOR_IID = 'a456b826ce1c4634a2df66d66c5cc07f'
 PRIOR_UNIT = 'horizon-qualify-170-replacement-local3retry10-20261121-v1.service'
 STOP_SHA = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
-ROOT_SHA = '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728'
+ROOT_SHA = ('466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if RETRY12 else
+            '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
+ROOT_INODE = 113836033 if RETRY12 else 113704962
+GUARD_SHA = ('7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if RETRY12 else
+             '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
+FAILED = R / 'epoch170-retry11-rebook-20261122-v1'
+FAILURE_SHA = '60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801'
+FAILED_IID = '7a9f41a86d9240be89e3484fc01c3a31'
+FAILED_UNIT = 'horizon-qualify-170-replacement-local3retry11-20261122.service'
+FAILED_GUARD = 'horizon-guard-170-replacement-local3retry11-20261122'
 RETURN_SHA = 'c9cf86c9b00d3403e715c14e7af22ea8162e105a222c1d8b9b79be190e97865d'
 SCOPES_SHA = '989f450ba2bea735593b0278ff996ff877d7984439da48522198421dd5249025'
 OLD_PROFILE_SHA = '1596f281f699b48f4e4c7e65adf1070e4961d604d38997a7747ffe60dc536782'
@@ -31,7 +41,7 @@ def stable(s):
     s.need(RUN.resolve(strict=True) == RUN and root['root'] == str(RUN) and root['parent'] == str(PREVIOUS_RUN)
            and (st.st_dev, st.st_ino, st.st_uid, st.st_gid, st.st_mode) ==
            (root['device'], root['inode'], root['uid'], root['gid'], root['mode']) ==
-           (64512, 113704962, 1001, 1003, 0o40700)
+           (64512, ROOT_INODE, 1001, 1003, 0o40700)
            and root['worker_launched'] is False and returned['original_cap'] == CAP
            and returned['free_space_credit_bytes'] == 0, 'different 170 successor root or original cap')
     release = 0
@@ -50,7 +60,19 @@ def stable(s):
     s.need(set(returned['docs']) == {'local3retry9','local3retry10'}
            and release == returned['actual_retired_allocated_bytes'] == 120971882496,
            'incomplete 170 physical cleanup')
-    return dict(stable_root=source, cleanup=proof, original_cap=CAP, resource_credit_bytes=0)
+    result = dict(stable_root=source, cleanup=proof, original_cap=CAP, resource_credit_bytes=0)
+    if RETRY12:
+        failure, fr = s.read(FAILED / 'START_FAILURE.json', FAILURE_SHA)
+        intent = s.bound(failure['intent'], FAILED / 'START_INTENT.json')
+        actor, _ = s.read(FAILED / 'ACTUAL_PRODUCER_NATIVE.json',
+                          '9afecd75bf867464a8c41cbab5819a481d530da394a039d9c7c00c97317fe439')
+        s.need(root['previous_start_failure'] == fr and failure['cgroup'] == [] and failure['partial_retained']
+               and failure['producer_invocation_id'] == actor['producer_invocation_id'] == FAILED_IID
+               and intent['producer_unit'] == actor['producer_unit'] == FAILED_UNIT
+               and not (FAILED / 'ACTUAL_ADMISSION_AND_PROTECTION.json').exists(),
+               'different unadmitted 170 retry11 failure')
+        result['previous_start_failure'] = fr
+    return result
 
 
 def checked_input(s, stored, source):
@@ -68,7 +90,7 @@ def mounted_inputs(s, prepared, intent, proc, readonly_mounts):
     b = prepared['baseline']
     p = prepared['profile']
     s.need(b['profile'] == p and p['indexes'] == prepared['indexes']
-           and intent['stable_root'] == b['root'] == {'path':str(RUN),'device':64512,'inode':113704962},
+           and intent['stable_root'] == b['root'] == {'path':str(RUN),'device':64512,'inode':ROOT_INODE},
            'unbound 170 prepared generation or stable root')
     pairs = {}
     for prior, expected, now in zip(origin['projections'][1:], enrolled['indexes'], p['indexes'], strict=True):
@@ -95,7 +117,7 @@ def mounted_inputs(s, prepared, intent, proc, readonly_mounts):
 
 
 def guard(s, prepared):
-    qualified, _ = s.read(GUARD / 'GUARD_QUALIFIED.json', '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
+    qualified, _ = s.read(GUARD / 'GUARD_QUALIFIED.json', GUARD_SHA)
     image = GUARD / 'tools/guard'
     digest = prepared['profile']['guard_binary_sha256']
     seal = s.bound(qualified['seal'], image.parent / 'deployment-seal-receipt.json')
@@ -111,10 +133,20 @@ def guard(s, prepared):
 
 
 def observe(s, fit, native_actor, own):
-    stable(s)
+    state = stable(s)
+    if RETRY12:
+        for unit in (FAILED_UNIT, FAILED_GUARD + '.service', FAILED_GUARD + '.timer'):
+            manager = s.show(unit)
+            s.need(manager['ActiveState'] == 'inactive' and not manager['Job'] and
+                   (unit.endswith('.timer') or not fit.members(unit)), 'failed 170 retry11 actor returned')
     stopped, ref = s.read(OLD / 'guard-receipts/stop-completion.json', STOP_SHA)
     s.need(stopped['producer_invocation_id'] == PRIOR_IID and stopped['terminal']['active'] == 'inactive'
            and stopped['terminal']['pid'] == 0 and s.show(PRIOR_UNIT)['ActiveState'] == 'inactive'
            and not fit.members(PRIOR_UNIT), 'prior 170 owner returned')
     predecessor = {'original': {'producer_invocation_id': PRIOR_IID}, 'stop_completion': ref}
-    return native_actor(170, own, LANE, RUN, predecessor, generation=(DIRECTORY, NAME))
+    row = native_actor(170, own, LANE, RUN, predecessor, generation=(DIRECTORY, NAME))
+    if row is not None and RETRY12:
+        prepared, _ = s.read(NEW / 'PREPARED.json')
+        s.need(row['producer_invocation_id'] != FAILED_IID and prepared['baseline']['previous_cold_failure'] ==
+               state['previous_start_failure'], 'different 170 retry12 predecessor')
+    return row
