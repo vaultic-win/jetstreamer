@@ -309,7 +309,7 @@ mod cold266 {
         pub(super) const FILESYSTEM: &str = "/var/lib/jetstreamer";
     }
     mod tmpfs {
-        include!("../../tools/horizon266-native-input/src/tmpfs.rs");
+        include!("../../tools/horizon266-native-input/src/original_tmpfs.rs");
     }
     const ROOT_CAP: u64 = 124 << 30;
     include!("native_tmpfs_sample.rs");

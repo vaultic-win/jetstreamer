@@ -65,7 +65,7 @@ pub(crate) fn latest(f: &Bound) -> Result<Value> {
     bail!("cyclic fleet")
 }
 
-fn donor(n: &mut Native, row: &Value, cap: u64) -> Result<Value> {
+pub(super) fn donor(n: &mut Native, row: &Value, cap: u64) -> Result<Value> {
     let unit = text(row, "unit")?;
     let iid = text(row, "iid")?;
     let hand = binding(&row["handoff"])?.sealed()?;
@@ -135,7 +135,7 @@ fn donor(n: &mut Native, row: &Value, cap: u64) -> Result<Value> {
     Ok(held)
 }
 
-fn sources(n: &mut Native, fleet: &Value) -> Result<(Value, Value)> {
+pub(super) fn sources(n: &mut Native, fleet: &Value) -> Result<(Value, Value)> {
     let t = trace().json()?;
     let basis = turnover::cut().json()?;
     turnover::closed_singletons(n, &basis, fleet)?;

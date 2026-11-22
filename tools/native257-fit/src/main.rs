@@ -2,14 +2,23 @@ use anyhow::{Result, ensure};
 use std::path::Path;
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
-    if args.len() == 5 && args[1] == "measure-261-turnover-fit" {
+    if args.len() == 5
+        && matches!(
+            args[1].as_str(),
+            "measure-261-turnover-fit" | "measure-capped-266-fit"
+        )
+    {
+        use horizon_singleton211_launch::native266_full::{
+            measure_261_turnover, measure_capped_266,
+        };
+        let measure = if args[1] == "measure-capped-266-fit" {
+            measure_capped_266
+        } else {
+            measure_261_turnover
+        };
         println!(
             "{}",
-            horizon_singleton211_launch::native266_full::measure_261_turnover(
-                Path::new(&args[2]),
-                Path::new(&args[3]),
-                &args[4]
-            )?
+            measure(Path::new(&args[2]), Path::new(&args[3]), &args[4])?
         );
         return Ok(());
     }
