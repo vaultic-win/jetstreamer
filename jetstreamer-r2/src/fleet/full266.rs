@@ -4,7 +4,7 @@ use super::*;
 pub(super) mod bridge;
 
 fn profile(c: &DiagnosticClaim) -> Option<&'static bridge::Pilot> {
-    [&bridge::FULL228, &bridge::FULL266]
+    [&bridge::FULL228, &bridge::FULL266, &bridge::SUCCESSOR266]
         .into_iter()
         .find(|p| c.unit == p.unit)
 }
