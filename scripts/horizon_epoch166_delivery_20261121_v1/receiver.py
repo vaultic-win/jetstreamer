@@ -52,6 +52,14 @@ PEERS = {
 }
 
 
+COLD167 = (
+    ROOT.parent / "epoch167-cold-delivery-20261122-v3",
+    "525b8104545f5d8a5716291e8540386932f49b1cfc096898fb380c602713c16e",
+    (64512, 114491424),
+    Producer(167, "horizon-qualify-167-source-index-v3-20261122.service", "6e4b569b61d7420fb30a24a4ad0609dd"),
+)
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -126,7 +134,8 @@ def watcher():
 def authority(stack, root, expected_digest, producer=ORIGINAL):
     epoch, unit, iid = producer
     directory(root, 0)
-    raw_live = seal(stack, root / "LIVE.json", 0o600)
+    live_mode = 0o400 if producer == COLD167[3] else 0o600
+    raw_live = seal(stack, root / "LIVE.json", live_mode)
     require(sha(raw_live) == expected_digest, "live authority digest differs")
     live = json.loads(raw_live)
     raw_term = seal(stack, root / "TERMINAL_SUCCESS.json", 0o400)
@@ -236,6 +245,7 @@ if __name__ == "__main__":
     profile = parser.add_mutually_exclusive_group()
     profile.add_argument("--metered168", action="store_true")
     profile.add_argument("--full172", dest="peer", action="store_const", const=172)
+    profile.add_argument("--cold167", action="store_true")
     profile.add_argument("--source167", dest="peer", action="store_const", const=167)
     profile.add_argument("--retry170", dest="peer", action="store_const", const=170)
     parser.add_argument("native", type=Path)
@@ -247,7 +257,9 @@ if __name__ == "__main__":
     signal.signal(signal.SIGIO, signal.SIG_DFL)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGIO})
     try:
-        if a.peer:
+        if a.cold167:
+            root, live_sha, lock_id, producer = COLD167
+        elif a.peer:
             root, live_sha, lock_id, producer = PEERS[a.peer]
         elif a.metered168:
             root, live_sha, lock_id, producer = METERED_ROOT, METERED_LIVE, METERED_LOCK, METERED

@@ -18,14 +18,15 @@ r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 retry10 = "--retry10" in sys.argv[5:]
 metered168 = "--metered168" in sys.argv[5:]
-peers = {"--source167": (167, "horizon-publish-167-source-index-committed.service"),
+peers = {"--cold167": (167, "horizon-publish-167-cold-source-index-committed.service"),
+         "--source167": (167, "horizon-publish-167-source-index-committed.service"),
          "--retry170": (170, "horizon-publish-170-retry10-committed.service"),
          "--full172": (172, "horizon-publish-172-full-committed.service")}
 peer = next((flag for flag in peers if flag in sys.argv[5:]), None)
 if peer:
     sys.argv.remove(peer)
     number, publication_unit = peers[peer]
-    live_root, original_sha, _, producer = r.PEERS[number]
+    live_root, original_sha, _, producer = r.COLD167 if peer == "--cold167" else r.PEERS[number]
 elif metered168:
     sys.argv.remove("--metered168")
     live_root, original_sha, producer = r.METERED_ROOT, r.METERED_LIVE, r.METERED
@@ -54,6 +55,7 @@ def put(path, value, mode):
     path.write_text(json.dumps(value))
     path.chmod(mode)
 
+live_mode = 0o400 if peer == "--cold167" else 0o600
 raw_live = (live_root/"LIVE.json").read_bytes()
 assert r.sha(raw_live) == original_sha
 live = json.loads(raw_live)
@@ -87,7 +89,7 @@ live["output"], live["private_batch_receipts"] = d(out), d(batch.parent)
 authority = work/"authority"
 authority.mkdir(mode=0o700)
 live_path = authority/"LIVE.json"
-put(live_path, live, 0o600)
+put(live_path, live, live_mode)
 live_hash = r.sha(live_path.read_bytes())
 terminal = {"schema":f"terminal{epoch}-success-v1","epoch":epoch,"live":{"path":str(live_path),"sha256":live_hash},
     "source_admission":live["admission"],f"terminal_{epoch}_disposition":"node-published-local-cohort",
@@ -132,6 +134,16 @@ if retry10 or metered168 or peer:
     wrong.update(producer_invocation_id=r.ORIGINAL.invocation_id, producer_unit=r.ORIGINAL.unit)
     wrong["manager_terminal"].update(INVOCATION_ID=r.ORIGINAL.invocation_id,UNIT=r.ORIGINAL.unit)
     put(term_path,wrong,0o400);denied("predecessor-producer",run,"terminal authority or original producer differs")
+if peer == "--cold167":
+    live_path.chmod(0o600)
+    denied("writable-cold167-witness", run, "unsafe authority")
+    live_path.chmod(live_mode)
+    previous = r.PEERS[167][3]
+    wrong = copy.deepcopy(terminal)
+    wrong.update(producer_unit=previous.unit, producer_invocation_id=previous.invocation_id)
+    wrong["manager_terminal"].update(UNIT=previous.unit, INVOCATION_ID=previous.invocation_id)
+    put(term_path, wrong, 0o400)
+    denied("old167-source-index", run, "terminal authority or original producer differs")
 if epoch == 172:
     for label, unit, iid in [
         ("old172-hourly-trace", "horizon-qualify-172-trace-hourly-20261120-v1.service", "5a691c24655a4ff489531d8d7cc50254"),
@@ -152,7 +164,7 @@ if peer:
     # Rebind both hashes so that this check specifically reaches the schema gate.
     original_live_bytes = live_path.read_bytes()
     wrong_live = {**live, "schema": f"horizon-{epoch}-live-to-terminal-witness-v1"}
-    put(live_path, wrong_live, 0o600)
+    put(live_path, wrong_live, live_mode)
     live_hash = r.sha(live_path.read_bytes())
     wrong = copy.deepcopy(terminal)
     wrong["live"]["sha256"] = live_hash
