@@ -1,17 +1,63 @@
-//! Reprice only blocks already occupied by the original 228 loop6 image.
+//! Measure blocks already occupied by a guarded replay guest.
 //! File descriptors pin the objects, while two FIEMAP samples establish which
 //! logical bytes still map to the same exclusive physical blocks.
 use super::*;
 use std::os::{fd::AsRawFd, unix::fs::FileTypeExt};
 
-const STATE: &str = "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1/pilot";
-const IMAGE: &str = "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1/pilot/private.ext4";
-const GUEST: &str = "/home/ubuntu/.jetstreamer-private/qualification-228-demotion-root-tail-v1";
-const LOOP: &str = "/dev/loop6";
-const CAP: u64 = 112 << 30;
-const HAND: &str = "da3fdea0fa6f6682daa741e4c72d5f3a81d6bd420743d5df70c46d40b6319752";
-const HELD: &str = "45e7ff78f1fae3b0075dc84a0e66add7fe6751a655260f7d1fcf93b7a8e50895";
-const MOUNT: &str = "eb09b34163d040856017b3ccdd45295448922483836ac20d4498d1697aeb335b";
+struct Guest {
+    epoch: u64,
+    state: &'static str,
+    guest: &'static str,
+    unit: &'static str,
+    iid: &'static str,
+    pid: u64,
+    loop_number: u32,
+    inode: u64,
+    mount_id: &'static str,
+    cap: u64,
+    handoff: &'static str,
+    held: &'static str,
+    mount: &'static str,
+}
+
+const E228: Guest = Guest {
+    epoch: 228,
+    state: "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1/pilot",
+    guest: "/home/ubuntu/.jetstreamer-private/qualification-228-demotion-root-tail-v1",
+    unit: "horizon-qualify-228-demotion-root-tail-16d4b158-v1.service",
+    iid: "5566869f329b46309aa8a2ea8f46047a",
+    pid: 2819393,
+    loop_number: 6,
+    inode: 18330573,
+    mount_id: "1167",
+    cap: 112 << 30,
+    handoff: "da3fdea0fa6f6682daa741e4c72d5f3a81d6bd420743d5df70c46d40b6319752",
+    held: "45e7ff78f1fae3b0075dc84a0e66add7fe6751a655260f7d1fcf93b7a8e50895",
+    mount: "eb09b34163d040856017b3ccdd45295448922483836ac20d4498d1697aeb335b",
+};
+const E266: Guest = Guest {
+    epoch: 266,
+    state: "/var/lib/jetstreamer/horizon266-instructions-2789f821-v194-control/pilot",
+    guest: "/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v194",
+    unit: "horizon-qualify-266-instructions-2789f821-v194.service",
+    iid: "41cf6e5a5cd54d57adc5eba3f0c0ecef",
+    pid: 3215067,
+    loop_number: 12,
+    inode: 18340079,
+    mount_id: "416",
+    cap: 320 << 30,
+    handoff: "fcab517e7281c8c1dde68c9e7f56cbabc294eff2154c181bdb72b1742170a4df",
+    held: "dddfa399c33267ad6dcb67ff66d556017f03a16ddf330cd72f1bc9cb979d7666",
+    mount: "fd9e3477764ca22ceb30d2b33a9580aaa89ffbd55a1c6317ade149a65790d072",
+};
+impl Guest {
+    fn image(&self) -> PathBuf {
+        Path::new(self.state).join("private.ext4")
+    }
+    fn device(&self) -> String {
+        format!("/dev/loop{}", self.loop_number)
+    }
+}
 const BATCH: usize = 512;
 const LAST: u32 = 1;
 const UNWRITTEN: u32 = 0x800;
@@ -81,29 +127,30 @@ fn filesys(file: &File) -> Result<(u64, u64)> {
     ))
 }
 
-fn original() -> Result<()> {
-    let bound = |name: &str, hash: &str| Bound::new(Path::new(STATE).join(name), hash);
-    let h = bound("handoff.json", HAND).sealed()?;
-    let fit = bound("held-fit.json", HELD);
+fn original(g: &Guest) -> Result<()> {
+    let bound = |name: &str, sha: &str| Bound::new(Path::new(g.state).join(name), sha);
+    let handoff = bound("handoff.json", g.handoff).sealed()?;
+    let fit = bound("held-fit.json", g.held);
     let f = fit.sealed()?;
-    let m = bound("mount.json", MOUNT).sealed()?;
     ensure!(
-        h["iid"] == "5566869f329b46309aa8a2ea8f46047a"
-            && h["pid"] == 2819393
-            && h["unit"] == "horizon-qualify-228-demotion-root-tail-16d4b158-v1.service"
-            && h["held_fit"] == json!(fit),
-        "228 original handoff"
+        handoff["iid"] == g.iid
+            && handoff["pid"] == g.pid
+            && handoff["unit"] == g.unit
+            && handoff["held_fit"] == json!(fit),
+        "original handoff changed"
     );
+    let m = bound("mount.json", g.mount).sealed()?;
     ensure!(
-        m == json!({"backing":IMAGE,"bytes":CAP,"loop":LOOP,"root":GUEST,"root_device":libc::makedev(7,6),"root_inode":2}),
-        "228 mount receipt"
+        m == json!({"backing":g.image(),"bytes":g.cap,"loop":g.device(),"root":g.guest,
+            "root_device":libc::makedev(7,g.loop_number),"root_inode":2}),
+        "mount receipt changed"
     );
     ensure!(
         f["winner"]["fits"] == true
-            && f["winner"]["root"] == CAP
-            && num(&f, "protected_floor")?.checked_add(CAP)
+            && f["winner"]["root"] == g.cap
+            && num(&f, "protected_floor")?.checked_add(g.cap)
                 == f["winner"]["required_free"].as_u64(),
-        "228 gross reservation"
+        "gross guest reservation changed"
     );
     Ok(())
 }
@@ -130,10 +177,12 @@ fn mount<'a>(path: &Path, info: &'a str) -> Result<(Vec<&'a str>, Vec<&'a str>)>
     ensure!(!duplicate, "ambiguous top mount");
     selected.context("missing original mount")
 }
-fn owner(image: &File, device: &File) -> Result<Value> {
+fn owner(profile: &Guest, image: &File, device: &File) -> Result<Value> {
     let host_dev = libc::makedev(259, 1);
-    let loop_dev = libc::makedev(7, 6);
-    let p = Path::new(IMAGE);
+    let loop_dev = libc::makedev(7, profile.loop_number);
+    let backing = profile.image();
+    let p = backing.as_path();
+    let loop_name = profile.device();
     let st = image.metadata()?;
     let named = fs::symlink_metadata(p)?;
     trusted_parents(p)?;
@@ -143,12 +192,12 @@ fn owner(image: &File, device: &File) -> Result<Value> {
             && named.is_file()
             && (named.dev(), named.ino()) == (st.dev(), st.ino())
             && st.dev() == host_dev
-            && st.ino() == 18_330_573
+            && st.ino() == profile.inode
             && st.mode() & 0o7777 == 0o600
             && st.nlink() == 1
             && st.uid() == 0
-            && st.len() == CAP,
-        "228 backing inode or capacity changed"
+            && st.len() == profile.cap,
+        "peer backing inode or capacity changed"
     );
     let dev = device.metadata()?;
     ensure!(
@@ -172,16 +221,33 @@ fn owner(image: &File, device: &File) -> Result<Value> {
         u64::from(status.flags),
     ];
     ensure!(
-        fields == [host_dev, st.ino(), 0, 0, 0, 6, 0, 0, 4]
-            && size == CAP
-            && fs::read_to_string("/sys/block/loop6/loop/backing_file")?.trim() == IMAGE,
-        "228 loop rebound, resized or changed flags"
+        fields
+            == [
+                host_dev,
+                st.ino(),
+                0,
+                0,
+                0,
+                u64::from(profile.loop_number),
+                0,
+                0,
+                4
+            ]
+            && size == profile.cap
+            && Path::new(
+                fs::read_to_string(format!(
+                    "/sys/block/loop{}/loop/backing_file",
+                    profile.loop_number
+                ))?
+                .trim()
+            ) == p,
+        "peer loop rebound, resized or changed flags"
     );
-    let guest = Path::new(GUEST);
+    let guest = Path::new(profile.guest);
     let root = fs::metadata(guest)?;
     ensure!(
         guest.canonicalize()? == guest && (root.dev(), root.ino()) == (loop_dev, 2),
-        "228 guest root changed"
+        "peer guest root changed"
     );
     let info = fs::read_to_string("/proc/self/mountinfo")?;
     let (h, hf) = mount(p, &info)?;
@@ -189,18 +255,26 @@ fn owner(image: &File, device: &File) -> Result<Value> {
     ensure!(
         (h[0], h[2], h[3], h[4], hf[0], hf[1])
             == ("47", "259:1", "/", "/", "ext4", "/dev/nvme0n1p1"),
-        "228 backing filesystem changed"
+        "peer backing filesystem changed"
     );
     ensure!(
-        (g[0], g[2], g[3], g[4], gf[0], gf[1]) == ("1167", "7:6", "/", GUEST, "ext4", LOOP)
+        (g[0], g[3], g[4], gf[0], gf[1])
+            == (
+                profile.mount_id,
+                "/",
+                profile.guest,
+                "ext4",
+                loop_name.as_str()
+            )
+            && g[2] == format!("7:{}", profile.loop_number)
             && !g[5]
                 .split(',')
                 .chain(gf[2].split(','))
                 .any(|s| s == "discard" || s.starts_with("discard=")),
-        "228 guest mount or discard changed"
+        "peer guest mount or discard changed"
     );
     Ok(
-        json!({"device":st.dev(),"inode":st.ino(),"uid":st.uid(),"nlink":st.nlink(),"size":st.len(),"host_mount":47,"guest_mount":1167,"host_source":hf[1],"guest_source":gf[1],"loop_status":fields}),
+        json!({"device":st.dev(),"inode":st.ino(),"uid":st.uid(),"nlink":st.nlink(),"size":st.len(),"host_mount":47,"guest_mount":profile.mount_id.parse::<u64>()?,"host_source":hf[1],"guest_source":gf[1],"loop_status":fields}),
     )
 }
 
@@ -348,16 +422,16 @@ fn blocks(file: &File) -> Result<u64> {
         .checked_mul(512)
         .context("inode block count overflow")
 }
-fn sample(image: &File, device: &File) -> Result<Sample> {
-    let id = owner(image, device)?;
+fn sample(profile: &Guest, image: &File, device: &File) -> Result<Sample> {
+    let id = owner(profile, image, device)?;
     let before = blocks(image)?;
     ensure!(filesys(image)?.0 == BLOCK, "different host block size");
-    let rows = scan(image, CAP)?;
+    let rows = scan(image, profile.cap)?;
     let available = filesys(image)?.1;
     let after = blocks(image)?;
-    let total = exclusive(&rows, CAP)?;
+    let total = exclusive(&rows, profile.cap)?;
     ensure!(
-        total <= after && before <= after && owner(image, device)? == id,
+        total <= after && before <= after && owner(profile, image, device)? == id,
         "228 backing shrink or rebind during sample"
     );
     Ok(Sample {
@@ -369,15 +443,24 @@ fn sample(image: &File, device: &File) -> Result<Sample> {
         total,
     })
 }
-fn compare(a: &Sample, b: &Sample) -> Result<u64> {
+fn common_allocation(a: &Sample, b: &Sample) -> Result<u64> {
     let credit = retained(&a.rows, &b.rows);
     ensure!(
-        a.id == b.id && a.after <= b.before && credit == a.total && credit <= b.total && credit > 0,
-        "228 allocation shrank, changed owner or remapped during election"
+        a.id == b.id && a.after <= b.before && credit <= a.total && credit <= b.total,
+        "guest allocation shrank or rebound during election"
+    );
+    Ok(credit)
+}
+fn compare(a: &Sample, b: &Sample) -> Result<u64> {
+    let credit = common_allocation(a, b)?;
+    ensure!(
+        credit == a.total && credit > 0,
+        "original 228 allocation remapped during election"
     );
     Ok(credit)
 }
 pub(super) struct Extents {
+    profile: &'static Guest,
     image: File,
     device: File,
     first: Sample,
@@ -385,18 +468,25 @@ pub(super) struct Extents {
 }
 impl Extents {
     pub(super) fn open() -> Result<Self> {
-        original()?;
-        let open = |p: &str| {
+        Self::for_guest(&E228)
+    }
+    pub(super) fn turnover266() -> Result<Self> {
+        Self::for_guest(&E266)
+    }
+    fn for_guest(profile: &'static Guest) -> Result<Self> {
+        original(profile)?;
+        let open = |p: &Path| {
             OpenOptions::new()
                 .read(true)
                 .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
                 .open(p)
         };
-        let image = open(IMAGE)?;
-        let device = open(LOOP)?;
+        let image = open(&profile.image())?;
+        let device = open(Path::new(&profile.device()))?;
         let started = Instant::now();
-        let first = sample(&image, &device)?;
+        let first = sample(profile, &image, &device)?;
         Ok(Self {
+            profile,
             image,
             device,
             first,
@@ -404,15 +494,19 @@ impl Extents {
         })
     }
     pub(super) fn finish(self) -> Result<Value> {
-        let next = sample(&self.image, &self.device)?;
-        let credit = compare(&self.first, &next)?;
+        let next = sample(self.profile, &self.image, &self.device)?;
+        let credit = if self.profile.epoch == 228 {
+            compare(&self.first, &next)?
+        } else {
+            common_allocation(&self.first, &next)?
+        };
         let lower = self
             .first
             .available
             .min(next.available)
             .min(filesys(&self.image)?.1);
         Ok(
-            json!({"schema":"horizon228-charged-ext4-allocation-witness-v1","first":self.first.document(),"second":next.document(),"credit":credit,"free_lower":lower,"bracket_ns":u64::try_from(self.started.elapsed().as_nanos())?,"source_handoff":HAND,"source_held":HELD,"source_mount":MOUNT,"charged_image_bytes":CAP,"remaining_image_growth":CAP-credit,"other_growth_released":0,"capacity_released":false,"admission_authorized":false}),
+            json!({"schema":format!("horizon{}-charged-ext4-allocation-witness-v1",self.profile.epoch),"first":self.first.document(),"second":next.document(),"credit":credit,"free_lower":lower,"bracket_ns":u64::try_from(self.started.elapsed().as_nanos())?,"source_handoff":self.profile.handoff,"source_held":self.profile.held,"source_mount":self.profile.mount,"charged_image_bytes":self.profile.cap,"remaining_image_growth":self.profile.cap-credit,"other_growth_released":0,"capacity_released":false,"admission_authorized":false}),
         )
     }
 }
@@ -420,6 +514,7 @@ impl Extents {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const CAP: u64 = E228.cap;
 
     fn e(start: u64, end: u64, physical: u64) -> Extent {
         Extent {
@@ -468,6 +563,16 @@ mod tests {
         b.before -= 1;
         assert!(compare(&a, &b).is_err());
         assert!(compare(&s(vec![]), &s(vec![])).is_err());
+    }
+    #[test]
+    fn live_266_credits_only_surviving_physical_ranges() {
+        let a = s(vec![e(0, 3, 10), e(3, 5, 20)]);
+        let b = s(vec![e(0, 2, 10), e(2, 3, 16), e(3, 5, 20), e(5, 7, 30)]);
+        assert_eq!(common_allocation(&a, &b).unwrap(), 4 * BLOCK);
+        assert!(compare(&a, &b).is_err());
+        let mut changed = b;
+        changed.id = json!({"inode":0});
+        assert!(common_allocation(&a, &changed).is_err());
     }
     #[test]
     fn unknown_shared_delayed_or_unaligned_extents_never_contribute() {

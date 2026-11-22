@@ -225,6 +225,28 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
 pub fn dispatch_instructions(args: &[String]) -> Result<Value> {
     controller(Lane::Instructions266, args)
 }
+pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
+    ensure!(
+        unsafe { libc::geteuid() } == 0
+            && std::env::var("CODEX_THREAD_ID")? == MAIN
+            && path.parent() == Some(Path::new(turnover::STATE))
+            && path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| s.starts_with("allocation-")),
+        "turnover allocation evidence namespace or owner"
+    );
+    trusted_parents(path)?;
+    dir(path, 0o700)?;
+    let mut n = Native {
+        root: path.to_owned(),
+        counter: 0,
+        deadline: Some(mono()? + 90_000_000),
+    };
+    let report = turnover::allocation(&mut n)?;
+    Ok(json!(save_json(path, "allocation.json", &report)?))
+}
+
 pub fn dispatch_turnover(args: &[String]) -> Result<Value> {
     controller(Lane::Turnover266, args)
 }

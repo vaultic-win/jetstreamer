@@ -395,3 +395,119 @@ mod tests {
         assert!(price(hard, growth, need, u64::MAX, floor).is_err());
     }
 }
+
+/// Bound the disk still needed by the original guarded 320 GiB producer while a
+/// second lane is being priced. The caller must still check the rest of the fleet.
+pub(super) fn allocation(n: &mut Native) -> Result<Value> {
+    original_boot()?;
+    let p = Profile::new(Lane::Turnover266, "pilot")?;
+    let hand = Bound::new(
+        p.state.join("handoff.json"),
+        "fcab517e7281c8c1dde68c9e7f56cbabc294eff2154c181bdb72b1742170a4df",
+    );
+    let h = hand.sealed()?;
+    let iid = text(&h, "iid")?;
+    let pid = num(&h, "pid")?;
+    let guard = binding(&h["guard"])?;
+    let plan = guard.sealed()?;
+    let spec = binding(&h["spec"])?.sealed()?;
+    let fit = binding(&h["held_fit"])?.sealed()?;
+    ensure!(
+        h["unit"] == p.unit
+            && plan["unit"] == p.unit
+            && plan["invocation_id"] == iid
+            && spec["root"] == json!(p.root)
+            && plan["minimum_free_bytes"] == fit["protected_floor"],
+        "changed live 266 handoff"
+    );
+    let check = |n: &mut Native| -> Result<Value> {
+        let u = n.show(&p.unit)?;
+        live::finite_owner(&u, &p.unit, iid, successor::MEMORY)?;
+        let proc = PathBuf::from(format!("/proc/{pid}"));
+        let args = rows(&spec, "argv")?
+            .iter()
+            .map(|s| s.as_str().context("node argument"))
+            .collect::<Result<Vec<_>>>()?;
+        let cmd = fs::read(proc.join("cmdline"))?;
+        ensure!(
+            text(&u, "MainPID")?.parse::<u64>()? == pid
+                && fs::read_link(proc.join("exe"))?
+                    == Path::new(args.first().context("node command")?)
+                && cmd.strip_suffix(&[0]).is_some_and(|raw| raw
+                    .split(|&b| b == 0)
+                    .eq(args.iter().map(|s| s.as_bytes()))),
+            "266 node changed"
+        );
+        let timer = n.show(&p.timer)?;
+        ensure!(
+            timer["InvocationID"] == h["timer"]
+                && timer["ActiveState"] == "active"
+                && timer["Unit"] == p.guard
+                && timer["Job"] == "",
+            "266 guard timer changed"
+        );
+        let dir = Path::new(text(&plan, "receipt_directory")?);
+        for marker in [
+            "stop-intent.json",
+            "pressure-stop.json",
+            "manager-stop-completion.json",
+        ] {
+            ensure!(!dir.join(marker).try_exists()?, "266 stop in progress");
+        }
+        // A new guard may already be running. Use the last successful PID 1
+        // completion and the sample written by that exact invocation.
+        let boot = BOOT.replace('-', "");
+        let unit = format!("UNIT={}", p.guard);
+        let journal = n.run(
+            "/usr/bin/journalctl",
+            &[
+                "--boot",
+                &boot,
+                "--quiet",
+                "--no-pager",
+                "-o",
+                "json",
+                "-n",
+                "1",
+                "_UID=0",
+                "_PID=1",
+                &unit,
+                "MESSAGE_ID=7ad2d189f7e94e70a38c781354912448",
+            ],
+        )?;
+        let event: Value = serde_json::from_slice(&journal)?;
+        let gid = text(&event, "INVOCATION_ID")?;
+        ensure!(
+            hex(gid, 32)
+                && event["_BOOT_ID"] == boot
+                && event["UNIT"] == p.guard
+                && event.get("UNIT_RESULT").is_none_or(|x| x == "success"),
+            "266 guard completion"
+        );
+        let sample = bound_at(&dir.join(format!("sample-{gid}.json")))?;
+        let v = sample.json()?;
+        start::validate_sample_for(GUARD_SHA, &v, &p.unit, iid, pid, &guard, None)?;
+        ensure!(
+            v["guard_invocation_id"] == gid
+                && v["minimum_free_bytes"] == plan["minimum_free_bytes"],
+            "266 guard sample changed"
+        );
+        fresh(num(&v, "recorded_unix_seconds")?, now()?, 120)?;
+        Ok(json!({"sample":sample,"producer":u,"timer_iid":timer["InvocationID"]}))
+    };
+    let before = check(n)?;
+    let extents = peer228_extents::Extents::turnover266()?;
+    let after = check(n)?;
+    let backing = extents.finish()?;
+    let end = check(n)?;
+    live::same_owner(&before["producer"], &after["producer"])?;
+    live::same_owner(&after["producer"], &end["producer"])?;
+    let floor = num(&fit, "protected_floor")?
+        .checked_add(num(&backing, "remaining_image_growth")?)
+        .context("266 remaining floor overflow")?;
+    Ok(
+        json!({"schema":"horizon266-live-guest-allocation-v1","handoff":hand,"held":h["held_fit"],
+        "first":before,"middle":after,"last":end,"backing":backing,"protected_free_with_remaining_growth":floor,
+        "capacity_released":false,"admission_authorized":false}),
+    )
+}

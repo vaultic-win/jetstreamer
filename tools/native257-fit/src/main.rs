@@ -2,6 +2,15 @@ use anyhow::{Result, ensure};
 use std::path::Path;
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 3 && args[1] == "measure-266-turnover" {
+        println!(
+            "{}",
+            horizon_singleton211_launch::native266_full::measure_turnover_allocation(Path::new(
+                &args[2]
+            ))?
+        );
+        return Ok(());
+    }
     if args.get(1).is_some_and(|op| op == "epoch228-full") {
         println!(
             "{}",
