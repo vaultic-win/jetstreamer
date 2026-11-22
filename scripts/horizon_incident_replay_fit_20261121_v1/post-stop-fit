@@ -47,8 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOMEFLOOR = HERE == D / "tools-homefloor-cold167-v3" or (
-    HERE.name == "tools-homefloor-cold167-v3" and HERE.parent.parent == D / "homefloor-qualification"
+HOMEFLOOR = HERE.name in {"tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"} and (
+    HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
 if HOMEFLOOR:
     recover = runpy.run_path(str(Path(__file__).with_name("homefloor_fit.py")))
