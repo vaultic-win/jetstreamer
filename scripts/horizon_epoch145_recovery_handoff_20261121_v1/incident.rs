@@ -97,7 +97,7 @@ const FLEET_DIRECTORY: &str = env!("HORIZON_145_ACCEPTED_FLEET_DIRECTORY");
 #[cfg(feature = "timer-rejoin")]
 const HEAD: &str = env!("HORIZON_145_ACCEPTED_FLEET_SHA256");
 
-#[cfg(feature = "timer-rejoin")]
+#[cfg(all(feature = "timer-rejoin", not(feature = "fixture-post")))]
 mod generation {
     pub(super) const SOURCE: &str = env!("HORIZON_145_SEMANTIC_INVOCATION");
     pub(super) const START: &str =
@@ -123,6 +123,29 @@ mod generation {
         "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
     pub(super) const INSPECT: &str = "inspect-v5e";
     pub(super) const FOLLOW: &str = "follow-v5e";
+}
+
+#[cfg(feature = "fixture-post")]
+pub(super) mod generation {
+    pub(crate) const SOURCE: &str = "50af3d8ab5da47e8bdc2828feab53908";
+    pub(crate) const START: &str =
+        "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_ADVANCING_WORKER.json";
+    pub(crate) const ADVANCING: &str =
+        "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496";
+    pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13b";
+    pub(crate) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
+    pub(crate) const STATE_PATH: &str = "epoch145-fixture-phase-dispatch-20261122-v1/state";
+    pub(crate) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v21b";
+    pub(crate) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
+    pub(crate) const PRIOR: &str = "a99ed8b51e8a482b805b8a36a11b2700";
+    pub(crate) const IMAGE: &str =
+        "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21";
+    pub(crate) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5f/export145";
+    pub(crate) const PIPELINE: &str =
+        "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
+    pub(crate) const INSPECT: &str = "inspect-v5f";
+    pub(crate) const FOLLOW: &str = "follow-v5f";
 }
 
 pub fn handles(mode: &str) -> bool {
@@ -240,6 +263,25 @@ fn original() -> Result<Value> {
                 .is_some_and(|rows| rows.len() == 2),
         "foreign semantic predecessor"
     );
+    #[cfg(feature = "fixture-post")]
+    {
+        let state = rt("epoch145-guarded-export-20261121-v1/state");
+        let failed = json!({"path":state.join(PRIOR).join("failed.json"),
+            "sha256":"da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"});
+        ensure!(
+            a["start"] == bound(&state.join(SOURCE).join("recovery-started.json"))?
+                && a["manager"]
+                    == bound(&rt(
+                        "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_MANAGER.json"
+                    ))?
+                && start["prior_frozen_recovery"]["failed_qualification_census"]["current_boot_failure"]
+                    ["failure"]
+                    == failed
+                && launch["failure"] == failed
+                && from_ref(&failed)?["iid"] == PRIOR,
+            "different V5f registration or predecessor"
+        );
+    }
     Ok(a)
 }
 pub(super) fn completed_semantics() -> Result<Value> {
@@ -466,6 +508,49 @@ pub fn run(mode: &str) -> Result<()> {
                 && platform::proc_exe(pid)? == rt(SEMANTIC),
             "different original live verifier"
         );
+        #[cfg(feature = "fixture-post")]
+        {
+            let child = i32::try_from(obs["child_pid"].as_i64().context("original V5f worker")?)?;
+            let parent_command = fs::read(format!("/proc/{pid}/cmdline"))?;
+            let worker_command = fs::read(format!("/proc/{child}/cmdline"))?;
+            let manager = from_ref(&original["manager"])?;
+            let intent = from_ref(&manager["intent"])?;
+            let image = rt(SEMANTIC);
+            let exe = platform::string_path(&image)?;
+            ensure!(
+                platform::proc_exe(child)? == image
+                    && platform::ticks(child)? == obs["child_ticks"]
+                    && parent_command
+                        == [
+                            exe,
+                            "recover-full-output",
+                            text(&intent["fleet"]["path"])?,
+                            text(&intent["fleet"]["sha256"])?,
+                            IMAGE,
+                            ""
+                        ]
+                        .join("\0")
+                        .as_bytes()
+                    && worker_command
+                        == [exe, "recover-worker", &pid.to_string(), IMAGE, ""]
+                            .join("\0")
+                            .as_bytes()
+                    && fs::read_to_string(format!("/proc/{child}/cgroup"))?.trim()
+                        == format!("0::/system.slice/{E}")
+                    && fs::read_to_string(format!("/proc/{child}/stat"))?
+                        .rsplit_once(')')
+                        .context("worker stat")?
+                        .1
+                        .split_whitespace()
+                        .nth(1)
+                        .context("worker parent")?
+                        .parse::<i32>()?
+                        == pid,
+                "different live V5f parent or worker"
+            );
+            ensure!(bound(&image)?["sha256"] == IMAGE, "V5f image changed");
+            check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+        }
         println!(
             "{}",
             json!({"original":iid,"manager":pid,"fleet":fleet()?,"post_seal":SEAL,"launch":false})
@@ -473,6 +558,8 @@ pub fn run(mode: &str) -> Result<()> {
         return Ok(());
     }
     ensure!(mode == FOLLOW, "invalid incident mode");
+    #[cfg(feature = "fixture-post")]
+    let _previous = boundary::guard_predecessor()?;
     let _lock = guard_instance(&rt(STATE_PATH))?;
     events::manager(E, SOURCE)?;
     let retained = completed_semantics()?;

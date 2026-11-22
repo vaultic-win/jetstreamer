@@ -16,7 +16,7 @@ fn local(name: &str) -> PathBuf {
     Path::new(BASE).join(name)
 }
 
-fn unit_state(unit: &str) -> Result<Value> {
+pub(super) fn unit_state(unit: &str) -> Result<Value> {
     let fields =
         "Id,LoadState,ActiveState,SubState,MainPID,ControlPID,Job,InvocationID,ExecStart,Unit";
     let out = Command::new("/usr/bin/systemctl")
@@ -351,12 +351,9 @@ pub(super) fn release_before_post(
             && valid_iid(text(&intent["writer_invocation_id"])?),
         "foreign selected 136 intent"
     );
-    let package = rt("epoch136-joint-writer-20261122-v6/controller");
-    let exact = check_member(
-        &package,
-        "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba",
-        "admit136",
-    )?;
+    use boundary::profile::{WRITER_DIR, WRITER_SEAL};
+    let package = rt(WRITER_DIR).join("controller");
+    let exact = check_member(&package, WRITER_SEAL, "admit136")?;
     ensure!(
         image == exact && bound(image)?["sha256"] == intent["writer"]["sha256"],
         "foreign release controller"
@@ -389,7 +386,7 @@ pub(super) fn release_before_post(
     let result = if release_path.try_exists()? {
         bound(&release_path)?
     } else {
-        // The sealed V6 controller alone acquires the original operation flock,
+        // The sealed selected controller alone acquires the original operation flock,
         // unmasks the exact recorded donor and emits the durable release receipt.
         serde_json::from_slice(&command(image, &["release"])?)?
     };

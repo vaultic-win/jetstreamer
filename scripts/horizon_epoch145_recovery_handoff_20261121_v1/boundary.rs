@@ -3,16 +3,44 @@
 use super::*;
 use std::fs::{File, OpenOptions};
 
-const DIR: &str = "epoch145-phase-dispatch-20261122-v1";
-const DISPATCH: &str = "horizon-145-phase-dispatch-20261122-v1.service";
-const OLD: &str = "horizon-145-v5e-delivery-follow-20261121-v1.service";
-const STATE: &str = "epoch145-v5e-delivery-handoff-20261121-v1/state";
+#[cfg(not(feature = "fixture-post"))]
+pub(super) mod profile {
+    pub(crate) const DIR: &str = "epoch145-phase-dispatch-20261122-v1";
+    pub(crate) const DEPLOY: &str = "tools-v2";
+    pub(crate) const DISPATCH: &str = "horizon-145-phase-dispatch-20261122-v1.service";
+    pub(crate) const OLD: &str = "horizon-145-v5e-delivery-follow-20261121-v1.service";
+    pub(crate) const STATE: &str = "epoch145-v5e-delivery-handoff-20261121-v1/state";
+    pub(crate) const SEMANTIC: &str = "a99ed8b51e8a482b805b8a36a11b2700";
+    pub(crate) const FOLLOW: &str = "follow-v5e";
+    pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v6";
+    pub(crate) const WRITER_SEAL: &str =
+        "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba";
+    pub(crate) const MIRROR_SEAL: &str =
+        "404c245db5060e54e24295cb54de1d60d5549f657fc288c2185c4c72612a8ee8";
+    pub(crate) const PARENT_SEAL: &str =
+        "a95b11e40ac911f3916494d8c932b3c61a16de857e8d2f49af7c9198438cfa6b";
+    pub(crate) const LAUNCHER: &str =
+        "b73e0c3220a1dcefb67ccda8981b4441dcb995238d1da377d91ad2ee0c35f804";
+}
+#[cfg(feature = "fixture-post")]
+pub(super) mod profile {
+    pub(crate) use crate::incident::generation::{FOLLOW, SOURCE as SEMANTIC, STATE_PATH as STATE};
+    pub(crate) const DIR: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
+    pub(crate) const DEPLOY: &str = "tools";
+    pub(crate) const DISPATCH: &str = "horizon-145-fixture-phase-dispatch-20261122-v1.service";
+    pub(crate) const OLD: &str = "horizon-145-phase-dispatch-20261122-v1.service";
+    pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v7b";
+    pub(crate) const WRITER_SEAL: &str = env!("HORIZON_136_WRITER_SEAL_SHA256");
+    pub(crate) const MIRROR_SEAL: &str = env!("HORIZON_136_MIRROR_SEAL_SHA256");
+    pub(crate) const PARENT_SEAL: &str = env!("HORIZON_136_PARENT_SEAL_SHA256");
+    pub(crate) const LAUNCHER: &str = env!("HORIZON_136_LAUNCHER_SHA256");
+}
+use profile::*;
+
 const LOCK: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 const BASE: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1";
 const PAYLOAD: &str = "horizon-qualify-136-actual-20261120-g1.service";
-const SEMANTIC: &str = "a99ed8b51e8a482b805b8a36a11b2700";
 const SELECTED: &str = "writer-selected.json";
-const WRITER_SEAL: &str = "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba";
 
 pub(super) fn ready_path() -> PathBuf {
     rt(DIR).join("READY.json")
@@ -119,8 +147,28 @@ fn registration() -> Result<(Value, Value)> {
             && ready["original_semantic_invocation"] == SEMANTIC,
         "foreign selector registration"
     );
+    #[cfg(feature = "fixture-post")]
+    {
+        use crate::incident::generation::{FIT_PKG, FIT_SEAL};
+        let provider = rt(FIT_PKG);
+        let image = check_member(&provider, FIT_SEAL, "post-stop-fit")?;
+        ensure!(
+            ready["registered_provider"]
+                == json!({"image":bound(&image)?,
+            "seal": bound(&provider.join("deployment-seal-receipt.json"))?}),
+            "different registered V21 provider"
+        );
+        let status =
+            rt("prefix140-status-cadence-20261122-v1/cadence-tools/deployment-seal-receipt.json");
+        ensure!(
+            ready["status_consumer_seal"] == bound(&status)?
+                && ready["status_consumer_seal"]["sha256"]
+                    == "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e",
+            "different prefix status consumer"
+        );
+    }
     compare_lock_identity(&fs::symlink_metadata(LOCK)?, &ready["operation_lock"])?;
-    let pkg = rt(DIR).join("tools-v2");
+    let pkg = rt(DIR).join(DEPLOY);
     let seal = bound(&pkg.join("deployment-seal-receipt.json"))?;
     ensure!(ready["deployment"] == seal, "different selector deployment");
     let image = check_member(&pkg, text(&seal["sha256"])?, "follow145")?;
@@ -139,12 +187,83 @@ fn registration() -> Result<(Value, Value)> {
                 &fs::metadata(&image)?
             )
             && fs::read(format!("/proc/{pid}/cmdline"))?
-                == [image.as_os_str().as_encoded_bytes(), b"follow-v5e", b""].join(&0),
+                == [image.as_os_str().as_encoded_bytes(), FOLLOW.as_bytes(), b""].join(&0),
         "selector invocation changed"
     );
     owned_lock(pid, &rt(STATE).join("controller.lock"))?;
+    #[cfg(not(feature = "fixture-post"))]
     drained(&native(OLD)?, OLD)?;
+    #[cfg(feature = "fixture-post")]
+    owned_lock(pid, &previous_lock()?)?;
     Ok((pin, ready))
+}
+
+#[cfg(feature = "fixture-post")]
+fn previous_lock() -> Result<PathBuf> {
+    let receipt = pinned(
+        &rt(DIR).join("PREDECESSOR_DRAINED.json"),
+        "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07",
+    )?;
+    let path = rt("epoch145-v5e-delivery-handoff-20261121-v1/state/controller.lock");
+    let prior = &receipt["controller_lock"];
+    let m = fs::symlink_metadata(&path)?;
+    ensure!(
+        prior == &json!({"path":path,"device":m.dev(),"inode":m.ino()})
+            && m.is_file()
+            && m.nlink() == 1
+            && m.len() == 0
+            && m.uid() == 0
+            && m.gid() == 0
+            && m.mode() & 0o7777 == 0o600,
+        "original controller lock changed"
+    );
+    for (unit, recorded) in [
+        (OLD, &receipt["previous"]),
+        (
+            "horizon-145-v5e-delivery-follow-20261121-v1.service",
+            &receipt["earlier"],
+        ),
+    ] {
+        let live = terminal136::unit_state(unit)?;
+        ensure!(
+            live["Id"] == recorded["Id"]
+                && live["MainPID"] == "0"
+                && live["ControlPID"] == "0"
+                && live["Job"] == ""
+                && (live["ActiveState"] == "inactive"
+                    || (live["ActiveState"] == "failed"
+                        && live["InvocationID"] == recorded["InvocationID"]
+                        && live["SubState"] == "failed"
+                        && recorded["ActiveState"] == "failed"))
+                && !Path::new("/sys/fs/cgroup/system.slice")
+                    .join(unit)
+                    .try_exists()?,
+            "previous dispatcher still owns work or has changed"
+        );
+    }
+    Ok(path)
+}
+
+#[cfg(feature = "fixture-post")]
+pub(super) fn guard_predecessor() -> Result<File> {
+    let path = previous_lock()?;
+    let original = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(&path)?;
+    ensure!(
+        same_inode(&original.metadata()?, &fs::symlink_metadata(&path)?)
+            && unsafe { libc::flock(original.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "previous dispatcher owns its controller lock"
+    );
+    ensure!(
+        same_inode(
+            &original.metadata()?,
+            &fs::symlink_metadata(previous_lock()?)?
+        ),
+        "previous lock changed"
+    );
+    Ok(original)
 }
 
 fn before_submission() -> Result<()> {
@@ -163,12 +282,53 @@ fn before_submission() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "fixture-post")]
+fn fixture_plan(plan: &Value) -> Result<()> {
+    use crate::incident::generation::{ADVANCING, PKG, SEAL, START};
+    let post = rt(PKG);
+    let seal_path = post.join("deployment-seal-receipt.json");
+    let seal = pinned(&seal_path, SEAL)?;
+    let binding = |name: &str| -> Result<Value> {
+        let path = post.join(name);
+        let reference = bound(&path)?;
+        ensure!(
+            seal["members"]
+                .as_array()
+                .context("V13b members")?
+                .iter()
+                .any(|m| m["name"] == name
+                    && m["sha256"] == reference["sha256"]
+                    && m["mode"] == "0444"),
+            "unsealed V13b member"
+        );
+        Ok(reference)
+    };
+    let worker = json!({"path":rt(START),"sha256":ADVANCING});
+    let build = binding("build-proof.json")?;
+    ensure!(
+        seal["destination"] == json!(post)
+            && from_ref(&build)?["prior_phase"] == worker
+            && plan["holding145_semantic_worker"] == worker
+            && plan["holding145_completion"]
+                == json!({"build":build,"adapter":binding("incident-post-phase.py")?,"seal":{"path":seal_path,"sha256":SEAL}}),
+        "different V5f/V13b completion"
+    );
+    Ok(())
+}
+
 fn offered_plan(offer: &Value, selector: &Value) -> Result<(Value, PathBuf)> {
     ensure!(
         offer["selector"] == *selector,
         "session offer selects a different dispatcher"
     );
+    #[cfg(feature = "fixture-post")]
+    ensure!(
+        aspath(&offer["writer_plan"])? == rt(WRITER_DIR).join("registered-production-plan.json"),
+        "different registered V7 plan"
+    );
     let plan = from_ref(&offer["writer_plan"])?;
+    #[cfg(feature = "fixture-post")]
+    fixture_plan(&plan)?;
     ensure!(
         plan["holding145_prestart_ready"] == *selector
             && plan["controller"]["path"] == json!(Path::new(BASE).join("controller/admit136")),
@@ -183,7 +343,7 @@ fn offered_plan(offer: &Value, selector: &Value) -> Result<(Value, PathBuf)> {
         "foreign writer package"
     );
     ensure!(
-        pkg == rt("epoch136-joint-writer-20261122-v6/controller") && seal["sha256"] == WRITER_SEAL,
+        pkg == rt(WRITER_DIR).join("controller") && seal["sha256"] == WRITER_SEAL,
         "different qualified writer"
     );
     let image = check_member(pkg, WRITER_SEAL, "admit136")?;
@@ -330,12 +490,8 @@ pub(super) fn selected_boundary() -> Result<Value> {
 }
 
 fn prepare_mirrors(offer: &Value, fleet: &Value, parent: &Path) -> Result<bool> {
-    let pkg = rt("epoch136-joint-writer-20261122-v6/preflight-tools");
-    let price = check_member(
-        &pkg,
-        "404c245db5060e54e24295cb54de1d60d5549f657fc288c2185c4c72612a8ee8",
-        "price-mirrors",
-    )?;
+    let pkg = rt(WRITER_DIR).join("preflight-tools");
+    let price = check_member(&pkg, MIRROR_SEAL, "price-mirrors")?;
     ensure!(
         offer["mirror_price"] == bound(&price)?,
         "foreign mirror price"
@@ -471,23 +627,23 @@ fn prepare_offer(offer_path: &Path, selector: &Value) -> Result<WriterOffer> {
     let (plan, image) = offered_plan(&offer, selector)?;
     let launcher = aspath(&offer["launcher"])?;
     let lp = launcher.parent().context("launcher directory")?;
+    #[cfg(feature = "fixture-post")]
+    ensure!(
+        lp == rt(WRITER_DIR).join("controller"),
+        "foreign V7 synchronous launcher"
+    );
     ensure!(
         lp.starts_with(RT)
             && launcher.file_name().is_some_and(|n| n == "run-writer")
-            && offer["launcher"]["sha256"]
-                == "b73e0c3220a1dcefb67ccda8981b4441dcb995238d1da377d91ad2ee0c35f804"
+            && offer["launcher"]["sha256"] == LAUNCHER
             && bound(launcher)? == offer["launcher"],
         "unqualified synchronous launcher"
     );
     let seal = bound(&lp.join("deployment-seal-receipt.json"))?;
     check_member(lp, text(&seal["sha256"])?, "run-writer")?;
     let fleet = incident::fleet()?;
-    let parent_pkg = rt("epoch136-joint-writer-20261122-v6/parent-package");
-    let parent = check_member(
-        &parent_pkg,
-        "a95b11e40ac911f3916494d8c932b3c61a16de857e8d2f49af7c9198438cfa6b",
-        "parent136",
-    )?;
+    let parent_pkg = rt(WRITER_DIR).join("parent-package");
+    let parent = check_member(&parent_pkg, PARENT_SEAL, "parent136")?;
     ensure!(offer["parent"] == bound(&parent)?, "foreign parent offer");
     ensure!(
         prepare_mirrors(&offer, &fleet, &parent)?,
@@ -588,6 +744,35 @@ pub(super) fn before_post(done: &Value) -> Result<File> {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "fixture-post")]
+    #[test]
+    fn only_the_selected_v7b_and_v13b_can_follow_the_fixture_worker() {
+        let actual =
+            from_ref(&bound(&rt(WRITER_DIR).join("production-plan.json")).unwrap()).unwrap();
+        fixture_plan(&actual).unwrap();
+        let mut earlier = actual.clone();
+        earlier["holding145_semantic_worker"]["path"] = json!(rt(
+            "epoch145-semantic-continuity-20261121-v1/V5E_ACTUAL_ADVANCING_WORKER.json"
+        ));
+        assert!(fixture_plan(&earlier).is_err());
+        let mut earlier = actual.clone();
+        earlier["holding145_completion"]["seal"]["path"] = json!(rt(
+            "epoch145-semantic-continuity-20261121-v1/tools-v13/deployment-seal-receipt.json"
+        ));
+        assert!(fixture_plan(&earlier).is_err());
+        let selector = json!({"path":ready_path(),"sha256":"f".repeat(64)});
+        let old_plan = json!({"selector":selector,"writer_plan":{"path":rt("epoch136-joint-writer-20261122-v7/registered-production-plan.json"),"sha256":"a".repeat(64)}});
+        assert!(offered_plan(&old_plan, &selector).is_err());
+        assert!(!crate::incident::handles("follow-v5e"));
+        assert!(crate::incident::handles("inspect-v5f"));
+        assert!(crate::incident::handles("follow-v5f"));
+        // Read-only inspection of the recorded closure leaves the original controller lock free.
+        assert!(
+            previous_lock()
+                .unwrap()
+                .ends_with("epoch145-v5e-delivery-handoff-20261121-v1/state/controller.lock")
+        );
+    }
     #[test]
     fn writer_custody_requires_the_original_exclusive_kernel_flock() {
         let dir = std::env::var_os("TMPDIR")

@@ -8,6 +8,7 @@ timeout-rejoin = []
 cadence-rejoin = []
 timer-rejoin = ["cadence-rejoin"]
 registered-post = ["timer-rejoin"]
+fixture-post = ["registered-post"]
 
 [workspace]
 

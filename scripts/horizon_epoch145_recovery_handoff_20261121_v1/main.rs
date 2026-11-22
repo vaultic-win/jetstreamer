@@ -223,6 +223,12 @@ fn required_environment() -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
+    #[cfg(feature = "fixture-post")]
+    ensure!(
+        matches!(args.as_slice(), [mode] if incident::handles(mode))
+            || (args.len() == 7 && Path::new(&args[0]) == boundary::ready_path()),
+        "expected inspect-v5f, follow-v5f, or the registered inspector arguments"
+    );
     #[cfg(feature = "registered-post")]
     if args.len() == 7 && Path::new(&args[0]) == boundary::ready_path() {
         return boundary::inspect(&args);
