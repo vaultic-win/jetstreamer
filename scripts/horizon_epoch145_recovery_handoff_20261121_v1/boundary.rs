@@ -1,0 +1,658 @@
+//! Serialize epoch 145's first post-verification submission with the original
+//! 136 writer. Both use the same kernel flock. Its inode survives owner exit.
+use super::*;
+use std::fs::{File, OpenOptions};
+
+const DIR: &str = "epoch145-phase-dispatch-20261122-v1";
+const DISPATCH: &str = "horizon-145-phase-dispatch-20261122-v1.service";
+const OLD: &str = "horizon-145-v5e-delivery-follow-20261121-v1.service";
+const STATE: &str = "epoch145-v5e-delivery-handoff-20261121-v1/state";
+const LOCK: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
+const BASE: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1";
+const PAYLOAD: &str = "horizon-qualify-136-actual-20261120-g1.service";
+const SEMANTIC: &str = "a99ed8b51e8a482b805b8a36a11b2700";
+const SELECTED: &str = "writer-selected.json";
+const WRITER_SEAL: &str = "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba";
+
+pub(super) fn ready_path() -> PathBuf {
+    rt(DIR).join("READY.json")
+}
+
+fn boot() -> Result<String> {
+    Ok(fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .to_owned())
+}
+
+fn owner(pid: i32, iid: &str) -> Result<Value> {
+    Ok(json!({"pid":pid,"start_ticks":platform::ticks(pid)?,"invocation_id":iid}))
+}
+
+fn same_inode(a: &fs::Metadata, b: &fs::Metadata) -> bool {
+    (a.dev(), a.ino()) == (b.dev(), b.ino())
+}
+
+fn compare_lock_identity(m: &fs::Metadata, spec: &Value) -> Result<()> {
+    ensure!(
+        m.is_file()
+            && m.nlink() == 1
+            && m.uid() == 0
+            && m.gid() == 0
+            && m.mode() & 0o7777 == 0o600
+            && m.len() == 0
+            && spec
+                == &json!({
+                    "path":LOCK, "device":m.dev(), "inode":m.ino()
+                }),
+        "different original operation lock"
+    );
+    Ok(())
+}
+
+fn exclusive_row(line: &str, pid: i32, m: &fs::Metadata) -> bool {
+    let dev = format!(
+        "{:02x}:{:02x}:{}",
+        libc::major(m.dev()),
+        libc::minor(m.dev()),
+        m.ino()
+    );
+    let fields: Vec<_> = line.split_whitespace().collect();
+    fields.len() == 9
+        && fields[0] == "lock:"
+        && fields[2..5] == ["FLOCK", "ADVISORY", "WRITE"]
+        && fields[5] == pid.to_string()
+        && fields[6] == dev
+        && fields[7..] == ["0", "EOF"]
+}
+
+fn owned_lock(pid: i32, path: &Path) -> Result<()> {
+    let m = fs::symlink_metadata(path)?;
+    let proc = PathBuf::from(format!("/proc/{pid}"));
+    for entry in fs::read_dir(proc.join("fd"))? {
+        let fd = entry?;
+        let info = proc.join("fdinfo").join(fd.file_name());
+        let Ok(meta) = fs::metadata(fd.path()) else {
+            continue;
+        };
+        if same_inode(&meta, &m)
+            && fs::read_to_string(info)?
+                .lines()
+                .any(|s| exclusive_row(s, pid, &m))
+        {
+            ensure!(
+                same_inode(&fs::symlink_metadata(path)?, &m),
+                "lock replaced"
+            );
+            return Ok(());
+        }
+    }
+    bail!("PID {pid} does not own the original exclusive lock")
+}
+
+fn open_operation(ready: &Value) -> Result<File> {
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(LOCK)?;
+    let m = f.metadata()?;
+    compare_lock_identity(&m, &ready["operation_lock"])?;
+    let rc = unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    ensure!(
+        rc == 0,
+        "136 operation still occupied: {}",
+        std::io::Error::last_os_error()
+    );
+    ensure!(
+        same_inode(&m, &fs::symlink_metadata(LOCK)?),
+        "operation inode replaced"
+    );
+    Ok(f)
+}
+
+fn registration() -> Result<(Value, Value)> {
+    let pin = bound(&ready_path())?;
+    let ready = from_ref(&pin)?;
+    ensure!(
+        ready["schema"] == "horizon-145-136-prestart-selector-ready-v1"
+            && ready["boot_id"] == boot()?
+            && ready["original_semantic_invocation"] == SEMANTIC,
+        "foreign selector registration"
+    );
+    compare_lock_identity(&fs::symlink_metadata(LOCK)?, &ready["operation_lock"])?;
+    let pkg = rt(DIR).join("tools");
+    let seal = bound(&pkg.join("deployment-seal-receipt.json"))?;
+    ensure!(ready["deployment"] == seal, "different selector deployment");
+    let image = check_member(&pkg, text(&seal["sha256"])?, "follow145")?;
+    let checker = check_member(&pkg, text(&seal["sha256"])?, "boundary-inspector")?;
+    ensure!(
+        ready["boundary_inspector"] == bound(&checker)?
+            && bound(&image)?["sha256"] == ready["boundary_inspector"]["sha256"],
+        "different inspector"
+    );
+    let (pid, iid) = stable(&native(DISPATCH)?, DISPATCH)?;
+    ensure!(
+        ready["dispatcher"] == owner(pid, &iid)?
+            && platform::proc_exe(pid)? == image
+            && same_inode(
+                &fs::metadata(format!("/proc/{pid}/exe"))?,
+                &fs::metadata(&image)?
+            )
+            && fs::read(format!("/proc/{pid}/cmdline"))?
+                == [image.as_os_str().as_encoded_bytes(), b"follow-v5e", b""].join(&0),
+        "selector invocation changed"
+    );
+    owned_lock(pid, &rt(STATE).join("controller.lock"))?;
+    drained(&native(OLD)?, OLD)?;
+    Ok((pin, ready))
+}
+
+fn before_submission() -> Result<()> {
+    for name in [
+        "post-full-submission.json",
+        "post-full-actor.json",
+        "publish-submission.json",
+        "publish-actor.json",
+        "completed.json",
+    ] {
+        ensure!(
+            !rt(STATE).join(name).try_exists()?,
+            "145 already crossed its post boundary"
+        );
+    }
+    Ok(())
+}
+
+fn offered_plan(offer: &Value, selector: &Value) -> Result<(Value, PathBuf)> {
+    ensure!(
+        offer["selector"] == *selector,
+        "session offer selects a different dispatcher"
+    );
+    let plan = from_ref(&offer["writer_plan"])?;
+    ensure!(
+        plan["holding145_prestart_ready"] == *selector
+            && plan["controller"]["path"] == json!(Path::new(BASE).join("controller/admit136")),
+        "different writer binding"
+    );
+    let seal = &plan["controller_deployment"];
+    let pkg = aspath(seal)?.parent().context("writer package")?;
+    ensure!(
+        pkg.file_name().is_some_and(|x| x == "controller")
+            && pkg.parent().and_then(Path::parent) == Some(Path::new(RT))
+            && aspath(seal)? == pkg.join("deployment-seal-receipt.json"),
+        "foreign writer package"
+    );
+    ensure!(
+        pkg == rt("epoch136-joint-writer-20261122-v6/controller") && seal["sha256"] == WRITER_SEAL,
+        "different qualified writer"
+    );
+    let image = check_member(pkg, WRITER_SEAL, "admit136")?;
+    ensure!(
+        bound(&image)?["sha256"] == plan["controller"]["sha256"],
+        "writer image changed"
+    );
+    Ok((plan, image))
+}
+
+pub(super) fn inspect(args: &[String]) -> Result<()> {
+    let (selector, ready) = registration()?;
+    ensure!(
+        args[1] == text(&selector["sha256"])?
+            && platform::proc_exe(std::process::id() as i32)?
+                == aspath(&ready["boundary_inspector"])?,
+        "unregistered inspector invocation"
+    );
+    before_submission()?;
+    let selected = from_ref(&bound(&rt(DIR).join("state").join(SELECTED))?)?;
+    let offer = from_ref(&selected["offer"])?;
+    let (plan, image) = offered_plan(&offer, &selector)?;
+    let (pid, iid) = stable(&native(W)?, W)?;
+    let writer = owner(pid, &iid)?;
+    ensure!(
+        args[2] == pid.to_string()
+            && args[3].parse::<u64>()? == writer["start_ticks"]
+            && args[4] == iid,
+        "wrong writer"
+    );
+    let fleet = json!({"path":args[5],"sha256":args[6]});
+    ensure!(
+        selected["fleet"] == fleet
+            && selected["semantic_complete"] == incident::completed_semantics()?,
+        "different selected inputs"
+    );
+    let expected = [
+        text(&plan["controller"]["path"])?,
+        "session",
+        text(&offer["writer_plan"]["path"])?,
+        text(&offer["writer_plan"]["sha256"])?,
+        &args[5],
+        &args[6],
+        "",
+    ]
+    .join("\0");
+    ensure!(
+        same_inode(
+            &fs::metadata(format!("/proc/{pid}/exe"))?,
+            &fs::metadata(image)?
+        ) && fs::read(format!("/proc/{pid}/cmdline"))? == expected.as_bytes(),
+        "foreign operation owner"
+    );
+    owned_lock(pid, Path::new(LOCK))?;
+    drained(&native(E)?, E)?;
+    before_submission()?;
+    ensure!(
+        stable(&native(W)?, W)? == (pid, iid) && platform::ticks(pid)? == writer["start_ticks"],
+        "writer changed"
+    );
+    println!(
+        "{}",
+        json!({"schema":"horizon-145-136-writer-boundary-v1","writer":writer,"fleet":fleet,
+        "selector":selector,"post_submission_held":true,"semantic_complete":selected["semantic_complete"]})
+    );
+    Ok(())
+}
+
+fn empty_candidate() -> Result<()> {
+    drained(&native(PAYLOAD)?, PAYLOAD)?;
+    for p in [
+        Path::new(BASE).join("prestart-intent.json"),
+        Path::new(BASE).join("admission.json"),
+        Path::new(BASE).join("reproduction"),
+        PathBuf::from("/run/horizon-epoch171-exclusive-to136-g1"),
+    ] {
+        ensure!(
+            fs::symlink_metadata(&p).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+            "136 retains ownership at {}",
+            p.display()
+        );
+    }
+    Ok(())
+}
+
+// A failure after a donor mutation requires the writer's own positive release.
+// A successful session may start the post verifier as soon as the same guarded
+// payload appears in the accepted fleet. Its native V19 price checks it again.
+fn settled(offer: &Value, selector: &Value, ready: &Value) -> Result<File> {
+    loop {
+        let operation = open_operation(ready)?;
+        drained(&native(W)?, W)?;
+        let (plan, image) = offered_plan(offer, selector)?;
+        let base = Path::new(BASE);
+        if !base.join("prestart-intent.json").try_exists()? {
+            empty_candidate()?;
+            return Ok(operation);
+        }
+        let intent = from_ref(&bound(&base.join("prestart-intent.json"))?)?;
+        ensure!(
+            intent["selector"] == *selector
+                && intent["writer_plan"] == offer["writer_plan"]
+                && intent["boot_id"] == boot()?
+                && intent["writer"] == plan["controller"],
+            "different selected writer"
+        );
+        if base.join("prestart-released.json").try_exists()? {
+            let actual: Value = serde_json::from_slice(&command(
+                &image,
+                &[
+                    "verify-release",
+                    text(&offer["writer_plan"]["path"])?,
+                    text(&offer["writer_plan"]["sha256"])?,
+                ],
+            )?)?;
+            ensure!(
+                actual == bound(&base.join("prestart-released.json"))?,
+                "unverified terminal 136"
+            );
+            return Ok(operation);
+        }
+        let head = incident::fleet()?;
+        let fleet = from_ref(&head)?;
+        let release = base.join("reproduction/receipts/parent-release.json");
+        if release.try_exists()? {
+            let v = from_ref(&bound(&release)?)?;
+            ensure!(
+                v["schema"] == "horizon-epoch136-actual-parent-release-v1"
+                    && v["unit"] == PAYLOAD
+                    && v["writer"] == intent["writer"]
+                    && v["writer_invocation_id"] == intent["writer_invocation_id"]
+                    && v["node_spawn_authorized"] == true,
+                "unrelated parent release"
+            );
+            let n = native(PAYLOAD)?;
+            if n["ActiveState"] == "active"
+                && n["InvocationID"] == v["invocation_id"]
+                && fleet["actual_active_private_diagnostics"]
+                    .as_array()
+                    .context("fleet diagnostics")?
+                    .iter()
+                    .any(|r| {
+                        r["epoch"] == 136
+                            && r["unit"]["Id"] == PAYLOAD
+                            && r["unit"]["InvocationID"] == v["invocation_id"]
+                    })
+            {
+                return Ok(operation);
+            }
+        }
+        // Release may arrive before the next accepted fleet. Wake on either.
+        drop(operation);
+        wait_for_either(
+            &outcome::next(&fleet)?,
+            &base.join("prestart-released.json"),
+        )?;
+    }
+}
+
+fn wait_for_either(head: &Path, release: &Path) -> Result<()> {
+    let fd = events::owned(unsafe { libc::inotify_init1(libc::IN_CLOEXEC) })?;
+    for f in [head, release] {
+        let parent = f.parent().context("receipt directory")?;
+        events::watch(
+            &fd,
+            if parent.is_dir() {
+                parent
+            } else {
+                parent.parent().context("fleet root")?
+            },
+        )?;
+    }
+    if !head.try_exists()? && !release.try_exists()? {
+        let mut bytes = [0u8; 4096];
+        let n = unsafe { libc::read(fd.as_raw_fd(), bytes.as_mut_ptr().cast(), bytes.len()) };
+        ensure!(n > 0, "lost 136 release or fleet notification");
+    }
+    Ok(())
+}
+
+fn prepare_mirrors(offer: &Value, fleet: &Value, parent: &Path) -> Result<bool> {
+    let pkg = rt("epoch136-joint-writer-20261122-v6/preflight-tools");
+    let price = check_member(
+        &pkg,
+        "404c245db5060e54e24295cb54de1d60d5549f657fc288c2185c4c72612a8ee8",
+        "price-mirrors",
+    )?;
+    ensure!(
+        offer["mirror_price"] == bound(&price)?,
+        "foreign mirror price"
+    );
+    let args = [text(&fleet["path"])?, text(&fleet["sha256"])?];
+    let priced = || -> Result<Value> {
+        let value: Value = serde_json::from_slice(&command(&price, &args)?)?;
+        ensure!(
+            value["schema"] == "horizon-136-parent-mirror-price-v1"
+                && value["fleet"] == *fleet
+                && value["admission_granted"] == false
+                && value["resource_credit_bytes"] == 0
+                && value["r2_mutations"] == false,
+            "invalid mirror price"
+        );
+        Ok(value)
+    };
+    let fits = |v: &Value| -> Result<bool> {
+        // The parent can create one waiting-fleet document of up to 16 MiB.
+        // Price that document and the event receipts separately from the inputs.
+        let reserve = (16 << 20) + (1 << 20);
+        Ok(v["memory_fits"] == true
+            && v["mirrors_fit"] == true
+            && v["remaining_after_mirrors_bytes"]
+                .as_i64()
+                .context("missing mirror residual")?
+                >= reserve)
+    };
+    let before = priced()?;
+    if !fits(&before)? {
+        return Ok(false);
+    }
+    command(parent, &["prepare-inputs", args[0], args[1]])?;
+    let after = priced()?;
+    ensure!(
+        after["missing_mirror_bytes"] == 0,
+        "parent omitted a priced mirror"
+    );
+    fits(&after)
+}
+
+// systemd-run --wait retains very short writer exits. The parent must serve the
+// actual writer's launch/status requests while that process is still waiting.
+fn run_session(
+    launcher: &Path,
+    parent: &Path,
+    offer: &Value,
+    plan: &Value,
+    fleet: &Value,
+    image: &Path,
+) -> Result<Value> {
+    let plan_args = [
+        text(&offer["writer_plan"]["path"])?,
+        text(&offer["writer_plan"]["sha256"])?,
+    ];
+    let fleet_args = [text(&fleet["path"])?, text(&fleet["sha256"])?];
+    let mut launch = Command::new(launcher)
+        .env("HORIZON_WAIT_FOR_136_WRITER", "1")
+        .args([
+            "session",
+            plan_args[0],
+            plan_args[1],
+            fleet_args[0],
+            fleet_args[1],
+        ])
+        .spawn()?;
+    let dispatcher = (|| -> Result<Option<(String, std::process::ExitStatus)>> {
+        loop {
+            if launch.try_wait()?.is_some() {
+                return Ok(None);
+            }
+            let n = native(W)?;
+            if n["ActiveState"] == "active" && n["SubState"] == "running" && n["Job"] == "" {
+                let (pid, iid) = stable(&n, W)?;
+                let expected = [
+                    text(&plan["controller"]["path"])?,
+                    "session",
+                    plan_args[0],
+                    plan_args[1],
+                    fleet_args[0],
+                    fleet_args[1],
+                    "",
+                ]
+                .join("\0");
+                ensure!(
+                    same_inode(
+                        &fs::metadata(format!("/proc/{pid}/exe"))?,
+                        &fs::metadata(image)?
+                    ) && fs::read(format!("/proc/{pid}/cmdline"))? == expected.as_bytes(),
+                    "different selected writer PID"
+                );
+                let status = Command::new(parent)
+                    .args([
+                        "dispatch",
+                        &iid,
+                        plan_args[0],
+                        plan_args[1],
+                        text(&plan["controller_deployment"]["path"])?,
+                        text(&plan["controller_deployment"]["sha256"])?,
+                    ])
+                    .status()?;
+                return Ok(Some((iid, status)));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    })();
+    // The writer has its own finite RuntimeMaxSec and activation expiry.
+    // Leave native ownership and all failure evidence intact if dispatch fails.
+    let status = launch.wait()?;
+    let parent_result = dispatcher?;
+    Ok(
+        json!({"exit_code":status.code(),"parent":parent_result.map(|(iid,exit)|
+        json!({"writer_invocation_id":iid,"exit_code":exit.code()}))}),
+    )
+}
+
+struct WriterOffer {
+    reference: Value,
+    offer: Value,
+    plan: Value,
+    image: PathBuf,
+    parent: PathBuf,
+    fleet: Value,
+}
+
+fn prepare_offer(offer_path: &Path, selector: &Value) -> Result<WriterOffer> {
+    let offer_ref = bound(offer_path)?;
+    let offer = from_ref(&offer_ref)?;
+    let (plan, image) = offered_plan(&offer, selector)?;
+    let launcher = aspath(&offer["launcher"])?;
+    let lp = launcher.parent().context("launcher directory")?;
+    ensure!(
+        lp.starts_with(RT)
+            && launcher.file_name().is_some_and(|n| n == "run-writer")
+            && offer["launcher"]["sha256"]
+                == "b73e0c3220a1dcefb67ccda8981b4441dcb995238d1da377d91ad2ee0c35f804"
+            && bound(launcher)? == offer["launcher"],
+        "unqualified synchronous launcher"
+    );
+    let seal = bound(&lp.join("deployment-seal-receipt.json"))?;
+    check_member(lp, text(&seal["sha256"])?, "run-writer")?;
+    let fleet = incident::fleet()?;
+    let parent_pkg = rt("epoch136-joint-writer-20261122-v6/parent-package");
+    let parent = check_member(
+        &parent_pkg,
+        "a95b11e40ac911f3916494d8c932b3c61a16de857e8d2f49af7c9198438cfa6b",
+        "parent136",
+    )?;
+    ensure!(offer["parent"] == bound(&parent)?, "foreign parent offer");
+    ensure!(
+        prepare_mirrors(&offer, &fleet, &parent)?,
+        "writer, status and mirror reservations do not fit"
+    );
+    ensure!(
+        incident::fleet()? == fleet,
+        "fleet advanced before writer selection"
+    );
+    Ok(WriterOffer {
+        reference: offer_ref,
+        offer,
+        plan,
+        image,
+        parent,
+        fleet,
+    })
+}
+
+pub(super) fn before_post(done: &Value) -> Result<File> {
+    outcome::wait_file(&ready_path())?;
+    let (selector, ready) = registration()?;
+    let lock = open_operation(&ready)?;
+    let state = rt(DIR).join("state");
+    let selection = state.join(SELECTED);
+    let offer_path = rt(DIR).join("OFFER.json");
+    if selection.try_exists()? {
+        let selection = from_ref(&bound(&selection)?)?;
+        ensure!(
+            selection["semantic_complete"] == *done,
+            "different prior semantic completion"
+        );
+        let offer = from_ref(&selection["offer"])?;
+        ensure!(
+            state.join("writer-exit.json").try_exists()?
+                || Path::new(BASE).join("prestart-intent.json").try_exists()?,
+            "unanswered writer submission requires reconciliation"
+        );
+        drop(lock);
+        return settled(&offer, &selector, &ready);
+    }
+    before_submission()?;
+    drained(&native(E)?, E)?;
+    drained(&native(W)?, W)?;
+    empty_candidate()?;
+    let decision = state.join("post-selected.json");
+    if decision.try_exists()? {
+        let prior = from_ref(&bound(&decision)?)?;
+        ensure!(
+            prior["selector"] == selector && prior["semantic_complete"] == *done,
+            "different post selection"
+        );
+        return Ok(lock);
+    }
+    let prepared = if offer_path.try_exists()? {
+        prepare_offer(&offer_path, &selector)
+    } else {
+        Err(anyhow::anyhow!(
+            "no qualified epoch 136 offer at this boundary"
+        ))
+    };
+    let WriterOffer {
+        reference: offer_ref,
+        offer,
+        plan,
+        image,
+        parent,
+        fleet,
+    } = match prepared {
+        Ok(v) => v,
+        Err(e) => {
+            // No writer can start in this window. Preserve the reason and let
+            // the already qualified 145 verifier run its own complete price.
+            drained(&native(W)?, W)?;
+            empty_candidate()?;
+            platform::save(
+                &decision,
+                &json!({"selector":selector,"semantic_complete":done,"reason":format!("{e:#}").chars().take(1800).collect::<String>()}),
+            )?;
+            return Ok(lock);
+        }
+    };
+    let launcher = aspath(&offer["launcher"])?;
+    platform::save(
+        &selection,
+        &json!({"offer":offer_ref,"fleet":fleet,"semantic_complete":done}),
+    )?;
+    drop(lock);
+    let result = run_session(launcher, &parent, &offer, &plan, &fleet, &image)?;
+    platform::save(
+        &state.join("writer-exit.json"),
+        &json!({"selection":bound(&selection)?,"result":result}),
+    )?;
+    settled(&offer, &selector, &ready)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn writer_custody_requires_the_original_exclusive_kernel_flock() {
+        let dir = std::env::var_os("TMPDIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(std::env::temp_dir);
+        let fixture = dir.join(format!("145-writer-flock-test-{}", std::process::id()));
+        let fd = OpenOptions::new()
+            .create_new(true)
+            .mode(0o600)
+            .read(true)
+            .write(true)
+            .open(&fixture)
+            .unwrap();
+        let pid = std::process::id() as i32;
+        assert!(owned_lock(pid, &fixture).is_err());
+        assert_eq!(
+            unsafe { libc::flock(fd.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) },
+            0
+        );
+        assert!(owned_lock(pid, &fixture).is_err());
+        assert_eq!(
+            unsafe { libc::flock(fd.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+            0
+        );
+        owned_lock(pid, &fixture).unwrap();
+        assert!(owned_lock(1, &fixture).is_err());
+        let meta = fd.metadata().unwrap();
+        let spec = json!({"path":LOCK,"device":meta.dev(),"inode":meta.ino()});
+        if meta.uid() == 0 && meta.gid() == 0 {
+            compare_lock_identity(&meta, &spec).unwrap();
+        }
+        let mut other = spec;
+        other["inode"] = json!(meta.ino() + 1);
+        assert!(compare_lock_identity(&meta, &other).is_err());
+        fs::remove_file(&fixture).unwrap();
+    }
+}

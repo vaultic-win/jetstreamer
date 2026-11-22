@@ -7,6 +7,7 @@ edition = "2024"
 timeout-rejoin = []
 cadence-rejoin = []
 timer-rejoin = ["cadence-rejoin"]
+registered-post = ["timer-rejoin"]
 
 [workspace]
 

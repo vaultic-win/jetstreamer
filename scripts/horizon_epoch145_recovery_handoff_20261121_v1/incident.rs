@@ -103,10 +103,16 @@ mod generation {
     pub(super) const START: &str =
         "epoch145-semantic-continuity-20261121-v1/V5E_ACTUAL_ADVANCING_WORKER.json";
     pub(super) const ADVANCING: &str = env!("HORIZON_145_ADVANCING_SHA256");
+    #[cfg(not(feature = "registered-post"))]
     pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v11";
+    #[cfg(feature = "registered-post")]
+    pub(super) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v12";
     pub(super) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
     pub(super) const STATE_PATH: &str = "epoch145-v5e-delivery-handoff-20261121-v1/state";
+    #[cfg(not(feature = "registered-post"))]
     pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v17";
+    #[cfg(feature = "registered-post")]
+    pub(super) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v19";
     pub(super) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
     pub(super) const PRIOR: &str = "e6551a0bb8a14b989902e15c9ecc0751";
     pub(super) const IMAGE: &str =
@@ -123,7 +129,7 @@ pub fn handles(mode: &str) -> bool {
     mode == INSPECT || mode == FOLLOW
 }
 
-fn fleet() -> Result<Value> {
+pub(super) fn fleet() -> Result<Value> {
     let mut dir = rt(FLEET_DIRECTORY);
     let mut at = json!({"path":dir.join(FLEET),"sha256":HEAD});
     loop {
@@ -158,10 +164,11 @@ fn fleet() -> Result<Value> {
     }
 }
 /// Only a successful complete current booking can submit either next stage.
-fn funded() -> Result<Value> {
+fn funded(boundary: impl Fn() -> Result<Option<fs::File>>) -> Result<(Value, Option<fs::File>)> {
     let pkg = rt(FIT_PKG);
     let reader = check_member(&pkg, FIT_SEAL, "post-stop-fit")?;
     loop {
+        let operation = boundary()?;
         let head = fleet()?;
         let out = Command::new(&reader)
             .args(["145", text(&head["path"])?, text(&head["sha256"])?])
@@ -195,8 +202,9 @@ fn funded() -> Result<Value> {
             "foreign complete fit"
         );
         if fits {
-            return Ok(head);
+            return Ok((head, operation));
         }
+        drop(operation);
         let next = outcome::next(&from_ref(&head)?)?;
         eprintln!(
             "epoch 145 awaiting {} after native fit: HOME {}/{} B, RAM {}/{} B",
@@ -234,7 +242,7 @@ fn original() -> Result<Value> {
     );
     Ok(a)
 }
-fn completed_semantics() -> Result<Value> {
+pub(super) fn completed_semantics() -> Result<Value> {
     let s = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
     ensure!(
         !s.join("failed.json").try_exists()?,
@@ -328,7 +336,13 @@ fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
             !intent.try_exists()?,
             "unanswered {mode} submission requires native reconciliation"
         );
-        let head = funded()?;
+        let (head, _operation) = funded(|| {
+            #[cfg(feature = "registered-post")]
+            if mode == "post-full" {
+                return boundary::before_post(prerequisite).map(Some);
+            }
+            Ok(None)
+        })?;
         let launcher = check_member(&rt(PKG), SEAL, "run-post")?;
         let mut argv = vec![mode.to_owned(), text(&head["path"])?.to_owned()];
         if mode == "publish" {

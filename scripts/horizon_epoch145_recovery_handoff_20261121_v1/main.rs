@@ -7,6 +7,8 @@ use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(feature = "registered-post")]
+mod boundary;
 mod events;
 mod incident;
 mod outcome;
@@ -219,6 +221,10 @@ fn required_environment() -> Result<()> {
 fn run() -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "root operator");
     let args = std::env::args().skip(1).collect::<Vec<_>>();
+    #[cfg(feature = "registered-post")]
+    if args.len() == 7 && Path::new(&args[0]) == boundary::ready_path() {
+        return boundary::inspect(&args);
+    }
     if let [mode] = args.as_slice() {
         if incident::handles(mode) {
             return incident::run(mode);
