@@ -3,7 +3,7 @@
     feature = "epochs209-212-singleton-qualification",
     any(
         feature = "epoch207-singleton-qualification",
-        feature = "epoch141-original-entry-qualification",
+        original_entry_replay,
         feature = "epoch140-native-restore-diagnostic",
         feature = "epoch144-native-restore-diagnostic",
         feature = "epoch203-native-restore-diagnostic",

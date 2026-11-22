@@ -394,7 +394,7 @@ struct RecorderState {
     slot_end_inclusive: Slot,
     assemblies: BTreeMap<Slot, SlotAssembly>,
     block_metas: BTreeMap<Slot, BufferedBlockMeta>,
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     original_entry_counts: BTreeMap<Slot, u64>,
     last_emitted: Option<Slot>,
     last_emitted_blockhash: Option<Hash>,
@@ -459,7 +459,7 @@ impl HorizonRecorder {
                 slot_end_inclusive,
                 assemblies: BTreeMap::new(),
                 block_metas: BTreeMap::new(),
-                #[cfg(feature = "epoch141-original-entry-qualification")]
+                #[cfg(original_entry_replay)]
                 original_entry_counts: BTreeMap::new(),
                 last_emitted: None,
                 last_emitted_blockhash: None,
@@ -482,7 +482,7 @@ impl HorizonRecorder {
     /// Bind a complete byte/PoH-verified original slot's actual entry count.
     /// Only the separate private 141adapter calls this; all other source block
     /// metadata stays unchanged, including transaction counts and rewards.
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     pub fn record_original_entry_count(&self, slot: Slot, count: u64) -> Result<(), String> {
         let mut state = self.lock();
         if slot < state.slot_start {
@@ -574,7 +574,7 @@ impl HorizonRecorder {
         });
         let blockhash = Hash::from_str(blockhash)
             .unwrap_or_else(|err| panic!("horizon: unparseable blockhash for slot {slot}: {err}"));
-        #[cfg(feature = "epoch141-original-entry-qualification")]
+        #[cfg(original_entry_replay)]
         let entry_count = state
             .original_entry_counts
             .get(&slot)
@@ -1266,7 +1266,7 @@ mod tests {
             .expect("join test thread");
     }
 
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     #[test]
     fn original_count_binding_handles_both_metadata_orders_without_changing_transactions() {
         let presence = presence_map(

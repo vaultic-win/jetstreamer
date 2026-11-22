@@ -5,7 +5,7 @@ mod epoch228_demotion;
     any(
         feature = "epoch207-singleton-qualification",
         feature = "epochs209-212-singleton-qualification",
-        feature = "epoch141-original-entry-qualification",
+        original_entry_replay,
         feature = "epoch140-native-restore-diagnostic",
         feature = "epoch144-native-restore-diagnostic",
         feature = "epoch203-native-restore-diagnostic",
@@ -34,6 +34,42 @@ use checkpoint_export::{
 mod checkpoint_continuation;
 mod checkpoint_continuation144;
 mod checkpoint_continuation203;
+#[cfg(all(
+    feature = "epoch140-suffix-recording",
+    any(
+        feature = "epoch136-actual-input-diagnostic",
+        feature = "epoch169-v1-5-8-diagnostic",
+        feature = "epoch207-singleton-qualification",
+        feature = "epochs209-212-singleton-qualification",
+        feature = "epoch228-called-program-demotion-qualification",
+        feature = "epoch141-original-entry-qualification"
+    )
+))]
+compile_error!("epoch 140 suffix recording must use its dedicated build");
+#[cfg(feature = "epoch140-suffix-recording")]
+mod epoch140_suffix_recording;
+// The private suffix only needs these legacy wire and PoH modules. Compile their
+// authoritative sources directly, preserving both the normal reader's inputs
+// and the existing epoch 141 qualification dependency graph.
+#[cfg(feature = "epoch140-suffix-recording")]
+#[path = "../../jetstreamer-utils/src/horizon_legacy_bundle.rs"]
+mod horizon_legacy_bundle;
+#[cfg(feature = "epoch140-suffix-recording")]
+#[path = "../../jetstreamer-utils/src/horizon_legacy_entry.rs"]
+mod horizon_legacy_entry;
+#[cfg(feature = "epoch140-suffix-recording")]
+#[path = "../../jetstreamer-utils/src/horizon_legacy_poh.rs"]
+mod horizon_legacy_poh;
+#[cfg(all(feature = "epoch140-suffix-recording", test))]
+#[path = "../../jetstreamer-utils/src/horizon_legacy_shred.rs"]
+mod horizon_legacy_shred;
+#[cfg(feature = "epoch140-suffix-recording")]
+#[path = "../../jetstreamer-utils/src/horizon_legacy_source.rs"]
+mod horizon_legacy_source;
+#[cfg(feature = "epoch141-original-entry-qualification")]
+use jetstreamer_utils::{horizon_legacy_bundle, horizon_legacy_source};
+#[cfg(all(feature = "epoch141-original-entry-qualification", test))]
+use jetstreamer_utils::{horizon_legacy_poh, horizon_legacy_shred};
 mod epoch141_original_entry;
 mod epoch141_suffix;
 mod epoch163_first_output128;
@@ -54,7 +90,7 @@ mod singletons209_212_profile;
 #[cfg(all(
     feature = "epoch223-v1-6-20-prefix-qualification",
     any(
-        feature = "epoch141-original-entry-qualification",
+        original_entry_replay,
         feature = "epoch140-native-restore-diagnostic",
         feature = "epoch144-native-restore-diagnostic",
         feature = "epoch203-native-restore-diagnostic",
@@ -73,7 +109,7 @@ mod singletons209_212_profile;
 compile_error!("epoch 223 v1.6.20 prefix requires its own exclusive qualification build");
 
 #[cfg(all(
-    feature = "epoch141-original-entry-qualification",
+    original_entry_replay,
     any(
         feature = "epoch140-native-restore-diagnostic",
         feature = "epoch144-native-restore-diagnostic",
@@ -3503,8 +3539,8 @@ struct TransactionScheduler {
     resume_target: Mutex<Option<ResumeTarget>>,
     restart_tracker: Arc<RestartTracker>,
     empty_slot_buffer_gap_limit: u64,
-    #[cfg(feature = "epoch141-original-entry-qualification")]
-    original_entries: Option<Mutex<jetstreamer_utils::horizon_legacy_bundle::OriginalEntryBundle>>,
+    #[cfg(original_entry_replay)]
+    original_entries: Option<Mutex<horizon_legacy_bundle::OriginalEntryBundle>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3528,9 +3564,9 @@ struct SchedulerState {
     /// metadata when a firehose retry re-delivers a block.
     decoded_parents: Vec<Option<Slot>>,
     highest_seen_slot: Slot,
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     original_expected: HashSet<Slot>,
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     original_matched: HashSet<Slot>,
 }
 
@@ -3587,13 +3623,8 @@ impl TransactionScheduler {
         empty_slot_buffer_gap_limit: u64,
     ) -> Self {
         let canonical_slot_count = presence.states.len();
-        #[cfg(feature = "epoch141-original-entry-qualification")]
-        let original_entries = epoch141_original_entry::take_bundle();
-        #[cfg(feature = "epoch141-original-entry-qualification")]
-        let original_expected = original_entries
-            .as_ref()
-            .map(|bundle| bundle.targets().collect())
-            .unwrap_or_default();
+        #[cfg(original_entry_replay)]
+        let (original_entries, original_expected) = epoch141_original_entry::take_bundle().unzip();
         Self {
             state: Mutex::new(SchedulerState {
                 last_finalized_slot: start_slot.saturating_sub(1),
@@ -3604,21 +3635,21 @@ impl TransactionScheduler {
                 canonical_slots: vec![CanonicalSlotState::Unknown; canonical_slot_count],
                 decoded_parents: vec![None; canonical_slot_count],
                 highest_seen_slot: start_slot.saturating_sub(1),
-                #[cfg(feature = "epoch141-original-entry-qualification")]
-                original_expected,
-                #[cfg(feature = "epoch141-original-entry-qualification")]
+                #[cfg(original_entry_replay)]
+                original_expected: original_expected.unwrap_or_default(),
+                #[cfg(original_entry_replay)]
                 original_matched: HashSet::new(),
             }),
             presence,
             resume_target: Mutex::new(None),
             restart_tracker,
             empty_slot_buffer_gap_limit,
-            #[cfg(feature = "epoch141-original-entry-qualification")]
+            #[cfg(original_entry_replay)]
             original_entries: original_entries.map(Mutex::new),
         }
     }
 
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     fn authenticate_original_source_metadata(
         &self,
         slot: Slot,
@@ -3807,7 +3838,7 @@ impl TransactionScheduler {
         let gap_end = slot.min(self.presence.end_inclusive.saturating_add(1));
 
         for skipped in gap_start..gap_end {
-            #[cfg(feature = "epoch141-original-entry-qualification")]
+            #[cfg(original_entry_replay)]
             if state.original_expected.contains(&skipped) {
                 return Err(format!(
                     "source parent edge marks independently pinned original target {skipped} skipped"
@@ -4075,7 +4106,7 @@ impl TransactionScheduler {
 
     fn verify_complete(&self, end_inclusive: Slot) -> Result<(), String> {
         let state = self.state.lock().expect("transaction scheduler lock");
-        #[cfg(feature = "epoch141-original-entry-qualification")]
+        #[cfg(original_entry_replay)]
         if state.original_matched != state.original_expected {
             return Err(format!(
                 "incomplete original source census: {} matched, {} required",
@@ -4280,7 +4311,7 @@ impl TransactionScheduler {
             if epoch141_suffix::active() && !epoch141_suffix::complete(current_slot, buffer)? {
                 break;
             }
-            #[cfg(feature = "epoch141-original-entry-qualification")]
+            #[cfg(original_entry_replay)]
             let original = if let Some(bundle) = &self.original_entries {
                 let mut bundle = bundle.lock().map_err(|_| "original bundle lock poisoned")?;
                 if bundle.expectation(current_slot).is_some() {
@@ -4298,7 +4329,7 @@ impl TransactionScheduler {
             } else {
                 None
             };
-            #[cfg(feature = "epoch141-original-entry-qualification")]
+            #[cfg(original_entry_replay)]
             let mut drained = match original {
                 Some(original) => {
                     if state.original_matched.contains(&current_slot) {
@@ -4310,7 +4341,7 @@ impl TransactionScheduler {
                 }
                 None => buffer.drain_ready_entries(current_slot)?,
             };
-            #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+            #[cfg(not(original_entry_replay))]
             let mut drained = buffer.drain_ready_entries(current_slot)?;
             ready.append(&mut drained);
             if state.highest_seen_slot > current_slot
@@ -4353,7 +4384,7 @@ struct SlotExecutionBuffer {
     processed_entry_count: u64,
     expected_tx_count: Option<u64>,
     expected_entry_count: Option<u64>,
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     original_source_anchors_verified: bool,
 }
 
@@ -4406,7 +4437,7 @@ impl SlotExecutionBuffer {
 
     fn reset_for_restart(&mut self) {
         self.suffix_anchor = None;
-        #[cfg(feature = "epoch141-original-entry-qualification")]
+        #[cfg(original_entry_replay)]
         {
             self.original_source_anchors_verified = false;
         }
@@ -5192,7 +5223,7 @@ impl BlockMetadataNotifier for BankBlockMetadataNotifier {
                 }
             }
         }
-        #[cfg(feature = "epoch141-original-entry-qualification")]
+        #[cfg(original_entry_replay)]
         if let Err(error) = self.scheduler.authenticate_original_source_metadata(
             slot,
             parent_slot,
@@ -6990,10 +7021,12 @@ fn archive_generation_profile() -> String {
     let route = "epochs209-212-singleton-qualification-v1";
     #[cfg(feature = "epoch207-singleton-qualification")]
     let route = "epoch207-singleton-qualification-v1";
+    #[cfg(feature = "epoch140-suffix-recording")]
+    let route = "epoch140-suffix-recording-v1";
     #[cfg(feature = "epoch141-original-entry-qualification")]
     let route = "epoch141-original-entry-qualification-v1";
     #[cfg(not(any(
-        feature = "epoch141-original-entry-qualification",
+        original_entry_replay,
         feature = "epoch207-singleton-qualification",
         feature = "epochs209-212-singleton-qualification"
     )))]
@@ -12198,13 +12231,16 @@ async fn run_geyser_replay(
             Some((ledger_dir, &horizon_output, replay_scratch_dir)),
         )?;
     }
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     epoch141_original_entry::validate_execution(
         epoch,
         bootstrap.slot()?,
         qualification.map(|p| p.end_inclusive).unwrap_or(0),
+        checkpoint_restart.is_some(),
         carried_state.is_some()
-            || checkpoint_restart.is_some()
+            || audited_cohort_bootstrap.is_some()
+            || (cfg!(feature = "epoch140-suffix-recording")
+                && verification_end_inclusive != Some(61_328_765))
             || retain_runtime_state
             || snapshot_export.is_some(),
     )?;
@@ -19876,6 +19912,11 @@ async fn run_epoch_range_supervisor_serial(
 #[tokio::main]
 async fn main() {
     let probe_args: Vec<_> = env::args().skip(1).collect();
+    #[cfg(feature = "epoch140-suffix-recording")]
+    let suffix_invocation = epoch140_suffix_recording::parse(&probe_args).unwrap_or_else(|error| {
+        eprintln!("{error}");
+        exit(2);
+    });
     if epoch163_first_output128::enabled()
         && let Err(error) = epoch163_first_output128::entrypoint(&probe_args)
     {
@@ -19992,6 +20033,17 @@ async fn main() {
         }) {
             eprintln!("failed to set CTRL+C handler: {err}");
         }
+    }
+    #[cfg(feature = "epoch140-suffix-recording")]
+    if cfg!(feature = "epoch140-suffix-recording") {
+        if let Err(error) =
+            epoch140_suffix_recording::run(suffix_invocation, shutdown, cursor, restart_tracker)
+                .await
+        {
+            eprintln!("private epoch 140 suffix recording failed: {error}");
+            exit(1);
+        }
+        return;
     }
     let mut args = env::args();
     let program = args

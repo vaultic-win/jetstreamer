@@ -27,7 +27,7 @@ static EXACT_GOVERNANCE: AtomicBool = AtomicBool::new(false);
 #[cfg(any(
     feature = "epoch136-actual-input-diagnostic",
     feature = "epoch140-native-restore-diagnostic",
-    feature = "epoch141-original-entry-qualification",
+    original_entry_replay,
     feature = "epoch144-checkpoint-continuation-diagnostic",
     feature = "epoch144-native-restore-diagnostic",
     feature = "epoch163-first-output128-diagnostic",

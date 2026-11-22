@@ -335,3 +335,42 @@ slots outstanding. The original producer's terminal accounts hash also still
 requires independent confirmation. The full prefix semantic audit, a
 suffix-recording worker with its pre-entry cut comparison, and canonical
 verification at 61,328,765 remain necessary for the private V4 assembly path.
+
+### Private recording executable
+
+Build `jetstreamer-node` with `--features epoch140-suffix-recording`. Its
+single replay invocation is shown below. The dedicated service name is
+`horizon-epoch140-suffix-recording.service`. Seal the executable, plan and
+successful selected-prefix audit before admission. Use the corrected default
+v1.4.25 worker from `horizon-v1425-corrected-default-candidate-20261023-v1`,
+the verified 60,911,751 snapshot and `JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=1`.
+
+```sh
+jetstreamer-node 140 "$run_root" --verify \
+  --epoch140-suffix-plan="$sealed_plan" \
+  --epoch140-suffix-plan-sha256="$plan_sha256"
+```
+
+The plan has schema `jetstreamer-private-epoch140-suffix-recording-plan-v1`.
+It binds the executable in `node_sha256`, the private work directory in
+`run_root`, the successful `prefix_audit` through its `path` and `sha256`,
+and the absolute `snapshot` and `genesis` archive paths. Set
+`minimum_free_bytes` from the current complete fleet admission. The existing
+allocation and continuous disk/memory guard procedure applies. Precreate
+`/home/sol/.jetstreamer-private/epoch140-suffix-recording-<admission>` with
+mode 0700 for the service user. The node creates a fresh `recording` child.
+
+The node authenticates the complete sealed original-entry bundle, then
+requires source equivalence at each of the ten selected gap targets. It
+freezes the initialized worker before the first replay entry and compares
+the selected-prefix cut, both cursor bindings, zero bootstrap writes and the
+64-tick clock. It records all 248 positions, checks the final Bank and
+accounts hashes and the remaining consensus fields against the original
+journal, then rereads the private suffix and its segment manifest. The
+receipt at `recording/suffix-recording.json` identifies the two cursor
+domains, archive digest and outstanding canonical root at 61,328,765.
+
+Operational qualification still requires the actual guarded Bank run. The
+downstream root must be linked to the recorded suffix through authenticated
+state or a replay reproducing its terminal state before private assembly and
+independent full-archive and public plugin verification.

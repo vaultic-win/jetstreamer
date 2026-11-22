@@ -51,6 +51,23 @@ fn hex_prefix(bytes: &[u8], take: usize) -> String {
 }
 
 fn main() {
+    let suffix_recording = env::var_os("CARGO_FEATURE_EPOCH140_SUFFIX_RECORDING").is_some();
+    println!("cargo:rustc-check-cfg=cfg(original_entry_replay)");
+    if suffix_recording
+        || env::var_os("CARGO_FEATURE_EPOCH141_ORIGINAL_ENTRY_QUALIFICATION").is_some()
+    {
+        println!("cargo:rustc-cfg=original_entry_replay");
+    }
+    let mut source_paths = SOURCE_PATHS.to_vec();
+    if suffix_recording {
+        source_paths.extend([
+            "jetstreamer-utils/src/horizon_legacy_bundle.rs",
+            "jetstreamer-utils/src/horizon_legacy_entry.rs",
+            "jetstreamer-utils/src/horizon_legacy_poh.rs",
+            "jetstreamer-utils/src/horizon_legacy_shred.rs",
+            "jetstreamer-utils/src/horizon_legacy_source.rs",
+        ]);
+    }
     let rustc = env::var_os("RUSTC").expect("Cargo did not provide RUSTC");
     let mut rustc_command = Command::new(rustc);
     rustc_command.arg("--version").arg("--verbose");
@@ -86,7 +103,7 @@ fn main() {
         .arg("--binary")
         .arg("HEAD")
         .arg("--")
-        .args(SOURCE_PATHS)
+        .args(&source_paths)
         .current_dir(repository);
     let tracked_diff = try_command_bytes(diff_command).unwrap_or_default();
 
@@ -97,7 +114,7 @@ fn main() {
         .arg("--exclude-standard")
         .arg("-z")
         .arg("--")
-        .args(SOURCE_PATHS)
+        .args(&source_paths)
         .current_dir(repository);
     let untracked = try_command_bytes(untracked_command).unwrap_or_default();
     let mut untracked_paths = untracked

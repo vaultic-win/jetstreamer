@@ -40,7 +40,7 @@ impl Cli {
         }
         Ok(())
     }
-    #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+    #[cfg(not(original_entry_replay))]
     fn supplied(&self) -> bool {
         self.index.is_some()
             || self.index_sha256.is_some()
@@ -49,7 +49,7 @@ impl Cli {
     }
 }
 
-#[cfg(any(feature = "epoch141-original-entry-qualification", test))]
+#[cfg(any(original_entry_replay, test))]
 fn validate_scope(
     start: u64,
     end: u64,
@@ -79,17 +79,55 @@ fn validate_scope(
     Ok(())
 }
 
-#[cfg(feature = "epoch141-original-entry-qualification")]
+#[cfg(original_entry_replay)]
 mod enabled {
     use super::*;
     use crate::{ReadyEntry, SlotExecutionBuffer};
-    use jetstreamer_utils::{
+    use crate::{
         horizon_legacy_bundle::{OriginalEntryBundle, OriginalSlot},
         horizon_legacy_source::bind_v1_4_25_source_entries,
     };
-    use std::sync::{Mutex, OnceLock};
+    use std::{
+        collections::HashSet,
+        sync::{Mutex, OnceLock},
+    };
 
-    static INPUT: OnceLock<Mutex<Option<OriginalEntryBundle>>> = OnceLock::new();
+    #[derive(Clone, Copy)]
+    enum ReplayScope {
+        Epoch141,
+        #[cfg(feature = "epoch140-suffix-recording")]
+        Epoch140Suffix,
+    }
+
+    impl ReplayScope {
+        fn admits(
+            self,
+            epoch: u64,
+            bootstrap: u64,
+            terminal: u64,
+            checkpoint_restart: bool,
+        ) -> bool {
+            match self {
+                Self::Epoch141 => {
+                    (epoch, bootstrap, terminal, checkpoint_restart)
+                        == (141, 60_911_751, 61_328_765, false)
+                }
+                #[cfg(feature = "epoch140-suffix-recording")]
+                Self::Epoch140Suffix => {
+                    (epoch, bootstrap, terminal, checkpoint_restart)
+                        == (140, 60_911_751, 60_911_999, true)
+                }
+            }
+        }
+    }
+
+    struct BoundInput {
+        scope: ReplayScope,
+        bundle: OriginalEntryBundle,
+        expected: HashSet<u64>,
+    }
+
+    static INPUT: OnceLock<Mutex<Option<BoundInput>>> = OnceLock::new();
 
     pub(crate) fn configure(
         cli: Cli,
@@ -107,16 +145,79 @@ mod enabled {
                 "original-entry diagnostic build requires all four explicit bundle options".into(),
             );
         };
+        install(ReplayScope::Epoch141, &index, &index_sha, &data, &data_sha)
+    }
+
+    #[cfg(feature = "epoch140-suffix-recording")]
+    pub(crate) fn configure_suffix(index: PathBuf, data: PathBuf) -> Result<(), String> {
+        install(
+            ReplayScope::Epoch140Suffix,
+            &index,
+            "fe38bd4ce018996349c10029720dd7f738340fb0ad30ce6b8577b9651bf87df3",
+            &data,
+            "5605dd1ba08b7e790227b0efc388a74a02cdf665220d2455c3ed39f803feada0",
+        )
+    }
+
+    #[cfg(feature = "epoch140-suffix-recording")]
+    const SUFFIX_TARGETS: [u64; 10] = [
+        60_911_776, 60_911_796, 60_911_833, 60_911_840, 60_911_852, 60_911_892, 60_911_936,
+        60_911_969, 60_911_990, 60_911_995,
+    ];
+    #[cfg(feature = "epoch140-suffix-recording")]
+    const FIRST_FOLLOWING_TARGET: u64 = 60_912_004;
+
+    #[cfg(feature = "epoch140-suffix-recording")]
+    fn suffix_targets(mut targets: impl Iterator<Item = u64>) -> Result<HashSet<u64>, String> {
+        if !targets
+            .by_ref()
+            .take(SUFFIX_TARGETS.len())
+            .eq(SUFFIX_TARGETS)
+            || targets.next() != Some(FIRST_FOLLOWING_TARGET)
+        {
+            return Err("original bundle does not contain the ten exact epoch 140 targets followed by slot 60912004".into());
+        }
+        Ok(SUFFIX_TARGETS.into_iter().collect())
+    }
+
+    fn install(
+        scope: ReplayScope,
+        index: &Path,
+        index_sha: &str,
+        data: &Path,
+        data_sha: &str,
+    ) -> Result<(), String> {
         let start = std::time::Instant::now();
-        let bundle = OriginalEntryBundle::open(&index, &index_sha, &data, &data_sha, || {
+        let bundle = OriginalEntryBundle::open(index, index_sha, data, data_sha, || {
             if start.elapsed().as_secs() > 1800 {
                 Err("original bundle authentication deadline exceeded".into())
             } else {
                 Ok(())
             }
         })?;
+        let expected = match scope {
+            ReplayScope::Epoch141 => bundle.targets().collect(),
+            #[cfg(feature = "epoch140-suffix-recording")]
+            ReplayScope::Epoch140Suffix => {
+                let expected = suffix_targets(bundle.targets())?;
+                if !bundle
+                    .expectation(FIRST_FOLLOWING_TARGET)
+                    .is_some_and(|e| e.parent_slot == 60_911_999)
+                {
+                    return Err(
+                        "first original target after epoch 140 must descend from slot 60911999"
+                            .into(),
+                    );
+                }
+                expected
+            }
+        };
         INPUT
-            .set(Mutex::new(Some(bundle)))
+            .set(Mutex::new(Some(BoundInput {
+                scope,
+                bundle,
+                expected,
+            })))
             .map_err(|_| "original input already initialized")?;
         log::info!(
             "authenticated private original-entry bundle index={} sha256={} data={} sha256={}; replay/publication still independently gated",
@@ -128,25 +229,25 @@ mod enabled {
         Ok(())
     }
 
-    pub(crate) fn take_bundle() -> Option<OriginalEntryBundle> {
+    pub(crate) fn take_bundle() -> Option<(OriginalEntryBundle, HashSet<u64>)> {
         INPUT
             .get()
             .and_then(|input| input.lock().expect("original input lock").take())
+            .map(|input| (input.bundle, input.expected))
     }
 
     pub(crate) fn validate_execution(
         epoch: u64,
         bootstrap: u64,
         terminal: u64,
+        checkpoint_restart: bool,
         forbidden: bool,
     ) -> Result<(), String> {
-        if epoch != 141
-            || bootstrap != 60911751
-            || terminal != 61328765
-            || forbidden
-            || INPUT
-                .get()
-                .is_none_or(|input| input.lock().map(|value| value.is_none()).unwrap_or(true))
+        let scope = INPUT
+            .get()
+            .and_then(|input| input.lock().ok()?.as_ref().map(|input| input.scope));
+        if forbidden
+            || !scope.is_some_and(|s| s.admits(epoch, bootstrap, terminal, checkpoint_restart))
         {
             return Err(
                 "original-entry build cannot run an ordinary, carried or unbound replay".into(),
@@ -250,9 +351,47 @@ mod enabled {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use crate::horizon_legacy_poh::PohExpectation;
         use crate::{PendingEntry, ScheduledTransaction};
-        use jetstreamer_utils::horizon_legacy_poh::PohExpectation;
         use sha2::{Digest, Sha256};
+
+        #[cfg(feature = "epoch140-suffix-recording")]
+        #[test]
+        fn suffix_census_ends_before_the_first_epoch141_target() {
+            let targets: Vec<_> = SUFFIX_TARGETS
+                .into_iter()
+                .chain([FIRST_FOLLOWING_TARGET, 60_912_030])
+                .collect();
+            let expected = suffix_targets(targets.iter().copied()).unwrap();
+            assert_eq!(expected.len(), 10);
+            assert!(SUFFIX_TARGETS.iter().all(|slot| expected.contains(slot)));
+            assert!(!expected.contains(&FIRST_FOLLOWING_TARGET));
+
+            let mut changed = targets.clone();
+            changed[4] += 1;
+            assert!(suffix_targets(changed.into_iter()).is_err());
+            let mut missing = targets.clone();
+            missing.remove(9);
+            assert!(suffix_targets(missing.into_iter()).is_err());
+            let mut extra = targets;
+            extra.insert(10, 60_911_998);
+            assert!(suffix_targets(extra.into_iter()).is_err());
+            assert!(suffix_targets(SUFFIX_TARGETS.into_iter()).is_err());
+        }
+
+        #[cfg(feature = "epoch140-suffix-recording")]
+        #[test]
+        fn restart_scope_cannot_authorize_the_full_epoch141_route_or_a_different_cut() {
+            let suffix = ReplayScope::Epoch140Suffix;
+            assert!(suffix.admits(140, 60_911_751, 60_911_999, true));
+            assert!(!suffix.admits(140, 60_911_751, 60_911_999, false));
+            assert!(!suffix.admits(140, 60_911_752, 60_911_999, true));
+            assert!(!suffix.admits(140, 60_911_751, FIRST_FOLLOWING_TARGET, true));
+            assert!(!suffix.admits(141, 60_911_751, 61_328_765, false));
+            assert!(ReplayScope::Epoch141.admits(141, 60_911_751, 61_328_765, false));
+            assert!(!ReplayScope::Epoch141.admits(141, 60_911_751, 61_328_765, true));
+            assert!(!ReplayScope::Epoch141.admits(140, 60_911_751, 60_911_999, true));
+        }
 
         fn transaction(signature: u8) -> Vec<u8> {
             let mut bytes = vec![1];
@@ -431,10 +570,10 @@ mod enabled {
         #[test]
         #[ignore = "root-private exact first-target acquisition and independent RPC fixtures; read-only adapter diagnostic, no Bank, archive, service observation or remote access"]
         fn actual_first_target_modern_wire_conversion_and_metadata_mapping() {
-            use base64::{Engine, engine::general_purpose::STANDARD};
-            use jetstreamer_utils::horizon_legacy_shred::{
+            use crate::horizon_legacy_shred::{
                 assemble_v1_4_25_padded_batches, decode_v1_4_25_complete_slot_meta,
             };
+            use base64::{Engine, engine::general_purpose::STANDARD};
             use std::{
                 fs::OpenOptions,
                 io::Read,
@@ -623,11 +762,11 @@ pub(super) fn configure(
     forbidden: bool,
     private: Option<(&Path, &Path, &Path)>,
 ) -> Result<(), String> {
-    #[cfg(feature = "epoch141-original-entry-qualification")]
+    #[cfg(original_entry_replay)]
     {
         enabled::configure(cli, start, end, plan, forbidden, private)
     }
-    #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+    #[cfg(not(original_entry_replay))]
     {
         let _ = (start, end, plan, forbidden, private);
         if cli.supplied() {
@@ -638,7 +777,9 @@ pub(super) fn configure(
     }
 }
 
-#[cfg(feature = "epoch141-original-entry-qualification")]
+#[cfg(feature = "epoch140-suffix-recording")]
+pub(super) use enabled::configure_suffix;
+#[cfg(original_entry_replay)]
 pub(super) use enabled::{adapt, complete_source, take_bundle, validate_execution};
 
 #[cfg(test)]
@@ -651,7 +792,7 @@ mod tests {
         cli.parse("--epoch141-original-index=/tmp/index").unwrap();
         assert!(cli.parse("--epoch141-original-index=/tmp/index").is_err());
         assert!(cli.parse("--epoch141-original-data=").is_err());
-        #[cfg(not(feature = "epoch141-original-entry-qualification"))]
+        #[cfg(not(original_entry_replay))]
         assert!(
             configure(
                 cli,

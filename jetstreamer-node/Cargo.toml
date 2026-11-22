@@ -24,6 +24,8 @@ epoch207-singleton-qualification = []
 epochs209-212-singleton-qualification = []
 # Complete original-entry source binding for one private 141 root qualification.
 epoch141-original-entry-qualification = ["dep:jetstreamer-utils"]
+# Record the 248 private slots after the independently checked epoch 140 cut.
+epoch140-suffix-recording = []
 # Fixed 60911751 native restore comparison; never sends replay entries.
 epoch140-native-restore-diagnostic = ["dep:chrono"]
 epoch144-native-restore-diagnostic = ["dep:chrono"]
