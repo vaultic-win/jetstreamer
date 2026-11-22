@@ -231,7 +231,13 @@ def actor(ref):
     op=b['operation']
     # Main supervises the complete cgroup for the booked duration, including curl/hash descendants.
     env={k:os.environ[k] for k in ('HORIZON_S3_ENDPOINT','HORIZON_ACCESS_KEY_ID','HORIZON_SECRET_ACCESS_KEY')}
-    r=subprocess.run([str(image),op],env=env,check=True,capture_output=True,timeout=PHASES[op][4])
+    r=subprocess.run([str(image),op],env=env,capture_output=True,timeout=PHASES[op][4])
+    if r.returncode:
+        message=r.stderr.decode(errors='replace')
+        for value in env.values():
+            if value:
+                message=message.replace(value,'[redacted]')
+        raise RuntimeError(f'native {op} exited {r.returncode}: {message[-1000:]}')
     doc=json.loads(r.stdout)
     need(doc['operation']==op and doc['sha256']==SHA and doc['bytes']==SIZE and doc['parts']==363 and
          re.fullmatch('[0-9a-f]{64}',doc['manifest_sha256']) and doc['capacity_credit']==0 and not doc['canonical_publication'],

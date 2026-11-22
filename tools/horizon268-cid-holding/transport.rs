@@ -95,7 +95,12 @@ impl Client {
             credentials: format!("user = \"{id}:{secret}\"\n"),
         })
     }
-    fn request(&self, key: &str, put: Option<&Path>, max: u64) -> R<(u16, Vec<u8>)> {
+    fn once(
+        &self,
+        key: &str,
+        put: Option<&Path>,
+        max: u64,
+    ) -> R<(Option<i32>, Option<u16>, Vec<u8>)> {
         let mut c = Command::new(CURL);
         c.env_clear().args([
             "--disable",
@@ -152,11 +157,43 @@ impl Client {
         let code = std::str::from_utf8(&o.stderr)
             .ok()
             .and_then(|s| s.parse::<u16>().ok());
-        if !o.status.success() || code.is_none() {
-            return Err("incomplete authenticated request".into());
-        }
         require(o.stdout.len() as u64 <= max, "response exceeds bound")?;
-        Ok((code.unwrap(), o.stdout))
+        Ok((o.status.code(), code, o.stdout))
+    }
+    fn request(&self, key: &str, put: Option<&Path>, max: u64) -> R<(u16, Vec<u8>)> {
+        // Every PUT uses If-None-Match. If a response was interrupted after
+        // creation, a repeated 412 leads to the same authenticated readback.
+        let mut retries = 0;
+        loop {
+            let (exit, status, body) = self.once(key, put, max)?;
+            let transient = retryable(exit, status);
+            if transient && retries < 4 {
+                drop(body);
+                std::thread::sleep(std::time::Duration::from_secs(1 << retries));
+                retries += 1;
+                continue;
+            }
+            if let (Some(0), Some(code)) = (exit, status) {
+                if !transient {
+                    return Ok((code, body));
+                }
+            }
+            return Err(format!(
+                "authenticated {} failed: curl {exit:?}, HTTP {status:?}",
+                if put.is_some() {
+                    "conditional PUT"
+                } else {
+                    "GET"
+                }
+            ));
+        }
+    }
+}
+fn retryable(exit: Option<i32>, status: Option<u16>) -> bool {
+    match exit {
+        Some(0) => matches!(status, Some(408 | 429 | 500 | 502 | 503 | 504)),
+        Some(5 | 6 | 7 | 16 | 18 | 28 | 52 | 55 | 56 | 92) => true,
+        _ => false,
     }
 }
 pub(super) trait Transport {
@@ -190,6 +227,16 @@ impl Transport for Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn transport_retries_interruptions_and_preserves_conditional_results() {
+        assert!(retryable(Some(18), Some(200)));
+        assert!(retryable(Some(0), Some(503)));
+        assert!(retryable(Some(0), Some(429)));
+        for status in [200, 403, 404, 412] {
+            assert!(!retryable(Some(0), Some(status)));
+        }
+        assert!(!retryable(Some(63), Some(200)));
+    }
     #[test]
     fn endpoint_rejects_redirects_foreign_buckets_and_ambiguous_hosts() {
         let account = "0".repeat(32);
