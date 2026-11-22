@@ -60,6 +60,9 @@ props=(
 if [[ $mode == preflight ]]; then
     props+=("--property=ReadOnlyPaths=$base" --property=RuntimeMaxSec=300s)
 else
+    if [[ ${HORIZON_WAIT_FOR_136_WRITER:-0} == 1 ]]; then
+        props+=(--wait)
+    fi
     # The parent enters this writer's mount namespace for register-status,
     # whose checks consume the original fleet through its immutable path.
     copy="$runtime/epoch136-parent-handoff-20261121-v1/immutable-inputs/$fleet_sha.json"
