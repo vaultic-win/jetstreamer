@@ -177,40 +177,43 @@ def start_and_wait(c, program):
             time.sleep(0.2)
 
 
-def activate(c, head):
-    qualified=c['read_ref'](QUAL)
-    require(qualified['package']==c['bound'](TOOL/'deployment-seal-receipt.json'), 'qualified package changed')
-    new_admission=admitted(c)
-    manifest='[Service]\nExecStart=\nEnvironmentFile=/etc/jetstreamer/horizon-r2.env\nExecStart=/usr/bin/python3 -IB '+str(NEW)+'\n'
-    intent=ROOT/'COLD167_V3_STATUS_INTENT.json'
-    if ACTIVE.exists():
-        receipt=c['read_ref'](ACTIVE)
-        require(receipt['new']==publisher(c,NEW) and receipt['admission']==new_admission
-                and receipt['qualified']==c['bound'](QUAL), 'different adopted writer')
-        return c['bound'](ACTIVE)
+def switch(c, head, *, target, incumbent, incumbent_iid, tag, drop, admission):
+    program=target/'status_cycle.py'
+    qualified_ref=ROOT/(tag+'QUALIFIED.json')
+    accepted=ROOT/(tag+'ACTIVE.json')
+    qualified=c['read_ref'](qualified_ref)
+    require(qualified['package']==c['bound'](target/'deployment-seal-receipt.json'), 'qualified package changed')
+    new_admission=admission(c)
+    manifest='[Service]\nExecStart=\nEnvironmentFile=/etc/jetstreamer/horizon-r2.env\nExecStart=/usr/bin/python3 -IB '+str(program)+'\n'
+    intent=ROOT/(tag+'INTENT.json')
+    if accepted.exists():
+        receipt=c['read_ref'](accepted)
+        require(receipt['new']==publisher(c,program) and receipt['admission']==new_admission
+                and receipt['qualified']==c['bound'](qualified_ref), 'different adopted writer')
+        return c['bound'](accepted)
     schedule=timer_evidence(c,head)
     if intent.exists():
         initial=c['read_ref'](intent)
-        require(initial['schedule']==schedule and initial['admission']==new_admission and initial['qualified']==c['bound'](QUAL),
+        require(initial['schedule']==schedule and initial['admission']==new_admission and initial['qualified']==c['bound'](qualified_ref),
                 'handoff intent is for a different cycle or owner')
     else:
-        old=publisher(c,OLD,True)
-        require(old['invocation_id']==OLD_IID and not DROP.exists(), 'different original status owner')
-        c['durable'](intent,dict(old=old,schedule=schedule,qualified=c['bound'](QUAL),admission=new_admission))
+        old=publisher(c,incumbent,True)
+        require(old['invocation_id']==incumbent_iid and not drop.exists(), 'different original status owner')
+        c['durable'](intent,dict(old=old,schedule=schedule,qualified=c['bound'](qualified_ref),admission=new_admission))
     initial=c['read_ref'](intent)
-    rollback=ROOT/'COLD167_V3_STATUS_ROLLBACK.json'
+    rollback=ROOT/(tag+'ROLLBACK.json')
     state=c['owners'].show(UNIT,FIELDS)
     previous=initial['old']
-    if rollback.exists() and state['MainPID']!='0' and not DROP.exists():
+    if rollback.exists() and state['MainPID']!='0' and not drop.exists():
         saved=c['read_ref'](rollback)
         if saved['restored']['invocation_id'] != state['InvocationID']:
             require(re.fullmatch('[0-9a-f]{32}',state['InvocationID']), 'invalid restored writer ID')
-            saved=c['read_ref'](ROOT/('COLD167_V3_STATUS_ROLLBACK_'+state['InvocationID']+'.json'))
+            saved=c['read_ref'](ROOT/(tag+'ROLLBACK_'+state['InvocationID']+'.json'))
             require(saved['original_rollback']==c['bound'](rollback), 'unbound subsequent rollback')
         require(saved['intent']==c['bound'](intent) and saved['schedule']==schedule, 'foreign restored writer')
         previous=saved['restored']
     if state['MainPID']!='0' and state['InvocationID']==previous['invocation_id']:
-        require(previous==publisher(c,OLD,True) and timer_evidence(c,head)==schedule, 'publisher moved before handoff')
+        require(previous==publisher(c,incumbent,True) and timer_evidence(c,head)==schedule, 'publisher moved before handoff')
         output('systemctl','stop',UNIT,timeout=95)
     state=c['owners'].show(UNIT,FIELDS)
     if state['MainPID']=='0':
@@ -219,42 +222,47 @@ def activate(c, head):
             lease=c['lock'](LOCK)
             try:
                 require(timer_evidence(c,head,15)==schedule, 'armed observer changed during switch')
-                write_new(DROP,manifest.encode())
+                write_new(drop,manifest.encode())
                 output('systemctl','daemon-reload')
                 argv=c['owners'].show(UNIT,('ExecStart','MainPID','Job'))
-                require(argv['MainPID']=='0' and not argv['Job'] and str(NEW)+' ' in argv['ExecStart'],
+                require(argv['MainPID']=='0' and not argv['Job'] and str(program)+' ' in argv['ExecStart'],
                         'manager has not loaded qualified replacement')
             finally:
                 os.close(lease)
-            new=start_and_wait(c,NEW)
+            new=start_and_wait(c,program)
         except Exception:
             # Restore the existing service if the new generation has not yet written a sample.
             current=c['owners'].show(UNIT,FIELDS)
             if current['MainPID']!='0':
                 require(timer_evidence(c,head,0)==schedule, 'new publisher may be processing the sample')
                 require((Path('/proc')/current['MainPID']/'cmdline').read_bytes().split(b'\0')==
-                        [b'/usr/bin/python3',b'-IB',os.fsencode(NEW),b''], 'different running publisher')
+                        [b'/usr/bin/python3',b'-IB',os.fsencode(program),b''], 'different running publisher')
                 output('systemctl','stop',UNIT,timeout=95)
-            if DROP.exists():
-                require(DROP.read_bytes()==manifest.encode(), 'drop-in replaced')
-                DROP.unlink();syncdir(DROP.parent)
+            if drop.exists():
+                require(drop.read_bytes()==manifest.encode(), 'drop-in replaced')
+                drop.unlink();syncdir(drop.parent)
             output('systemctl','daemon-reload')
-            restored=start_and_wait(c,OLD)
+            restored=start_and_wait(c,incumbent)
             record=dict(intent=c['bound'](intent),restored=restored,schedule=schedule)
-            target=rollback
+            rollback_record=rollback
             if rollback.exists():
                 record['original_rollback']=c['bound'](rollback)
-                target=ROOT/('COLD167_V3_STATUS_ROLLBACK_'+restored['invocation_id']+'.json')
-            c['durable'](target,record)
+                rollback_record=ROOT/(tag+'ROLLBACK_'+restored['invocation_id']+'.json')
+            c['durable'](rollback_record,record)
             raise
     else:
-        require(DROP.read_bytes()==manifest.encode(), 'different live service during recovery')
-        new=publisher(c,NEW)
-    require(timer_evidence(c,head,0)==schedule and new_admission==admitted(c) and new['invocation_id']!=initial['old']['invocation_id'],
+        require(drop.read_bytes()==manifest.encode(), 'different live service during recovery')
+        new=publisher(c,program)
+    require(timer_evidence(c,head,0)==schedule and new_admission==admission(c) and new['invocation_id']!=initial['old']['invocation_id'],
             'custody changed across the switch')
-    c['durable'](ACTIVE,dict(new=new,old=initial['old'],intent=c['bound'](intent),schedule=schedule,
-                            qualified=c['bound'](QUAL),admission=new_admission,dropin=c['bound'](DROP)))
-    return c['bound'](ACTIVE)
+    c['durable'](accepted,dict(new=new,old=initial['old'],intent=c['bound'](intent),schedule=schedule,
+                            qualified=c['bound'](qualified_ref),admission=new_admission,dropin=c['bound'](drop)))
+    return c['bound'](accepted)
+
+
+def activate(c, head):
+    return switch(c,head,target=TOOL,incumbent=OLD,incumbent_iid=OLD_IID,tag='COLD167_V3_STATUS_',
+                  drop=DROP,admission=admitted)
 
 
 def main():
