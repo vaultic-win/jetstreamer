@@ -27,18 +27,53 @@ def locked_fd(s, pid, path):
                 if any(line.startswith("lock:") and line.split()[2:] == match for line in rows):
                     s.need(os.path.samestat(target, path.lstat()) and os.path.samestat(target, fd.stat()),
                            "status writer lock replaced")
-                    return
+                    return int(fd.name)
         except FileNotFoundError:
             # An unrelated short-lived descriptor can close during enumeration.
             continue
     raise ValueError("writer does not hold the original exclusive consumer lock")
 
 
+def selected_status(s, fit):
+    deployed, _ = s.read(STATUS / "DEPLOYED.json", "80fff053350536011bf779df37f121cad46fda101251ed3295320257c0de4773")
+    active = STATUS / "COLD167_STATUS_ACTIVE.json"
+    rollback = STATUS / "COLD167_STATUS_ROLLBACK.json"
+    if not active.exists() and not rollback.exists():
+        return STATUS / "tools", deployed["sources"], PUBLISHER_IID, None
+    q, qr = s.read(STATUS / "COLD167_STATUS_QUALIFIED.json",
+                   "c9d14b49aece021a26dca2ac7b29786f43fd6921dc6bb1af417901042a1b9846")
+    intent, ir = s.read(STATUS / "COLD167_STATUS_INTENT.json")
+    previous = intent["old"]
+    s.need(previous["unit"] == fit.PUBLISHER and previous["invocation_id"] == PUBLISHER_IID
+           and Path(previous["program"]) == STATUS / "tools/status_cycle.py" and intent["qualified"] == qr,
+           "foreign prior cadence handoff")
+    if not active.exists():
+        row, _ = s.read(rollback)
+        current = row["restored"]
+        s.need(row["intent"] == ir and row["schedule"] == intent["schedule"], "foreign status rollback")
+        package, seal_ref = STATUS / "tools", deployed["sources"]
+    else:
+        row, _ = s.read(active)
+        current = row["new"]
+        package, seal_ref = STATUS / "tools-cold167", q["package"]
+        s.need(seal_ref["sha256"] == "41203635cd5e52237f0c3915ea48ce9c5b062cd1beed4d3414abad5fa3e3f985"
+               and row["qualified"] == qr and row["old"] == previous and row["intent"] == ir
+               and row["schedule"] == intent["schedule"] and row["admission"] == intent["admission"],
+               "foreign status deployment or adoption")
+        candidate = R / "epoch167-source-index-rebook-20261122-v1"
+        admitted = s.bound(row["admission"], candidate / "ACTUAL_ADMISSION_AND_PROTECTION.json")
+        s.need(admitted["epoch"] == 167 and s.iid(admitted["producer_invocation_id"]), "foreign 167 admission")
+    s.need(current["unit"] == fit.PUBLISHER and Path(current["program"]) == package / "status_cycle.py"
+           and s.iid(current["invocation_id"]) and current["invocation_id"] != PUBLISHER_IID
+           and all(current["lock"][k] == previous["lock"][k] for k in ("device","inode","path")),
+           "different writer or lock across the cadence handoff")
+    return package, seal_ref, current["invocation_id"], current
+
+
 def registered_status(s, fit):
     _, registration = s.read(fit.READY, "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")
-    deployed, _ = s.read(STATUS / "DEPLOYED.json", "80fff053350536011bf779df37f121cad46fda101251ed3295320257c0de4773")
-    package = STATUS / "tools"
-    seal = s.bound(deployed["sources"], package / "deployment-seal-receipt.json")
+    package, seal_ref, iid, adopted = selected_status(s, fit)
+    seal = s.bound(seal_ref, package / "deployment-seal-receipt.json")
     program = package / "status_cycle.py"
     s.need(seal["destination"] == str(package), "foreign status deployment")
     member, = (r for r in seal["members"] if r["name"] == program.name)
@@ -48,7 +83,7 @@ def registered_status(s, fit):
 
     def owner():
         mgr = s.show(fit.PUBLISHER)
-        s.need(mgr["Id"] == fit.PUBLISHER and mgr["InvocationID"] == PUBLISHER_IID
+        s.need(mgr["Id"] == fit.PUBLISHER and mgr["InvocationID"] == iid
                and mgr["ActiveState"] == "active" and mgr["SubState"] == "running" and not mgr["Job"]
                and mgr["ControlPID"] == mgr["NRestarts"] == "0", "different status writer invocation")
         pid = int(mgr["MainPID"])
@@ -61,9 +96,14 @@ def registered_status(s, fit):
         return pid, ticks
 
     pid, ticks = owner()
-    locked_fd(s, pid, fit.LOCK)
+    fd = locked_fd(s, pid, fit.LOCK)
+    if adopted is not None:
+        lock = fit.LOCK.lstat()
+        s.need((pid, ticks) == (adopted["pid"], adopted["start_ticks"]) and adopted["lock"] ==
+               dict(path=str(fit.LOCK), device=lock.st_dev, inode=lock.st_ino, fd=fd),
+               "adopted publisher changed after taking its exclusive lock")
     s.need(owner() == (pid, ticks), "status generation changed during registration")
-    return dict(registration=registration, consumer_seal=deployed["sources"], invocation_id=PUBLISHER_IID,
+    return dict(registration=registration, consumer_seal=seal_ref, invocation_id=iid,
                 pid=pid, start_ticks=ticks)
 
 
