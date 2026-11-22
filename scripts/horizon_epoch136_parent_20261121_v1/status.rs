@@ -11,9 +11,16 @@ const BRIDGE_SEAL: &str = "76283826f8700557ffa359aa274ba991f7f644302476dde78e436
 const NEXT_PKG: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-post168-cadence-20261121-v1/publisher-v1";
 const NEXT_SEAL: &str = "923519c0d6f031594b9b5b34195af8b37772c25553c5cb7d195f8ec66e7c276c";
+const PREFIX_PKG: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/prefix140-status-cadence-20261122-v1/cadence-tools";
+const PREFIX_SEAL: &str = "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e";
 static SELECTED: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
 fn bridge_package(consumer: &Path) -> Result<(&'static str, &'static str)> {
-    for (pkg, seal) in [(BRIDGE_PKG, BRIDGE_SEAL), (NEXT_PKG, NEXT_SEAL)] {
+    for (pkg, seal) in [
+        (BRIDGE_PKG, BRIDGE_SEAL),
+        (NEXT_PKG, NEXT_SEAL),
+        (PREFIX_PKG, PREFIX_SEAL),
+    ] {
         if Path::new(pkg).join("consume") == consumer {
             return Ok((pkg, seal));
         }

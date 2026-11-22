@@ -417,6 +417,41 @@ pub(super) fn inspect(
         "complete preexisting reservations changed"
     );
     let ancestry = fence::ancestry()?;
+    if fleet.get("active_ready_range_audit_obligation").is_some() {
+        let own = candidate(waiting_iid)?;
+        let active = observe_145()?;
+        let mut cmd = Command::new("/usr/bin/python3");
+        let result = cmd
+            .args(["-I", "-B", "-c", include_str!("incident_prestart.py")])
+            .arg(fleet_path)
+            .arg(fleet_sha)
+            .arg(serde_json::to_string(&own)?)
+            .arg(if require_activation_compatible {
+                "session"
+            } else {
+                "preflight"
+            })
+            .arg(serde_json::to_string(&plan["joint_fit_145"])?)
+            .stdin(Stdio::null())
+            .output()
+            .context("capture epoch 136 incident prestart")?;
+        ensure!(
+            result.status.success() && result.stdout.len() <= 4 << 20,
+            "136 incident price: {}",
+            String::from_utf8_lossy(&result.stderr[..result.stderr.len().min(4096)])
+        );
+        let mut confirmed: Value = serde_json::from_slice(&result.stdout)?;
+        ensure!(
+            confirmed["fleet"] == binding(fleet_path, fleet_sha)
+                && (!require_activation_compatible || confirmed["activation_compatible"] == true)
+                && candidate(waiting_iid)? == own
+                && observe_145()? == active,
+            "changed candidate, holding owner or incident price"
+        );
+        confirmed["donor171_ancestry"] = ancestry;
+        confirmed["native_145"] = active;
+        return Ok(confirmed);
+    }
     let audit = fit::observe_audit(&fleet["continuing_audit_obligation"])?;
     let p = &plan["joint_fit_145"];
     let executable = image(p, &fleet)?;
