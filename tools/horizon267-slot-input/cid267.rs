@@ -6,7 +6,7 @@ use std::path::Path;
 
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277
+    epoch277, epoch278, epoch279, epoch280
 )))]
 mod profile {
     pub(super) const SIZE: u64 = 10_392_794_246;
@@ -41,9 +41,15 @@ mod profile {
     pub(super) const HEADER: usize = 130;
     pub(super) const PREFIX: &[u8; 4096] = include_bytes!("270-cid-prefix.bin");
 }
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 pub mod compact_profiles;
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 mod profile {
     pub(super) use super::compact_profiles::{
         CAR as CAR_SIZE, CID_BUCKETS as BUCKETS, CID_BYTES as SIZE, CID_PREFIX as PREFIX,
@@ -137,14 +143,16 @@ fn inspect(input: impl Read) -> io::Result<u64> {
 
 fn run() -> io::Result<()> {
     #[cfg(not(any(
-        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277
+        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
+        epoch278, epoch279, epoch280
     )))]
     let p = {
         require(std::env::args_os().len() == 1, "unexpected arguments")?;
         Path::new(SOURCE)
     };
     #[cfg(any(
-        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277
+        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
+        epoch278, epoch279, epoch280
     ))]
     let path = {
         let mut args = std::env::args_os().skip(1);
@@ -155,7 +163,8 @@ fn run() -> io::Result<()> {
         p
     };
     #[cfg(any(
-        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277
+        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
+        epoch278, epoch279, epoch280
     ))]
     let p = {
         if path == "--cid-stdin" {

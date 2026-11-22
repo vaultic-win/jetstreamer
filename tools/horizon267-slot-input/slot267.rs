@@ -6,7 +6,7 @@ use std::path::Path;
 
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277
+    epoch277, epoch278, epoch279, epoch280
 )))]
 mod profile {
     pub(super) const EPOCH: u64 = 267;
@@ -43,9 +43,15 @@ mod profile {
     pub(super) const HEADER: usize = 119;
     pub(super) const BUCKETS: usize = 41;
 }
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 pub mod compact_profiles;
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 mod profile {
     pub(super) use super::compact_profiles::{
         EPOCH, SLOT_BUCKETS as BUCKETS, SLOT_BYTES as SIZE, SLOT_ENTRIES as EXPECTED,

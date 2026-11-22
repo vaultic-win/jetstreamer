@@ -77,7 +77,7 @@ impl Bucket<'_> {
 const SLOTS: usize = 432000;
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277
+    epoch277, epoch278, epoch279, epoch280
 )))]
 mod profile {
     pub(super) const START: u64 = 115344000;
@@ -126,9 +126,15 @@ mod profile {
     pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("270-cid-prefix.bin");
     pub(super) const MAX_EXAMPLES: usize = 4096;
 }
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 pub mod compact_profiles;
-#[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+#[cfg(any(
+    epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+    epoch280
+))]
 mod profile {
     pub(super) use super::compact_profiles::{
         CAR, CID_BUCKETS, CID_BYTES, CID_PREFIX, SLOT_BUCKETS, SLOT_BYTES, SLOT_PREFIX,
@@ -172,7 +178,8 @@ fn run() -> io::Result<()> {
     )?;
     require(slot.starts_with(SLOT_PREFIX), "slot header")?;
     #[cfg(any(
-        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277
+        epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
+        epoch278, epoch279, epoch280
     ))]
     if args[2] == "--cid-stdin" {
         return compare(&raw, &slot, io::stdin().lock());
@@ -283,7 +290,7 @@ mod tests {
     use super::*;
     #[cfg(not(any(
         epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-        epoch277
+        epoch277, epoch278, epoch279, epoch280
     )))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
@@ -298,7 +305,10 @@ mod tests {
         assert_eq!(bucket_number(&START.to_le_bytes(), 39), 10);
         assert_eq!(bucket_number(&cid, 86596), 42756);
     }
-    #[cfg(any(epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277))]
+    #[cfg(any(
+        epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
+        epoch280
+    ))]
     #[test]
     fn both_directories_start_at_the_registered_payload_offsets() {
         assert_eq!(le(&SLOT_PREFIX[129..135]), 119 + 16 * SLOT_BUCKETS as u64);
