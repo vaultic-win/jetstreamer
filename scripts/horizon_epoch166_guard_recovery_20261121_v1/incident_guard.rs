@@ -10,7 +10,8 @@ const IMAGE: &str =
     feature = "epoch170-384",
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
-    feature = "epoch170-retry11"
+    feature = "epoch170-retry11",
+    feature = "epoch170-retry12"
 )))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
@@ -23,6 +24,9 @@ const IMAGE: &str =
 #[cfg(feature = "epoch170-retry11")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry11-guard-20261122-v1/tools/guard";
+#[cfg(feature = "epoch170-retry12")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry12-guard-20261122-v1/tools/guard";
 const HOME: &str = "/home/sol/.jetstreamer-private";
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -54,6 +58,13 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch170-retry11-rebook-20261122-v1",
     cap: 384 << 30,
 }];
+#[cfg(feature = "epoch170-retry12")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-170-replacement-local3retry12-20261122.service",
+    tree: "epoch170-standard-lane-20261109-v1",
+    runtime: "epoch170-retry12-rebook-20261122-v1",
+    cap: 384 << 30,
+}];
 #[cfg(feature = "epoch170-384")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
@@ -65,7 +76,8 @@ const LANES: &[Lane] = &[Lane {
     feature = "epoch170-384",
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
-    feature = "epoch170-retry11"
+    feature = "epoch170-retry11",
+    feature = "epoch170-retry12"
 )))]
 const LANES: &[Lane] = &[
     Lane {
@@ -116,7 +128,8 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
 #[cfg(any(
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
-    feature = "epoch170-retry11"
+    feature = "epoch170-retry11",
+    feature = "epoch170-retry12"
 ))]
 pub(crate) fn validate_cold_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
     let deployment = Path::new(IMAGE)
@@ -160,6 +173,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch170-retry11-rebook-20261122-v1/SUCCESSOR_ROOT.json",
             "8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728",
         ),
+        #[cfg(feature = "epoch170-retry12")]
+        (
+            "epoch170-retry12-rebook-20261122-v1/SUCCESSOR_ROOT.json",
+            "466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19",
+        ),
         #[cfg(feature = "epoch166-retry11")]
         (
             "epoch166-independent-closed-accounts-20261122-v1/SUCCESSOR_ROOT.json",
@@ -192,6 +210,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
         (
             "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122",
             113704962,
+        ),
+        #[cfg(feature = "epoch170-retry12")]
+        (
+            "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry12-20261122",
+            113836033,
         ),
         #[cfg(feature = "epoch166-retry11")]
         (
@@ -311,6 +334,22 @@ mod tests {
         ));
     }
 
+    #[cfg(feature = "epoch170-retry12")]
+    #[test]
+    fn retry12_170_accepts_only_its_384_gib_successor() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 384 << 30);
+        assert!(is_route(
+            "horizon-qualify-170-replacement-local3retry12-20261122.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-170-replacement-local3retry11-20261122.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-166-independent-retry11-20261122.service"
+        ));
+    }
+
     #[cfg(feature = "epoch167-cold-v3")]
     #[test]
     fn cold167_accepts_only_the_v3_source_index_unit() {
@@ -347,7 +386,8 @@ mod tests {
         let roots = qualification_roots(Path::new(IMAGE)).unwrap();
         let expected = if cfg!(any(
             feature = "epoch166-retry11",
-            feature = "epoch170-retry11"
+            feature = "epoch170-retry11",
+            feature = "epoch170-retry12"
         )) {
             4
         } else {
