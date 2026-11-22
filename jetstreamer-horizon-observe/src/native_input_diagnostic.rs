@@ -44,6 +44,9 @@ impl NativeConfig {
                 "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input",
                 "b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce",
             ),
+            266 if self.unit==capped266::UNIT => (
+                capped266::UNIT,capped266::ROOT,capped266::HARNESS,capped266::HARNESS_SHA,
+            ),
             266 => (
                 "horizon-266-native-input-20261121-v1.service",
                 "/run/horizon266-native-cold-v1",
@@ -276,6 +279,8 @@ fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
             "/var/lib/jetstreamer/horizon-singleton211-production-worker-1c89b6a214f9487b-v1/jetstreamer-historical-worker-v1-6-16-shrink-budget",
             "1c89b6a214f9487babfd9dc121ade06037b371fbfcc3243f0e6ec67b6b961c41",
         )
+    } else if n.epoch == 266 && n.unit==capped266::UNIT {
+        (capped266::WORKER,capped266::WORKER_SHA)
     } else if n.epoch == 266 {
         ("/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-historical-worker-v1-8-11", "9f7763ff57c27bcfa112814701314c1b36366a35c7e171a7d6f3ee97ee7330ae")
     } else {
@@ -303,6 +308,27 @@ fn bootstrap_child(n: &NativeConfig, u: &UnitObservation) -> Result<Value> {
     image["start_ticks"] = child["start_ticks"].clone();
     Ok(image)
 }
+#[allow(dead_code)]
+#[path="../../tools/horizon266-native-input/src/capped_site.rs"]
+mod capped_site;
+mod capped266 {
+    use super::capped_site as site;
+    pub(super) use site::{UNIT,ROOT,HARNESS,WORKER,WORKER_SHA};
+    pub(super) const HARNESS_SHA:&str="72f04be574d9f81a0d0e610392ae9b53aed171029c2ea0e81bfd34a4919f9bac";
+    mod profile {
+        pub(super) use super::site::ROOT;
+        pub(super) const FILESYSTEM:&str="/var/lib/jetstreamer";
+    }
+    mod tmpfs {
+        pub(crate) const BYTES:u64=128<<30;
+        pub(crate) const INODES:u64=1_048_576;
+        const SOURCE:&str="horizon266-capped-native-cold";
+        include!("../../tools/horizon261-native-input/src/mount.rs");
+    }
+    const ROOT_CAP:u64=124<<30;
+    include!("native_tmpfs_sample.rs");
+}
+
 mod cold266 {
     mod profile {
         pub(super) const ROOT: &str = "/run/horizon266-native-cold-v1";
@@ -339,6 +365,7 @@ mod cold261 {
 }
 fn scratch_sample(n: &NativeConfig) -> Result<(Value, u64)> {
     match n.epoch {
+        266 if n.unit==capped266::UNIT => return capped266::sample(n),
         266 => return cold266::sample(n),
         212 => return cold212::sample(n),
         261 => return cold261::sample(n),
@@ -464,6 +491,17 @@ mod tests {
         assert_eq!(unavailable["entry_replay"], false);
         assert_eq!(unavailable["ordinary_replay_claim"], false);
     }
+    #[test]
+    fn capped_epoch266_keeps_its_own_worker_root_and_harness() {
+        let mut row:NativeConfig=serde_json::from_value(json!({"epoch":266,"unit":capped266::UNIT,"expected_invocation_id":"a".repeat(32),"main_pid":42,"scratch_path":capped266::ROOT,"executable":capped266::HARNESS,"executable_sha256":capped266::HARNESS_SHA})).unwrap();
+        row.validate().unwrap();
+        row.scratch_path="/run/horizon266-native-cold-v1".into();
+        assert!(row.validate().is_err());
+        row.scratch_path=capped266::ROOT.into();
+        row.unit="horizon-266-native-input-20261121-v1.service".into();
+        assert!(row.validate().is_err());
+    }
+
     #[test]
     fn native266_owns_only_its_registered_bootstrap_tuple() {
         let good = json!({"epoch":266,"unit":"horizon-266-native-input-20261121-v1.service","expected_invocation_id":"a".repeat(32),

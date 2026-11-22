@@ -463,6 +463,9 @@ fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Res
         257 => {
             horizon_singleton211_launch::native257::validate_saved_handoff(&b.path, &b.sha256)?;
         }
+        266 if row["unit"]=="horizon-266-capped-native-input-v1.service" => {
+            horizon_singleton211_launch::native266_capped::validate_saved_handoff(&b.path,&b.sha256)?;
+        }
         266 => {
             horizon_singleton211_launch::native266::validate_saved_handoff(&b.path, &b.sha256)?;
         }
@@ -488,6 +491,7 @@ fn cold_pass_through(config: &Value, binding: Option<&Bound>, epoch: u64) -> Res
 fn cold_owner(config: &Value, row: &Value, handoff: &Value, epoch: u64) -> Result<()> {
     let root = Path::new(match epoch {
         257 => "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1",
+        266 if handoff["unit"]=="horizon-266-capped-native-input-v1.service" => "/run/horizon266-capped-native-cold-v1",
         266 => "/run/horizon266-native-cold-v1",
         212 => "/run/horizon212-native-cold-v1",
         261 => "/run/horizon261-native-cold-v1",

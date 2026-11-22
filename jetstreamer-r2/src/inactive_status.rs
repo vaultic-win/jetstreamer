@@ -466,6 +466,17 @@ fn fresh_census(
         fleet::validate_native266_inactive(terminal_fleet, &current, owners)?;
     }
 
+    let native266_capped = owners
+        .iter()
+        .any(|(unit, _)| unit == "horizon-266-capped-native-input-v1.service");
+    if native266_capped {
+        ensure!(
+            plan.epoch == 266,
+            "native266_capped status attached to another epoch"
+        );
+        fleet::validate_native266_capped_inactive(terminal_fleet, &current, owners)?;
+    }
+
     let native212 = owners
         .iter()
         .any(|(unit, _)| unit == "horizon-212-native-input-20261120-v1.service");
@@ -539,6 +550,7 @@ fn fresh_census(
             && !native211
             && !native257
             && !native266
+            && !native266_capped
             && !native212
             && !native261
             && !native265
