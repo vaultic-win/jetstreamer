@@ -715,7 +715,8 @@ fn run() -> Result<()> {
         feature = "epoch167-cold-v3",
         feature = "epoch166-retry11",
         feature = "epoch170-retry11",
-        feature = "epoch170-retry12"
+        feature = "epoch170-retry12",
+        feature = "epoch170-retry13"
     ))]
     data_fulfillment::incident::validate_cold_contract(&plan, &args[5])?;
     #[cfg(not(feature = "incident-recovery"))]

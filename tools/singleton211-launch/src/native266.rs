@@ -36,7 +36,7 @@ mod profile {
     pub(super) const ROOT: &str = "/run/horizon266-native-cold-v1";
     pub(super) const FILESYSTEM: &str = "/var/lib/jetstreamer";
 }
-#[path = "../../horizon266-native-input/src/tmpfs.rs"]
+#[path = "../../horizon266-native-input/src/original_tmpfs.rs"]
 mod tmpfs;
 use profile::{FILESYSTEM, ROOT};
 

@@ -14,9 +14,9 @@ ROOT = BASE/'survivor172-cadence-20261122-v1'
 DUAL = ROOT/'tools-cold167-v3'
 TRIPLE = ROOT/'tools-cold166-retry11'
 # The sealer installs the same entry point in a distinct read-only directory for each attempt.
-ATTEMPT = 'retry12' if Path(__file__).resolve().parent.name == 'retry12-170-switch' else 'retry11'
-TARGET = ROOT/f'tools-cold170-{ATTEMPT}'
-TAG = f'COLD170_{ATTEMPT.upper()}_STATUS_'
+ATTEMPT = 'retry12' if Path(__file__).resolve().parent.name.startswith('retry12-170-switch') else 'retry11'
+TARGET = ROOT/f'tools-cold170-{ATTEMPT}-v2'
+TAG = f'COLD170_{ATTEMPT.upper()}_V2_STATUS_'
 QUAL = ROOT/(TAG+'QUALIFIED.json')
 ANCHOR = dict(path=str(BASE/f'epoch170-{ATTEMPT}-rebook-20261122-v1/SUCCESSOR_ROOT.json'),
               sha256='466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if ATTEMPT=='retry12' else '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
@@ -40,7 +40,7 @@ def prepare(c, shared, commit):
     c['checked'](GUARD)
     enrollment = c['checked'](TRIPLE_QUAL)
     need(enrollment['package']==c['bound'](TRIPLE/'deployment-seal-receipt.json'), 'different 166 registration')
-    stage = ROOT/f'{ATTEMPT}-170-status-source'
+    stage = ROOT/f'{ATTEMPT}-170-status-source-v2'
     c['ensure_dir'](stage)
     for name in MEMBERS:
         shared['write_new'](stage/name,git('show',f"{commit}:{shared['SRC']}/{name}"))
@@ -49,7 +49,7 @@ def prepare(c, shared, commit):
     c['durable'](stage/f'{ATTEMPT}-170-generation.json', dict(successor_root=ANCHOR,guard_qualification=GUARD))
     names=(*MEMBERS,'generation.json','retry11-generation.json',f'{ATTEMPT}-170-generation.json')
     need({p.name for p in stage.iterdir()}==set(names),'unexpected package member')
-    plan=ROOT/f'{ATTEMPT}-170-status-seal-plan.json'
+    plan=ROOT/f'{ATTEMPT}-170-status-seal-plan-v2.json'
     c['durable'](plan,dict(schema='jetstreamer-sealed-deployment-plan-v1',destination=str(TARGET),
          members=[dict(name=n,mode=0o444,source=str(stage/n),sha256=c['bound'](stage/n)['sha256']) for n in names]))
     if not TARGET.exists():
@@ -59,12 +59,14 @@ def prepare(c, shared, commit):
     need(c['checked'](seal)['plan_sha256']==c['bound'](plan)['sha256'] and all(
         c['bound'](TARGET/n)['sha256']==c['bound'](stage/n)['sha256'] for n in names),'changed 170 package')
     if not QUAL.exists():
-        qa=ROOT/f'{ATTEMPT}-170-status-qa';c['ensure_dir'](qa)
+        qa=ROOT/f'{ATTEMPT}-170-status-qa-v2';c['ensure_dir'](qa)
         suites={n:json.loads(shared['output']('/usr/bin/python3','-IB',TARGET/n,qa)) for n in MEMBERS if n.startswith('qualify')}
         need(suites['qualify_cold170.py']['measured_lanes']==4 and suites['qualify_cold170.py']['authenticated_fixture_writes']==2
              and suites['qualify_cold166.py']['counted_native_workers']==3
              and len(set(suites['qualify.py']['conditional_epochs']))==20,'incomplete 170 qualification')
-        c['durable'](QUAL,dict(package=seal,source_commit=commit,successor_root=ANCHOR,guard=GUARD,suites=suites))
+        entry=json.loads(shared['output']('/usr/bin/python3','-IB',TARGET/'status_cycle.py','--check-entry'))
+        need(entry==seal,'sealed deployment cannot enter production main')
+        c['durable'](QUAL,dict(package=seal,entry=entry,source_commit=commit,successor_root=ANCHOR,guard=GUARD,suites=suites))
     signed=c['bound'](QUAL)
     need(c['checked'](signed)['package']==seal and c['checked'](signed)['source_commit']==commit,'foreign 170 qualifier')
     return signed
