@@ -31,19 +31,35 @@ def floor(candidate):
     return provider["disk_budget"](native["original_aggregate_HOME_bytes"], candidate, native["bookings"], 145,
                                    native["survivors"], native["replacements"], native["active168_guard_floor"],
                                    native["closed_prestart_remaining"])[0]
-assert floor(native["candidate136"]) == native["complete_required_HOME_bytes"]
-whole136 = floor(dict(native["candidate136"], remaining=0)) + (72 << 30)
+ordinary = floor(native["candidate136"])
+zero = floor(dict(native["candidate136"], remaining=0))
+whole136 = zero + (72 << 30)
 runtime = Path("/var/lib/jetstreamer/horizon_runtime_data")
 sys.path.insert(0, str(runtime / "prefix140-status-cadence-20261122-v1/cadence-tools"))
 from prefix140_storage import storage
 prefix = storage()
 assert prefix["registration"] == fleet["current_private_prefix140_obligation"]["registration"]
-assert 0 <= prefix["remaining_DATA_growth_bytes"] <= 16 << 20
+growth = prefix["remaining_DATA_growth_bytes"]
+assert 0 <= growth <= 16 << 20
+if source.parent.name == "tools-v20-prestart":
+    assert native["bounded_qualification"] is None
+    assert ordinary == native["native_before_registered_floor"] and zero == native["zero_candidate_floor"]
+    snapshots = (native["prefix_before"], native["prefix_after"], prefix)
+    assert all(item["registration"] == prefix["registration"] and
+               item["child"]["InvocationID"] == prefix["child"]["InvocationID"] for item in snapshots)
+    recorded_growth = max(item["remaining_DATA_growth_bytes"] for item in snapshots[:2])
+    assert recorded_growth == native["remaining_prefix140_bytes"]
+    booked = provider["post145_floor"](ordinary, zero, native["candidate136"], recorded_growth)
+    assert booked == native["complete_required_HOME_bytes"]
+    protected = max(booked, provider["post145_floor"](ordinary, zero, native["candidate136"], growth))
+else:
+    assert ordinary == native["complete_required_HOME_bytes"]
+    protected = max(whole136, ordinary) + growth
 assert out.stat().st_dev == Path("/home/sol").stat().st_dev
 fs = os.statvfs(out)
 available = min(native["available_HOME_bytes"], fs.f_bavail * fs.f_frsize)
 scratch, retained = 88 << 20, 24 << 20
-required = max(whole136, native["complete_required_HOME_bytes"]) + prefix["remaining_DATA_growth_bytes"] + scratch + retained
+required = protected + scratch + retained
 assert available >= required, (available, required)
 assert native["available_memory_bytes"] >= native["required_available_memory_bytes"] + (768 << 20)
 with (out / "build-reservation.json").open("x") as receipt:
