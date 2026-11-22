@@ -27,6 +27,10 @@ pub(super) fn is_image(path: &Path) -> bool {
             == Path::new(
                 "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v9/retire",
             )
+        || path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v10/retire",
+            )
 }
 pub(super) fn holding_transition() -> Result<File> {
     acquire(
@@ -544,6 +548,8 @@ mod tests {
         let base =
             Path::new("/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1");
         assert!(is_image(&base.join("retire-v9/retire")));
+        assert!(is_image(&base.join("retire-v10/retire")));
+        assert!(!is_image(&base.join("retire-v10/other")));
         for path in [
             base.join("retire-v9/copy"),
             base.join("retire-v90/retire"),
