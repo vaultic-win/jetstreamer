@@ -144,7 +144,15 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
       # Capture the 136 mirrors and public reader commitments in the same native observation.
       quote=${6:?expected full mirror price executable}
       quote_digest=${7:?expected qualification hash for mirror price}
-      [[ $(realpath -e -- "$quote") == "$quote" && ${quote%/*} == "${provider%/*/*}" ]]
+      [[ $(realpath -e -- "$quote") == "$quote" ]]
+      if [[ $native_package == tools-v20 ]]; then
+        [[ $quote == "${provider%/*}/price_recovery_mirrors.py" ]]
+        jq -e --arg hash "$quote_digest" '
+          [.members[] | select(.name == "price_recovery_mirrors.py" and .mode == "0444" and .sha256 == $hash)] | length == 1
+        ' "${provider%/*}/deployment-seal-receipt.json" >/dev/null
+      else
+        [[ $quote == "${provider%/*/*}/PRICE_V20_PRESTART_MIRRORS.py" ]]
+      fi
       [[ $(stat -c '%u %g %a %h' -- "$quote") == '0 0 444 1' && $quote_digest =~ ^[a-f0-9]{64}$ ]]
       [[ $(sha256sum -- "$quote" | cut -d' ' -f1) == "$quote_digest" ]]
       quote_args=("$1" "$fleet_sha")
