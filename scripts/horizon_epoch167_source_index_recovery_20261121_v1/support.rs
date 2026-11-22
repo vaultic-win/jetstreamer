@@ -1,9 +1,19 @@
 use super::*;
 
 pub const R: &str = "/var/lib/jetstreamer/horizon_runtime_data";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
+#[cfg(not(any(
+    epoch167_cold_rebook,
+    epoch166_retry11,
+    epoch170_retry11,
+    epoch170_retry12
+)))]
 pub const COMMON: &str = "incident-replay-guard-20261121-v1";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
+#[cfg(not(any(
+    epoch167_cold_rebook,
+    epoch166_retry11,
+    epoch170_retry11,
+    epoch170_retry12
+)))]
 pub const PROVIDER: &str = "incident-replay-fit-20261121-v1/tools/post-stop-fit";
 pub const SEALER: &str = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3";
 pub fn rt(s: &str) -> PathBuf {
