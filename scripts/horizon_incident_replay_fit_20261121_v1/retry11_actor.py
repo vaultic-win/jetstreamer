@@ -81,7 +81,7 @@ def holding(s, fit, fleet):
 
 
 def guard(s, prepared):
-    qualified, qr = s.read(GUARD_ROOT/'GUARD_QUALIFIED.json')
+    qualified, qr = s.read(GUARD_ROOT/'GUARD_QUALIFIED.json', 'd43d47340cc01d97cea8a37bdff9ac2d27762761c4cbb74f0d8740dda9e5ea22')
     image=GUARD_ROOT/'tools/guard'; digest=prepared['profile']['guard_binary_sha256']
     seal=s.bound(qualified['seal'],image.parent/'deployment-seal-receipt.json')
     contract=qualified['contract']; terms=s.bound(contract['contract'],GUARD_ROOT/'contract/contract.json')
@@ -93,6 +93,61 @@ def guard(s, prepared):
            and witness['native_identity']['executable']==str(image) and witness['native_identity']['executable_sha256']==digest
            and hashlib.sha256(image.read_bytes()).hexdigest()==digest, 'wrong retry11 qualified guard')
     return digest,contract
+
+
+def readonly_mounts(s, proc, pairs):
+    """Verify each producer-namespace bind resolves to the enrolled source inode and is read-only."""
+    mounts = {}
+    for line in (proc / 'mountinfo').read_text().splitlines():
+        parts = line.split()
+        target = Path(parts[4])
+        if target in pairs:
+            s.need(target not in mounts, 'ambiguous input mount')
+            mounts[target] = parts[5].split(',')
+    for target, source in pairs.items():
+        actual = proc / 'root' / target.relative_to('/')
+        s.need(source.resolve(strict=True) == source and s.same_file(actual, source)
+               and 'ro' in mounts.get(target, ()), 'changed or writable retry11 input: ' + str(target))
+
+
+def mounted_inputs(s, prepared, intent, proc):
+    """Bind the current namespace to the five inputs verified by the native cold session."""
+    b = prepared['baseline']
+    profile = prepared['profile']
+    s.need(b['profile'] == profile and prepared['indexes'] == profile['indexes']
+           and b['stable_roots'] == s.ref(CLEAN / 'SUCCESSOR_ROOT.json', ROOT_SHA)
+           and intent['stable_root'] == b['root'] == {
+               'path': str(RUN), 'device': RUN.stat().st_dev, 'inode': RUN.stat().st_ino},
+           'different retry11 prepared source or root')
+    prior, _ = s.read(STOP_PATH.parents[1] / 'PREPARED.json',
+                      '3da08c1ba5947e439877c984f60f297178733ee06e230cc96564b11a11d754d5')
+    prior_indexes = prior['indexes']
+    pairs = {}
+    s.need(len(prior_indexes) == len(prepared['indexes']) == 3, 'missing retry11 indexes')
+    for previous, current in zip(prior_indexes, prepared['indexes'], strict=True):
+        target = RUN / Path(previous['target']).relative_to(PREVIOUS_RUN)
+        s.need(current == {**previous, 'target': str(target)}, 'different retry11 index registration')
+        source = Path(current['path'])
+        st = source.lstat()
+        s.need(stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and (st.st_uid, st.st_gid) == (1001, 1003)
+               and [st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns] == current['identity'],
+               'changed retained compact index')
+        pairs[target] = source
+    old = prior['baseline']['snapshot']
+    view = Path(old['path'])
+    snap = b['snapshot']
+    src = Path(snap['path'])
+    st = src.lstat()
+    s.need(src.is_relative_to(PREVIOUS_RUN / 'private') and src.name == view.name
+           and stat.S_ISREG(st.st_mode) and (st.st_uid, st.st_gid, st.st_nlink) == (1001, 1003, 1)
+           and (snap['device'], snap['inode'], snap['length']) == (st.st_dev, st.st_ino, st.st_size)
+           == (64512, 93782058, old['length']) and snap['ctime'] == list(divmod(st.st_ctime_ns, 10**9))
+           and snap['sha256'] == old['sha256'] and snap['generation'] == old['generation'],
+           'foreign retry11 HOME snapshot')
+    pairs[view] = src
+    pairs[RUN / 'output/genesis.tar.bz2'] = view.parent / 'genesis.tar.bz2'
+    s.need(len(pairs) == 5, 'overlapping cold input mount targets')
+    readonly_mounts(s, proc, pairs)
 
 
 def observe(s, fit, native_actor, own):

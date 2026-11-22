@@ -47,8 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-RETRY11 = HERE.name == "tools-homefloor-retry11-166-v1"
-HOMEFLOOR = HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"} and (
+RETRY11 = HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2"}
+HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
 if RETRY11:
@@ -273,6 +273,7 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
         s.need(actual_argv == [os.fsencode(x) for x in argv[argv.index(str(pkg/"jetstreamer-node")):]] + [b""],
                "different cold epoch 166 executable arguments")
         guard_image, contract = retry11["guard"](s, prepared)
+        retry11["mounted_inputs"](s, prepared, intent, pr)
     if e==170:
         wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
     plan,pref=s.read(d/"ACTUAL_GUARD_PLAN.json");first,fr=s.read(d/"FIRST_GUARD.json")
