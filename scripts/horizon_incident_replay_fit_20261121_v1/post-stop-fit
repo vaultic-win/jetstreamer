@@ -48,7 +48,8 @@ ORIGINAL={166,167,170}
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
 FOURTH166 = HERE.name == "tools-homefloor-166-after170-v1"
-RETRY13_170 = FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
+PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
+RETRY13_170 = PUBLISH170 or FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
                             "tools-homefloor-145-rejoin-v1"}
 RETRY12_170 = RETRY13_170 or HERE.name in {"tools-homefloor-retry12-170-v1", "tools-homefloor-retry12-170-adopted"}
 COLD170 = RETRY12_170 or HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted"}
@@ -56,6 +57,8 @@ RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-home
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
+if PUBLISH170:
+    publication170 = runpy.run_path(str(HERE / "cold170_commit.py"))
 if COLD170:
     cold170 = runpy.run_path(str(HERE / "cold170_actor.py"), init_globals={"RETRY12": RETRY12_170, "RETRY13": RETRY13_170})
 if RETRY11:
@@ -699,6 +702,8 @@ def joined_resident(active):
     return charged
 
 def registered_status():
+    if PUBLISH170:
+        return registrations["registered_status"](s,fit,13,publication170["registered_writer"])
     if HOMEFLOOR:
         return registrations["registered_status"](s, fit, cold170["ATTEMPT"] if COLD170 else 11)
     registration=s.read(fit.READY,"02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")[1]
@@ -864,6 +869,11 @@ def capture_once(epoch,ref,prestart136=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    terminal170 = None
+    if PUBLISH170:
+        s.need(epoch == 145 and prestart136 is None, "cold170 provider only prices terminal publication")
+        terminal170 = publication170["current"](f)
+        s.need(terminal170 is not None, "cold170 has no locally committed archive")
     post_price = epoch == 145 and prestart136 is None
     prefix_before = prefix145(f) if post_price else None
     closed169=focused169_terminal(f,rows)
@@ -906,7 +916,9 @@ def capture_once(epoch,ref,prestart136=None):
         settlement = terminal or interrupted.get(e)
         if settlement:
             closed_prepaid[str(e)]=closed_allowance(e,settlement,row,root,run,effective,extension)
-        a=observe_actor(e,epoch,root,run,row,settlement)
+        # The predecessor's stopped allowance remains in closed_prepaid. The
+        # retry consumed the same whole-tree allowance, not a second booking.
+        a=None if e == 170 and terminal170 else observe_actor(e,epoch,root,run,row,settlement)
         active_run = cold167["RUN"] if HOMEFLOOR and e == 167 else run
         if RETRY11 and e == 166:
             active_run = retry11["RUN"]
@@ -1027,6 +1039,9 @@ def capture_once(epoch,ref,prestart136=None):
         protected += required - need
         need = required
         recovered_price = dict(homefloor_stops=interrupted, recovery_obligations=after)
+    if PUBLISH170:
+        s.need(publication170["current"](f) == terminal170, "cold170 terminal changed during price")
+        recovered_price["closed_cold170"] = terminal170
     if COLD170:
         recovered_price["cold170"] = cold170["stable"](s)
     if RETRY11:

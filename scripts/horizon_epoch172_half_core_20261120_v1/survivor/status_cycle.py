@@ -210,6 +210,22 @@ def publish(c,store,refs,out,epoch,archive=None):
             after=full172.forecast(c,prior,archive,previous_remaining,quote['total_millis'])
             extra.update(delivery_forecast=quote,producer_invocation_id=c.full172_row['unit']['InvocationID'],
                          measured_canonical_progress=c.advancing[172],current_repair_owner=None,archive_sample=archive)
+        elif epoch == 170 and epoch in getattr(c,'commits',{}):
+            proof=c.commits[epoch]
+            term=checked(proof['terminal'])
+            committed=term['local_archive']
+            size=committed['size']
+            age=round((c.now-utc(prior['sampled_at_utc'])).total_seconds()*1000)
+            need(size>0 and age>=0 and prior['phase'] in ('replay','verification'), 'foreign committed 170 status')
+            quote=delivery_eta.estimate(c,epoch,size,committed=True)
+            first=old.get('cold170_local_commit') != proof['terminal']
+            remaining=quote['total_millis'] if first else prior['estimated_remaining_millis']-age
+            need(remaining>0,'committed epoch 170 needs a fresh delivery forecast')
+            after=dict(prior, sampled_at_utc=c.stamp, elapsed_execution_millis=prior['elapsed_execution_millis']+age,
+                       estimated_remaining_millis=remaining, phase='verification', jet_size_bytes=size)
+            extra.update(cold170_local_commit=proof['terminal'], archive_sample=committed,
+                         delivery_forecast=quote, producer_invocation_id=None, measured_canonical_progress=False,
+                         current_repair_owner='/root')
         elif epoch in getattr(c,'new_rows',{}):
             after,archive=cold_workers.reader().forecast(c,epoch,prior,old)
             actor=c.new_rows[epoch]
@@ -238,7 +254,7 @@ def publish(c,store,refs,out,epoch,archive=None):
                 observer=c.sample_ref,fleet_predecessor=c.fleet_ref,sampled_at_utc=c.stamp,
                 **cold167_status.counts(c),
                 current_four_homefloor_stop=c.fleet.get('current_four_homefloor_stops')
-                    if epoch in CLOSED and epoch not in getattr(c,'new_rows',{}) else None,
+                    if epoch in CLOSED and epoch not in getattr(c,'new_rows',{}) and epoch not in getattr(c,'commits',{}) else None,
                 archive_publication_authorized=False,replay_launch_authorized=False,**extra))
     plan=read_ref(intent)
     need(plan['previous_receipt']==original and plan['observer']==c.sample_ref and plan['fleet_predecessor']==c.fleet_ref,
@@ -442,7 +458,7 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     cold_workers.install(c,fleet)
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
-        pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows))))
+        pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows)-set(c.commits))))
         fleet['cycle_reconciliation_scope']=f'Guarded epochs {active}. Four original HOME closures and twenty authenticated status keys.'
         fleet['current_replay_lane_recovery']=f'Maintain epochs {active} and reprice {pending}.'
         fleet['next_lane_recovery']=fleet['current_replay_lane_recovery']
@@ -550,6 +566,8 @@ def entry():
     package='tools-cold166-retry11'
     if cold_workers is not cold166_status:
         package=f'tools-cold170-{cold_workers.ATTEMPT}-v2'
+        if cold_workers.ATTEMPT == 'retry13' and CURRENT.with_name('cold170_commit.py').is_file():
+            package='tools-cold170-retry13-terminal-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)

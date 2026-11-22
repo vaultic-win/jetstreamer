@@ -126,11 +126,21 @@ def projection(row):
          'different 170 worker projection')
 
 
-def roster(module, fleet_ref, fleet):
+def terminal_route(fleet):
+    if ATTEMPT == 'retry13' and (LOCAL/'cold170_commit.py').is_file():
+        import cold170_commit
+        return cold170_commit.current(fleet, adopting=True)
+    return None
+
+
+def roster(module, fleet_ref, fleet, terminal=None):
     checks = {166: retry166.check_generation, 167: cold167.check_generation, 170: check_generation}
     enrolled = set()
     for epoch, check in checks.items():
         state = module.native(epoch)
+        if epoch == 170 and terminal:
+            need(state is None, 'committed cold170 producer still active')
+            continue
         if state is None:
             need(epoch == 166 and not (retry166.ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json').exists()
                  and '166' not in fleet.get(FIELD, {}) and '166' not in fleet.get(retry166.FIELD, {}),
@@ -145,9 +155,47 @@ def reconcile(c, observed_lane):
     module = reader()
     c.commits = {}
     c.histories = {}
-    enrolled = roster(module, c.fleet_ref, c.fleet)
+    terminal = terminal_route(c.fleet)
+    enrolled = roster(module, c.fleet_ref, c.fleet, terminal)
+    if terminal:
+        from copy import copy
+        c.commits[170] = terminal
+        module.ROUTES.pop(170)
+        # A same-sample retry can already have frozen the original live set.
+        # Keep that record and bind the reduced capture separately.
+        prior = c.paths['out']/'RECOVERED_WORKERS.json'
+        closed_dir = c.paths['out']/'after-cold170-commit'
+        if prior.exists():
+            from evidence import durable, ensure_dir
+            prior_ref = bound(prior)
+            earlier = checked(prior_ref)
+            old = earlier['owners'].get('170')
+            need(earlier['fleet'] == c.fleet_ref and earlier['sample'] == c.sample_ref
+                 and old and old['admission'] == terminal['admission'] and old['first_worker'] == terminal['first_worker']
+                 and old['actor']['producer_invocation_id'] == terminal['producer_invocation_id']
+                 and set(earlier['measured']) <= earlier['owners'].keys(),
+                 'different pre-terminal cold170 capture')
+            kept = {k:v for k,v in earlier['owners'].items() if k != '170'}
+            need(kept == module.ownership(c.fleet), 'surviving workers changed after cold170 commit')
+            ensure_dir(closed_dir)
+            target=closed_dir/'RECOVERED_WORKERS.json'
+            reduced = dict(fleet=c.fleet_ref, sample=c.sample_ref, owners=kept,
+                           measured={k:v for k,v in earlier['measured'].items() if k != '170'},
+                           prior_same_sample_capture=prior_ref)
+            if target.exists(): need(checked(bound(target)) == reduced, 'changed terminal recovery capture')
+            else: durable(target,reduced)
+        sample_context = copy(c)
+        # The inherited capture helper recognizes only the predecessor retry10 field.
+        sample_context.commits = {}
+        sample_context.paths = dict(c.paths, out=closed_dir)
+        c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if row['range'] != '170']
+    else:
+        sample_context = c
     c.next_cfg['replays'] = [row for row in c.next_cfg['replays'] if int(row['range']) not in enrolled]
-    module.sample_rows(c, observed_lane)
+    module.sample_rows(sample_context, observed_lane)
+    if terminal:
+        for attr in ('recovered_ref','recovered_owners','new_rows'):
+            setattr(c,attr,getattr(sample_context,attr))
     need(set(c.new_rows) == enrolled and set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold roster changed during capture')
     for epoch in enrolled:
         key = str(epoch)
@@ -159,7 +207,11 @@ def reconcile(c, observed_lane):
 
 
 def install(c, fleet):
-    reader().install(fleet, c)
+    from copy import copy
+    live_context=copy(c)
+    # Generic install_recovered uses the historical indexed/retry10 registers.
+    live_context.commits={}
+    reader().install(fleet, live_context)
     capture = fleet.pop('recovered_workers_observation')
     fleet['current_homefloor_cold166_167_170_observation'] = capture
     fleet[cold167.FIELD] = {'167': c.recovered_owners['167']}
@@ -167,6 +219,18 @@ def install(c, fleet):
     if 166 in c.new_rows:
         fleet[retry166.FIELD] = {key: c.recovered_owners[key] for key in ('166', '167')}
         fleet['current_homefloor_cold166_167_observation'] = capture
+    if 170 in c.commits:
+        proof=c.commits[170]
+        fleet['cold170_local_commit']=proof['terminal']
+        if proof.get('guard_retirement'):
+            fleet['cold170_guard_retirement']=proof['guard_retirement']
+        row=next(v for v in fleet['epochs'] if v['epoch']==170)
+        previous=row.pop('current_home_floor_stop',row.get('original_home_floor_stop'))
+        need(previous['completion']['sha256']==STOP, 'lost stopped predecessor of committed cold170')
+        row.update(original_home_floor_stop=previous, cold170_local_commit=proof['terminal'],
+                   state='verification', no_live_producer_claimed=True, current_repair_owner='/root',
+                   current_status_scope='Epoch 170 committed locally and awaits verification and public delivery.',
+                   next_action='Verify and publish the retained epoch 170 archive.')
     fleet['useful_replay_count'] = cold167.counts(c)['current_replay_lanes']
     stops = {166: retry166.STOP, 167: cold167.STOP_SHA, 170: STOP}
     for epoch in c.new_rows:

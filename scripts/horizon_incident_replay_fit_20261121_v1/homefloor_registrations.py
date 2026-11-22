@@ -169,11 +169,12 @@ def cold_status(s, fit, prior, epoch, attempt=11):
     return package, seal, actor['invocation_id'], actor
 
 
-def registered_status(s, fit, attempt170=11):
+def registered_status(s, fit, attempt170=11, successor=None):
     _, registration = s.read(fit.READY, "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")
     prior = selected_status(s, fit)
     third = cold_status(s, fit, prior, 166)
-    package, seal_ref, iid, adopted = cold_status(s, fit, third, 170, attempt170)
+    selected = cold_status(s, fit, third, 170, attempt170)
+    package, seal_ref, iid, adopted = successor(s, selected) if successor else selected
     seal = s.bound(seal_ref, package / "deployment-seal-receipt.json")
     program = package / "status_cycle.py"
     s.need(seal["destination"] == str(package), "foreign status deployment")
