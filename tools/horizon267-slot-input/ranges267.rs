@@ -75,7 +75,7 @@ impl Bucket<'_> {
     }
 }
 const SLOTS: usize = 432000;
-#[cfg(not(any(epoch268, epoch269, epoch270)))]
+#[cfg(not(any(epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274)))]
 mod profile {
     pub(super) const START: u64 = 115344000;
     pub(super) const CAR: u64 = 428826209761;
@@ -123,6 +123,16 @@ mod profile {
     pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("270-cid-prefix.bin");
     pub(super) const MAX_EXAMPLES: usize = 4096;
 }
+#[cfg(any(epoch271, epoch272, epoch273, epoch274))]
+pub mod compact_profiles;
+#[cfg(any(epoch271, epoch272, epoch273, epoch274))]
+mod profile {
+    pub(super) use super::compact_profiles::{
+        CAR, CID_BUCKETS, CID_BYTES, CID_PREFIX, SLOT_BUCKETS, SLOT_BYTES, SLOT_PREFIX,
+    };
+    pub(super) const START: u64 = super::compact_profiles::EPOCH * super::SLOTS as u64;
+    pub(super) const MAX_EXAMPLES: usize = 4096;
+}
 #[cfg(any(
     all(epoch268, epoch269),
     all(epoch268, epoch270),
@@ -158,7 +168,7 @@ fn run() -> io::Result<()> {
         "input lengths",
     )?;
     require(slot.starts_with(SLOT_PREFIX), "slot header")?;
-    #[cfg(any(epoch269, epoch270))]
+    #[cfg(any(epoch269, epoch270, epoch271, epoch272, epoch273, epoch274))]
     if args[2] == "--cid-stdin" {
         return compare(&raw, &slot, io::stdin().lock());
     }
@@ -266,7 +276,7 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(any(epoch268, epoch269, epoch270)))]
+    #[cfg(not(any(epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274)))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
         let mut cid = [0; 36];
@@ -279,6 +289,13 @@ mod tests {
         }
         assert_eq!(bucket_number(&START.to_le_bytes(), 39), 10);
         assert_eq!(bucket_number(&cid, 86596), 42756);
+    }
+    #[cfg(any(epoch271, epoch272, epoch273, epoch274))]
+    #[test]
+    fn both_directories_start_at_the_registered_payload_offsets() {
+        assert_eq!(le(&SLOT_PREFIX[129..135]), 119 + 16 * SLOT_BUCKETS as u64);
+        assert_eq!(le(&CID_PREFIX[140..146]), 130 + 16 * CID_BUCKETS as u64);
+        assert_eq!(le(&SLOT_PREFIX[..8]), le(&CID_PREFIX[..8]));
     }
     #[cfg(epoch269)]
     #[test]
