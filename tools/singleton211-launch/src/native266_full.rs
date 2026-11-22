@@ -11,6 +11,7 @@ mod peer228_extents;
 mod start;
 mod stopped;
 mod successor;
+mod turnover;
 
 const V: &str = "/var/lib/jetstreamer";
 const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a2";
@@ -33,12 +34,13 @@ const MODES: [&str; 3] = ["qa-disk", "qa-memory", "pilot"];
 enum Lane {
     Epoch266,
     Instructions266,
+    Turnover266,
     Epoch228,
 }
 impl Lane {
     fn epoch(self) -> u64 {
         match self {
-            Self::Epoch266 | Self::Instructions266 => 266,
+            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 => 266,
             Self::Epoch228 => 228,
         }
     }
@@ -46,6 +48,7 @@ impl Lane {
         match self {
             Self::Epoch266 => STATE,
             Self::Instructions266 => successor::STATE,
+            Self::Turnover266 => turnover::STATE,
             Self::Epoch228 => epoch228::STATE,
         }
     }
@@ -53,6 +56,7 @@ impl Lane {
         match self {
             Self::Epoch266 => CTRL,
             Self::Instructions266 => successor::CONTROLLER,
+            Self::Turnover266 => turnover::CONTROLLER,
             Self::Epoch228 => epoch228::CTRL,
         }
     }
@@ -60,12 +64,13 @@ impl Lane {
         match self {
             Self::Epoch266 => "epoch266-full",
             Self::Instructions266 => "epoch266-instructions",
+            Self::Turnover266 => "epoch266-turnover",
             Self::Epoch228 => "epoch228-full",
         }
     }
     fn guard(self) -> (&'static str, &'static str) {
         match self {
-            Self::Epoch266 | Self::Instructions266 => (GUARD, GUARD_SHA),
+            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 => (GUARD, GUARD_SHA),
             Self::Epoch228 => (epoch228::GUARD, epoch228::GUARD_SHA),
         }
     }
@@ -88,8 +93,13 @@ impl Profile {
         } else {
             format!("-{mode}{}", if mode == "qa-disk" { "-a2" } else { "" })
         };
-        if lane == Lane::Instructions266 {
-            let tag = format!("266-instructions-2789f821{suffix}-v169");
+        if matches!(lane, Lane::Instructions266 | Lane::Turnover266) {
+            let generation = if lane == Lane::Turnover266 {
+                "v194"
+            } else {
+                "v169"
+            };
+            let tag = format!("266-instructions-2789f821{suffix}-{generation}");
             let guard = format!("horizon-{tag}-protective");
             return Ok(Self {
                 lane,
@@ -214,6 +224,9 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
 }
 pub fn dispatch_instructions(args: &[String]) -> Result<Value> {
     controller(Lane::Instructions266, args)
+}
+pub fn dispatch_turnover(args: &[String]) -> Result<Value> {
+    controller(Lane::Turnover266, args)
 }
 pub fn dispatch228(args: &[String]) -> Result<Value> {
     if args.first().is_some_and(|op| op == "entries-sealed") {

@@ -100,7 +100,7 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         epoch228::verify_payload(p, &s)?;
     } else {
         inputs()?;
-        if p.lane == Lane::Instructions266 {
+        if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
             successor::payload(p, &s)?;
         }
     }
@@ -130,7 +130,7 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         .collect::<Result<Vec<_>>>()?;
     if p.lane == Lane::Epoch228 {
         epoch228::verify_payload(p, &s)?;
-    } else if p.lane == Lane::Instructions266 {
+    } else if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
         successor::payload(p, &s)?;
     } else {
         ensure!(

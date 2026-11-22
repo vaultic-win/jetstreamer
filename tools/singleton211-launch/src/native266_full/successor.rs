@@ -36,6 +36,14 @@ pub(super) fn selected(review: &Value) -> Result<()> {
             && review["epoch266_reassignment"] == allocation(),
         "explicit bounded-generation review"
     );
+    writer(review)
+}
+pub(super) fn writer(review: &Value) -> Result<()> {
+    let qual = qualification();
+    ensure!(
+        review["selected_producer"] == json!(qual),
+        "different selected writer"
+    );
     let q = qual.json()?;
     let node = Bound::new(NODE, NODE_SHA);
     node.artifact()?;

@@ -219,7 +219,7 @@ pub(super) fn kernel(p: &Profile, owner: &Value, fit: &Value) -> Result<()> {
             && owner["TasksMax"] == "512",
         "held CPU or task envelope"
     );
-    let memory = if p.lane == Lane::Instructions266 {
+    let memory = if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
         successor::MEMORY
     } else {
         MEMORY

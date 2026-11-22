@@ -34,8 +34,12 @@ fn original_plan(p: &Profile, cap: u64, review: &Value) -> Result<Value> {
                 == "9f7763ff57c27bcfa112814701314c1b36366a35c7e171a7d6f3ee97ee7330ae",
         "native 1.8.11 binding"
     );
-    let node = if p.lane == Lane::Instructions266 {
-        successor::selected(review)?;
+    let node = if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
+        if p.lane == Lane::Turnover266 {
+            successor::writer(review)?;
+        } else {
+            successor::selected(review)?;
+        }
         successor::NODE
     } else {
         node

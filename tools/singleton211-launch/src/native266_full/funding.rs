@@ -135,7 +135,7 @@ pub(super) fn discharge() -> Result<Bound> {
     binding(&d["basis"]["canonical_terminal"])?.sealed()?;
     Ok(b)
 }
-fn anchor(f: &Bound) -> Result<Value> {
+pub(super) fn anchor(f: &Bound) -> Result<Value> {
     let v = f.json()?;
     fresh(num(&v, "recorded_unix_seconds")?, now()?, 1800)?;
     ensure!(
@@ -171,7 +171,7 @@ fn anchor(f: &Bound) -> Result<Value> {
     }
     bail!("v165 fleet predecessor absent")
 }
-fn manager_units(n: &mut Native) -> Result<BTreeSet<String>> {
+pub(super) fn manager_units(n: &mut Native) -> Result<BTreeSet<String>> {
     let raw = n.run(
         "/usr/bin/systemctl",
         &[
@@ -194,7 +194,7 @@ fn manager_units(n: &mut Native) -> Result<BTreeSet<String>> {
         .map(str::to_owned)
         .collect())
 }
-fn candidates(
+pub(super) fn candidates(
     lane: Lane,
     hard: u64,
     total: u64,
@@ -207,6 +207,7 @@ fn candidates(
     let mut all = Vec::new();
     let mut chosen = Value::Null;
     let (roots, memories): (&[u64], &[u64]) = match lane {
+        Lane::Turnover266 => (&[320 << 30], &[176000000000]),
         Lane::Instructions266 => (&[320 << 30, 128 << 30], &[176000000000]),
         Lane::Epoch266 => (&ROOTS, &MEMORY),
         Lane::Epoch228 => (&[epoch228::ROOT_BYTES], &[epoch228::MEMORY]),
@@ -241,6 +242,9 @@ pub(super) fn elect(
     r: &Value,
     held: Option<(&Profile, &Value, (u64, u64))>,
 ) -> Result<Value> {
+    if lane == Lane::Turnover266 {
+        return turnover::elect(n, r, held);
+    }
     let replacement = lane == Lane::Instructions266;
     let paired = lane != Lane::Epoch266;
     if replacement {
@@ -277,6 +281,7 @@ pub(super) fn elect(
             successor::MEMORY + GUARD_MEM + CONTROL_MEM,
             epoch228::proof251(n, &f, &ledger)?,
         ),
+        Lane::Turnover266 => bail!("turnover has an independent election"),
         Lane::Epoch266 => (191932891136, json!(discharge()?)),
         Lane::Epoch228 => (epoch228::ASSIGNED, epoch228::funding(n, r, &f, &ledger)?),
     };
@@ -531,6 +536,7 @@ pub(super) fn elect(
             result["epoch251_assignment"] = basis;
             result["new_266_assignment"] = successor::allocation();
         }
+        Lane::Turnover266 => bail!("turnover has an independent election"),
         Lane::Epoch266 => result["cold_discharge"] = basis,
         Lane::Epoch228 => result["epoch251_assignment"] = basis,
     }
