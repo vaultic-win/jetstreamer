@@ -49,7 +49,10 @@ mod generation {
 #[cfg(epoch170_retry12)]
 #[path = "retry12.rs"]
 mod generation;
-#[cfg(epoch170_retry12)]
+#[cfg(epoch170_retry13)]
+#[path = "retry13.rs"]
+mod generation;
+#[cfg(any(epoch170_retry12, epoch170_retry13))]
 pub use generation::funded_guard_floor;
 pub use generation::{ATTEMPT, BASE, CONTRACT, CSEAL, GSEAL, GUARD_SHA, TIMER, UNIT, WITNESS};
 use generation::{LOG_INODE, ROOT_INODE, ROOT_RECEIPT};
@@ -139,6 +142,47 @@ mod retry11 {
     }
 }
 
+#[cfg(any(epoch170_retry12, epoch170_retry13))]
+fn previous_cold_attempt(
+    root: &Value,
+    directory: &str,
+    unit_name: &str,
+    timer_name: &str,
+    invocation: &str,
+    floor_file: &str,
+) -> Result<Value> {
+    let prior = rt(directory);
+    let fr = &root["previous_start_failure"];
+    let failure = bound(fr, &prior.join("START_FAILURE.json"))?;
+    bound(&root["floor_reconstruction"], &prior.join(floor_file))?;
+    let intent = bound(&failure["intent"], &prior.join("START_INTENT.json"))?;
+    ensure!(
+        failure["producer_invocation_id"] == invocation
+            && failure["partial_retained"] == true
+            && failure["cgroup"] == json!([])
+            && intent["producer_unit"] == unit_name
+            && !prior
+                .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
+                .try_exists()?,
+        "previous 170 attempt was admitted or its failure evidence changed"
+    );
+    for unit in [
+        unit_name,
+        timer_name,
+        &timer_name.replace(".timer", ".service"),
+    ] {
+        let manager = native(unit)?;
+        ensure!(
+            manager["ActiveState"] == "inactive"
+                && manager["Job"] == ""
+                && (unit.ends_with(".timer")
+                    || (manager["MainPID"] == "0" && members(unit)?.is_empty())),
+            "previous 170 actor or guard remains active"
+        );
+    }
+    Ok(fr.clone())
+}
+
 pub fn files() -> Result<Value> {
     let (root, rr) = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT_RECEIPT))?;
     let m = fs::symlink_metadata(run())?;
@@ -151,7 +195,7 @@ pub fn files() -> Result<Value> {
             && root["log"]["inode"] == LOG_INODE,
         "unexpected successor root or predecessor"
     );
-    #[cfg(epoch170_retry12)]
+    #[cfg(any(epoch170_retry12, epoch170_retry13))]
     let previous_failure = generation::previous_attempt(&root)?;
     let source = doc(
         &rt(PREDECESSOR).join("profile.json"),
@@ -220,7 +264,7 @@ pub fn files() -> Result<Value> {
     )?;
     let baseline = json!({"predecessor_stop":sr,"predecessor_intent":ir,"stable_roots":rr,"root":{"path":run(),"device":m.dev(),"inode":m.ino()},
         "snapshot":retry11::snapshot(false)?,"manifest":manifest,"profile":profile()?});
-    #[cfg(epoch170_retry12)]
+    #[cfg(any(epoch170_retry12, epoch170_retry13))]
     let baseline = {
         let mut baseline = baseline;
         baseline["previous_cold_failure"] = previous_failure;

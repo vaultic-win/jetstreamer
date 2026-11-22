@@ -47,15 +47,16 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-RETRY12_170 = HERE.name in {"tools-homefloor-retry12-170-v1", "tools-homefloor-retry12-170-adopted",
+RETRY13_170 = HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
                             "tools-homefloor-145-rejoin-v1"}
+RETRY12_170 = RETRY13_170 or HERE.name in {"tools-homefloor-retry12-170-v1", "tools-homefloor-retry12-170-adopted"}
 COLD170 = RETRY12_170 or HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted"}
 RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2", "tools-homefloor-retry11-166-v2-adopted"}
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
 if COLD170:
-    cold170 = runpy.run_path(str(HERE / "cold170_actor.py"), init_globals={"RETRY12": RETRY12_170})
+    cold170 = runpy.run_path(str(HERE / "cold170_actor.py"), init_globals={"RETRY12": RETRY12_170, "RETRY13": RETRY13_170})
 if RETRY11:
     retry11 = runpy.run_path(str(HERE / "retry11_actor.py"))
 if HOMEFLOOR:
@@ -1045,7 +1046,7 @@ def capture_once(epoch,ref,prestart136=None):
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,**recovered_price,active168_guard_floor=floor168,
         population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
-def capture(epoch,ref,prestart136=None):
+def capture_native(epoch,ref,prestart136=None):
     try:
         return capture_once(epoch,ref,prestart136)
     except WorkerFork as fork:
@@ -1063,6 +1064,23 @@ def capture(epoch,ref,prestart136=None):
     result["confirmed_worker_fork"]=dict(epoch=e,before=before["guard"],first_worker=after["guard"],
                                          final_guard=row["guard"],processes=row["processes"],complete_fit_repeated=True)
     return result
+
+def capture(epoch, ref, prestart136=None):
+    if not RETRY13_170 or epoch != 170 or fit.members('horizon-qualify-' + cold170['NAME'] + '.service'):
+        return capture_native(epoch, ref, prestart136)
+
+    # Price the peer fallback before the fresh native census, so its receipts and
+    # free-space sample do not age during these walks of the inactive siblings.
+    root, run = cold167['LANE'], cold167['RUN']
+    cap = CAPS[167]
+    retained = tree_size(root, cap, run)
+    s.need(tree_size(root, cap, run) == retained, 'retained epoch 167 siblings changed')
+    result = capture_native(epoch, ref, prestart136)
+    s.need(result['candidate'] is None and result['bookings']['167']['root'] == str(root)
+           and result['bookings']['167']['run'] == str(run), '170 or its charged 167 siblings changed')
+    cold170['fund_prestart'](s, result, retained, disk_budget, post145_floor)
+    return result
+
 
 if __name__=="__main__":
     args=sys.argv[1:]

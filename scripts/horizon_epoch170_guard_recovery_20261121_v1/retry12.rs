@@ -20,43 +20,14 @@ const FAILED_TIMER: &str = "horizon-guard-170-replacement-local3retry11-20261122
 const FAILED_IID: &str = "7a9f41a86d9240be89e3484fc01c3a31";
 
 pub(super) fn previous_attempt(root: &Value) -> Result<Value> {
-    let prior = rt(PRIOR);
-    let (failure, fr) = doc(
-        &prior.join("START_FAILURE.json"),
-        Some("60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801"),
-    )?;
-    let (_, reconstruction) = doc(
-        &prior.join("PROVIDER_POSTSTOP_FLOOR_RECONSTRUCTION.json"),
-        Some("2c25a4bd49cc0228196bd23d29caae0617d4b6c4ace2302dec42dc7c1b8dfd1e"),
-    )?;
-    let intent = bound(&failure["intent"], &prior.join("START_INTENT.json"))?;
-    ensure!(
-        root["previous_start_failure"] == fr
-            && root["floor_reconstruction"] == reconstruction
-            && failure["producer_invocation_id"] == FAILED_IID
-            && failure["partial_retained"] == true
-            && failure["cgroup"] == json!([])
-            && intent["producer_unit"] == FAILED_UNIT
-            && !prior
-                .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
-                .try_exists()?,
-        "previous 170 attempt was admitted or its failure evidence changed"
-    );
-    for unit in [
+    previous_cold_attempt(
+        root,
+        PRIOR,
         FAILED_UNIT,
         FAILED_TIMER,
-        &FAILED_TIMER.replace(".timer", ".service"),
-    ] {
-        let manager = native(unit)?;
-        ensure!(
-            manager["ActiveState"] == "inactive"
-                && manager["Job"] == ""
-                && (unit.ends_with(".timer")
-                    || (manager["MainPID"] == "0" && members(unit)?.is_empty())),
-            "previous 170 actor or guard remains active"
-        );
-    }
-    Ok(fr)
+        FAILED_IID,
+        "PROVIDER_POSTSTOP_FLOOR_RECONSTRUCTION.json",
+    )
 }
 
 /// Protect the observed return of peer allowance without spending the candidate's booking.
