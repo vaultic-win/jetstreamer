@@ -10,8 +10,9 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-TIMER_SUCCESSOR = VERSION in ("tools-v11", "tools-v12")
-TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10", "tools-v11", "tools-v12")
+FIXTURE_SUCCESSOR = VERSION == "tools-v13"
+TIMER_SUCCESSOR = VERSION in ("tools-v11", "tools-v12", "tools-v13")
+TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10", "tools-v11", "tools-v12", "tools-v13")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
 IMAGE = PKG / "export145"
@@ -43,7 +44,7 @@ if RETRIED_SEMANTIC:
 
 if TIMER_SUCCESSOR:
     PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/fast-range-residency-0f29fd116ef5/horizon_pipeline")
-    ADVANCING_NAME = "V5E_ACTUAL_ADVANCING_WORKER.json"
+    ADVANCING_NAME = "V5F_ACTUAL_ADVANCING_WORKER.json" if FIXTURE_SUCCESSOR else "V5E_ACTUAL_ADVANCING_WORKER.json"
 
 
 def argv(pid):
@@ -82,8 +83,46 @@ def generation(s, parent, mode, args, fleet, m, profile):
     return sr, br
 
 
+def fixture_semantic(s, build):
+    """Authenticate the V5F worker that restarted the retained V5E candidate."""
+    failed = "a99ed8b51e8a482b805b8a36a11b2700"
+    old_failure = {"path": str(STATE / failed / "failed.json"),
+                   "sha256": "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"}
+    old_start = {"path": str(STATE / failed / "recovery-started.json"),
+                 "sha256": "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"}
+    advancing = s.bound(build["prior_phase"], PKG.parent / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    new = advancing["invocation_id"]
+    manager = s.bound(advancing["manager"], PKG.parent / "V5F_ACTUAL_MANAGER.json")
+    intent = s.bound(manager["intent"], PKG.parent / "V5F_START_INTENT.json")
+    s.need(s.iid(new) and new != failed and manager["new"]["Id"] == UNIT
+           and manager["new"]["InvocationID"] == new and intent["old"] == failed
+           and intent["schema"] == "horizon-145-retry-after-fixture-census-intent-v1"
+           and build["semantic_manager"] == advancing["manager"] and build["semantic_intent"] == manager["intent"]
+           and build["old_failure"] == intent["failure"] == old_failure
+           and build["old_start"] == intent["recovery"] == old_start
+           and build["semantic_start"] == advancing["start"], "different V5F recovery")
+    start = s.bound(advancing["start"], STATE / new / "recovery-started.json")
+    prior = start["prior_frozen_recovery"]["failed_qualification_census"]
+    s.need(start["iid"] == new and start["file"] == str(OUTPUT / ".tmp36MvkN")
+           and start["r2_mutations"] is False and prior["current_boot_failure"]["failure"] == old_failure
+           and prior["prior_started"] == old_start and prior["source_checkpoint_exists"] is False
+           and prior["original_candidate"] == build["original_candidate"]
+           and prior["original_candidate"]["inode"] == 103237059 and prior["original_candidate"]["bytes"] == 105610995833
+           and prior["resource_credit_bytes"] == 0, "different retained V5F semantic source")
+    a, b = advancing["observations"]
+    s.need(all(a[k] == b[k] for k in ("parent_pid", "parent_ticks", "child_pid", "child_ticks",
+                                      "source_inode", "cgroup", "native_leases"))
+           and a["parent_pid"] == manager["parent_pid"] and a["parent_ticks"] == manager["parent_start_ticks"]
+           and a["cgroup"] == "/sys/fs/cgroup" + CGROUP and len(a["native_leases"]) >= 6
+           and b["time_ns"] > a["time_ns"] and b["worker_cpu_ticks"] > a["worker_cpu_ticks"]
+           and b["source_offset"] > a["source_offset"], "unproven V5F semantic progress")
+    return new, advancing
+
+
 def completion(s, build=None):
-    if TIMER_SUCCESSOR:
+    if FIXTURE_SUCCESSOR:
+        bootstrap, advancing = fixture_semantic(s, build)
+    elif TIMER_SUCCESSOR:
         # The price observer authenticates the build receipt against the sealed
         # deployment before passing its ID-bound original worker reference.
         advancing = s.bound(build["prior_phase"], PKG.parent / ADVANCING_NAME)

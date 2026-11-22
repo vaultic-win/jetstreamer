@@ -14,8 +14,13 @@ if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused
 fi
 registered=false
 fixture_recovery=false
-if [[ $flavor == registered-post || $flavor == fixture-rejoin ]]; then
-  if [[ $flavor == registered-post ]]; then
+fixture_post=false
+if [[ $flavor == registered-post || $flavor == fixture-rejoin || $flavor == fixture-post ]]; then
+  if [[ $flavor == fixture-post ]]; then
+    fixture_post=true
+    registered=true
+    flavor=timer-post
+  elif [[ $flavor == registered-post ]]; then
     registered=true
     flavor=timer-post
   else
@@ -56,6 +61,7 @@ if $fixture_recovery; then
   sources+=(registered-build-fit.py)
   fixture+=(incident145::authenticates_the_failed_fixture_census_and_frozen_inode)
 fi
+if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
 q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/incident-build-$INVOCATION_ID
 out="$current/tmp/incident145-$INVOCATION_ID"
@@ -111,8 +117,13 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=c651d4d2b8d1c32a83ca7b6cfc77d711f19b0b97a78fd489fb11a399a00b7802
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 428442272e7b2d68c66533636b22600dba8daf3decc44ced6d3075d517acfd47 ]]
   fi
-  if $fixture_recovery; then
-    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20-prestart/post-stop-fit
+  if $fixture_post || $fixture_recovery; then
+    native_package=tools-v20-prestart
+    if $fixture_post; then
+      native_package=${5:?expected build price generation}
+      [[ $native_package == tools-v20-prestart || $native_package == tools-v20 ]]
+    fi
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/$native_package/post-stop-fit
     signature=${3:?expected qualified terminal price digest}
     seal_digest=${4:?expected qualified terminal deployment digest}
     [[ $signature =~ ^[a-f0-9]{64}$ && $seal_digest =~ ^[a-f0-9]{64}$ ]]
@@ -129,7 +140,25 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   maximum_attempts=5
   if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
-    if "$provider" 145 "$1" "$fleet_sha" > "$q/fit-$probe.json" 2> "$q/fit-$probe.stderr"; then
+    if $fixture_post; then
+      # Capture the 136 mirrors and public reader commitments in the same native observation.
+      quote=${6:?expected full mirror price executable}
+      quote_digest=${7:?expected qualification hash for mirror price}
+      [[ $(realpath -e -- "$quote") == "$quote" && ${quote%/*} == "${provider%/*/*}" ]]
+      [[ $(stat -c '%u %g %a %h' -- "$quote") == '0 0 444 1' && $quote_digest =~ ^[a-f0-9]{64}$ ]]
+      [[ $(sha256sum -- "$quote" | cut -d' ' -f1) == "$quote_digest" ]]
+      quote_args=("$1" "$fleet_sha")
+      if [[ $native_package == tools-v20 ]]; then quote_args+=("$seal_digest"); fi
+      if /usr/bin/python3 -IB "$quote" "${quote_args[@]}" > "$q/mirrors-$probe.json" 2> "$q/fit-$probe.stderr"; then
+        jq -e --arg seal "$seal_digest" --arg path "${provider%/*}/deployment-seal-receipt.json" '
+           .mirrors_fit and .admission_granted == false and .resource_credit_bytes == 0
+           and .provider == {path:$path,sha256:$seal} and .native.fleet == .fleet
+        ' "$q/mirrors-$probe.json" >/dev/null
+        cp "$q/mirrors-$probe.json" "$q/build-mirrors.json"
+        jq -e '.native' "$q/build-mirrors.json" > "$q/before.json"
+        break
+      fi
+    elif "$provider" 145 "$1" "$fleet_sha" > "$q/fit-$probe.json" 2> "$q/fit-$probe.stderr"; then
       cp "$q/fit-$probe.json" "$q/before.json"
       break
     fi
@@ -198,6 +227,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if [[ $flavor == retry-post ]]; then phase_package=tools-v10; fi
   if [[ $flavor == timer-post ]]; then phase_package=tools-v11; fi
   if $registered; then phase_package=tools-v12; fi
+  if $fixture_post; then phase_package=tools-v13; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"

@@ -49,7 +49,7 @@ class PostPhaseTest(unittest.TestCase):
             if phase["TIMER_SUCCESSOR"]:
                 self.assertEqual(phase["PKG"].name, Path(os.environ["POST_PHASE_UNDER_TEST"]).parent.name)
                 self.assertEqual(phase["IMAGE"], phase["PKG"] / "export145")
-                self.assertEqual(phase["ADVANCING_NAME"], "V5E_ACTUAL_ADVANCING_WORKER.json")
+                self.assertEqual(phase["ADVANCING_NAME"], "V5F_ACTUAL_ADVANCING_WORKER.json" if phase["FIXTURE_SUCCESSOR"] else "V5E_ACTUAL_ADVANCING_WORKER.json")
                 self.assertEqual(phase["PIPE"].parent.name, "fast-range-residency-0f29fd116ef5")
                 return
             if phase["RETRIED_SEMANTIC"]:
@@ -105,7 +105,33 @@ class PostPhaseTest(unittest.TestCase):
                 proof = save(base / phase["ADVANCING_NAME"],
                              {"invocation_id": gen, "start": started})
                 build = None
-                if phase["TIMER_SUCCESSOR"]:
+                if phase["FIXTURE_SUCCESSOR"]:
+                    failed = "a99ed8b51e8a482b805b8a36a11b2700"
+                    old = folder.parent / failed
+                    failure = {"path": str(old / "failed.json"),
+                               "sha256": "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"}
+                    recovery = {"path": str(old / "recovery-started.json"),
+                                "sha256": "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"}
+                    prior = {"current_boot_failure":{"failure": failure}, "prior_started": recovery,
+                             "source_checkpoint_exists":False, "resource_credit_bytes":0,
+                             "original_candidate":{"inode":103237059, "bytes":105610995833}}
+                    started = record("recovery-started", {"iid":gen, "r2_mutations":False,
+                         "file":str(base / ".tmp36MvkN"), "prior_frozen_recovery":{"failed_qualification_census":prior}})
+                    intent = save(base / "V5F_START_INTENT.json",
+                        {"schema":"horizon-145-retry-after-fixture-census-intent-v1", "old":failed,
+                         "failure":failure, "recovery":recovery})
+                    manager = save(base / "V5F_ACTUAL_MANAGER.json", {"intent":intent, "parent_pid":91,
+                         "parent_start_ticks":123, "new":{"Id":phase["UNIT"], "InvocationID":gen}})
+                    sample = dict(parent_pid=91, parent_ticks=123, child_pid=92, child_ticks=127,
+                         source_inode=100214450, cgroup="/sys/fs/cgroup"+phase["CGROUP"], native_leases=list(range(7)),
+                         time_ns=1000, worker_cpu_ticks=10, source_offset=2500000)
+                    observations = [sample,dict(sample,time_ns=2000,worker_cpu_ticks=13,source_offset=5000000)]
+                    proof = save(base / phase["ADVANCING_NAME"], {"invocation_id":gen,"start":started,
+                                 "manager":manager, "observations":observations})
+                    build = dict(prior_phase=proof,semantic_start=started,semantic_manager=manager,
+                                 semantic_intent=intent,old_start=recovery,old_failure=failure,
+                                 original_candidate=prior["original_candidate"])
+                elif phase["TIMER_SUCCESSOR"]:
                     old_failure = {"sha256": "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f"}
                     old_start = {"sha256": "2" * 64}
                     intent = save(base / "V5E_START_INTENT.json", {
@@ -126,7 +152,18 @@ class PostPhaseTest(unittest.TestCase):
                 fn.__globals__.update(STATE=folder.parent, PKG=base / phase["PKG"].name, ADVANCING=proof["sha256"],
                                       ARCHIVE=pub, OUTPUT=base)
                 self.assertEqual(fn(Status(), build), (done, e))
-                if phase["TIMER_SUCCESSOR"]:
+                if phase["FIXTURE_SUCCESSOR"]:
+                    with self.assertRaisesRegex(ValueError, "different V5F recovery"):
+                        fn(Status(), dict(build, old_start={"sha256":"7"*64}))
+                    with self.assertRaisesRegex(ValueError, "fixture receipt path"):
+                        fn(Status(), dict(build, prior_phase=dict(proof,path=str(base / "V5E_ACTUAL_ADVANCING_WORKER.json"))))
+                    same = save(base / phase["ADVANCING_NAME"], {"invocation_id":gen,"start":started,
+                                "manager":manager,"observations":[sample,sample]})
+                    with self.assertRaisesRegex(ValueError, "unproven V5F semantic progress"):
+                        fn(Status(), dict(build,prior_phase=same))
+                    save(base / phase["ADVANCING_NAME"], {"invocation_id":gen,"start":started,
+                         "manager":manager,"observations":observations})
+                elif phase["TIMER_SUCCESSOR"]:
                     with self.assertRaisesRegex(ValueError, "different original timer recovery"):
                         fn(Status(), dict(build, old_start={"sha256": "7"*64}))
                 (base / ".tmp36MvkN").touch()
