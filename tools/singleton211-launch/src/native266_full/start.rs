@@ -34,6 +34,12 @@ fn original_plan(p: &Profile, cap: u64, review: &Value) -> Result<Value> {
                 == "9f7763ff57c27bcfa112814701314c1b36366a35c7e171a7d6f3ee97ee7330ae",
         "native 1.8.11 binding"
     );
+    let node = if p.lane == Lane::Instructions266 {
+        successor::selected(review)?;
+        successor::NODE
+    } else {
+        node
+    };
     let seal = Bound::new(
         Path::new(INDEX).join("deployment-seal-receipt.json"),
         INDEX_SHA,
@@ -300,7 +306,7 @@ fn release(
     let iid = text(owner, "InvocationID")?;
     let pid = text(owner, "MainPID")?.parse::<u64>()?;
     let memory = num(&fit["winner"], "memory")?;
-    if p.lane == Lane::Epoch228 {
+    if p.lane != Lane::Epoch266 {
         epoch228::kernel(p, owner, fit)?;
     }
     ensure!(
@@ -506,7 +512,7 @@ fn release(
             && command_field(n, &p.timer, "InvocationID")? == text(&timer, "InvocationID")?,
         "release owner changed"
     );
-    if p.lane == Lane::Epoch228 {
+    if p.lane != Lane::Epoch266 {
         epoch228::kernel(p, &n.show(&p.unit)?, &held)?;
     }
     let h = save_json(&p.state, "held-fit.json", &held)?;

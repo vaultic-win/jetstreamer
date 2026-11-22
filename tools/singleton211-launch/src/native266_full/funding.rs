@@ -44,6 +44,17 @@ pub(super) fn cpus(text: &str) -> Result<BTreeSet<u32>> {
 fn available_cpus(n: &mut Native, lane: Lane) -> Result<BTreeSet<u32>> {
     let mut cpus_free = cpus(&fs::read_to_string("/sys/devices/system/cpu/online")?)?;
     for (unit, _, _) in OWNERS {
+        if lane == Lane::Instructions266
+            && unit == OWNERS[2].0
+            && !Path::new("/sys/fs/cgroup/system.slice")
+                .join(unit)
+                .try_exists()?
+        {
+            successor::drained247(n)?;
+            let reserved = cpus("48-55")?;
+            cpus_free.retain(|cpu| !reserved.contains(cpu));
+            continue;
+        }
         let pid = command_field(n, unit, "MainPID")?.parse::<u32>()?;
         let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
         let reserved = cpus(
@@ -58,6 +69,15 @@ fn available_cpus(n: &mut Native, lane: Lane) -> Result<BTreeSet<u32>> {
         // The original 266 CPU allocation remains reserved after the witnessed exit.
         let mask = cpus("32-39")?;
         cpus_free.retain(|cpu| !mask.contains(cpu));
+    }
+    if lane == Lane::Instructions266 {
+        let reserved = cpus("40-47")?;
+        cpus_free.retain(|cpu| !reserved.contains(cpu));
+        ensure!(
+            cpus("32-39")?.is_subset(&cpus_free),
+            "original 266 CPU block unavailable"
+        );
+        return cpus("32-39");
     }
     ensure!(cpus_free.len() >= 8, "eight disjoint replay CPUs");
     Ok(cpus_free.into_iter().take(8).collect())
@@ -187,6 +207,7 @@ fn candidates(
     let mut all = Vec::new();
     let mut chosen = Value::Null;
     let (roots, memories): (&[u64], &[u64]) = match lane {
+        Lane::Instructions266 => (&[320 << 30, 128 << 30], &[176000000000]),
         Lane::Epoch266 => (&ROOTS, &MEMORY),
         Lane::Epoch228 => (&[epoch228::ROOT_BYTES], &[epoch228::MEMORY]),
     };
@@ -220,6 +241,12 @@ pub(super) fn elect(
     r: &Value,
     held: Option<(&Profile, &Value, (u64, u64))>,
 ) -> Result<Value> {
+    let replacement = lane == Lane::Instructions266;
+    let paired = lane != Lane::Epoch266;
+    if replacement {
+        successor::selected(r)?;
+    }
+    let extent_window = replacement.then(peer228_extents::Extents::open);
     let fleet = binding(&r["fleet"])?;
     let f = anchor(&fleet)?;
     let book = digest_file(
@@ -246,6 +273,10 @@ pub(super) fn elect(
     );
     let first_disk_qa = stopped::original(n)?;
     let (credit, basis) = match lane {
+        Lane::Instructions266 => (
+            successor::MEMORY + GUARD_MEM + CONTROL_MEM,
+            epoch228::proof251(n, &f, &ledger)?,
+        ),
         Lane::Epoch266 => (191932891136, json!(discharge()?)),
         Lane::Epoch228 => (epoch228::ASSIGNED, epoch228::funding(n, r, &f, &ledger)?),
     };
@@ -275,7 +306,15 @@ pub(super) fn elect(
             "held producer identity"
         );
     }
-    let peer266 = if lane == Lane::Epoch228 {
+    let peer228 = if replacement {
+        let peer = successor::peer(n)?;
+        allowed.insert(text(&peer.0, "unit")?.to_owned());
+        allowed.insert(text(&peer.0, "guard_service")?.to_owned());
+        Some(peer)
+    } else {
+        None
+    };
+    let peer266 = if paired {
         allowed.insert(epoch228_peer::UNIT.into());
         allowed.insert(epoch228_peer::SERVICE.into());
         Some(epoch228_peer::verify(n, r)?)
@@ -288,9 +327,13 @@ pub(super) fn elect(
         "unaccounted live owners: {:?}",
         census.difference(&allowed).collect::<Vec<_>>()
     );
-    let mut curr = 0u64;
+    let mut curr = peer228.as_ref().map_or(0, |v| v.1);
     let mut peer_rows = Vec::new();
     for (idx, (u, iid, cap)) in OWNERS.iter().enumerate() {
+        if replacement && idx == 2 && !census.contains(*u) {
+            peer_rows.push(json!({"unit":u,"invocation_id":iid,"main_pid":"0","memory_max":cap,"terminal":successor::drained247(n)?,"booking_released":false}));
+            continue;
+        }
         // Uploaders contain credentials in Environment. Read just the envelope properties.
         let raw=n.run("/usr/bin/systemctl",&["show",u,"-p","Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MainPID,MemoryMax,MemorySwapMax"])?;
         let mut fields = serde_json::Map::new();
@@ -303,7 +346,7 @@ pub(super) fn elect(
         }
         let m = Value::Object(fields);
         let amount = live::finite_owner(&m, u, iid, *cap)?;
-        if lane == Lane::Epoch228 && idx == 2 {
+        if paired && idx == 2 {
             epoch228::mapped_command(&m, &book)?;
         }
         let previous = if idx == 2 {
@@ -372,8 +415,62 @@ pub(super) fn elect(
     } else {
         floor
     };
+    // The 228 calculation above carries its historical exclusive 251 assignment and
+    // 228 cold scratch transfer. Keep its full rooted allocation and all absolute floors.
+    let extent_report =
+        extent_window.map(
+            |state| match state.and_then(peer228_extents::Extents::finish) {
+                Ok(v) => v,
+                Err(e) => json!({"credit":0,"gross_charge_used":true,"reason":e.to_string()}),
+            },
+        );
+    let floor = if let Some((peer, _)) = &peer228 {
+        let old = peer266.as_ref().context("missing original 266 drain")?;
+        ensure!(
+            old["terminal_failure"].is_object()
+                && old["readonly_loop"].is_object()
+                && old["main_pid"] == 0
+                && old["memory_max"] == successor::MEMORY
+                && old["memory_credit_for_228"] == 0
+                && old["readonly_loop"]["sha256"]
+                    == "f0312d5f559dd2adca57c89e5a01f1d66d1ea72512248e4635b0dd252aef3f76"
+                && old["cold_discharge_for_266_only"] == json!(discharge()?)
+                && r["epoch266_reassignment"] == successor::allocation()
+                && basis == peer["retained_251"]
+                && transfer.as_ref() == Some(&peer["scratch_reassignment"]),
+            "original assignments differ"
+        );
+        // Add newly requested two QA roots and controls (768 MiB) via candidates' common 1 GiB charge.
+        let guarded = floor
+            .checked_add(RECEIPTS)
+            .context("228 floor")?
+            .max(num(peer, "original_floor")?);
+        let full = guarded
+            .checked_add(epoch228::ROOT_BYTES)
+            .context("228 scratch")?
+            .max(num(peer, "original_required_free")?);
+        let allocation = num(
+            extent_report
+                .as_ref()
+                .context("missing 228 extent accounting")?,
+            "credit",
+        )?;
+        full.checked_sub(allocation)
+            .context("228 allocation")?
+            .max(guarded)
+            .checked_sub(256 << 20)
+            .context("shared QA accounting")?
+    } else {
+        floor
+    };
     let (total, avail, free) = live::resources_at(Path::new(V))?;
     let free = free.min(num(&firing, "free")?);
+    let free = free.min(
+        extent_report
+            .as_ref()
+            .and_then(|v| v["free_lower"].as_u64())
+            .unwrap_or(u64::MAX),
+    );
     let hard = num(&book, "hard_memory_obligation")?
         .checked_sub(credit)
         .context("discharge underflow")?;
@@ -393,6 +490,13 @@ pub(super) fn elect(
     );
     for p in &peer_rows {
         let u = text(p, "unit")?;
+        if let Some(event) = p.get("terminal") {
+            ensure!(
+                successor::drained247(n)? == *event,
+                "247 changed during election"
+            );
+            continue;
+        }
         ensure!(
             command_field(n, u, "InvocationID")? == text(p, "invocation_id")?
                 && command_field(n, u, "MainPID")? == text(p, "main_pid")?,
@@ -419,6 +523,14 @@ pub(super) fn elect(
     result["fleet"] = json!(fleet);
     result["peer_envelopes"] = json!(peer_rows);
     match lane {
+        Lane::Instructions266 => {
+            let (peer, _) = peer228.context("228 evidence")?;
+            ensure!(successor::peer(n)?.0 == peer, "228 changed during election");
+            result["live_228"] = peer;
+            result["epoch228_extents"] = extent_report.context("missing extent result")?;
+            result["epoch251_assignment"] = basis;
+            result["new_266_assignment"] = successor::allocation();
+        }
         Lane::Epoch266 => result["cold_discharge"] = basis,
         Lane::Epoch228 => result["epoch251_assignment"] = basis,
     }
@@ -469,5 +581,47 @@ mod tests {
             .unwrap()["winner"]
                 .is_null()
         );
+    }
+}
+
+#[cfg(test)]
+mod replacement_tests {
+    use super::*;
+
+    #[test]
+    fn original_228_headroom_cannot_fund_the_next_128_gib_266_root() {
+        let floor = 4_216_875_956_224u64 - (256 << 20);
+        let q = candidates(
+            Lane::Instructions266,
+            1_211_435_323_392 - (successor::MEMORY + GUARD_MEM + CONTROL_MEM),
+            1_212_136_964_096,
+            u64::MAX,
+            0,
+            4_335_859_884_032,
+            floor,
+            None,
+        )
+        .unwrap();
+        assert!(q["winner"].is_null());
+        let small = q["options"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["root"] == 128u64 << 30)
+            .unwrap();
+        assert_eq!(small["required_free"], 4_355_120_216_064u64);
+        let funded = candidates(
+            Lane::Instructions266,
+            1_211_435_323_392 - (successor::MEMORY + GUARD_MEM + CONTROL_MEM),
+            1_212_136_964_096,
+            u64::MAX,
+            0,
+            4_355_120_216_064,
+            floor,
+            None,
+        )
+        .unwrap();
+        assert_eq!(funded["winner"]["root"], 128u64 << 30);
+        assert_eq!(funded["winner"]["hard"], 1_211_435_323_392u64);
     }
 }

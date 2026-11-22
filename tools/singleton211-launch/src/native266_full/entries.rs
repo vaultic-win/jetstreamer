@@ -18,6 +18,11 @@ fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
     let mut workers = Vec::new();
     let (node, scratch, worker_sha) = match p.lane {
         Lane::Epoch228 => (PathBuf::from(NODE228), "scratch", epoch228::WORKER_SHA),
+        Lane::Instructions266 => (
+            PathBuf::from(successor::NODE),
+            "state",
+            successor::WORKER_SHA,
+        ),
         Lane::Epoch266 => (
             Path::new(SNAPROOT).join("jetstreamer-node"),
             "state",
@@ -122,7 +127,7 @@ fn progress(row: &Value, target: u64) -> Result<Option<(u64, u64, u64, u64)>> {
 pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
     let p = Profile::new(lane, "pilot")?;
     let (bootstrap, target) = match lane {
-        Lane::Epoch266 => (114910768, 115343999),
+        Lane::Epoch266 | Lane::Instructions266 => (114910768, 115343999),
         Lane::Epoch228 => (98495291, 98928278),
     };
     let handoff = bound_at(&p.state.join("handoff.json"))?;
@@ -229,6 +234,17 @@ pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
         ensure!(
             num(&journal, "last_monotonic_us")? < a.0,
             "entries preceded first guard release"
+        );
+    }
+    if lane == Lane::Instructions266 {
+        ensure!(
+            b.1 > 114912038,
+            "replacement has not yet passed the original transaction's slot"
+        );
+        let g = binding(&binding(&h["token"])?.sealed()?["guard_pid1"])?.sealed()?;
+        ensure!(
+            num(&g, "last_monotonic_us")? < a.0,
+            "progress preceded release"
         );
     }
     let v = json!({"schema":format!("horizon{}-first-useful-native-entry-replay-v1",lane.epoch()),"handoff":handoff,"unit":p.unit,"iid":iid,"pid":pid,"processes":current,"first":points[0],"last":points.last().unwrap(),"entry_replay_proven":true,"full_epoch_qualified":false,"publication_authorized":false});

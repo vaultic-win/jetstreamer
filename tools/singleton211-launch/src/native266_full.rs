@@ -7,8 +7,10 @@ mod epoch228_peer;
 mod epoch228_storage;
 mod funding;
 mod gate;
+mod peer228_extents;
 mod start;
 mod stopped;
+mod successor;
 
 const V: &str = "/var/lib/jetstreamer";
 const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a2";
@@ -30,36 +32,40 @@ const MODES: [&str; 3] = ["qa-disk", "qa-memory", "pilot"];
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Lane {
     Epoch266,
+    Instructions266,
     Epoch228,
 }
 impl Lane {
     fn epoch(self) -> u64 {
         match self {
-            Self::Epoch266 => 266,
+            Self::Epoch266 | Self::Instructions266 => 266,
             Self::Epoch228 => 228,
         }
     }
     fn state(self) -> &'static str {
         match self {
             Self::Epoch266 => STATE,
+            Self::Instructions266 => successor::STATE,
             Self::Epoch228 => epoch228::STATE,
         }
     }
     fn controller(self) -> &'static str {
         match self {
             Self::Epoch266 => CTRL,
+            Self::Instructions266 => successor::CONTROLLER,
             Self::Epoch228 => epoch228::CTRL,
         }
     }
     fn command(self) -> &'static str {
         match self {
             Self::Epoch266 => "epoch266-full",
+            Self::Instructions266 => "epoch266-instructions",
             Self::Epoch228 => "epoch228-full",
         }
     }
     fn guard(self) -> (&'static str, &'static str) {
         match self {
-            Self::Epoch266 => (GUARD, GUARD_SHA),
+            Self::Epoch266 | Self::Instructions266 => (GUARD, GUARD_SHA),
             Self::Epoch228 => (epoch228::GUARD, epoch228::GUARD_SHA),
         }
     }
@@ -82,6 +88,20 @@ impl Profile {
         } else {
             format!("-{mode}{}", if mode == "qa-disk" { "-a2" } else { "" })
         };
+        if lane == Lane::Instructions266 {
+            let tag = format!("266-instructions-2789f821{suffix}-v169");
+            let guard = format!("horizon-{tag}-protective");
+            return Ok(Self {
+                lane,
+                mode: mode.into(),
+                unit: format!("horizon-qualify-{tag}.service"),
+                guard: format!("{guard}.service"),
+                timer: format!("{guard}.timer"),
+                root: Path::new("/home/ubuntu/.jetstreamer-private")
+                    .join(format!("qualification-{tag}")),
+                state: Path::new(lane.state()).join(mode),
+            });
+        }
         let g = format!("horizon-266-general-protective{suffix}-v1");
         if lane == Lane::Epoch228 {
             let g = format!("horizon-228-root-tail-protective{suffix}-v1");
@@ -191,6 +211,9 @@ fn digest_file(p: &str, sha: &str) -> Result<Value> {
 
 pub fn dispatch(args: &[String]) -> Result<Value> {
     controller(Lane::Epoch266, args)
+}
+pub fn dispatch_instructions(args: &[String]) -> Result<Value> {
+    controller(Lane::Instructions266, args)
 }
 pub fn dispatch228(args: &[String]) -> Result<Value> {
     if args.first().is_some_and(|op| op == "entries-sealed") {
@@ -312,7 +335,7 @@ fn controller(lane: Lane, args: &[String]) -> Result<Value> {
         };
         if args[0] == "entries" {
             ensure!(
-                lane == Lane::Epoch266,
+                lane != Lane::Epoch228,
                 "use the archive parent receipts for epoch 228"
             );
             return entries::witness(&mut n, lane);

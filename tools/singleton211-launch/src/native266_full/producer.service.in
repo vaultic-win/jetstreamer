@@ -67,4 +67,4 @@ BindPaths=@ROOT@/tmp:/tmp @ROOT@/var-tmp:/var/tmp
 InaccessiblePaths=-/dev/shm -/home/ubuntu/.aws -/home/ubuntu/.config/gcloud -/root/.aws
 Environment=AWS_EC2_METADATA_DISABLED=true
 UnsetEnvironment=GOOGLE_APPLICATION_CREDENTIALS AWS_PROFILE
-ExecStart=@IMAGE@ epoch266-full wait @MODE@ @STATE@/spec.json @SPEC@
+ExecStart=@IMAGE@ @COMMAND@ wait @MODE@ @STATE@/spec.json @SPEC@

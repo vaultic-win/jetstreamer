@@ -9,6 +9,13 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    if args.get(1).is_some_and(|op| op == "epoch266-instructions") {
+        println!(
+            "{}",
+            horizon_singleton211_launch::native266_full::dispatch_instructions(&args[2..])?
+        );
+        return Ok(());
+    }
     if args.get(1).is_some_and(|op| op == "epoch266-full") {
         let result = horizon_singleton211_launch::native266_full::dispatch(&args[2..])?;
         println!("{result}");

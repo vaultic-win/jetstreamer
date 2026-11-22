@@ -100,6 +100,9 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         epoch228::verify_payload(p, &s)?;
     } else {
         inputs()?;
+        if p.lane == Lane::Instructions266 {
+            successor::payload(p, &s)?;
+        }
     }
     mounted(p, &s)?;
     let token = p.state.join(format!("token-{iid}.json"));
@@ -127,6 +130,8 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         .collect::<Result<Vec<_>>>()?;
     if p.lane == Lane::Epoch228 {
         epoch228::verify_payload(p, &s)?;
+    } else if p.lane == Lane::Instructions266 {
+        successor::payload(p, &s)?;
     } else {
         ensure!(
             argv.first() == Some(&format!("{SNAPROOT}/jetstreamer-node").as_str())
