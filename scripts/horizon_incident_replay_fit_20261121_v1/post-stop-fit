@@ -383,10 +383,13 @@ def phase145(epoch):
     if Path(__file__).resolve().parent.name == "tools-v20-prestart":
         s.need(not ps and m["ActiveState"] == "failed" and m["InvocationID"] == extensions["FAILED_QUALIFICATION_CENSUS"],
                "bootstrap price requires the original drained V5e")
+    if Path(__file__).resolve().parent.name == "tools-v22-prestart":
+        s.need(not ps and m["ActiveState"] == "failed" and m["InvocationID"] == extensions["FAILED_GUARD_FIXTURE"],
+               "bootstrap price requires the drained V5f")
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"],extensions["FAILED_TIMER_INSPECTION"],extensions["FAILED_QUALIFICATION_CENSUS"]):
+        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"],extensions["FAILED_TIMER_INSPECTION"],extensions["FAILED_QUALIFICATION_CENSUS"],extensions["FAILED_GUARD_FIXTURE"]):
             v.update(extensions["failed_verifier"](s,m,m["InvocationID"]))
         elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",

@@ -33,7 +33,11 @@ def capture(path, digest, active_seal=None):
             path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json","foreign caller or fleet")
     native_package = NATIVE if active_seal is None else BASE / "tools-v20"
     native_seal = SEAL if active_seal is None else active_seal
-    if active_seal is not None:
+    guard_terminal = Path(__file__).resolve().parent == BASE / "tools-v22-prestart"
+    if guard_terminal:
+        require(isinstance(active_seal,str) and len(active_seal)==64, "V22 bootstrap requires its sealed package")
+        native_package = Path(__file__).resolve().parent
+    elif active_seal is not None:
         require(Path(__file__).resolve().parent == native_package and len(active_seal) == 64,
                 "active mirror price requires the original V20 package and seal")
     for package,sha in ((V6,V6_SEAL),(CADENCE,CADENCE_SEAL),(native_package,native_seal)):
@@ -72,7 +76,15 @@ def capture(path, digest, active_seal=None):
     adapter=runpy.run_path(str(ADAPTER))
     native=json.loads(adapter["capture_provider"](native_package/"post-stop-fit",str(path),digest))
     phase = native["phase145"]
-    if active_seal is None:
+    if guard_terminal:
+        require(phase["InvocationID"] == "50af3d8ab5da47e8bdc2828feab53908" and
+                phase["source_checkpoint_exists"] is False and phase["failure"]["sha256"] ==
+                "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd" and
+                phase["qualification_census_incident"]["sha256"] ==
+                "f4a13a58292296c22dd870d5ecdf4ab4c056f3e06562bb5bb121a899c89f3bb7",
+                "foreign V5f guard-fixture terminal")
+        semantic_worker = None
+    elif active_seal is None:
         require(phase["InvocationID"]=="a99ed8b51e8a482b805b8a36a11b2700" and
                 phase["source_checkpoint_exists"] is False,"foreign terminal 145 price")
         semantic_worker = None

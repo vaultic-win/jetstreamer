@@ -87,8 +87,50 @@ FAILED_REJOIN = "dc043eb78c4a4349b0098760dc764a1f"
 FAILED_CADENCE = "d37f36f898a44932a19fd50d7014a6fe"
 FAILED_QUALIFIER = "500c8d717a4147b087ff302b5afa7fc0"
 FAILED_QUALIFICATION_CENSUS = "a99ed8b51e8a482b805b8a36a11b2700"
+FAILED_GUARD_FIXTURE = "50af3d8ab5da47e8bdc2828feab53908"
 FAILED_TIMER_INSPECTION = "e6551a0bb8a14b989902e15c9ecc0751"
 VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
+
+
+def guard_fixture_failure(s, incident, manager, started, failed, recovery, failure, state):
+    fixture = R / "epoch142-next-lane-20261122-v1/guard-fixture"
+    semantic = R / "epoch145-semantic-continuity-20261121-v1"
+    proof = s.bound(incident["qualifier"], fixture / "QUALIFIED.json")
+    owner = proof["holder"]
+    actual = s.bound(incident["advancing"], semantic / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    original = s.bound(incident["manager"], semantic / "V5F_ACTUAL_MANAGER.json")
+    intent = s.bound(original["intent"], semantic / "V5F_START_INTENT.json")
+    unit = "horizon-qualify-142-guard-holder-20261122-v1.service"
+    iid = "992e0ab969d34bbab4ff885cac4cd421"
+    boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "")
+    s.need(incident["boot"] == boot == intent["boot"] and owner["Id"] == unit
+           and owner["InvocationID"] == iid and owner["MainPID"] == "361889"
+           and proof["holder_start_ticks"] == 367889965 and proof["holder_exe"] == "/usr/bin/sleep"
+           and proof["production_replay_started"] is False and proof["holder_terminal"]["MainPID"] == "0"
+           and not (Path("/sys/fs/cgroup") / owner["ControlGroup"].lstrip("/")).exists(),
+           "unexpected 142 observer or undrained fixture")
+    rows = incident["observed_pid1"]
+    s.need(all(row["_PID"] == "1" and row["_BOOT_ID"] == boot for row in rows)
+           and {row["UNIT"] for row in rows if row["UNIT"].startswith("horizon-qualify-")} == {unit},
+           "different incident manager or qualifier population")
+    def event(unit_name, generation, event_id):
+        row, = (r for r in rows if (r["UNIT"], r["INVOCATION_ID"], r["MESSAGE_ID"]) ==
+                (unit_name, generation, event_id))
+        return int(row["__REALTIME_TIMESTAMP"])
+    start = event(unit, iid, "39f53479d3a045ac8e11786248231fbf")
+    exit_time = event(VERIFIER_UNIT, FAILED_GUARD_FIXTURE, "98e322203f7a4ed290d09fe03c09fe15")
+    stop = event(unit, iid, "de5b426a63be47a7b6ac3eaac82e2f6f")
+    s.need(start < exit_time < stop and start // 1000000 <= failed["at"] <= exit_time // 1000000
+           and failed["error"].rstrip().endswith("ValueError: foreign qualifier unit")
+           and incident["failed"] == failure and incident["recovery"] == recovery == actual["start"]
+           and actual["manager"] == incident["manager"] and actual["invocation_id"] ==
+               original["new"]["InvocationID"] == manager["InvocationID"] == FAILED_GUARD_FIXTURE
+           and actual["observations"] and all((r["parent_pid"],r["child_pid"],r["parent_ticks"],r["child_ticks"]) ==
+               (320133,320351,367594995,367597991) for r in actual["observations"])
+           and started["fresh_fit"]["provider_seal"] == intent["semantic_provider"]
+           and set(p.name for p in state.iterdir()) == {"failed.json", "recovery-started.json"}
+           and manager["Result"] == "exit-code" and not manager["ControlGroup"],
+           "different failed verifier, time window, or crossed native owner")
 
 
 def failed_verifier(s, manager, expected=FAILED_VERIFIER):
@@ -97,7 +139,7 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     import subprocess
 
     iid = manager["InvocationID"]
-    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE, FAILED_QUALIFIER, FAILED_TIMER_INSPECTION, FAILED_QUALIFICATION_CENSUS) and iid == expected and manager["Id"] == VERIFIER_UNIT
+    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE, FAILED_QUALIFIER, FAILED_TIMER_INSPECTION, FAILED_QUALIFICATION_CENSUS, FAILED_GUARD_FIXTURE) and iid == expected and manager["Id"] == VERIFIER_UNIT
            and manager["ActiveState"] == manager["SubState"] == "failed"
            and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
            and manager["NRestarts"] == "0" and not manager["Job"]
@@ -108,6 +150,10 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         failure_sha = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
         start_sha = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
         image_sha = "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    elif expected == FAILED_GUARD_FIXTURE:
+        failure_sha = "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd"
+        start_sha = "3dd15e821b9972e3f7f69f787d585bbe86fd9898ec1df5e8e5d08cab14231bb8"
+        image_sha = "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21"
     elif expected == FAILED_QUALIFICATION_CENSUS:
         failure_sha = "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"
         start_sha = "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"
@@ -131,7 +177,11 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     failed, failure = s.read(state / "failed.json", failure_sha)
     started, recovery = s.read(state / "recovery-started.json", start_sha)
     incident_ref = None
-    if expected == FAILED_QUALIFICATION_CENSUS:
+    if expected == FAILED_GUARD_FIXTURE:
+        incident, incident_ref = s.read(R / "incident-replay-fit-20261121-v1/GUARD142_V5F_TERMINAL.json",
+                                       "f4a13a58292296c22dd870d5ecdf4ab4c056f3e06562bb5bb121a899c89f3bb7")
+        guard_fixture_failure(s, incident, manager, started, failed, recovery, failure, state)
+    elif expected == FAILED_QUALIFICATION_CENSUS:
         import runpy
         bounded = runpy.run_path(str(Path(__file__).with_name("bounded142.py")))
         incident, incident_ref = s.read(bounded["INCIDENT"], bounded["INCIDENT_SHA"])
