@@ -10,6 +10,7 @@ const IMAGE: &str =
     feature = "epoch170-384",
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
+    feature = "epoch168-cold-v2",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13"
@@ -19,6 +20,9 @@ const IMAGE: &str =
 #[cfg(feature = "epoch167-cold-v3")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-cold-guard-20261122-v3/tools/guard";
+#[cfg(feature = "epoch168-cold-v2")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261122-v2/tools/guard";
 #[cfg(feature = "epoch166-retry11")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1/tools/guard";
@@ -47,6 +51,13 @@ const LANES: &[Lane] = &[Lane {
     tree: "epoch167-standard-lane-20261109-v1",
     runtime: "epoch167-source-index-rebook-20261122-v3",
     cap: 512 << 30,
+}];
+#[cfg(feature = "epoch168-cold-v2")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-168-full-metered-cold-v2-20261122.service",
+    tree: "epoch168-standard-lane-20261109-v1",
+    runtime: "epoch168-retry2-rebook-20261122-v1",
+    cap: 288 << 30,
 }];
 #[cfg(feature = "epoch166-retry11")]
 const LANES: &[Lane] = &[Lane {
@@ -87,6 +98,7 @@ const LANES: &[Lane] = &[Lane {
     feature = "epoch170-384",
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
+    feature = "epoch168-cold-v2",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13"
@@ -140,6 +152,7 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
 #[cfg(any(
     feature = "epoch167-cold-v3",
     feature = "epoch166-retry11",
+    feature = "epoch168-cold-v2",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
     feature = "epoch170-retry13"
@@ -196,6 +209,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch170-retry13-rebook-20261122-v1/SUCCESSOR_ROOT.json",
             "654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69",
         ),
+        #[cfg(feature = "epoch168-cold-v2")]
+        (
+            "epoch168-retry2-rebook-20261122-v1/SUCCESSOR_ROOT.json",
+            "ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc",
+        ),
         #[cfg(feature = "epoch166-retry11")]
         (
             "epoch166-independent-closed-accounts-20261122-v1/SUCCESSOR_ROOT.json",
@@ -238,6 +256,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
         (
             "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry13-20261122",
             113981945,
+        ),
+        #[cfg(feature = "epoch168-cold-v2")]
+        (
+            "epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry2-20261122",
+            103481350,
         ),
         #[cfg(feature = "epoch166-retry11")]
         (
@@ -327,6 +350,23 @@ pub(super) fn observe(binding: &Value, scope: &Scope<'_>) -> Result<Observation>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "epoch168-cold-v2")]
+    #[test]
+    fn metered168_accepts_only_its_new_cold_generation() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 288 << 30);
+        assert!(is_route(
+            "horizon-qualify-168-full-metered-cold-v2-20261122.service"
+        ));
+        for other in [
+            "horizon-qualify-168-full-metered-20261121-v1.service",
+            "horizon-qualify-166-independent-retry11-20261122.service",
+            "horizon-qualify-170-replacement-local3retry13-20261122.service",
+        ] {
+            assert!(!is_route(other));
+        }
+    }
 
     #[cfg(feature = "epoch166-retry11")]
     #[test]
@@ -425,6 +465,7 @@ mod tests {
         let roots = qualification_roots(Path::new(IMAGE)).unwrap();
         let expected = if cfg!(any(
             feature = "epoch166-retry11",
+            feature = "epoch168-cold-v2",
             feature = "epoch170-retry11",
             feature = "epoch170-retry12",
             feature = "epoch170-retry13"
