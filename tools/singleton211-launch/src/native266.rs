@@ -2,7 +2,8 @@
 use super::*;
 #[path = "native266_observer_gap.rs"]
 mod observer_gap;
-pub use observer_gap::validate_v164_observer_predecessor;
+pub use observer_gap::validate_observer_predecessor;
+pub use observer_gap::validate_observer_predecessor as validate_v164_observer_predecessor;
 mod funding {
     include!("native261/funding.rs");
 }

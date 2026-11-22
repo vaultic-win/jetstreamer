@@ -318,7 +318,7 @@ pub(in crate::fleet) fn census_check(
         if !continuous {
             ensure!(EPOCH == 266 && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
                 "native bootstrap observation chain interrupted");
-            horizon_singleton211_launch::native266::validate_v164_observer_predecessor(
+            horizon_singleton211_launch::native266::validate_observer_predecessor(
                 &predecessor.path, &predecessor.sha256, &p.observer.path, observation,
             )?;
         }
