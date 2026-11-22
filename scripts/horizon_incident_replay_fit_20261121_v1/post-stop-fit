@@ -345,6 +345,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
                     "timer-semantic": ("profile145-timer-semantic.json", "tools-v5e"),
                     "fixture-semantic": ("profile145-fixture-semantic.json", "tools-v5f"),
                     "timer-post": ("profile145-timer-post.json", "tools-v11"),
+                    "fixture-post": ("profile145-fixture-post.json", "tools-v13"),
                     "registered-post": ("profile145-registered-post.json", "tools-v12")}
         s.need(focused in profiles and not any((post, rejoin, timeout_rejoin, recovery_post)),
                "ambiguous paid verifier profile")
@@ -363,7 +364,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         profile,directory="profile145-post.json","tools-v6"
     else:
         profile,directory="profile145.json","tools-v5"
-    name="incident-post-phase.py" if post or recovery_post or focused in ("post","retry-post","timer-post","registered-post") else "incident-phase.py"
+    name="incident-post-phase.py" if post or recovery_post or focused in ("post","retry-post","timer-post","registered-post","fixture-post") else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
     seal,sr=s.read(package/"deployment-seal-receipt.json",cfg["seal_sha256"])
@@ -410,7 +411,7 @@ def phase145(epoch):
     recovery_post_image=base/"tools-v8/export145"
     recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
     image=Path("/proc")/m["MainPID"]/"exe"
-    focused_modes=[mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"),("fixture-semantic","tools-v5f"),("timer-post","tools-v11"),("registered-post","tools-v12"))
+    focused_modes=[mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"),("fixture-semantic","tools-v5f"),("timer-post","tools-v11"),("registered-post","tools-v12"),("fixture-post","tools-v13"))
                        if (candidate:=base/directory/"export145").exists() and s.same_file(image,candidate)]
     s.need(len(focused_modes)<=1,"ambiguous native 145 executable")
     focused_mode=next(iter(focused_modes),None)
@@ -644,6 +645,43 @@ def prefix145(fleet):
     return prefix
 
 
+def released136_route(intent):
+    old = R / "epoch145-phase-dispatch-20261122-v1"
+    current = R / "epoch145-fixture-phase-dispatch-20261122-v1"
+    if intent["selector"].get("path") == str(old / "READY.json"):
+        s.need(Path(__file__).resolve().parent != D / "tools-v21", "V21 cannot select the retired V2 dispatcher")
+        return old, R / "epoch136-joint-writer-20261122-v6/controller", {
+            "seal_sha256": "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba",
+            "image_sha256": "26c6d7bfa41fbc1b1b9e563063726e1602dd87e3fe5f85ea53b07adfaf403a7e"}
+    s.need(intent["selector"].get("path") == str(current / "READY.json"), "foreign released 136 selector")
+    provider = D / "tools-v21"
+    s.need(Path(__file__).resolve().parent == provider, "V7 release requires its registered V21 provider")
+    profile, _ = s.read(provider / "profile136-fixture-writer.json")
+    return current, R / "epoch136-joint-writer-20261122-v7/controller", profile
+
+
+def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt):
+    ready = s.bound(selector, dispatcher / "READY.json")
+    s.need(planref["path"] == str(controller.parent / "registered-production-plan.json")
+           and plan["holding145_prestart_ready"] == selector and s.iid(ready["original_semantic_invocation"]),
+           "V7 plan did not select the original fixture boundary")
+    pkg = D / "tools-v21"
+    provider, provider_ref = s.read(pkg / "deployment-seal-receipt.json")
+    images = {r["name"]:r["sha256"] for r in provider["members"]}
+    s.need(provider["destination"] == str(pkg) and ready["registered_provider"] ==
+           dict(image=s.ref(pkg / "post-stop-fit", images["post-stop-fit"]), seal=provider_ref),
+           "release selector bound to another registered provider")
+    fit.binary(pkg / "post-stop-fit",images["post-stop-fit"])
+    semantic = R / "epoch145-semantic-continuity-20261121-v1"
+    worker = s.bound(plan["holding145_semantic_worker"], semantic / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    cfg, adapter, post = profile145(pkg,focused="fixture-post")
+    s.need(plan["holding145_completion"] == dict(seal=post["seal"], build=post["build"],
+           adapter=s.ref(adapter,cfg["adapter_sha256"])) and worker["invocation_id"] == ready["original_semantic_invocation"]
+           and receipt["schema"] == "horizon-136-incident-donor-released-v1"
+           and receipt["boot_id"] == ready["boot_id"] and s.iid(receipt["writer_invocation_id"]),
+           "foreign V13 completion, semantic predecessor, donor boot or released writer")
+
+
 def registered136(fleet, registration):
     root = H / "epoch136-actual-20261120-g1"
     intent_path = root / "prestart-intent.json"
@@ -657,7 +695,7 @@ def registered136(fleet, registration):
     # producer, guard and original donor fences again on every released price.
     intent, intent_ref = s.read(intent_path)
     receipt, release = s.read(root / "prestart-released.json")
-    dispatcher = R / "epoch145-phase-dispatch-20261122-v1"
+    dispatcher, package, profile = released136_route(intent)
     offer, _ = s.read(dispatcher / "OFFER.json")
     s.bound(offer["selector"], dispatcher / "READY.json")
     s.need(intent["selector"] == offer["selector"] and intent["writer_plan"] == offer["writer_plan"]
@@ -667,11 +705,11 @@ def registered136(fleet, registration):
            "foreign 136 release or selected writer")
     planref = offer["writer_plan"]
     plan = bound(planref)
-    package = R / "epoch136-joint-writer-20261122-v6/controller"
-    seal, sr = s.read(package / "deployment-seal-receipt.json",
-                      "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba")
+    if package.parent.name == "epoch136-joint-writer-20261122-v7":
+        validate_v7_release(dispatcher,package,offer["selector"],planref,plan,receipt)
+    seal, sr = s.read(package / "deployment-seal-receipt.json",profile["seal_sha256"])
     image = package / "admit136"
-    digest = "26c6d7bfa41fbc1b1b9e563063726e1602dd87e3fe5f85ea53b07adfaf403a7e"
+    digest = profile["image_sha256"]
     s.need(seal["destination"] == str(package) and plan["controller_deployment"] == sr
            and plan["controller"] == intent["writer"] == s.ref(root / "controller/admit136", digest)
            and any(m["name"] == image.name and m["sha256"] == digest and m["mode"] == "0555"
