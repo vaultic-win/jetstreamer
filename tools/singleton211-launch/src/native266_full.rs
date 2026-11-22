@@ -8,6 +8,7 @@ mod epoch228_storage;
 mod funding;
 mod gate;
 mod peer228_extents;
+pub(crate) mod peer261;
 mod start;
 mod stopped;
 mod successor;
@@ -230,6 +231,31 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
     observed_turnover(path, "allocation-", "allocation.json", turnover::allocation)
 }
 
+/// Read-only candidate census under the finite qualification booking.
+pub fn measure_261_turnover(path: &Path, fleet: &Path, sha: &str) -> Result<Value> {
+    let controller = fs::read_to_string("/proc/self/cgroup")?;
+    let unit = controller
+        .trim()
+        .strip_prefix("0::/system.slice/")
+        .context("funded qualification controller")?;
+    ensure!(
+        unit.starts_with("horizon261-turnover-fit-check-") && unit.ends_with(".service"),
+        "unexpected qualification controller"
+    );
+    observed_turnover(path, "fit-261-", "assessment.json", |n| {
+        let owner = n.show(unit)?;
+        let iid = std::env::var("INVOCATION_ID")?;
+        ensure!(
+            text(&owner, "MainPID")?.parse::<u32>()? == std::process::id(),
+            "not the controller process"
+        );
+        live::finite_owner(&owner, unit, &iid, 256 << 20)?;
+        let result = peer261::assess(n, &Bound::new(fleet, sha), unit, false)?;
+        live::same_owner(&owner, &n.show(unit)?)?;
+        Ok(json!({"assessment":result,"admission_authorized":false,"producer_started":false}))
+    })
+}
+
 pub fn qualify_turnover_window(path: &Path) -> Result<Value> {
     observed_turnover(
         path,
@@ -243,7 +269,7 @@ fn observed_turnover(
     path: &Path,
     prefix: &str,
     file: &str,
-    observe: fn(&mut Native) -> Result<Value>,
+    observe: impl FnOnce(&mut Native) -> Result<Value>,
 ) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0

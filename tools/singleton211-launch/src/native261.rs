@@ -52,7 +52,7 @@ const PACKET_SHA: &str = "9d36d766ab81ac0f831dc1af81198bef3f67ec7ad47f05d1541629
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261121-v9/horizon-native261-launch";
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261122-v10/horizon-native261-launch";
 
 const TOKEN_SCHEMA: &str = "horizon-native261-first-guard-token-v1";
 const PLAN_SCHEMA: &str = "horizon-native261-startup-plan-v1";
@@ -115,10 +115,20 @@ const V153_GATE: (&str, &str) = (
 );
 const V153_GATE_COMMIT: &str = "f648ab3547ddef529cb8e2e0de1f30787b8fd87f";
 
+const V160_PREPARED: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon-native261-prepared-guard-access-v160-a1/prepared.json",
+    "df461018cec8480d1fbe3f48d4379eec615ce3854a1e87891ea43d5707d782c9",
+);
+const V160_GATE: (&str, &str) = (
+    "/var/lib/jetstreamer/horizon261-native-launch-tmpfs-20261121-v9/horizon-native261-launch",
+    "16624841facc6c8a37341bffbe692702abfab2cb219832d306c378f2e1008f71",
+);
+const V160_GATE_COMMIT: &str = "af744d6c80105f3be3242121f04df2beb70ddee7";
 pub(super) fn registered_preparation(reference: &Bound, gate: &Bound, commit: &Value) -> bool {
     [
         (V151_PREPARED, V151_GATE, V151_GATE_COMMIT),
         (V153_PREPARED, V153_GATE, V153_GATE_COMMIT),
+        (V160_PREPARED, V160_GATE, V160_GATE_COMMIT),
     ]
     .iter()
     .any(|(prepared, launcher, revision)| {
@@ -148,6 +158,36 @@ include!("native261/controller.rs");
 #[cfg(test)]
 mod v151_window_tests {
     use super::*;
+    #[test]
+    fn prepared_guard_access_graph_accepts_only_the_v9_launcher() {
+        let reference = Bound::new(V160_PREPARED.0, V160_PREPARED.1);
+        let gate = Bound::new(V160_GATE.0, V160_GATE.1);
+        let new = Bound::new(LAUNCHER, "e".repeat(64));
+        let roles = |image: &Bound, commit: &str| json!({"artifacts":[{"role":"launcher","artifact":image,"source_commit":commit},{"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"a".repeat(40)}]});
+        let current = roles(&new, &"c".repeat(40));
+        let previous = roles(&gate, V160_GATE_COMMIT);
+        prepared_transition(&reference, &gate, &new, &previous, &current).unwrap();
+        assert!(
+            prepared_transition(
+                &reference,
+                &gate,
+                &new,
+                &roles(&gate, V153_GATE_COMMIT),
+                &current
+            )
+            .is_err()
+        );
+        assert!(
+            prepared_transition(
+                &Bound::new(V153_PREPARED.0, V153_PREPARED.1),
+                &gate,
+                &new,
+                &previous,
+                &current
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn v153_preparation_requires_its_original_controller() {
         let prepared = Bound::new(V153_PREPARED.0, V153_PREPARED.1);
