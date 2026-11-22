@@ -73,7 +73,13 @@ const RETRY10_IID: &str = "3c220efd0d0740f59572a96447e83762";
 const ORIGINAL_SCANNER_IID: &str = "f3b74aa33a734cb38debea76fb883395";
 const INDEXES_AND_PROTECTED: &str =
     include_str!("../../scripts/horizon_epoch167_ancestor_accounts_20261122_v1/profiles166.json");
+const ADDITIONAL_COMPILED: &[(&str, &str, &str)] = &[];
+const ORIGINAL_NODE: (&str, &str) = super::INDEPENDENT_166_NODE;
+const HOLDING_IMAGE_FIELD: &str = "qualified_image";
 macro_rules! profile {
+    (epoch $prefix:literal, $suffix:literal) => {
+        concat!($prefix, "166-", profile!("", ""), $suffix)
+    };
     ($prefix:literal, $suffix:literal) => {
         concat!($prefix, "retry10", $suffix)
     };
@@ -209,16 +215,6 @@ fn validate_profile_rows(proof: &Value, iid: &str, start: &Value, basis: &Value)
         2 << 20,
     )?;
     validate_paid_rows(proof, iid, start, basis, &admission, &fit)
-}
-pub(super) fn check_transition_lock(file: &File) -> Result<()> {
-    let md = file.metadata()?;
-    ensure!(
-        md.dev() == 64512
-            && md.ino() == 95_818_311
-            && identity(&md) == regular_identity(&Path::new(STATE).join("transition.lock"))?,
-        "unexpected holding transition lock descriptor"
-    );
-    Ok(())
 }
 fn checked_protected(row: &Value) -> Result<Value> {
     let p = Path::new(row["path"].as_str().context("retained path")?);

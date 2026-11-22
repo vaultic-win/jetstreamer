@@ -40,7 +40,13 @@ const PARK_START: &str = "/var/lib/jetstreamer/horizon_runtime_data/root0145-zer
 const MTIME_SEC: i64 = 1795050666;
 const MTIME_NSEC: i64 = 976233534;
 const RUNTIME_PACKAGE_ROOT: Option<&str> = Some("/var/lib/jetstreamer/horizon_runtime_data");
+const ADDITIONAL_COMPILED: &[(&str, &str, &str)] = &[];
+const ORIGINAL_NODE: (&str, &str) = super::INDEPENDENT_166_NODE;
+const HOLDING_IMAGE_FIELD: &str = "qualified_image";
 macro_rules! profile {
+    (epoch $prefix:literal, $suffix:literal) => {
+        concat!($prefix, "166-", profile!("", ""), $suffix)
+    };
     ($prefix:literal, $suffix:literal) => {
         concat!($prefix, "retry7", $suffix)
     };

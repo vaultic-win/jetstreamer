@@ -26,7 +26,7 @@ fn validate_rows(proof: &Value, iid: &str, start: &Value, booking: &Value) -> Re
         helper["sha256"]
     ]);
     ensure!(
-        proof["schema"] == profile!("horizon-closed166-", "-park-terminal-v1")
+        proof["schema"] == profile!(epoch "horizon-closed", "-park-terminal-v1")
             && proof["unit"] == PARK
             && proof["park_plan"] == plan
             && proof["helper"] == *helper
@@ -82,8 +82,8 @@ pub(super) fn capture_terminal(spec: &Bound) -> Result<()> {
         .context("native park invocation")?;
     park_shape(&native_before, iid)?;
     let start_bytes = read_stable_bounded(Path::new(PARK_START), 1 << 20, "park start")?;
-    let mut proof = json!({"schema":profile!("horizon-closed166-", "-park-terminal-v1"),"unit":PARK,
-        "park_plan":spec,"helper":booking["qualified_image"],"native":native_before,"invocation_id":iid,
+    let mut proof = json!({"schema":profile!(epoch "horizon-closed", "-park-terminal-v1"),"unit":PARK,
+        "park_plan":spec,"helper":booking[HOLDING_IMAGE_FIELD],"native":native_before,"invocation_id":iid,
         "start":binding(PARK_START,&hex_lower(&Sha256::digest(start_bytes)))});
     validate_transfer_provenance(&proof, iid)?;
     let manifest = manifest_bytes(
@@ -120,7 +120,7 @@ pub(super) fn capture_terminal(spec: &Bound) -> Result<()> {
     proof["local_retirement_authorized"] = json!(false);
     let output = Path::new(STATE)
         .join("receipts")
-        .join(format!("epoch166-retry{ATTEMPT}-park-terminal-{iid}.json"));
+        .join(format!("{}-{iid}.json", profile!(epoch "epoch", "-park-terminal")));
     persist(&output, &proof)?;
     println!("{}", output.display());
     Ok(())
@@ -160,7 +160,7 @@ mod terminal_tests {
           "native":{"MainPID":"123","ExecMainPID":"123","Id":PARK,"InvocationID":iid,
           "ActiveState":"activating","NRestarts":"0","ControlGroup":format!("/system.slice/{PARK}"),"ExecMainStartTimestamp":"Fri 2026-11-20 02:10:00 UTC"},
           "start_ticks":99,"local_credit_bytes":0});
-        let terminal = json!({"unit":PARK,"schema":profile!("horizon-closed166-", "-park-terminal-v1"),
+        let terminal = json!({"unit":PARK,"schema":profile!(epoch "horizon-closed", "-park-terminal-v1"),
            "park_plan":plan,"helper":helper,"native":{"ExecMainPID":"123","NRestarts":"0","ExecMainStartTimestamp":start["native"]["ExecMainStartTimestamp"]}});
         validate_rows(&terminal, iid, &start, &booking).unwrap();
         for (key, val) in [

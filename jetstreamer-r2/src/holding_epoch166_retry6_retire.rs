@@ -48,7 +48,12 @@ const MTIME_SEC: i64 = 1795004048;
 const MTIME_NSEC: i64 = 625036367;
 const INSPECTION_SCHEMA: &str = "horizon-epoch166-retry6-closed-prefix-inspection-v1";
 const RUNTIME_PACKAGE_ROOT: Option<&str> = None;
+const ADDITIONAL_COMPILED: &[(&str, &str, &str)] = &[];
+const ORIGINAL_NODE: (&str, &str) = super::INDEPENDENT_166_NODE;
 macro_rules! profile {
+    (epoch $prefix:literal, $suffix:literal) => {
+        concat!($prefix, "166-", profile!("", ""), $suffix)
+    };
     ($prefix:literal, $suffix:literal) => {
         concat!($prefix, "retry6", $suffix)
     };

@@ -16,6 +16,10 @@ mod epoch141_retire;
 mod epoch157_laned_retire;
 #[path = "holding_epoch166_retire.rs"]
 mod epoch166_retire;
+const INDEPENDENT_166_NODE: (&str, &str) = (
+    "/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-node",
+    "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65",
+);
 #[path = "holding_epoch166_retry6_retire.rs"]
 mod epoch166_retry6_retire;
 #[path = "holding_epoch166_retry7_retire.rs"]
@@ -24,6 +28,8 @@ mod epoch166_retry7_retire;
 mod epoch166_retry8_retire;
 #[path = "holding_epoch166_retry10_retire.rs"]
 mod epoch166_retry10_retire;
+#[path = "holding_epoch168_metered_retire.rs"]
+mod epoch168_metered_retire;
 #[path = "holding_epoch169_retire.rs"]
 mod epoch169_retire;
 #[path = "holding_epoch185.rs"]
@@ -79,6 +85,17 @@ struct RestoreAdmission {
     mapping: Bound,
     custody: Bound,
     capacity_completion: Bound,
+}
+
+fn check_primary_transition_lock(file: &File) -> Result<()> {
+    let md = file.metadata()?;
+    ensure!(
+        md.dev() == 64512
+            && md.ino() == 95_818_311
+            && identity(&md) == regular_identity(&Path::new(STATE).join("transition.lock"))?,
+        "unexpected holding transition lock descriptor"
+    );
+    Ok(())
 }
 
 fn digest(s: &str) -> bool {
@@ -1324,8 +1341,13 @@ pub(super) async fn run() -> Result<()> {
             && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "holding transition is occupied"
     );
-    if matches!(args[1].as_str(), "holding-check-retire166-retry10" | "holding-retire166-retry10") {
-        epoch166_retry10_retire::check_transition_lock(&lock)?;
+    if matches!(
+        args[1].as_str(),
+        "holding-check-retire166-retry10" | "holding-retire166-retry10"
+            | "holding-capture168-full-metered-terminal" | "holding-census168-full-metered-consumers"
+            | "holding-check-retire168-full-metered" | "holding-retire168-full-metered"
+    ) {
+        check_primary_transition_lock(&lock)?;
     }
     // Keep the descriptor alive through all uploads, receipts and restoration.
     lock.flush()?;
@@ -1333,9 +1355,11 @@ pub(super) async fn run() -> Result<()> {
         "holding-capture166-retry7-terminal" => return epoch166_retry7_retire::capture_terminal(&spec),
         "holding-capture166-retry8-terminal" => return epoch166_retry8_retire::capture_terminal(&spec),
         "holding-capture166-retry10-terminal" => return epoch166_retry10_retire::capture_terminal(&spec),
+        "holding-capture168-full-metered-terminal" => return epoch168_metered_retire::capture_terminal(&spec),
         "holding-census166-retry7-consumers" => return epoch166_retry7_retire::inspect_consumers(&spec),
         "holding-census166-retry8-consumers" => return epoch166_retry8_retire::inspect_consumers(&spec),
         "holding-census166-retry10-consumers" => return epoch166_retry10_retire::inspect_consumers(&spec),
+        "holding-census168-full-metered-consumers" => return epoch168_metered_retire::inspect_consumers(&spec),
         _ => (),
     }
     if args[1] == "holding-census166-retry6-consumers" {
@@ -1399,8 +1423,10 @@ pub(super) async fn run() -> Result<()> {
         "holding-retire166-retry7" => epoch166_retry7_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166-retry8" => epoch166_retry8_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-check-retire166-retry10" => epoch166_retry10_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
+        "holding-check-retire168-full-metered" => epoch168_metered_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire166-retry8" => epoch166_retry8_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-retire166-retry10" => epoch166_retry10_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
+        "holding-retire168-full-metered" => epoch168_metered_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         "holding-check-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, true).await,
         "holding-retire166-retry6" => epoch166_retry6_retire::run(&client, &m, &serde_json::from_value(v)?, &spec, false).await,
         _ => bail!("unsupported holding action"),

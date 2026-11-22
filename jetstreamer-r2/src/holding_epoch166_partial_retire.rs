@@ -309,7 +309,7 @@ fn park(p: &Retire) -> Result<Value> {
 }
 fn scope(p: &Retire) -> Result<Value> {
     ensure!(
-        p.schema == profile!("jetstreamer-horizon-holding-retire166-", "-plan-v1")
+        p.schema == profile!(epoch "jetstreamer-horizon-holding-retire", "-plan-v1")
             && same_bound(&p.mapping, &binding(MAPPING, MAPPING_SHA))
             && same_bound(&p.eligibility, &binding(ELIGIBILITY, ELIGIBILITY_SHA))
             && p.inspection.sha256 == INSPECTION_SHA,
@@ -581,25 +581,25 @@ pub(super) async fn run(
     private(&root)?;
     let source = Path::new(SOURCE);
     let quarantine = Path::new(QUARANTINE);
-    let intent_path = root.join(profile!("epoch166-", "-intent.json"));
-    let moved_path = root.join(profile!("epoch166-", "-moved.json"));
-    let unlink_path = root.join(profile!("epoch166-", "-unlink-intent.json"));
-    let completion_path = root.join(profile!("epoch166-", "-completion.json"));
+    let intent_path = root.join(profile!(epoch "epoch", "-intent.json"));
+    let moved_path = root.join(profile!(epoch "epoch", "-moved.json"));
+    let unlink_path = root.join(profile!(epoch "epoch", "-unlink-intent.json"));
+    let completion_path = root.join(profile!(epoch "epoch", "-completion.json"));
     let retained = preserved()?;
     // A fresh consumer closure may change after interruption, but the exact
     // original held bytes, park invocation, custody and preserved run may not.
-    let descriptor = json!({"schema":profile!("jetstreamer-holding-retire166-", "-intent-v1"),
+    let descriptor = json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-intent-v1"),
         "source":SOURCE,"quarantine":QUARANTINE,"sha256":SHA,"length":LENGTH,"inode":INODE,
         "eligibility":p.eligibility,"inspection":p.inspection,"custody":p.custody,"mapping":p.mapping,
         "park_terminal":p.park_terminal,"preserved":retained,
         "canonical_archive":false,"scratch_retirement_authorized":false,"resource_credit_bytes":0,
         "resource_promise_ending_authorized":false,"replay_launch_authorized":false,
         "remote_mutations":false,"r2_mutations":false});
-    let expected_moved = json!({"schema":profile!("jetstreamer-holding-retire166-", "-moved-v1"),"intent":descriptor,
+    let expected_moved = json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-moved-v1"),"intent":descriptor,
         "local_sha256":SHA,"local_multipart_etag":c["object_etag"]});
-    let expected_unlink = json!({"schema":profile!("jetstreamer-holding-retire166-", "-unlink-intent-v1"),
+    let expected_unlink = json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-unlink-intent-v1"),
         "moved":expected_moved,"authenticated_custody_revalidated":true});
-    let expected_completion = json!({"schema":profile!("jetstreamer-holding-retire166-", "-completion-v1"),
+    let expected_completion = json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-completion-v1"),
         "intent":descriptor,"source_absent":true,"quarantine_absent":true,"preserved":retained,
         "retired_censused_physical_bytes":ALLOCATED,"actual_free_delta_claimed":false,
         "authenticated_custody_revalidated":true,"scratch_retirement_authorized":false,
@@ -664,7 +664,7 @@ pub(super) async fn run(
     let attempt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let check_path = Path::new(STATE).join("receipts").join(format!(
         "{}-{}-{attempt}.json",
-        profile!("retire166-", "-check"),
+        profile!(epoch "retire", "-check"),
         spec.sha256
     ));
     if check {
@@ -674,7 +674,7 @@ pub(super) async fn run(
         );
         persist(
             &check_path,
-            &json!({"schema":profile!("jetstreamer-holding-retire166-", "-check-v1"),
+            &json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-check-v1"),
             "descriptor":descriptor,"checked":true,"data_removed":false,"local_proof":local_proof,
             "recovering_after_durable_unlink":current.is_none()&&old_unlink.is_some(),
             "consumer_closure":p.consumer_closure,"gates":gate,"recorded_unix_seconds":clock()?}),
@@ -689,7 +689,7 @@ pub(super) async fn run(
     let prior = bound(prior_binding)?;
     let at = clock()?;
     ensure!(
-        prior["schema"] == profile!("jetstreamer-holding-retire166-", "-check-v1")
+        prior["schema"] == profile!(epoch "jetstreamer-holding-retire", "-check-v1")
             && prior["descriptor"] == descriptor
             && prior["checked"] == true
             && prior["data_removed"] == false
@@ -702,12 +702,12 @@ pub(super) async fn run(
     // graph/closure used, independently of the stable interruption descriptor.
     let qualification_path = root.join(format!(
         "{}-{}-{attempt}.json",
-        profile!("epoch166-", "-qualified"),
+        profile!(epoch "epoch", "-qualified"),
         spec.sha256
     ));
     persist(
         &qualification_path,
-        &json!({"schema":profile!("jetstreamer-holding-retire166-", "-qualified-v1"),
+        &json!({"schema":profile!(epoch "jetstreamer-holding-retire", "-qualified-v1"),
         "spec":spec,"check":prior_binding,"descriptor":descriptor,"consumer_closure":p.consumer_closure,"gates":gate}),
     )?;
     if old_intent.is_none() {
@@ -876,7 +876,7 @@ mod tests {
     #[test]
     fn custody_cannot_borrow_another_retry_or_use_unqualified_remote_bytes() {
         let p = Retire {
-            schema: profile!("jetstreamer-horizon-holding-retire166-", "-plan-v1").into(),
+            schema: profile!(epoch "jetstreamer-horizon-holding-retire", "-plan-v1").into(),
             mapping: binding(MAPPING, MAPPING_SHA),
             eligibility: binding(ELIGIBILITY, ELIGIBILITY_SHA),
             inspection: binding("/sealed/inspection.json", INSPECTION_SHA),

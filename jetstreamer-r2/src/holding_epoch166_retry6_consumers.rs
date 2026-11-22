@@ -629,7 +629,7 @@ fn reverse_graph(
 }
 fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
     ensure!(
-        r.schema == profile!("horizon-closed166-", "-transitive-consumer-closure-v1")
+        r.schema == profile!(epoch "horizon-closed", "-transitive-consumer-closure-v1")
             && r.owner == "/root"
             && r.source == Path::new(SOURCE)
             && r.sha256 == SHA
@@ -895,7 +895,7 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
         "definition":c.all[path].definition,"edges":edges})
         })
         .collect();
-    let receipt = json!({"schema":profile!("horizon-closed166-", "-transitive-consumer-census-v1"),"source":SOURCE,"sha256":SHA,"length":LENGTH,
+    let receipt = json!({"schema":profile!(epoch "horizon-closed", "-transitive-consumer-census-v1"),"source":SOURCE,"sha256":SHA,"length":LENGTH,
         "park_plan":spec,"sealed_metadata_root":SEALED,"definition_roots":ROOTS,
         "sealed_metadata_census_sha256":c.sealed_sha,"definition_census_sha256":c.definitions_sha,
         "nodes":nodes,"censused_entries":c.entries,"censused_bytes":c.bytes,
@@ -909,7 +909,7 @@ pub(super) fn inspect(spec: &Bound) -> Result<()> {
     );
     let path = Path::new(STATE).join("receipts").join(format!(
         "{}-{}.json",
-        profile!("retire166-", "-consumer-census"),
+        profile!(epoch "retire", "-consumer-census"),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     persist(&path, &receipt)?;
@@ -959,6 +959,7 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
     let park_proof = bound(&p.park_terminal)?;
     let park_helper: Bound = serde_json::from_value(park_proof["helper"].clone())?;
     let mut old_node = false;
+    let mut additional = BTreeSet::new();
     let mut park_image = false;
     for item in &r.compiled_consumers {
         ensure!(
@@ -972,19 +973,20 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
             read_artifact(proof, 128 << 20, true)?;
         }
         owner_units(&item.owner_units, p)?;
-        old_node |= item.image.path
-            == Path::new(
-                "/usr/local/lib/jetstreamer/horizon-independent166-singleton-package-20261109-v1/jetstreamer-node",
-            )
-            && item.image.sha256
-                == "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+        for &(path, sha, unit) in ADDITIONAL_COMPILED {
+            if item.image.path == Path::new(path) && item.image.sha256 == sha && item.owner_units.iter().any(|owner| owner == unit) {
+                additional.insert(path);
+            }
+        }
+        old_node |= item.image.path == Path::new(ORIGINAL_NODE.0)
+            && item.image.sha256 == ORIGINAL_NODE.1
             && item.owner_units.iter().any(|u| u == PRODUCER);
         park_image |=
             same_bound(&item.image, &park_helper) && item.owner_units.iter().any(|u| u == PARK);
     }
     ensure!(
-        old_node && park_image,
-        "actual original node and actual park image are missing from compiled closure"
+        old_node && park_image && additional.len() == ADDITIONAL_COMPILED.len(),
+        "compiled closure is missing an original image and its terminal owner"
     );
     for row in &r.classes {
         let inputs: Vec<Bound> = serde_json::from_value(row["inspected_inputs"].clone())?;
@@ -1543,7 +1545,7 @@ mod tests {
     }
     fn review(nodes: Vec<Node>) -> Review {
         Review {
-            schema: profile!("horizon-closed166-", "-transitive-consumer-closure-v1").into(),
+            schema: profile!(epoch "horizon-closed", "-transitive-consumer-closure-v1").into(),
             owner: "/root".into(),
             source: SOURCE.into(),
             sha256: SHA.into(),
