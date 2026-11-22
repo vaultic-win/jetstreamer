@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import status_cycle as c
@@ -31,6 +32,37 @@ def fail(call):
     try: call()
     except (ValueError,AssertionError):return
     raise AssertionError('accepted mismatched input')
+
+def resume_after_external_event(m, parent, baseline, event_record):
+    # The fixture first writes and independently authenticates an event between cadence samples.
+    epoch=168
+    event_dir=parent/'event-168-resume-test'; c.ensure_dir(event_dir)
+    c.durable(event_dir/'RECEIPT.json',c.checked(event_record))
+    event=c.bound(event_dir/'RECEIPT.json')
+    advanced=copy.copy(m)
+    advanced.now+=c.dt.timedelta(seconds=1); advanced.stamp=c.stamp(advanced.now)
+    cycle_dir=parent/'resume-cycle'; c.ensure_dir(cycle_dir)
+    mirror=Mirror({'168':event})
+    state={'168':event}
+    c.publish(advanced,mirror,state,cycle_dir,epoch)
+    successor=state['168']
+    with patch('evidence.STATUS_ROOT',parent):
+        # A crash can leave only the intent, on either side of the remote conditional PUT.
+        for saved_remote, num_writes in ((event,1),(successor,0)):
+            retry_store=Mirror({'168':saved_remote})
+            proof=cycle_dir/'epoch-168.receipt.json'
+            proof.unlink()
+            selected={'168':baseline}
+            c.read_statuses(retry_store,selected,cycle_dir)
+            assert selected['168']==event
+            c.publish(advanced,retry_store,selected,cycle_dir,epoch)
+            assert len(retry_store.writes)==num_writes and selected['168']==successor
+            c.authenticated(retry_store,epoch,successor)
+        # An unrelated epoch or fork may never acquire the stored If-Match.
+        fail(lambda:c.read_statuses(mirror,{'168':event_record | {'sha256':'0'*64}},cycle_dir))
+        fork=parent/'event-168-fork';c.ensure_dir(fork)
+        c.durable(fork/'RECEIPT.json',c.checked(event))
+        fail(lambda:c.read_statuses(mirror,{'168':baseline},cycle_dir))
 
 def main():
     c.validate_package()
@@ -81,10 +113,11 @@ def main():
     c.publish(m,store,refs,temporary,168)
     assert refs['168']==committed and len(store.writes)==20
     fail(lambda:c.authenticated(store,168,orig['168']))
+    resume_after_external_event(m,temporary,orig['168'],committed)
     assert diag['resource_credit_bytes']==0 and diag['retained_root_cap_bytes']==96<<30
     print(json.dumps(dict(signed_head=head,incident=c.bound(c.BASE/'four-homefloor-20261122-v1/HANDOFF.json'),
          positive_window=fleet['observer'],bytes_written_to_R2=0,conditional_epochs=store.writes,
-         interrupted_after_put_recovered=True,wrong_predecessor_rejected=True,wrong_producer_rejected=True,
+         interrupted_after_put_recovered=True,external_event_restart_before_and_after_put=True,wrong_predecessor_rejected=True,wrong_producer_rejected=True,
          guard_closures=list(stops),diagnostic169=diag,qualified_utc=future)))
 
 if __name__=='__main__':

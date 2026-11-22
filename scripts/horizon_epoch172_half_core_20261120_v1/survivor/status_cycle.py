@@ -152,7 +152,20 @@ def authenticated(store,key,ref):
 def read_statuses(store, receipts, destination):
     original=dict(receipts)
     for key,ref in original.items():
-        if (destination/f'epoch-{key}.intent.json').exists():
+        intent=destination/f'epoch-{key}.intent.json'
+        if intent.exists():
+            plan=read_ref(intent)
+            previous=plan['previous_receipt']
+            before=checked(previous)
+            need(plan['epoch']==int(key) and before['epoch']==int(key) and before['authenticated_readback']
+                 and before['after_etag']==plan['before_etag'] and before['after_sha256']==plan['before_sha256']
+                 and before['after_status']==plan['before_status'], 'intent changed its authenticated predecessor')
+            if previous!=ref:
+                # The current remote body may already be the result of the interrupted PUT.
+                # Prove the event chain to its saved predecessor; publish checks the remote body.
+                prior,_=external_event(int(key),ref,plan['before_etag'],status.body(plan['before_status']))
+                need(prior==previous,'intent predecessor is outside the registered event chain')
+                receipts[key]=prior
             continue
         if int(key)!=172:
             etag,raw=store.get(int(key))
