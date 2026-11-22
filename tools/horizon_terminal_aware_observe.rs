@@ -90,8 +90,15 @@ struct Plan {
     singleton211_handoff: Option<Bound>,
     #[serde(default)]
     full266_entries: Option<Bound>,
+    #[serde(default)]
+    full228_entries: Option<Bound>,
     state_directory: PathBuf,
     deployment: PathBuf,
+}
+impl Plan {
+    fn entry_pilots(&self) -> [(&full266::Pilot, Option<&Bound>); 2] {
+        [(&full266::FULL228, self.full228_entries.as_ref()), (&full266::FULL266, self.full266_entries.as_ref())]
+    }
 }
 fn sha(b: &[u8]) -> String {
     format!("{:x}", Sha256::digest(b))
@@ -560,6 +567,7 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
         .context("missing replay census")?;
     ensure!(
         (!rows.is_empty()
+            || p.full228_entries.is_some() || p.full266_entries.is_some()
             || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
             || p.native212_handoff.is_some() || p.native266_handoff.is_some())
@@ -598,21 +606,30 @@ fn validate(p: &Plan, config: &Value, handoffs: &[Value]) -> Result<()> {
             "handoff owner/range differs"
         );
     }
-    let mut peers=config.clone();
-    if let Some(b)=&p.full266_entries {
-        let proof=full266::validate(&json!(b))?;
-        let rows=config["diagnostic_replays"].as_array().context("266 diagnostic census")?;
-        let matched:Vec<_>=rows.iter().filter(|v|v["range"]=="266-266").collect();
-        ensure!(matched.len()==1 && matched[0]==&proof["tuple"] && p.native266_handoff.is_none(),"different original 266 replay tuple");
-        for field in ["replays","native_input_diagnostics"] {
-            for row in config[field].as_array().into_iter().flatten() {
-                let scratch=Path::new(string(row,"scratch_path")?);
-                ensure!(row["epoch"]!=266 && row["producer_unit"]!=full266::UNIT && row["controller_unit"]!=full266::UNIT &&
-                    row["unit"]!=full266::UNIT && !scratch.starts_with(full266::ROOT) && !Path::new(full266::ROOT).starts_with(scratch),
-                    "duplicate original 266 owner");
+    let mut peers = config.clone();
+    for (pilot, evidence) in p.entry_pilots() {
+        let Some(b) = evidence else { continue };
+        let proof = pilot.validate(&json!(b))?;
+        let range = format!("{0}-{0}", pilot.epoch);
+        let rows = peers["diagnostic_replays"].as_array().context("missing entry diagnostics")?;
+        let mut matching = rows.iter().filter(|row| row["range"] == range);
+        ensure!(matching.next() == Some(&proof["tuple"]) && matching.next().is_none()
+            && (pilot.epoch != 266 || p.native266_handoff.is_none()), "original entry claim differs");
+        for row in ["replays", "native_input_diagnostics"].iter()
+            .flat_map(|field| config[*field].as_array().into_iter().flatten())
+            .chain(config["diagnostic_replays"].as_array().into_iter().flatten().filter(|row| *row != &proof["tuple"])) {
+            let scratch = Path::new(string(row,"scratch_path")?);
+            if let Some(range) = row["range"].as_str() {
+                let (first,last) = range.split_once('-').unwrap_or((range,range));
+                ensure!(!(first.parse::<u64>()?..=last.parse::<u64>()?).contains(&pilot.epoch), "overlapping entry range");
             }
+            ensure!(row["epoch"] != pilot.epoch && row["producer_unit"] != pilot.unit
+                && row["controller_unit"] != pilot.unit && row["unit"] != pilot.unit
+                && !scratch.starts_with(pilot.root) && !Path::new(pilot.root).starts_with(scratch),
+                "duplicate original entry owner");
         }
-        peers["diagnostic_replays"]=json!(rows.iter().filter(|row|row["range"]!="266-266").collect::<Vec<_>>());
+        let remaining: Vec<_> = rows.iter().filter(|row| row["range"] != range).cloned().collect();
+        peers["diagnostic_replays"] = Value::Array(remaining);
     }
     singleton211_pass_through(p, &peers)?;
     ensure!(
@@ -704,12 +721,15 @@ fn run(args: &[String]) -> Result<()> {
     let previous: Value = serde_json::from_slice(&previous_bytes)?;
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     due(&config, &previous, now)?; // No unit/resource reads before the original clock.
-    if let Some(b)=&p.full266_entries {
-        let proof=full266::validate(&json!(b))?; let m=properties(full266::UNIT)?;
-        if m["ActiveState"]=="active" {
-            let pid=proof["pid"].as_u64().context("266 PID")?;
-            ensure!(m["InvocationID"]==proof["iid"] && m["MainPID"].as_str().and_then(|s|s.parse::<u64>().ok())==Some(pid) && m["NRestarts"]=="0","266 due census changed");
-            full266::mapped_node(pid)?;
+    for (pilot, evidence) in p.entry_pilots() {
+        let Some(b) = evidence else { continue };
+        let proof = pilot.validate(&json!(b))?;
+        let m = properties(pilot.unit)?;
+        if m["ActiveState"] == "active" {
+            let pid = proof["pid"].as_u64().context("original replay PID")?;
+            ensure!(m["InvocationID"] == proof["iid"] && m["MainPID"].as_str().and_then(|s|s.parse::<u64>().ok()) == Some(pid)
+                && m["NRestarts"] == "0", "due replay owner changed");
+            pilot.mapped_node(pid)?;
         }
     }
     let mut live = Vec::new();
@@ -739,12 +759,13 @@ fn run(args: &[String]) -> Result<()> {
     let prescreen = save(
         &p.state_directory,
         "prescreen.json",
-        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-prescreen-v1","plan":plan_ref,"tool_sha256":args[5],"recorded_unix_seconds":now,"previous_sample_sha256":sha(&previous_bytes),"unit_census":census,"full228_entries":p.full228_entries,"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"omitted":omitted,"finalization":finalization,"active_range_count":live.len(),"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         !live.is_empty()
             || !finalization.is_empty()
             || p.singleton211_handoff.is_some()
+            || p.full228_entries.is_some() || p.full266_entries.is_some()
             || p.native257_handoff.is_some()
             || p.native261_handoff.is_some()
             || p.native212_handoff.is_some() || p.native266_handoff.is_some(),
@@ -793,7 +814,7 @@ fn run(args: &[String]) -> Result<()> {
     save(
         &p.state_directory,
         "completion.json",
-        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
+        &json!({"schema":"horizon-terminal-aware-observation-v1","prescreen":prescreen,"effective_config":effective,"observer_exit_code":result.code(),"omitted_owners_unchanged":still_terminal,"observer_output":config["output"],"full228_entries":p.full228_entries,"full266_entries":p.full266_entries,"native211_handoff":p.native211_handoff,"native265_handoff":p.native265_handoff,"native257_handoff":p.native257_handoff,"native261_handoff":p.native261_handoff,"native212_handoff":p.native212_handoff,"native266_handoff":p.native266_handoff,"native_input_diagnostics":config.get("native_input_diagnostics"),"full_fleet_reconciliation_required":true,"omitted_owner_reservations_retained":true,"finalization_owner_reservations_retained":true,"resource_release_authorized":false,"publication_authorized":false,"replay_launch_authorized":false}),
     )?;
     ensure!(
         result.success() && still_terminal,
@@ -1190,6 +1211,7 @@ mod full211_offline_integration {
             native212_handoff: None,
             native266_handoff: None,
             full266_entries: None,
+            full228_entries: None,
             singleton211_handoff: Some(serde_json::from_value(a["handoff"].clone()).unwrap()),
             state_directory: state.path().into(),
             deployment: "/var/lib/jetstreamer/horizon-terminal-aware-cycle-offline-fixture".into(),

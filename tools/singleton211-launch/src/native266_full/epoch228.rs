@@ -14,7 +14,7 @@ const IID251: &str = "cd2477bfec7f4e498545762c633e7bb0";
 const PAIR: &str = "8248727043dc05b54effd1b383e8094283970d673a33dd65e0ff9aababa968b2";
 const WORKER: &str =
     "/var/lib/jetstreamer/horizon228-demotion-bank-9d2fd8d4-v158-v2-qualified/worker";
-const WORKER_SHA: &str = "16d4b15881979bb7d65a0f49408580d4508b451a5953f35cbb60505d2e3cee00";
+pub(super) const WORKER_SHA: &str = "16d4b15881979bb7d65a0f49408580d4508b451a5953f35cbb60505d2e3cee00";
 const SNAP: &str = "/var/lib/jetstreamer/horizon-contiguous-228-230-current-46b4b4a-v1/snapshot-98495291-GfiRSgpC1qvH3uxVd9VAtYZ6qKM8fcdkyoyAkhF7izLq.tar.zst";
 const HASHES: &str = "/var/lib/jetstreamer/horizon-bounded228-inputs-v2/epoch-hashes.txt";
 const GENESIS: &str = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/genesis.tar.bz2";

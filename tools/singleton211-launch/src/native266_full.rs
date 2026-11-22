@@ -193,6 +193,74 @@ pub fn dispatch(args: &[String]) -> Result<Value> {
     controller(Lane::Epoch266, args)
 }
 pub fn dispatch228(args: &[String]) -> Result<Value> {
+    if args.first().is_some_and(|op| op == "entries-sealed") {
+        ensure!(
+            unsafe { libc::geteuid() } == 0
+                && std::env::var("CODEX_THREAD_ID")? == MAIN
+                && args.len() == 3,
+            "Main requires entries-sealed SELF_SHA256 NEW_EVIDENCE_DIR"
+        );
+        original_boot()?;
+        let image = fs::read_link("/proc/self/exe")?;
+        let base = image.parent().context("entry witness package")?;
+        let package = base
+            .file_name()
+            .and_then(|v| v.to_str())
+            .context("entry package name")?;
+        let attempt = package
+            .strip_prefix("horizon228-private-entry-consumers-a")
+            .and_then(|s| s.strip_suffix("-qualified"))
+            .context("entry witness deployment")?;
+        ensure!(
+            base.parent() == Some(Path::new(V))
+                && attempt
+                    .parse::<u8>()
+                    .is_ok_and(|n| n != 0 && n.to_string() == attempt)
+                && image
+                    .file_name()
+                    .is_some_and(|name| name == "horizon-native257-fit"),
+            "incorrect witness package"
+        );
+        let member = Bound::new(&image, &args[1]);
+        member.artifact()?;
+        ensure!(
+            metadata_identity(&fs::metadata("/proc/self/exe")?) == identity(&image)?
+                && hash(Path::new("/proc/self/exe"))? == member.sha256,
+            "another mapped witness image"
+        );
+        let seal = bound_at(&base.join("deployment-seal-receipt.json"))?.sealed()?;
+        ensure!(
+            rows(&seal, "members")?
+                .iter()
+                .filter(|v| v["name"] == "horizon-native257-fit" && v["sha256"] == member.sha256)
+                .count()
+                == 1,
+            "entry witness outside qualified deployment"
+        );
+        let out = PathBuf::from(&args[2]);
+        let attempt = out
+            .file_name()
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.strip_prefix("first-entries-"))
+            .context("entry capture attempt")?;
+        ensure!(
+            out.parent() == Some(Path::new(epoch228::STATE))
+                && attempt
+                    .parse::<u32>()
+                    .is_ok_and(|n| n > 0 && n.to_string() == attempt),
+            "entry evidence namespace"
+        );
+        trusted_parents(&out)?;
+        dir(&out, 0o700)?;
+        return entries::witness(
+            &mut Native {
+                root: out,
+                counter: 0,
+                deadline: Some(mono()? + 90_000_000),
+            },
+            Lane::Epoch228,
+        );
+    }
     controller(Lane::Epoch228, args)
 }
 fn controller(lane: Lane, args: &[String]) -> Result<Value> {
@@ -247,7 +315,7 @@ fn controller(lane: Lane, args: &[String]) -> Result<Value> {
                 lane == Lane::Epoch266,
                 "use the archive parent receipts for epoch 228"
             );
-            return entries::witness(&mut n);
+            return entries::witness(&mut n, lane);
         }
         let first = funding::elect(lane, &mut n, &r, None)?;
         save_json(&out, "initial-election.json", &first)?;
