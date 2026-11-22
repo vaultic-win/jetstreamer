@@ -4,7 +4,7 @@ use std::io::{self, BufReader, Read, Seek};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
-#[cfg(not(epoch268))]
+#[cfg(not(any(epoch268, epoch269, epoch270)))]
 mod profile {
     pub(super) const SIZE: u64 = 10_392_794_246;
     pub(super) const CAR_SIZE: u64 = 428_826_209_761;
@@ -22,6 +22,28 @@ mod profile {
     pub(super) const SOURCE: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
     pub(super) const PREFIX: &[u8; 4096] = include_bytes!("268-cid-prefix.bin");
 }
+#[cfg(epoch269)]
+mod profile {
+    pub(super) const SIZE: u64 = 12000956422;
+    pub(super) const CAR_SIZE: u64 = 472271953708;
+    pub(super) const BUCKETS: usize = 300000;
+    pub(super) const HEADER: usize = 130;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("269-cid-prefix.bin");
+}
+#[cfg(epoch270)]
+mod profile {
+    pub(super) const SIZE: u64 = 11233794466;
+    pub(super) const CAR_SIZE: u64 = 450199158585;
+    pub(super) const BUCKETS: usize = 93603;
+    pub(super) const HEADER: usize = 130;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("270-cid-prefix.bin");
+}
+#[cfg(any(
+    all(epoch268, epoch269),
+    all(epoch268, epoch270),
+    all(epoch269, epoch270)
+))]
+compile_error!("choose a single epoch");
 use profile::*;
 
 fn require(v: bool, why: &str) -> io::Result<()> {
@@ -100,8 +122,22 @@ fn inspect(file: File) -> io::Result<u64> {
 }
 
 fn run() -> io::Result<()> {
-    require(std::env::args_os().len() == 1, "unexpected arguments")?;
-    let p = Path::new(SOURCE);
+    #[cfg(not(any(epoch269, epoch270)))]
+    let p = {
+        require(std::env::args_os().len() == 1, "unexpected arguments")?;
+        Path::new(SOURCE)
+    };
+    #[cfg(any(epoch269, epoch270))]
+    let path = {
+        let mut args = std::env::args_os().skip(1);
+        let p = args
+            .next()
+            .ok_or(io::Error::other("expected qualified CID body"))?;
+        require(args.next().is_none(), "unexpected arguments")?;
+        p
+    };
+    #[cfg(any(epoch269, epoch270))]
+    let p = Path::new(&path);
     let f = OpenOptions::new()
         .read(true)
         .custom_flags(0o400000)

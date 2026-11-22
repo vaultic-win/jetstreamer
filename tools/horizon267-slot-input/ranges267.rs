@@ -75,7 +75,7 @@ impl Bucket<'_> {
     }
 }
 const SLOTS: usize = 432000;
-#[cfg(not(epoch268))]
+#[cfg(not(any(epoch268, epoch269, epoch270)))]
 mod profile {
     pub(super) const START: u64 = 115344000;
     pub(super) const CAR: u64 = 428826209761;
@@ -99,6 +99,36 @@ mod profile {
     pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("268-cid-prefix.bin");
     pub(super) const MAX_EXAMPLES: usize = 4096;
 }
+#[cfg(epoch269)]
+mod profile {
+    pub(super) const START: u64 = 116208000;
+    pub(super) const CAR: u64 = 472271953708;
+    pub(super) const SLOT_BYTES: usize = 16013365;
+    pub(super) const CID_BYTES: u64 = 12000956422;
+    pub(super) const SLOT_BUCKETS: usize = 44;
+    pub(super) const CID_BUCKETS: usize = 300000;
+    pub(super) const SLOT_PREFIX: &[u8; 4096] = include_bytes!("269-slot-to-cid.bin");
+    pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("269-cid-prefix.bin");
+    pub(super) const MAX_EXAMPLES: usize = 4096;
+}
+#[cfg(epoch270)]
+mod profile {
+    pub(super) const START: u64 = 116640000;
+    pub(super) const CAR: u64 = 450199158585;
+    pub(super) const SLOT_BYTES: usize = 15728656;
+    pub(super) const CID_BYTES: u64 = 11233794466;
+    pub(super) const SLOT_BUCKETS: usize = 41;
+    pub(super) const CID_BUCKETS: usize = 93603;
+    pub(super) const SLOT_PREFIX: &[u8; 4096] = include_bytes!("270-slot-to-cid.bin");
+    pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("270-cid-prefix.bin");
+    pub(super) const MAX_EXAMPLES: usize = 4096;
+}
+#[cfg(any(
+    all(epoch268, epoch269),
+    all(epoch268, epoch270),
+    all(epoch269, epoch270)
+))]
+compile_error!("choose a single epoch");
 use profile::*;
 fn compatible(raw: (u64, u64), block: Option<(u64, u64)>) -> bool {
     match block {
@@ -224,7 +254,7 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(epoch268))]
+    #[cfg(not(any(epoch268, epoch269, epoch270)))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
         let mut cid = [0; 36];
@@ -237,6 +267,24 @@ mod tests {
         }
         assert_eq!(bucket_number(&START.to_le_bytes(), 39), 10);
         assert_eq!(bucket_number(&cid, 86596), 42756);
+    }
+    #[cfg(epoch269)]
+    #[test]
+    fn registered_269_geometry_and_hashes() {
+        assert_eq!((START, START + SLOTS as u64 - 1), (116208000, 116639999));
+        assert_eq!(bucket_number(&START.to_le_bytes(), SLOT_BUCKETS), 32);
+        assert_eq!(bucket_number(&SLOT_PREFIX[826..862], CID_BUCKETS), 206988);
+        assert_eq!(le(&CID_PREFIX[140..146]), 130 + 16 * CID_BUCKETS as u64);
+        assert!(!compatible((u64::MAX, 2), Some((u64::MAX, 40))));
+    }
+    #[cfg(epoch270)]
+    #[test]
+    fn registered_270_geometry_and_hashes() {
+        assert_eq!((START, START + SLOTS as u64 - 1), (116640000, 117071999));
+        assert_eq!(bucket_number(&START.to_le_bytes(), SLOT_BUCKETS), 0);
+        assert_eq!(bucket_number(&SLOT_PREFIX[778..814], CID_BUCKETS), 19078);
+        assert_eq!(le(&CID_PREFIX[140..146]), 130 + 16 * CID_BUCKETS as u64);
+        assert!(!compatible((u64::MAX, 2), Some((u64::MAX, 40))));
     }
     #[cfg(epoch268)]
     #[test]

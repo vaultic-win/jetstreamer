@@ -4,7 +4,7 @@ use std::io::Read;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
-#[cfg(not(epoch268))]
+#[cfg(not(any(epoch268, epoch269, epoch270)))]
 mod profile {
     pub(super) const EPOCH: u64 = 267;
     pub(super) const PREFIX: &[u8; 4096] = include_bytes!("267-slot-to-cid.bin");
@@ -22,6 +22,30 @@ mod profile {
     pub(super) const HEADER: usize = 119;
     pub(super) const BUCKETS: usize = 44;
 }
+#[cfg(epoch269)]
+mod profile {
+    pub(super) const EPOCH: u64 = 269;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("269-slot-to-cid.bin");
+    pub(super) const SIZE: usize = 16013365;
+    pub(super) const EXPECTED: usize = 410578;
+    pub(super) const HEADER: usize = 119;
+    pub(super) const BUCKETS: usize = 44;
+}
+#[cfg(epoch270)]
+mod profile {
+    pub(super) const EPOCH: u64 = 270;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("270-slot-to-cid.bin");
+    pub(super) const SIZE: usize = 15728656;
+    pub(super) const EXPECTED: usize = 403279;
+    pub(super) const HEADER: usize = 119;
+    pub(super) const BUCKETS: usize = 41;
+}
+#[cfg(any(
+    all(epoch268, epoch269),
+    all(epoch268, epoch270),
+    all(epoch269, epoch270)
+))]
+compile_error!("choose a single epoch");
 use profile::*;
 
 fn check(condition: bool, reason: &'static str) -> Result<(), &'static str> {
