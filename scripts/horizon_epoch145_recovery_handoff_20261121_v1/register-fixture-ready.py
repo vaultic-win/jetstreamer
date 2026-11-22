@@ -29,6 +29,9 @@ def handoff_inputs():
                     "aa19524b24e32eb6a30e277c8057c1275329b9fa94f0d3bc47f7992989ba09a7")
     proof = pinned(WRITER / "PROSPECTIVE_NATIVE_PLAN.json",
                    "31c6b517efa45925e58fc035b34a79fa4337f329c48dcb6b08928fe2a52d6c01")
+    handoff_ref = pinned(WRITER / "PARENT_NATIVE_HANDOFF.json",
+                         "0131b8958990a18d86a067da3dc97b932310fdea3819ae759180115e1a111b3c")
+    handoff = common.read_ref(handoff_ref)
     packages = common.read_ref(native)
     prospect = common.read_ref(proof)
     for name in ("proof", "parent", "controller", "parent_seal", "controller_seal",
@@ -37,6 +40,15 @@ def handoff_inputs():
         common.need(common.ref(Path(bound["path"])) == bound, f"changed writer {name}")
     plan_ref = prospect["writer_plan"]
     common.need(Path(plan_ref["path"]) == WRITER / "production-plan.json", "foreign writer plan")
+    common.need(handoff["native_packages"] == native and handoff["native_plan"] == proof
+                and handoff["prospective_writer_plan"] == plan_ref and handoff["parent_proof"] == packages["proof"]
+                and handoff["physical_dispatch"] is False and handoff["ready_registered"] is False
+                and all(handoff[k] == packages[k] for k in ("parent", "controller", "parent_seal", "controller_seal",
+                                                            "launcher", "mirror_price", "mirror_price_seal")),
+                "different qualified parent handoff")
+    for name in ("fixed_mirrors", "fixed_quarter", "native_status", "registration_environment"):
+        evidence = handoff[name]
+        common.need(common.ref(Path(evidence["path"])) == evidence, f"changed handoff {name}")
     plan = common.read_ref(plan_ref)
     semantic = pinned(POST.parent / "V5F_ACTUAL_ADVANCING_WORKER.json",
                       "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496")
@@ -55,7 +67,7 @@ def handoff_inputs():
                 and plan["holding145_completion"] == completion == prospect["completion"]
                 and prospect["semantic_iid"] == SEMANTIC, "different prospective writer generation")
     return plan, dict(schema="horizon-136-registered-prestart-offer-v1", launcher=packages["launcher"],
-                      parent=packages["parent"], mirror_price=packages["mirror_price"], prestart_evidence=proof)
+                      parent=packages["parent"], mirror_price=packages["mirror_price"], prestart_evidence=handoff_ref)
 
 
 def observed_ready(dispatch_seal):
