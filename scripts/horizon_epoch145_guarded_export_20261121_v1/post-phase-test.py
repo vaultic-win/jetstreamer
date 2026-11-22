@@ -49,7 +49,10 @@ class PostPhaseTest(unittest.TestCase):
             if phase["TIMER_SUCCESSOR"]:
                 self.assertEqual(phase["PKG"].name, Path(os.environ["POST_PHASE_UNDER_TEST"]).parent.name)
                 self.assertEqual(phase["IMAGE"], phase["PKG"] / "export145")
-                self.assertEqual(phase["ADVANCING_NAME"], "V5F_ACTUAL_ADVANCING_WORKER.json" if phase["FIXTURE_SUCCESSOR"] else "V5E_ACTUAL_ADVANCING_WORKER.json")
+                name = "V5E_ACTUAL_ADVANCING_WORKER.json"
+                if phase["FIXTURE_SUCCESSOR"]:
+                    name = ("V5F_RETRY1" if phase["SAME_IMAGE_RETRY"] else "V5F") + "_ACTUAL_ADVANCING_WORKER.json"
+                self.assertEqual(phase["ADVANCING_NAME"], name)
                 self.assertEqual(phase["PIPE"].parent.name, "fast-range-residency-0f29fd116ef5")
                 return
             if phase["RETRIED_SEMANTIC"]:
@@ -117,10 +120,19 @@ class PostPhaseTest(unittest.TestCase):
                              "original_candidate":{"inode":103237059, "bytes":105610995833}}
                     started = record("recovery-started", {"iid":gen, "r2_mutations":False,
                          "file":str(base / ".tmp36MvkN"), "prior_frozen_recovery":{"failed_qualification_census":prior}})
-                    intent = save(base / "V5F_START_INTENT.json",
-                        {"schema":"horizon-145-retry-after-fixture-census-intent-v1", "old":failed,
-                         "failure":failure, "recovery":recovery})
-                    manager = save(base / "V5F_ACTUAL_MANAGER.json", {"intent":intent, "parent_pid":91,
+                    outer = {"schema":"horizon-145-retry-after-fixture-census-intent-v1", "old":failed,
+                             "failure":failure, "recovery":recovery}
+                    if phase["SAME_IMAGE_RETRY"]:
+                        owner = "50af3d8ab5da47e8bdc2828feab53908"
+                        outer.update(old=owner,
+                            failure={"path":str(folder.parent / owner / "failed.json"),
+                                     "sha256":"38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd"},
+                            recovery={"path":str(folder.parent / owner / "recovery-started.json"),
+                                      "sha256":"3dd15e821b9972e3f7f69f787d585bbe86fd9898ec1df5e8e5d08cab14231bb8"},
+                            previous_advancement={"path":str(base / "V5F_ACTUAL_ADVANCING_WORKER.json"),
+                                      "sha256":"a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496"})
+                    intent = save(base / (phase["SEMANTIC_PREFIX"] + "_START_INTENT.json"), outer)
+                    manager = save(base / (phase["SEMANTIC_PREFIX"] + "_ACTUAL_MANAGER.json"), {"intent":intent, "parent_pid":91,
                          "parent_start_ticks":123, "new":{"Id":phase["UNIT"], "InvocationID":gen}})
                     sample = dict(parent_pid=91, parent_ticks=123, child_pid=92, child_ticks=127,
                          source_inode=100214450, cgroup="/sys/fs/cgroup"+phase["CGROUP"], native_leases=list(range(7)),
@@ -131,6 +143,8 @@ class PostPhaseTest(unittest.TestCase):
                     build = dict(prior_phase=proof,semantic_start=started,semantic_manager=manager,
                                  semantic_intent=intent,old_start=recovery,old_failure=failure,
                                  original_candidate=prior["original_candidate"])
+                    if phase["SAME_IMAGE_RETRY"]:
+                        build.update(retry_failure=outer["failure"], retry_start=outer["recovery"])
                 elif phase["TIMER_SUCCESSOR"]:
                     old_failure = {"sha256": "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f"}
                     old_start = {"sha256": "2" * 64}
@@ -152,6 +166,9 @@ class PostPhaseTest(unittest.TestCase):
                 fn.__globals__.update(STATE=folder.parent, PKG=base / phase["PKG"].name, ADVANCING=proof["sha256"],
                                       ARCHIVE=pub, OUTPUT=base)
                 self.assertEqual(fn(Status(), build), (done, e))
+                if phase["SAME_IMAGE_RETRY"]:
+                    with self.assertRaisesRegex(ValueError, "different V5F same-image retry predecessor"):
+                        fn(Status(), dict(build,retry_failure=failure))
                 if phase["FIXTURE_SUCCESSOR"]:
                     with self.assertRaisesRegex(ValueError, "different V5F recovery"):
                         fn(Status(), dict(build, old_start={"sha256":"7"*64}))

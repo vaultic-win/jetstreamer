@@ -7,7 +7,9 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
 #[cfg(incident_fixture_post145_only)]
-pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v7b_post145_only) {
+pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v7c_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13c/export145"
+} else if cfg!(incident_v7b_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13b/export145"
 } else {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13/export145"
@@ -546,11 +548,26 @@ pub(super) fn fixture_semantic_owner(export: &str) -> Result<()> {
             == package
                 .parent()
                 .unwrap()
-                .join("V5F_ACTUAL_ADVANCING_WORKER.json"),
+                .join(if cfg!(incident_v7c_post145_only) {
+                    "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json"
+                } else {
+                    "V5F_ACTUAL_ADVANCING_WORKER.json"
+                }),
         "different semantic worker proof"
     );
     let worker = custody::json(&progress, true)?;
     let state = Path::new(BASE).join("state");
+    if cfg!(incident_v7c_post145_only) {
+        let failed = "50af3d8ab5da47e8bdc2828feab53908";
+        ensure!(
+            export != failed
+                && build["retry_failure"] == json!({"path":state.join(failed).join("failed.json"),
+                    "sha256":"38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd"})
+                && build["retry_start"] == json!({"path":state.join(failed).join("recovery-started.json"),
+                    "sha256":"3dd15e821b9972e3f7f69f787d585bbe86fd9898ec1df5e8e5d08cab14231bb8"}),
+            "different V5F same-image retry predecessor"
+        );
+    }
     ensure!(
         custody::hex(export, 32)
             && export != "a99ed8b51e8a482b805b8a36a11b2700"
