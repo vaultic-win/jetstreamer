@@ -17,7 +17,7 @@ use std::{
 };
 
 const BASE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v1";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v2";
 
 const DEVICE: u64 = 64512;
 const UID: u32 = 1001;
@@ -420,7 +420,9 @@ fn run() -> Result<()> {
         let first = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         let second = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         ensure!(
-            first == second && p["expected_entries"] == first.len() as u64,
+            first == second
+                && first.contains_key("")
+                && p["expected_entries"] == (first.len() - 1) as u64,
             "old accounts inventory changed"
         );
         drop(second);
