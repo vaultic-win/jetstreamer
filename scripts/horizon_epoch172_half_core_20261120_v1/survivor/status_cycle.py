@@ -33,6 +33,8 @@ import ready_audit_growth
 import resident_clock
 import retired_public_audit
 import status
+sys.path.insert(0,str(CURRENT.parent))
+import cold167_status
 
 def now():
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
@@ -58,10 +60,14 @@ def project(original, due, predecessor):
     need(original['observation_reason']=='routine' and original['minimum_interval_seconds']==1800,
          'unexpected cadence or user observation')
     owners_by_epoch={r['range']:r for r in original['replays']}
-    need(len(owners_by_epoch)==len(original['replays']) and set(owners_by_epoch) in ({'172'}, {'166','167','168','170','172'}),
+    need(len(owners_by_epoch)==len(original['replays']) and set(owners_by_epoch) in ({'172'}, {'167','172'}, {'166','167','168','170','172'}),
          'unrecognized prior producer population')
     need(owners_by_epoch['172']['producer_unit']==full172.UNIT,'changed survivor')
-    return dict(original,replays=[owners_by_epoch['172']],
+    rows=[owners_by_epoch['172']]
+    if set(owners_by_epoch)=={'167','172'}:
+        cold167_status.projection(owners_by_epoch['167'])
+        rows.insert(0,owners_by_epoch['167'])
+    return dict(original,replays=rows,
                 diagnostic_replays=[r for r in original['diagnostic_replays'] if r['range']!='169'],
                 previous_sample=predecessor['path'],output=str(names(due)['sample']),not_before_utc=due)
 
@@ -73,7 +79,9 @@ def check_sample(fleet, sample, cfg):
     need(scheduled['configured_not_before_utc']==cfg['not_before_utc'] and scheduled['observation_reason']=='routine'
          and scheduled['routine_minimum_interval_enforced'] and scheduled['previous_sample']==fleet['observer']['path']
          and scheduled['previous_sample_sha256']==fleet['observer']['sha256']
-         and scheduled['observed_interval_seconds']>=1800 and len(sample['replays'])==len(cfg['replays'])==1,
+         and scheduled['observed_interval_seconds']>=1800
+         and [r['range'] for r in sample['replays']]==[r['range'] for r in cfg['replays']]
+         and [r['range'] for r in cfg['replays']] in (['172'],['167','172']),
          'wrong sample predecessor or cadence')
     need([r['range'] for r in sample['diagnostic_replays']]==[r['range'] for r in cfg['diagnostic_replays']],
          'native diagnostic population changed')
@@ -179,6 +187,12 @@ def publish(c,store,refs,out,epoch,archive=None):
             after=full172.forecast(c,prior,archive,previous_remaining,quote['total_millis'])
             extra.update(delivery_forecast=quote,producer_invocation_id=c.full172_row['unit']['InvocationID'],
                          measured_canonical_progress=c.advancing[172],current_repair_owner=None,archive_sample=archive)
+        elif epoch in getattr(c,'new_rows',{}):
+            after,archive=cold167_status.reader().forecast(c,epoch,prior,old)
+            actor=c.new_rows[epoch]
+            extra.update(delivery_forecast=c.delivery_forecasts[epoch],producer_invocation_id=actor['unit']['InvocationID'],
+                         measured_canonical_progress=c.advancing[epoch],current_repair_owner=None,archive_sample=archive,
+                         current_guarded_admission=actor['admission'],current_guard=actor['guard_protection'])
         else:
             need(prior['phase']=='verification','new replay owner requires adoption before publication')
             age=round((c.now-utc(prior['sampled_at_utc'])).total_seconds()*1000)
@@ -191,8 +205,9 @@ def publish(c,store,refs,out,epoch,archive=None):
                 before_etag=old['after_etag'],before_sha256=old['after_sha256'],before_status=prior,
                 after_sha256=hashlib.sha256(status.body(after)).hexdigest(),after_status=after,
                 observer=c.sample_ref,fleet_predecessor=c.fleet_ref,sampled_at_utc=c.stamp,
-                current_replay_lanes=int(c.advancing[172]),canonical_producer_count=1,active_bootstraps=0,
-                current_four_homefloor_stop=c.fleet.get('current_four_homefloor_stops') if epoch in CLOSED else None,
+                **cold167_status.counts(c),
+                current_four_homefloor_stop=c.fleet.get('current_four_homefloor_stops')
+                    if epoch in CLOSED and epoch not in getattr(c,'new_rows',{}) else None,
                 archive_publication_authorized=False,replay_launch_authorized=False,**extra))
     plan=read_ref(intent)
     need(plan['previous_receipt']==original and plan['observer']==c.sample_ref and plan['fleet_predecessor']==c.fleet_ref,
@@ -273,7 +288,8 @@ def make_context(head,fleet,sample_ref,cfg,out):
     c.full172=read_ref(oref)
     need(c.full172['observer']==sample_ref and c.full172['fleet']==head and c.full172['identity']==ident,'foreign guard evidence')
     full172.reconcile_sample(c,cycle.observed_lane)
-    owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True)
+    cold167_status.reconcile(c,cycle.observed_lane)
+    owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,restored=c.recovered_owners)
     return c
 
 def baselines(head,fleet,bridge):
@@ -305,7 +321,10 @@ def census(c,bridge):
         cap['historical_pre_homefloor_metered168_observation']=cap.pop('current_metered168_observation')
     arc=status.observed_archive(c,172) if c.full172_row['scratch_path'] else None
     witness=dict(observer=c.sample_ref,fleet_predecessor=c.fleet_ref,audit=audit,capacity=cap,
-            survivors=[172],closures=deaths,focused169=diag,archive172=arc)
+            survivors=sorted([172,*c.new_rows]),closures=deaths,focused169=diag,archive172=arc,
+            cold167=c.recovered_ref)
+    if c.recovered_ref:
+        cap['current_cold167_protection']=c.recovered_ref
     durable(path,witness)
     return witness
 
@@ -320,10 +339,12 @@ def publish_all(c,bridge,store,vs):
         publish(c,store,refs,target,e,vs['archive172'] if e==172 else None)
     for e,r in refs.items(): authenticated(store,int(e),r)
     need(ready==status.inventory(c,store),'archive inventory changed during status refresh')
+    counts=cold167_status.counts(c)
     original=dict(c.prior)
     original.update(receipts={k:v for k,v in refs.items() if k!='140'},observer=c.sample_ref,
-                    active_producer_count=1,active_private_diagnostic_count=0,canonical_producer_count=1,
-                    replay_lanes=int(c.advancing[172]),active_bootstraps=0,fleet_predecessor=c.fleet_ref,
+                    active_producer_count=counts['canonical_producer_count'],active_private_diagnostic_count=0,
+                    canonical_producer_count=counts['canonical_producer_count'],replay_lanes=counts['current_replay_lanes'],
+                    active_bootstraps=counts['active_bootstraps'],fleet_predecessor=c.fleet_ref,
                     effective_status_predecessor=c.fleet['authenticated_status_audit'],sampled_at_utc=c.stamp,
                     owner=CONTROLLER,coordinated_private_diagnostic_169=vs['focused169'],
                     newer_events_read_back_without_overwrite={})
@@ -382,6 +403,11 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     fleet['complete_DATA_with_remaining_audit_growth_bytes']=fleet['complete_DATA_bytes']+cap['audit_storage']['remaining_DATA_growth_bytes']
     ready_audit_growth.reconcile(fleet,observed['audit'],cap,ar)
     prefix140_storage.reconcile(fleet,cap)
+    cold167_status.install(c,fleet)
+    if c.new_rows:
+        fleet['cycle_reconciliation_scope']='Guarded epoch 167 cold recovery and 172 replay. Four original HOME closures, terminal 169, and twenty authenticated status keys.'
+        fleet['current_replay_lane_recovery']='Maintain the admitted 167 generation and reprice 166/168/170.'
+        fleet['next_lane_recovery']=fleet['current_replay_lane_recovery']
     return fleet
 
 def track_timer(ref):
@@ -463,7 +489,7 @@ def one_cycle(head,ref,bridge):
         due=max(now()+dt.timedelta(seconds=20),utc(c.stamp)+dt.timedelta(seconds=1800))
         durable(marker,dict(due=stamp(due),observer=sample))
     when=read_ref(marker);need(when['observer']==sample,'different recorded next phase')
-    nextref=config(out,project(cfg,when['due'],sample))
+    nextref=config(out,project(c.next_cfg,when['due'],sample))
     # Commit the next active schedule before exposing the fleet as the new head.
     if utc(when['due'])>now():
         timer=schedule(nextref)
@@ -473,17 +499,17 @@ def one_cycle(head,ref,bridge):
         alt=out/'recovery-clock';ensure_dir(alt)
         altref=alt/'REGISTERED.json'
         if not altref.exists():
-            r=config(alt,project(cfg,stamp(now()+dt.timedelta(seconds=20)),sample))
+            r=config(alt,project(c.next_cfg,stamp(now()+dt.timedelta(seconds=20)),sample))
             durable(altref,dict(config=r))
         nextref=read_ref(altref)['config'];timer=schedule(nextref)
     result=fleet_successor(c,bridge,observed,legacy,whole,nextref,timer)
     target=out/'ROOT_COMPLETE_OPERATIONAL_FLEET.json';durable(target,result)
-    print(json.dumps(dict(fleet=bound(target),timer=timer,status_count=20,replay_lanes=1,advancing=c.advancing[172])),
+    print(json.dumps(dict(fleet=bound(target),timer=timer,status_count=20,**cold167_status.counts(c))),
           flush=True)
     return bound(target)
 
 def main():
-    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools/status_cycle.py','expected deployed sole controller')
+    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools-cold167/status_cycle.py','expected deployed sole controller')
     os.umask(0o077)
     fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
     try:
