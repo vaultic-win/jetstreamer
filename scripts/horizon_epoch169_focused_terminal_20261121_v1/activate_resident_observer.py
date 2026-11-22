@@ -13,6 +13,8 @@ ROOT=R/'resident-observer-20261121-v1'
 OLD=R/'host-census-clock-recovery-20261121-v1/cadence-tools'
 mode = sys.argv[1] if len(sys.argv)>1 else ''
 DEPLOYMENTS = {
+    '--private140-status': ('prefix140-cadence-20261122-v1', 'prefix140-status-cadence-20261122-v1',
+                            'zzzzzzzz-private140-status.conf', 'qualified-private140-status-cadence-v1'),
     '--prefix140-cadence': ('ready-idle-cpu-20261121-v1', 'prefix140-cadence-20261122-v1',
                             'zzzzzzz-prefix140-cadence.conf', 'qualified-prefix140-metered-cadence-v1'),
     '--ready-audit-retirement': ('resident-observer-20261121-v1', 'ready-audit-cadence-20261121-v1',
@@ -70,7 +72,7 @@ def fresh_paid_boundary():
         return dict(manager=m,stage='stopped')
     assert m['ActiveState']=='active' and m['InvocationID']
     parent=Path('/proc')/m['MainPID']
-    version,provider=('v5e','v16') if mode=='--prefix140-cadence' else ('v5d','v14')
+    version,provider=('v5e','v16') if mode in ('--prefix140-cadence','--private140-status') else ('v5d','v14')
     assert (parent/'exe').resolve()==R/f'epoch145-semantic-continuity-20261121-v1/tools-{version}/export145'
     end=time.monotonic()+95
     while time.monotonic()<end:
