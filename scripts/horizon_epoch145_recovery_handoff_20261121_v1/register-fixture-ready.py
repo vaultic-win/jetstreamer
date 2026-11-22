@@ -31,6 +31,13 @@ def handoff_inputs():
                    "31c6b517efa45925e58fc035b34a79fa4337f329c48dcb6b08928fe2a52d6c01")
     handoff_ref = pinned(WRITER / "PARENT_NATIVE_HANDOFF.json",
                          "0131b8958990a18d86a067da3dc97b932310fdea3819ae759180115e1a111b3c")
+    semantic = pinned(POST.parent / "V5F_ACTUAL_ADVANCING_WORKER.json",
+                      "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496")
+    seal = pinned(POST / "deployment-seal-receipt.json", "6654198121f2e9e1b63cb9b48f7f73c500d7b465bc34ac205316b84f90d0ec5c")
+    return inspect_handoff(WRITER, POST, SEMANTIC, semantic, seal, native, proof, handoff_ref)
+
+
+def inspect_handoff(writer, post, semantic_iid, semantic, seal, native, proof, handoff_ref):
     handoff = common.read_ref(handoff_ref)
     packages = common.read_ref(native)
     prospect = common.read_ref(proof)
@@ -39,7 +46,7 @@ def handoff_inputs():
         bound = packages[name]
         common.need(common.ref(Path(bound["path"])) == bound, f"changed writer {name}")
     plan_ref = prospect["writer_plan"]
-    common.need(Path(plan_ref["path"]) == WRITER / "production-plan.json", "foreign writer plan")
+    common.need(Path(plan_ref["path"]) == writer / "production-plan.json", "foreign writer plan")
     common.need(handoff["native_packages"] == native and handoff["native_plan"] == proof
                 and handoff["prospective_writer_plan"] == plan_ref and handoff["parent_proof"] == packages["proof"]
                 and handoff["physical_dispatch"] is False and handoff["ready_registered"] is False
@@ -50,12 +57,8 @@ def handoff_inputs():
         evidence = handoff[name]
         common.need(common.ref(Path(evidence["path"])) == evidence, f"changed handoff {name}")
     plan = common.read_ref(plan_ref)
-    semantic = pinned(POST.parent / "V5F_ACTUAL_ADVANCING_WORKER.json",
-                      "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496")
-    completion = dict(seal=pinned(POST / "deployment-seal-receipt.json",
-                                  "6654198121f2e9e1b63cb9b48f7f73c500d7b465bc34ac205316b84f90d0ec5c"),
-                      build=common.ref(POST / "build-proof.json"),
-                      adapter=common.ref(POST / "incident-post-phase.py"))
+    completion = dict(seal=seal, build=common.ref(post / "build-proof.json"),
+                      adapter=common.ref(post / "incident-post-phase.py"))
     inspection = prospect["inspection"]
     common.need(not any(packages[k] for k in ("registered", "launched"))
                 and not any(prospect[k] for k in ("registered", "launched", "donor_fenced"))
@@ -65,7 +68,7 @@ def handoff_inputs():
                 and plan["controller_deployment"] == inspection["writer_deployment"] == packages["controller_seal"]
                 and plan["holding145_semantic_worker"] == semantic == prospect["semantic_worker"]
                 and plan["holding145_completion"] == completion == prospect["completion"]
-                and prospect["semantic_iid"] == SEMANTIC, "different prospective writer generation")
+                and prospect["semantic_iid"] == semantic_iid, "different prospective writer generation")
     return plan, dict(schema="horizon-136-registered-prestart-offer-v1", launcher=packages["launcher"],
                       parent=packages["parent"], mirror_price=packages["mirror_price"], prestart_evidence=handoff_ref)
 
@@ -81,19 +84,23 @@ def observed_ready(dispatch_seal):
                                        [DIRECTORY / "state/controller.lock", common.LOCK])
     seal = pinned(PROVIDER / "deployment-seal-receipt.json",
                   "b4cc3480c03ac70f23ee252032a8f2b23e1adcfdac836ff5319127e6f0ac69c8")
+    return ready_for(identity, DISPATCHER, SEMANTIC, PROVIDER, seal)
+
+
+def ready_for(identity, dispatcher, semantic, provider, seal):
     document = common.read_ref(seal)
-    image = common.ref(PROVIDER / "post-stop-fit")
-    common.need(document["destination"] == str(PROVIDER) and document["sealer_sha256"] == common.SEALER
+    image = common.ref(provider / "post-stop-fit")
+    common.need(document["destination"] == str(provider) and document["sealer_sha256"] == common.SEALER
                 and document["remote_mutations"] is False
                 and [x["sha256"] for x in document["members"] if x["name"] == "post-stop-fit"
                      and x["mode"] == "0555"] == [image["sha256"]], "different registered provider")
     status = runpy.run_path(image["path"])["registered_status"]()
     consumer = pinned(common.CADENCE, "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
     common.need(status["consumer_seal"] == consumer, "different status consumer")
-    common.same_dispatcher(DISPATCHER, identity["dispatcher"])
+    common.same_dispatcher(dispatcher, identity["dispatcher"])
     return dict(schema="horizon-145-136-prestart-selector-ready-v1", **identity,
                 boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-                original_semantic_invocation=SEMANTIC, operation_lock=common.lock_identity(common.OP),
+                original_semantic_invocation=semantic, operation_lock=common.lock_identity(common.OP),
                 registered_provider=dict(image=image, seal=seal), status_consumer_seal=consumer)
 
 
