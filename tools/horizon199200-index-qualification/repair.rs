@@ -94,6 +94,8 @@ fn known_root(e: u64) -> Result<&'static str> {
         200 => Ok("bafyreibhxmsejxsshqpplpyhrpvf3tbl2cgl7qj33snet5b3q2txorimfu"),
         267 => Ok("bafyreifn4ykgns5ih2lzfzrvky2u5vfh4jvqcqy7tdylujrbvl6pqavi4m"),
         268 => Ok("bafyreiadrsuockl4wyx2s2nu247atdi7xhc6pc7ynhmetagg7mdkjdktgu"),
+        269 => Ok("bafyreihyxzt42dpkxrmluxqvkxqfnkas7czh5igcvorg5a7fr4ckvewxzm"),
+        270 => Ok("bafyreiewpp2gte55lvp5ml7labmgudq72juwvj5o5j3jd6xyjjbaxpudcu"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -296,7 +298,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     let mut changes = Vec::new();
     let mut verified_skips = Vec::new();
     for (slot, value) in witness {
-        if e == 268 && value.is_none() {
+        if (268..=270).contains(&e) && value.is_none() {
             verified_skips.push(slot);
         }
         let was = row(&raw, e, slot)?;
@@ -332,7 +334,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     }
     let mut result = json!({"epoch":e,"root":known_root(e)?,"windows":partial,"changes":changes,"present":present,"skips":SLOTS-present as u64,
         "physical_end":pos,"original_sha256":sha(&raw),"corrected_sha256":sha(&corrected)});
-    if e == 268 {
+    if (268..=270).contains(&e) {
         result["rooted_window_skips"] = json!(verified_skips);
     }
     save(&out.join(format!("epoch-{e}-slot-ranges.raw")), &corrected)?;
@@ -345,33 +347,48 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     )
 }
 
-fn reviewed268(plan_path: &Path, expected: &str) -> Result<(String, u64, usize)> {
+fn reviewed(epoch: u64, plan_path: &Path, expected: &str) -> Result<(String, u64, usize)> {
+    let (car_bytes, header_sha) = match epoch {
+        268 => (
+            476675176389,
+            "56e3dd997f05185be809c81914781ae69a5c65c5199b2aca467041e11af41333",
+        ),
+        269 => (
+            472271953708,
+            "72d6c4f592052faafeb2f1f71ee13f61ec621db543ee11d6d1fc5dfa1a92337a",
+        ),
+        270 => (
+            450199158585,
+            "2f147ec43612148360a9eaca172011f46c64d61e5e521fd67621626423c818f7",
+        ),
+        _ => return Err("unregistered dynamic epoch".into()),
+    };
+    let first = epoch * SLOTS;
     let len = fs::symlink_metadata(plan_path)?.len();
     if len > 256_000 {
-        return Err("oversized epoch 268 capture plan".into());
+        return Err(format!("oversized epoch {epoch} capture plan").into());
     }
     let input = read(plan_path, len)?;
     if sha(&input) != expected {
-        return Err("unrecognized epoch 268 capture plan".into());
+        return Err(format!("unrecognized epoch {epoch} capture plan").into());
     }
     let doc: Value = serde_json::from_slice(&input)?;
     let epochs = doc["epochs"].as_array().ok_or("plan epochs")?;
     if epochs.len() != 1 {
-        return Err("expected singleton 268".into());
+        return Err("expected singleton dynamic epoch".into());
     }
     let p = &epochs[0];
     let car = number(p, "car_bytes")?;
     let foot = number(p, "footer_at")?;
-    if number(p, "epoch")? != 268
-        || car != 476675176389
-        || text(p, "root")? != known_root(268)?
-        || text(p, "header_sha256")?
-            != "56e3dd997f05185be809c81914781ae69a5c65c5199b2aca467041e11af41333"
+    if number(p, "epoch")? != epoch
+        || car != car_bytes
+        || text(p, "root")? != known_root(epoch)?
+        || text(p, "header_sha256")? != header_sha
         || foot < HEADER
         || foot >= car
         || car - foot > 32 << 20
     {
-        return Err("wrong epoch 268 source geometry".into());
+        return Err("wrong registered epoch geometry".into());
     }
     let ws = p["individual_windows"].as_array().ok_or("windows")?;
     if ws.len() > 256 {
@@ -384,8 +401,8 @@ fn reviewed268(plan_path: &Path, expected: &str) -> Result<(String, u64, usize)>
         let hi = number(w, "hi_slot")?;
         let a = number(w, "start")?;
         let b = number(w, "end")?;
-        if lo < 115776000
-            || hi > 116207999
+        if lo < first
+            || hi >= first + SLOTS
             || lo >= hi
             || hi - lo > 64
             || a < HEADER
@@ -394,7 +411,7 @@ fn reviewed268(plan_path: &Path, expected: &str) -> Result<(String, u64, usize)>
             || b - a > 20 << 20
             || !seen.insert((a, b))
         {
-            return Err("invalid or duplicate 268 window".into());
+            return Err("invalid or duplicate dynamic window".into());
         }
         bytes += b - a;
     }
@@ -410,11 +427,18 @@ fn reviewed268(plan_path: &Path, expected: &str) -> Result<(String, u64, usize)>
 fn main() -> Result<()> {
     let mut command = env::args_os().skip(1).peekable();
     let owned;
-    let (profile, body_bytes, range_count) = if command.next_if(|s| s == "--epoch268").is_some() {
-        let path = command.next().ok_or("usage: repair --epoch268 PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
-        let digest = command.next().ok_or("missing epoch 268 plan SHA-256")?;
+    let dynamic_epoch = match command.peek().and_then(|arg| arg.to_str()) {
+        Some("--epoch268") => Some(268),
+        Some("--epoch269") => Some(269),
+        Some("--epoch270") => Some(270),
+        _ => None,
+    };
+    let (profile, body_bytes, range_count) = if let Some(epoch) = dynamic_epoch {
+        command.next();
+        let path = command.next().ok_or("usage: repair --epoch{268,269,270} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let digest = command.next().ok_or("missing reviewed plan SHA-256")?;
         let (plan, bytes, count) =
-            reviewed268(Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
+            reviewed(epoch, Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
         owned = plan;
         (owned.as_str(), bytes, count)
     } else if command.next_if(|s| s == "--epoch267").is_some() {
@@ -429,7 +453,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267 | --epoch268 PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch{268,269,270} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
