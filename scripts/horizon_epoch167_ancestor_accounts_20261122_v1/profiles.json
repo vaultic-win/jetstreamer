@@ -1,0 +1,155 @@
+{
+  "latest_stop": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch167-source-index-recovery-20261121-v1/guard-receipts/stop-completion.json",
+    "sha256": "50c7f072d70a1e3112c67034e4fc324a8597093871483c7c3af411bb52ea1c64"
+  },
+  "profiles": {
+    "local3retry5": {
+      "admission": {
+        "path": "/var/lib/jetstreamer/retry5-single167-guarded-launch-20261117-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "e4332cdc5f6163748bbaa8197ae200e5da407362d688ec78290fa127c81fc1e1"
+      },
+      "attempt": "local3retry5",
+      "cohort_file": {
+        "device": 64512,
+        "inode": 105250886,
+        "mode": 33152,
+        "mtime_ns": 1794946624974260885,
+        "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-aba639b394b2b3acee46b856c25cef6b6c85d13305f0f16ae79f0a7fe545bbbe/work/root-cohort-167-167/run-872689-1794946624975400750/cohort-state.json",
+        "size": 222
+      },
+      "cohort_sha256": "4f8f0119713fb8945f778eaaf9a6881c4b192e3d2f56d78b1c611611d5d5b2c2",
+      "expected_bytes": 50550640640,
+      "expected_entries": 388995,
+      "guard": "horizon-guard-replacement-167-local3retry5-20261110-v1.service",
+      "iid": "c6f69b8bb668428ea560b12736a53b6b",
+      "inode": 105709694,
+      "intent": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry5/guard-state/receipts/stop-intent.json",
+        "sha256": "f98f19b72fedbe9e2e73bef057bb259b6d9ea670c4d306bb7f419fe71bb593f9"
+      },
+      "plan": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry5/guard-state/plan-sealed-v1/guard-plan.json",
+        "sha256": "ec4eedcd9018d13bad813dfc849133c9de32ab6c197bd90f9b792d7d54552876"
+      },
+      "preserved": [
+        {
+          "device": 64512,
+          "inode": 105250973,
+          "mode": 33152,
+          "mtime_ns": 1795004056832077250,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-aba639b394b2b3acee46b856c25cef6b6c85d13305f0f16ae79f0a7fe545bbbe/work/root-cohort-167-167/run-872689-1794946624975400750/archives/epoch-167.jet",
+          "size": 35066573092
+        },
+        {
+          "device": 64512,
+          "inode": 105250938,
+          "mode": 33152,
+          "mtime_ns": 1794946636377312551,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-aba639b394b2b3acee46b856c25cef6b6c85d13305f0f16ae79f0a7fe545bbbe/work/root-cohort-167-167/run-872689-1794946624975400750/scratch/.historical-runtime/jetstreamer-historical-parent-qGuLif/bound-bootstrap/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst",
+          "size": 2022614652
+        },
+        {
+          "device": 64512,
+          "inode": 105709692,
+          "mode": 33188,
+          "mtime_ns": 1617526906000000000,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-aba639b394b2b3acee46b856c25cef6b6c85d13305f0f16ae79f0a7fe545bbbe/work/root-cohort-167-167/run-872689-1794946624975400750/scratch/.historical-runtime/jetstreamer-historical-parent-qGuLif/jetstreamer-historical-v1.5.6-qk7h7l/unpacked/snapshots/72143703/72143703",
+          "size": 39317419
+        }
+      ],
+      "protection": {
+        "path": "/var/lib/jetstreamer/retry5-single167-guarded-launch-20261117-v1/epoch167/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "faac89575a00a973d4ff83e6b63d4155d12ca9436d3125db7ed8b3ae6d5c4e0a"
+      },
+      "runtime_entries": [
+        "accounts-state",
+        "genesis-unpacked",
+        "unpacked"
+      ],
+      "stop": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry5/guard-state/receipts/stop-completion.json",
+        "sha256": "65a1a0f574e0f5f776ca1540cf5498300aa0a87016055f4ab8de0a8327900062"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry5-20261110-v1/private/destination-aba639b394b2b3acee46b856c25cef6b6c85d13305f0f16ae79f0a7fe545bbbe/work/root-cohort-167-167/run-872689-1794946624975400750/scratch/.historical-runtime/jetstreamer-historical-parent-qGuLif/jetstreamer-historical-v1.5.6-qk7h7l/accounts-state",
+      "timer": "horizon-guard-replacement-167-local3retry5-20261110-v1.timer",
+      "unit": "horizon-qualify-167-replacement-local3retry5-20261110-v1.service"
+    },
+    "local3retry7": {
+      "admission": {
+        "path": "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_REPLACEMENT_ADMISSION.json",
+        "sha256": "e2b8c18f572903fec9e0a28a2469f732855b69b63fb1e3ef489c26b0a294648d"
+      },
+      "attempt": "local3retry7",
+      "cohort_file": {
+        "device": 64512,
+        "inode": 108003356,
+        "mode": 33152,
+        "mtime_ns": 1795071350250194823,
+        "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/cohort-state.json",
+        "size": 222
+      },
+      "cohort_sha256": "4f8f0119713fb8945f778eaaf9a6881c4b192e3d2f56d78b1c611611d5d5b2c2",
+      "expected_bytes": 45008977920,
+      "expected_entries": 383684,
+      "guard": "horizon-guard-replacement-167-local3retry7-20261110-v1.service",
+      "iid": "a680103e76f546faaf469aa80c35fa3b",
+      "inode": 108789766,
+      "intent": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry7/guard-state/receipts/stop-intent.json",
+        "sha256": "dd5f515167b27bc1541c73d57e98c2bfab975ee0e1b6ca051be28a4b79f8f946"
+      },
+      "plan": {
+        "path": "/usr/local/lib/jetstreamer/horizon-replacement167-local3retry7-guard-a680103e76f546faaf469aa80c35fa3b-20261118-v1/guard-plan.json",
+        "sha256": "4c2501603ac301447446e059858791ce3910c246660794c1fda5c4bedd0fb546"
+      },
+      "preserved": [
+        {
+          "device": 64512,
+          "inode": 108003383,
+          "mode": 33152,
+          "mtime_ns": 1795137916049195443,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/archives/epoch-167.jet",
+          "size": 40619487949
+        },
+        {
+          "device": 64512,
+          "inode": 108003373,
+          "mode": 33152,
+          "mtime_ns": 1795071361597247067,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/scratch/.historical-runtime/jetstreamer-historical-parent-hhCwNI/bound-bootstrap/snapshot-72143703-CJEQdfn6zGqx4da6wL7CqgDhNAEij9tCPz7CrY9ZWH1a.tar.zst",
+          "size": 2022614652
+        },
+        {
+          "device": 64512,
+          "inode": 108789764,
+          "mode": 33188,
+          "mtime_ns": 1617526906000000000,
+          "path": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/scratch/.historical-runtime/jetstreamer-historical-parent-hhCwNI/jetstreamer-historical-v1.5.6-BckCOM/unpacked/snapshots/72143703/72143703",
+          "size": 39317419
+        }
+      ],
+      "protection": {
+        "path": "/var/lib/jetstreamer/retry7-single167-guarded-launch-20261119-v1/epoch167/ACTUAL_GUARD_PROTECTION.json",
+        "sha256": "b6708b351bfd18d4a755147433fb4306c5db7def507158a392b00460decc0576"
+      },
+      "runtime_entries": [
+        "accounts-state",
+        "genesis-unpacked",
+        "unpacked"
+      ],
+      "stop": {
+        "path": "/var/lib/jetstreamer/retry3-preparation-20261113-v1/epoch167/local3retry7/guard-state/receipts/stop-completion.json",
+        "sha256": "5b51b01a57f5c717ef6397cad6bcc6b01ac72336e84d02d2b9354c99ee3fd5aa"
+      },
+      "target": "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/private/destination-fa04a9e9c489108e13fa7d9a23ad7b245fd0684341dc686041698e23da441581/work/root-cohort-167-167/run-1871809-1795071350250949686/scratch/.historical-runtime/jetstreamer-historical-parent-hhCwNI/jetstreamer-historical-v1.5.6-BckCOM/accounts-state",
+      "timer": "horizon-guard-replacement-167-local3retry7-20261110-v1.timer",
+      "unit": "horizon-qualify-167-replacement-local3retry7-20261110-v1.service"
+    }
+  },
+  "schema": "horizon-167-closed-accounts-profiles-v1",
+  "witness": {
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/NATIVE_WITNESS.json",
+    "sha256": "33e62f01194935876985fabdc18a283ac00baccef58e30e97c65360420bb7f91"
+  }
+}

@@ -8,11 +8,21 @@ const BASE: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const PREFIX: &str = "horizon-observer-root";
 const TAIL: &str = "-live166167170-20261122-v1";
 const SEED: &str = "system:horizon-observer-root024010-live166167170-20261122-v1.service";
+const SURVIVOR_SEED: &str = "system:horizon-observer-root191757-live166167170-20261122-v1.service";
+const SURVIVOR_CONFIG_SHA: &str =
+    "cad29ce493591878fe4227ebeaf6f597b3e05620e5c73003196fbfd314693f92";
 const WRAPPER: &str = "/var/lib/jetstreamer/horizon_runtime_data/prefix140-status-cadence-20261122-v1/cadence-tools/guard_stops.py";
 const PYTHON: &str = "/usr/bin/python3";
 const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/resident-observer-20261121-v1/observer/jetstreamer-horizon-observe";
 
+#[derive(Clone, Copy)]
+enum Observer {
+    GuardStops,
+    Survivor172,
+}
+
 struct Schedule {
+    observer: Observer,
     seconds: u32,
     id: String,
     previous_dir: String,
@@ -56,23 +66,30 @@ impl Schedule {
         );
         let hour: u32 = time[..2].parse()?;
         let minute: u32 = time[2..4].parse()?;
-        ensure!(
-            hour < 24 && matches!(minute, 10 | 40) && &time[4..] == "10",
-            "observer is off cadence"
-        );
-        let seconds = hour * 3600 + minute * 60 + 10;
-        ensure!(
-            seconds >= 2 * 3600 + 40 * 60 + 10,
-            "observer predates reviewed seed"
-        );
+        let second: u32 = time[4..].parse()?;
+        let seconds = hour * 3600 + minute * 60 + second;
+        ensure!(hour < 24, "observer hour outside day");
+        let observer = match (minute, second) {
+            (10 | 40, 10) if seconds >= 2 * 3600 + 40 * 60 + 10 => Observer::GuardStops,
+            (17 | 47, 57) if seconds >= 19 * 3600 + 17 * 60 + 57 => Observer::Survivor172,
+            _ => anyhow::bail!("observer is off the reviewed cadence"),
+        };
         let previous_dir = format!("{BASE}/root{}{TAIL}", tag(seconds - 1800));
         Ok(Some(Self {
+            observer,
             seconds,
             id: id.into(),
             config: format!("{previous_dir}/sealed-next/observer.json"),
             previous_dir,
             fragment: format!("/run/systemd/transient/{id}"),
         }))
+    }
+
+    fn seed(&self) -> &'static str {
+        match self.observer {
+            Observer::GuardStops => SEED,
+            Observer::Survivor172 => SURVIVOR_SEED,
+        }
     }
 
     fn manager(&self, route: &Value) -> Result<Value> {
@@ -83,11 +100,14 @@ impl Schedule {
             .get_mut("properties")
             .and_then(Value::as_object_mut)
             .context("manager properties")?;
+        let command = match self.observer {
+            Observer::GuardStops => format!("{PYTHON} -B {WRAPPER} {}", self.config),
+            Observer::Survivor172 => format!("{IMAGE} {}", self.config),
+        };
         ensure!(
             props.remove("Id") == Some(json!(self.id))
                 && props.remove("FragmentPath") == Some(json!(self.fragment))
-                && props.remove("ExecStart")
-                    == Some(json!(format!("{PYTHON} -B {WRAPPER} {}", self.config)))
+                && props.remove("ExecStart") == Some(json!(command))
                 && props.get("DropInPaths") == Some(&json!("")),
             "observer identity, arguments or drop-ins changed"
         );
@@ -98,9 +118,13 @@ impl Schedule {
         ensure!(
             files.remove(&self.fragment).is_some()
                 && files.remove(&self.config).is_some()
-                && files.len() == 2
-                && files.contains_key(PYTHON)
-                && files.contains_key(WRAPPER),
+                && match self.observer {
+                    Observer::GuardStops =>
+                        files.len() == 2
+                            && files.contains_key(PYTHON)
+                            && files.contains_key(WRAPPER),
+                    Observer::Survivor172 => files.len() == 1 && files.contains_key(IMAGE),
+                },
             "different manager inputs"
         );
         Ok(stable)
@@ -262,7 +286,7 @@ fn compare(
     seed_config: &[u8],
     fragment: &[u8],
 ) -> Result<()> {
-    let base = Schedule::from_unit(SEED)?.context("invalid compiled seed")?;
+    let base = Schedule::from_unit(s.seed())?.context("invalid compiled seed")?;
     ensure!(
         s.manager(route)? == base.manager(seed)?,
         "observer manager or fixed inputs changed"
@@ -285,7 +309,7 @@ pub(super) fn reviewed(unit: &str, route: &Value, approved: &Map<String, Value>)
     let Some(s) = Schedule::from_unit(unit)? else {
         return Ok(false);
     };
-    let Some(seed) = approved.get(SEED) else {
+    let Some(seed) = approved.get(s.seed()) else {
         return Ok(false);
     };
     let fragment = sample_bound(&s.fragment, 1 << 16, &route["inputs"][&s.fragment])?;
@@ -294,7 +318,7 @@ pub(super) fn reviewed(unit: &str, route: &Value, approved: &Map<String, Value>)
 }
 
 fn verify_route(s: &Schedule, route: &Value, seed: &Value, fragment: &[u8]) -> Result<()> {
-    let base = Schedule::from_unit(SEED)?.context("invalid compiled seed")?;
+    let base = Schedule::from_unit(s.seed())?.context("invalid compiled seed")?;
     let config = sample_bound(&s.config, 2 << 20, &route["inputs"][&s.config])?;
     let seed_config = sample_bound(&base.config, 2 << 20, &seed["inputs"][&base.config])?;
     ensure!(
@@ -302,17 +326,32 @@ fn verify_route(s: &Schedule, route: &Value, seed: &Value, fragment: &[u8]) -> R
         "unbound observer fragment"
     );
     compare(s, route, seed, &config, &seed_config, fragment)?;
-    ensure!(
-        sha(&sample_bound(WRAPPER, 1 << 20, &route["inputs"][WRAPPER])?)
-            == "c02a87bfe7a37153b47ed11f0cd26439327e84010afb5d0fe5d91536017befc2",
-        "unrecognized observer wrapper"
-    );
-    ensure!(
-        sha(&raw(&Path::new(PYTHON).canonicalize()?, 16 << 20, true)?)
-            == "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
-            && fs::metadata(PYTHON).map(|m| ident(&m))? == seed["inputs"][PYTHON]["identity"],
-        "observer interpreter changed"
-    );
+    match s.observer {
+        Observer::GuardStops => {
+            ensure!(
+                sha(&sample_bound(WRAPPER, 1 << 20, &route["inputs"][WRAPPER])?)
+                    == "c02a87bfe7a37153b47ed11f0cd26439327e84010afb5d0fe5d91536017befc2",
+                "unrecognized observer wrapper"
+            );
+            ensure!(
+                sha(&raw(&Path::new(PYTHON).canonicalize()?, 16 << 20, true)?)
+                    == "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f"
+                    && fs::metadata(PYTHON).map(|m| ident(&m))?
+                        == seed["inputs"][PYTHON]["identity"],
+                "observer interpreter changed"
+            );
+        }
+        Observer::Survivor172 => {
+            ensure!(
+                sha(&seed_config) == SURVIVOR_CONFIG_SHA,
+                "different survivor seed or replay population"
+            );
+            ensure!(
+                route["inputs"][IMAGE]["identity"] == ident(&fs::metadata(IMAGE)?),
+                "changed survivor executable identity"
+            );
+        }
+    }
     ensure!(
         sha(&raw(Path::new(IMAGE), 4 << 20, true)?)
             == "1c248bf2b2c5e12886ae32a2d71ca8cfa12881f63368ce896b3fa832b2dfab1f",
@@ -342,6 +381,56 @@ mod tests {
     fn route(s: &Schedule) -> Value {
         json!({"properties":{"Id":s.id,"FragmentPath":s.fragment,"DropInPaths":"","ExecStart":format!("{PYTHON} -B {WRAPPER} {}",s.config),"WorkingDirectory":""},
                "inputs":{PYTHON:{"identity":[1,2]},WRAPPER:{"sha256":"wrapper"},s.config.clone():{"sha256":sha(&config(s))},s.fragment.clone():{"sha256":sha(fragment(s).as_bytes())}}})
+    }
+    #[test]
+    fn direct_survivor_routes_preserve_the_sealed_reader_and_epoch_scope() {
+        let base = schedule("191757");
+        let next = schedule("194757");
+        let direct = |s: &Schedule| {
+            let mut r = route(s);
+            r["properties"]["ExecStart"] = json!(format!("{IMAGE} {}", s.config));
+            let files = r["inputs"].as_object_mut().unwrap();
+            files.remove(PYTHON);
+            files.remove(WRAPPER);
+            files.insert(IMAGE.into(), json!({"identity":[1,2]}));
+            r
+        };
+        let mut seed = direct(&base);
+        let first_fragment = format!(
+            "Description={IMAGE} {}\nExecStart={IMAGE} {}\n",
+            base.config, base.config
+        );
+        seed["inputs"][&base.fragment]["sha256"] = json!(sha(first_fragment.as_bytes()));
+        let current = direct(&next);
+        let cfg = config(&next);
+        let seed_cfg = config(&base);
+        let fragment = format!(
+            "Description={IMAGE} {}\nExecStart={IMAGE} {}\n",
+            next.config, next.config
+        );
+        let accepts = |route: &Value, bytes: &[u8]| {
+            compare(&next, route, &seed, bytes, &seed_cfg, fragment.as_bytes())
+        };
+        assert!(accepts(&current, &cfg).is_ok());
+        let mut wrong = current.clone();
+        wrong["properties"]["ExecStart"] = json!(format!("{PYTHON} -B {WRAPPER} {}", next.config));
+        assert!(accepts(&wrong, &cfg).is_err());
+        let mut wrong_scope: Value = serde_json::from_slice(&cfg).unwrap();
+        wrong_scope["replays"] = json!([170]);
+        assert!(accepts(&current, &serde_json::to_vec(&wrong_scope).unwrap()).is_err());
+        assert!(Schedule::from_unit(&SURVIVOR_SEED.replace("191757", "191758")).is_err());
+        assert!(Schedule::from_unit(&SURVIVOR_SEED.replace("191757", "184757")).is_err());
+    }
+
+    #[test]
+    #[ignore = "requires the signed current host route and predecessor fleet"]
+    fn current_native_survivor_seed() -> Result<()> {
+        let path = std::env::var("HORIZON_COLD130_SURVIVOR_ROUTE")?;
+        let routes: Value = serde_json::from_slice(&fs::read(path)?)?;
+        let seed = &routes[SURVIVOR_SEED];
+        let s = Schedule::from_unit(SURVIVOR_SEED)?.unwrap();
+        let f = fs::read(&s.fragment)?;
+        verify_route(&s, seed, seed, &f)
     }
     #[test]
     fn only_approved_november_22_clock_and_predecessor() {
