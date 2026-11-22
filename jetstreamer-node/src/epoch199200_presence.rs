@@ -16,6 +16,7 @@ const COHORT_274_277_SHA: &str = "bfaec617dd5fdbd2294f19f223ffcd38d2ce8650e6c157
 const COHORT_277_280_SHA: &str = "511f9cac500fc75eaaa86ee0e46fabee67a26d3f20f41cf38d7cb9b728fe064a";
 const COHORT_280_282_SHA: &str = "af9d5fcd9383e918efaeaf5546a63f04801e08dacfb3ade962c72c801aa636d6";
 const COHORT_282_287_SHA: &str = "1b77f353edca605aafc74531503ca66c1f22afcf6442a1928a35b13266e07456";
+const COHORT_287_291_SHA: &str = "2371bb638798ec91fc57c57acde95c3d25e35a6a79abe61a21ed3343a9be1602";
 const SLOTS: u64 = 432_000;
 const TABLE_BYTES: usize = SLOTS as usize * 12;
 
@@ -213,6 +214,14 @@ const EPOCH_286: Profile = Profile { epoch: 286, raw_sha: "8264bd00f0959c298773b
 
 const EPOCH_287: Profile = Profile { epoch: 287, raw_sha: "84840b5814d69c57e514997a2ed696940088ce280b727b40fd269ae5922b3342", compact_sha: "a305c8579265db1240d558fbb55f8715c8e387ceacce1b628bf482333c8ef4d5", proven_skips: &[123987056, 124013282, 124044238, 124113164, 124197084, 124218451, 124256576, 124263480, 124264364, 124303310, 124323292, 124342757, 124347190, 124361448, 124373120, 124384036, 124404404], };
 
+const EPOCH_288: Profile = Profile { epoch: 288, raw_sha: "9d3e8484fd30a47081f957bb0a0c51a295699a39a5bf8cbe2d3f655160daa0a9", compact_sha: "33b45ab949b64384e79ac901b1efccbba3f9d461356dfb282217deff0fb1e064", proven_skips: &[124421322, 124443384, 124468130, 124469896, 124470226, 124496342, 124501153, 124503340, 124532364, 124537689, 124550252, 124585180, 124586520, 124620423, 124627829, 124639920, 124696371, 124698026, 124701379, 124730372, 124764481, 124765026], };
+
+const EPOCH_289: Profile = Profile { epoch: 289, raw_sha: "07dc4f9eb5316d4b41e72771751b5fa28347b5f9fcb30fe14c54e0c95b7f1e40", compact_sha: "11e51436e48565a8ccaedc7f29c986db0250605fb76be4428b206dfe26f7b5ad", proven_skips: &[124885876, 124933073, 124964816, 125039944, 125052852, 125066744, 125095799, 125105244, 125255635, 125274555, 125275286], };
+
+const EPOCH_290: Profile = Profile { epoch: 290, raw_sha: "26e5a644ef5a4325a1ac85aeb24a114bff7d3373230b92ae748198d82fbfa9cd", compact_sha: "9ef2163f5bf87022660af9c3a944a6f747c4d7711a4ab6182be2c2709717f805", proven_skips: &[125317639, 125341538, 125439204, 125530076, 125556713, 125602510, 125665561], };
+
+const EPOCH_291: Profile = Profile { epoch: 291, raw_sha: "9568ff835536291f8e794b473d463696001fd98a851d007b4552b3c765d43d2d", compact_sha: "b861fde53874950253a107aad277f9d8372d03d5249b77e4625f1e1e7c585878", proven_skips: &[125722612, 125844447, 125980483, 125988329, 125992032, 126005727, 126007633, 126015745, 126019673, 126036416, 126114254], };
+
 pub(super) struct RootedSlotPresence {
     profile: &'static Profile,
     raw: Vec<u8>,
@@ -287,6 +296,10 @@ impl RootedSlotPresence {
             285 => (&EPOCH_285, "af2f553c3e38130ca398d95cb061642f18844716c60e44ddc4d28d319a1f5a1f"),
             286 => (&EPOCH_286, "1124c3dfba0b5bb15914d9375109a7262a9390bc1c939d64e714153cf8800d8e"),
             287 => (&EPOCH_287, "75e657ca86720f75d8888a91bc44e2b376dcd458b8c4d81eec6e79ba84b72cd0"),
+            288 => (&EPOCH_288, "e2dd00891f1bc8f22ca321751e993ad32de54374ff9a942a78e76753693f7043"),
+            289 => (&EPOCH_289, "c8ad407daf7103c21997d32f31b2552c4dd58d396e218c54e2057d85aa235d32"),
+            290 => (&EPOCH_290, "a95a06cd0f12d4ff21e0cbb4dd20f21c9eb6658912b169d1898778dc192dcece"),
+            291 => (&EPOCH_291, "97b855928409df975d51286720c8ca9f676c48dfd2fca7c798956314eadfc149"),
             _ => return Ok(None),
         };
         let configured = env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").ok();
@@ -298,6 +311,7 @@ impl RootedSlotPresence {
             Some(COHORT_277_280_SHA) => (277..=280).contains(&epoch),
             Some(COHORT_280_282_SHA) => (280..=282).contains(&epoch),
             Some(COHORT_282_287_SHA) => (282..=287).contains(&epoch),
+            Some(COHORT_287_291_SHA) => (287..=291).contains(&epoch),
             _ => false,
         };
         if configured.as_deref() != Some(manifest_sha) && !in_cohort {
@@ -571,6 +585,30 @@ mod qualified_epoch268 {
         check(&super::EPOCH_287, "bafyreiatkwxgebjpf57nclv3snf6tr3wfbk5b62xezxfjtouzxsgdwmqbq").await;
     }
 
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 288 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch288_map() {
+        check(&super::EPOCH_288, "bafyreiahdgxtk3turqkhar76tkv4hp6kz3kaqjenlgvrwpjml5oaggmabq").await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 289 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch289_map() {
+        check(&super::EPOCH_289, "bafyreicacdmz6ivzpuaofj2ytyknmkpnkb6b5544hczun3k7acrrsdvqse").await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 290 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch290_map() {
+        check(&super::EPOCH_290, "bafyreihd6jxi75sl5polwtldkxdpatnkhhrkwh7cpjukyn42oe6pkagmiq").await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 291 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch291_map() {
+        check(&super::EPOCH_291, "bafyreiabgztwahscuxhsjqdrv7sxxs7vys4rh37krbbm5mx3ds2ftdoqyq").await;
+    }
+
     async fn check(profile: &Profile, car_root: &str) {
         let epoch = profile.epoch;
         let first = epoch * SLOTS;
@@ -642,6 +680,9 @@ mod qualified_epoch268 {
         }
         if env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref() == Ok(super::COHORT_282_287_SHA) {
             for sibling in 282..=287 { assert!(RootedSlotPresence::configured(sibling).await.unwrap().is_some()); }
+        }
+        if env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref() == Ok(super::COHORT_287_291_SHA) {
+            for sibling in 287..=291 { assert!(RootedSlotPresence::configured(sibling).await.unwrap().is_some()); }
         }
         let source = RootedSlotPresence::configured(epoch)
             .await
