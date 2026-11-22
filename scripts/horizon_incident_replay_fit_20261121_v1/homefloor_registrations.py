@@ -36,13 +36,24 @@ def locked_fd(s, pid, path):
 
 def selected_status(s, fit):
     deployed, _ = s.read(STATUS / "DEPLOYED.json", "80fff053350536011bf779df37f121cad46fda101251ed3295320257c0de4773")
-    active = STATUS / "COLD167_STATUS_ACTIVE.json"
-    rollback = STATUS / "COLD167_STATUS_ROLLBACK.json"
-    if not active.exists() and not rollback.exists():
+    # The first cold launch drained before admission. Retain its selector for historical qualification.
+    configs = [
+        ("COLD167_STATUS_", "tools-cold167", "epoch167-source-index-rebook-20261122-v1",
+         "c9d14b49aece021a26dca2ac7b29786f43fd6921dc6bb1af417901042a1b9846",
+         "41203635cd5e52237f0c3915ea48ce9c5b062cd1beed4d3414abad5fa3e3f985"),
+        ("COLD167_V3_STATUS_", "tools-cold167-v3", "epoch167-source-index-rebook-20261122-v3",
+         "9fc8a60108922025b77b01901d8f36f5ed22168862922cadb48a66c0b832977a", "bf5e7c55b8d6dd1c943b424a70427fcaeea17dc2a8cfd77b6de2fae5caa00a82"),
+    ]
+    adopted = [cfg for cfg in configs if any((STATUS / (cfg[0] + key + ".json")).exists()
+                                              for key in ("ACTIVE", "ROLLBACK"))]
+    if not adopted:
         return STATUS / "tools", deployed["sources"], PUBLISHER_IID, None
-    q, qr = s.read(STATUS / "COLD167_STATUS_QUALIFIED.json",
-                   "c9d14b49aece021a26dca2ac7b29786f43fd6921dc6bb1af417901042a1b9846")
-    intent, ir = s.read(STATUS / "COLD167_STATUS_INTENT.json")
+    s.need(len(adopted) == 1, "competing cold 167 status generations")
+    prefix, package_name, candidate_name, qsha, seal_sha = adopted[0]
+    active = STATUS / (prefix + "ACTIVE.json")
+    rollback = STATUS / (prefix + "ROLLBACK.json")
+    q, qr = s.read(STATUS / (prefix + "QUALIFIED.json"), qsha)
+    intent, ir = s.read(STATUS / (prefix + "INTENT.json"))
     previous = intent["old"]
     s.need(previous["unit"] == fit.PUBLISHER and previous["invocation_id"] == PUBLISHER_IID
            and Path(previous["program"]) == STATUS / "tools/status_cycle.py" and intent["qualified"] == qr,
@@ -52,7 +63,7 @@ def selected_status(s, fit):
         iid = s.show(fit.PUBLISHER)["InvocationID"]
         if row["restored"]["invocation_id"] != iid:
             s.need(s.iid(iid), "invalid restored writer invocation")
-            row, _ = s.read(STATUS / ("COLD167_STATUS_ROLLBACK_" + iid + ".json"))
+            row, _ = s.read(STATUS / (prefix + "ROLLBACK_" + iid + ".json"))
             s.need(row["original_rollback"] == first_ref, "unbound subsequent status rollback")
         current = row["restored"]
         s.need(row["intent"] == ir and row["schedule"] == intent["schedule"], "foreign status rollback")
@@ -60,12 +71,12 @@ def selected_status(s, fit):
     else:
         row, _ = s.read(active)
         current = row["new"]
-        package, seal_ref = STATUS / "tools-cold167", q["package"]
-        s.need(seal_ref["sha256"] == "41203635cd5e52237f0c3915ea48ce9c5b062cd1beed4d3414abad5fa3e3f985"
+        package, seal_ref = STATUS / package_name, q["package"]
+        s.need(seal_ref["sha256"] == seal_sha
                and row["qualified"] == qr and row["old"] == previous and row["intent"] == ir
                and row["schedule"] == intent["schedule"] and row["admission"] == intent["admission"],
                "foreign status deployment or adoption")
-        candidate = R / "epoch167-source-index-rebook-20261122-v1"
+        candidate = R / candidate_name
         admitted = s.bound(row["admission"], candidate / "ACTUAL_ADMISSION_AND_PROTECTION.json")
         s.need(admitted["epoch"] == 167 and s.iid(admitted["producer_invocation_id"]), "foreign 167 admission")
     s.need(current["unit"] == fit.PUBLISHER and Path(current["program"]) == package / "status_cycle.py"
