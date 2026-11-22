@@ -75,8 +75,31 @@ impl Bucket<'_> {
     }
 }
 const SLOTS: usize = 432000;
-const START: u64 = 115344000;
-const CAR: u64 = 428826209761;
+#[cfg(not(epoch268))]
+mod profile {
+    pub(super) const START: u64 = 115344000;
+    pub(super) const CAR: u64 = 428826209761;
+    pub(super) const SLOT_BYTES: usize = 15166712;
+    pub(super) const CID_BYTES: u64 = 10392794246;
+    pub(super) const SLOT_BUCKETS: usize = 39;
+    pub(super) const CID_BUCKETS: usize = 86596;
+    pub(super) const SLOT_PREFIX: &[u8; 4096] = include_bytes!("267-slot-to-cid.bin");
+    pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("267-cid-prefix.bin");
+    pub(super) const MAX_EXAMPLES: usize = 256;
+}
+#[cfg(epoch268)]
+mod profile {
+    pub(super) const START: u64 = 115776000;
+    pub(super) const CAR: u64 = 476675176389;
+    pub(super) const SLOT_BYTES: usize = 16006150;
+    pub(super) const CID_BYTES: u64 = 12161495866;
+    pub(super) const SLOT_BUCKETS: usize = 44;
+    pub(super) const CID_BUCKETS: usize = 300000;
+    pub(super) const SLOT_PREFIX: &[u8; 4096] = include_bytes!("268-slot-to-cid.bin");
+    pub(super) const CID_PREFIX: &[u8; 4096] = include_bytes!("268-cid-prefix.bin");
+    pub(super) const MAX_EXAMPLES: usize = 4096;
+}
+use profile::*;
 fn compatible(raw: (u64, u64), block: Option<(u64, u64)>) -> bool {
     match block {
         None => raw == (0, 0),
@@ -85,40 +108,39 @@ fn compatible(raw: (u64, u64), block: Option<(u64, u64)>) -> bool {
                 && raw.1 > 0
                 && b >= raw.0
                 && n >= 38
-                && b + n == raw.0 + raw.1
-                && b + n <= CAR
+                && b.checked_add(n)
+                    .is_some_and(|end| Some(end) == raw.0.checked_add(raw.1) && end <= CAR)
         }
     }
 }
 fn run() -> io::Result<()> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     require(args.len() == 3, "expected RAW SLOT_INDEX CID_INDEX")?;
+    require(
+        fs::metadata(&args[0])?.len() == 12 * SLOTS as u64
+            && fs::metadata(&args[1])?.len() == SLOT_BYTES as u64,
+        "raw/slot input length",
+    )?;
     let raw = fs::read(&args[0])?;
     let slot = fs::read(&args[1])?;
     let cid = File::open(&args[2])?;
     require(
-        raw.len() == 12 * SLOTS && slot.len() == 15166712 && cid.metadata()?.len() == 10392794246,
+        raw.len() == 12 * SLOTS && slot.len() == SLOT_BYTES && cid.metadata()?.len() == CID_BYTES,
         "input lengths",
     )?;
-    require(
-        slot.starts_with(include_bytes!("267-slot-to-cid.bin")),
-        "slot header",
-    )?;
+    require(slot.starts_with(SLOT_PREFIX), "slot header")?;
     let mut reader = BufReader::with_capacity(1 << 20, cid);
     let mut prefix = [0; 4096];
     reader.read_exact(&mut prefix)?;
-    require(
-        &prefix == include_bytes!("267-cid-prefix.bin"),
-        "CID header",
-    )?;
+    require(&prefix == CID_PREFIX, "CID header")?;
     reader.seek(SeekFrom::Start(130))?;
-    let mut directory = vec![0; 86596 * 16];
+    let mut directory = vec![0; CID_BUCKETS * 16];
     reader.read_exact(&mut directory)?;
-    let mut requests = vec![Vec::<(usize, [u8; 36])>::new(); 86596];
+    let mut requests = vec![Vec::<(usize, [u8; 36])>::new(); CID_BUCKETS];
     let mut slot_hits = vec![false; SLOTS];
     for (i, hit) in slot_hits.iter_mut().enumerate() {
         let key = (START + i as u64).to_le_bytes();
-        let d = 119 + 16 * bucket_number(&key, 39);
+        let d = 119 + 16 * bucket_number(&key, SLOT_BUCKETS);
         let b = Bucket(&slot[d..d + 16]);
         let start = b.offset();
         let size = b.bytes(36)?;
@@ -128,7 +150,7 @@ fn run() -> io::Result<()> {
         if let Some(cid) = b.lookup(&key, rows, 36) {
             let block: [u8; 36] = cid.try_into().unwrap();
             require(block[..4] == [1, 113, 18, 32], "block CID")?;
-            requests[bucket_number(&block, 86596)].push((i, block));
+            requests[bucket_number(&block, CID_BUCKETS)].push((i, block));
             *hit = true;
         }
     }
@@ -147,7 +169,7 @@ fn run() -> io::Result<()> {
             }
         }
     }
-    require(end == 10392794246, "incomplete CID scan")?;
+    require(end as u64 == CID_BYTES, "incomplete CID scan")?;
     let mut differences = 0;
     let mut present = 0;
     let mut missing_sections = 0;
@@ -160,7 +182,10 @@ fn run() -> io::Result<()> {
         let overlap = nonempty && range.0 < previous_end;
         if nonempty {
             present += 1;
-            previous_end = range.0 + range.1;
+            previous_end = range
+                .0
+                .checked_add(range.1)
+                .ok_or_else(|| io::Error::other("raw range overflows"))?;
         }
         if overlap {
             overlaps += 1;
@@ -170,7 +195,7 @@ fn run() -> io::Result<()> {
         }
         if overlap || slot_hits[i] != nonempty || !compatible(range, sections[i]) {
             differences += 1;
-            if examples.len() < 256 {
+            if examples.len() < MAX_EXAMPLES {
                 let (b, n) = sections[i].unwrap_or((0, 0));
                 examples.push(format!(
                     "[{},{},{},{},{},{},{}]",
@@ -199,6 +224,7 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(epoch268))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
         let mut cid = [0; 36];
@@ -211,6 +237,26 @@ mod tests {
         }
         assert_eq!(bucket_number(&START.to_le_bytes(), 39), 10);
         assert_eq!(bucket_number(&cid, 86596), 42756);
+    }
+    #[cfg(epoch268)]
+    #[test]
+    fn registered_268_geometry_and_hashes() {
+        assert_eq!((START, START + SLOTS as u64 - 1), (115776000, 116207999));
+        assert_eq!(bucket_number(&START.to_le_bytes(), SLOT_BUCKETS), 5);
+        let cid = [
+            1, 113, 18, 32, 3, 140, 168, 225, 41, 124, 182, 47, 169, 105, 180, 215, 62, 9, 141, 31,
+            185, 197, 231, 139, 248, 105, 216, 73, 128, 198, 251, 6, 164, 141, 83, 53,
+        ];
+        assert_eq!(bucket_number(&cid, CID_BUCKETS), 270738);
+        assert_eq!(
+            le(&SLOT_PREFIX[119 + 10..119 + 16]),
+            119 + 16 * SLOT_BUCKETS as u64
+        );
+        assert_eq!(
+            le(&CID_PREFIX[130 + 10..130 + 16]),
+            130 + 16 * CID_BUCKETS as u64
+        );
+        assert!(!compatible((u64::MAX, 2), Some((u64::MAX, 40))));
     }
     #[test]
     fn first_block_and_empty_and_wrong_ranges() {
