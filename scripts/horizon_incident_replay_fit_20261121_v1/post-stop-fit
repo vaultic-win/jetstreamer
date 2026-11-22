@@ -26,6 +26,8 @@ import status168 as s
 registered_idle_floor=runpy.run_path(str(Path(__file__).resolve().with_name("idle_floor.py")))["floor"]
 extensions=runpy.run_path(str(Path(__file__).resolve().with_name("incident_extensions.py")))
 
+bounded142=runpy.run_path(str(Path(__file__).resolve().with_name("bounded142.py")))
+
 G=1<<30
 INC=R/"epoch168-witness-incident-20261121-v1"
 PREV=s.ref(R/"root104959-live166167170-20261121-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json","696df8323a2db5535f72b661999b1519b4061f3465af70a068d5a71c3a8e8515")
@@ -375,10 +377,13 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
 
 def phase145(epoch):
     m=s.show(fit.A145);ps=fit.members(fit.A145)
+    if Path(__file__).resolve().parent.name == "tools-v20-prestart":
+        s.need(not ps and m["ActiveState"] == "failed" and m["InvocationID"] == extensions["FAILED_QUALIFICATION_CENSUS"],
+               "bootstrap price requires the original drained V5e")
     if not ps:
         s.need(m["ActiveState"] in ("inactive","failed") and not m["Job"] and int(m["MainPID"])==0,"145 transitioning")
         v={k:m[k] for k in ("Id","ActiveState","SubState","InvocationID","MainPID")}
-        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"],extensions["FAILED_TIMER_INSPECTION"]):
+        if m["ActiveState"]=="failed" and m["InvocationID"] in (extensions["FAILED_VERIFIER"],extensions["FAILED_REJOIN"],extensions["FAILED_CADENCE"],extensions["FAILED_QUALIFIER"],extensions["FAILED_TIMER_INSPECTION"],extensions["FAILED_QUALIFICATION_CENSUS"]):
             v.update(extensions["failed_verifier"](s,m,m["InvocationID"]))
         elif m["ActiveState"]=="failed":
             failure,fr=s.read(fit.ANCHOR.parent.parent/"add576f115cc4d3b897f47d024af72fd/failed.json",
@@ -533,6 +538,7 @@ def census(peers,replacements,extra,c136,own,stops):
         for p,ticks,*inode in prs:
             st=Path(f"/proc/{p}/exe").stat()
             s.need(s.process(p)[1:]==(ticks,"0::/system.slice/"+u) and (not inode or [st.st_dev,st.st_ino]==inode),"process generation changed")
+    qualification=None
     monitored={p[0] for prs in expect.values() for p in prs}
     for p in Path("/proc").iterdir():
         if not p.name.isdigit() or int(p.name) in monitored:continue
@@ -541,7 +547,11 @@ def census(peers,replacements,extra,c136,own,stops):
         if comm.startswith(("historical-work","jetstreamer-nod")):
             # A child may appear after the cgroup leg. Recheck only the previously
             # attested one-process replacement; any other executable is foreign.
-            parent,_,group=s.process(int(p.name))
+            parent,start,group=s.process(int(p.name))
+            bounded=bounded142["observe"](s,int(p.name),comm,start,group)
+            if bounded is not None:
+                qualification=bounded
+                continue
             item=next(((int(k),v) for k,v in replacements.items() if len(v["processes"])==1 and
                        v["producer_pid"]==parent and group=="0::/system.slice/"+v["producer_unit"]),None)
             s.need(item and comm.startswith("historical-work"),"unregistered replay process "+p.name)
@@ -555,7 +565,7 @@ def census(peers,replacements,extra,c136,own,stops):
             before=dict(prior,processes=now["processes"])
             same_fork(before,now,True)
             raise Reprice(e,before,now)
-    return {u:[p[:2] for p in prs] for u,prs in expect.items()}
+    return {u:[p[:2] for p in prs] for u,prs in expect.items()}, qualification
 
 def joined_resident(active):
     if not active["admission"]:return 0
@@ -768,7 +778,7 @@ def capture_once(epoch,ref,prestart136=None):
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
     if guard168:books["168"]["measured_guard"]=guard168["receipt"]
-    population=census(peers,rep,extra,c136,epoch,stopped)
+    population,qualification=census(peers,rep,extra,c136,epoch,stopped)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -779,7 +789,7 @@ def capture_once(epoch,ref,prestart136=None):
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
@@ -806,6 +816,10 @@ def capture_once(epoch,ref,prestart136=None):
         protected += need - old_need
         registered_price = dict(native_before_registered_floor=old_need, zero_candidate_floor=zero,
                                 remaining_prefix140_bytes=growth, prefix_before=prefix_before, prefix_after=prefix_after)
+    if qualification:
+        need += qualification["scratch_bytes"]
+        protected += qualification["scratch_bytes"]
+        needmem += qualification["memory_bytes"]
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
@@ -815,7 +829,7 @@ def capture_once(epoch,ref,prestart136=None):
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,active168_guard_floor=floor168,
-        population=population,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
+        population=population,bounded_qualification=qualification,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
 def capture(epoch,ref,prestart136=None):
     try:

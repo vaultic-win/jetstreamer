@@ -86,6 +86,7 @@ FAILED_VERIFIER = "5e0e20bc974149f096ea4bab10b15e1b"
 FAILED_REJOIN = "dc043eb78c4a4349b0098760dc764a1f"
 FAILED_CADENCE = "d37f36f898a44932a19fd50d7014a6fe"
 FAILED_QUALIFIER = "500c8d717a4147b087ff302b5afa7fc0"
+FAILED_QUALIFICATION_CENSUS = "a99ed8b51e8a482b805b8a36a11b2700"
 FAILED_TIMER_INSPECTION = "e6551a0bb8a14b989902e15c9ecc0751"
 VERIFIER_UNIT = "horizon-holding-export145-20261121-v1.service"
 
@@ -96,7 +97,7 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
     import subprocess
 
     iid = manager["InvocationID"]
-    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE, FAILED_QUALIFIER, FAILED_TIMER_INSPECTION) and iid == expected and manager["Id"] == VERIFIER_UNIT
+    s.need(expected in (FAILED_VERIFIER, FAILED_REJOIN, FAILED_CADENCE, FAILED_QUALIFIER, FAILED_TIMER_INSPECTION, FAILED_QUALIFICATION_CENSUS) and iid == expected and manager["Id"] == VERIFIER_UNIT
            and manager["ActiveState"] == manager["SubState"] == "failed"
            and manager["ExecMainStatus"] == "1" and manager["MainPID"] == manager["ControlPID"] == "0"
            and manager["NRestarts"] == "0" and not manager["Job"]
@@ -107,6 +108,10 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         failure_sha = "00de799e968fa8c6e31a76284f0610bcc84bbe617193361ef457629b7294d38f"
         start_sha = "03cf2deacc6d38f5107bb894c59ced4ba2381aac425a1e3d9c401260053ca04f"
         image_sha = "0a24d0ab666e532630c3223a9ede9ba86107a65a211041ed0ecd12b35f0b5061"
+    elif expected == FAILED_QUALIFICATION_CENSUS:
+        failure_sha = "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"
+        start_sha = "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"
+        image_sha = "148804337a0c47093f67ae642fe01dc3a529cb07dbc809bfd9ab0ff9ca714a7c"
     elif expected == FAILED_TIMER_INSPECTION:
         failure_sha = "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f"
         start_sha = "55d2a0504271e8a1eea2ca8c105a288be9497f1a2b80177279481692d06e041f"
@@ -125,7 +130,41 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
         image_sha = "710b9c840fe26d964874fa6fadc2b0be9fc59d011755ce5da57a46c6ca2349f1"
     failed, failure = s.read(state / "failed.json", failure_sha)
     started, recovery = s.read(state / "recovery-started.json", start_sha)
-    if expected == FAILED_TIMER_INSPECTION:
+    incident_ref = None
+    if expected == FAILED_QUALIFICATION_CENSUS:
+        import runpy
+        bounded = runpy.run_path(str(Path(__file__).with_name("bounded142.py")))
+        incident, incident_ref = s.read(bounded["INCIDENT"], bounded["INCIDENT_SHA"])
+        q = s.bound(incident["qualifier"], bounded["Q"] / "NORMAL_ENTRY_QUALIFIED.json")
+        route = s.bound(q["route"], bounded["Q"] / "ROUTE.json")
+        base = R / "epoch145-semantic-continuity-20261121-v1"
+        actual = s.bound(incident["advancing"], base / "V5E_ACTUAL_ADVANCING_WORKER.json")
+        parent = s.bound(actual["manager"], base / "V5E_ACTUAL_MANAGER.json")
+        intent = s.bound(parent["intent"], base / "V5E_START_INTENT.json")
+        provider = R / "incident-replay-fit-20261121-v1/tools-v16"
+        for ref, folder, name, digest in ((intent["provider"], provider, "post-stop-fit", incident["provider"]["sha256"]),
+                                          (intent["verifier"], base / "tools-v5e", "export145", image_sha)):
+            package = s.bound(ref, folder / "deployment-seal-receipt.json")
+            s.need(package["destination"] == str(folder) and any(r["name"] == name and r["sha256"] == digest
+                   for r in package["members"]), "changed incident provider or verifier")
+        qual = incident["managers"]["qualification"]
+        a,b = incident["journal"]["qualification"]
+        s.need(qual["ExecMainPID"] == "227497" and q["native"]["InvocationID"] == bounded["IID"] == qual["InvocationID"]
+               and q["route"] == incident["available_route"] and q["argv"] == incident["argv"]
+               and not q["worker_started"] and not q["payload_replay_started"] and not route["admission_granted"]
+               and a["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
+               and b["MESSAGE_ID"] == "98e322203f7a4ed290d09fe03c09fe15" and b["EXIT_STATUS"] == "1"
+               and int(a["__REALTIME_TIMESTAMP"]) // 1000000 <= failed["at"] <= int(b["__REALTIME_TIMESTAMP"]) // 1000000
+               and failed["error"].rstrip().endswith("ValueError: unregistered replay process 227497")
+               and incident["incident"] == failure and incident["recovery"] == recovery == actual["start"]
+               and actual["invocation_id"] == iid == parent["new"]["InvocationID"] and parent["parent_pid"] == 94449
+               and all(x["child_pid"] == 94696 and x["parent_pid"] == 94449 for x in actual["observations"])
+               and len(actual["observations"]) == 2 and intent["boot"] == incident["boot"] == bounded["BOOT"]
+               and Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-","") == incident["boot"]
+               and set(p.name for p in state.iterdir()) == {"recovery-started.json", "failed.json"}
+               and manager["Result"] == "exit-code" and not manager["ControlGroup"],
+               "foreign bounded 142 incident or advanced verifier")
+    elif expected == FAILED_TIMER_INSPECTION:
         progress = R / "epoch145-semantic-continuity-20261121-v1/V5D_RETRY1_ACTUAL_ADVANCING_WORKER.json"
         observed, _ = s.read(progress, "3a41dac31746938b482133b9ff224f9d9d821569cc16f63c83f872fe907c13e0")
         inspected = R / "incident-replay-fit-20261121-v1/tools-v14/retire-original-timers.py"
@@ -198,4 +237,5 @@ def failed_verifier(s, manager, expected=FAILED_VERIFIER):
            and int(starts[0]["__MONOTONIC_TIMESTAMP"]) < int(exits[0]["__MONOTONIC_TIMESTAMP"]),
            "missing original verifier PID 1 failure")
     return dict(failure=failure, recovery=recovery, candidate=identity, manager_exit=exits[0],
-                source_checkpoint_exists=False, resource_credit_bytes=0)
+                source_checkpoint_exists=False, resource_credit_bytes=0,
+                **({"qualification_census_incident": incident_ref} if incident_ref else {}))
