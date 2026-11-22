@@ -86,9 +86,69 @@ def selected_status(s, fit):
     return package, seal_ref, current["invocation_id"], current
 
 
+def third_status(s, fit, prior, qualified_digest, seal_digest):
+    """Resolve the epoch 166 adoption of the existing 167/172 cadence writer."""
+    prefix = 'COLD166_RETRY11_STATUS_'
+    active_path = STATUS / (prefix + 'ACTIVE.json')
+    rollback_path = STATUS / (prefix + 'ROLLBACK.json')
+    if not active_path.exists() and not rollback_path.exists():
+        return prior
+    old_package, old_seal, old_iid, old_actor = prior
+    old, _ = s.read(STATUS / 'COLD167_V3_STATUS_ACTIVE.json',
+                    'a0ab18c5bd28557884a837d0ad125f5535267c68eca73bd286682e9f43961a3f')
+    s.need(old['new'] == old_actor and old_iid == old_actor['invocation_id']
+           and old_package == STATUS / 'tools-cold167-v3' and old_seal['sha256'] ==
+           'bf5e7c55b8d6dd1c943b424a70427fcaeea17dc2a8cfd77b6de2fae5caa00a82',
+           'third lane must inherit the admitted 167/172 writer')
+    qualified, qr = s.read(STATUS / (prefix + 'QUALIFIED.json'), qualified_digest)
+    intent, ir = s.read(STATUS / (prefix + 'INTENT.json'))
+    s.need(intent['old'] == old_actor and intent['qualified'] == qr, 'foreign third-lane handoff')
+    if active_path.exists():
+        active, _ = s.read(active_path)
+        package = STATUS / 'tools-cold166-retry11'
+        seal = qualified['package']
+        actor = active['new']
+        if rollback_path.exists():
+            # A retry can adopt the new writer after an earlier rollback. Preserve that evidence.
+            restored, _ = s.read(rollback_path)
+            s.need(restored['intent'] == ir and restored['schedule'] == intent['schedule']
+                   and restored['restored']['unit'] == fit.PUBLISHER
+                   and restored['restored']['program'] == old_actor['program'],
+                   'foreign intermediate writer rollback')
+        s.need(active['old'] == old_actor and active['intent'] == ir and active['qualified'] == qr
+               and active['schedule'] == intent['schedule'] and active['admission'] == intent['admission']
+               and seal == s.ref(package / 'deployment-seal-receipt.json', seal_digest),
+               'foreign third-lane activation')
+        candidate = R / 'epoch166-retry11-rebook-20261122-v1'
+        admission = s.bound(active['admission'], candidate / 'ACTUAL_ADMISSION_AND_PROTECTION.json')
+        s.need(admission['epoch'] == 166 and admission['producer_unit'] ==
+               'horizon-qualify-166-independent-retry11-20261122.service' and
+               s.iid(admission['producer_invocation_id']), 'foreign epoch 166 admission')
+    else:
+        restored, first_ref = s.read(rollback_path)
+        iid = s.show(fit.PUBLISHER)['InvocationID']
+        if restored['restored']['invocation_id'] != iid:
+            s.need(s.iid(iid), 'invalid restored dual writer invocation')
+            restored, _ = s.read(STATUS / (prefix + 'ROLLBACK_' + iid + '.json'))
+            s.need(restored['original_rollback'] == first_ref, 'foreign third-lane rollback')
+        s.need(restored['intent'] == ir and restored['schedule'] == intent['schedule'],
+               'changed third-lane rollback schedule')
+        package, seal, actor = old_package, old_seal, restored['restored']
+    s.need(actor['unit'] == fit.PUBLISHER and Path(actor['program']) == package / 'status_cycle.py'
+           and s.iid(actor['invocation_id']) and actor['invocation_id'] not in (old_iid, PUBLISHER_IID)
+           and all(actor['lock'][k] == old_actor['lock'][k] for k in ('device','inode','path')),
+           'different third-lane writer or exclusive lock')
+    return package, seal, actor['invocation_id'], actor
+
+
 def registered_status(s, fit):
     _, registration = s.read(fit.READY, "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")
-    package, seal_ref, iid, adopted = selected_status(s, fit)
+    prior = selected_status(s, fit)
+    package, seal_ref, iid, adopted = third_status(
+        s, fit, prior,
+        '5ecd660bf949538b23838b68a90798843b586d61671c983528e148ea2344c017',
+        '17387e4cb210b1832d11fb2c3fe3879d409dce3c0c686d189ee9b1dd27d80e10',
+    )
     seal = s.bound(seal_ref, package / "deployment-seal-receipt.json")
     program = package / "status_cycle.py"
     s.need(seal["destination"] == str(package), "foreign status deployment")
