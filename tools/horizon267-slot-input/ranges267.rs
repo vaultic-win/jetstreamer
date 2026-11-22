@@ -77,7 +77,9 @@ impl Bucket<'_> {
 const SLOTS: usize = 432000;
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277, epoch278, epoch279, epoch280, epoch281, epoch282
+    epoch277, epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285,
+    epoch286, epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294,
+    epoch295, epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
 )))]
 mod profile {
     pub(super) const START: u64 = 115344000;
@@ -128,12 +130,16 @@ mod profile {
 }
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280, epoch281, epoch282
+    epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286, epoch287, epoch288,
+    epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295, epoch296, epoch297,
+    epoch298, epoch299, epoch300, epoch301
 ))]
 pub mod compact_profiles;
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280, epoch281, epoch282
+    epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286, epoch287, epoch288,
+    epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295, epoch296, epoch297,
+    epoch298, epoch299, epoch300, epoch301
 ))]
 mod profile {
     pub(super) use super::compact_profiles::{
@@ -179,7 +185,9 @@ fn run() -> io::Result<()> {
     require(slot.starts_with(SLOT_PREFIX), "slot header")?;
     #[cfg(any(
         epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
-        epoch278, epoch279, epoch280, epoch281, epoch282
+        epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286,
+        epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295,
+        epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
     ))]
     if args[2] == "--cid-stdin" {
         return compare(&raw, &slot, io::stdin().lock());
@@ -290,7 +298,9 @@ mod tests {
     use super::*;
     #[cfg(not(any(
         epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-        epoch277, epoch278, epoch279, epoch280, epoch281, epoch282
+        epoch277, epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285,
+        epoch286, epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294,
+        epoch295, epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
     )))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
@@ -307,7 +317,9 @@ mod tests {
     }
     #[cfg(any(
         epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-        epoch280, epoch281, epoch282
+        epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286, epoch287, epoch288,
+        epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295, epoch296, epoch297,
+        epoch298, epoch299, epoch300, epoch301
     ))]
     #[test]
     fn both_directories_start_at_the_registered_payload_offsets() {

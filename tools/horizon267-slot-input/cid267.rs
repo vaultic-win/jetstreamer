@@ -6,7 +6,9 @@ use std::path::Path;
 
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277, epoch278, epoch279, epoch280, epoch281, epoch282
+    epoch277, epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285,
+    epoch286, epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294,
+    epoch295, epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
 )))]
 mod profile {
     pub(super) const SIZE: u64 = 10_392_794_246;
@@ -43,12 +45,16 @@ mod profile {
 }
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280, epoch281, epoch282
+    epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286, epoch287, epoch288,
+    epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295, epoch296, epoch297,
+    epoch298, epoch299, epoch300, epoch301
 ))]
 pub mod compact_profiles;
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280, epoch281, epoch282
+    epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286, epoch287, epoch288,
+    epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295, epoch296, epoch297,
+    epoch298, epoch299, epoch300, epoch301
 ))]
 mod profile {
     pub(super) use super::compact_profiles::{
@@ -144,7 +150,9 @@ fn inspect(input: impl Read) -> io::Result<u64> {
 fn run() -> io::Result<()> {
     #[cfg(not(any(
         epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
-        epoch278, epoch279, epoch280, epoch281, epoch282
+        epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286,
+        epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295,
+        epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
     )))]
     let p = {
         require(std::env::args_os().len() == 1, "unexpected arguments")?;
@@ -152,7 +160,9 @@ fn run() -> io::Result<()> {
     };
     #[cfg(any(
         epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
-        epoch278, epoch279, epoch280, epoch281, epoch282
+        epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286,
+        epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295,
+        epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
     ))]
     let path = {
         let mut args = std::env::args_os().skip(1);
@@ -164,7 +174,9 @@ fn run() -> io::Result<()> {
     };
     #[cfg(any(
         epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
-        epoch278, epoch279, epoch280, epoch281, epoch282
+        epoch278, epoch279, epoch280, epoch281, epoch282, epoch283, epoch284, epoch285, epoch286,
+        epoch287, epoch288, epoch289, epoch290, epoch291, epoch292, epoch293, epoch294, epoch295,
+        epoch296, epoch297, epoch298, epoch299, epoch300, epoch301
     ))]
     let p = {
         if path == "--cid-stdin" {
