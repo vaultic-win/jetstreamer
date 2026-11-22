@@ -23,6 +23,10 @@ pub(super) fn is_image(path: &Path) -> bool {
             == Path::new(
                 "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v8/retire",
             )
+        || path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v9/retire",
+            )
 }
 pub(super) fn holding_transition() -> Result<File> {
     acquire(
@@ -535,6 +539,21 @@ pub(super) fn assess(fleet_binding: &Value, remote_binding: &Value) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_the_deployed_v9_path_selects_the_new_prior_boot_image() {
+        let base =
+            Path::new("/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1");
+        assert!(is_image(&base.join("retire-v9/retire")));
+        for path in [
+            base.join("retire-v9/copy"),
+            base.join("retire-v90/retire"),
+            base.join("qualification/retire"),
+            Path::new("/tmp/retire-v9/retire").to_owned(),
+        ] {
+            assert!(!is_image(&path));
+        }
+    }
+
     #[test]
     fn historical_mode_rejects_substituted_owner_or_invocation() {
         let mut v = json!({"original_owner_method":"cold130-prior-boot-v1","closed_source_owners":owners()});
