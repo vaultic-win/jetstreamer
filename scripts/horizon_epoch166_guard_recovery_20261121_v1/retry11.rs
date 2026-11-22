@@ -151,7 +151,7 @@ pub(crate) fn holding_complete() -> Result<()> {
         Some("dd02c73abfee1065873cf370e9a72d566717bd1b4efab4ae206032ce4424778e"),
     )?;
     let path = Path::new(st(&plan, "expected_receipt")?);
-    let (custody, _) = doc(path, None)?;
+    let (custody, custody_ref) = doc(path, None)?;
     let archive = Path::new(LANE)
         .join(PRIOR_RUN)
         .join("archives/epoch-166.jet");
@@ -169,9 +169,103 @@ pub(crate) fn holding_complete() -> Result<()> {
             && custody["canonical_publication_authorized"] == false,
         "private holding custody incomplete"
     );
+    let holding = Path::new("/home/sol/.jetstreamer-private/r2-holding-state-dev-samjohnson-v1");
+    let state = holding.join("retirements");
+    let quarantine = state.join(format!("epoch166-retry10-{}.jet", st(&custody, "sha256")?));
+    let terminal_path = holding
+        .join("receipts/epoch166-retry10-park-terminal-57146d4b5c9940449cd129433a5acd2b.json");
+    let (terminal, terminal_ref) = doc(&terminal_path, None)?;
+    let (intent, _) = doc(&state.join("epoch166-retry10-intent.json"), None)?;
+    let (completion, _) = doc(&state.join("epoch166-retry10-completion.json"), None)?;
+    let retired_custody = doc(
+        Path::new(st(&intent["custody"], "path")?),
+        Some(st(&custody_ref, "sha256")?),
+    )?
+    .0;
+    let retired_terminal = doc(
+        Path::new(st(&intent["park_terminal"], "path")?),
+        Some(st(&terminal_ref, "sha256")?),
+    )?
+    .0;
     ensure!(
-        matches!(fs::symlink_metadata(&archive), Err(e) if e.kind()==std::io::ErrorKind::NotFound),
-        "local partial retirement pending"
+        terminal["custody"] == custody_ref
+            && retired_custody == custody
+            && retired_terminal == terminal
+            && intent["schema"] == "jetstreamer-holding-retire166-retry10-intent-v1"
+            && intent["source"] == json!(archive)
+            && intent["quarantine"] == json!(quarantine)
+            && intent["inode"] == 93782070
+            && intent["length"] == custody["length"]
+            && intent["sha256"] == custody["sha256"]
+            && intent["custody"]["sha256"] == custody_ref["sha256"]
+            && intent["park_terminal"]["sha256"] == terminal_ref["sha256"]
+            && intent["inspection"]["sha256"]
+                == "dd02c73abfee1065873cf370e9a72d566717bd1b4efab4ae206032ce4424778e"
+            && intent["mapping"] == custody["mapping"]
+            && intent["eligibility"] == custody["eligibility"],
+        "retirement intent does not bind the original held partial and transfer"
     );
+    verify_retirement(&completion, &intent, &archive, &quarantine)
+}
+
+fn verify_retirement(
+    completion: &Value,
+    intent: &Value,
+    archive: &Path,
+    quarantine: &Path,
+) -> Result<()> {
+    ensure!(
+        completion["schema"] == "jetstreamer-holding-retire166-retry10-completion-v1"
+            && completion["intent"] == *intent
+            && completion["source_absent"] == true
+            && completion["quarantine_absent"] == true
+            && completion["authenticated_custody_revalidated"] == true
+            && completion["retired_censused_physical_bytes"] == 64922697728u64
+            && completion["actual_free_delta_claimed"] == false
+            && completion["resource_credit_bytes"] == 0,
+        "native retirement has not completed"
+    );
+    for path in [archive, quarantine] {
+        ensure!(
+            matches!(fs::symlink_metadata(path), Err(e) if e.kind()==std::io::ErrorKind::NotFound),
+            "retired prefix still present at {}",
+            path.display()
+        );
+    }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn retirement_requires_native_completion_and_both_absences() {
+        let lease = tempfile::tempdir().unwrap();
+        let archive = lease.path().join("archive");
+        let quarantine = lease.path().join("quarantine");
+        let intent = json!({"source":archive,"quarantine":quarantine});
+        let completion = json!({"schema":"jetstreamer-holding-retire166-retry10-completion-v1","intent":intent,
+            "source_absent":true,"quarantine_absent":true,"authenticated_custody_revalidated":true,
+            "retired_censused_physical_bytes":64922697728u64,"actual_free_delta_claimed":false,"resource_credit_bytes":0});
+        assert!(verify_retirement(&completion, &intent, &archive, &quarantine).is_ok());
+        fs::write(&quarantine, b"preserved until unlink").unwrap();
+        assert!(verify_retirement(&completion, &intent, &archive, &quarantine).is_err());
+        fs::rename(&quarantine, &archive).unwrap();
+        assert!(verify_retirement(&completion, &intent, &archive, &quarantine).is_err());
+        fs::remove_file(&archive).unwrap();
+        for (key, bad) in [
+            ("source_absent", json!(false)),
+            ("quarantine_absent", json!(false)),
+            ("retired_censused_physical_bytes", json!(0)),
+            ("intent", json!({})),
+            ("authenticated_custody_revalidated", json!(false)),
+        ] {
+            let mut changed = completion.clone();
+            changed[key] = bad;
+            assert!(
+                verify_retirement(&changed, &intent, &archive, &quarantine).is_err(),
+                "{key}"
+            );
+        }
+    }
 }
