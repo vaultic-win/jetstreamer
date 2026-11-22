@@ -83,8 +83,13 @@ fn publish_fixture(f: &Fake, d: &Path, hashes: &[String]) -> R<()> {
 }
 #[test]
 fn exact_geometry() {
-    assert_eq!(SIZE.div_ceil(PART as u64), 363);
-    assert_eq!(SIZE % (PART as u64), 14_791_482);
+    let (parts, tail) = if EPOCH == 267 {
+        (310, 24474758)
+    } else {
+        (363, 14_791_482)
+    };
+    assert_eq!(SIZE.div_ceil(PART as u64), parts);
+    assert_eq!(SIZE % (PART as u64), tail);
     assert!(header().contains(REC_SHA));
     assert_eq!(
         fs::read_link("/usr/bin/sha256sum").unwrap(),
@@ -216,6 +221,8 @@ fn owner_and_profile_do_not_accept_another_namespace() {
         .unwrap()
         .replace("node_01", "node_02");
     assert!(approved_owner(200, foreign.as_bytes()).is_err());
-    assert!(fixed().starts_with("foundation_node_01/closed-private-v1/epoch268-cid-index-v1/"));
+    assert!(fixed().starts_with(&format!(
+        "foundation_node_01/closed-private-v1/epoch{EPOCH}-cid-index-v1/"
+    )));
     assert!(!key(&"0".repeat(64)).ends_with(".jet"));
 }

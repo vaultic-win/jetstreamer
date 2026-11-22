@@ -1,4 +1,4 @@
-"""Fixed epoch 268 booked payload and pure fit calculation. Main owns admission and completion."""
+"""Fixed epoch 267 and 268 booked payloads and pure fit calculation. Main owns admission and completion."""
 import argparse
 import hashlib
 import json
@@ -9,6 +9,7 @@ import subprocess
 import time
 from pathlib import Path
 
+EPOCH = 268
 M = 1 << 20
 SIZE = 12_161_495_866
 SHA = 'c4555600164ccd37313ae7f02c3fd36fd47a8117c91a92b812c1052ab2b2ce68'
@@ -45,6 +46,20 @@ PHASES = {
     'retire': (128, 64, 0, 0, 900),
 }
 
+def select_epoch267():
+    """Select the separately compiled 267 image for this single-operation process."""
+    global EPOCH, SRC, SIZE, SHA, INO, STAMP, TMP, DEST
+    EPOCH = 267
+    SRC = ORIGINAL_267
+    SIZE = 10_392_794_246
+    SHA = '03ee92c1cd55485275d21633e4fd2a759eb6fb21484b580a0c6e98901795a9fc'
+    INO = 18336175
+    STAMP = (DEV, INO, SIZE, 1795315093251462982, 1795315093465463670)
+    DEST = Path('/var/lib/jetstreamer/horizon267-cid-holding-restore-v1')
+    TMP = Path('/run/horizon267-cid-holding-work')
+    PHASES['restore'] = (320, 64, 0, SIZE + 4*M, 3600)
+
+
 def need(ok, message):
     if not ok:
         raise ValueError(message)
@@ -77,8 +92,8 @@ def census(dev, ino):
     hits = []
     seen_mounts = set()
     dev_field=f'{os.major(dev)}:{os.minor(dev)}'.encode()
-    roots={os.fsencode(SRC),os.fsencode(SRC.with_name('.horizon268-quarantine-c4555600.body')),
-           b'/var/lib/jetstreamer/horizon268-cid-holding-custody-v1/quarantine-c4555600.body'}
+    roots={os.fsencode(SRC),os.fsencode(SRC.with_name(f'.horizon{EPOCH}-quarantine-{SHA[:8]}.body')),
+           os.fsencode(f'/var/lib/jetstreamer/horizon{EPOCH}-cid-holding-custody-v1/quarantine-{SHA[:8]}.body')}
     for p in Path('/proc').iterdir():
         if not p.name.isdigit():
             continue
@@ -169,7 +184,7 @@ def bind_fit(booking):
 
 def booked_kernel(b):
     op = b['operation']
-    need(op in PHASES and b['schema']=='horizon268-cid-holding-booking-v1'
+    need(op in PHASES and b['schema']==f'horizon{EPOCH}-cid-holding-booking-v1'
          and b['controller']==MAIN and b['boot']==BOOT==Path('/proc/sys/kernel/random/boot_id').read_text().strip().replace('-','')
          and os.geteuid()==0 and os.uname().nodename=='horizon-vaultic','wrong executing identity')
     fit = bind_fit(b)
@@ -200,7 +215,7 @@ def native_conditions(b):
     for tool,sha in PINS.items():
         need(digest(tool)==sha, 'different native transport or hash executable')
     if op=='park':
-        need(stamp(SRC)==STAMP and not census(DEV,INO),'original 268 is open or changed')
+        need(stamp(SRC)==STAMP and not census(DEV,INO),'original CID index is open or changed')
         need(b['closed_source_review']['sha256'] and binding(b['closed_source_review'])['source_sha256']==SHA,'source closure missing')
         closed=binding(b['closed_source_review'])
         need(closed['controller']==MAIN and closed['source_identity']==list(STAMP) and
@@ -240,7 +255,7 @@ def actor(ref):
                 message=message.replace(value,'[redacted]')
         raise RuntimeError(f'native {op} exited {r.returncode}: {message[-1000:]}')
     doc=json.loads(r.stdout)
-    need(doc['operation']==op and doc['sha256']==SHA and doc['bytes']==SIZE and doc['parts']==363 and
+    need(doc['operation']==op and doc['sha256']==SHA and doc['bytes']==SIZE and doc['epoch']==EPOCH and doc['parts']==(SIZE+32*M-1)//(32*M) and
          re.fullmatch('[0-9a-f]{64}',doc['manifest_sha256']) and doc['capacity_credit']==0 and not doc['canonical_publication'],
          'native result mismatch')
     if op=='restore':
@@ -249,10 +264,11 @@ def actor(ref):
         doc['restored_identity']=m
     if op=='park':
         need(stamp(SRC)==STAMP,'source incarnation after park')
-    return dict(schema='horizon268-cid-holding-actor-v1',booking=ref,worker=b['image'],result=doc)
+    return dict(schema=f'horizon{EPOCH}-cid-holding-actor-v1',booking=ref,worker=b['image'],result=doc)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--epoch',type=int,choices=(267,268),default=268)
     sub=p.add_subparsers(dest='action',required=True)
     f=sub.add_parser('fit')
     f.add_argument('basis',type=Path);f.add_argument('phase',choices=PHASES)
@@ -260,6 +276,8 @@ def main():
         f.add_argument(name,type=int)
     a=sub.add_parser('actor');a.add_argument('booking',type=Path);a.add_argument('sha256')
     args=p.parse_args()
+    if args.epoch==267:
+        select_epoch267()
     if args.action=='fit':
         base=json.loads(args.basis.read_bytes())
         if 'fit' in base:

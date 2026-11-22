@@ -1,4 +1,4 @@
-//! Exact Foundation CID-index byte custody for epoch 268.
+//! Exact Foundation CID-index byte custody for epochs 267 and 268.
 mod transport;
 use std::{
     env,
@@ -9,23 +9,59 @@ use std::{
     process::{Child, Command, Stdio},
 };
 use transport::{Client, OWNER, R, Transport, hash, hash_bytes, hex, require};
-const SRC: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
-const SIZE: u64 = 12_161_495_866;
-const SHA: &str = "c4555600164ccd37313ae7f02c3fd36fd47a8117c91a92b812c1052ab2b2ce68";
-const PART: usize = 32 << 20;
-const PREFIX: &str = "foundation_node_01/closed-private-v1/epoch268-cid-index-v1";
 const MAP: &str =
     "/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json";
 const MAP_SHA: &str = "50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6";
-const RECOVERY: &str =
-    "/home/ubuntu/.codex/diagnostics/horizon268-cid-recovery-v175-a1/completion.json";
-const REC_SHA: &str = "d374ac0907aefdf3e5b6969afb77e1e28298969eaf2330f1c6220c9dd4363c8d";
-const STRUCTURAL: &str =
-    "/home/ubuntu/.codex/diagnostics/horizon268-structural-check-v175-a1/completion.json";
-const STR_SHA: &str = "224c59913bdbb6c0093d677f0e1da5b3dbe2f5f1e141734711b118aa8782dd90";
-const TMP: &str = "/run/horizon268-cid-holding-work";
-const DEST: &str = "/var/lib/jetstreamer/horizon268-cid-holding-restore-v1";
-const KEY: &str = "index-c4555600-v1.manifest";
+const PART: usize = 32 << 20;
+#[cfg(not(epoch267))]
+mod profile {
+    pub(super) const SRC: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
+    pub(super) const SIZE: u64 = 12_161_495_866;
+    pub(super) const SHA: &str = "c4555600164ccd37313ae7f02c3fd36fd47a8117c91a92b812c1052ab2b2ce68";
+    pub(super) const PREFIX: &str = "foundation_node_01/closed-private-v1/epoch268-cid-index-v1";
+    pub(super) const RECOVERY: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon268-cid-recovery-v175-a1/completion.json";
+    pub(super) const REC_SHA: &str =
+        "d374ac0907aefdf3e5b6969afb77e1e28298969eaf2330f1c6220c9dd4363c8d";
+    pub(super) const STRUCTURAL: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon268-structural-check-v175-a1/completion.json";
+    pub(super) const STR_SHA: &str =
+        "224c59913bdbb6c0093d677f0e1da5b3dbe2f5f1e141734711b118aa8782dd90";
+    pub(super) const TMP: &str = "/run/horizon268-cid-holding-work";
+    pub(super) const DEST: &str = "/var/lib/jetstreamer/horizon268-cid-holding-restore-v1";
+    pub(super) const KEY: &str = "index-c4555600-v1.manifest";
+    pub(super) const EPOCH: u64 = 268;
+    pub(super) const CAR_BYTES: u64 = 476675176389;
+    pub(super) const ENTRIES: u64 = 1013057978;
+    pub(super) const BUCKETS: u64 = 300000;
+    pub(super) const INODE: u64 = 18336466;
+    pub(super) const TIMES: (i64, i64, i64, i64) = (1795317228, 600534172, 1795317228, 862535056);
+}
+#[cfg(epoch267)]
+mod profile {
+    pub(super) const SRC: &str = "/var/lib/jetstreamer/horizon267-cid-input-v173-a1/index.body";
+    pub(super) const SIZE: u64 = 10_392_794_246;
+    pub(super) const SHA: &str = "03ee92c1cd55485275d21633e4fd2a759eb6fb21484b580a0c6e98901795a9fc";
+    pub(super) const PREFIX: &str = "foundation_node_01/closed-private-v1/epoch267-cid-index-v1";
+    pub(super) const RECOVERY: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon267-cid-input-v173-a1/completion.json";
+    pub(super) const REC_SHA: &str =
+        "e922dd18dca95c0eb9a05d2d09aaf43af210d291121a5c352d54dbf6a04ef2ca";
+    pub(super) const STRUCTURAL: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon267-cid-validate-v174-a1/completion.json";
+    pub(super) const STR_SHA: &str =
+        "b260b65cd84557bfc41954b9987237df61b855723beb9ac65c7e6c5f28be3daa";
+    pub(super) const TMP: &str = "/run/horizon267-cid-holding-work";
+    pub(super) const DEST: &str = "/var/lib/jetstreamer/horizon267-cid-holding-restore-v1";
+    pub(super) const KEY: &str = "index-03ee92c1-v1.manifest";
+    pub(super) const EPOCH: u64 = 267;
+    pub(super) const CAR_BYTES: u64 = 428826209761;
+    pub(super) const ENTRIES: u64 = 865950715;
+    pub(super) const BUCKETS: u64 = 86596;
+    pub(super) const INODE: u64 = 18336175;
+    pub(super) const TIMES: (i64, i64, i64, i64) = (1795315093, 251462982, 1795315093, 465463670);
+}
+use profile::*;
 fn ioe(e: io::Error) -> String {
     e.to_string()
 }
@@ -91,10 +127,9 @@ fn original(path: &Path) -> R<File> {
                     m.gid(),
                     m.mode() & 0o7777,
                     m.nlink(),
-                ) == (66305, 18336466, SIZE, 0, 0, 0o400, 1)
-                && (m.mtime(), m.mtime_nsec(), m.ctime(), m.ctime_nsec())
-                    == (1795317228, 600534172, 1795317228, 862535056),
-            "closed original 268 CID table changed",
+                ) == (66305, INODE, SIZE, 0, 0, 0o400, 1)
+                && (m.mtime(), m.mtime_nsec(), m.ctime(), m.ctime_nsec()) == TIMES,
+            "closed original CID table changed",
         )?;
     }
     Ok(f)
@@ -163,7 +198,7 @@ fn manifest(header: &str, hashes: &[String]) -> Vec<u8> {
 }
 fn header() -> String {
     format!(
-        "horizon268-cid-index-v1 epoch=268 bytes={SIZE} sha256={SHA} part_bytes={PART} car_bytes=476675176389 entries=1013057978 buckets=300000 mapping={MAP_SHA} recovery={REC_SHA} structural={STR_SHA} canonical=false"
+        "horizon{EPOCH}-cid-index-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} car_bytes={CAR_BYTES} entries={ENTRIES} buckets={BUCKETS} mapping={MAP_SHA} recovery={REC_SHA} structural={STR_SHA} canonical=false"
     )
 }
 fn parse(bytes: &[u8], profile: &str, size: u64, part: usize) -> R<Vec<String>> {
@@ -446,7 +481,7 @@ fn run() -> R<()> {
         _ => {}
     }
     println!(
-        "{{\"epoch\":268,\"kind\":\"cid-to-offset-and-size\",\"operation\":\"{}\",\"manifest_sha256\":\"{msha}\",\"sha256\":\"{SHA}\",\"bytes\":{SIZE},\"parts\":{},\"capacity_credit\":0,\"canonical_publication\":false}}",
+        "{{\"epoch\":{EPOCH},\"kind\":\"cid-to-offset-and-size\",\"operation\":\"{}\",\"manifest_sha256\":\"{msha}\",\"sha256\":\"{SHA}\",\"bytes\":{SIZE},\"parts\":{},\"capacity_credit\":0,\"canonical_publication\":false}}",
         args[1],
         parts.len()
     );
