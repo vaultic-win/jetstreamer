@@ -163,7 +163,7 @@ mod v151_window_tests {
         let reference = Bound::new(V160_PREPARED.0, V160_PREPARED.1);
         let gate = Bound::new(V160_GATE.0, V160_GATE.1);
         let new = Bound::new(LAUNCHER, "e".repeat(64));
-        let roles = |image: &Bound, commit: &str| json!({"artifacts":[{"role":"launcher","artifact":image,"source_commit":commit},{"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"a".repeat(40)}]});
+        let roles = |image: &Bound, commit: &str| json!({"artifacts":[{"role":"launcher","artifact":image,"source_commit":commit},{"role":"harness","artifact":Bound::new(HARNESS,HARNESS_SHA),"source_commit":"a".repeat(40)},{"role":"guard","artifact":Bound::new(GUARD,GUARD_SHA),"source_commit":"b".repeat(40)}]});
         let current = roles(&new, &"c".repeat(40));
         let previous = roles(&gate, V160_GATE_COMMIT);
         prepared_transition(&reference, &gate, &new, &previous, &current).unwrap();
