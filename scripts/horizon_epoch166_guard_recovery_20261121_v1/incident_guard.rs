@@ -6,9 +6,12 @@ const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 #[cfg(feature = "epoch170-384")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1/tools/guard";
-#[cfg(not(feature = "epoch170-384"))]
+#[cfg(not(any(feature = "epoch170-384", feature = "epoch167-cold-v3")))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
+#[cfg(feature = "epoch167-cold-v3")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch167-cold-guard-20261122-v3/tools/guard";
 const HOME: &str = "/home/sol/.jetstreamer-private";
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -19,6 +22,13 @@ struct Lane {
     cap: u64,
 }
 
+#[cfg(feature = "epoch167-cold-v3")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-167-source-index-v3-20261122.service",
+    tree: "epoch167-standard-lane-20261109-v1",
+    runtime: "epoch167-source-index-rebook-20261122-v3",
+    cap: 512 << 30,
+}];
 #[cfg(feature = "epoch170-384")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
@@ -26,7 +36,7 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch170-retry10-recovery-20261121-v1",
     cap: 384 << 30,
 }];
-#[cfg(not(feature = "epoch170-384"))]
+#[cfg(not(any(feature = "epoch170-384", feature = "epoch167-cold-v3")))]
 const LANES: &[Lane] = &[
     Lane {
         unit: "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -73,6 +83,36 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "epoch167-cold-v3")]
+pub(crate) fn validate_cold167_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
+    let deployment = Path::new(RUNTIME).join("epoch167-cold-guard-20261122-v3");
+    let proof = plan
+        .data_fulfillment
+        .as_ref()
+        .context("missing epoch 167 DATA proof")?;
+    let binding: Binding = serde_json::from_value(proof.clone())?;
+    ensure!(
+        binding.contract.path == deployment.join("contract/contract.json"),
+        "expected the epoch 167 v3 sealed contract"
+    );
+    let contract: Contract = serde_json::from_value(sealed(
+        &binding.contract,
+        &binding.deployment_seal,
+        "contract.json",
+    )?)?;
+    ensure!(
+        contract.qualified_native_witness.path == deployment.join("NATIVE_WITNESS.json"),
+        "expected the epoch 167 v3 native witness"
+    );
+    let witness = bound(&contract.qualified_native_witness)?;
+    ensure!(
+        witness["native_identity"]["executable"] == IMAGE
+            && witness["native_identity"]["executable_sha256"] == image_sha256,
+        "epoch 167 witness belongs to another guard"
+    );
+    Ok(())
+}
+
 // Check the hash-bound original namespace receipts and reopen the directories from / without symlinks.
 // Once replay is running the sizes and times of these private output directories legitimately change.
 pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
@@ -101,6 +141,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
         refs.push(r);
     }
     for (rel, ino) in [
+        #[cfg(feature = "epoch167-cold-v3")]
+        (
+            "epoch167-standard-lane-20261109-v1/replacement-source-index-v1-20261121/cold-source-index-v3-20261122",
+            114491410,
+        ),
         (
             "epoch166-independent-cold-20261120-v1/replacement-local3retry10-20261121-v1",
             93782017,
@@ -180,6 +225,21 @@ pub(super) fn observe(binding: &Value, scope: &Scope<'_>) -> Result<Observation>
 mod tests {
     use super::*;
 
+    #[cfg(feature = "epoch167-cold-v3")]
+    #[test]
+    fn cold167_accepts_only_the_v3_source_index_unit() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 512 << 30);
+        assert!(is_route(
+            "horizon-qualify-167-source-index-v3-20261122.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-167-source-index-v2-20261122.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-167-source-index-v1-20261121.service"
+        ));
+    }
     #[cfg(feature = "epoch170-384")]
     #[test]
     fn enlarged_cap_is_exclusive_to_the_170_successor() {

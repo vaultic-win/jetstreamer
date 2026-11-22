@@ -7,6 +7,7 @@ edition="2024"
 preparation=[]
 incident-recovery=[]
 epoch170-384=["incident-recovery"]
+epoch167-cold-v3=["incident-recovery"]
 epoch207-native-main-guard=[]
 epoch209-native-main-guard=[]
 epoch209-singleton-guard=[]

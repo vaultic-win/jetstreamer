@@ -41,6 +41,17 @@ def check(package, fixture_root):
                 now=cycle.utc(sample['recorded_at_utc']), advancing={172: True}, lanes={}, delivery_forecasts={})
 
     reader = cold.reader()
+    binding, prepared, guard = cold.generation()
+    assert reader.QUAL == binding['guard_qualification'] and reader.GUARD_SHA == guard['guard']['sha256']
+    assert reader.ROUTES[167] == (cold.NAME, cold.ROOT.name, cold.RUN, prepared['baseline']['root']['inode'], 512)
+    forged = copy.deepcopy(binding)
+    forged['guard_qualification']['sha256'] = '0' * 64
+    cycle.ensure_dir(fixture_root)
+    with tempfile.TemporaryDirectory(dir=fixture_root) as temp:
+        selected = Path(temp) / 'generation.json'
+        cycle.durable(selected, forged)
+        with patch.object(cold, 'BINDING', selected):
+            fail(cold.reader)
     def bind(c):
         with patch.object(reader, 'freeze', return_value=(recovery_ref, actual)):
             reader.sample_rows(c, cycle.cycle.observed_lane)
@@ -84,6 +95,7 @@ def check(package, fixture_root):
     return dict(fixture=ref, first_worker=actual['owners']['167']['first_worker'], progress_receipt=rate_ref,
                 slots_advanced=work['slot_delta'], transactions=work['transaction_delta'],
                 tps=work['transactions_per_second'], next_status=history['167'], simulated_conditional_writes=1,
+                guard_qualification=binding['guard_qualification'],wrong_guard_qualification_rejected=True,
                 wrong_main_pid_rejected=True, wrong_worker_pid_rejected=True, wrong_config_rejected=True,
                 r2_mutations=False)
 
