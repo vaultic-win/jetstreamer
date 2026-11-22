@@ -194,11 +194,13 @@ retire = ORIGINAL.retire
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("action",choices=["inspect","retire"])
-    parser.add_argument("--cold167", action="store_true", help="use the November 22 cold epoch 167 replay")
+    profile = parser.add_mutually_exclusive_group()
+    for name in ("cold167", "cold170"):
+        profile.add_argument("--" + name, dest="producer", action="store_const", const=name)
     args = parser.parse_args()
     guard = ORIGINAL
-    if args.cold167:
+    if args.producer:
         import runpy
         peers = runpy.run_path(str(Path(__file__).with_name("peer_closures.py")))
-        guard = peers["cold167"]().guard
+        guard = peers[args.producer]().guard
     print(json.dumps(guard.retire() if args.action == "retire" else guard.inspect(), sort_keys=True))
