@@ -113,6 +113,10 @@ fn known_root(e: u64) -> Result<&'static str> {
         285 => Ok("bafyreiam2ndwsov4oj4jelptiiat3l67kil4mj5tnovqkjv7n4bi3rjtoe"),
         286 => Ok("bafyreibsdipvtbosqf75w3skclwjphlncov2is5iivnl5cccjqvm4exmbu"),
         287 => Ok("bafyreiatkwxgebjpf57nclv3snf6tr3wfbk5b62xezxfjtouzxsgdwmqbq"),
+        288 => Ok("bafyreiahdgxtk3turqkhar76tkv4hp6kz3kaqjenlgvrwpjml5oaggmabq"),
+        289 => Ok("bafyreicacdmz6ivzpuaofj2ytyknmkpnkb6b5544hczun3k7acrrsdvqse"),
+        290 => Ok("bafyreihd6jxi75sl5polwtldkxdpatnkhhrkwh7cpjukyn42oe6pkagmiq"),
+        291 => Ok("bafyreiabgztwahscuxhsjqdrv7sxxs7vys4rh37krbbm5mx3ds2ftdoqyq"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -315,7 +319,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     let mut changes = Vec::new();
     let mut verified_skips = Vec::new();
     for (slot, value) in witness {
-        if (268..=287).contains(&e) && value.is_none() {
+        if (268..=291).contains(&e) && value.is_none() {
             verified_skips.push(slot);
         }
         let was = row(&raw, e, slot)?;
@@ -351,7 +355,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     }
     let mut result = json!({"epoch":e,"root":known_root(e)?,"windows":partial,"changes":changes,"present":present,"skips":SLOTS-present as u64,
         "physical_end":pos,"original_sha256":sha(&raw),"corrected_sha256":sha(&corrected)});
-    if (268..=287).contains(&e) {
+    if (268..=291).contains(&e) {
         result["rooted_window_skips"] = json!(verified_skips);
     }
     save(&out.join(format!("epoch-{e}-slot-ranges.raw")), &corrected)?;
@@ -446,6 +450,22 @@ fn reviewed(epoch: u64, plan_path: &Path, expected: &str) -> Result<(String, u64
             471_816_188_164,
             "cea1a636793d0f375af497b42d0fe14913af3a6e8aeceb99a1038db42cfbf89e",
         ),
+        288 => (
+            502_563_875_656,
+            "e61d9dc74899050a0913ec06642b6a977af9feb07748bd9ae530dcfbe68ea11d",
+        ),
+        289 => (
+            445_210_450_979,
+            "2502cd58d1e6f879343db5f7dcc1953985a8b5226543f2ae3711f37b50ba81fb",
+        ),
+        290 => (
+            507_505_413_726,
+            "f4d0c5e528988bdca41ce9e03738c96d983b077b501ef3539f430346be611bdf",
+        ),
+        291 => (
+            497_952_843_848,
+            "cb3d713eb1968e2c2156c7b24b552da2f83528cc2d27d9e6b3ba6e994dede04e",
+        ),
         _ => return Err("unregistered dynamic epoch".into()),
     };
     let first = epoch * SLOTS;
@@ -531,13 +551,17 @@ fn main() -> Result<()> {
         Some("--epoch285") => Some(285),
         Some("--epoch286") => Some(286),
         Some("--epoch287") => Some(287),
+        Some("--epoch288") => Some(288),
+        Some("--epoch289") => Some(289),
+        Some("--epoch290") => Some(290),
+        Some("--epoch291") => Some(291),
         Some("--epoch283") => Some(283),
         Some("--epoch280") => Some(280),
         _ => None,
     };
     let (profile, body_bytes, range_count) = if let Some(epoch) = dynamic_epoch {
         command.next();
-        let path = command.next().ok_or("usage: repair --epoch{268..287} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let path = command.next().ok_or("usage: repair --epoch{268..291} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
         let digest = command.next().ok_or("missing reviewed plan SHA-256")?;
         let (plan, bytes, count) =
             reviewed(epoch, Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
@@ -555,7 +579,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267 | --epoch{268..287} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch{268..291} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
