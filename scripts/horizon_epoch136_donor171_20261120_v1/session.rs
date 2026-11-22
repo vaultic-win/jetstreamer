@@ -278,6 +278,8 @@ pub(super) fn release_incident(path: &Path, allow_release: bool) -> Result<Value
     let iid = text(&intent, "writer_invocation_id")?;
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     let (plan, source) = immutable(Path::new(text(&intent["writer_plan"], "path")?))?;
+    #[cfg(feature = "fixture-semantic")]
+    super::fixture_plan::validate(&plan)?;
     ensure!(
         intent["schema"] == "horizon-136-incident-donor-intent-v1"
             && intent["boot_id"] == boot.trim()

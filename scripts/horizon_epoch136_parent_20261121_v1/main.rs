@@ -1,6 +1,9 @@
 //! The parent owns the admitted actor's systemd envelope and conditional status publication.
 mod actor;
 mod dispatch;
+#[cfg(feature = "fixture-semantic")]
+#[path = "../horizon_epoch136_donor171_20261120_v1/fixture_plan.rs"]
+mod fixture_plan;
 mod status;
 // Reuse the campaign's no-follow, root-custody reads, exclusive fsynced receipt writes and native clock helpers.
 #[allow(dead_code)]
@@ -121,6 +124,8 @@ fn qualified_package(args: &[String]) -> Result<(Value, Value, PathBuf, Value)> 
     let writer_plan = json!({"path":args[0],"sha256":args[1]});
     let package_seal = json!({"path":args[2],"sha256":args[3]});
     let full = immutable(&writer_plan)?;
+    #[cfg(feature = "fixture-semantic")]
+    fixture_plan::validate(&full)?;
     ensure!(
         full["controller_deployment"] == package_seal,
         "incorrect writer-plan deployment"

@@ -113,7 +113,7 @@ def pending_candidate(waiter, fence, expected_writer, checked, observation):
                               processes=[[pid, waiter["start_ticks"], binary.st_dev, binary.st_ino]]))
 
 
-def holding_complete(pinned, holding_module, build, observer):
+def holding_complete(pinned, holding_module, build, observer, semantic_iid=V5E):
     manager = native(HOLDING)
     require(manager["ActiveState"] == "inactive" and manager["SubState"] == "dead"
             and not manager["Job"] and manager["MainPID"] == manager["ControlPID"] == "0"
@@ -121,7 +121,7 @@ def holding_complete(pinned, holding_module, build, observer):
             and manager["ExecMainStatus"] == "0" and not (Path("/sys/fs/cgroup/system.slice") / HOLDING).exists(),
             "holding verifier has not completed and drained")
     done, extraction = holding_module["completion"](observer, build)
-    expected = RUNTIME / "epoch145-guarded-export-20261121-v1/state" / V5E / "complete.json"
+    expected = RUNTIME / "epoch145-guarded-export-20261121-v1/state" / semantic_iid / "complete.json"
     require(done["path"] == str(expected) and pinned == done and extraction["epoch"] == 145,
             "wrong original successful semantic recovery")
     return done
@@ -134,7 +134,7 @@ def boundary(proof, writer, fleetref, registered):
     return proof["semantic_complete"]
 
 
-def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, observation):
+def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, observation, fixture_provider=None):
     # The systemd writer and its immutable plan, not a projection from the caller,
     # select the deployed price and cross-owner inspector.
     proc = Path("/proc") / str(os.getppid())
@@ -152,25 +152,35 @@ def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, obser
     members = {row["name"]: row for row in seal["members"]}
     require(os.path.samestat((proc / "exe").stat(), (owner_pkg / "admit136").stat()) and
             plan["controller"]["sha256"] == members["admit136"]["sha256"], "foreign session executable")
-    for name in ("admit136", "post-stop-fit", "retire-original-timers.py", "closure.py", "idle_floor.py",
-                 "idle_audit_cpu.py", "incident_extensions.py"):
-        pin(owner_pkg / name, members[name]["sha256"])
-
     registered = plan["holding145_prestart_ready"]
     ready_path = Path(registered["path"])
     require(ready_path.parent.parent == RUNTIME and ready_path.name == "READY.json", "foreign selector registration")
-    ready = json.loads(pin(ready_path, registered["sha256"]))
-    require(ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
-            ready["original_semantic_invocation"] == V5E, "unregistered holding selector")
+    def read(ref):
+        return json.loads(pin(Path(ref["path"]), ref["sha256"]))
+    ready = read(registered)
     checker = ready["boundary_inspector"]
     executable = Path(checker["path"])
     require(executable.is_relative_to(RUNTIME) and executable.parent != Path("/"), "foreign boundary inspector")
-    pin(executable, checker["sha256"])
-    price = runpy.run_path(str(owner_pkg / "post-stop-fit"))
-    v11 = RUNTIME / "epoch145-semantic-continuity-20261121-v1/tools-v11"
-    v11_build = json.loads(pin(v11 / "build-proof.json", "96db190a72ce8057c32a46b5128d9918ffcf0e771ca5cd306f57529fb7c6b4b7"))
-    pin(v11 / "incident-post-phase.py", "6e3fde964884be35641212a0016072c214653004110b1e1391f0818a9179d4a6")
-    verifier = runpy.run_path(str(v11 / "incident-post-phase.py"))
+    if fixture_provider is not None:
+        require(owner_pkg == RUNTIME / "epoch136-joint-writer-20261122-v7/controller", "foreign V7 controller")
+        module = owner_pkg / "fixture_boundary.py"
+        pin(module, members[module.name]["sha256"])
+        fixture = runpy.run_path(str(module))
+        iid, price, build, verifier = fixture["prepare"](planref, plan, registered, ready, read, pin,
+                                                         fixture_provider, runpy)
+    else:
+        for name in ("admit136", "post-stop-fit", "retire-original-timers.py", "closure.py", "idle_floor.py",
+                     "idle_audit_cpu.py", "incident_extensions.py"):
+            pin(owner_pkg / name, members[name]["sha256"])
+        require(ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
+                ready["original_semantic_invocation"] == V5E, "unregistered holding selector")
+        pin(executable, checker["sha256"])
+        price = runpy.run_path(str(owner_pkg / "post-stop-fit"))
+        v11 = RUNTIME / "epoch145-semantic-continuity-20261121-v1/tools-v11"
+        build = json.loads(pin(v11 / "build-proof.json", "96db190a72ce8057c32a46b5128d9918ffcf0e771ca5cd306f57529fb7c6b4b7"))
+        pin(v11 / "incident-post-phase.py", "6e3fde964884be35641212a0016072c214653004110b1e1391f0818a9179d4a6")
+        verifier = runpy.run_path(str(v11 / "incident-post-phase.py"))
+        iid = V5E
 
     def current(fleet, status):
         require(fleet["schema"] == "horizon-Root-complete-fleet-operational-review-v1" and
@@ -182,7 +192,7 @@ def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, obser
         require(len(call.stdout) < 65536, "oversized selector proof")
         proof = json.loads(call.stdout)
         completion = boundary(proof, writer, fleetref, registered)
-        holding_complete(completion, verifier, v11_build, price["s"])
+        holding_complete(completion, verifier, build, price["s"], iid)
         candidate = pending_candidate(waiter, fence, writer, checked, observation)
         return dict(candidate, writer=writer, selector=registered, semantic_complete=proof["semantic_complete"])
 

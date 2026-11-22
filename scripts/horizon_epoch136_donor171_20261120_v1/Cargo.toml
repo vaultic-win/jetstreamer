@@ -5,6 +5,9 @@ edition = "2024"
 
 [workspace]
 
+[features]
+fixture-semantic = []
+
 [dependencies]
 anyhow = "1"
 libc = "0.2"

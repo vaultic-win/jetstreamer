@@ -32,6 +32,16 @@ check_file "$fleet" "$fleet_sha"
 seal=$(jq -er '.controller_deployment.path' "$plan")
 check_file "$seal" "$(jq -er '.controller_deployment.sha256' "$plan")"
 pkg=$(dirname -- "$seal")
+fixture="$runtime/epoch136-joint-writer-20261122-v7"
+if [[ $(realpath -e -- "$0") == "$fixture/controller/run-writer" ]]; then
+    [[ $pkg == "$fixture/controller" ]]
+    if [[ $mode == session ]]; then
+        [[ $plan == "$fixture/registered-production-plan.json" ]]
+        [[ $(jq -er '.holding145_prestart_ready.path' "$plan") == "$runtime/epoch145-fixture-phase-dispatch-20261122-v1/READY.json" ]]
+    else
+        [[ $plan == "$fixture/production-plan.json" || $plan == "$fixture/registered-production-plan.json" ]]
+    fi
+fi
 [[ $seal == "$pkg/deployment-seal-receipt.json" && $pkg == "$runtime/"*/controller ]]
 [[ $(jq -er '.controller.path' "$plan") == "$base/controller/admit136" ]]
 image_sha=$(jq -er '.controller.sha256' "$plan")

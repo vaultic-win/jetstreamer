@@ -2,6 +2,8 @@
 #![recursion_limit = "384"]
 mod fence;
 mod fit;
+#[cfg(feature = "fixture-semantic")]
+mod fixture_plan;
 mod joint_fit;
 mod session;
 mod standard169;
@@ -270,6 +272,8 @@ fn file_write(path: &Path, data: &Value) -> Result<Value> {
 const WRITER_UNIT: &str = "horizon-admit-136-actual-20261120-g1.service";
 const IL_PATH: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 fn generation(plan: &Value) -> Result<()> {
+    #[cfg(feature = "fixture-semantic")]
+    fixture_plan::validate(plan)?;
     ensure!(
         plan["schema"] == "horizon-epoch136-actual-plan-v1"
             && plan["barrier_version"] == "epoch136-actual-20261120-before-initialize-v1",

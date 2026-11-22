@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import runpy
 import stat
+import subprocess
 import sys
 import time
 
@@ -17,6 +18,9 @@ CADENCE_SEAL = "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e
 PRICE = "924c72177d61b8340f8ff75caba72d4cfe5228df4b27111e56d2656a9d8d2aa8"
 ADAPTER_SHA = "729ceda384e4def082967e24758f2e58f18f2d068ad41bae5358cf9cb60b5fb0"
 CAP = 72 << 30
+V20 = ROOT / "incident-replay-fit-20261121-v1/tools-v20"
+V7 = ROOT / "epoch136-joint-writer-20261122-v7"
+SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
 
 def require(value, reason):
@@ -24,22 +28,57 @@ def require(value, reason):
         raise ValueError(reason)
 
 
-def pin(path, expected):
+def immutable_bytes(path):
     metadata = path.lstat()
     require(path.resolve(strict=True) == path and stat.S_ISREG(metadata.st_mode)
             and metadata.st_uid == metadata.st_gid == 0 and metadata.st_nlink == 1
             and metadata.st_mode & 0o222 == 0 and metadata.st_size <= 32 << 20, str(path))
     raw = path.read_bytes()
+    after = path.lstat()
+    require(len(raw) == metadata.st_size and os.path.samestat(metadata, after)
+            and metadata.st_ctime_ns == after.st_ctime_ns, "unstable root evidence " + str(path))
+    return raw
+
+
+def pin(path, expected):
+    raw = immutable_bytes(path)
     require(hashlib.sha256(raw).hexdigest() == expected, "changed deployed member " + str(path))
     return raw
 
 
 def check_package(path, digest):
     seal = json.loads(pin(path / "deployment-seal-receipt.json", digest))
-    require(seal["destination"] == str(path), "foreign sealed directory")
+    require(seal["destination"] == str(path) and seal["schema"] == "jetstreamer-sealed-deployment-receipt-v1"
+            and seal["sealer_sha256"] == SEALER and seal["remote_mutations"] is False, "foreign sealed directory")
     for row in seal["members"]:
         require(Path(row["name"]).name == row["name"], "foreign member")
         pin(path / row["name"], row["sha256"])
+    return seal
+
+
+def fixture_provider(provider, directory):
+    image, sealref = provider["image"], provider["seal"]
+    require(set(provider) == {"image", "seal"} and sealref["path"] == str(directory/"deployment-seal-receipt.json")
+            and image["path"] == str(directory/"post-stop-fit"), "wrong fixture price source")
+    seal = check_package(directory, sealref["sha256"])
+    rows = [row for row in seal["members"] if row["name"] == "post-stop-fit"]
+    require(len(rows) == 1 and rows[0]["sha256"] == image["sha256"] and rows[0]["mode"] == "0555",
+            "wrong fixture price image")
+    return directory/"post-stop-fit"
+
+
+def capture_fixture(native_path, path, digest):
+    # A running verifier performs its own census. Retry only that recognized
+    # transient, then collect every measurement again under the original quota.
+    for attempt in range(3):
+        result = subprocess.run([native_path, "145", path, digest], capture_output=True, timeout=150)
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        transient = any(reason in result.stderr for reason in
+                        (b"foreign 145 descendants", b"capacity generation changed during collection"))
+        if not transient or attempt == 2:
+            raise ValueError(result.stderr.decode(errors="replace")[-1800:])
+        time.sleep(2)
 
 
 def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_total, waiter=None):
@@ -72,13 +111,18 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
                 unfenced_with_candidate_cpu_micros=68_250_000, new_resource_credit_bytes=0)
 
 
-def inspect(path, digest, waiter, mode, provider, fence=None):
+def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False):
     require(mode in ("preflight", "session"), "unknown writer mode")
     expected = dict(image=dict(path=str(NATIVE / "post-stop-fit"), sha256=PRICE),
                     seal=dict(path=str(NATIVE / "deployment-seal-receipt.json"), sha256=NATIVE_SEAL))
-    require(provider == expected, "new fleet needs the explicit V17 plan")
+    directory = V20 if fixture else NATIVE
+    if fixture:
+        fixture_provider(provider, directory)
+        expected = provider
+    else:
+        require(provider == expected, "new fleet needs the explicit V17 plan")
+        check_package(NATIVE, NATIVE_SEAL)
     check_package(CADENCE, CADENCE_SEAL)
-    check_package(NATIVE, NATIVE_SEAL)
     pin(ADAPTER, ADAPTER_SHA)
     sys.path.insert(0, str(CADENCE))
     from evidence import checked
@@ -107,8 +151,11 @@ def inspect(path, digest, waiter, mode, provider, fence=None):
     before = storage()
     if mode == "preflight":
         require(waiter is None and fence is None, "preflight cannot claim an actor or donor")
-        bridge = runpy.run_path(str(ADAPTER))
-        native = json.loads(bridge["capture_provider"](NATIVE / "post-stop-fit", str(path), digest))
+        if fixture:
+            native = capture_fixture(directory / "post-stop-fit", path, digest)
+        else:
+            bridge = runpy.run_path(str(ADAPTER))
+            native = json.loads(bridge["capture_provider"](directory / "post-stop-fit", str(path), digest))
     else:
         proc = Path("/proc") / str(os.getppid())
         argv = [os.fsdecode(v) for v in (proc / "cmdline").read_bytes().split(b"\0") if v]
@@ -121,12 +168,25 @@ def inspect(path, digest, waiter, mode, provider, fence=None):
         require(package.parent.parent == ROOT and package.name == "controller"
                 and (package / "admit136").samefile(proc / "exe"), "wrong writer deployment")
         from private136 import observation
+        require(not fixture or package == V7 / "controller", "different V7 writer")
         session = runpy.run_path(str(package / "prestart_session.py"))
-        native = session["capture_context"](ref, fence, waiter, pin=pin, checked=checked,
+        context = {"fixture_provider": fixture_provider} if fixture else {}
+        native = session["capture_context"](ref, fence, waiter, **context, pin=pin, checked=checked,
                                             runpy=runpy, json=json, observation=observation)
     require(native["fleet"] == ref and native["schema"] == "horizon-incident-replay-fit-v1"
             and 0 <= time.time() - native["recorded_unix_seconds"] < 120, "wrong native price")
-    module = runpy.run_path(str(NATIVE / "post-stop-fit"))
+    module = runpy.run_path(str(directory / "post-stop-fit"))
+    if fixture and mode == "preflight":
+        prospective = json.loads(immutable_bytes(V7 / "production-plan.json"))
+        require(prospective["joint_fit_145"] == expected, "prospective native provider changed")
+        controller = V7 / "controller"
+        binding = prospective["controller_deployment"]
+        require(binding["path"] == str(controller / "deployment-seal-receipt.json"), "wrong fixture controller")
+        deployment = check_package(controller, binding["sha256"])
+        member = [r for r in deployment["members"] if r["name"] == "fixture_boundary.py"]
+        require(len(member) == 1 and member[0]["mode"] == "0444", "missing fixture semantic reader")
+        fixture_module = runpy.run_path(str(controller / "fixture_boundary.py"))
+        fixture_module["ordinary_phase"](prospective, native["phase145"], checked, pin, runpy, module["s"])
     floor, _, _ = module["disk_budget"](native["original_aggregate_HOME_bytes"], dict(remaining=0),
         native["bookings"], 145, native["survivors"], native["replacements"], native["active168_guard_floor"],
         native["closed_prestart_remaining"])
@@ -142,10 +202,12 @@ def inspect(path, digest, waiter, mode, provider, fence=None):
                 prefix_before=before, prefix_after=after, waiting_candidate=waiter,
                 activation_compatible=mode == "session" and result["disk_fits"] and result["memory_fits"],
                 replay_launch_authorized=False,
-                next_gate="successful V5e completion and exclusive prestart before V11")
+                next_gate=("successful V5F completion and exclusive prestart before V13" if fixture else
+                           "successful V5e completion and exclusive prestart before V11"))
 
 
 if __name__ == "__main__":
     print(json.dumps(inspect(Path(sys.argv[1]), sys.argv[2], json.loads(sys.argv[3]),
                              sys.argv[4], json.loads(sys.argv[5]),
-                             json.loads(sys.argv[6]) if len(sys.argv) == 7 else None), sort_keys=True))
+                             json.loads(sys.argv[6]) if len(sys.argv) >= 7 else None,
+                             fixture=sys.argv[7:] == ["fixture-semantic"]), sort_keys=True))

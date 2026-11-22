@@ -40,7 +40,11 @@ def capture(path, digest):
     image = bridge["NATIVE"]
     provider = dict(image=dict(path=str(image / "post-stop-fit"), sha256=bridge["PRICE"]),
                     seal=dict(path=str(image / "deployment-seal-receipt.json"), sha256=bridge["NATIVE_SEAL"]))
-    observed = bridge["inspect"](path, digest, None, "preflight", provider)
+    fixture = Path(__file__).resolve().parent == bridge["V7"] / "preflight-tools"
+    if fixture:
+        plan = bridge["V7"] / "production-plan.json"
+        provider = json.loads(bridge["immutable_bytes"](plan))["joint_fit_145"]
+    observed = bridge["inspect"](path, digest, None, "preflight", provider, fixture=fixture)
     require(observed["waiting_candidate"] is None and observed["activation_compatible"] is False and
             observed["new_resource_credit_bytes"] == 0, "unexpected occupied or activating price")
     meta = STORE.lstat()
