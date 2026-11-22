@@ -64,6 +64,35 @@ def check_args(row, argv, profile):
             "unrecognized output root")
 
 
+def accepted_regions(audit, scope_ref, inventory_ref):
+    regions = []
+    for ref in audit["summary"]["accepted_ranges"]:
+        receipt = document(ref)
+        lo, hi = receipt["range"]
+        require(type(lo) is int and type(hi) is int and 101 <= lo <= hi <= 300 and
+                ref["path"] == str(READY / "accepted" / f"{lo}-{hi}.json") and
+                receipt["schema"] == "horizon-ready-range-verified-v1" and
+                receipt["method"] == "strict-public-slot-ranges" and receipt["scope"] == scope_ref and
+                receipt["inventory"] == inventory_ref and
+                [row["epoch"] for row in receipt["epochs"]] == list(range(lo, hi+1)),
+                "foreign completed ready region")
+        if lo <= 130 <= hi:
+            require(receipt["epochs"][130-lo]["object"] == CANONICAL,
+                    "completed reader used another epoch 130 source")
+        regions.append([lo, hi])
+    return regions
+
+
+def complete_population(active, completed, scope, summary):
+    passed = sum(hi-lo+1 for lo, hi in completed)
+    count = sum(hi-lo+1 for lo, hi in scope["eligible_ranges"])
+    require(sorted(active + completed) == sorted(scope["eligible_ranges"]) and
+            len({tuple(region) for region in active + completed}) == len(scope["eligible_ranges"]) and
+            summary["passed"] == passed and summary["archives"] == count and
+            summary["pending"] == count - passed and summary["failed"] == 0 and
+            summary["complete"] is (count == passed), "incomplete ready reader population")
+
+
 def main(fleet_path, fleet_sha):
     for name, digest in MODULES.items():
         read(TOOLS / name, digest)
@@ -95,9 +124,11 @@ def main(fleet_path, fleet_sha):
     profiles = [json.loads(read(READY / name, digest)) for name, digest in PROFILES.items()]
     by_exe = {v["elf"]["path"]: v for v in profiles}
     jobs = native_jobs(scope_ref)
-    require(jobs and jobs == audit["active_ready_workers"] and len({r["pid"] for r in jobs}) == len(jobs) and
-            sorted(row["range"] for row in jobs) == sorted(scope["eligible_ranges"]),
-            "complete active ready worker set differs from its scope or fleet")
+    require(jobs == audit["active_ready_workers"] and len({r["pid"] for r in jobs}) == len(jobs),
+            "native ready reader identities differ from the accepted fleet")
+    inventory_ref = {"path": str(inventory), "sha256": scope["inventory_sha256"]}
+    completed = accepted_regions(audit, scope_ref, inventory_ref)
+    complete_population([j["range"] for j in jobs], completed, scope, audit["summary"])
     worker_proofs = []
     for row in jobs:
         proc = Path("/proc") / str(row["pid"])
@@ -118,7 +149,7 @@ def main(fleet_path, fleet_sha):
     require(native_jobs(scope_ref) == jobs, "ready workers changed across closure")
     return {"schema": "cold130-ready-audit-reader-proof-v1", "fleet": fleet_ref, "audit": current,
             "retirement": audit["chronological_retirement"], "scope": scope_ref,
-            "inventory": {"path": str(inventory), "sha256": scope["inventory_sha256"]},
+            "inventory": inventory_ref, "accepted_ranges": audit["summary"]["accepted_ranges"],
             "readers": worker_proofs, "canonical_object": CANONICAL, "source_body_bytes_read": 0,
             "resource_credit_bytes": 0, "retirement_authorized": False}
 

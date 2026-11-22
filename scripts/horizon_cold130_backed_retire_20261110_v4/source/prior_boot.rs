@@ -19,6 +19,10 @@ pub(super) fn is_image(path: &Path) -> bool {
             == Path::new(
                 "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v7/retire",
             )
+        || path
+            == Path::new(
+                "/var/lib/jetstreamer/horizon_runtime_data/cold130-boot-lineage-20261121-v1/retire-v8/retire",
+            )
 }
 pub(super) fn holding_transition() -> Result<File> {
     acquire(
@@ -295,22 +299,7 @@ pub(super) fn remote_state(remote_binding: &Value, custody: &Value) -> Result<()
 
     Ok(())
 }
-pub(super) fn fleet_readers(fleet_binding: &Value) -> Result<()> {
-    let fleet = crate::closure::fleet(fleet_binding)?;
-    let row = fleet["epochs"]
-        .as_array()
-        .context("complete epoch rows")?
-        .iter()
-        .find(|r| r["epoch"] == 130)
-        .context("missing epoch130")?;
-    ensure!(
-        fleet["owner"] == "/root"
-            && fleet["primary_thread"] == crate::PRIMARY
-            && row["state"] == "remote-ready"
-            && row["inventory_state"] == "ready-pair",
-        "current epoch disposition"
-    );
-    let audit = bound(&fleet["current_audit_child"]["observation"])?;
+fn chronological_reader(audit: &Value) -> Result<Value> {
     let inventory = bound(&audit["inventory"])?;
     let remote = inventory["objects"]
         .as_array()
@@ -345,6 +334,69 @@ pub(super) fn fleet_readers(fleet_binding: &Value) -> Result<()> {
         (actual.dev(), actual.ino()) == (observed.dev(), observed.ino()),
         "audit child inventory differs"
     );
+    Ok(remote.clone())
+}
+
+fn ready_readers(fleet_binding: &Value, fleet: &Value, audit: &Value) -> Result<Value> {
+    let output = std::process::Command::new("/usr/bin/python3")
+        .env_clear()
+        .args([
+            "-IB",
+            "-c",
+            include_str!("../ready_audit_preflight.py"),
+            s(fleet_binding, "path")?,
+            s(fleet_binding, "sha256")?,
+        ])
+        .output()
+        .context("verify current public ready readers")?;
+    ensure!(
+        output.status.success(),
+        "current ready audit proof failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let proof: Value = serde_json::from_slice(&output.stdout)?;
+    let expected = json!({"epoch":130,"key":"epoch-130.jet","bytes":83_405_061_082u64,
+                          "etag":"\"73d501e604900b1c9a079d9453459a52-1243\""});
+    ensure!(
+        proof["schema"] == "cold130-ready-audit-reader-proof-v1"
+            && proof["fleet"] == *fleet_binding
+            && proof["audit"] == fleet["current_audit_child"]["observation"]
+            && proof["scope"] == audit["inventory"]
+            && proof["retirement"] == audit["chronological_retirement"]
+            && proof["canonical_object"] == expected
+            && proof["source_body_bytes_read"] == 0
+            && proof["resource_credit_bytes"] == 0
+            && proof["retirement_authorized"] == false,
+        "ready reader proof belongs to another source or scope"
+    );
+    println!(
+        "{}",
+        json!({"stage":"current-ready-public-readers","proof":proof})
+    );
+    Ok(expected)
+}
+
+pub(super) fn fleet_readers(fleet_binding: &Value) -> Result<()> {
+    let fleet = crate::closure::fleet(fleet_binding)?;
+    let row = fleet["epochs"]
+        .as_array()
+        .context("complete epoch rows")?
+        .iter()
+        .find(|r| r["epoch"] == 130)
+        .context("missing epoch130")?;
+    ensure!(
+        fleet["owner"] == "/root"
+            && fleet["primary_thread"] == crate::PRIMARY
+            && row["state"] == "remote-ready"
+            && row["inventory_state"] == "ready-pair",
+        "current epoch disposition"
+    );
+    let audit = bound(&fleet["current_audit_child"]["observation"])?;
+    let remote = if audit.get("child").is_some_and(Value::is_null) {
+        ready_readers(fleet_binding, &fleet, &audit)?
+    } else {
+        chronological_reader(&audit)?
+    };
     let mut replay = Vec::new();
     for key in [
         "actual_executing_replays",
