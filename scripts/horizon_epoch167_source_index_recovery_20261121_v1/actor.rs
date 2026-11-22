@@ -108,28 +108,80 @@ pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
                 .is_some_and(|t| t <= 120),
         "invalid guard proof"
     );
-    let events = command(
-        "/usr/bin/journalctl",
-        &[
-            "--no-pager",
-            "-ojson",
-            "--output-fields=_PID,UNIT,INVOCATION_ID,JOB_RESULT",
-            "_PID=1",
-            &format!("UNIT={unit}"),
-            &format!("INVOCATION_ID={id}"),
-            "-n12",
-        ],
-        10,
-    )?;
-    ensure!(
-        events
-            .split(|x| *x == b'\n')
-            .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
-            .any(|e| e["UNIT"] == unit && e["INVOCATION_ID"] == id && e["JOB_RESULT"] == "done"),
-        "first native guard not completed by PID1"
-    );
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut waited = false;
+    loop {
+        let events = command(
+            "/usr/bin/journalctl",
+            &[
+                "--no-pager",
+                "-ojson",
+                "--output-fields=_PID,UNIT,INVOCATION_ID,JOB_RESULT",
+                "_PID=1",
+                &format!("UNIT={unit}"),
+                &format!("INVOCATION_ID={id}"),
+                "-n12",
+            ],
+            10,
+        )?;
+        if guard_job_done(&events, &unit, id)? {
+            break;
+        }
+        // The guard writes its sample immediately before PID1 publishes its job result.
+        let manager = native(&unit)?;
+        ensure!(
+            Instant::now() < deadline && guard_job_pending(&manager, id),
+            "missing PID1 completion for original guard {unit} {id}"
+        );
+        waited = true;
+        thread::sleep(Duration::from_millis(100));
+    }
+    if waited {
+        let current = native(TIMER)?;
+        ensure!(
+            current["InvocationID"] == timer["InvocationID"]
+                && current["ActiveState"] == "active"
+                && current["Triggers"] == unit
+                && sample()? == *actor
+                && now()?
+                    .checked_sub(n(&v, "recorded_unix_seconds")?)
+                    .is_some_and(|age| age <= 120),
+            "guard timer, producer or sample changed while waiting for PID1"
+        );
+    }
     Ok((json!({"receipt":sr,"guard_invocation":id,"timer":timer}), v))
 }
+
+fn guard_job_done(events: &[u8], unit: &str, id: &str) -> Result<bool> {
+    let mut done = false;
+    for line in events
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+    {
+        let event: Value = serde_json::from_slice(line)?;
+        if event["_PID"] == "1"
+            && event["UNIT"] == unit
+            && event["INVOCATION_ID"] == id
+            && let Some(result) = event["JOB_RESULT"].as_str()
+        {
+            ensure!(
+                result == "done",
+                "PID1 reported {result} for guard {unit} {id}"
+            );
+            done = true;
+        }
+    }
+    Ok(done)
+}
+
+fn guard_job_pending(manager: &Value, id: &str) -> bool {
+    matches!(
+        manager["ActiveState"].as_str(),
+        Some("activating" | "active" | "deactivating" | "inactive")
+    ) && (manager["InvocationID"] == id
+        || (manager["InvocationID"] == "" && manager["ActiveState"] == "inactive"))
+}
+
 pub fn worker() -> Result<Value> {
     let (ad, ar) = doc(&base().join("ACTUAL_ADMISSION_AND_PROTECTION.json"), None)?;
     let a = sample()?;
@@ -198,4 +250,54 @@ pub fn worker() -> Result<Value> {
         return Ok(b);
     }
     record("FIRST_PROTECTED_WORKER.json", &value)
+}
+
+#[cfg(test)]
+mod guard_job_tests {
+    use super::*;
+
+    fn row(pid: &str, unit: &str, id: &str, result: &str) -> Vec<u8> {
+        serde_json::to_vec(&json!({"_PID":pid,"UNIT":unit,"INVOCATION_ID":id,"JOB_RESULT":result}))
+            .unwrap()
+    }
+
+    #[test]
+    fn requires_the_original_job_even_if_the_sample_was_emitted_first() {
+        for events in [
+            vec![],
+            row("1", "guard", "old", "done"),
+            row("1", "other", "selected", "done"),
+            row("42", "guard", "selected", "done"),
+        ] {
+            assert!(!guard_job_done(&events, "guard", "selected").unwrap());
+        }
+        assert!(
+            guard_job_done(&row("1", "guard", "selected", "done"), "guard", "selected").unwrap()
+        );
+        assert!(
+            guard_job_done(
+                &row("1", "guard", "selected", "failed"),
+                "guard",
+                "selected"
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn waits_only_for_the_same_guard_or_its_just_collected_exit() {
+        for (iid, state, expected) in [
+            ("selected", "activating", true),
+            ("selected", "deactivating", true),
+            ("", "inactive", true),
+            ("selected", "failed", false),
+            ("new", "active", false),
+            ("", "active", false),
+        ] {
+            assert_eq!(
+                guard_job_pending(&json!({"InvocationID":iid,"ActiveState":state}), "selected"),
+                expected
+            );
+        }
+    }
 }
