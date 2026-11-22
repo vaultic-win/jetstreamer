@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_fixture145_only)]
+#[cfg(incident_homefloor145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5g/export145";
+#[cfg(all(incident_fixture145_only, not(incident_homefloor145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5f/export145";
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5e/export145";
@@ -437,6 +439,61 @@ pub fn failed_qualification_census() -> Result<Value> {
         parent: (94449, 365122971),
         child: (94696, 365125891),
     })
+}
+
+#[cfg(incident_homefloor145_only)]
+fn retry1_census(trace: &str, provider: &str) -> bool {
+    trace.starts_with(&format!(
+        "Traceback (most recent call last):\n  File \"{provider}\", line "
+    )) && trace.contains(&format!("  File \"{provider}\", line 558, in census\n"))
+        && trace
+            .trim_end()
+            .ends_with("ValueError: unregistered replay process 429808")
+}
+
+#[cfg(incident_homefloor145_only)]
+pub fn failed_retry1() -> Result<Value> {
+    failed_observation(FailedObservation {
+        iid: "afcf6cdd1ec0400ea2757f81472987b3",
+        failure_hash: "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366",
+        start_hash: "82532ce3f39356a26d78b2eb07ef32d6a90d604f7537d024ba5e696c42573ceb",
+        progress_name: "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json",
+        progress_sha: "1b16ce2d061e2ec97ab8c1ba81cd2dbcff9d0a759f317fbaf53b64e731a19501",
+        manager_sha: "46b2a40efce3c995060ec8a2f426ff9cc72057f1c9032f5f80d7d24688d84932",
+        prior_image: "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21",
+        provider: "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20/post-stop-fit",
+        recognize: retry1_census,
+        parent: (367458, 367957081),
+        child: (367741, 367960010),
+    })
+}
+
+#[cfg(all(test, incident_homefloor145_only))]
+#[test]
+#[ignore = "requires original immutable recovery evidence and journal"]
+fn accepts_only_the_actual_stopped_retry1_and_retained_candidate() {
+    let observed = failed_retry1().unwrap();
+    assert_eq!(observed["original_candidate"]["inode"], 103237059);
+    assert_eq!(observed["original_candidate"]["bytes"], 105610995833u64);
+    assert_eq!(observed["source_checkpoint_exists"], false);
+    let failed: Bound =
+        serde_json::from_value(observed["current_boot_failure"]["failure"].clone()).unwrap();
+    let body = custody::evidence(&failed).unwrap();
+    let trace = body["error"]
+        .as_str()
+        .unwrap()
+        .split_once("exit status: 1: ")
+        .unwrap()
+        .1;
+    let provider = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20/post-stop-fit";
+    assert!(retry1_census(trace, provider));
+    for (from, to) in [
+        ("429808", "227497"),
+        ("tools-v20", "tools-v16"),
+        ("in census", "in refresh"),
+    ] {
+        assert!(!retry1_census(&trace.replace(from, to), provider));
+    }
 }
 
 #[cfg(all(test, incident_fixture145_only))]
