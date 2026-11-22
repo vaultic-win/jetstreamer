@@ -38,7 +38,7 @@ import cold167_status
 import cold166_status
 
 cold_workers = cold166_status
-if CURRENT.with_name('retry11-170-generation.json').is_file():
+if any(CURRENT.with_name(f'{name}-170-generation.json').is_file() for name in ('retry11','retry12')):
     import cold170_status as cold_workers
 
 # The original five-lane receipt predates all four HOME guard stops.
@@ -339,7 +339,7 @@ def census(c,bridge):
         if 166 in c.new_rows:
             cap['current_cold166_retry11_protection']=c.recovered_ref
         if 170 in c.new_rows:
-            cap['current_cold170_retry11_protection']=c.recovered_ref
+            cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref
     durable(path,witness)
     return witness
 

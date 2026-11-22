@@ -13,13 +13,15 @@ BASE = Path('/var/lib/jetstreamer/horizon_runtime_data')
 ROOT = BASE/'survivor172-cadence-20261122-v1'
 DUAL = ROOT/'tools-cold167-v3'
 TRIPLE = ROOT/'tools-cold166-retry11'
-TARGET = ROOT/'tools-cold170-retry11'
-QUAL = ROOT/'COLD170_RETRY11_STATUS_QUALIFIED.json'
-TAG = 'COLD170_RETRY11_STATUS_'
-ANCHOR = dict(path=str(BASE/'epoch170-retry11-rebook-20261122-v1/SUCCESSOR_ROOT.json'),
-              sha256='8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
-GUARD = dict(path=str(BASE/'epoch170-retry11-guard-20261122-v1/GUARD_QUALIFIED.json'),
-             sha256='36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
+# The sealer installs the same entry point in a distinct read-only directory for each attempt.
+ATTEMPT = 'retry12' if Path(__file__).resolve().parent.name == 'retry12-170-switch' else 'retry11'
+TARGET = ROOT/f'tools-cold170-{ATTEMPT}'
+TAG = f'COLD170_{ATTEMPT.upper()}_STATUS_'
+QUAL = ROOT/(TAG+'QUALIFIED.json')
+ANCHOR = dict(path=str(BASE/f'epoch170-{ATTEMPT}-rebook-20261122-v1/SUCCESSOR_ROOT.json'),
+              sha256='466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if ATTEMPT=='retry12' else '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
+GUARD = dict(path=str(BASE/f'epoch170-{ATTEMPT}-guard-20261122-v1/GUARD_QUALIFIED.json'),
+             sha256='7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if ATTEMPT=='retry12' else '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
 PRIOR = ROOT/'COLD167_V3_STATUS_ACTIVE.json'
 PRIOR_SHA = 'a0ab18c5bd28557884a837d0ad125f5535267c68eca73bd286682e9f43961a3f'
 TRIPLE_QUAL = dict(path=str(ROOT/'COLD166_RETRY11_STATUS_QUALIFIED.json'),
@@ -38,16 +40,16 @@ def prepare(c, shared, commit):
     c['checked'](GUARD)
     enrollment = c['checked'](TRIPLE_QUAL)
     need(enrollment['package']==c['bound'](TRIPLE/'deployment-seal-receipt.json'), 'different 166 registration')
-    stage = ROOT/'retry11-170-status-source'
+    stage = ROOT/f'{ATTEMPT}-170-status-source'
     c['ensure_dir'](stage)
     for name in MEMBERS:
         shared['write_new'](stage/name,git('show',f"{commit}:{shared['SRC']}/{name}"))
     for name in ('generation.json','retry11-generation.json'):
         shared['write_new'](stage/name,(TRIPLE/name).read_bytes())
-    c['durable'](stage/'retry11-170-generation.json', dict(successor_root=ANCHOR,guard_qualification=GUARD))
-    names=(*MEMBERS,'generation.json','retry11-generation.json','retry11-170-generation.json')
+    c['durable'](stage/f'{ATTEMPT}-170-generation.json', dict(successor_root=ANCHOR,guard_qualification=GUARD))
+    names=(*MEMBERS,'generation.json','retry11-generation.json',f'{ATTEMPT}-170-generation.json')
     need({p.name for p in stage.iterdir()}==set(names),'unexpected package member')
-    plan=ROOT/'retry11-170-status-seal-plan.json'
+    plan=ROOT/f'{ATTEMPT}-170-status-seal-plan.json'
     c['durable'](plan,dict(schema='jetstreamer-sealed-deployment-plan-v1',destination=str(TARGET),
          members=[dict(name=n,mode=0o444,source=str(stage/n),sha256=c['bound'](stage/n)['sha256']) for n in names]))
     if not TARGET.exists():
@@ -57,7 +59,7 @@ def prepare(c, shared, commit):
     need(c['checked'](seal)['plan_sha256']==c['bound'](plan)['sha256'] and all(
         c['bound'](TARGET/n)['sha256']==c['bound'](stage/n)['sha256'] for n in names),'changed 170 package')
     if not QUAL.exists():
-        qa=ROOT/'retry11-170-status-qa';c['ensure_dir'](qa)
+        qa=ROOT/f'{ATTEMPT}-170-status-qa';c['ensure_dir'](qa)
         suites={n:json.loads(shared['output']('/usr/bin/python3','-IB',TARGET/n,qa)) for n in MEMBERS if n.startswith('qualify')}
         need(suites['qualify_cold170.py']['measured_lanes']==4 and suites['qualify_cold170.py']['authenticated_fixture_writes']==2
              and suites['qualify_cold166.py']['counted_native_workers']==3
@@ -118,7 +120,7 @@ def main():
     fd=c['lock'](ROOT/'cold167-status-handoff.lock')
     try:
         return shared['switch'](c,head,target=TARGET,incumbent=old/'status_cycle.py',incumbent_iid=iid,
-                                tag=TAG,drop=shared['DROP'].with_name('zzzzzzzzzzzzzzzz-retry11-170.conf'),admission=admitted)
+                                tag=TAG,drop=shared['DROP'].with_name(f'zzzzzzzzzzzzzzzz-{ATTEMPT}-170.conf'),admission=admitted)
     finally:
         os.close(fd)
 
