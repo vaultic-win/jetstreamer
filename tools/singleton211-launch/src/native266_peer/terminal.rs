@@ -213,38 +213,63 @@ mod tests {
     }
 }
 
-const CONFIG: &str =
-    "/var/lib/jetstreamer/horizon-resume-cycle-v162-native266-terminal-v1/config.json";
-const WRAPPER: &str =
-    "/var/lib/jetstreamer/horizon-resume-cycle-v162-native266-terminal-v1/wrapper-plan.json";
 const DIAG: &str = "/home/ubuntu/.codex/diagnostics";
 const TERMINAL_FLEET: &str = "ba5ad60de5e81500e685dd0c7efd7adacddbbedc9d423604d15af2d22485672c";
 
 fn schedule(version: u32) -> Result<(Value, Value, Bound)> {
-    let base_cfg = Bound::new(
-        CONFIG,
-        "978b51b6dc55d3e336915ba8417295c6ed5d49e6c4e126e084c8b186e6302a15",
-    );
-    let base_wrapper = Bound::new(
-        WRAPPER,
-        "8922361e1c68eb82dff5dc11a486ce7aefbc7ed55b0ed8140448c83aac6fa2f2",
+    // Each change of observed owners starts with a separately sealed plan.
+    // Later cycles may move the clock and output paths of that plan only.
+    let (first, family, state_family, wrapper_sha) = match version {
+        162..=165 => (
+            162,
+            "native266-terminal",
+            "three-live-20261120",
+            "8922361e1c68eb82dff5dc11a486ce7aefbc7ed55b0ed8140448c83aac6fa2f2",
+        ),
+        166..=169 => (
+            166,
+            "staged247-fadfe2d4",
+            "staged247-fadfe2d4",
+            "18a729074b169499b334b3852fe436af338f9158a4258ad4456a8c668a762f7c",
+        ),
+        170..=176 => (
+            170,
+            "staged247-full228",
+            "staged247-full228",
+            "6aa1ac996b00f7c1b31e2980be61a0e8003abc2ec3b3871074a09b46d7fc7278",
+        ),
+        177.. => (
+            177,
+            "staged247-stopped228",
+            "staged247-stopped228",
+            "0dd7f37b0909a592f32b4c70624bcf2fdc5a3a56ed18828abfe025aac8c4dad8",
+        ),
+        _ => bail!("native266 observer predates terminal admission"),
+    };
+    let root_for = |n| {
+        PathBuf::from(format!(
+            "/var/lib/jetstreamer/horizon-resume-cycle-v{n}-{family}-v1"
+        ))
+    };
+    let base = root_for(first);
+    let base_wrapper = Bound::new(base.join("wrapper-plan.json"), wrapper_sha);
+    let mut w = base_wrapper.sealed()?;
+    let base_cfg = binding(&w["config"])?;
+    ensure!(
+        base_cfg.path == base.join("config.json"),
+        "observer base config namespace"
     );
     let mut cfg = base_cfg.sealed()?;
-    let mut w = base_wrapper.sealed()?;
     ensure!(
-        version >= 162
-            && w["config"] == json!(base_cfg)
-            && w.get("native266_handoff").is_none()
+        w.get("native266_handoff").is_none()
             && cfg["native_input_diagnostics"] == json!([])
             && cfg["minimum_interval_seconds"] == 1800,
         "native266 retired diagnostic schedule differs"
     );
-    if version == 162 {
+    if version == first {
         return Ok((cfg, w, base_wrapper));
     }
-    let root = PathBuf::from(format!(
-        "/var/lib/jetstreamer/horizon-resume-cycle-v{version}-native266-terminal-v1"
-    ));
+    let root = root_for(version);
     let wp = root.join("wrapper-plan.json");
     let actual = Bound::new(&wp, hash(&wp)?);
     let aw = actual.sealed()?;
@@ -264,10 +289,10 @@ fn schedule(version: u32) -> Result<(Value, Value, Bound)> {
         w == aw
             && cfg == nc
             && text(&w, "state_directory")?
-                == format!("{DIAG}/horizon-terminal-aware-cycle-v{version}-three-live-20261120-v1")
+                == format!("{DIAG}/horizon-terminal-aware-cycle-v{version}-{state_family}-v1")
             && text(&w, "deployment")?
                 == format!(
-                    "/var/lib/jetstreamer/horizon-terminal-aware-cycle-v{version}-three-live-20261120-v1"
+                    "/var/lib/jetstreamer/horizon-terminal-aware-cycle-v{version}-{state_family}-v1"
                 ),
         "native266 sealed successor changed other original observer owners"
     );
@@ -305,8 +330,16 @@ fn completed_observer(f: &Value, o: &Value) -> Result<()> {
         );
     } else if version == 164 && previous["observer_receipt"] != cfg["previous_sample"] {
         let prior = binding(&f["previous_fleet"])?;
-        ensure!(f["admission_transition_guard"].is_null(), "v164 requires a routine fleet");
-        native266::validate_v164_observer_predecessor(&prior.path, &prior.sha256, Path::new(output), o)?;
+        ensure!(
+            f["admission_transition_guard"].is_null(),
+            "v164 requires a routine fleet"
+        );
+        native266::validate_v164_observer_predecessor(
+            &prior.path,
+            &prior.sha256,
+            Path::new(output),
+            o,
+        )?;
     } else {
         ensure!(
             previous["observer_sha256"] == cadence["previous_sample_sha256"]
@@ -370,6 +403,34 @@ fn completed_observer(f: &Value, o: &Value) -> Result<()> {
 #[cfg(test)]
 mod schedule_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires the sealed Foundation observer schedules and completed v183 fleet"]
+    fn staged_uploader_schedules_authenticate_the_retired_worker() -> Result<()> {
+        for version in [165, 166, 169, 170, 176, 177, 183] {
+            let (config, wrapper, _) = schedule(version)?;
+            assert_eq!(config["native_input_diagnostics"], json!([]));
+            assert!(wrapper.get("native266_handoff").is_none());
+            assert_eq!(
+                config["output"],
+                format!("{DIAG}/horizon-resume-observer-20261120-v{version}.json")
+            );
+        }
+        let fleet = Bound::new(
+            format!("{DIAG}/horizon-fleet-takeover-v183-20261120-v1/fleet-v1.json"),
+            "d45a956802a7d5f78ee3ee4e993f83eff2e695b8e56fc26754859db631764fce",
+        )
+        .json()?;
+        let mut observer = Bound::new(
+            text(&fleet, "observer_receipt")?,
+            text(&fleet, "observer_sha256")?,
+        )
+        .json()?;
+        completed_observer(&fleet, &observer)?;
+        observer["cadence"]["previous_sample_sha256"] = json!("0".repeat(64));
+        assert!(completed_observer(&fleet, &observer).is_err());
+        Ok(())
+    }
 
     #[test]
     #[ignore = "requires the real sealed v162 terminal-aware observer deployment"]
