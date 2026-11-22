@@ -149,7 +149,7 @@ def verify_prior_trace(a, rows):
 @contextlib.contextmanager
 def monitor(a, attempt):
     """Start the existing passive probe after its v2 owner releases the original scopes."""
-    script = Path(__file__).resolve().with_name("http.py")
+    script = Path(__file__).resolve().with_name("passive_http.py")
     require(a.sha(script) == "526c597cde655e542da103c331f4045ffe459d718c504a6c1e4dd92e79715826",
             "history HTTP observer source changed")
     invocation = os.environ["INVOCATION_ID"]

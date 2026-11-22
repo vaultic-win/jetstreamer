@@ -7,8 +7,8 @@ StartLimitBurst=3
 [Service]
 Type=exec
 Slice=horizonaudit.slice
-ExecCondition=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/historical-ready-handoff-20261122-v1/history.py ready
-ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/historical-ready-handoff-20261122-v1/history.py play
+ExecCondition=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/historical-ready-handoff-20261122-v2/history.py ready
+ExecStart=/usr/bin/python3 -IB /var/lib/jetstreamer/horizon_runtime_data/historical-ready-handoff-20261122-v2/history.py play
 CPUWeight=10
 CPUQuota=400%
 MemoryHigh=14G
