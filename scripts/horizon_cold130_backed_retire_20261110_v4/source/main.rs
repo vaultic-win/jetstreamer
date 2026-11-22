@@ -18,6 +18,7 @@ mod atomic_fs;
 mod canonical;
 mod closure;
 mod current_readers;
+mod guard_observer;
 mod launch_routes;
 mod prior_boot;
 mod process_references;

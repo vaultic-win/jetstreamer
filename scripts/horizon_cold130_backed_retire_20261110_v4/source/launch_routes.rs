@@ -449,7 +449,9 @@ pub(super) fn reviewed(binding: &Value) -> Result<()> {
         .context("independently reviewed route set")?;
     for (unit, route) in current.as_object().context("sampled route set")? {
         ensure!(
-            approved.get(unit) == Some(route) || cadence(unit, route, &plan["cadence_template"])?,
+            approved.get(unit) == Some(route)
+                || cadence(unit, route, &plan["cadence_template"])?
+                || crate::guard_observer::reviewed(unit, route, approved)?,
             "new or changed reachable actor requires inspection: {unit}"
         );
     }
@@ -481,4 +483,11 @@ mod tests {
         assert!(selected_fields("Id=x\nExecStart=unknown").is_err());
         assert!(cold(b"args=../run-382916-1790762712552279895/archives"));
     }
+}
+
+#[cfg(test)]
+pub(super) fn captured_guard_inputs(block: &str) -> Result<Value> {
+    let properties = selected_fields(block)?;
+    let files = inputs(&properties)?;
+    Ok(json!({"properties": properties, "inputs": files}))
 }
