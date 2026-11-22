@@ -8,6 +8,14 @@ use std::{
     os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
 };
+#[derive(Copy, Clone)]
+struct Pins<'a> {
+    iid: &'a str,
+    pid: u64,
+    handoff_sha: &'a str,
+    qa_disk: &'a str,
+    qa_memory: &'a str,
+}
 pub struct Pilot {
     pub epoch: u64,
     pub unit: &'static str,
@@ -16,13 +24,9 @@ pub struct Pilot {
     pub node: &'static str,
     state: &'static str,
     guard: &'static str,
-    iid: &'static str,
-    pid: u64,
-    handoff_sha: &'static str,
     bootstrap: u64,
     target: u64,
-    qa_disk: &'static str,
-    qa_memory: &'static str,
+    fixed: Option<Pins<'static>>,
 }
 pub const FULL266: Pilot = Pilot {
     epoch: 266,
@@ -32,13 +36,16 @@ pub const FULL266: Pilot = Pilot {
     node: "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-node",
     state: "/var/lib/jetstreamer/horizon266-native-full-v165-a2",
     guard: "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d",
-    iid: "09dcaaddbbc34f3eb5f81c0a4f8a909e",
-    pid: 2791171,
-    handoff_sha: "1fd365a05f8f74c1456b1bfaf44199fd006afd6785d0161afca34fdf20e262d5",
     bootstrap: 114910768,
     target: 115343999,
-    qa_disk: "7c1433602af9934b792c3ea1e2ae190d69573c83625940e84ec77011200e47af",
-    qa_memory: "2dc8c837ca301d494f936762472690b71ac0ee44dbbfb401be04bf53e4f77086",
+
+    fixed: Some(Pins {
+        iid: "09dcaaddbbc34f3eb5f81c0a4f8a909e",
+        pid: 2791171,
+        handoff_sha: "1fd365a05f8f74c1456b1bfaf44199fd006afd6785d0161afca34fdf20e262d5",
+        qa_disk: "7c1433602af9934b792c3ea1e2ae190d69573c83625940e84ec77011200e47af",
+        qa_memory: "2dc8c837ca301d494f936762472690b71ac0ee44dbbfb401be04bf53e4f77086",
+    }),
 };
 pub const FULL228: Pilot = Pilot {
     epoch: 228,
@@ -48,13 +55,28 @@ pub const FULL228: Pilot = Pilot {
     node: "/var/lib/jetstreamer/horizon228-demotion-parent-natural-f797454e-v165-v1-qualified/parent",
     state: "/var/lib/jetstreamer/horizon228-native-root-tail-v166-a1",
     guard: "98ae85499fd21fa294104a1ff05c21dc155c9aa14ea10a70a0b29302d853dbfb",
-    iid: "5566869f329b46309aa8a2ea8f46047a",
-    pid: 2819393,
-    handoff_sha: "da3fdea0fa6f6682daa741e4c72d5f3a81d6bd420743d5df70c46d40b6319752",
     bootstrap: 98495291,
     target: 98928278,
-    qa_disk: "7601c423f259baf6e9cddbe5417c77288566d383bb739bc2b3a78eedda320c0c",
-    qa_memory: "be6b2fa7dde8ec4242766ce6e3844c78313ef1973ae62295083c330f6d563f7e",
+
+    fixed: Some(Pins {
+        iid: "5566869f329b46309aa8a2ea8f46047a",
+        pid: 2819393,
+        handoff_sha: "da3fdea0fa6f6682daa741e4c72d5f3a81d6bd420743d5df70c46d40b6319752",
+        qa_disk: "7601c423f259baf6e9cddbe5417c77288566d383bb739bc2b3a78eedda320c0c",
+        qa_memory: "be6b2fa7dde8ec4242766ce6e3844c78313ef1973ae62295083c330f6d563f7e",
+    }),
+};
+pub const SUCCESSOR266: Pilot = Pilot {
+    epoch: 266,
+    unit: "horizon-qualify-266-instructions-2789f821-v169.service",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v169",
+    schema: "horizon266-instruction-successor-entry-registration-v1",
+    node: "/var/lib/jetstreamer/horizon253255-node-index-20261118-v2/jetstreamer-node",
+    state: "/var/lib/jetstreamer/horizon266-instructions-2789f821-v169-control",
+    guard: FULL266.guard,
+    bootstrap: 114910768,
+    target: 115343999,
+    fixed: None,
 };
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
     v[k].as_str()
@@ -70,6 +92,9 @@ fn hex(s: &str, n: usize) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn read(b: &Value, loc: &Path, immutable: bool) -> Result<Value> {
+    Ok(serde_json::from_slice(&receipt_bytes(b, loc, immutable)?)?)
+}
+fn receipt_bytes(b: &Value, loc: &Path, immutable: bool) -> Result<Vec<u8>> {
     let p = Path::new(text(b, "path")?);
     let digest = text(b, "sha256")?;
     ensure!(
@@ -122,7 +147,7 @@ fn read(b: &Value, loc: &Path, immutable: bool) -> Result<Value> {
             && format!("{:x}", Sha256::digest(&bytes)) == digest,
         "entry proof changed"
     );
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(bytes)
 }
 impl Pilot {
     pub fn tuple(&self, iid: &str) -> Result<Value> {
@@ -155,6 +180,7 @@ impl Pilot {
                 && self.bootstrap < a[1]
                 && a[1] < b[1]
                 && b[1] <= self.target
+                && (self.fixed.is_some() || b[1] > 114912038)
                 && (self.epoch != 228 || a[2] > 0)
                 && a[2] < b[2]
                 && a[3] <= b[3],
@@ -163,6 +189,114 @@ impl Pilot {
         Ok(())
     }
     pub fn validate(&self, b: &Value) -> Result<Value> {
+        if let Some(pins) = self.fixed {
+            return self.entries(b, pins);
+        }
+        let path = Path::new(text(b, "path")?);
+        let dir = path
+            .parent()
+            .context("missing successor capture directory")?;
+        ensure!(
+            dir.parent() == Some(Path::new(self.state))
+                && path.file_name().is_some_and(|n| n == "registration.json")
+                && dir
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|s| s.strip_prefix("first-entries-"))
+                    .is_some_and(|s| !s.starts_with('0') && s.parse::<u32>().is_ok_and(|n| n > 0)),
+            "wrong successor registration location"
+        );
+        let r = read(b, path, true)?;
+        ensure!(
+            r["schema"] == self.schema
+                && r["unit"] == self.unit
+                && r["entry_replay_proven"] == true
+                && r["publication_authorized"] == false
+                && r["full_epoch_qualified"] == false
+                && Path::new(text(&r["entries"], "path")?) == dir.join("first-entries.json"),
+            "different successor receipt"
+        );
+        for (key, mode) in [("qa_disk", "qa-disk"), ("qa_memory", "qa-memory")] {
+            ensure!(
+                Path::new(text(&r[key], "path")?)
+                    == Path::new(self.state).join(mode).join("qualification.json"),
+                "different pressure receipt"
+            );
+        }
+        let pins = Pins {
+            iid: text(&r, "iid")?,
+            pid: num(&r, "pid")?,
+            handoff_sha: text(&r["handoff"], "sha256")?,
+            qa_disk: text(&r["qa_disk"], "sha256")?,
+            qa_memory: text(&r["qa_memory"], "sha256")?,
+        };
+        ensure!(
+            hex(pins.iid, 32)
+                && pins.iid != FULL266.fixed.context("original 266 registration")?.iid
+                && pins.pid > 1,
+            "different successor owner"
+        );
+        let native = read(&r["entries"], &dir.join("first-entries.json"), true)?;
+        let journal = receipt_bytes(&r["journal"], &dir.join("command-0002.stdout"), false)?;
+        self.original_progress(&native, &journal, pins)?;
+        let proof = self.entries(&r["entries"], pins)?;
+        ensure!(
+            proof["handoff"] == r["handoff"],
+            "substituted successor handoff"
+        );
+        Ok(proof)
+    }
+    fn original_progress(&self, e: &Value, raw: &[u8], pins: Pins<'_>) -> Result<()> {
+        let mut matched = [false; 2];
+        for line in std::str::from_utf8(raw)?.lines() {
+            let row: Value = serde_json::from_str(line)?;
+            for (n, key) in ["first", "last"].iter().enumerate() {
+                let point = &e[*key];
+                if row["__CURSOR"] != point[1] {
+                    continue;
+                }
+                let stamp = text(&row, "__MONOTONIC_TIMESTAMP")?.parse::<u64>()?;
+                let message = text(&row, "MESSAGE")?
+                    .split_once("progress slot ")
+                    .context("original progress row")?
+                    .1;
+                let (slot, target) = message
+                    .split_whitespace()
+                    .next()
+                    .context("missing progress range")?
+                    .split_once('/')
+                    .context("invalid progress range")?;
+                let counter = |k: &str| -> Result<u64> {
+                    let mut hits = message.split_whitespace().filter_map(|w| w.strip_prefix(k));
+                    let v = hits.next().context("missing progress count")?.parse()?;
+                    ensure!(hits.next().is_none(), "repeated progress count");
+                    Ok(v)
+                };
+                ensure!(
+                    !matched[n]
+                        && row["_BOOT_ID"] == "3b17d0055c3a4a0e8841da097e0957b5"
+                        && row["_SYSTEMD_UNIT"] == self.unit
+                        && row["_SYSTEMD_INVOCATION_ID"] == pins.iid
+                        && row["_UID"] == "1000"
+                        && text(&row, "_PID")?.parse::<u64>()? == pins.pid
+                        && row["_EXE"] == self.node
+                        && target.parse::<u64>()? == self.target
+                        && point[0]
+                            == json!([
+                                stamp,
+                                slot.parse::<u64>()?,
+                                counter("txs=")?,
+                                counter("accounts=")?
+                            ]),
+                    "different original progress source"
+                );
+                matched[n] = true;
+            }
+        }
+        ensure!(matched == [true, true], "missing original progress cursors");
+        Ok(())
+    }
+    fn entries(&self, b: &Value, pins: Pins<'_>) -> Result<Value> {
         let path = Path::new(text(b, "path")?);
         let state = Path::new(self.state);
         ensure!(
@@ -174,9 +308,10 @@ impl Pilot {
         let iid = text(&e, "iid")?;
         let pid = num(&e, "pid")?;
         ensure!(
-            iid == self.iid
-                && pid == self.pid
-                && e["schema"] == self.schema
+            iid == pins.iid
+                && pid == pins.pid
+                && e["schema"]
+                    == format!("horizon{}-first-useful-native-entry-replay-v1", self.epoch)
                 && e["unit"] == self.unit
                 && e["entry_replay_proven"] == true
                 && e["publication_authorized"] == false
@@ -204,7 +339,7 @@ impl Pilot {
             let image = Path::new(text(worker, "image")?);
             ensure!(
                 worker["role"] == "worker"
-                    && worker["parent"] == self.pid
+                    && worker["parent"] == pins.pid
                     && image.starts_with(Path::new(self.root).join("scratch"))
                     && image.ends_with("bound-worker/historical-worker")
                     && num(parent, "device")? > 0
@@ -215,7 +350,23 @@ impl Pilot {
                 "wrong epoch 228 Bank child"
             );
         }
-        let mut registration = self.original(&e["handoff"])?;
+        if self.fixed.is_none() {
+            let (_, worker) = proc
+                .iter()
+                .find(|(_, v)| v["role"] == "worker")
+                .context("missing historical worker")?;
+            let image = Path::new(text(worker, "image")?);
+            ensure!(
+                image.starts_with(Path::new(self.root).join("state"))
+                    && image.ends_with("bound-worker/historical-worker")
+                    && num(worker, "device")? > 0
+                    && num(worker, "inode")? > 0
+                    && num(parent, "device")? > 0
+                    && num(parent, "inode")? > 0,
+                "different successor worker mapping"
+            );
+        }
+        let mut registration = self.original(&e["handoff"], pins)?;
         ensure!(
             num(&registration, "guard_end_us")?
                 < e["first"][0][0].as_u64().context("first replay clock")?,
@@ -224,12 +375,12 @@ impl Pilot {
         registration["entries"] = b.clone();
         Ok(registration)
     }
-    fn original(&self, b: &Value) -> Result<Value> {
+    fn original(&self, b: &Value, pins: Pins<'_>) -> Result<Value> {
         let state = Path::new(self.state);
         let pilot = state.join("pilot");
-        let iid = self.iid;
-        let pid = self.pid;
-        ensure!(b["sha256"] == self.handoff_sha, "another pilot handoff");
+        let iid = pins.iid;
+        let pid = pins.pid;
+        ensure!(b["sha256"] == pins.handoff_sha, "another pilot handoff");
         let h = read(b, &pilot.join("handoff.json"), true)?;
         ensure!(
             h["schema"] == format!("horizon{}-first-full-native-node-handoff-v1", self.epoch)
@@ -301,7 +452,10 @@ impl Pilot {
                 && sample["root_physical_observation"].is_object(),
             "pilot original admission, first firing or release"
         );
-        for (mode, sha) in [("qa-disk", self.qa_disk), ("qa-memory", self.qa_memory)] {
+        if self.fixed.is_none() {
+            validate_successor(self, &review, &fit, &s)?;
+        }
+        for (mode, sha) in [("qa-disk", pins.qa_disk), ("qa-memory", pins.qa_memory)] {
             let qp = state.join(mode).join("qualification.json");
             let qb = json!({"path":qp,"sha256":sha});
             let q = read(&qb, &qp, true)?;
@@ -315,6 +469,23 @@ impl Pilot {
                     && hex(text(&q, "iid")?, 32),
                 "pilot missing pressure qualification {mode}"
             );
+            if self.fixed.is_none() {
+                let suffix = if mode == "qa-disk" {
+                    "qa-disk-a2"
+                } else {
+                    "qa-memory"
+                };
+                ensure!(
+                    q["unit"]
+                        == format!(
+                            "horizon-qualify-266-instructions-2789f821-{suffix}-v169.service"
+                        )
+                        && q["terminal"]["MainPID"] == "0"
+                        && q["terminal"]["ControlGroup"] == ""
+                        && q["terminal"]["NRestarts"] == "0",
+                    "different successor pressure stop"
+                );
+            }
             let sample_path = Path::new(text(&q["first_guard"], "path")?);
             ensure!(
                 sample_path.parent() == Some(state.join(mode).join("receipts").as_path()),
@@ -334,9 +505,13 @@ impl Pilot {
         }
         let image = text(&review["controller_image"], "path")?;
         let target = pilot.join("spec.json");
+        let command = if self.fixed.is_none() {
+            "epoch266-instructions".to_owned()
+        } else {
+            format!("epoch{}-full", self.epoch)
+        };
         let exec = format!(
-            "{{ path={image} ; argv[]={image} epoch{}-full wait pilot {} {}",
-            self.epoch,
+            "{{ path={image} ; argv[]={image} {command} wait pilot {} {}",
             target.display(),
             text(&h["spec"], "sha256")?
         );
@@ -362,6 +537,43 @@ impl Pilot {
         Ok(())
     }
 }
+fn validate_successor(p: &Pilot, review: &Value, fit: &Value, spec: &Value) -> Result<()> {
+    let old = FULL266.fixed.context("missing original 266 registration")?;
+    let peer = FULL228.fixed.context("missing original 228 registration")?;
+    let original = json!({"path":Path::new(FULL266.state).join("pilot/handoff.json"),"sha256":old.handoff_sha});
+    let peer_hand = json!({"path":Path::new(FULL228.state).join("pilot/handoff.json"),"sha256":peer.handoff_sha});
+    let assignment = json!({"from_original_invocation":old.iid,"assigned_to":p.unit,"producer_bytes":176000000000u64,
+        "new_guard_bytes":1u64<<30,"new_controller_bytes":256u64<<20,"old_guard_retained":1u64<<30,
+        "old_controller_retained":256u64<<20,"original_cold_residual":64u64<<20,"disk_credit":0});
+    ensure!(
+        review["controller_image"]
+            == json!({"path":"/var/lib/jetstreamer/horizon266-instruction-controller-build-v169-a1-qualified/native-fit",
+            "sha256":"c1891a419df5b5f6ed74912f3760c52bad383e93088ff5414932e28220a57ca4"})
+            && review["qualified_build"]
+                == json!({"path":"/home/ubuntu/.codex/diagnostics/horizon266-instruction-controller-build-v169-a1/completion.json","sha256":"7dd5b650da5a33e6fd1187fe34c0eb95d9b451edc469ba94c77158b561b6cde6"})
+            && review["published_commit"] == "acbd2eb0833eebc6ee01f2948924ffbdf5ac28df"
+            && review["selected_producer"]
+                == json!({"path":"/home/ubuntu/.codex/diagnostics/horizon266-selected-producer-capability-v167-a2/qualification.json","sha256":"18c0e334c7c0c6861344b07c34d2fb982325f0d2605c640b55d72b4f31fb3618"})
+            && review["bounded266_handoff"] == original
+            && review["epoch228_handoff"] == peer_hand
+            && review["epoch266_reassignment"] == assignment
+            && fit["new_266_assignment"] == assignment
+            && fit["concurrent_266"]["handoff"] == original
+            && fit["concurrent_266"]["iid"] == old.iid
+            && fit["concurrent_266"]["terminal_failure"]
+                == json!({"path":"/home/ubuntu/.codex/diagnostics/horizon266-instruction-repair-v166-a1/terminal.json","sha256":"7445122e9ca61f7a7c46d7ca47140c63edb174c7e2fb97b56bff35bb7dd554ff"})
+            && fit["live_228"]["handoff"] == peer_hand
+            && fit["live_228"]["iid"] == peer.iid
+            && fit["live_228"]["pid"] == peer.pid
+            && fit["publication_authorized"] == false
+            && fit["winner"]["memory"] == 176000000000u64
+            && [128u64 << 30, 320u64 << 30].contains(&num(&fit["winner"], "root")?)
+            && fit["cpus"] == json!([32, 33, 34, 35, 36, 37, 38, 39])
+            && spec["argv"][0] == p.node,
+        "successor review, failed original generation, peer or held award differs"
+    );
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,10 +581,10 @@ mod tests {
     #[ignore = "original epoch 266 native handoff and both retained pressure qualifications"]
     fn authentic_original_guard_release_and_both_pressure_qualifications() {
         let p = Path::new(FULL266.state).join("pilot/handoff.json");
-        let mut b = json!({"path":p,"sha256":FULL266.handoff_sha});
-        let r = FULL266.original(&b).unwrap();
-        assert_eq!(r["pid"], FULL266.pid);
-        assert_eq!(r["iid"], FULL266.iid);
+        let mut b = json!({"path":p,"sha256":FULL266.fixed.unwrap().handoff_sha});
+        let r = FULL266.original(&b, FULL266.fixed.unwrap()).unwrap();
+        assert_eq!(r["pid"], FULL266.fixed.unwrap().pid);
+        assert_eq!(r["iid"], FULL266.fixed.unwrap().iid);
         assert_eq!(r["memory"], 176000000000u64);
         assert_eq!(r["root_cap"], 112u64 << 30);
         assert_eq!(
@@ -380,13 +592,13 @@ mod tests {
             "8be8c0b73a88aad4935817e5787161a857d008194d54b11cfb7900639b562241"
         );
         b["sha256"] = json!("0".repeat(64));
-        assert!(FULL266.original(&b).is_err());
+        assert!(FULL266.original(&b, FULL266.fixed.unwrap()).is_err());
     }
     #[test]
     #[ignore = "requires the original root-owned epoch 228 pilot QA, release and handoff"]
     fn original_228_guard_and_terminal_qa() {
-        let b = json!({"path":Path::new(FULL228.state).join("pilot/handoff.json"),"sha256":FULL228.handoff_sha});
-        let r = FULL228.original(&b).unwrap();
+        let b = json!({"path":Path::new(FULL228.state).join("pilot/handoff.json"),"sha256":FULL228.fixed.unwrap().handoff_sha});
+        let r = FULL228.original(&b, FULL228.fixed.unwrap()).unwrap();
         assert_eq!(r["pid"], 2819393);
         assert_eq!(r["memory"], 120000000000u64);
         assert_eq!(r["root_cap"], 112u64 << 30);
@@ -394,7 +606,7 @@ mod tests {
             r["fleet"]["sha256"],
             "ed624ffec8cfe447b9830aab6bd62bb1a0b1e6ff58a0776397d61cc48e8ba7c0"
         );
-        assert!(FULL266.original(&b).is_err());
+        assert!(FULL266.original(&b, FULL266.fixed.unwrap()).is_err());
     }
     #[test]
     fn registered_228_requires_positive_original_entry_delta_and_bounded_slots() {
@@ -406,6 +618,45 @@ mod tests {
         e["last"][0][2] = json!(82);
         e["last"][0][1] = json!(98928279);
         assert!(FULL228.markers(&e).is_err());
+    }
+    #[test]
+    fn successor_requires_progress_beyond_original_writer_failure() {
+        let mut v = json!({"first":[[100,114912000,10,20],"a"],"last":[[101,114912038,11,21],"b"]});
+        assert!(SUCCESSOR266.markers(&v).is_err());
+        v["last"][0][1] = json!(114912039);
+        SUCCESSOR266.markers(&v).unwrap();
+        assert_ne!(SUCCESSOR266.unit, FULL266.unit);
+        assert_ne!(SUCCESSOR266.schema, FULL266.schema);
+    }
+    #[test]
+    fn instruction_successor_reopens_two_original_parent_cursors() {
+        let pins = Pins {
+            iid: "1234567890abcdef1234567890abcdef",
+            pid: 123,
+            qa_disk: "",
+            qa_memory: "",
+            handoff_sha: "",
+        };
+        let proof = json!({"first":[[10,114912035,50,8],"a"],"last":[[20,114912039,51,10],"b"]});
+        let raw = |pid: &str| {
+            ["first","last"].map(|k|{let v=&proof[k][0]; json!({"__CURSOR":proof[k][1],"__MONOTONIC_TIMESTAMP":v[0].to_string(),
+                "_BOOT_ID":"3b17d0055c3a4a0e8841da097e0957b5","_SYSTEMD_UNIT":SUCCESSOR266.unit,"_SYSTEMD_INVOCATION_ID":pins.iid,
+                "_UID":"1000","_PID":pid,"_EXE":SUCCESSOR266.node,"MESSAGE":format!("progress slot {}/115343999 (1%) txs={} accounts={}",v[1],v[2],v[3])}).to_string()}).join("\n")
+        };
+        SUCCESSOR266
+            .original_progress(&proof, raw("123").as_bytes(), pins)
+            .unwrap();
+        assert!(
+            SUCCESSOR266
+                .original_progress(&proof, raw("124").as_bytes(), pins)
+                .is_err()
+        );
+        let changed = raw("123").replace("114912039/115343999", "114912038/115343999");
+        assert!(
+            SUCCESSOR266
+                .original_progress(&proof, changed.as_bytes(), pins)
+                .is_err()
+        );
     }
     #[test]
     fn requires_actual_progress_and_distinct_receipts() {

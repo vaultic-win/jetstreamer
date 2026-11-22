@@ -5,7 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 base = Path("/var/lib/jetstreamer/horizon_runtime_data")
-packages = [base/"epoch168-terminal-status-20261121-v1/publisher-v1", base/"epoch166-post168-cadence-20261121-v1/publisher-v1"]
+packages = [base/"epoch168-terminal-status-20261121-v1/publisher-v1", base/"epoch166-post168-cadence-20261121-v1/publisher-v1",
+            base/"prefix140-status-cadence-20261122-v1/cadence-tools"]
 package = Path(sys.argv[2]) if len(sys.argv) == 3 else packages[0]
 assert package in packages, "unregistered status deployment"
 sys.path.insert(0, str(package))

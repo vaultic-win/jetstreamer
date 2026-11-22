@@ -15,7 +15,7 @@ const HELPER: &str = "93162c6910f01149cb50eccdfa742e5a732658dd8ac17865a5f2eaef52
 const NODE: &str = "bf702870fa328cf3fc43dd12a3943cab059fb7b0aa4ea1d3753c6a09b940cd71";
 pub(super) const WORKER: &str = "3ea95997d956de6a8c7fa431e679d496a5d3c31e15f8a104a8ddb0086646ea3d";
 pub const LIMIT: u64 = 72 << 30;
-const ROOT_CAP: u64 = 64 << 30;
+pub(super) const ROOT_CAP: u64 = 64 << 30;
 const ROOT136: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1/reproduction";
 
 pub struct Candidate {
@@ -290,6 +290,113 @@ fn timer_trigger() -> Result<u64> {
         .parse::<u64>()?)
 }
 
+const TIMER_FIELDS: &str = "Id,InvocationID,ActiveState,Triggers,Job";
+const GUARD_FIELDS: &str = "Id,InvocationID,Type,Result,ExecMainStatus,ExecStart,NRestarts,ExecMainStartTimestampMonotonic,MainPID,ControlPID";
+
+pub(super) struct GuardFire {
+    timer: Value,
+    service: Value,
+    trigger: u64,
+    receipt: Bound,
+    pub sample: Value,
+}
+
+impl GuardFire {
+    pub fn is_current(&self) -> Result<bool> {
+        Ok(show(TIMER, TIMER_FIELDS)? == self.timer
+            && show(GUARD, GUARD_FIELDS)? == self.service
+            && timer_trigger()? == self.trigger)
+    }
+}
+
+/// Bind the completed PID1 timer invocation to its own sample file.
+pub(super) fn guard_fire(
+    gp: &Bound,
+    iid: &str,
+    pid: u32,
+    floor: u64,
+    staging: bool,
+) -> Result<GuardFire> {
+    let timer = show(TIMER, TIMER_FIELDS)?;
+    let guard = show(GUARD, GUARD_FIELDS)?;
+    if (timer["ActiveState"] != "active" || guard["InvocationID"] == "") && staging {
+        return Err(capacity::GuardInFlight.into());
+    }
+    let trigger = timer_trigger()?;
+    if trigger == 0
+        || guard["MainPID"] != "0"
+        || guard["ControlPID"] != "0"
+        || prop(&guard, "ExecMainStartTimestampMonotonic")?.parse::<u64>()? < trigger
+    {
+        return Err(capacity::GuardInFlight.into());
+    }
+    let gid = prop(&guard, "InvocationID")?;
+    let line = format!(
+        "{{ path={GUARD_IMAGE} ; argv[]={GUARD_IMAGE} {} --plan-sha256 {} --self-sha256 {GUARD_SHA} ;",
+        gp.path.display(),
+        gp.sha256
+    );
+    ensure!(
+        timer["ActiveState"] == "active"
+            && timer["Triggers"] == GUARD
+            && timer["Job"] == ""
+            && custody::hex(prop(&timer, "InvocationID")?, 32)
+            && custody::hex(gid, 32)
+            && guard["Type"] == "oneshot"
+            && guard["NRestarts"] == "0"
+            && prop(&guard, "ExecStart")?.starts_with(&line)
+            && prop(&guard, "ExecStart")?.matches(" ; argv[]=").count() == 1,
+        "foreign 136 guard/timer"
+    );
+    let sp = Path::new(ROOT136)
+        .join("receipts/guard")
+        .join(format!("sample-{gid}.json"));
+    if !sp.try_exists()? {
+        return Err(capacity::GuardInFlight.into());
+    }
+    let (sb, sample) = joint::receipt(&sp)?;
+    let o = &sample["root_physical_observation"];
+    ensure!(
+        guard["Result"] == "success"
+            && guard["ExecMainStatus"] == "0"
+            && sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
+            && sample["guard_invocation_id"] == gid
+            && sample["producer_invocation_id"] == iid
+            && sample["plan_sha256"] == gp.sha256
+            && sample["producer"]["pid"] == pid
+            && sample["producer"]["invocation_id"] == iid
+            && sample["producer"]["cgroup"] == format!("/system.slice/{UNIT}")
+            && sample["producer"]["active"] == "active"
+            && sample["producer"]["sub"] == "running"
+            && sample["producer"]["restarts"] == 0
+            && sample["guard_sha256"] == GUARD_SHA
+            && sample["minimum_free_bytes"] == floor
+            && sample["maximum_root_physical_bytes"] == ROOT_CAP
+            && sample["maximum_worker_vmas"] == 3_500_000
+            && sample["bounded_measurement"] == false
+            && sample["bounded_canary"].is_null()
+            && sample["native_main"].is_null()
+            && sample["producer_stop_enabled"] == true
+            && sample["trip_reason"].is_null()
+            && sample["worker_observation_error"].is_null()
+            && sample["root_physical_observation_error"].is_null()
+            && o["exceeds_budget"] == false
+            && num(o, "conservative_physical_bytes")? <= ROOT_CAP
+            && num(&sample, "available_bytes")? >= floor
+            && custody::now()?
+                .checked_sub(num(&sample, "recorded_unix_seconds")?)
+                .is_some_and(|d| d <= 120),
+        "136 guard health or generation"
+    );
+    Ok(GuardFire {
+        timer,
+        service: guard,
+        trigger,
+        receipt: sb,
+        sample,
+    })
+}
+
 pub fn observe() -> Result<Candidate> {
     let base = Path::new(BASE136);
     let ap = base.join("admission.json");
@@ -400,80 +507,15 @@ pub fn observe() -> Result<Candidate> {
             && g["receipt_directory"] == receipts.join("guard").to_str().unwrap(),
         "136 guard plan changed"
     );
-    let timer_fields = "Id,InvocationID,ActiveState,Triggers,Job";
-    let guard_fields = "Id,InvocationID,Type,Result,ExecMainStatus,ExecStart,NRestarts,ExecMainStartTimestampMonotonic,MainPID,ControlPID";
-    let timer = show(TIMER, timer_fields)?;
-    let guard = show(GUARD, guard_fields)?;
-    if (timer["ActiveState"] != "active" || guard["InvocationID"] == "")
-        && live_writer
-        && now <= num(&a, "launch_expires_unix_seconds")?
-    {
-        return Err(capacity::GuardInFlight.into());
-    }
-    let trigger = timer_trigger()?;
-    if trigger == 0
-        || guard["MainPID"] != "0"
-        || guard["ControlPID"] != "0"
-        || prop(&guard, "ExecMainStartTimestampMonotonic")?.parse::<u64>()? < trigger
-    {
-        return Err(capacity::GuardInFlight.into());
-    }
-    let gid = prop(&guard, "InvocationID")?;
-    let line = format!(
-        "{{ path={GUARD_IMAGE} ; argv[]={GUARD_IMAGE} {} --plan-sha256 {} --self-sha256 {GUARD_SHA} ;",
-        plan_path.display(),
-        gp.sha256
-    );
-    ensure!(
-        timer["ActiveState"] == "active"
-            && timer["Triggers"] == GUARD
-            && timer["Job"] == ""
-            && custody::hex(prop(&timer, "InvocationID")?, 32)
-            && custody::hex(gid, 32)
-            && guard["Type"] == "oneshot"
-            && guard["NRestarts"] == "0"
-            && prop(&guard, "ExecStart")?.starts_with(&line)
-            && prop(&guard, "ExecStart")?.matches(" ; argv[]=").count() == 1,
-        "foreign 136 guard/timer"
-    );
-    let sp = receipts.join("guard").join(format!("sample-{gid}.json"));
-    if !sp.try_exists()? {
-        return Err(capacity::GuardInFlight.into());
-    }
-    let (sb, sample) = joint::receipt(&sp)?;
+    let fire = guard_fire(
+        &gp,
+        iid,
+        pid,
+        floor,
+        live_writer && now <= num(&a, "launch_expires_unix_seconds")?,
+    )?;
+    let sample = &fire.sample;
     let o = &sample["root_physical_observation"];
-    ensure!(
-        guard["Result"] == "success"
-            && guard["ExecMainStatus"] == "0"
-            && sample["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
-            && sample["guard_invocation_id"] == gid
-            && sample["producer_invocation_id"] == iid
-            && sample["plan_sha256"] == gp.sha256
-            && sample["producer"]["pid"] == pid
-            && sample["producer"]["invocation_id"] == iid
-            && sample["producer"]["cgroup"] == format!("/system.slice/{UNIT}")
-            && sample["producer"]["active"] == "active"
-            && sample["producer"]["sub"] == "running"
-            && sample["producer"]["restarts"] == 0
-            && sample["guard_sha256"] == GUARD_SHA
-            && sample["minimum_free_bytes"] == floor
-            && sample["maximum_root_physical_bytes"] == ROOT_CAP
-            && sample["maximum_worker_vmas"] == 3_500_000
-            && sample["bounded_measurement"] == false
-            && sample["bounded_canary"].is_null()
-            && sample["native_main"].is_null()
-            && sample["producer_stop_enabled"] == true
-            && sample["trip_reason"].is_null()
-            && sample["worker_observation_error"].is_null()
-            && sample["root_physical_observation_error"].is_null()
-            && o["exceeds_budget"] == false
-            && num(o, "conservative_physical_bytes")? <= ROOT_CAP
-            && num(&sample, "available_bytes")? >= floor
-            && custody::now()?
-                .checked_sub(num(&sample, "recorded_unix_seconds")?)
-                .is_some_and(|d| d <= 120),
-        "136 guard health or generation"
-    );
     let root = Path::new(ROOT136);
     let procgroup = format!("0::/system.slice/{UNIT}");
     let census = |members: &BTreeSet<u32>| {
@@ -508,7 +550,7 @@ pub fn observe() -> Result<Candidate> {
     if let Some(w) = &tree.worker {
         let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
         ensure!(hz > 0, "kernel process clock");
-        let guard_start = prop(&guard, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
+        let guard_start = prop(&fire.service, "ExecMainStartTimestampMonotonic")?.parse::<u64>()?;
         if (u128::from(w.start_ticks) + 1) * 1_000_000 > u128::from(guard_start) * hz as u128 {
             return Err(capacity::GuardInFlight.into());
         }
@@ -554,9 +596,7 @@ pub fn observe() -> Result<Candidate> {
             let after = fs::symlink_metadata(root)?;
             after.dev() == rm.dev() && after.ino() == rm.ino()
         }
-        || show(TIMER, timer_fields)? != timer
-        || show(GUARD, guard_fields)? != guard
-        || timer_trigger()? != trigger
+        || !fire.is_current()?
     {
         return Err(capacity::GuardInFlight.into());
     }
@@ -567,7 +607,7 @@ pub fn observe() -> Result<Candidate> {
         realized,
         identity: json!({"unit":UNIT,"invocation_id":iid,
       "pid":pid,"start_ticks":ticks,"admission":ab,"writer_invocation_id":a["writer_invocation_id"],"writer":w,
-      "guard_plan":gp,"guard_sample":sb,"node_pid":node,"worker_pid":worker,"process_tree":tree,"positive_physical_subset":proof}),
+      "guard_plan":gp,"guard_sample":fire.receipt,"node_pid":node,"worker_pid":worker,"process_tree":tree,"positive_physical_subset":proof}),
     })
 }
 #[cfg(test)]

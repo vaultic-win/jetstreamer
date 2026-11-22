@@ -1543,7 +1543,7 @@ fn diagnostic_guard_profile_matches(claim: &DiagnosticClaim, plan: &Value) -> bo
 }
 
 fn validate_diagnostic_launch(receipt: &Value, claim: &DiagnosticClaim) -> Result<()> {
-    if full266::namespace(claim) || [full266::bridge::FULL228.schema, full266::bridge::FULL266.schema].iter().any(|schema| receipt["schema"] == *schema) {
+    if full266::namespace(claim) || [full266::bridge::FULL228.schema, full266::bridge::FULL266.schema, full266::bridge::SUCCESSOR266.schema].iter().any(|schema| receipt["schema"] == *schema) {
         full266::claim(claim,receipt)?;
         return Ok(());
     }

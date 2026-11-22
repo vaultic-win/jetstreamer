@@ -18,8 +18,8 @@ HOME=Path("/home/sol")
 H=HOME/".jetstreamer-private"
 CHILD=Path(__file__).resolve().with_name("retire-original-timers.py")
 loader=runpy.run_path(str(CHILD))
-PKG=R/"epoch168-full-metered-20261121-v1/session-v3"
-loader["load_package"](PKG,"c70887c1a09f91d48b1af23c19004419d255e933848abd7513be3afbd64d0421")
+PKG=R/"epoch168-full-metered-20261121-v1/session-v4-registered136"
+loader["load_package"](PKG,"04e90e862f334f26ad63743d624d21787f9cfa7b2a0b2d8697983ac5ff9c0066")
 sys.path.insert(0,str(PKG))
 import fit
 import status168 as s

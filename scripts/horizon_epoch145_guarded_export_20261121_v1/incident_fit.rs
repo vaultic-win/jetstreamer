@@ -784,25 +784,33 @@ impl Fit {
                 .context("replacement growth")?;
             absolute = absolute.max(floor);
         }
-        if !s["normal168"].is_null() || s["candidate136"]["occupied"] == true {
-            // Both are admitted by the full provider. Check their exact current guard plan and remaining
-            // allowance using the original rooted admission rather than letting a new peer bypass the check.
-            for (epoch, plan, unit, remaining) in extra_guards(s)? {
-                let sample =
-                    if cfg!(any(incident_rejoin145_only, incident_post145_only)) && epoch == 168 {
-                        Some(
-                            s["bookings"]["168"]
-                                .get("measured_guard")
-                                .context("missing priced 168 native sample")?,
-                        )
-                    } else {
-                        None
-                    };
-                let (floor, growth) = current_guard(&plan, sample, remaining, &unit)?;
-                required = required.checked_add(growth).context("peer growth")?;
-                absolute = absolute.max(floor);
-                ensure!(matches!(epoch, 136 | 168), "foreign peer");
-            }
+        if !s["normal168"].is_null() {
+            let row = &s["normal168"];
+            ensure!(row["ordinary_canonical"] == true, "unadmitted 168");
+            let admitted = custody::evidence(&serde_json::from_value(row["admission"].clone())?)?;
+            let booking = &s["bookings"]["168"];
+            let sample = if cfg!(any(incident_rejoin145_only, incident_post145_only)) {
+                Some(
+                    booking
+                        .get("measured_guard")
+                        .context("missing priced 168 native sample")?,
+                )
+            } else {
+                None
+            };
+            let (floor, growth) = current_guard(
+                &admitted["actual_guard_plan"],
+                sample,
+                capacity::n(booking, "remaining_bytes")?,
+                admitted["producer_unit"].as_str().context("168 unit")?,
+            )?;
+            required = required.checked_add(growth).context("168 growth")?;
+            absolute = absolute.max(floor);
+        }
+        if s["candidate136"]["occupied"] == true {
+            let (floor, growth) = current136(&s["candidate136"])?;
+            required = required.checked_add(growth).context("136 growth")?;
+            absolute = absolute.max(floor);
         }
         required = required.max(absolute);
         let free = capacity::home()?.0;
@@ -869,46 +877,98 @@ impl Fit {
     }
 }
 
-fn extra_guards(s: &Value) -> Result<Vec<(u64, Value, String, u64)>> {
-    let mut result = Vec::new();
-    if !s["normal168"].is_null() {
-        let r = &s["normal168"];
-        ensure!(r["ordinary_canonical"] == true, "unadmitted 168");
-        let a = custody::evidence(&serde_json::from_value(r["admission"].clone())?)?;
-        result.push((
-            168,
-            a["actual_guard_plan"].clone(),
-            a["producer_unit"].as_str().context("168 unit")?.to_owned(),
-            capacity::n(&s["bookings"]["168"], "remaining_bytes")?,
-        ));
+fn current136(priced: &Value) -> Result<(u64, u64)> {
+    // This timer writes per-invocation receipts with StandardOutput=null.
+    let unit = joint_candidate::UNIT;
+    let identity = &priced["identity"];
+    let iid = identity["iid"].as_str().context("136 invocation")?;
+    let owner = capacity::native_values(unit)?;
+    let pid = owner["MainPID"]
+        .as_str()
+        .context("136 PID")?
+        .parse::<u32>()?;
+    let ticks = native::ticks(pid)?;
+    let plan: Bound = serde_json::from_value(priced["guard_plan"].clone())?;
+    let root = Path::new(joint_candidate::BASE136).join("reproduction");
+    let floor = capacity::n(priced, "guard_floor")?;
+    ensure!(
+        plan.path == root.join("receipts/guard-plan.json"),
+        "foreign 136 guard plan"
+    );
+    let g = custody::evidence(&plan)?;
+    ensure!(
+        priced["cap"] == joint_candidate::LIMIT
+            && identity["unit"] == unit
+            && owner["InvocationID"] == iid
+            && custody::hex(iid, 32)
+            && identity["processes"]
+                .as_array()
+                .is_some_and(|ps| ps.contains(&json!([pid, ticks])))
+            && g["unit"] == unit
+            && g["invocation_id"] == iid
+            && g["minimum_free_bytes"] == floor
+            && g["maximum_root_physical_bytes"] == joint_candidate::ROOT_CAP
+            && g["worker_root"] == json!(root)
+            && g["receipt_directory"] == json!(root.join("receipts/guard")),
+        "different protected 136 admission"
+    );
+    let fire = joint_candidate::guard_fire(&plan, iid, pid, floor, false)?;
+    if !fire.is_current()?
+        || capacity::native_values(unit)? != owner
+        || native::ticks(pid)? != ticks
+    {
+        return Err(capacity::GuardInFlight.into());
     }
-    if s["candidate136"]["occupied"] == true {
-        let r = &s["candidate136"];
-        let identity = &r["identity"];
-        let path = Path::new(
-            "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1/reproduction/receipts/guard-plan.json",
-        );
-        let (plan, entry) = original(path, 2 << 20)?;
-        ensure!(
-            entry["invocation_id"] == identity["iid"]
-                && entry["unit"] == identity["unit"]
-                && entry["minimum_free_bytes"] == r["guard_floor"]
-                && entry["maximum_root_physical_bytes"] == r["cap"],
-            "foreign current 136 guard"
-        );
-        result.push((
-            136,
-            json!(plan),
-            identity["unit"].as_str().context("136 unit")?.to_owned(),
-            capacity::n(r, "remaining")?,
-        ));
-    }
-    Ok(result)
+    let remaining = capacity::n(priced, "remaining")?;
+    ensure!(
+        (joint_candidate::LIMIT - joint_candidate::ROOT_CAP..=joint_candidate::LIMIT)
+            .contains(&remaining),
+        "136 booking outside its paid range"
+    );
+    Ok((floor, remaining136(&fire.sample)?.saturating_sub(remaining)))
+}
+
+fn remaining136(sample: &Value) -> Result<u64> {
+    let scan = &sample["root_physical_observation"];
+    let cap = joint_candidate::ROOT_CAP;
+    ensure!(
+        sample["maximum_root_physical_bytes"] == cap
+            && scan["maximum_physical_bytes"] == cap
+            && scan["exceeds_budget"] == false,
+        "different 136 subtree guard"
+    );
+    let first = capacity::n(&scan["first"], "physical_bytes")?;
+    let second = capacity::n(&scan["second"], "physical_bytes")?;
+    ensure!(
+        first <= cap && second <= cap,
+        "invalid 136 physical measurement"
+    );
+    let stable_first = capacity::n(&scan["first"], "vanished_entries")? == 0;
+    let stable_second = capacity::n(&scan["second"], "vanished_entries")? == 0;
+    let realized = if stable_first && stable_second {
+        first.min(second)
+    } else {
+        0
+    };
+    Ok(joint_candidate::LIMIT - realized)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn private_136_keeps_the_unspent_reservation_outside_its_guarded_subtree() {
+        let cap = joint_candidate::ROOT_CAP;
+        let mut sample = json!({"maximum_root_physical_bytes":cap, "root_physical_observation":{
+            "maximum_physical_bytes":cap, "exceeds_budget":false,
+            "first":{"physical_bytes":cap,"vanished_entries":0},
+            "second":{"physical_bytes":cap-4096,"vanished_entries":0}}});
+        assert_eq!(remaining136(&sample).unwrap(), (8u64 << 30) + 4096);
+        sample["root_physical_observation"]["first"]["vanished_entries"] = 1.into();
+        assert_eq!(remaining136(&sample).unwrap(), 72u64 << 30);
+        sample["root_physical_observation"]["second"]["physical_bytes"] = (cap + 1).into();
+        assert!(remaining136(&sample).is_err());
+    }
     #[test]
     #[ignore = "root-owned accepted fleet and native production cgroups"]
     fn authenticates_the_actual_fleet_and_disallows_missing_members() {

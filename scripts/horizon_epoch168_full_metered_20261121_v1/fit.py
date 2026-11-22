@@ -315,6 +315,22 @@ def phase145():
     return dict(stable,publication=fr),True
 
 
+def remaining136(plan, sample):
+    # The 72 GiB booking includes 8 GiB beyond the native 64 GiB subtree stop.
+    # Only the subtree blocks seen by both complete walks can offset the booking.
+    cap = 64 * G
+    scan = sample["root_physical_observation"]
+    s.need(plan["maximum_root_physical_bytes"] == sample["maximum_root_physical_bytes"] == cap
+           and scan["maximum_physical_bytes"] == cap and scan["exceeds_budget"] is False,
+           "different 136 subtree guard")
+    walks = [scan["first"], scan["second"]]
+    s.need(all(type(w["physical_bytes"]) is int and 0 <= w["physical_bytes"] <= cap
+               and type(w["vanished_entries"]) is int and w["vanished_entries"] >= 0
+               for w in walks), "invalid 136 physical measurement")
+    realized = 0 if any(w["vanished_entries"] for w in walks) else min(w["physical_bytes"] for w in walks)
+    return 72 * G - realized
+
+
 def candidate136(fleet,ready):
     unit=s.show(N136)
     root=Path("/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1")
@@ -339,8 +355,12 @@ def candidate136(fleet,ready):
            and current.get("guard") and current.get("post_prefire_capacity"),"136 is outside its protected phase")
     guard=current["guard"]; plan=s.bound(guard["plan"],root/"reproduction/receipts/guard-plan.json")
     sample=s.bound(guard["sample"],Path(guard["sample"]["path"]))
-    pref=current["post_prefire_capacity"]; post=s.bound(pref,Path(pref["path"]))
-    donor=post["exclusive_handoff_receipt"]; s.bound(donor,Path(donor["path"]))
+    fire=sample["guard_invocation_id"]
+    s.need(s.iid(fire) and Path(guard["sample"]["path"])==root/"reproduction/receipts/guard"/f"sample-{fire}.json"
+           and sample["plan_sha256"]==guard["plan"]["sha256"]
+           and sample["producer_invocation_id"]==plan["invocation_id"]==unit["InvocationID"],"different 136 guard receipt")
+    pref=current["post_prefire_capacity"]; post=s.bound(pref,root/"capacity-post-prefire.json")
+    donor=post["exclusive_handoff_receipt"]; s.bound(donor,root/"donor171.json")
     masks,regref=s.read(registry)
     lease=post["complete_fresh_fit"]["exclusive_standard169_cpu_lease"]
     routes=lease["masked_standard_routes"]
@@ -353,11 +373,10 @@ def candidate136(fleet,ready):
         s.need("/" not in name and path.is_symlink() and path.readlink()==Path("/dev/null")
                and os.path.samestat(path.lstat(),anchor.lstat()) and s.show(name)["LoadState"]=="masked" and not members(name),
                "standard 169 route is no longer fenced")
-    o=sample["root_physical_observation"]; remain=72*G
-    if all(o[k]["vanished_entries"]==0 for k in ("first","second")):
-        remain-=min(o[k]["physical_bytes"] for k in ("first","second"))
-    s.need(plan["maximum_root_physical_bytes"]==72*G and 0<=remain<=72*G and members(N136)==managed,"136 fit changed")
+    remain=remaining136(plan,sample)
+    s.need(members(N136)==managed,"136 fit changed")
     return dict(occupied=True,cap=72*G,remaining=remain,loan_micros=4250000,guard_floor=plan["minimum_free_bytes"],
+                guard_plan=guard["plan"],guard_sample=guard["sample"],
                 identity=dict(unit=N136,iid=unit["InvocationID"],processes=[[p,s.process(p)[1]] for p in managed],fence=regref))
 
 
