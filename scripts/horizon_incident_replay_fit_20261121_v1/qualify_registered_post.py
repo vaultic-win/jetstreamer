@@ -15,9 +15,15 @@ check = module["registered136"]
 scope = check.__globals__
 native = scope["fit"]
 status = scope["s"]
-original = scope["R"] / "epoch136-joint-writer-20261122-v6/controller"
+retry = provider.parent.name.removeprefix("source-") == "tools-v23"
+v23 = scope["D"] / "tools-v23"
+original = scope["R"] / ("epoch136-joint-writer-20261122-v7c/controller" if retry else "epoch136-joint-writer-20261122-v6/controller")
 seal, sr = status.read(original / "deployment-seal-receipt.json")
-assert sr["sha256"] == "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba"
+if retry:
+    writer_profile,_=status.read(provider.parent/"profile136-fixture-writer.json")
+    assert sr["sha256"] == writer_profile["seal_sha256"]
+else:
+    assert sr["sha256"] == "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba"
 image = original / "admit136"
 digest = next(x["sha256"] for x in seal["members"] if x["name"] == "admit136")
 native.binary(image, digest)
@@ -44,7 +50,7 @@ with tempfile.TemporaryDirectory(dir=scratch) as temporary, ExitStack() as mocks
     base = Path(temporary)
     root = base / "epoch136-actual-20261120-g1"
     root.mkdir()
-    dispatch = scope["R"] / "epoch145-phase-dispatch-20261122-v1"
+    dispatch = scope["R"] / ("epoch145-fixture-retry1-dispatch-20261122-v1" if retry else "epoch145-phase-dispatch-20261122-v1")
     selector = {"path":str(dispatch/"READY.json"),"sha256":"f"*64}
     plan = {"controller":status.ref(root/"controller/admit136",digest),"controller_deployment":sr}
     planref = write(base / "plan.json",plan)
@@ -54,6 +60,8 @@ with tempfile.TemporaryDirectory(dir=scratch) as temporary, ExitStack() as mocks
     release_path = root / "prestart-released.json"
     rows = []
     def read(path, sha=None):
+        if retry and path == v23 / "profile136-fixture-writer.json":
+            return writer_profile, None
         if path == dispatch / "OFFER.json":
             return offer, None
         return status.read(path,sha)
@@ -70,6 +78,9 @@ with tempfile.TemporaryDirectory(dir=scratch) as temporary, ExitStack() as mocks
     child.candidate136.return_value = dict(ordinary=True)
     run = Mock(wraps=subprocess)
     mocks.enter_context(patch.dict(scope, H=base,s=context,fit=child,subprocess=run))
+    if retry:
+        lineage = Mock()
+        mocks.enter_context(patch.dict(scope, __file__=str(v23/"post-stop-fit"),validate_v7_release=lineage))
     assert check({},None)==dict(ordinary=True)
     write(release_path,{})
     refused(lambda:check({},None))
@@ -85,6 +96,11 @@ with tempfile.TemporaryDirectory(dir=scratch) as temporary, ExitStack() as mocks
     run.check_output.return_value=json.dumps(release)
     expected=dict(occupied=False,cap=72<<30,remaining=72<<30,loan_micros=0,identity=None,verified_release=release)
     assert check({},None)==expected
+    if retry:
+        lineage.assert_called_once_with(dispatch,original,selector,planref,plan,doc)
+        lineage.side_effect = ValueError("different release lineage")
+        refused(lambda:check({},None))
+        lineage.side_effect = None
     run.check_output.assert_called_once_with([image,"verify-release",planref["path"],planref["sha256"]],timeout=45)
     for field in ("donor_restored","candidate_physically_drained","all_physical_outputs_retained","resource_credit_bytes","intent"):
         write(release_path,dict(doc,**{field:1 if field=="resource_credit_bytes" else False}))

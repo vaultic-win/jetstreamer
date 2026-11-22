@@ -337,9 +337,14 @@ def confirm_fork(epoch,own,baseline,stop):
         time.sleep(.6)
 
 
+def fixture_post_directory(here):
+    version = here.name.removeprefix("source-")
+    return {"tools-v23":"tools-v13c","tools-v21b":"tools-v13b"}.get(version,"tools-v13")
+
+
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
-        post_directory = "tools-v13b" if here.name in ("tools-v21b","source-tools-v21b") else "tools-v13"
+        post_directory = fixture_post_directory(here)
         profiles = {"semantic": ("profile145-focused-semantic.json", "tools-v5d"),
                     "post": ("profile145-focused-post.json", "tools-v9"),
                     "retry-post": ("profile145-retried-post.json", "tools-v10"),
@@ -415,20 +420,36 @@ def phase145(epoch):
     recovery_post_image=base/"tools-v8/export145"
     recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
     image=Path("/proc")/m["MainPID"]/"exe"
-    post_directory = "tools-v13b" if current.parent == D / "tools-v21b" else "tools-v13"
+    post_directory = fixture_post_directory(current.parent)
     focused_modes=[mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"),("fixture-semantic","tools-v5f"),("timer-post","tools-v11"),("registered-post","tools-v12"),("fixture-post",post_directory))
                        if (candidate:=base/directory/"export145").exists() and s.same_file(image,candidate)]
     s.need(len(focused_modes)<=1,"ambiguous native 145 executable")
     focused_mode=next(iter(focused_modes),None)
+    if current.parent == D / "tools-v23":
+        s.need(focused_mode in ("fixture-semantic","fixture-post"), "V23 requires its registered 145 verifier")
     if focused_mode or recovery_post or timeout_rejoin or post_rejoin or post or rejoin or fp.exists() and s.same_file(image,fp):
         cfg,adapter,_=profile145(current.parent,post or post_rejoin,rejoin or post_rejoin,timeout_rejoin,recovery_post,focused_mode)
         mod=runpy.run_path(str(adapter))
         item=mod["inspect"](s,fit.overlap.leases,m,ps,epoch,current,cfg)
         s.need(item is not None,"unbound new 145 verifier")
+        if current.parent == D / "tools-v23" and focused_mode == "fixture-semantic":
+            registration,_=s.read(base / "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json",
+                                  "1b16ce2d061e2ec97ab8c1ba81cd2dbcff9d0a759f317fbaf53b64e731a19501")
+            verify_registered_semantic(item,registration)
         return item
     phase,_=fit.phase145()
     s.need(phase.get("window") and len(ps)>0,"unknown 145 holding generation")
     return phase
+
+
+def verify_registered_semantic(phase, registration):
+    window=phase["window"]
+    row=registration["observations"][-1]
+    s.need(phase["stage"] == "leased-worker" and phase["invocation_id"] == registration["invocation_id"]
+           and window["recovery"] == registration["start"]
+           and window["native_parent"] == dict(pid=row["parent_pid"], start_ticks=row["parent_ticks"])
+           and window["native_child"] == dict(pid=row["child_pid"], start_ticks=row["child_ticks"]),
+           "different registered same-image 145 worker")
 
 def trace168():
     t=bound(s.ref(s.TRACE,s.CLOSED));v=t["partial"];p=Path(v["path"]);st=p.lstat()
@@ -654,6 +675,12 @@ def released136_route(intent):
     old = R / "epoch145-phase-dispatch-20261122-v1"
     current = R / "epoch145-fixture-phase-dispatch-20261122-v1"
     provider = Path(__file__).resolve().parent
+    if provider == D / "tools-v23":
+        retry = R / "epoch145-fixture-retry1-dispatch-20261122-v1"
+        s.need(intent["selector"].get("path") == str(retry / "READY.json"),
+               "V23 requires the same-image retry dispatcher")
+        profile, _ = s.read(provider / "profile136-fixture-writer.json")
+        return retry, R / "epoch136-joint-writer-20261122-v7c/controller", profile
     if intent["selector"].get("path") == str(old / "READY.json"):
         s.need(provider not in (D / "tools-v21", D / "tools-v21b"), "V21 cannot select the retired V2 dispatcher")
         return old, R / "epoch136-joint-writer-20261122-v6/controller", {
@@ -672,7 +699,7 @@ def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt
            and plan["holding145_prestart_ready"] == selector and s.iid(ready["original_semantic_invocation"]),
            "V7 plan did not select the original fixture boundary")
     pkg = Path(__file__).resolve().parent
-    s.need(pkg in (D / "tools-v21", D / "tools-v21b"), "unregistered V7 provider")
+    s.need(pkg in (D / "tools-v21", D / "tools-v21b", D / "tools-v23"), "unregistered V7 provider")
     provider, provider_ref = s.read(pkg / "deployment-seal-receipt.json")
     images = {r["name"]:r["sha256"] for r in provider["members"]}
     s.need(provider["destination"] == str(pkg) and ready["registered_provider"] ==
@@ -680,10 +707,23 @@ def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt
            "release selector bound to another registered provider")
     fit.binary(pkg / "post-stop-fit",images["post-stop-fit"])
     semantic = R / "epoch145-semantic-continuity-20261121-v1"
-    worker = s.bound(plan["holding145_semantic_worker"], semantic / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    if pkg == D / "tools-v23":
+        s.need(controller == R / "epoch136-joint-writer-20261122-v7c/controller" and
+               dispatcher == R / "epoch145-fixture-retry1-dispatch-20261122-v1", "wrong retry boundary")
+        writer, _ = s.read(pkg / "profile136-fixture-writer.json")
+        controller_seal, _ = s.read(controller / "deployment-seal-receipt.json", writer["seal_sha256"])
+        boundary = controller / "fixture_boundary.py"
+        record, = (m for m in controller_seal["members"] if m["name"] == boundary.name)
+        s.need(controller_seal["destination"] == str(controller) and record["mode"] == "0444",
+               "unbound V7c semantic reader")
+        fit.binary(boundary,record["sha256"])
+        worker_iid = runpy.run_path(str(boundary))["semantic"](plan,bound,bound,retry=True)
+    else:
+        worker = s.bound(plan["holding145_semantic_worker"], semantic / "V5F_ACTUAL_ADVANCING_WORKER.json")
+        worker_iid = worker["invocation_id"]
     cfg, adapter, post = profile145(pkg,focused="fixture-post")
     s.need(plan["holding145_completion"] == dict(seal=post["seal"], build=post["build"],
-           adapter=s.ref(adapter,cfg["adapter_sha256"])) and worker["invocation_id"] == ready["original_semantic_invocation"]
+           adapter=s.ref(adapter,cfg["adapter_sha256"])) and worker_iid == ready["original_semantic_invocation"]
            and receipt["schema"] == "horizon-136-incident-donor-released-v1"
            and receipt["boot_id"] == ready["boot_id"] and s.iid(receipt["writer_invocation_id"]),
            "foreign V13 completion, semantic predecessor, donor boot or released writer")
@@ -712,7 +752,8 @@ def registered136(fleet, registration):
            "foreign 136 release or selected writer")
     planref = offer["writer_plan"]
     plan = bound(planref)
-    if package.parent.name == "epoch136-joint-writer-20261122-v7":
+    if package.parent.name in ("epoch136-joint-writer-20261122-v7", "epoch136-joint-writer-20261122-v7b",
+                               "epoch136-joint-writer-20261122-v7c"):
         validate_v7_release(dispatcher,package,offer["selector"],planref,plan,receipt)
     seal, sr = s.read(package / "deployment-seal-receipt.json",profile["seal_sha256"])
     image = package / "admit136"

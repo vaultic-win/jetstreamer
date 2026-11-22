@@ -14,11 +14,14 @@ def verify(provider):
     release_route = module["released136_route"]
     verify_release = module["validate_v7_release"]
     scope = verify_release.__globals__
-    successor = provider.parent.name in ("tools-v21b", "source-tools-v21b")
-    pkg = module["D"] / ("tools-v21b" if successor else "tools-v21")
-    current = root / "epoch145-fixture-phase-dispatch-20261122-v1"
+    family = provider.parent.name.removeprefix("source-")
+    retry = family == "tools-v23"
+    successor = retry or family == "tools-v21b"
+    pkg = module["D"] / (family if successor else "tools-v21")
+    current = root / ("epoch145-fixture-retry1-dispatch-20261122-v1" if retry else "epoch145-fixture-phase-dispatch-20261122-v1")
     retired = root / "epoch145-phase-dispatch-20261122-v1"
-    controller = root / ("epoch136-joint-writer-20261122-v7b" if successor else "epoch136-joint-writer-20261122-v7") / "controller"
+    writer = {"tools-v23":"v7c","tools-v21b":"v7b"}.get(family,"v7")
+    controller = root / ("epoch136-joint-writer-20261122-"+writer) / "controller"
     v5f = root / "epoch145-semantic-continuity-20261121-v1"
     profile, _ = s.read(provider.parent / "profile136-fixture-writer.json")
     seal, sr = s.read(controller / "deployment-seal-receipt.json", profile["seal_sha256"])
@@ -27,7 +30,7 @@ def verify(provider):
            "foreign V7 writer package")
     module["fit"].binary(controller / "admit136", profile["image_sha256"])
     cfg,adapter,post=module["profile145"](provider.parent,focused="fixture-post")
-    worker,wr=s.read(v5f / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    worker,wr=s.read(v5f / ("V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json" if retry else "V5F_ACTUAL_ADVANCING_WORKER.json"))
     q = s.bound(worker["start"],root/"epoch145-guarded-export-20261121-v1/state"/worker["invocation_id"]/"recovery-started.json")
     target=q["prior_frozen_recovery"]["failed_qualification_census"]["current_boot_failure"]["failure"]
     s.need(target==s.ref(root/"epoch145-guarded-export-20261121-v1/state/a99ed8b51e8a482b805b8a36a11b2700/failed.json",
@@ -64,10 +67,19 @@ def verify(provider):
                  "wrong V21 seal","wrong V21 image","unrelated donor boot","foreign release writer")
     if successor:
         scenarios += ("V7 writer plan", "V13 completion", "V21 provider",)
+    if retry:
+        scenarios += ("original V3 selector", "previous V5f worker", "previous V5f IID", "V7b writer plan",
+                      "V13b completion", "V21b provider")
     with patch.dict(scope, __file__=str(pkg/"post-stop-fit"),s=reader,fit=fit,
                     profile145=lambda *a,**k:(cfg,adapter,post)):
         for case in scenarios:
             chosen=selector.copy();ready=deepcopy(select);actual=deepcopy(plan);pr=plan_ref.copy();done=released.copy()
+            if case=="original V3 selector":chosen["path"]=str(root/"epoch145-fixture-phase-dispatch-20261122-v1/READY.json")
+            if case=="previous V5f worker":actual["holding145_semantic_worker"]=s.read(v5f/"V5F_ACTUAL_ADVANCING_WORKER.json")[1]
+            if case=="previous V5f IID":ready["original_semantic_invocation"]="50af3d8ab5da47e8bdc2828feab53908"
+            if case=="V7b writer plan":pr["path"]=str(root/"epoch136-joint-writer-20261122-v7b/registered-production-plan.json")
+            if case=="V13b completion":actual["holding145_completion"]["seal"]["path"]=str(v5f/"tools-v13b/deployment-seal-receipt.json")
+            if case=="V21b provider":ready["registered_provider"]["seal"]["path"]=str(module["D"]/"tools-v21b/deployment-seal-receipt.json")
             if case=="V7 writer plan":pr["path"]=str(root/"epoch136-joint-writer-20261122-v7/registered-production-plan.json")
             if case=="V13 completion":actual["holding145_completion"]["seal"]["path"]=str(v5f/"tools-v13/deployment-seal-receipt.json")
             if case=="V21 provider":ready["registered_provider"]["seal"]["path"]=str(module["D"]/"tools-v21/deployment-seal-receipt.json")
@@ -87,6 +99,20 @@ def verify(provider):
             except ValueError:
                 if case=="positive":raise
             else:s.need(case=="positive","accepted crossed "+case)
+    if retry:
+        record,_=s.read(module["D"]/"V22_SUCCESSOR_ACTIVE_MIRRORS_1795333149.json",
+                        "015e6ef2d46d42cfc673660c3544ae26aceaec841edf3d2cf65b5d54f1b732aa")
+        active=record["native"]["phase145"]
+        verify=module["verify_registered_semantic"]
+        verify(active,worker)
+        for key in ("invocation_id","stage","recovery","native_parent","native_child"):
+            changed=deepcopy(active)
+            if key in ("invocation_id","stage"):changed[key]="other"
+            else:changed["window"][key]={}
+            try:verify(changed,worker)
+            except ValueError:pass
+            else:raise AssertionError("accepted crossed "+key)
+            scenarios+=(key,)
     return dict(v7_controller=sr,v13=post,v5f_worker=wr,checks=list(scenarios),
                 production_selector_created=False,donor_or_candidate_started=False)
 
