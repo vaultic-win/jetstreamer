@@ -35,7 +35,10 @@ pub(super) mod profile {
     pub(crate) const PARENT_SEAL: &str = env!("HORIZON_136_PARENT_SEAL_SHA256");
     pub(crate) const LAUNCHER: &str = env!("HORIZON_136_LAUNCHER_SHA256");
 }
-use profile::*;
+use profile::{
+    DEPLOY, DIR, DISPATCH, FOLLOW, LAUNCHER, MIRROR_SEAL, OLD, PARENT_SEAL, SEMANTIC, STATE,
+    WRITER_DIR, WRITER_SEAL,
+};
 
 const LOCK: &str = "/run/horizon-epoch171-to136-g1.operation.lock";
 const BASE: &str = "/home/sol/.jetstreamer-private/epoch136-actual-20261120-g1";
