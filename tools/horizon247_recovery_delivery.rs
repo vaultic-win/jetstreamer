@@ -46,6 +46,100 @@ const PEERS: [(&str, &str); 3] = [
     ),
 ];
 
+const POST228_TERM: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon228-private-scratch-stop-v176-a1/terminal.json";
+const POST228_SHA: &str = "51cc6b025cc91653d592f4788afaa1ffa3ff3b7a3ba086f6e4ac6147916919af";
+const POST228_STATUS: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon228-private-scratch-stop-v176-a1/completion.json";
+const POST228_STATUS_SHA: &str = "3dabfdfba258b624ec83f3f71aa9d14c94751fbbdcc5e39a2180046f1562baa7";
+const F177: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon-fleet-takeover-v177-20261120-v1/fleet-v1.json";
+const F177_SHA: &str = "9a39f161db4adc0ab33319408e18fc063edc711994fd59ce7b754003cdb6652f";
+const COLD266: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon266-postclosure-capacity-v173-a1/result.json";
+const COLD266_SHA: &str = "d400bf947d870e7e878ccea832c3717264ce947fac64027254d9c7b5b47005c6";
+
+fn post228_profile(cap: &Value) -> Result<()> {
+    let stopped = &cap["stopped228"];
+    ensure!(
+        stopped["unit"] == PEERS[1].0
+            && stopped["iid"] == PEERS[1].1
+            && stopped["terminal"] == old::binding(POST228_TERM, POST228_SHA)
+            && stopped["status"] == old::binding(POST228_STATUS, POST228_STATUS_SHA)
+            && stopped["root"] == 112u64 << 30
+            && stopped["memory_retained"] == 120000000000u64
+            && stopped["released_memory"] == 0
+            && stopped["released_disk"] == 0
+            && cap["v177"] == old::binding(F177, F177_SHA)
+            && cap["readonly266"]["snapshot"] == old::binding(COLD266, COLD266_SHA),
+        "post-228 original custody"
+    );
+    let peers = cap["live_owners"].as_object().context("two live peers")?;
+    ensure!(
+        peers.len() == 2
+            && [(PEERS[0], "1962046"), (PEERS[2], "1581654")]
+                .iter()
+                .all(|((u, i), pid)| {
+                    let row = &cap["live_owners"][*u];
+                    row["Id"] == *u
+                        && row["InvocationID"] == *i
+                        && row["ActiveState"] == "active"
+                        && row["MainPID"] == *pid
+                }),
+        "two original surviving 211/265 owners"
+    );
+    Ok(())
+}
+
+fn post228_accounting(cap: &Value) -> Result<()> {
+    let fit = &cap["fit"];
+    let extra = cap["retained_auxiliary"]["additional_bytes"]
+        .as_u64()
+        .context("outstanding finite bytes")?;
+    let hard = fit["hard_after"]
+        .as_u64()
+        .context("registered hard obligations")?;
+    ensure!(
+        cap["retained_auxiliary"]["issue_current"] == true
+            && fit["auxiliary_bytes"] == extra
+            && fit["entire_hard_after_auxiliary"].as_u64() == hard.checked_add(extra)
+            && ["hard_margin", "growth_margin", "disk_margin"]
+                .iter()
+                .all(|k| fit[*k].as_i64().is_some_and(|v| v >= 0))
+            && fit["fits"] == true,
+        "post-228 complete resource margins"
+    );
+    Ok(())
+}
+fn post228_receipts(term: &Value, status: &Value, fleet: &Value, cold: &Value) -> Result<()> {
+    let events = term["pid1"]
+        .as_array()
+        .context("original terminal events")?;
+    ensure!(
+        term["producer_drained"] == true
+            && term["full_epoch_qualified"] == false
+            && term["resource_release_authorized"] == false
+            && term["guard_reason"] == "private-filesystem-floor"
+            && term["partial_archive"]["size"] == 7559756149u64
+            && events.iter().any(|e| e["_UID"] == "0"
+                && e["_PID"] == "1"
+                && e["UNIT"] == PEERS[1].0
+                && e["INVOCATION_ID"] == PEERS[1].1
+                && e["_BOOT_ID"] == BOOT
+                && e["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448")
+            && status["authenticated_exact_byte_readback"] == true
+            && status["key"] == "epoch-228.epoch-status.json"
+            && fleet["observer_sha256"]
+                == "a4d4adb852725cbf7fe3e72f9788acca5e5fad8396a5dabb208c37aee6110a69"
+            && fleet["unit_census"][PEERS[1].0]["ActiveState"] == "inactive"
+            && cold["installed_loop_readonly"] == true
+            && cold["after"] == 1770889216u64
+            && cold["old_memory_release"] == 0,
+        "original 228 terminal, stopped roster and 266 read-only proof"
+    );
+    Ok(())
+}
+
 fn read(reference: &Value, path: &Path) -> Result<Value> {
     ensure!(
         reference["path"].as_str() == path.to_str()
@@ -202,20 +296,26 @@ fn allocation(cap: &Value, ledger: &Value, reg: &Value, closure: &Value) -> Resu
             && cap["stopped266"]["released_disk"] == 0,
         "fourth 247 exclusive funding"
     );
-    let peers = cap["live_owners"].as_object().context("247 peer roster")?;
-    ensure!(
-        peers.len() == 3
-            && PEERS.iter().all(
-                |(name, iid)| peers.get(*name).is_some_and(|p| p["Id"] == *name
-                    && p["InvocationID"] == *iid
-                    && p["ActiveState"] == "active"
-                    && p["MainPID"]
-                        .as_str()
-                        .and_then(|x| x.parse::<u32>().ok())
-                        .is_some_and(|n| n > 1))
-            ),
-        "247 original 211/228/265 roster after 266 scratch stop"
-    );
+    if cap.get("stopped228").is_some() {
+        post228_profile(cap)?;
+    } else {
+        let peers = cap["live_owners"].as_object().context("247 peer roster")?;
+        ensure!(
+            peers.len() == 3
+                && PEERS
+                    .iter()
+                    .all(
+                        |(name, iid)| peers.get(*name).is_some_and(|p| p["Id"] == *name
+                            && p["InvocationID"] == *iid
+                            && p["ActiveState"] == "active"
+                            && p["MainPID"]
+                                .as_str()
+                                .and_then(|x| x.parse::<u32>().ok())
+                                .is_some_and(|n| n > 1))
+                    ),
+            "247 original 211/228/265 roster after 266 scratch stop"
+        );
+    }
     ensure!(
         reg["claim"] == closure["claim"]
             && reg["booking"] == closure["booking"]
@@ -292,6 +392,16 @@ pub fn load(reference: &Value) -> Result<old::Owner> {
                 == json!([old::ORIGINAL_IID, old::PRIOR_IID, OLD]),
         "fourth 247 qualification graph"
     );
+    // Every new fourth launch must prove both closed producers even when a previous
+    // three-peer fixture is replayed to check historical allocation arithmetic.
+    post228_profile(cap)?;
+    post228_accounting(cap)?;
+    post228_receipts(
+        &read(&cap["stopped228"]["terminal"], Path::new(POST228_TERM))?,
+        &read(&cap["stopped228"]["status"], Path::new(POST228_STATUS))?,
+        &read(&cap["v177"], Path::new(F177))?,
+        &read(&cap["readonly266"]["snapshot"], Path::new(COLD266))?,
+    )?;
     allocation(cap, &ledger, &reg, &close)?;
     let stop = read(&cap["stopped266"]["manager_stop"], Path::new(STOP))?;
     let corrected = read(&cap["stopped266"]["status"], Path::new(CORRECTION))?;
@@ -306,7 +416,7 @@ pub fn load(reference: &Value) -> Result<old::Owner> {
         "unproved stopped 266"
     );
     let (iid, pid, ticks, command) = identity(&c, &l, &b, &recipe)?;
-    let proof = json!({"claim":reference,"booking":evidence[0],"launch":evidence[1],"admission":b["admission"],"recovery":recovery,"plan":p,"start_ticks":ticks,"prior":regref,"old_close":cap["transfer"]["close"],"old_claim_evidence":[reg["booking"],reg["launch"]],"retained_ledger":reg["retained_ledger"],"stopped266":cap["stopped266"]["manager_stop"],"status266":cap["stopped266"]["status"]});
+    let proof = json!({"claim":reference,"booking":evidence[0],"launch":evidence[1],"admission":b["admission"],"recovery":recovery,"plan":p,"start_ticks":ticks,"prior":regref,"old_close":cap["transfer"]["close"],"old_claim_evidence":[reg["booking"],reg["launch"]],"retained_ledger":reg["retained_ledger"],"stopped266":cap["stopped266"]["manager_stop"],"status266":cap["stopped266"]["status"],"stopped228":cap["stopped228"]["terminal"],"status228":cap["stopped228"]["status"],"v177":cap["v177"],"readonly266":cap["readonly266"]["snapshot"]});
     Ok(old::Owner {
         iid,
         pid,
@@ -408,5 +518,60 @@ mod tests {
         let mut anticipated = closure.clone();
         anticipated["original_event"]["UNIT_RESULT"] = json!("success");
         assert!(allocation(&cap, &ledger, &reg, &anticipated).is_err());
+    }
+    #[test]
+    fn two_surviving_peers_require_original_228_custody() {
+        let mut cap = json!({"v177":old::binding(F177,F177_SHA),"readonly266":{"snapshot":old::binding(COLD266,COLD266_SHA)},
+            "stopped228":{"unit":PEERS[1].0,"iid":PEERS[1].1,"terminal":old::binding(POST228_TERM,POST228_SHA),"status":old::binding(POST228_STATUS,POST228_STATUS_SHA),
+            "root":112u64<<30,"memory_retained":120000000000u64,"released_memory":0,"released_disk":0},"live_owners":{}});
+        for ((u, i), pid) in [(PEERS[0], "1962046"), (PEERS[2], "1581654")] {
+            cap["live_owners"][u] =
+                json!({"Id":u,"InvocationID":i,"ActiveState":"active","MainPID":pid});
+        }
+        let mut funding = json!({"retained_auxiliary":{"additional_bytes":7,"issue_current":true},
+            "fit":{"hard_after":101,"auxiliary_bytes":7,"entire_hard_after_auxiliary":108,
+            "hard_margin":1,"growth_margin":2,"disk_margin":0,"fits":true}});
+        post228_accounting(&funding).unwrap();
+        funding["fit"]["disk_margin"] = json!(-1);
+        assert!(post228_accounting(&funding).is_err());
+        post228_profile(&cap).unwrap();
+        for key in [
+            "root",
+            "memory_retained",
+            "released_memory",
+            "released_disk",
+            "terminal",
+            "status",
+            "iid",
+        ] {
+            let mut v = cap.clone();
+            v["stopped228"][key] = json!(1);
+            assert!(post228_profile(&v).is_err());
+        }
+        let mut missing = cap.clone();
+        missing["live_owners"]
+            .as_object_mut()
+            .unwrap()
+            .remove(PEERS[0].0);
+        assert!(post228_profile(&missing).is_err());
+        cap["live_owners"][PEERS[1].0] = json!({"Id":PEERS[1].0});
+        assert!(post228_profile(&cap).is_err());
+    }
+    #[test]
+    fn stopped_peer_proof_rejects_other_pid1_and_266_release() {
+        let t = json!({"producer_drained":true,"full_epoch_qualified":false,"resource_release_authorized":false,
+            "guard_reason":"private-filesystem-floor","partial_archive":{"size":7559756149u64},"pid1":[{"_PID":"1","_UID":"0","UNIT":PEERS[1].0,"INVOCATION_ID":PEERS[1].1,"_BOOT_ID":BOOT,"MESSAGE_ID":"7ad2d189f7e94e70a38c781354912448"}]});
+        let status =
+            json!({"authenticated_exact_byte_readback":true,"key":"epoch-228.epoch-status.json"});
+        let mut f = json!({"observer_sha256":"a4d4adb852725cbf7fe3e72f9788acca5e5fad8396a5dabb208c37aee6110a69","unit_census":{}});
+        f["unit_census"][PEERS[1].0] = json!({"ActiveState":"inactive"});
+        let mut c =
+            json!({"installed_loop_readonly":true,"after":1770889216u64,"old_memory_release":0});
+        post228_receipts(&t, &status, &f, &c).unwrap();
+        let mut other = t.clone();
+        other["pid1"][0]["_PID"] = json!("99");
+        assert!(post228_receipts(&other, &status, &f, &c).is_err());
+        c["old_memory_release"] = json!(1);
+        assert!(post228_receipts(&t, &status, &f, &c).is_err());
     }
 }
