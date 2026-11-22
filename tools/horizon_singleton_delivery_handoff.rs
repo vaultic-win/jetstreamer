@@ -596,6 +596,82 @@ fn capture_drain(p: &Plan, binding: &Bound, terminal_sha: &str, self_sha: &str) 
     );
     Ok(())
 }
+// A manager reload can clear the runtime fields following ExecStart's command.
+// Validate both command prefixes against the plan and bind the original PID1
+// journal cursors across the reload.
+fn same_terminal_events(p: &Plan, saved: &Value, current: &Value, boot: &str) -> Result<()> {
+    let unit: BTreeMap<String, String> = serde_json::from_value(saved["unit"].clone())?;
+    let events = saved["events"]
+        .as_array()
+        .context("saved terminal events")?;
+    let checked = terminal_values(p, &unit, events)?;
+    ensure!(checked == *saved, "saved terminal record differs");
+    let live = current["events"]
+        .as_array()
+        .context("current terminal events")?;
+    ensure!(
+        live.len() == 2
+            && events.iter().zip(live).all(|(a, b)| {
+                a["_BOOT_ID"] == boot
+                    && b["_BOOT_ID"] == boot
+                    && a["__CURSOR"].as_str().is_some_and(|s| !s.is_empty())
+                    && [
+                        "__CURSOR",
+                        "MESSAGE_ID",
+                        "__REALTIME_TIMESTAMP",
+                        "INVOCATION_ID",
+                    ]
+                    .iter()
+                    .all(|&k| a[k] == b[k])
+            }),
+        "original terminal journal events changed"
+    );
+    Ok(())
+}
+fn check_drain(p: &Plan, binding: &Bound, drain_sha: &str) -> Result<()> {
+    let drain = Bound {
+        path: p.receipt_directory.join("terminal-drain.json"),
+        sha256: drain_sha.into(),
+    };
+    let saved = json_bound(&drain)?;
+    let handoff: Bound = serde_json::from_value(saved["terminal_handoff"].clone())?;
+    ensure!(
+        handoff.path == p.receipt_directory.join("terminal-handoff.json"),
+        "handoff path changed"
+    );
+    let prior = json_bound(&handoff)?;
+    ensure!(
+        saved["schema"] == "horizon-singleton-terminal-drain-v1"
+            && prior["schema"] == "horizon-singleton-delivery-handoff-v1"
+            && saved["producer_cgroup_drained"] == true
+            && saved["producer"] == prior["producer"]
+            && [&saved, &prior].iter().all(|v| v["epoch"] == p.epoch
+                && v["resource_release_authorized"] == false
+                && v["replay_launch_authorized"] == false
+                && v["local_retirement_authorized"] == false
+                && v["publication_authorized"] == false
+                && v["remote_mutations"] == false)
+            && saved["plan"] == serde_json::to_value(binding)?
+            && prior["plan"] == saved["plan"],
+        "drain and handoff differ"
+    );
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    let before = terminal(p)?;
+    same_terminal_events(p, &prior["producer"], &before, &boot)?;
+    let census = drained(p)?;
+    ensure!(
+        before == terminal(p)?,
+        "producer changed during drain recheck"
+    );
+    println!(
+        "{}",
+        json!({"epoch":p.epoch,"terminal_handoff":handoff,"terminal_drain":drain,
+        "plan":binding,"census":census,"producer_cgroup_drained":true,"resource_release_authorized":false})
+    );
+    Ok(())
+}
 fn source_directory(p: &Plan) -> Result<()> {
     ensure!(
         unsafe { libc::geteuid() } == p.source_uid,
@@ -718,15 +794,22 @@ fn source(p: &Plan, manifest: &Value) -> Result<Value> {
 fn run(args: &[String]) -> Result<()> {
     ensure!(
         (args.len() == 6
-            || (args.len() == 8 && args[0] == "capture-drain" && args[6] == "--terminal-sha256"))
+            || (args.len() == 8
+                && ((args[0] == "capture-drain" && args[6] == "--terminal-sha256")
+                    || (args[0] == "check-drain" && args[6] == "--drain-sha256"))))
             && args[2] == "--plan-sha256"
             && args[4] == "--self-sha256",
-        "usage: horizon-singleton-delivery-handoff capture|check-plan|source PLAN --plan-sha256 HEX --self-sha256 HEX"
+        "expected OPERATION PLAN --plan-sha256 HEX --self-sha256 HEX; capture-drain requires --terminal-sha256 HEX and check-drain requires --drain-sha256 HEX"
     );
     ensure!(
         matches!(
             args[0].as_str(),
-            "capture" | "capture-drain" | "check-plan" | "source" | "check-source-inputs"
+            "capture"
+                | "capture-drain"
+                | "check-drain"
+                | "check-plan"
+                | "source"
+                | "check-source-inputs"
         ),
         "unknown operation"
     );
@@ -767,6 +850,10 @@ fn run(args: &[String]) -> Result<()> {
     }
     validate_plan(&p)?;
     ensure!(unsafe { libc::geteuid() } == 0, "root capture required");
+    if args[0] == "check-drain" {
+        ensure!(args.len() == 8, "check-drain requires --drain-sha256 HEX");
+        return check_drain(&p, &binding, &args[7]);
+    }
     if args[0] == "capture-drain" {
         ensure!(
             args.len() == 8,
@@ -917,6 +1004,26 @@ mod tests {
         validate_manifest(&p, &manifest).unwrap();
         manifest["manifest"]["epochs"][0]["epoch"] = json!(264);
         assert!(validate_manifest(&p, &manifest).is_err());
+    }
+    #[test]
+    fn drained_owner_survives_manager_reload_only_with_original_journal() {
+        let (p, mut unit, mut rows) = fixture();
+        for (i, row) in rows.iter_mut().enumerate() {
+            row["_BOOT_ID"] = json!("boot");
+            row["__CURSOR"] = json!(format!("original-{i}"));
+        }
+        let saved = terminal_values(&p, &unit, &rows).unwrap();
+        unit.insert("InvocationID".into(), String::new());
+        unit.insert(
+            "ExecStart".into(),
+            format!("{} ; ignore_errors=no ; pid=0 }}", p.expected_exec_prefix),
+        );
+        let current = terminal_values(&p, &unit, &rows).unwrap();
+        same_terminal_events(&p, &saved, &current, "boot").unwrap();
+        assert!(same_terminal_events(&p, &saved, &current, "other-boot").is_err());
+        let mut unrelated = current;
+        unrelated["events"][1]["__CURSOR"] = json!("later");
+        assert!(same_terminal_events(&p, &saved, &unrelated, "boot").is_err());
     }
     #[test]
     fn drain_rejects_control_work_restart_delegation_and_triggers() {
