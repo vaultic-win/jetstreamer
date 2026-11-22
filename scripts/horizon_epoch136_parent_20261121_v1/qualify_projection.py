@@ -16,13 +16,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("fleet", type=Path)
 parser.add_argument("digest")
 parser.add_argument("fixture_parent", type=Path)
-parser.add_argument("--combined",action="store_true")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--combined",action="store_true")
+group.add_argument("--prefix140",action="store_true")
 a = parser.parse_args()
 pkg = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1")
 seal="76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53"
 if a.combined:
     pkg=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch166-post168-cadence-20261121-v1/publisher-v1")
     seal="923519c0d6f031594b9b5b34195af8b37772c25553c5cb7d195f8ec66e7c276c"
+if a.prefix140:
+    pkg=Path("/var/lib/jetstreamer/horizon_runtime_data/prefix140-status-cadence-20261122-v1/cadence-tools")
+    seal="7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e"
 assert hashlib.sha256((pkg/"deployment-seal-receipt.json").read_bytes()).hexdigest()==seal
 sys.path.insert(0,str(pkg))
 import status
@@ -30,7 +35,16 @@ from cycle import load_fleet
 from evidence import bound, checked, durable, lock, names, utc
 
 f, cfg, cohort = load_fleet({"path":str(a.fleet),"sha256":a.digest})
-assert f["active_producer_count"] == 5 and f["terminal168_trace_mismatch"]["sha256"] == "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2" and f["all_active_status_reports_authenticated_readback"]
+if a.prefix140:
+    complete = checked(f["complete_active_status_audit"])
+    assert complete["authenticated_readback"] and complete["authenticated_status_count"] == f["complete_active_status_count"] == 20
+    assert complete["receipts"] == f["complete_active_status_receipts"]
+    assert all(checked(r)["authenticated_readback"] for r in complete["receipts"].values())
+    assert {e:r for e,r in complete["receipts"].items() if e!="140"} == f["effective_status_receipts"]
+    assert f["active_producer_count"] == sum(map(len,(f[k] for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics"))))
+else:
+    assert f["active_producer_count"] == 5
+assert f["terminal168_trace_mismatch"]["sha256"] == "29672efbaff97d23a9a9d45a824840cb2d4cf43c6f5e8427ed3b532b41a38de2" and f["all_active_status_reports_authenticated_readback"]
 oldref = cohort["receipts"]["136"]
 original = checked(oldref)
 assert oldref==f["effective_status_receipts"]["136"] and original["current_repair_owner"]=="/root"
@@ -88,6 +102,8 @@ with tempfile.TemporaryDirectory(dir=a.fixture_parent) as temp:
     projection["epoch136_registration_unix_seconds"]=int(stamp.timestamp())
     projection["effective_status_receipts"]["136"]=bound(p)
     preserved=["complete_DATA_bytes","complete_projected_memory_bytes","all_reservation_ending_bytes","actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics","terminal172_closure"]
+    if a.prefix140:
+        preserved += ["complete_active_status_count","complete_active_status_audit","complete_active_status_receipts","current_private140_status_receipt"]
     assert all(projection[k]==f[k] for k in preserved)
     assert not any(r.get("epoch")==136 for k in preserved[3:6] for r in projection[k])
     for key,bad in [("before_etag",tag),("before_sha256","d"*64),("previous_receipt",fake_request),("current_repair_owner","other"),("authenticated_readback",False)]:

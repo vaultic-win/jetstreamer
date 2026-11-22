@@ -1,0 +1,50 @@
+"""Check the extra home-backed compiler allocation against the whole fleet."""
+import json
+import os
+from pathlib import Path
+import runpy
+import sys
+import time
+
+out, source, group = map(Path, sys.argv[1:])
+assert os.geteuid() == 0 and sys.flags.isolated and __debug__
+assert group.name == "horizon-incident-145-post-registered-build-v1.service"
+assert group.parent.name == "horizonaudit.slice"
+assert (group.parent / "cpu.max").read_text().split() == ["1200000", "100000"]
+assert (group.parent / "cpu.idle").read_text().strip() == "1"
+assert int((group.parent / "memory.high").read_text()) == 20 << 30
+assert int((group.parent / "memory.max").read_text()) == 24 << 30
+assert int((group.parent / "memory.current").read_text()) + (768 << 20) <= 20 << 30
+assert int((group.parent / "pids.current").read_text()) + 128 <= int((group.parent / "pids.max").read_text())
+
+native = json.loads((out / "before.json").read_bytes())
+provider = runpy.run_path(str(source))
+assert native["fits"] and native["resource_credit_bytes"] == 0 and native["complete_cpu_quota_micros"] == 64_000_000
+assert 0 <= time.time() - native["recorded_unix_seconds"] <= 120
+fleet, _ = provider["fleet_head"](native["fleet"])
+assert native["candidate136"] == dict(cap=72 << 30, remaining=72 << 30, occupied=False, loan_micros=0, identity=None)
+def floor(candidate):
+    return provider["disk_budget"](native["original_aggregate_HOME_bytes"], candidate, native["bookings"], 145,
+                                   native["survivors"], native["replacements"], native["active168_guard_floor"],
+                                   native["closed_prestart_remaining"])[0]
+assert floor(native["candidate136"]) == native["complete_required_HOME_bytes"]
+whole136 = floor(dict(native["candidate136"], remaining=0)) + (72 << 30)
+runtime = Path("/var/lib/jetstreamer/horizon_runtime_data")
+sys.path.insert(0, str(runtime / "prefix140-status-cadence-20261122-v1/cadence-tools"))
+from prefix140_storage import storage
+prefix = storage()
+assert prefix["registration"] == fleet["current_private_prefix140_obligation"]["registration"]
+assert 0 <= prefix["remaining_DATA_growth_bytes"] <= 16 << 20
+assert out.stat().st_dev == Path("/home/sol").stat().st_dev
+fs = os.statvfs(out)
+available = min(native["available_HOME_bytes"], fs.f_bavail * fs.f_frsize)
+scratch, retained = 88 << 20, 24 << 20
+required = max(whole136, native["complete_required_HOME_bytes"]) + prefix["remaining_DATA_growth_bytes"] + scratch + retained
+assert available >= required, (available, required)
+assert native["available_memory_bytes"] >= native["required_available_memory_bytes"] + (768 << 20)
+with (out / "build-reservation.json").open("x") as receipt:
+    json.dump(dict(fleet=native["fleet"], prefix140=prefix, full_136_floor=whole136, scratch=scratch, retained=retained,
+                   available=available, required=required, headroom=available-required, cpu=1, memory=768<<20, tasks=128), receipt)
+    receipt.flush()
+    os.fsync(receipt.fileno())
+print("registered 145 build HOME margin", available-required, flush=True)

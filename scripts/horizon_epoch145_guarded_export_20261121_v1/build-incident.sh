@@ -12,6 +12,16 @@ if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused
   focused=true
   src=/home/sol/.jetstreamer-private/paid145-focused169-recovery-20261121-v1
 fi
+registered=false
+if [[ $flavor == registered-post ]]; then
+  registered=true
+  flavor=timer-post
+  focused=true
+  src=$(cd -- "$(dirname "$(realpath -e "$0")")/../.." && pwd -P)
+  exec 9>>/run/lock/horizon-epoch140-suffix-compiler.lock
+  flock -n 9
+  ps -eo comm | awk '$1=="cargo" || $1=="rustc" || $1=="ld.lld" {busy=1} END{exit busy}'
+fi
 extra=()
 fixture=(incident145::tests::failed_145_pass_keeps_the_original_leased_objects_and_requires_restart materialized::tests::paid_inode_native_projection)
 case "$flavor" in
@@ -35,6 +45,7 @@ post|current-post|timeout-post|focused-post|retry-post|timer-post) sources=(inci
       ;;
 *) exit 2 ;;
 esac
+if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
 q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/incident-build-$INVOCATION_ID
 out="$current/tmp/incident145-$INVOCATION_ID"
 cg="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"
@@ -84,6 +95,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=5829fb668122a391d61672598e82967e5299a9d84909d2ee6fc6ffd5563d1ee4
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == b11e6366a6fc0cf3ed91d2584314851b628f2589d60b70d41b922cb1170d0cb5 ]]
   fi
+  if $registered; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v18-registered136/post-stop-fit
+    signature=c651d4d2b8d1c32a83ca7b6cfc77d711f19b0b97a78fd489fb11a399a00b7802
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 428442272e7b2d68c66533636b22600dba8daf3decc44ced6d3075d517acfd47 ]]
+  fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
   fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
@@ -107,6 +123,9 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     sleep "$((2+probe))"
   done
   python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory"
+  if $registered; then
+    python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/registered-build-fit.py" "$q" "$provider" "$cg"
+  fi
   image="$q/cache.ext4"
   fallocate -l 92274688 "$image"
   /usr/sbin/mke2fs -q -t ext4 -F -m0 -E nodiscard,lazy_itable_init=0,lazy_journal_init=0 "$image"
@@ -155,6 +174,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $focused; then phase_package=tools-v9; fi
   if [[ $flavor == retry-post ]]; then phase_package=tools-v10; fi
   if [[ $flavor == timer-post ]]; then phase_package=tools-v11; fi
+  if $registered; then phase_package=tools-v12; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
