@@ -295,7 +295,19 @@ args=("${extra[@]}" --cfg incident145_only --cfg continuity145_only --cfg materi
 for o in "$d"/build/*/out; do args+=(-L "native=$o"); done
 ulimit -c 0
 args+=(@"$base/epoch145-aligned-prefix-integration-20261120-g1/rustc.args")
-if $homefloor_rejoin; then /usr/bin/python3 -IB "$s/homefloor-phase-test.py"; fi
+if $homefloor_rejoin; then
+  /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
+  # Both the real source inode and its read-only test mounts are inside this build's own image.
+  projection="$out/tmp/paid-projection"
+  mkdir -m0700 "$projection" "$projection/view"
+  export RECOVERY_FIXTURE_SOURCE="$projection/source" RECOVERY_FIXTURE_VIEW="$projection/view/fixture"
+  echo paid-fixture > "$RECOVERY_FIXTURE_SOURCE"
+  touch "$RECOVERY_FIXTURE_VIEW"
+  mount --bind "$projection/view" "$projection/view"
+  mount --bind "$RECOVERY_FIXTURE_SOURCE" "$RECOVERY_FIXTURE_VIEW"
+  mount -o remount,bind,ro "$RECOVERY_FIXTURE_VIEW"
+  mount -o remount,bind,ro "$projection/view"
+fi
 rustc --edition=2024 --test "${args[@]}" "$s/main.rs" -o "$out/tests"
 "$out/tests" --test-threads=1
 for name in "${fixture[@]}"; do "$out/tests" --ignored --exact "$name"; done

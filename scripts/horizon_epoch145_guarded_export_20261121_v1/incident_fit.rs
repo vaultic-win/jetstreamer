@@ -472,6 +472,30 @@ pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
         && lines.next_back() == Some(expected.as_str())
 }
 
+fn reserved_memory(_complete: &Value) -> Result<u64> {
+    #[cfg(incident_homefloor145_only)]
+    let qualification_memory = match &_complete["bounded_qualification"] {
+        Value::Null => 0,
+        q => {
+            ensure!(
+                q["unit"] == "horizon-142-full-local-qualification-20261122-v1.service"
+                    && q["invocation_id"] == "42466cf599e7429889a778a68376c5ed"
+                    && q["pid"] == 227497
+                    && q["memory_bytes"] == 192u64 << 20
+                    && q["scratch_bytes"] == 8u64 << 20
+                    && q["additional_cpu_quota_micros"] == 0,
+                "foreign bounded native qualification"
+            );
+            capacity::n(q, "memory_bytes")?
+        }
+    };
+    #[cfg(not(incident_homefloor145_only))]
+    let qualification_memory = 0;
+    HOST_MEMORY
+        .checked_add(qualification_memory)
+        .context("qualified memory budget")
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -615,27 +639,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             .checked_add(n.as_u64().context("joined resident")?)
             .context("joined resident total")?;
     }
-    #[cfg(incident_homefloor145_only)]
-    let qualification_memory = match &complete["bounded_qualification"] {
-        Value::Null => 0,
-        q => {
-            ensure!(
-                q["unit"] == "horizon-142-full-local-qualification-20261122-v1.service"
-                    && q["invocation_id"] == "42466cf599e7429889a778a68376c5ed"
-                    && q["pid"] == 227497
-                    && q["memory_bytes"] == 192u64 << 20
-                    && q["scratch_bytes"] == 8u64 << 20
-                    && q["additional_cpu_quota_micros"] == 0,
-                "foreign bounded native qualification"
-            );
-            capacity::n(q, "memory_bytes")?
-        }
-    };
-    #[cfg(not(incident_homefloor145_only))]
-    let qualification_memory = 0;
-    let reserved_ram = HOST_MEMORY
-        .checked_add(qualification_memory)
-        .context("qualified memory budget")?;
+    let reserved_ram = reserved_memory(&complete)?;
     ensure!(
         required_ram.checked_add(resident) == Some(reserved_ram),
         "registered memory equation changed"
@@ -936,7 +940,9 @@ impl Fit {
                 )
                 .context("resident sum")?;
         }
-        let memory = HOST_MEMORY.checked_sub(resident).context("memory budget")?;
+        let memory = reserved_memory(s)?
+            .checked_sub(resident)
+            .context("memory budget")?;
         let available = capacity::meminfo("MemAvailable:")?;
         if free < required || available < memory {
             return Err(capacity::Reprice(format!(
@@ -1030,6 +1036,21 @@ fn remaining136(sample: &Value) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(incident_homefloor145_only)]
+    #[test]
+    fn complete_and_live_prices_keep_the_bounded_qualification() {
+        let mut observed = json!({"bounded_qualification":null});
+        assert_eq!(reserved_memory(&observed).unwrap(), HOST_MEMORY);
+        observed["bounded_qualification"] = json!({"unit":"horizon-142-full-local-qualification-20261122-v1.service",
+            "invocation_id":"42466cf599e7429889a778a68376c5ed","pid":227497,"memory_bytes":192u64<<20,
+            "scratch_bytes":8u64<<20,"additional_cpu_quota_micros":0});
+        assert_eq!(
+            reserved_memory(&observed).unwrap(),
+            HOST_MEMORY + (192 << 20)
+        );
+        observed["bounded_qualification"]["pid"] = 42.into();
+        assert!(reserved_memory(&observed).is_err());
+    }
     #[test]
     fn private_136_keeps_the_unspent_reservation_outside_its_guarded_subtree() {
         let cap = joint_candidate::ROOT_CAP;
