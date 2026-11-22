@@ -77,7 +77,7 @@ impl Bucket<'_> {
 const SLOTS: usize = 432000;
 #[cfg(not(any(
     epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-    epoch277, epoch278, epoch279, epoch280
+    epoch277, epoch278, epoch279, epoch280, epoch281, epoch282
 )))]
 mod profile {
     pub(super) const START: u64 = 115344000;
@@ -128,12 +128,12 @@ mod profile {
 }
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280
+    epoch280, epoch281, epoch282
 ))]
 pub mod compact_profiles;
 #[cfg(any(
     epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-    epoch280
+    epoch280, epoch281, epoch282
 ))]
 mod profile {
     pub(super) use super::compact_profiles::{
@@ -179,7 +179,7 @@ fn run() -> io::Result<()> {
     require(slot.starts_with(SLOT_PREFIX), "slot header")?;
     #[cfg(any(
         epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277,
-        epoch278, epoch279, epoch280
+        epoch278, epoch279, epoch280, epoch281, epoch282
     ))]
     if args[2] == "--cid-stdin" {
         return compare(&raw, &slot, io::stdin().lock());
@@ -290,7 +290,7 @@ mod tests {
     use super::*;
     #[cfg(not(any(
         epoch268, epoch269, epoch270, epoch271, epoch272, epoch273, epoch274, epoch275, epoch276,
-        epoch277, epoch278, epoch279, epoch280
+        epoch277, epoch278, epoch279, epoch280, epoch281, epoch282
     )))]
     #[test]
     fn registration_matches_real_slot_and_cid_buckets() {
@@ -307,7 +307,7 @@ mod tests {
     }
     #[cfg(any(
         epoch271, epoch272, epoch273, epoch274, epoch275, epoch276, epoch277, epoch278, epoch279,
-        epoch280
+        epoch280, epoch281, epoch282
     ))]
     #[test]
     fn both_directories_start_at_the_registered_payload_offsets() {
