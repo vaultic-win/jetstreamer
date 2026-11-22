@@ -1,0 +1,135 @@
+{
+  "actor_started": false,
+  "admission_granted": false,
+  "argv": [
+    "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node",
+    "146",
+    "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/ledger",
+    "--verify",
+    "--root-checkpoint-cohort",
+    "--cohort-manifest=/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/inputs/preflight-146-v4.json",
+    "--cohort-manifest-fingerprint=sha256:4f7a8842b2f68a7837a06cc050f2cfa7c5b1a2cf5f184dcfd2190dc8d5f644f8",
+    "--snapshot-archive=/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/inputs/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst"
+  ],
+  "bootstrap": {
+    "accounts_hash": "GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt",
+    "anchor_slot": 62639490,
+    "crc32c": "4LiJUw==",
+    "extension": ".tar.zst",
+    "generation": 1634786801410701,
+    "md5_hash": "jPEgksKIAPcm21cuG2rMsQ==",
+    "size": 4459684282,
+    "slot": 63054846,
+    "source": "hourly",
+    "uri": "gs://mainnet-beta-ledger-us-ny5/62639490/hourly/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst",
+    "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/62639490/hourly/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst#1634786801410701"
+  },
+  "cohort_epochs": [
+    146,
+    146
+  ],
+  "earliest_processed_slot": 63054847,
+  "environment": {
+    "JETSTREAMER_ALLOW_CANDIDATE_RUNTIME": "1",
+    "JETSTREAMER_ARCHIVE_BACKEND": "http",
+    "JETSTREAMER_CLEAR_ACCOUNTS_ON_START": "true",
+    "JETSTREAMER_COMPACT_INDEX_BASE_URL": "https://files.old-faithful.net/",
+    "JETSTREAMER_ENFORCE_ARCHIVE_HASH": "1",
+    "JETSTREAMER_HISTORICAL_POH_THREADS": "10",
+    "JETSTREAMER_HISTORICAL_REAP_TIMEOUT_SECS": "600",
+    "JETSTREAMER_HISTORICAL_WORKER_V1_4_25": "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-historical-worker-v1-4-25",
+    "JETSTREAMER_HTTP_BASE_URL": "https://files.old-faithful.net/",
+    "JETSTREAMER_LOAD_FROM_DIR": "0",
+    "JETSTREAMER_NETWORK_CAPACITY_MB": "1024",
+    "JETSTREAMER_PRIVATE_RUN_ROOT": "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/private",
+    "JETSTREAMER_PRUNE_EPOCH_SNAPSHOTS": "0",
+    "JETSTREAMER_RIPGET_THREADS": "12",
+    "JETSTREAMER_SKIP_SNAPSHOT_VERIFY": "0",
+    "JETSTREAMER_THREADS": "12",
+    "JETSTREAMER_VERIFY_SNAPSHOTS": "1",
+    "RAYON_NUM_THREADS": "10",
+    "SOLANA_RAYON_THREADS": "32"
+  },
+  "estimated_full_lane": {
+    "basis": "Standard full-lane starting envelope from qualified epoch 142 using this runtime package. Epoch 146 peak remains unmeasured.",
+    "guard_cores": 1,
+    "guard_memory": 1073741824,
+    "input_outside_work_tree": true,
+    "physical_work_tree_bytes": 309237645312,
+    "producer_cores": 9,
+    "producer_memory": 73014444032
+  },
+  "genesis": {
+    "path": "/usr/local/lib/jetstreamer/horizon-standard-local-input172-20261110-v1/genesis.tar.bz2",
+    "sha256": "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945"
+  },
+  "guarded_work_parent": "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1",
+  "mandatory_roots": [
+    {
+      "accounts_hash": "DsoBNgzFVZ7j5bF2CpKnt7HAC7fRrMMwdWW9FUafRe1p",
+      "anchor_slot": 63072070,
+      "crc32c": "ZriMUg==",
+      "extension": ".tar.zst",
+      "generation": 1634786831290186,
+      "md5_hash": "DGOWXlT4MOVzV3/3LEMvlA==",
+      "size": 2561109216,
+      "slot": 63072070,
+      "source": "root",
+      "uri": "gs://mainnet-beta-ledger-us-ny5/63072070/snapshot-63072070-DsoBNgzFVZ7j5bF2CpKnt7HAC7fRrMMwdWW9FUafRe1p.tar.zst",
+      "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/63072070/snapshot-63072070-DsoBNgzFVZ7j5bF2CpKnt7HAC7fRrMMwdWW9FUafRe1p.tar.zst#1634786831290186"
+    },
+    {
+      "accounts_hash": "GzRRmVLgimKik5KYVBQ6xC18Z3p2FTCxe88TaJtAb4ds",
+      "anchor_slot": 63503456,
+      "crc32c": "QL+q2A==",
+      "extension": ".tar.zst",
+      "generation": 1634786912025289,
+      "md5_hash": "NN8Hbh61mNzwgmwahiBoeQ==",
+      "size": 3514456693,
+      "slot": 63503456,
+      "source": "root",
+      "uri": "gs://mainnet-beta-ledger-us-ny5/63503456/snapshot-63503456-GzRRmVLgimKik5KYVBQ6xC18Z3p2FTCxe88TaJtAb4ds.tar.zst",
+      "versioned_uri": "gs://mainnet-beta-ledger-us-ny5/63503456/snapshot-63503456-GzRRmVLgimKik5KYVBQ6xC18Z3p2FTCxe88TaJtAb4ds.tar.zst#1634786912025289"
+    }
+  ],
+  "manifest": {
+    "fingerprint": "sha256:4f7a8842b2f68a7837a06cc050f2cfa7c5b1a2cf5f184dcfd2190dc8d5f644f8",
+    "path": "/var/lib/jetstreamer/horizon_runtime_data/epoch146-singleton-20261122-v1/preflight-146-v4.json",
+    "sha256": "ad84b781be23800c107fdb307b2bcf2ca30d4a8aa3832537df13a8724c23385d"
+  },
+  "node": {
+    "path": "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-node",
+    "sha256": "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65"
+  },
+  "output_slots": [
+    63072000,
+    63503999
+  ],
+  "read_only_inputs": [
+    {
+      "source": "/home/sol/.jetstreamer-private/epoch146-snapshot-replan-20261122/inputs/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst",
+      "target": "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/inputs/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst"
+    },
+    {
+      "source": "/var/lib/jetstreamer/horizon_runtime_data/epoch146-singleton-20261122-v1/preflight-146-v4.json",
+      "target": "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/inputs/preflight-146-v4.json"
+    },
+    {
+      "source": "/usr/local/lib/jetstreamer/horizon-standard-local-input172-20261110-v1/genesis.tar.bz2",
+      "target": "/home/sol/.jetstreamer-private/epoch146-standard-lane-20261122-v1/full-local-v1/ledger/genesis.tar.bz2"
+    }
+  ],
+  "runtime": "solana-v1.4.25",
+  "runtime_seal": {
+    "path": "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/deployment-seal-receipt.json",
+    "sha256": "e3dae3cf3a1c565500a10c5ed7301e2c6c5164fcfab8847bb1387965358c433d"
+  },
+  "schema": "horizon-epoch146-ordinary-singleton-plan-v1",
+  "slots_after_last_root": 543,
+  "source_stage": "/home/sol/.jetstreamer-private/epoch146-snapshot-replan-20261122/inputs/snapshot-63054846-GWh8TCBRBCPxYQ9zwQSv8zuLEGUP4xvQsN1jMYfoXqmt.tar.zst",
+  "warmup_slots": 17153,
+  "worker": {
+    "path": "/usr/local/lib/jetstreamer/deploy-epochs144-147-upgradeable-loader-20261016-v1/jetstreamer-historical-worker-v1-4-25",
+    "sha256": "2cca500106d274ebfbbc8c5bfa0e6e8343cd5e41003f9e82c93282800732d8c8"
+  }
+}
