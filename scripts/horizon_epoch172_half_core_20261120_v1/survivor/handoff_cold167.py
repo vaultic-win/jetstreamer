@@ -95,13 +95,13 @@ def prepare(c, commit):
     return c['bound'](QUAL)
 
 
-def timer_evidence(c, ref):
+def timer_evidence(c, ref, minimum_seconds=110):
     data = c['checked'](ref)
     cfg = c['sealed'](data['sole_next_observer'])
     due = c['utc'](cfg['not_before_utc'])
     timer = c['names'](cfg['not_before_utc'])['timer']
     require(data['sole_next_timer']==timer and c['timer_names']()==[timer] and data['complete_active_status_count']==20
-            and due>c['now']()+datetime.timedelta(seconds=110) and not Path(cfg['output']).exists(),
+            and due>c['now']()+datetime.timedelta(seconds=minimum_seconds) and not Path(cfg['output']).exists(),
             'handoff needs a completed cycle and time for the service switch')
     manager = c['owners'].show(timer,('Id','ActiveState','SubState','Triggers','InvocationID','TimersCalendar','Job'))
     require(manager['ActiveState']=='active' and manager['SubState']=='waiting' and
@@ -172,7 +172,6 @@ def activate(c, head):
     qualified=c['read_ref'](QUAL)
     require(qualified['package']==c['bound'](TOOL/'deployment-seal-receipt.json'), 'qualified package changed')
     new_admission=admitted(c)
-    schedule=timer_evidence(c,head)
     manifest='[Service]\nExecStart=\nEnvironmentFile=/etc/jetstreamer/horizon-r2.env\nExecStart=/usr/bin/python3 -IB '+str(NEW)+'\n'
     intent=ROOT/'COLD167_STATUS_INTENT.json'
     if ACTIVE.exists():
@@ -180,6 +179,7 @@ def activate(c, head):
         require(receipt['new']==publisher(c,NEW) and receipt['admission']==new_admission
                 and receipt['qualified']==c['bound'](QUAL), 'different adopted writer')
         return c['bound'](ACTIVE)
+    schedule=timer_evidence(c,head)
     if intent.exists():
         initial=c['read_ref'](intent)
         require(initial['schedule']==schedule and initial['admission']==new_admission and initial['qualified']==c['bound'](QUAL),
@@ -189,9 +189,19 @@ def activate(c, head):
         require(old['invocation_id']==OLD_IID and not DROP.exists(), 'different original status owner')
         c['durable'](intent,dict(old=old,schedule=schedule,qualified=c['bound'](QUAL),admission=new_admission))
     initial=c['read_ref'](intent)
+    rollback=ROOT/'COLD167_STATUS_ROLLBACK.json'
     state=c['owners'].show(UNIT,FIELDS)
-    if state['MainPID']!='0' and state['InvocationID']==initial['old']['invocation_id']:
-        require(initial['old']==publisher(c,OLD,True) and timer_evidence(c,head)==schedule, 'publisher moved before handoff')
+    previous=initial['old']
+    if rollback.exists() and state['MainPID']!='0' and not DROP.exists():
+        saved=c['read_ref'](rollback)
+        if saved['restored']['invocation_id'] != state['InvocationID']:
+            require(re.fullmatch('[0-9a-f]{32}',state['InvocationID']), 'invalid restored writer ID')
+            saved=c['read_ref'](ROOT/('COLD167_STATUS_ROLLBACK_'+state['InvocationID']+'.json'))
+            require(saved['original_rollback']==c['bound'](rollback), 'unbound subsequent rollback')
+        require(saved['intent']==c['bound'](intent) and saved['schedule']==schedule, 'foreign restored writer')
+        previous=saved['restored']
+    if state['MainPID']!='0' and state['InvocationID']==previous['invocation_id']:
+        require(previous==publisher(c,OLD,True) and timer_evidence(c,head)==schedule, 'publisher moved before handoff')
         output('systemctl','stop',UNIT,timeout=95)
     state=c['owners'].show(UNIT,FIELDS)
     if state['MainPID']=='0':
@@ -199,7 +209,7 @@ def activate(c, head):
         try:
             lease=c['lock'](LOCK)
             try:
-                require(timer_evidence(c,head)==schedule, 'armed observer changed during switch')
+                require(timer_evidence(c,head,15)==schedule, 'armed observer changed during switch')
                 write_new(DROP,manifest.encode())
                 output('systemctl','daemon-reload')
                 argv=c['owners'].show(UNIT,('ExecStart','MainPID','Job'))
@@ -210,9 +220,9 @@ def activate(c, head):
             new=start_and_wait(c,NEW)
         except Exception:
             # Restore the existing service if the new generation has not yet written a sample.
-            require(timer_evidence(c,head)==schedule, 'scheduled sampler advanced; retain recovery evidence')
             current=c['owners'].show(UNIT,FIELDS)
             if current['MainPID']!='0':
+                require(timer_evidence(c,head,0)==schedule, 'new publisher may be processing the sample')
                 require((Path('/proc')/current['MainPID']/'cmdline').read_bytes().split(b'\0')==
                         [b'/usr/bin/python3',b'-IB',os.fsencode(NEW),b''], 'different running publisher')
                 output('systemctl','stop',UNIT,timeout=95)
@@ -221,12 +231,17 @@ def activate(c, head):
                 DROP.unlink();syncdir(DROP.parent)
             output('systemctl','daemon-reload')
             restored=start_and_wait(c,OLD)
-            c['durable'](ROOT/'COLD167_STATUS_ROLLBACK.json',dict(intent=c['bound'](intent),restored=restored,schedule=schedule))
+            record=dict(intent=c['bound'](intent),restored=restored,schedule=schedule)
+            target=rollback
+            if rollback.exists():
+                record['original_rollback']=c['bound'](rollback)
+                target=ROOT/('COLD167_STATUS_ROLLBACK_'+restored['invocation_id']+'.json')
+            c['durable'](target,record)
             raise
     else:
         require(DROP.read_bytes()==manifest.encode(), 'different live service during recovery')
         new=publisher(c,NEW)
-    require(timer_evidence(c,head)==schedule and new_admission==admitted(c) and new['invocation_id']!=initial['old']['invocation_id'],
+    require(timer_evidence(c,head,0)==schedule and new_admission==admitted(c) and new['invocation_id']!=initial['old']['invocation_id'],
             'custody changed across the switch')
     c['durable'](ACTIVE,dict(new=new,old=initial['old'],intent=c['bound'](intent),schedule=schedule,
                             qualified=c['bound'](QUAL),admission=new_admission,dropin=c['bound'](DROP)))

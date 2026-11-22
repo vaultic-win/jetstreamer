@@ -48,7 +48,12 @@ def selected_status(s, fit):
            and Path(previous["program"]) == STATUS / "tools/status_cycle.py" and intent["qualified"] == qr,
            "foreign prior cadence handoff")
     if not active.exists():
-        row, _ = s.read(rollback)
+        row, first_ref = s.read(rollback)
+        iid = s.show(fit.PUBLISHER)["InvocationID"]
+        if row["restored"]["invocation_id"] != iid:
+            s.need(s.iid(iid), "invalid restored writer invocation")
+            row, _ = s.read(STATUS / ("COLD167_STATUS_ROLLBACK_" + iid + ".json"))
+            s.need(row["original_rollback"] == first_ref, "unbound subsequent status rollback")
         current = row["restored"]
         s.need(row["intent"] == ir and row["schedule"] == intent["schedule"], "foreign status rollback")
         package, seal_ref = STATUS / "tools", deployed["sources"]
