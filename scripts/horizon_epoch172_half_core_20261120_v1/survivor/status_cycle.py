@@ -509,7 +509,7 @@ def one_cycle(head,ref,bridge):
     return bound(target)
 
 def main():
-    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools-cold167/status_cycle.py','expected deployed sole controller')
+    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools-cold167-v3/status_cycle.py','expected deployed sole controller')
     os.umask(0o077)
     fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
     try:

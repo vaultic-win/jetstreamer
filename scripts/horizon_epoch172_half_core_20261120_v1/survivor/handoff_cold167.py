@@ -13,15 +13,15 @@ import time
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
 ROOT = R / 'survivor172-cadence-20261122-v1'
-TOOL = ROOT / 'tools-cold167'
+TOOL = ROOT / 'tools-cold167-v3'
 OLD = ROOT / 'tools/status_cycle.py'
 OLD_IID = '1baf803f31384ddaacb3a291ad9383bc'
 NEW = TOOL / 'status_cycle.py'
-QUAL = ROOT / 'COLD167_STATUS_QUALIFIED.json'
-ACTIVE = ROOT / 'COLD167_STATUS_ACTIVE.json'
-CANDIDATE = R / 'epoch167-source-index-rebook-20261122-v1'
+QUAL = ROOT / 'COLD167_V3_STATUS_QUALIFIED.json'
+ACTIVE = ROOT / 'COLD167_V3_STATUS_ACTIVE.json'
+CANDIDATE = R / 'epoch167-source-index-rebook-20261122-v3'
 UNIT = 'horizon-archive-status-cadence-after172-20261120-v1.service'
-DROP = Path('/run/systemd/system') / (UNIT + '.d') / 'zzzzzzzzzzzzzz-cold167.conf'
+DROP = Path('/run/systemd/system') / (UNIT + '.d') / 'zzzzzzzzzzzzzz-cold167-v3.conf'
 LOCK = R / 'stable-cadence-controller-20261120-v1/consumer.lock'
 REPO = Path('/home/sol/workspace/jetstreamer')
 SRC = 'scripts/horizon_epoch172_half_core_20261120_v1/survivor'
@@ -59,37 +59,44 @@ def syncdir(directory):
         os.close(fd)
 
 
-def prepare(c, commit):
+def prepare(c, commit, prepared_sha, guard_sha):
     require(re.fullmatch('[0-9a-f]{40}', commit), 'full source revision required')
     def git(*args):
         return output('/usr/sbin/runuser','-u','sol','--','/usr/bin/git','-C',REPO,*args)
     git('merge-base','--is-ancestor',commit,'origin/account-updates')
-    stage = ROOT / 'cold167-status-source'
+    stage = ROOT / 'cold167-v3-status-source'
     c['ensure_dir'](stage)
     for name in MEMBERS:
         write_new(stage / name, git('show', f'{commit}:{SRC}/{name}'))
-    require(set(p.name for p in stage.iterdir()) == set(MEMBERS), 'unexpected staged member')
-    plan = ROOT / 'cold167-status-seal-plan.json'
+    guard_root = R/'epoch167-cold-guard-20261122-v3'
+    prepared = c['bound'](CANDIDATE/'PREPARED.json')
+    guard = c['bound'](guard_root/'GUARD_QUALIFIED.json')
+    require(prepared['sha256']==prepared_sha and guard['sha256']==guard_sha, 'different launch or guard qualification')
+    c['durable'](stage/'generation.json', dict(prepared=prepared,guard_qualification=guard))
+    members = (*MEMBERS,'generation.json')
+    require(set(p.name for p in stage.iterdir()) == set(members), 'unexpected staged member')
+    plan = ROOT / 'cold167-v3-status-seal-plan.json'
     c['durable'](plan, dict(schema='jetstreamer-sealed-deployment-plan-v1', destination=str(TOOL),
-        members=[dict(name=n, mode=0o444, source=str(stage/n), sha256=c['bound'](stage/n)['sha256']) for n in MEMBERS]))
+        members=[dict(name=n, mode=0o444, source=str(stage/n), sha256=c['bound'](stage/n)['sha256']) for n in members]))
     if not TOOL.exists():
         output(SEALER, plan, '--plan-sha256', c['bound'](plan)['sha256'], '--self-sha256',
                'e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3')
     seal = c['bound'](TOOL/'deployment-seal-receipt.json')
     actual = c['checked'](seal)
     require(actual['plan_sha256'] == c['bound'](plan)['sha256'] and actual['destination']==str(TOOL)
-            and all(c['bound'](stage/n)['sha256']==c['bound'](TOOL/n)['sha256'] for n in MEMBERS), 'package differs')
+            and all(c['bound'](stage/n)['sha256']==c['bound'](TOOL/n)['sha256'] for n in members), 'package differs')
     if QUAL.exists():
         receipt = c['read_ref'](QUAL)
         require(receipt['package']==seal and receipt['source_commit']==commit, 'conflicting cadence qualification')
         return c['bound'](QUAL)
-    qa = ROOT/'cold167-status-qa'
+    qa = ROOT/'cold167-v3-status-qa'
     c['ensure_dir'](qa)
     old = json.loads(output('/usr/bin/python3','-IB',TOOL/'qualify.py',qa))
     recent = json.loads(output('/usr/bin/python3','-IB',TOOL/'qualify_cold167.py',qa))
     dual = json.loads(output('/usr/bin/python3','-IB',TOOL/'qualify_cold167_cadence.py',qa))
     require(dual['two_guarded_owners'] and len(set(old['conditional_epochs'])) == 20 and old['bytes_written_to_R2']==0
             and recent['wrong_main_pid_rejected'] and recent['wrong_worker_pid_rejected'] and recent['wrong_config_rejected']
+            and recent['guard_qualification']==guard and recent['wrong_guard_qualification_rejected']
             and recent['simulated_conditional_writes']==1 and not recent['r2_mutations'], 'status qualification failed')
     c['durable'](QUAL,dict(source_commit=commit,package=seal,normal=old,cold167=recent,dual=dual))
     return c['bound'](QUAL)
@@ -150,7 +157,9 @@ def admitted(c):
     a=c['checked'](ref)
     m['check_generation'](a['fleet'],c['checked'](a['fleet']),state)
     first=c['checked'](c['bound'](CANDIDATE/'FIRST_PROTECTED_WORKER.json'))
-    m['projection'](first['observer_row'])
+    proof,sample=reader.guard(167,a,state[1])
+    row=reader.observe_worker(167,state[1],first,sample)
+    m['projection'](row)
     require(first['admission']==ref and a['producer_invocation_id']==state[1]['producer_invocation_id'],
             'new worker differs from actual admission')
     return ref
@@ -173,7 +182,7 @@ def activate(c, head):
     require(qualified['package']==c['bound'](TOOL/'deployment-seal-receipt.json'), 'qualified package changed')
     new_admission=admitted(c)
     manifest='[Service]\nExecStart=\nEnvironmentFile=/etc/jetstreamer/horizon-r2.env\nExecStart=/usr/bin/python3 -IB '+str(NEW)+'\n'
-    intent=ROOT/'COLD167_STATUS_INTENT.json'
+    intent=ROOT/'COLD167_V3_STATUS_INTENT.json'
     if ACTIVE.exists():
         receipt=c['read_ref'](ACTIVE)
         require(receipt['new']==publisher(c,NEW) and receipt['admission']==new_admission
@@ -189,14 +198,14 @@ def activate(c, head):
         require(old['invocation_id']==OLD_IID and not DROP.exists(), 'different original status owner')
         c['durable'](intent,dict(old=old,schedule=schedule,qualified=c['bound'](QUAL),admission=new_admission))
     initial=c['read_ref'](intent)
-    rollback=ROOT/'COLD167_STATUS_ROLLBACK.json'
+    rollback=ROOT/'COLD167_V3_STATUS_ROLLBACK.json'
     state=c['owners'].show(UNIT,FIELDS)
     previous=initial['old']
     if rollback.exists() and state['MainPID']!='0' and not DROP.exists():
         saved=c['read_ref'](rollback)
         if saved['restored']['invocation_id'] != state['InvocationID']:
             require(re.fullmatch('[0-9a-f]{32}',state['InvocationID']), 'invalid restored writer ID')
-            saved=c['read_ref'](ROOT/('COLD167_STATUS_ROLLBACK_'+state['InvocationID']+'.json'))
+            saved=c['read_ref'](ROOT/('COLD167_V3_STATUS_ROLLBACK_'+state['InvocationID']+'.json'))
             require(saved['original_rollback']==c['bound'](rollback), 'unbound subsequent rollback')
         require(saved['intent']==c['bound'](intent) and saved['schedule']==schedule, 'foreign restored writer')
         previous=saved['restored']
@@ -235,7 +244,7 @@ def activate(c, head):
             target=rollback
             if rollback.exists():
                 record['original_rollback']=c['bound'](rollback)
-                target=ROOT/('COLD167_STATUS_ROLLBACK_'+restored['invocation_id']+'.json')
+                target=ROOT/('COLD167_V3_STATUS_ROLLBACK_'+restored['invocation_id']+'.json')
             c['durable'](target,record)
             raise
     else:
@@ -252,12 +261,14 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('mode',choices=('prepare','observe','activate'))
     parser.add_argument('reference',help='merged source commit for prepare, complete fleet pathname otherwise')
+    parser.add_argument('--prepared-sha256')
+    parser.add_argument('--guard-qualification-sha256')
     args=parser.parse_args()
     require(os.geteuid()==0 and sys.flags.isolated and __debug__ and hashlib.sha256(OLD.read_bytes()).hexdigest()==OLD_SHA,
             'expected original installed cadence')
     c=runpy.run_path(str(OLD))
     if args.mode=='prepare':
-        return prepare(c,args.reference)
+        return prepare(c,args.reference,args.prepared_sha256,args.guard_qualification_sha256)
     ref=c['bound'](Path(args.reference))
     require(Path(ref['path']).name=='ROOT_COMPLETE_OPERATIONAL_FLEET.json' and Path(ref['path']).parent.parent==R,
             'foreign fleet path')
