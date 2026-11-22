@@ -610,7 +610,10 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0,close
 def registered136(fleet, registration):
     root = H / "epoch136-actual-20261120-g1"
     intent_path = root / "prestart-intent.json"
-    if not intent_path.exists() or fit.members(fit.N136):
+    if not intent_path.exists():
+        s.need(not (root / "prestart-released.json").exists(), "136 release without original intent")
+        return fit.candidate136(fleet, registration)
+    if fit.members(fit.N136):
         return fit.candidate136(fleet, registration)
 
     # The original controller validates the admission (including expiry), writer,
@@ -622,7 +625,8 @@ def registered136(fleet, registration):
     s.bound(offer["selector"], dispatcher / "READY.json")
     s.need(intent["selector"] == offer["selector"] and intent["writer_plan"] == offer["writer_plan"]
            and receipt["intent"] == intent_ref and receipt["donor_restored"] is True
-           and receipt["candidate_physically_drained"] is True and receipt["resource_credit_bytes"] == 0,
+           and receipt["candidate_physically_drained"] is True and receipt["all_physical_outputs_retained"] is True
+           and receipt["resource_credit_bytes"] == 0,
            "foreign 136 release or selected writer")
     planref = offer["writer_plan"]
     plan = bound(planref)
