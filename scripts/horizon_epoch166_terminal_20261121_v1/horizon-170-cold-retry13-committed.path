@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the cold retry13 batch receipt for epoch 170
+
+[Path]
+PathExistsGlob=/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry13-20261122/private/destination-9d7fbc3a094253cd1318488f6a60e44900245948f42eba157699ae1df4828fd6/evidence/archive-batches/destination-000000000000fc00-0000000006cb39fb/batch-*.json
+Unit=horizon-170-cold-retry13-committed.service
+
+[Install]
+WantedBy=multi-user.target
