@@ -1,0 +1,10 @@
+{
+  "entries": [
+    {
+      "epoch": 268,
+      "path": "/var/lib/jetstreamer/horizon268-rooted-slot-ranges-v1/epoch-268-slot-ranges.raw",
+      "sha256": "97a0e4ad0cbf5b99c81f1e5097625ef90b3e03364aee567c7679ba59ff4417af"
+    }
+  ],
+  "schema": "jetstreamer-local-slot-ranges-overrides-v1"
+}
