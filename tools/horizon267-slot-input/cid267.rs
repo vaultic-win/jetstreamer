@@ -1,15 +1,28 @@
-//! Bounded streaming verification of the CID-to-offset-and-size compact index for epoch 267.
+//! Bounded streaming verification of the CID-to-offset-and-size compact index for epochs 267 and 268.
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufReader, Read, Seek};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
-const SIZE: u64 = 10_392_794_246;
-const CAR_SIZE: u64 = 428_826_209_761;
-const BUCKETS: usize = 86_596;
-const HEADER: usize = 130;
-const SOURCE: &str = "/var/lib/jetstreamer/horizon267-cid-input-v173-a1/index.body";
-const PREFIX: &[u8; 4096] = include_bytes!("267-cid-prefix.bin");
+#[cfg(not(epoch268))]
+mod profile {
+    pub(super) const SIZE: u64 = 10_392_794_246;
+    pub(super) const CAR_SIZE: u64 = 428_826_209_761;
+    pub(super) const BUCKETS: usize = 86_596;
+    pub(super) const HEADER: usize = 130;
+    pub(super) const SOURCE: &str = "/var/lib/jetstreamer/horizon267-cid-input-v173-a1/index.body";
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("267-cid-prefix.bin");
+}
+#[cfg(epoch268)]
+mod profile {
+    pub(super) const SIZE: u64 = 12_161_495_866;
+    pub(super) const CAR_SIZE: u64 = 476_675_176_389;
+    pub(super) const BUCKETS: usize = 300_000;
+    pub(super) const HEADER: usize = 130;
+    pub(super) const SOURCE: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("268-cid-prefix.bin");
+}
+use profile::*;
 
 fn require(v: bool, why: &str) -> io::Result<()> {
     if v {

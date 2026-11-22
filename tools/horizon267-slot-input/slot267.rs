@@ -1,21 +1,31 @@
-//! Complete epoch-267 slot-index structure check. The pinned prefix includes the full directory.
+//! Complete slot-index structure check. The pinned prefix includes the full directory.
 use std::fs::{self, File, OpenOptions};
 use std::io::Read;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
-const PREFIX: &[u8; 4096] = include_bytes!("267-slot-to-cid.bin");
-const SIZE: usize = 15_166_712;
-const EXPECTED: usize = 388_871;
-const HEADER: usize = 119;
-const BUCKETS: usize = 39;
+#[cfg(not(epoch268))]
+mod profile {
+    pub(super) const EPOCH: u64 = 267;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("267-slot-to-cid.bin");
+    pub(super) const SIZE: usize = 15_166_712;
+    pub(super) const EXPECTED: usize = 388_871;
+    pub(super) const HEADER: usize = 119;
+    pub(super) const BUCKETS: usize = 39;
+}
+#[cfg(epoch268)]
+mod profile {
+    pub(super) const EPOCH: u64 = 268;
+    pub(super) const PREFIX: &[u8; 4096] = include_bytes!("268-slot-to-cid.bin");
+    pub(super) const SIZE: usize = 16_006_150;
+    pub(super) const EXPECTED: usize = 410_393;
+    pub(super) const HEADER: usize = 119;
+    pub(super) const BUCKETS: usize = 44;
+}
+use profile::*;
 
 fn check(condition: bool, reason: &'static str) -> Result<(), &'static str> {
-    if condition {
-        Ok(())
-    } else {
-        Err(reason)
-    }
+    if condition { Ok(()) } else { Err(reason) }
 }
 fn little(bytes: &[u8]) -> u64 {
     bytes
@@ -125,7 +135,9 @@ fn verify(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         identity(&f.metadata()?) == id && identity(&fs::symlink_metadata(path)?) == id,
         "body changed",
     )?;
-    println!("{{\"epoch\":267,\"kind\":\"slot-to-cid\",\"bytes\":{SIZE},\"entries\":{entries},\"buckets\":{BUCKETS},\"all_cid_types_checked\":true,\"all_search_trees_checked\":true,\"car_lookups_verified\":false,\"admission_authorized\":false}}");
+    println!(
+        "{{\"epoch\":{EPOCH},\"kind\":\"slot-to-cid\",\"bytes\":{SIZE},\"entries\":{entries},\"buckets\":{BUCKETS},\"all_cid_types_checked\":true,\"all_search_trees_checked\":true,\"car_lookups_verified\":false,\"admission_authorized\":false}}"
+    );
     Ok(())
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
