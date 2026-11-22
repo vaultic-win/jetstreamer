@@ -1,0 +1,197 @@
+#!/usr/bin/python3 -IB
+"""Retry the complete sealed V20 mirror price after its V5c-only wait fails."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import runpy
+import select
+import stat
+import subprocess
+import sys
+import time
+
+R = Path("/var/lib/jetstreamer/horizon_runtime_data")
+BASE = R / "incident-replay-fit-20261121-v1"
+V20 = BASE / "tools-v20"
+MIRROR = V20 / "price_recovery_mirrors.py"
+NATIVE = V20 / "post-stop-fit"
+V20_SEAL = "87dae932c9b4b0773db56fcd04a1b882ac2b2db2c2b63428b7cb09bf306f546d"
+V5F = R / "epoch145-semantic-continuity-20261121-v1"
+IMAGE = V5F / "tools-v5f/export145"
+IMAGE_SHA = "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21"
+PARENT, WORKER = 320133, 320351
+OWNERS = {PARENT, WORKER}
+UNIT = "horizon-holding-export145-20261121-v1.service"
+CGROUP = "/system.slice/" + UNIT
+CGPROCS = Path("/sys/fs/cgroup" + CGROUP) / "cgroup.procs"
+PYTHON = "/usr/bin/python3"
+IID = "50af3d8ab5da47e8bdc2828feab53908"
+BOOT = "763ea84ca81f4dddad364b1ea2ba36dd"
+# Full stderr emitted by the pinned entry and original V5c publication-fit
+# when its wait_for_145_probe() reads the departed manager /proc/4011654/stat.
+LEGACY_STDERR = "c9112465de54f1269579c6d9f92a56f7af0f64bbef8f16bdb1b0957414bc8f03"
+
+def need(test, message):
+    if not test:
+        raise ValueError(message)
+
+def checked(path, digest, mode):
+    info = path.lstat()
+    need(path.resolve(strict=True) == path and stat.S_ISREG(info.st_mode) and
+         stat.S_IMODE(info.st_mode) == mode and info.st_uid == info.st_gid == 0 and
+         info.st_nlink == 1, "changed price input " + str(path))
+    data = path.read_bytes()
+    need(hashlib.sha256(data).hexdigest() == digest, "changed digest " + str(path))
+    return data
+
+def bindings():
+    progress = json.loads(checked(V5F / "V5F_ACTUAL_ADVANCING_WORKER.json",
+        "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496", 0o400))
+    manager = json.loads(checked(V5F / "V5F_ACTUAL_MANAGER.json", progress["manager"]["sha256"], 0o400))
+    intent = json.loads(checked(V5F / "V5F_START_INTENT.json", manager["intent"]["sha256"], 0o400))
+    need(intent["boot"] == BOOT and progress["invocation_id"] == manager["new"]["InvocationID"] == IID and
+         intent["semantic_provider"]["sha256"] == V20_SEAL, "different V5f registration")
+    for pkg, digest, images in [
+        (V20, V20_SEAL, {MIRROR.name: "6f692a82eaa7a078dd59d03febb71b8a76c77c286a199be69fc531389f373be6",
+                          NATIVE.name: "232287d770d514ac9dfaafc3cbb258ab374a987f80e058a4d9d730f73f4dac23"}),
+        (IMAGE.parent, intent["verifier"]["sha256"], {IMAGE.name: IMAGE_SHA}),
+    ]:
+        seal = json.loads(checked(pkg / "deployment-seal-receipt.json", digest, 0o444))
+        rows = {row["name"]: row for row in seal["members"]}
+        need(seal["destination"] == str(pkg), "different package")
+        for name, sha in images.items():
+            need(rows[name]["sha256"] == sha, "different package member")
+            checked(pkg / name, sha, int(rows[name]["mode"], 8))
+    fleet = intent["fleet"]
+    row = progress["observations"][-1]
+    need(row["parent_pid"] == PARENT and row["child_pid"] == WORKER and
+         manager["parent_start_ticks"] == row["parent_ticks"], "different V5f owners")
+    return {PARENT: (1, row["parent_ticks"], [str(IMAGE), "recover-full-output",
+                    fleet["path"], fleet["sha256"], IMAGE_SHA]),
+            WORKER: (PARENT, row["child_ticks"], [str(IMAGE), "recover-worker", str(PARENT), IMAGE_SHA])}
+
+def head_reader():
+    pkg = R / "epoch199-delivery-recovery-20261121-v1/phase-transition-v4"
+    checked(pkg / "transition_budget.py", "77b65b79097dd62ce8b591f382ccb8a1597d510a211206ca4d2caf301eb9840d", 0o444)
+    checked(pkg / "transition_fit.py", "e5bbcebb43974ebaaa12c1eb8b93b76c9615842f9ee5fdcd2b79982b254b6e34", 0o444)
+    scope = runpy.run_path(str(pkg / "transition_fit.py"))
+    _, event = scope["helpers"]()
+    return lambda: scope["head"](event)[1]
+
+def proc_info(pid):
+    proc = Path("/proc") / str(pid)
+    fields = (proc / "stat").read_text().rsplit(")", 1)[1].split()
+    raw = (proc / "cmdline").read_bytes().split(b"\0")
+    return int(fields[1]), int(fields[19]), [os.fsdecode(x) for x in raw[:-1]], (proc / "cgroup").read_text().strip()
+
+def pid1_and_owners(expected):
+    need(Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-", "") == BOOT, "different boot")
+    target = dict(Id=UNIT, MainPID=str(PARENT), InvocationID=IID, ControlGroup=CGROUP, LoadState="loaded",
+                  ActiveState="active", SubState="running", ControlPID="0", NRestarts="0", Job="",
+                  CPUQuotaPerSecUSec="1s", MemoryMax=str(2 << 30), MemorySwapMax="0")
+    output = subprocess.check_output(["/usr/bin/systemctl", "show", "--property=" + ",".join(target), UNIT],
+                                     timeout=8, text=True)
+    need(dict(line.split("=", 1) for line in output.splitlines()) == target, "changed PID1 manager")
+    for pid, (ppid, ticks, argv) in expected.items():
+        need(proc_info(pid) == (ppid, ticks, argv, "0::" + CGROUP) and
+             Path(f"/proc/{pid}/exe").samefile(IMAGE), "changed original V5f owner")
+
+def members():
+    return set(map(int, CGPROCS.read_text().split()))
+
+def probe_identity(info, interpreter, fleet):
+    ppid, ticks, args, group = info
+    return ppid == PARENT and ticks > 0 and group == "0::" + CGROUP and interpreter and args == [
+        PYTHON, "-IB", str(NATIVE), "145", fleet["path"], fleet["sha256"]]
+
+def witness(fleet):
+    # Only a direct child is eligible. Any additional processes keep the
+    # window closed, including descendants of the probe while it is running.
+    extra = set(map(int, Path(f"/proc/{PARENT}/task/{PARENT}/children").read_text().split())) - {WORKER}
+    if not extra:
+        return None
+    need(len(extra) == 1, "foreign direct V5f child")
+    pid = extra.pop()
+    try:
+        fd = os.pidfd_open(pid)
+    except ProcessLookupError:
+        return None
+    try:
+        info = proc_info(pid)
+        need(probe_identity(info, Path(f"/proc/{pid}/exe").samefile(PYTHON), fleet)
+             and pid in members(), "foreign V5f probe")
+        return pid, info[1], fd
+    except (FileNotFoundError, ProcessLookupError):
+        os.close(fd)
+        return None
+    except BaseException:
+        os.close(fd)
+        raise
+
+def drain(observed, deadline):
+    pid, ticks, fd = observed
+    poll = select.poll()
+    poll.register(fd, select.POLLIN)
+    limit = min(90, deadline - time.monotonic())
+    need(limit > 0 and poll.poll(int(limit * 1000)), "original V20 probe did not finish")
+    print(f"original V20 probe exited pid={pid} ticks={ticks}", file=sys.stderr, flush=True)
+
+def window(expected, fleet, deadline):
+    pid1_and_owners(expected)
+    if members() != OWNERS:
+        probe = witness(fleet)
+        if probe:
+            try:
+                drain(probe, deadline)
+            finally:
+                os.close(probe[2])
+        pid1_and_owners(expected)
+        need(members() == OWNERS, "foreign V5f cgroup member or closed price window")
+
+def retryable(code, stdout, stderr, observed):
+    return code == 1 and not stdout and observed is not None and hashlib.sha256(stderr).hexdigest() == LEGACY_STDERR
+
+def capture(fleet):
+    expected, head = bindings(), head_reader()
+    deadline = time.monotonic() + 240
+    command = [PYTHON, "-IB", str(MIRROR), fleet["path"], fleet["sha256"], V20_SEAL]
+    for attempt in range(3):
+        need(head() == fleet, "selected fleet is no longer the latest accepted head")
+        window(expected, fleet, deadline)
+        observed = None
+        try:
+            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as child:
+                try:
+                    while True:
+                        need(time.monotonic() < deadline, "mirror capture deadline expired")
+                        try:
+                            out, err = child.communicate(timeout=0.5)
+                            break
+                        except subprocess.TimeoutExpired:
+                            if observed is None:
+                                observed = witness(fleet)
+                except BaseException:
+                    child.kill()
+                    raise
+            if attempt < 2 and retryable(child.returncode, out, err, observed):
+                print("discarded complete V20 mirror capture after original V5c wait failed", file=sys.stderr)
+                drain(observed, deadline)
+                continue
+            if child.returncode == 0:
+                window(expected, fleet, deadline)
+                need(head() == fleet, "accepted fleet changed during price")
+                price = json.loads(out)
+                need(price["mirrors_fit"] and price["native"]["fits"] and price["fleet"] == fleet and
+                     0 <= time.time() - price["native"]["recorded_unix_seconds"] < 120, "expired V20 price")
+            sys.stdout.buffer.write(out)
+            sys.stderr.buffer.write(err)
+            return child.returncode
+        finally:
+            if observed:
+                os.close(observed[2])
+
+if __name__ == "__main__":
+    need(len(sys.argv) == 3 and os.geteuid() == 0 and sys.flags.isolated and __debug__,
+         "price-mirrors FLEET_PATH FLEET_SHA256")
+    sys.exit(capture(dict(path=sys.argv[1], sha256=sys.argv[2])))
