@@ -47,10 +47,13 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-RETRY11 = HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2", "tools-homefloor-retry11-166-v2-adopted"}
+COLD170 = HERE.name == "tools-homefloor-retry11-170-v1"
+RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2", "tools-homefloor-retry11-166-v2-adopted"}
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
+if COLD170:
+    cold170 = runpy.run_path(str(HERE / "cold170_actor.py"))
 if RETRY11:
     retry11 = runpy.run_path(str(HERE / "retry11_actor.py"))
 if HOMEFLOOR:
@@ -230,7 +233,7 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
         return None
     s.need(terminal is None,"closed replacement has a live process")
     intent,_=s.read(d/"START_INTENT.json")
-    gated=e==170 and not (d/"ACTUAL_PRODUCER_NATIVE.json").exists()
+    gated=e==170 and generation is None and not (d/"ACTUAL_PRODUCER_NATIVE.json").exists()
     actor,aref=s.read(d/("NATIVE_GATED.json" if gated else "ACTUAL_PRODUCER_NATIVE.json"))
     pid=int(manager["MainPID"]);iid=manager["InvocationID"];group="/system.slice/"+unit
     s.need(s.iid(iid) and iid!=stop["original"]["producer_invocation_id"] and manager["ActiveState"]=="active" and
@@ -275,7 +278,21 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
         guard_image, contract = retry11["guard"](s, prepared)
         retry11["mounted_inputs"](s, prepared, intent, pr)
     if e==170:
-        wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
+        if COLD170 and generation is not None:
+            prepared, pr_ref = s.read(d / "PREPARED.json")
+            profile = prepared["profile"]
+            s.need(intent["prepared"] == pr_ref and profile["producer_unit"] == unit
+                   and profile["fresh_attempt"] == str(run) and profile["guard_timer"] == timer
+                   and profile["guard_worker_root"] == str(tree), "wrong cold 170 startup registration")
+            argv = profile["producer_argv"]
+            s.need((pr/"cmdline").read_bytes().split(b"\0") ==
+                   [os.fsencode(a) for a in argv[argv.index(str(pkg/"jetstreamer-node")):]] + [b""],
+                   "foreign cold 170 node arguments")
+            cap = cold170["CAP"]
+            guard_image, contract = cold170["guard"](s, prepared)
+            cold170["mounted_inputs"](s, prepared, intent, pr, retry11["readonly_mounts"])
+        else:
+            wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
     plan,pref=s.read(d/"ACTUAL_GUARD_PLAN.json");first,fr=s.read(d/"FIRST_GUARD.json")
     s.need(plan["invocation_id"]==iid and plan["unit"]==unit and plan["filesystem"]==str(HOME) and plan["worker_root"]==str(tree)
            and plan["receipt_directory"]==str(d/"guard-receipts") and plan["maximum_root_physical_bytes"]==cap
@@ -364,6 +381,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     return row
 
 def observe_actor(e, own, tree, run, stop, terminal=None):
+    if COLD170 and e == 170:
+        return cold170["observe"](s, fit, native_actor, own)
     if RETRY11 and e == 166:
         return retry11["observe"](s, fit, native_actor, own)
     if HOMEFLOOR and e == 167:
@@ -877,6 +896,9 @@ def capture_once(epoch,ref,prestart136=None):
         if RETRY11 and e == 166:
             active_run = retry11["RUN"]
 
+        if COLD170 and e == 170:
+            active_run = cold170["RUN"]
+
         if a:rep[str(e)]=a
         if a and a["physical"] is not None:
             physical=a["physical"];measurement="two complete native whole-tree walks"
@@ -990,6 +1012,8 @@ def capture_once(epoch,ref,prestart136=None):
         protected += required - need
         need = required
         recovered_price = dict(homefloor_stops=interrupted, recovery_obligations=after)
+    if COLD170:
+        recovered_price["cold170"] = cold170["stable"](s)
     if RETRY11:
         s.need(retry11["holding"](s,fit,f)==parked166, "166 holding stage changed during complete fit")
         recovered_price.update(registered_retry11_holding=parked166, retry11_root=retry11["stable"](s))
