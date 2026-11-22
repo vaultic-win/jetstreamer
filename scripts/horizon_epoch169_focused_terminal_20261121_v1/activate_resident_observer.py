@@ -13,6 +13,8 @@ ROOT=R/'resident-observer-20261121-v1'
 OLD=R/'host-census-clock-recovery-20261121-v1/cadence-tools'
 mode = sys.argv[1] if len(sys.argv)>1 else ''
 DEPLOYMENTS = {
+    '--prefix140-cadence': ('ready-idle-cpu-20261121-v1', 'prefix140-cadence-20261122-v1',
+                            'zzzzzzz-prefix140-cadence.conf', 'qualified-prefix140-metered-cadence-v1'),
     '--ready-audit-retirement': ('resident-observer-20261121-v1', 'ready-audit-cadence-20261121-v1',
                                  'zzzz-ready-audit-retirement.conf', 'qualified-ready-audit-handoff-v1'),
     '--ready-audit-idle-clock': ('ready-audit-growth-20261121-v1', 'ready-idle-cpu-20261121-v1',
@@ -68,14 +70,15 @@ def fresh_paid_boundary():
         return dict(manager=m,stage='stopped')
     assert m['ActiveState']=='active' and m['InvocationID']
     parent=Path('/proc')/m['MainPID']
-    assert (parent/'exe').resolve()==R/'epoch145-semantic-continuity-20261121-v1/tools-v5d/export145'
+    version,provider=('v5e','v16') if mode=='--prefix140-cadence' else ('v5d','v14')
+    assert (parent/'exe').resolve()==R/f'epoch145-semantic-continuity-20261121-v1/tools-{version}/export145'
     end=time.monotonic()+95
     while time.monotonic()<end:
         for row in (parent/'task'/parent.name/'children').read_text().split():
             child=Path('/proc')/row
             try:
                 cmd=(child/'cmdline').read_bytes().split(b'\0')
-                if str(R/'incident-replay-fit-20261121-v1/tools-v14/post-stop-fit').encode() not in cmd:continue
+                if str(R/f'incident-replay-fit-20261121-v1/tools-{provider}/post-stop-fit').encode() not in cmd:continue
                 fd=os.pidfd_open(int(row))
             except ProcessLookupError:continue
             except FileNotFoundError:continue
