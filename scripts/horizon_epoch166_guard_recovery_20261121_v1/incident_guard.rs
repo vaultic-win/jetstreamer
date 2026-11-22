@@ -6,12 +6,19 @@ const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 #[cfg(feature = "epoch170-384")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1/tools/guard";
-#[cfg(not(any(feature = "epoch170-384", feature = "epoch167-cold-v3")))]
+#[cfg(not(any(
+    feature = "epoch170-384",
+    feature = "epoch167-cold-v3",
+    feature = "epoch166-retry11"
+)))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
 #[cfg(feature = "epoch167-cold-v3")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-cold-guard-20261122-v3/tools/guard";
+#[cfg(feature = "epoch166-retry11")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry11-guard-20261122-v1/tools/guard";
 const HOME: &str = "/home/sol/.jetstreamer-private";
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -29,6 +36,13 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch167-source-index-rebook-20261122-v3",
     cap: 512 << 30,
 }];
+#[cfg(feature = "epoch166-retry11")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-166-independent-retry11-20261122.service",
+    tree: "epoch166-independent-cold-20261120-v1",
+    runtime: "epoch166-retry11-rebook-20261122-v1",
+    cap: 288 << 30,
+}];
 #[cfg(feature = "epoch170-384")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
@@ -36,7 +50,11 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch170-retry10-recovery-20261121-v1",
     cap: 384 << 30,
 }];
-#[cfg(not(any(feature = "epoch170-384", feature = "epoch167-cold-v3")))]
+#[cfg(not(any(
+    feature = "epoch170-384",
+    feature = "epoch167-cold-v3",
+    feature = "epoch166-retry11"
+)))]
 const LANES: &[Lane] = &[
     Lane {
         unit: "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -83,17 +101,20 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "epoch167-cold-v3")]
-pub(crate) fn validate_cold167_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
-    let deployment = Path::new(RUNTIME).join("epoch167-cold-guard-20261122-v3");
+#[cfg(any(feature = "epoch167-cold-v3", feature = "epoch166-retry11"))]
+pub(crate) fn validate_cold_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
+    let deployment = Path::new(IMAGE)
+        .parent()
+        .and_then(Path::parent)
+        .context("invalid guard deployment path")?;
     let proof = plan
         .data_fulfillment
         .as_ref()
-        .context("missing epoch 167 DATA proof")?;
+        .context("missing cold replay DATA proof")?;
     let binding: Binding = serde_json::from_value(proof.clone())?;
     ensure!(
         binding.contract.path == deployment.join("contract/contract.json"),
-        "expected the epoch 167 v3 sealed contract"
+        "expected the cold replay sealed contract"
     );
     let contract: Contract = serde_json::from_value(sealed(
         &binding.contract,
@@ -102,13 +123,13 @@ pub(crate) fn validate_cold167_contract(plan: &Plan, image_sha256: &str) -> Resu
     )?)?;
     ensure!(
         contract.qualified_native_witness.path == deployment.join("NATIVE_WITNESS.json"),
-        "expected the epoch 167 v3 native witness"
+        "expected the cold replay native witness"
     );
     let witness = bound(&contract.qualified_native_witness)?;
     ensure!(
         witness["native_identity"]["executable"] == IMAGE
             && witness["native_identity"]["executable_sha256"] == image_sha256,
-        "epoch 167 witness belongs to another guard"
+        "cold replay witness belongs to another guard"
     );
     Ok(())
 }
@@ -118,6 +139,11 @@ pub(crate) fn validate_cold167_contract(plan: &Plan, image_sha256: &str) -> Resu
 pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
     ensure!(image == Path::new(IMAGE), "use the sealed incident guard");
     let receipts = [
+        #[cfg(feature = "epoch166-retry11")]
+        (
+            "epoch166-independent-closed-accounts-20261122-v1/SUCCESSOR_ROOT.json",
+            "02ca91b396f6bc9327b626eb80583af4ce004d63fb6854c7a5e2c50f38c12329",
+        ),
         (
             "epoch166-independent-cold-recovery-20261121-v1/ROOTS_BEFORE_WITNESS.json",
             "cc7d780afe3d0180de6785cdad4f1e38e70feb82df1c95d21ab342c5974782e2",
@@ -141,6 +167,11 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
         refs.push(r);
     }
     for (rel, ino) in [
+        #[cfg(feature = "epoch166-retry11")]
+        (
+            "epoch166-independent-cold-20261120-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122",
+            93782068,
+        ),
         #[cfg(feature = "epoch167-cold-v3")]
         (
             "epoch167-standard-lane-20261109-v1/replacement-source-index-v1-20261121/cold-source-index-v3-20261122",
@@ -225,6 +256,19 @@ pub(super) fn observe(binding: &Value, scope: &Scope<'_>) -> Result<Observation>
 mod tests {
     use super::*;
 
+    #[cfg(feature = "epoch166-retry11")]
+    #[test]
+    fn independent_retry11_rejects_the_previous_worker() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 288 << 30);
+        assert!(is_route(
+            "horizon-qualify-166-independent-retry11-20261122.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-166-independent-recovery-20261121-v1.service"
+        ));
+    }
+
     #[cfg(feature = "epoch167-cold-v3")]
     #[test]
     fn cold167_accepts_only_the_v3_source_index_unit() {
@@ -259,7 +303,12 @@ mod tests {
     #[ignore = "requires the original root-owned namespace evidence on dev-samjohnson"]
     fn original_namespace_receipts_and_all_precreated_roots() {
         let roots = qualification_roots(Path::new(IMAGE)).unwrap();
-        assert_eq!(roots["receipts"].as_array().unwrap().len(), 3);
+        let expected = if cfg!(feature = "epoch166-retry11") {
+            4
+        } else {
+            3
+        };
+        assert_eq!(roots["receipts"].as_array().unwrap().len(), expected);
         assert!(qualification_roots(Path::new("/tmp/guard")).is_err());
     }
 
