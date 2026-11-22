@@ -47,7 +47,7 @@ pub fn validate(plan: &Value) -> Result<()> {
         reference(
             &plan["holding145_completion"][key],
             FAMILY,
-            &format!("tools-v13/{name}"),
+            &format!("tools-v13b/{name}"),
         )?;
     }
     if let Some(selector) = plan.get("holding145_prestart_ready") {
@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn only_the_selected_fixture_generation_can_pass_registration_inspection() {
         let key = |s: &str| json!({"path":format!("{RUNTIME}/{s}"),"sha256":"c".repeat(64)});
-        let post = |s: &str| key(&format!("{FAMILY}/tools-v13/{s}"));
+        let post = |s: &str| key(&format!("{FAMILY}/tools-v13b/{s}"));
         let mut plan = json!({
             "controller_deployment":key("epoch136-joint-writer-20261122-v7b/controller/deployment-seal-receipt.json"),
             "joint_fit_145":{"image":key(&format!("{PRICE}/post-stop-fit")),
