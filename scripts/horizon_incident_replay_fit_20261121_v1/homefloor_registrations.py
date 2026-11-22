@@ -50,34 +50,13 @@ def selected_status(s, fit):
         return STATUS / "tools", deployed["sources"], PUBLISHER_IID, None
     s.need(len(adopted) == 1, "competing cold 167 status generations")
     prefix, package_name, candidate_name, qsha, seal_sha = adopted[0]
-    incumbent = None
-    prior_seal = deployed["sources"]
-    prior_package = STATUS / "tools"
-    expected_prior_iid = PUBLISHER_IID
-    epoch = 167
-    third = "COLD166_RETRY11_STATUS_"
-    if any((STATUS / (third + key + ".json")).exists() for key in ("ACTIVE", "ROLLBACK")):
-        s.need(prefix == "COLD167_V3_STATUS_", "retry11 must succeed the admitted 167 writer")
-        old, _ = s.read(STATUS / "COLD167_V3_STATUS_ACTIVE.json",
-                        "a0ab18c5bd28557884a837d0ad125f5535267c68eca73bd286682e9f43961a3f")
-        incumbent = old["new"]
-        expected_prior_iid = incumbent["invocation_id"]
-        prior_package = STATUS / package_name
-        prior_proof, _ = s.read(STATUS / (prefix + "QUALIFIED.json"), qsha)
-        prior_seal = prior_proof["package"]
-        s.need(prior_seal["sha256"] == seal_sha and old["new"]["program"] == str(prior_package / "status_cycle.py"),
-               "wrong incumbent before third worker")
-        prefix, package_name, candidate_name, epoch = third, "tools-cold166-retry11", "epoch166-retry11-rebook-20261122-v1", 166
-        qsha = "5ecd660bf949538b23838b68a90798843b586d61671c983528e148ea2344c017"
-        seal_sha = "17387e4cb210b1832d11fb2c3fe3879d409dce3c0c686d189ee9b1dd27d80e10"
     active = STATUS / (prefix + "ACTIVE.json")
     rollback = STATUS / (prefix + "ROLLBACK.json")
     q, qr = s.read(STATUS / (prefix + "QUALIFIED.json"), qsha)
     intent, ir = s.read(STATUS / (prefix + "INTENT.json"))
     previous = intent["old"]
-    s.need(previous["unit"] == fit.PUBLISHER and previous["invocation_id"] == expected_prior_iid
-           and (incumbent is None or previous == incumbent)
-           and Path(previous["program"]) == prior_package / "status_cycle.py" and intent["qualified"] == qr,
+    s.need(previous["unit"] == fit.PUBLISHER and previous["invocation_id"] == PUBLISHER_IID
+           and Path(previous["program"]) == STATUS / "tools/status_cycle.py" and intent["qualified"] == qr,
            "foreign prior cadence handoff")
     if not active.exists():
         row, first_ref = s.read(rollback)
@@ -88,7 +67,7 @@ def selected_status(s, fit):
             s.need(row["original_rollback"] == first_ref, "unbound subsequent status rollback")
         current = row["restored"]
         s.need(row["intent"] == ir and row["schedule"] == intent["schedule"], "foreign status rollback")
-        package, seal_ref = prior_package, prior_seal
+        package, seal_ref = STATUS / "tools", deployed["sources"]
     else:
         row, _ = s.read(active)
         current = row["new"]
@@ -99,9 +78,9 @@ def selected_status(s, fit):
                "foreign status deployment or adoption")
         candidate = R / candidate_name
         admitted = s.bound(row["admission"], candidate / "ACTUAL_ADMISSION_AND_PROTECTION.json")
-        s.need(admitted["epoch"] == epoch and s.iid(admitted["producer_invocation_id"]), "foreign cold worker admission")
+        s.need(admitted["epoch"] == 167 and s.iid(admitted["producer_invocation_id"]), "foreign 167 admission")
     s.need(current["unit"] == fit.PUBLISHER and Path(current["program"]) == package / "status_cycle.py"
-           and s.iid(current["invocation_id"]) and current["invocation_id"] not in (PUBLISHER_IID, expected_prior_iid)
+           and s.iid(current["invocation_id"]) and current["invocation_id"] != PUBLISHER_IID
            and all(current["lock"][k] == previous["lock"][k] for k in ("device","inode","path")),
            "different writer or lock across the cadence handoff")
     return package, seal_ref, current["invocation_id"], current
