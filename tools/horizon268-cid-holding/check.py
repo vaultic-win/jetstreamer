@@ -80,5 +80,24 @@ def retirement_tests():
         def deny():raise ValueError('live ref')
         rejects(lambda:r.transition(s,q,{},lambda *_:None,deny,lambda:999))
         assert s.read_bytes()==secret and not list(q.iterdir())
+    with tempfile.TemporaryDirectory() as t:
+        src=Path(t)/'source';src.write_bytes(secret);state=Path(t)/'state';state.mkdir()
+        def same_mount_rename(a,b):
+            assert a.parent==b.parent
+            os.rename(a,b)
+        def stop_after_rename(point):
+            if point=='quarantine':raise Crash(point)
+        def validate(p,original,full):
+            assert p.read_bytes()==secret
+        args=(src,state,{'sha256':o.SHA},validate,lambda:None,lambda:999)
+        with patch.object(r,'rename',same_mount_rename):
+            try:r.transition(*args,stop_after_rename)
+            except Crash:pass
+        adjacent=src.with_name('.horizon268-quarantine-c4555600.body')
+        legacy=state/'quarantine-c4555600.body'
+        legacy.write_bytes(b'conflict')
+        rejects(lambda:r.transition(*args))
+        legacy.unlink();adjacent.rename(legacy)
+        assert r.transition(*args)['quarantine_name_absent'] and not legacy.exists()
     print('Retirement fixtures passed: interruption at all four durable boundaries, exact-identity binding, conflicting operation, repeated success, live-reference rejection and neighbor preservation.')
 if __name__=='__main__':retirement_tests()

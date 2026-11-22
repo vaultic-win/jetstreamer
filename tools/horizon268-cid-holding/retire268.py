@@ -33,7 +33,13 @@ def contents(path):
 
 def transition(src,state,key,validate,closure,free,checkpoint=lambda _:None):
     """State is root private and same-device. The funded owner serializes all writers externally."""
-    q=state/'quarantine-c4555600.body'
+    # Two separately writable systemd bind mounts can report the same st_dev
+    # while renameat2 between them fails with EXDEV. Keep new renames within
+    # the original directory and resume an already quarantined older run.
+    legacy=state/'quarantine-c4555600.body'
+    adjacent=src.parent/'.horizon268-quarantine-c4555600.body'
+    op.need(not (exists(legacy) and exists(adjacent)), 'two occupied quarantine names')
+    q=legacy if exists(legacy) else adjacent
     intent,unlink,done=(state/n for n in ('retire-intent.json','unlink-intent.json','retired.json'))
     for record in (intent,unlink,done):
         if exists(record):op.need(contents(record)['operation']==key,'record belongs to another source or decision')
@@ -57,14 +63,14 @@ def transition(src,state,key,validate,closure,free,checkpoint=lambda _:None):
                                physical_ceiling=contents(intent)['physical_ceiling']))
             checkpoint('unlink-intent')
         closure();validate(q,False,False)
-        q.unlink();sync_dir(state);checkpoint('unlink')
+        q.unlink();sync_dir(q.parent);checkpoint('unlink')
     sync_dir(state);sync_dir(src.parent)
     prior=contents(unlink);after=free()
     result=dict(operation=key,physical_ceiling=prior['physical_ceiling'],
                 before_available=prior['before_available'],after_available=after,
                 concurrent_filesystem_delta=after-prior['before_available'],
                 source_name_absent=True,quarantine_name_absent=True,capacity_credit=0)
-    op.need(not exists(src) and not exists(q),'local name reappeared')
+    op.need(not any(exists(p) for p in (src,legacy,adjacent)),'local name reappeared')
     c.save(done,result)
     return result
 

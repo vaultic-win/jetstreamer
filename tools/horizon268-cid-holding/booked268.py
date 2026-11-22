@@ -77,7 +77,8 @@ def census(dev, ino):
     hits = []
     seen_mounts = set()
     dev_field=f'{os.major(dev)}:{os.minor(dev)}'.encode()
-    roots={os.fsencode(SRC),b'/var/lib/jetstreamer/horizon268-cid-holding-custody-v1/quarantine-c4555600.body'}
+    roots={os.fsencode(SRC),os.fsencode(SRC.with_name('.horizon268-quarantine-c4555600.body')),
+           b'/var/lib/jetstreamer/horizon268-cid-holding-custody-v1/quarantine-c4555600.body'}
     for p in Path('/proc').iterdir():
         if not p.name.isdigit():
             continue
