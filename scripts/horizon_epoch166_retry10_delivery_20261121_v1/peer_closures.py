@@ -12,6 +12,7 @@ class Producer(NamedTuple):
     witness_sha256: str
     verifier_sha256: str
     receipt_mode: int
+    witness_mode: int = 0o600
 
 
 PRODUCERS = {
@@ -27,9 +28,20 @@ PRODUCERS = {
 
 
 def authority(epoch):
-    profile = PRODUCERS[epoch]
-    root = shared["R"] / f"epoch{epoch}-current-delivery-20261121-v1"
-    live, _ = shared["document"](root / "LIVE.json", 0o600, profile.witness_sha256)
+    return _authority(epoch, PRODUCERS[epoch], f"epoch{epoch}-current-delivery-20261121-v1")
+
+
+def cold167():
+    profile = Producer("cold167_local_commit",
+                       "525b8104545f5d8a5716291e8540386932f49b1cfc096898fb380c602713c16e",
+                       "72c2d093719693931e5e2282334256ac711ab72b8f766872aee14f10674e96de",
+                       0o444, 0o400)
+    return _authority(167, profile, "epoch167-cold-delivery-20261122-v3")
+
+
+def _authority(epoch, profile, directory):
+    root = shared["R"] / directory
+    live, _ = shared["document"](root / "LIVE.json", profile.witness_mode, profile.witness_sha256)
     native = live["native"]
     node, timer = native["manager"], native["timer"]
     admitted = Path(live["admission"]["path"])
@@ -46,6 +58,7 @@ def authority(epoch):
         witness_hash=profile.witness_sha256, admission_hash=live["admission"]["sha256"],
         admission_mode=profile.receipt_mode, worker_hash=live["first_protected_worker"]["sha256"],
         worker_mode=profile.receipt_mode, terminal_program_hash=profile.verifier_sha256,
+        witness_mode=profile.witness_mode,
     )
     return SimpleNamespace(T=root, DONE=guard.completion_path, FIELD=profile.field,
                            UNIT=guard.producer_unit, IID=guard.producer_id, guard=guard,

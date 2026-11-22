@@ -97,6 +97,7 @@ class GuardClosure(NamedTuple):
     worker_hash: str
     terminal_program_hash: str
     worker_mode: int = 0o444
+    witness_mode: int = 0o600
 
     @property
     def guard_service(self):
@@ -125,7 +126,7 @@ class GuardClosure(NamedTuple):
 
     def committed(self):
         term,tr=document(self.terminal_root/"TERMINAL_SUCCESS.json",0o400)
-        live,lr=document(self.terminal_root/"LIVE.json",0o600,self.witness_hash)
+        live,lr=document(self.terminal_root/"LIVE.json",self.witness_mode,self.witness_hash)
         a,ar=document(self.admission_root/"ACTUAL_ADMISSION_AND_PROTECTION.json",self.admission_mode,self.admission_hash)
         w,wr=document(self.admission_root/"FIRST_PROTECTED_WORKER.json",self.worker_mode,self.worker_hash)
         self.validate_terminal(term,live,lr,ar,wr)
@@ -193,4 +194,11 @@ retire = ORIGINAL.retire
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("action",choices=["inspect","retire"])
-    print(json.dumps(retire() if parser.parse_args().action=="retire" else inspect(),sort_keys=True))
+    parser.add_argument("--cold167", action="store_true", help="use the November 22 cold epoch 167 replay")
+    args = parser.parse_args()
+    guard = ORIGINAL
+    if args.cold167:
+        import runpy
+        peers = runpy.run_path(str(Path(__file__).with_name("peer_closures.py")))
+        guard = peers["cold167"]().guard
+    print(json.dumps(guard.retire() if args.action == "retire" else guard.inspect(), sort_keys=True))
