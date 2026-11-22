@@ -177,8 +177,18 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     if [[ ( $flavor == retry-post || $flavor == timer-post ) && $last == "subprocess.TimeoutExpired: Command '['/usr/bin/systemctl', 'show', '-p', "*" 'horizon-qualify-168-full-metered-20261121-v1.service']' timed out after 10 seconds" ]]; then
       manager_timeout=true
     fi
+    expired_probe=false
+    if $fixture_post && [[ $native_package == tools-v20 &&
+         $last == "FileNotFoundError: [Errno 2] No such file or directory: '/proc/4011654/stat'" ]]; then
+      # The historical publication adapter consults its V5C PID only after a full native
+      # price reports a transient verifier descendant. Discard the failed price in full.
+      if grep -Fq 'capacity-tools-bounded/publication-fit", line 129, in wait_for_145_probe' "$q/fit-$probe.stderr" &&
+         grep -Fq 'tools-v20/price_recovery_mirrors.py", line 73, in capture' "$q/fit-$probe.stderr"; then
+        expired_probe=true
+      fi
+    fi
     [[ ( $flavor == current-post || $flavor == timeout-post || $focused == true ) && $probe -lt $maximum_attempts &&
-       ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' || $manager_timeout == true ) ]] ||
+       ( "$last" == 'ValueError: foreign 145 descendants' || "$last" == 'ValueError: foreign recovery worker' || $manager_timeout == true || $expired_probe == true ) ]] ||
        { cat "$q/fit-$probe.stderr" >&2; exit 1; }
     sleep "$((2+probe))"
   done
