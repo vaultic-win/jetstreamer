@@ -38,7 +38,7 @@ import cold167_status
 import cold166_status
 
 cold_workers = cold166_status
-if any(CURRENT.with_name(f'{name}-170-generation.json').is_file() for name in ('retry11','retry12')):
+if any(CURRENT.with_name(f'{name}-170-generation.json').is_file() for name in ('retry11','retry12','retry13')):
     import cold170_status as cold_workers
 
 # The original five-lane receipt predates all four HOME guard stops.

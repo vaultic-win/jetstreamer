@@ -14,14 +14,21 @@ ROOT = BASE/'survivor172-cadence-20261122-v1'
 DUAL = ROOT/'tools-cold167-v3'
 TRIPLE = ROOT/'tools-cold166-retry11'
 # The sealer installs the same entry point in a distinct read-only directory for each attempt.
-ATTEMPT = 'retry12' if Path(__file__).resolve().parent.name.startswith('retry12-170-switch') else 'retry11'
+ATTEMPT = Path(__file__).resolve().parent.name.split('-',1)[0]
+assert ATTEMPT in ('retry11','retry12','retry13')
 TARGET = ROOT/f'tools-cold170-{ATTEMPT}-v2'
 TAG = f'COLD170_{ATTEMPT.upper()}_V2_STATUS_'
 QUAL = ROOT/(TAG+'QUALIFIED.json')
-ANCHOR = dict(path=str(BASE/f'epoch170-{ATTEMPT}-rebook-20261122-v1/SUCCESSOR_ROOT.json'),
-              sha256='466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if ATTEMPT=='retry12' else '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
-GUARD = dict(path=str(BASE/f'epoch170-{ATTEMPT}-guard-20261122-v1/GUARD_QUALIFIED.json'),
-             sha256='7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if ATTEMPT=='retry12' else '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
+REFERENCES = {
+    'retry11': ('8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728',
+                '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d'),
+    'retry12': ('466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19',
+                '7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c'),
+    'retry13': ('654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69','34ee106fc4dd290e8ad447f1ff5ab15cfe538b7ca522785a87df106566e0645c'),
+}
+anchor_sha,guard_sha = REFERENCES[ATTEMPT]
+ANCHOR = dict(path=str(BASE/f'epoch170-{ATTEMPT}-rebook-20261122-v1/SUCCESSOR_ROOT.json'),sha256=anchor_sha)
+GUARD = dict(path=str(BASE/f'epoch170-{ATTEMPT}-guard-20261122-v1/GUARD_QUALIFIED.json'),sha256=guard_sha)
 PRIOR = ROOT/'COLD167_V3_STATUS_ACTIVE.json'
 PRIOR_SHA = 'a0ab18c5bd28557884a837d0ad125f5535267c68eca73bd286682e9f43961a3f'
 TRIPLE_QUAL = dict(path=str(ROOT/'COLD166_RETRY11_STATUS_QUALIFIED.json'),
