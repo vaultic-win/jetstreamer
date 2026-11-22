@@ -1,4 +1,4 @@
-//! Reconcile approximate legacy compact membership with the two root-verified local indexes.
+//! Reconcile approximate legacy compact membership with root-verified local indexes.
 use jetstreamer_firehose::index::{
     SlotOffsetIndex, SlotOffsetIndexError, get_index_base_url, slot_to_range,
 };
@@ -49,6 +49,18 @@ const EPOCH_200: Profile = Profile {
     ],
 };
 
+const EPOCH_267: Profile = Profile {
+    epoch: 267,
+    raw_sha: "b60ac1831d3f8850e426a6b47ee393e8260e67a9c7c473f1aea370fedd92c5e0",
+    compact_sha: "f4e7038ddc675f1a232da98aedce805c30f73297d556ebe61e5ea5b2b9a1496a",
+    proven_skips: &[
+        115346704, 115347368, 115363157, 115372859, 115378566, 115385019, 115425045, 115473625,
+        115475380, 115488514, 115489756, 115506558, 115535754, 115558078, 115578563, 115581456,
+        115583627, 115610728, 115612956, 115613553, 115615519, 115620615, 115629720, 115640040,
+        115662050, 115668148, 115721933, 115722433, 115747564, 115760672,
+    ],
+};
+
 pub(super) struct RootedSlotPresence {
     profile: &'static Profile,
     raw: Vec<u8>,
@@ -57,13 +69,17 @@ pub(super) struct RootedSlotPresence {
 impl RootedSlotPresence {
     /// An ordinary replay keeps its existing sources and trust assumptions.
     pub(super) async fn configured(epoch: u64) -> Result<Option<Self>, String> {
-        let profile = match epoch {
-            199 => &EPOCH_199,
-            200 => &EPOCH_200,
+        let (profile, manifest_sha) = match epoch {
+            199 => (&EPOCH_199, MANIFEST_SHA),
+            200 => (&EPOCH_200, MANIFEST_SHA),
+            267 => (
+                &EPOCH_267,
+                "e6f765e4fdca3f5e2c7c8bb1cda38b8ad9ff0e801dcb6df75799f74ce9e47f6f",
+            ),
             _ => return Ok(None),
         };
         if env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref()
-            != Ok(MANIFEST_SHA)
+            != Ok(manifest_sha)
         {
             return Ok(None);
         }

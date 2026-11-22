@@ -92,6 +92,7 @@ fn known_root(e: u64) -> Result<&'static str> {
     match e {
         199 => Ok("bafyreid5x4ci3xei4wy5rijuqfjh4y6svca3a7tkhhsirxuhu3bj7p5z7y"),
         200 => Ok("bafyreibhxmsejxsshqpplpyhrpvf3tbl2cgl7qj33snet5b3q2txorimfu"),
+        267 => Ok("bafyreifn4ykgns5ih2lzfzrvky2u5vfh4jvqcqy7tdylujrbvl6pqavi4m"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -337,10 +338,20 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
 }
 
 fn main() -> Result<()> {
-    let args: Vec<_> = env::args_os().skip(1).collect();
+    let mut command = env::args_os().skip(1).peekable();
+    let (profile, body_bytes, range_count) = if command.next_if(|s| s == "--epoch267").is_some() {
+        (
+            include_str!("../horizon267-slot-input/repair-windows.json"),
+            99_707_283,
+            32,
+        )
+    } else {
+        (PROFILE, 205_729_899, 139)
+    };
+    let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
@@ -351,7 +362,7 @@ fn main() -> Result<()> {
     if out.read_dir()?.next().is_some() {
         return Err("output directory must be empty".into());
     }
-    let plan: Value = serde_json::from_str(PROFILE)?;
+    let plan: Value = serde_json::from_str(profile)?;
     let manifest_path = captured.join("RESULT.json");
     let size = fs::symlink_metadata(&manifest_path)?.len();
     if size > 256_000 {
@@ -363,7 +374,7 @@ fn main() -> Result<()> {
     }
     let manifest: Value = serde_json::from_slice(&m)?;
     if text(&manifest, "plan_sha256")? != text(&plan, "capture_plan_sha256")?
-        || number(&manifest, "body_bytes")? != 205_729_899
+        || number(&manifest, "body_bytes")? != body_bytes
     {
         return Err("incomplete capture".into());
     }
@@ -376,8 +387,8 @@ fn main() -> Result<()> {
             return Err("duplicate capture".into());
         }
     }
-    if entries.len() != 139 {
-        return Err("expected 139 distinct captured ranges".into());
+    if entries.len() != range_count {
+        return Err(format!("expected {range_count} distinct captured ranges").into());
     }
     let cap = Captures {
         root: captured,
