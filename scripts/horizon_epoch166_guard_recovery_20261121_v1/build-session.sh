@@ -7,7 +7,7 @@ base=/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-recover
 scratch=$work
 cfg=epoch166_recovery
 epoch=166
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -48,7 +48,11 @@ for lib in anyhow-fcfd55939853d71f serde-8c11d906d3ff8a0b serde_json-c069c0f2e8c
 ulimit -c 0
 rustc "${args[@]}" --cfg "$cfg" --test "$shared/main.rs" -o "$out/tests$epoch"
 "$out/tests$epoch" --test-threads=1
-if [[ $cfg == epoch170_retry12 ]]; then
+if [[ $cfg == epoch170_retry13 ]]; then
+    rustc "${args[@]}" --cfg epoch170_retry12 --test "$shared/main.rs" -o "$out/tests170-retry12"
+    "$out/tests170-retry12" --test-threads=1
+fi
+if [[ $cfg == epoch170_retry12 || $cfg == epoch170_retry13 ]]; then
     rustc "${args[@]}" --cfg epoch170_retry11 --test "$shared/main.rs" -o "$out/tests170-prior"
     "$out/tests170-prior" --test-threads=1
 fi
