@@ -320,12 +320,24 @@ fn shape(full: &Value, payload: &Value, r: &Value, a: &Value, wp: &Value) -> Res
 }
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.first().is_some_and(|a| a == "inspect-status") {
+    if args
+        .first()
+        .is_some_and(|a| a == "inspect-status" || a == "inspect-registration")
+    {
         ensure!(
             args.len() == 3 && unsafe { libc::geteuid() } == 0,
-            "parent136 inspect-status FLEET SHA"
+            "parent136 inspect-status|inspect-registration FLEET SHA"
         );
-        println!("{}", status::inspect_head(&args[1], &args[2])?);
+        let head = status::inspect_head(&args[1], &args[2])?;
+        if args[0] == "inspect-registration" {
+            status::check_registration_environment()?;
+            println!(
+                "{}",
+                json!({"head": head, "status_client_configured": true, "remote_requests": 0})
+            );
+        } else {
+            println!("{head}");
+        }
         return Ok(());
     }
     if args.first().is_some_and(|a| a == "dispatch") {
