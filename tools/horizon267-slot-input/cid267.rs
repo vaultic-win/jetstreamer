@@ -1,6 +1,6 @@
-//! Bounded streaming verification of the CID-to-offset-and-size compact index for epochs 267 and 268.
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, Read, Seek};
+//! Bounded streaming verification of the CID-to-offset-and-size compact index for registered Horizon epochs.
+use std::fs::OpenOptions;
+use std::io::{self, BufReader, Read};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
@@ -88,12 +88,14 @@ fn tree(
     tree(rows, width, i * 2 + 2, Some(hash), high)
 }
 
-fn inspect(file: File) -> io::Result<u64> {
-    let mut r = BufReader::with_capacity(1 << 20, file);
+fn inspect(input: impl Read) -> io::Result<u64> {
+    let mut r = BufReader::with_capacity(1 << 20, input);
     let mut prefix = [0; 4096];
     r.read_exact(&mut prefix)?;
     require(&prefix == PREFIX, "registered source header")?;
-    r.seek(std::io::SeekFrom::Start(HEADER as u64))?;
+    // The registered prefix overlaps the bucket directory. Reuse its bytes so
+    // the same validation works on a file and on a bounded HTTP body.
+    let mut r = prefix[HEADER..].chain(r);
     let mut directory = vec![0; 16 * BUCKETS];
     r.read_exact(&mut directory)?;
     let mut pos = (HEADER + directory.len()) as u64;
@@ -137,7 +139,13 @@ fn run() -> io::Result<()> {
         p
     };
     #[cfg(any(epoch269, epoch270))]
-    let p = Path::new(&path);
+    let p = {
+        if path == "--cid-stdin" {
+            report(inspect(io::stdin().lock())?);
+            return Ok(());
+        }
+        Path::new(&path)
+    };
     let f = OpenOptions::new()
         .read(true)
         .custom_flags(0o400000)
@@ -172,10 +180,14 @@ fn run() -> io::Result<()> {
         ),
         "source changed",
     )?;
+    report(rows);
+    Ok(())
+}
+
+fn report(rows: u64) {
     println!(
         "{{\"entries\":{rows},\"buckets\":{BUCKETS},\"bytes\":{SIZE},\"car_bytes\":{CAR_SIZE},\"all_tree_keys_checked\":true,\"all_car_bounds_checked\":true}}"
     );
-    Ok(())
 }
 fn main() -> io::Result<()> {
     run()

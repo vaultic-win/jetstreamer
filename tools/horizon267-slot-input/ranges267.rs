@@ -1,7 +1,7 @@
 //! Compare every raw range to the block section reached through both compact indexes.
 //! Group block CID lookups by bucket to stream the large index once.
 use std::fs::{self, File};
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use std::io::{self, BufReader, Read};
 
 #[link(name = "libxxhash.so.0", kind = "dylib", modifiers = "+verbatim")]
 unsafe extern "C" {
@@ -153,17 +153,26 @@ fn run() -> io::Result<()> {
     )?;
     let raw = fs::read(&args[0])?;
     let slot = fs::read(&args[1])?;
-    let cid = File::open(&args[2])?;
     require(
-        raw.len() == 12 * SLOTS && slot.len() == SLOT_BYTES && cid.metadata()?.len() == CID_BYTES,
+        raw.len() == 12 * SLOTS && slot.len() == SLOT_BYTES,
         "input lengths",
     )?;
     require(slot.starts_with(SLOT_PREFIX), "slot header")?;
+    #[cfg(any(epoch269, epoch270))]
+    if args[2] == "--cid-stdin" {
+        return compare(&raw, &slot, io::stdin().lock());
+    }
+    let cid = File::open(&args[2])?;
+    require(cid.metadata()?.len() == CID_BYTES, "CID file length")?;
+    compare(&raw, &slot, cid)
+}
+
+fn compare(raw: &[u8], slot: &[u8], cid: impl Read) -> io::Result<()> {
     let mut reader = BufReader::with_capacity(1 << 20, cid);
     let mut prefix = [0; 4096];
     reader.read_exact(&mut prefix)?;
     require(&prefix == CID_PREFIX, "CID header")?;
-    reader.seek(SeekFrom::Start(130))?;
+    let mut reader = prefix[130..].chain(reader);
     let mut directory = vec![0; CID_BUCKETS * 16];
     reader.read_exact(&mut directory)?;
     let mut requests = vec![Vec::<(usize, [u8; 36])>::new(); CID_BUCKETS];
@@ -199,7 +208,10 @@ fn run() -> io::Result<()> {
             }
         }
     }
-    require(end as u64 == CID_BYTES, "incomplete CID scan")?;
+    require(
+        end as u64 == CID_BYTES && reader.read(&mut [0])? == 0,
+        "incorrect CID stream length",
+    )?;
     let mut differences = 0;
     let mut present = 0;
     let mut missing_sections = 0;
