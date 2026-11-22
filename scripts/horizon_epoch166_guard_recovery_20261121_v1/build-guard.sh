@@ -6,7 +6,12 @@ work=/home/sol/.jetstreamer-private/epoch168-trace-worker-build-20261120-v1/work
 base=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1
 group=/sys/fs/cgroup/system.slice/horizon-incident-native-guard-build-v2.service
 features=(--cfg 'feature="incident-recovery"')
-if [[ ${1:-} == epoch170-384 && $# == 1 ]]; then
+if [[ ${1:-} == epoch167-cold-v3 && $# == 1 ]]; then
+    src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
+    base=/var/lib/jetstreamer/horizon_runtime_data/epoch167-cold-guard-20261122-v3
+    group=/sys/fs/cgroup/system.slice/horizon-167-cold-guard-v3-build.service
+    features+=(--cfg 'feature="epoch167-cold-v3"')
+elif [[ ${1:-} == epoch170-384 && $# == 1 ]]; then
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1
     group=/sys/fs/cgroup/system.slice/horizon-170-retry10-guard384-build.service
@@ -20,7 +25,16 @@ test "$(cat "$group/cpu.max")" = '100000 100000'
 test "$(cat "$group/memory.max")" = '1073741824'
 test "$(cat "$group/memory.swap.max")" = '0'
 test "$(findmnt -n -T "$work" -o SOURCE)" = /dev/loop4
-test "$(df -B1 --output=avail "$work" | tail -1)" -gt 100663296
+if [[ ${1:-} == epoch167-cold-v3 ]]; then
+    # Reuse the already allocated compiler filesystem for intermediates. Leave the
+    # older read-only dependency filesystem and its remaining free space alone.
+    scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
+    test "$(findmnt -n -T "$scratch" -o SOURCE)" = /dev/loop3
+    out=$scratch/epoch167-cold-guard-$INVOCATION_ID
+else
+    scratch=$work
+fi
+test "$(df -B1 --output=avail "$scratch" | tail -1)" -gt 100663296
 mkdir -p -m0700 "$base"
 mkdir -m0700 "$stage" "$out" "$out/tmp"
 exec > "$stage/build.log" 2>&1

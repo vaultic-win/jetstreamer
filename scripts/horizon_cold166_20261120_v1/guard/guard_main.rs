@@ -711,6 +711,8 @@ fn run() -> Result<()> {
     validate_plan(&plan)?;
     #[cfg(feature = "incident-recovery")]
     data_fulfillment::incident::validate(&plan)?;
+    #[cfg(feature = "epoch167-cold-v3")]
+    data_fulfillment::incident::validate_cold167_contract(&plan, &args[5])?;
     #[cfg(not(feature = "incident-recovery"))]
     ensure!(
         plan.unit == data_fulfillment::COLD_UNIT

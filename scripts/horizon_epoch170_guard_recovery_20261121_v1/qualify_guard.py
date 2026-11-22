@@ -1,12 +1,15 @@
 import hashlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 work=Path(__file__).resolve().parents[2]
-base=Path("/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry10-guard384-20261121-v1")
+assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3]=='epoch167-cold-v3')
+cold167=len(sys.argv)==4
+runtime=Path('/var/lib/jetstreamer/horizon_runtime_data')
+base=runtime/('epoch167-cold-guard-20261122-v3' if cold167 else 'epoch170-retry10-guard384-20261121-v1')
 build=sys.argv[2]
 assert re.fullmatch(r"[0-9a-f]{32}",build)
 proof=base/("build-"+build)
 out=Path((proof/"build-dir").read_text().strip())
-group=Path('/sys/fs/cgroup/system.slice/horizon-170-retry10-guard384-qualify.service')
+group=Path('/sys/fs/cgroup/system.slice')/('horizon-167-cold-guard-v3-qualify.service' if cold167 else 'horizon-170-retry10-guard384-qualify.service')
 sealer=Path('/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment')
 sha_sealer='e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3'
 code=sys.argv[1]
@@ -49,7 +52,7 @@ artifacts={Path(line.split("  ",1)[1]).name:line.split("  ",1)[0] for line in (p
 assert set(artifacts)=={"guard","tests"} and all(sha(out/name)==h for name,h in artifacts.items())
 build_source=work/'scripts/horizon_epoch166_guard_recovery_20261121_v1/build-guard.sh'
 assert sha(build_source)==hashlib.sha256(git('show',code+':scripts/horizon_epoch166_guard_recovery_20261121_v1/build-guard.sh')).hexdigest()
-j=dict(schema='horizon-170-384-native-guard-build-v1',commit=code,source_hashes=sources,artifact=ref(out/'guard'),test=ref(out/'tests'),script=ref(build_source),build_iid=build,captured_source=ref(proof/'sources'),qualification_log=ref(proof/'build.log'),test_count=102)
+j=dict(schema='horizon-cold167-v3-native-guard-build-v1' if cold167 else 'horizon-170-384-native-guard-build-v1',commit=code,source_hashes=sources,artifact=ref(out/'guard'),test=ref(out/'tests'),script=ref(build_source),build_iid=build,captured_source=ref(proof/'sources'),qualification_log=ref(proof/'build.log'),test_count=102)
 bp=base/'BUILD.json';durable(bp,j)
 bseal=seal('tools',[member('guard',out/'guard',0o555),member('build.json',bp,0o444)])
 old=base.parent/'epoch166-independent-cold-20261120-v1/staging/p0355/sealed-contract/contract.json'
@@ -69,17 +72,31 @@ run=base.parent/"epoch170-retry10-recovery-20261121-v1"
 plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=unit,invocation_id=os.environ["INVOCATION_ID"],
           filesystem="/home/sol",minimum_free_bytes=8297502499408,worker_root="/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
           maximum_root_physical_bytes=384<<30,maximum_worker_vmas=3500000,receipt_directory=str(run/"guard-receipts"),data_fulfillment=binding)
+if cold167:
+ plan.update(unit='horizon-qualify-167-source-index-v3-20261122.service',
+             worker_root='/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1',
+             maximum_root_physical_bytes=512<<30,
+             receipt_directory=str(runtime/'epoch167-source-index-rebook-20261122-v3/guard-receipts'))
 records={}
-for label,p in [("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=288<<30)),
+cases=[("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=288<<30)),
                 ("wrong-epoch",dict(plan,unit="horizon-qualify-167-source-index-v1-20261121.service")),
                 ("wrong-root",dict(plan,worker_root="/home/sol/.jetstreamer-private")),
-                ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]:
+                ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]
+if cold167:
+ old_contract=runtime/'incident-replay-guard-20261121-v1/contract'
+ cases.extend([('wrong-old-unit',dict(plan,unit='horizon-qualify-167-source-index-v2-20261122.service')),
+               ('wrong-floor',dict(plan,minimum_free_bytes=plan['minimum_free_bytes']-1)),
+               ('wrong-receipts',dict(plan,receipt_directory=str(runtime/'epoch167-source-index-rebook-20261122-v2/guard-receipts'))),
+               ('wrong-contract',dict(plan,data_fulfillment={'contract':ref(old_contract/'contract.json'),
+                                                              'deployment_seal':ref(old_contract/'deployment-seal-receipt.json')})),
+               ('wrong-contract-digest',dict(plan,data_fulfillment={**binding,'contract':{**binding['contract'],'sha256':'0'*64}}))])
+for label,p in cases:
  fp=base/(label+"-"+os.environ["INVOCATION_ID"]+".json");durable(fp,p)
  proc=subprocess.run([exe,fp,"--plan-sha256",sha(fp),"--self-sha256",sha(exe),"--validate-plan-only"],capture_output=True)
  if label=="positive":assert proc.returncode==0 and json.loads(proc.stdout)["validated"]
  else:assert proc.returncode != 0 and proc.stderr
  records[label]=ref(fp)
-result=dict(schema="horizon-170-384-native-guard-qualified-v1",build=ref(bp),guard=ref(exe),seal=bseal,witness=ref(w),
+result=dict(schema="horizon-cold167-v3-native-guard-qualified-v1" if cold167 else "horizon-170-384-native-guard-qualified-v1",build=ref(bp),guard=ref(exe),seal=bseal,witness=ref(w),
             contract=binding,static_controls=records,physical_launch=False,qualification_invocation=os.environ["INVOCATION_ID"])
 durable(base/"GUARD_QUALIFIED.json",result)
 print(json.dumps(result))
