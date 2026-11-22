@@ -339,13 +339,14 @@ def confirm_fork(epoch,own,baseline,stop):
 
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
+        post_directory = "tools-v13b" if here.name in ("tools-v21b","source-tools-v21b") else "tools-v13"
         profiles = {"semantic": ("profile145-focused-semantic.json", "tools-v5d"),
                     "post": ("profile145-focused-post.json", "tools-v9"),
                     "retry-post": ("profile145-retried-post.json", "tools-v10"),
                     "timer-semantic": ("profile145-timer-semantic.json", "tools-v5e"),
                     "fixture-semantic": ("profile145-fixture-semantic.json", "tools-v5f"),
                     "timer-post": ("profile145-timer-post.json", "tools-v11"),
-                    "fixture-post": ("profile145-fixture-post.json", "tools-v13"),
+                    "fixture-post": ("profile145-fixture-post.json", post_directory),
                     "registered-post": ("profile145-registered-post.json", "tools-v12")}
         s.need(focused in profiles and not any((post, rejoin, timeout_rejoin, recovery_post)),
                "ambiguous paid verifier profile")
@@ -411,7 +412,8 @@ def phase145(epoch):
     recovery_post_image=base/"tools-v8/export145"
     recovery_post=recovery_post_image.exists() and s.same_file(Path("/proc")/m["MainPID"]/"exe",recovery_post_image)
     image=Path("/proc")/m["MainPID"]/"exe"
-    focused_modes=[mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"),("fixture-semantic","tools-v5f"),("timer-post","tools-v11"),("registered-post","tools-v12"),("fixture-post","tools-v13"))
+    post_directory = "tools-v13b" if current.parent == D / "tools-v21b" else "tools-v13"
+    focused_modes=[mode for mode, directory in (("semantic","tools-v5d"),("post","tools-v9"),("retry-post","tools-v10"),("timer-semantic","tools-v5e"),("fixture-semantic","tools-v5f"),("timer-post","tools-v11"),("registered-post","tools-v12"),("fixture-post",post_directory))
                        if (candidate:=base/directory/"export145").exists() and s.same_file(image,candidate)]
     s.need(len(focused_modes)<=1,"ambiguous native 145 executable")
     focused_mode=next(iter(focused_modes),None)
@@ -648,16 +650,17 @@ def prefix145(fleet):
 def released136_route(intent):
     old = R / "epoch145-phase-dispatch-20261122-v1"
     current = R / "epoch145-fixture-phase-dispatch-20261122-v1"
+    provider = Path(__file__).resolve().parent
     if intent["selector"].get("path") == str(old / "READY.json"):
-        s.need(Path(__file__).resolve().parent != D / "tools-v21", "V21 cannot select the retired V2 dispatcher")
+        s.need(provider not in (D / "tools-v21", D / "tools-v21b"), "V21 cannot select the retired V2 dispatcher")
         return old, R / "epoch136-joint-writer-20261122-v6/controller", {
             "seal_sha256": "62ced18aed9e45e564bc01aebfc2c18639c7cf2125626bdda405b6ac0af976ba",
             "image_sha256": "26c6d7bfa41fbc1b1b9e563063726e1602dd87e3fe5f85ea53b07adfaf403a7e"}
     s.need(intent["selector"].get("path") == str(current / "READY.json"), "foreign released 136 selector")
-    provider = D / "tools-v21"
-    s.need(Path(__file__).resolve().parent == provider, "V7 release requires its registered V21 provider")
+    s.need(provider in (D / "tools-v21", D / "tools-v21b"), "V7 release requires its registered V21 provider")
     profile, _ = s.read(provider / "profile136-fixture-writer.json")
-    return current, R / "epoch136-joint-writer-20261122-v7/controller", profile
+    controller = "epoch136-joint-writer-20261122-v7b" if provider == D / "tools-v21b" else "epoch136-joint-writer-20261122-v7"
+    return current, R / controller / "controller", profile
 
 
 def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt):
@@ -665,7 +668,8 @@ def validate_v7_release(dispatcher, controller, selector, planref, plan, receipt
     s.need(planref["path"] == str(controller.parent / "registered-production-plan.json")
            and plan["holding145_prestart_ready"] == selector and s.iid(ready["original_semantic_invocation"]),
            "V7 plan did not select the original fixture boundary")
-    pkg = D / "tools-v21"
+    pkg = Path(__file__).resolve().parent
+    s.need(pkg in (D / "tools-v21", D / "tools-v21b"), "unregistered V7 provider")
     provider, provider_ref = s.read(pkg / "deployment-seal-receipt.json")
     images = {r["name"]:r["sha256"] for r in provider["members"]}
     s.need(provider["destination"] == str(pkg) and ready["registered_provider"] ==

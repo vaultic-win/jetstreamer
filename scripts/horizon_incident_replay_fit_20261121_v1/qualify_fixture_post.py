@@ -14,10 +14,11 @@ def verify(provider):
     release_route = module["released136_route"]
     verify_release = module["validate_v7_release"]
     scope = verify_release.__globals__
-    pkg = module["D"] / "tools-v21"
+    successor = provider.parent.name in ("tools-v21b", "source-tools-v21b")
+    pkg = module["D"] / ("tools-v21b" if successor else "tools-v21")
     current = root / "epoch145-fixture-phase-dispatch-20261122-v1"
     retired = root / "epoch145-phase-dispatch-20261122-v1"
-    controller = root / "epoch136-joint-writer-20261122-v7/controller"
+    controller = root / ("epoch136-joint-writer-20261122-v7b" if successor else "epoch136-joint-writer-20261122-v7") / "controller"
     v5f = root / "epoch145-semantic-continuity-20261121-v1"
     profile, _ = s.read(provider.parent / "profile136-fixture-writer.json")
     seal, sr = s.read(controller / "deployment-seal-receipt.json", profile["seal_sha256"])
@@ -61,10 +62,15 @@ def verify(provider):
     reader.read.side_effect=read;reader.bound.side_effect=bound;fit.binary.side_effect=binary
     scenarios = ("positive","V2 READY","foreign READY","V5e semantic generation","V12 completion","V6 writer plan",
                  "wrong V21 seal","wrong V21 image","unrelated donor boot","foreign release writer")
+    if successor:
+        scenarios += ("V7 writer plan", "V13 completion", "V21 provider",)
     with patch.dict(scope, __file__=str(pkg/"post-stop-fit"),s=reader,fit=fit,
                     profile145=lambda *a,**k:(cfg,adapter,post)):
         for case in scenarios:
             chosen=selector.copy();ready=deepcopy(select);actual=deepcopy(plan);pr=plan_ref.copy();done=released.copy()
+            if case=="V7 writer plan":pr["path"]=str(root/"epoch136-joint-writer-20261122-v7/registered-production-plan.json")
+            if case=="V13 completion":actual["holding145_completion"]["seal"]["path"]=str(v5f/"tools-v13/deployment-seal-receipt.json")
+            if case=="V21 provider":ready["registered_provider"]["seal"]["path"]=str(module["D"]/"tools-v21/deployment-seal-receipt.json")
             if case=="V2 READY":chosen["path"]=str(retired/"READY.json")
             if case=="foreign READY":chosen["path"]=str(current/"FORGED.json")
             if case=="V5e semantic generation":ready["original_semantic_invocation"]="a99ed8b51e8a482b805b8a36a11b2700"
