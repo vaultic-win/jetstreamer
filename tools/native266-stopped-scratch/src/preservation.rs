@@ -63,7 +63,7 @@ fn open(p: &Path) -> io::Result<(File, Stamp)> {
     need(st == Stamp::from(&f.metadata()?), "rebound source")?;
     Ok((f, st))
 }
-fn digest(f: &File) -> io::Result<String> {
+pub(crate) fn digest(f: &File) -> io::Result<String> {
     // The containing deployment checks HASHER_SHA256 and immutable /usr/bin/sha256sum
     // custody on its first guard. Only an already-open source handle is exposed.
     let o = Command::new(HASHER)

@@ -1,6 +1,11 @@
 //! Read-only check of the original guard-stopped cad28704 guest. The controller
 //! separately binds its completed stop, live fleet, process census and service grant.
+mod closure;
+mod controller;
+mod journal;
 mod preservation;
+mod retained;
+mod retirement;
 
 use std::ffi::OsStr;
 use std::fs::{self, File, OpenOptions};
@@ -136,7 +141,17 @@ fn inspect(dir: &File, relative: &Path, counts: &mut Counts, until: Instant) -> 
     Ok(())
 }
 
+const EXPECTED: Counts = Counts {
+    files: 413571,
+    directories: 13,
+    logical: 134663299285,
+    allocated_files: 129322577920,
+};
 fn run() -> io::Result<()> {
+    let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if args == [OsStr::new("--retire")] || args == [OsStr::new("--close")] {
+        return controller::run(args[0] == "--close");
+    }
     need(
         std::env::args_os().skip(1).collect::<Vec<_>>() == [OsStr::new("--check-only")],
         "expected --check-only",
@@ -164,13 +179,7 @@ fn run() -> io::Result<()> {
         &mut counts,
         Instant::now() + Duration::from_secs(240),
     )?;
-    let expected = Counts {
-        files: 413571,
-        directories: 13,
-        logical: 134663299285,
-        allocated_files: 129322577920,
-    };
-    need(counts == expected, "stopped inventory differs")?;
+    need(counts == EXPECTED, "stopped inventory differs")?;
     need(
         parent.join(CHILD).symlink_metadata()?.ino() == tree.metadata()?.ino(),
         "rebound root",
@@ -213,3 +222,6 @@ mod tests {
         assert!(!dir_name(&["archives"]));
     }
 }
+
+#[cfg(test)]
+mod interrupted;
