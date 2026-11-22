@@ -21,16 +21,16 @@ IMAGE=DIR/"tools-v2/follow145"
 # Native release unlinks an owned registry beneath /run itself. Protect the installed
 # controller and all other currently existing runtime directories except the mask parent.
 # Existing individual lock files must track replacement, so do not inode-bind them.
-def props():
+def props(*, state=DIR/"state", previous=OLD_DIR/"state"):
     ro={str(BASE/"controller"),str(BASE/"tools"),"/run/systemd"}
     ro.update(str(p) for p in Path("/run").iterdir() if p.is_dir() and not p.is_symlink() and p!=REG)
-    writes=[OLD_DIR/"state",DIR/"state",BASE,STATUS,PARENT,Path("/run"),MASKS]
+    writes=([previous] if previous is not None else [])+[state,BASE,STATUS,PARENT,Path("/run"),MASKS]
     return ["Type=exec","CPUQuota=25%","CPUWeight=10","Nice=15","MemoryMax=134217728",
             "MemorySwapMax=0","TasksMax=64","Restart=no","KillMode=control-group","UMask=0077",
             "NoNewPrivileges=yes","ProtectSystem=strict","ProtectHome=read-only","PrivateTmp=no",
             "EnvironmentFile="+str(CRED),"ReadWritePaths="+" ".join(map(str,writes)),
             "ReadOnlyPaths="+" ".join(sorted(ro)),"StandardOutput=journal","StandardError=journal"]
 
-def cmd(unit,exe,args=(),extra=(),slice_name="system.slice"):
-    opts=[v for p in [*props(),*extra] for v in ("-p",p)]
+def cmd(unit,exe,args=(),extra=(),slice_name="system.slice",*,state=DIR/"state",previous=OLD_DIR/"state"):
+    opts=[v for p in [*props(state=state,previous=previous),*extra] for v in ("-p",p)]
     return ["/usr/bin/systemd-run","--quiet","--unit="+unit,"--slice="+slice_name,*opts,"--",str(exe),*map(str,args)]
