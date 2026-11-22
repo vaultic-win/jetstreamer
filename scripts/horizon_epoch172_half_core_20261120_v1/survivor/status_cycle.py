@@ -1,0 +1,504 @@
+"""Continue the existing fleet status protocol after the four November 22 HOME guard stops."""
+import copy
+import datetime as dt
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+from types import SimpleNamespace
+
+BASE = Path('/var/lib/jetstreamer/horizon_runtime_data')
+PACKAGE = BASE/'prefix140-status-cadence-20261122-v1/cadence-tools'
+PARENT_SEAL = '7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e'
+HEAD = BASE/'root171010-live166167170-20261122-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json'
+ROOT = BASE/'survivor172-cadence-20261122-v1'
+CONTROLLER = 'horizon-archive-status-cadence-after172-20261120-v1.service'
+CLOSED = (166, 167, 168, 170)
+GUARD169 = BASE/'epoch169-focused-terminal-20261121-v1'
+CURRENT = Path(__file__).resolve()
+assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
+sys.path.insert(0,str(PACKAGE))
+from evidence import bound, checked, content, durable, ensure_dir, lock, names, need, sealed, utc
+import cycle
+import delivery_eta
+import focused169_completion
+import full172
+import owners
+import prefix140_storage
+import race166
+import ready_audit_growth
+import resident_clock
+import retired_public_audit
+import status
+
+def now():
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+
+def stamp(value):
+    return value.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+def read_ref(path):
+    return checked(bound(path))
+
+def run(*args):
+    return subprocess.check_output(list(map(str,args)),text=True,timeout=120)
+
+def validate_package():
+    from evidence import raw
+    for row in checked(dict(path=str(PACKAGE/'deployment-seal-receipt.json'),sha256=PARENT_SEAL))['members']:
+        path=PACKAGE/row['name']
+        need(hashlib.sha256(raw(path)).hexdigest()==row['sha256'],'changed cadence dependency '+str(path))
+    with race166.NATIVE.open('rb') as source:
+        need(hashlib.file_digest(source,'sha256').hexdigest()==race166.NATIVE_SHA,'changed native observer')
+
+def project(original, due, predecessor):
+    need(original['observation_reason']=='routine' and original['minimum_interval_seconds']==1800,
+         'unexpected cadence or user observation')
+    owners_by_epoch={r['range']:r for r in original['replays']}
+    need(len(owners_by_epoch)==len(original['replays']) and set(owners_by_epoch) in ({'172'}, {'166','167','168','170','172'}),
+         'unrecognized prior producer population')
+    need(owners_by_epoch['172']['producer_unit']==full172.UNIT,'changed survivor')
+    return dict(original,replays=[owners_by_epoch['172']],
+                diagnostic_replays=[r for r in original['diagnostic_replays'] if r['range']!='169'],
+                previous_sample=predecessor['path'],output=str(names(due)['sample']),not_before_utc=due)
+
+def check_sample(fleet, sample, cfg):
+    parent=checked(fleet['observer'])
+    scheduled=sample['cadence']
+    need(sample['schema']==parent['schema'] and utc(sample['recorded_at_utc'])>=utc(cfg['not_before_utc']),
+         'sample predates configured clock')
+    need(scheduled['configured_not_before_utc']==cfg['not_before_utc'] and scheduled['observation_reason']=='routine'
+         and scheduled['routine_minimum_interval_enforced'] and scheduled['previous_sample']==fleet['observer']['path']
+         and scheduled['previous_sample_sha256']==fleet['observer']['sha256']
+         and scheduled['observed_interval_seconds']>=1800 and len(sample['replays'])==len(cfg['replays'])==1,
+         'wrong sample predecessor or cadence')
+    need([r['range'] for r in sample['diagnostic_replays']]==[r['range'] for r in cfg['diagnostic_replays']],
+         'native diagnostic population changed')
+    need(not resident_clock.incomplete(sample),'native host census incomplete')
+    return sample['recorded_at_utc']
+
+def native_closed(row,ref):
+    data=checked(ref)
+    plan_dir=Path(row['guard_protection']['path']).parent
+    need(ref['path']==str(plan_dir/'stop-completion.json') and data['producer_invocation_id']==row['unit']['InvocationID']
+         and data['terminal']['pid']==0,'guard completion does not bind original producer')
+    intent=read_ref(plan_dir/'stop-intent.json')
+    need(intent['reason']=='filesystem-floor' and intent['producer_invocation_id']==data['producer_invocation_id']
+         and data['intent']==str(plan_dir/'stop-intent.json'),
+         'different stop reason or producer')
+    n=owners.show(row['unit']['Id'],('Id','ActiveState','MainPID','ControlPID','Job','ControlGroup'))
+    need(n['MainPID']==n['ControlPID']=='0' and not n['Job'] and n['ActiveState'] in ('inactive','failed'),
+         'closed producer reacquired a process')
+    return dict(completion=ref,intent=bound(plan_dir/'stop-intent.json'),unit=n,
+                guard=owners.show(row['guard_timer']['Id'],('Id','ActiveState','SubState','Job','InvocationID')))
+
+def stopped_populations(handoff, fleet):
+    initial=checked(handoff['fleet'])
+    original={r['epoch']:r for r in initial['actual_executing_replays']}
+    need(set(original)=={*CLOSED,172} and set(map(int,handoff['closures']))==set(CLOSED),'unexpected closure population')
+    deaths={str(e):native_closed(original[e],handoff['closures'][str(e)]) for e in CLOSED}
+    term=bound(GUARD169/'TERMINAL.json'); data=checked(term)
+    need(data['producer_invocation_id']==focused169_completion.IID and data['disposition'] in focused169_completion.DISPOSITIONS,
+         'different focused diagnostic')
+    keeper=next(r for r in initial['actual_active_private_diagnostics'] if r['epoch']==169)
+    checked(keeper['admission'])
+    need(data['admission']==keeper['admission'] and not data['canonical_replay_claimed']
+         and not data['archive_publication_authorized'] and not data['reservation_ending_bytes'],
+         'unknown diagnostic disposition')
+    n=owners.show(keeper['unit']['Id'],('Id','ActiveState','MainPID','ControlPID','Job'))
+    need(n['MainPID']==n['ControlPID']=='0' and n['ActiveState'] in ('inactive','failed') and not n['Job'],
+         'diagnostic producer did not drain')
+    timer=owners.show(keeper['guard_timer']['Id'],('Id','ActiveState','SubState','InvocationID','Job'))
+    drained=GUARD169/'TERMINAL_GUARD_DRAINED.json'
+    return deaths,dict(terminal=term,unit=n,timer=timer,guard_retirement=bound(drained) if drained.exists() else None,
+        disposition=data['disposition'],fallback_guard_stop=data.get('guard_stop'),retained_root_cap_bytes=focused169_completion.CAP,
+        actual_guard_plan=data['actual_guard_plan'],reservation_ending_bytes=0,resource_credit_bytes=0)
+
+def closure_members(head,handoff):
+    need(handoff['fleet']['path']==str(HEAD),'wrong incident head')
+    need(checked(handoff['fleet'])['sampled_at_utc']=='2026-11-22T17:10:10Z','wrong incident sample')
+    if head!=handoff['fleet']:
+        need(checked(head)['survivor172_incident']==bound(ROOT/'HANDOFF.json'),'different incident lineage')
+
+def authenticated(store,key,ref):
+    etag,raw=store.get(key)
+    row=checked(ref)
+    need(row['epoch']==key and row['authenticated_readback'] and row['after_etag']==etag
+         and row['after_sha256']==hashlib.sha256(raw).hexdigest() and status.body(row['after_status'])==raw,
+         'status changed outside authenticated handoff for '+str(key))
+    return row
+
+def read_statuses(store, receipts, destination):
+    original=dict(receipts)
+    for key,ref in original.items():
+        if (destination/f'epoch-{key}.intent.json').exists():
+            continue
+        if int(key)!=172:
+            etag,raw=store.get(int(key))
+            row=checked(ref)
+            if row['after_etag']!=etag or row['after_sha256']!=hashlib.sha256(raw).hexdigest():
+                ref,row=external_event(int(key),ref,etag,raw)
+                receipts[key]=ref
+        authenticated(store,int(key),ref)
+
+def external_event(epoch,prior,etag,raw):
+    from evidence import STATUS_ROOT, digest
+    # Concurrent changes must be a recorded chain of exact If-Match events for this epoch.
+    candidates=[]
+    previous=checked(prior)
+    for path in STATUS_ROOT.glob(f'event-{epoch}-*/RECEIPT.json'):
+        if path.stat().st_mtime_ns< Path(prior['path']).stat().st_mtime_ns: continue
+        row=read_ref(path)
+        if row.get('epoch')==epoch and row.get('authenticated_readback') and row.get('conditional_header')=='If-Match':
+            candidates.append((path,row))
+    seen=set()
+    while prior['sha256'] not in seen:
+        seen.add(prior['sha256'])
+        matches=[(p,r) for p,r in candidates if r.get('previous_receipt')==prior and r.get('before_etag')==previous['after_etag']
+                 and r.get('before_sha256')==previous['after_sha256'] and r.get('before_status')==previous['after_status']]
+        need(len(matches)==1,'unresolved or forked external status event for '+str(epoch))
+        p,previous=matches[0];prior=bound(p)
+        if previous['after_etag']==etag and previous['after_sha256']==digest(raw) and status.body(previous['after_status'])==raw:
+            return prior,previous
+    raise ValueError('cyclic successor event')
+
+def publish(c,store,refs,out,epoch,archive=None):
+    key=str(epoch)
+    original=refs[key];old=checked(original);intent=out/f'epoch-{epoch}.intent.json';dest=out/f'epoch-{epoch}.receipt.json'
+    if not intent.exists():
+        authenticated(store,epoch,original)
+        if utc(old['after_status']['sampled_at_utc'])>=c.now:
+            return
+        prior=old['after_status'];extra={}
+        if epoch==172:
+            quote=delivery_eta.estimate(c,172,archive['size'] if archive else 0)
+            previous_remaining=delivery_eta.adjusted_remaining(prior,old,quote)
+            after=full172.forecast(c,prior,archive,previous_remaining,quote['total_millis'])
+            extra.update(delivery_forecast=quote,producer_invocation_id=c.full172_row['unit']['InvocationID'],
+                         measured_canonical_progress=c.advancing[172],current_repair_owner=None,archive_sample=archive)
+        else:
+            need(prior['phase']=='verification','new replay owner requires adoption before publication')
+            age=round((c.now-utc(prior['sampled_at_utc'])).total_seconds()*1000)
+            need(age>=0 and prior['estimated_remaining_millis']>age,'external forecast expired or follows observation')
+            after=dict(prior,sampled_at_utc=c.stamp,elapsed_execution_millis=prior['elapsed_execution_millis']+age,
+                       estimated_remaining_millis=prior['estimated_remaining_millis']-age)
+            extra.update(producer_invocation_id=None,measured_canonical_progress=False,current_repair_owner='/root',
+                         estimate_model='Retain the absolute publication forecast of the authenticated predecessor.')
+        durable(intent,dict(epoch=epoch,key=status.key(epoch),previous_receipt=original,conditional_header='If-Match',
+                before_etag=old['after_etag'],before_sha256=old['after_sha256'],before_status=prior,
+                after_sha256=hashlib.sha256(status.body(after)).hexdigest(),after_status=after,
+                observer=c.sample_ref,fleet_predecessor=c.fleet_ref,sampled_at_utc=c.stamp,
+                current_replay_lanes=int(c.advancing[172]),canonical_producer_count=1,active_bootstraps=0,
+                current_four_homefloor_stop=c.fleet.get('current_four_homefloor_stops') if epoch in CLOSED else None,
+                archive_publication_authorized=False,replay_launch_authorized=False,**extra))
+    plan=read_ref(intent)
+    need(plan['previous_receipt']==original and plan['observer']==c.sample_ref and plan['fleet_predecessor']==c.fleet_ref,
+         'different uncompleted status intent')
+    etag,raw=store.get(epoch)
+    if etag==plan['before_etag'] and raw==status.body(plan['before_status']):
+        need(not dest.exists(),'old status replayed after commit')
+        written=store.put(epoch,etag,status.body(plan['after_status']))
+        etag,raw=store.get(epoch);need(written==etag,'updated status ETag lost')
+    need(raw==status.body(plan['after_status']) and etag!=plan['before_etag'],'conditional update was superseded')
+    durable(dest,dict(plan,after_etag=etag,authenticated_readback=True))
+    refs[key]=bound(dest)
+
+def handoff():
+    stopref=bound(BASE/'four-homefloor-20261122-v1/R2_STOP_CORRECTIONS.json')
+    need(stopref['sha256']=='9719cca38d4d9f8fddb65529436c408139d884c1a7838b4ea323e39a8499a214',
+         'foreign incident aggregate')
+    stop=checked(stopref)
+    finalref=bound(BASE/'four-homefloor-20261122-v1/FINAL_READBACK.json')
+    final=checked(finalref)
+    need(stop['fleet']==final['native_fleet']==bound(HEAD) and len(final['statuses'])==20 and not stop['archives_or_sidecars_changed'],
+         'unbound final 20-status handoff')
+    path=BASE/'four-homefloor-20261122-v1/HANDOFF.json'
+    result=checked(dict(path=str(path),sha256='6ec8ef5b423a960162964723a86a4be8b3d87b4b09eb909c902b240fdde15d8a'))
+    need(result['corrected_stop_events']==stopref and result['fleet']==stop['fleet'] and result['final_readback']==finalref
+         and result['closures']=={e:checked(ref)['guard_stop_completion'] for e,ref in stop['reports'].items()},
+         'different incident handoff or native closures')
+    for e,entry in final['statuses'].items():
+        receipt=checked(entry['receipt'])
+        need(receipt['after_etag']==entry['etag'] and receipt['after_sha256']==entry['sha256']
+             and receipt['epoch']==int(e) and receipt['authenticated_readback'],'foreign incident readback')
+    return result
+
+def config(directory,cfg):
+    ensure_dir(directory)
+    source=directory/'observer.json';durable(source,cfg)
+    target=directory/'sealed-next';plan=directory/'next-seal-plan.json'
+    durable(plan,dict(schema='jetstreamer-sealed-deployment-plan-v1',destination=str(target),
+        members=[dict(source=str(source),name='observer.json',mode=0o444,sha256=bound(source)['sha256'])]))
+    if not (target/'deployment-seal-receipt.json').exists():
+        from evidence import SEALER
+        run('/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment',
+            plan,'--plan-sha256',bound(plan)['sha256'],'--self-sha256',SEALER)
+    ref=bound(target/'observer.json')
+    need(sealed(ref)==cfg,'different sealed config')
+    return ref
+
+def timer_names():
+    return [r.split()[0] for r in run('systemctl','list-units','--type=timer','--state=waiting','--no-legend',
+                  '--plain','horizon-observer-*.timer').splitlines() if r.strip()]
+
+def schedule(ref):
+    cfg=sealed(ref);due=cfg['not_before_utc'];timer=names(due)['timer'];unit=timer.removesuffix('.timer')
+    waiting=timer_names()
+    if not waiting:
+        need(utc(due)>now(),'requested timer deadline elapsed')
+        run('systemd-run','--quiet','--unit='+unit,'--on-calendar='+utc(due).strftime('%F %T UTC'),
+            '--timer-property=AccuracySec=1s','--timer-property=RemainAfterElapse=no',race166.NATIVE,ref['path'])
+    need(timer_names()==[timer],'multiple or foreign observer clocks')
+    n=owners.show(timer,('ActiveState','SubState','Triggers','TimersCalendar'))
+    command=owners.show(unit+'.service',('ExecStart',))['ExecStart']
+    need(n['ActiveState']=='active' and n['SubState']=='waiting' and n['Triggers']==unit+'.service'
+         and str(race166.NATIVE)+' '+ref['path']+' ' in command
+         and utc(due).strftime('%F %T UTC') in n['TimersCalendar'],'scheduled observer command differs')
+    return timer
+
+def make_context(head,fleet,sample_ref,cfg,out):
+    sample=checked(sample_ref);when=check_sample(fleet,sample,cfg)
+    c=SimpleNamespace(fleet_ref=head,fleet=fleet,stamp=when,now=utc(when),cfg=cfg,sample=sample,sample_ref=sample_ref,
+           paths={'out':out,'sample':Path(sample_ref['path'])},lanes={},advancing={},next_cfg=copy.deepcopy(cfg),
+           prior=checked(fleet['authenticated_status_audit']),new_rows={},rows={},metered168_row=None)
+    old=full172.owned(fleet);need(old is not None,'172 missing prior ownership')
+    ident=full172.identity(fleet)
+    oref=out/'FULL172_OBSERVATION.json'
+    if not oref.exists():
+        guard=full172.guard_view(ident['admission'])
+        durable(oref,dict(fleet=head,observer=sample_ref,identity=ident,guard=guard))
+    c.full172=read_ref(oref)
+    need(c.full172['observer']==sample_ref and c.full172['fleet']==head and c.full172['identity']==ident,'foreign guard evidence')
+    full172.reconcile_sample(c,cycle.observed_lane)
+    owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True)
+    return c
+
+def baselines(head,fleet,bridge):
+    if head==bridge['fleet']:
+        observed=checked(bridge['final_readback'])['statuses']
+        return {e:row['receipt'] for e,row in observed.items()}
+    return dict(checked(fleet['complete_active_status_audit'])['receipts'])
+
+def census(c,bridge):
+    out=c.paths['out'];path=out/'CYCLE_OBSERVATION.json'
+    if path.exists():
+        stored=read_ref(path)
+        need(stored['observer']==c.sample_ref and stored['fleet_predecessor']==c.fleet_ref,'foreign local observation')
+        return stored
+    deaths,diag=stopped_populations(bridge,c.fleet)
+    prefix=prefix140_storage.storage()
+    audit,storage,owner=retired_public_audit.observe_public(Path('/home/sol').stat().st_dev,c.fleet['continuing_audit_obligation'])
+    old=checked(c.fleet['current_home_cycle_capacity'])
+    # Whole-root promises for closed and waiting actors continue on this branch.
+    cap=dict(old,home_filesystem=c.sample['filesystem'],audit_storage=storage,audit_owner_witness=owner,
+        private_epoch140_verifier=prefix,surviving_epoch172_protection=c.full172,closed_producer_observations=deaths,
+        retained_private_diagnostic_169=diag,retained_prior_capacity=c.fleet['current_home_cycle_capacity'],
+        fresh_admission=False,resource_credit_bytes=0,all_reservation_ending_bytes=0)
+    cap['historical_prior_owner_observations']={k:cap.pop(k) for k in ('private136_observation','private136_capacity',
+        'active_live_diagnostics','current_normal_168','optional_existing_serial_build_136') if k in cap}
+    # Retain each older obligation once by the immutable prior capacity reference.
+    cap.pop('historical_prior_owner_observations',None)
+    if 'current_metered168_observation' in cap:
+        cap['historical_pre_homefloor_metered168_observation']=cap.pop('current_metered168_observation')
+    arc=status.observed_archive(c,172) if c.full172_row['scratch_path'] else None
+    witness=dict(observer=c.sample_ref,fleet_predecessor=c.fleet_ref,audit=audit,capacity=cap,
+            survivors=[172],closures=deaths,focused169=diag,archive172=arc)
+    durable(path,witness)
+    return witness
+
+def publish_all(c,bridge,store,vs):
+    target=names(c.cfg['not_before_utc'])['statuses'];ensure_dir(target)
+    refs=baselines(c.fleet_ref,c.fleet,bridge)
+    initial=set(int(k) for k in refs)
+    need(initial==set(status.EPOCHS)|{140},'different status population')
+    ready=status.inventory(c,store)
+    read_statuses(store,refs,target)
+    for e in sorted(initial):
+        publish(c,store,refs,target,e,vs['archive172'] if e==172 else None)
+    for e,r in refs.items(): authenticated(store,int(e),r)
+    need(ready==status.inventory(c,store),'archive inventory changed during status refresh')
+    original=dict(c.prior)
+    original.update(receipts={k:v for k,v in refs.items() if k!='140'},observer=c.sample_ref,
+                    active_producer_count=1,active_private_diagnostic_count=0,canonical_producer_count=1,
+                    replay_lanes=int(c.advancing[172]),active_bootstraps=0,fleet_predecessor=c.fleet_ref,
+                    effective_status_predecessor=c.fleet['authenticated_status_audit'],sampled_at_utc=c.stamp,
+                    owner=CONTROLLER,coordinated_private_diagnostic_169=vs['focused169'],
+                    newer_events_read_back_without_overwrite={})
+    p=target/'COMPLETED.json';durable(p,original)
+    complete=target/'COMPLETE_ACTIVE_STATUSES.json'
+    durable(complete,dict(schema='horizon-all-current-authenticated-statuses-v1',observer=c.sample_ref,
+         fleet_predecessor=c.fleet_ref,sampled_at_utc=c.stamp,authenticated_readback=True,
+         authenticated_status_count=len(refs),status_epochs=sorted(initial),receipts=refs,original_nineteen=bound(p),
+         private140=refs['140'],archives_or_sidecars_changed=False))
+    return bound(p),bound(complete)
+
+def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
+    fleet=copy.deepcopy(c.fleet)
+    lookup={r['epoch']:r for r in fleet['epochs']}
+    a=checked(allref);base=c.paths['out']
+    for name in ('AUDIT','HOME_CAPACITY'):
+        durable(base/(name+'.json'),observed['audit' if name=='AUDIT' else 'capacity'])
+    ar=bound(base/'AUDIT.json');hr=bound(base/'HOME_CAPACITY.json');disk=c.sample['filesystem']['conservative_available_bytes']
+    for e,ref in a['receipts'].items():
+        new=checked(ref)['after_status'];entry=lookup[int(e)]
+        entry.update(status=new,current_status=new,status_publication=ref,current_authenticated_status_receipt=ref,
+                     current_coordinated_observer=c.sample_ref)
+    for e in CLOSED:
+        entry=lookup[e];entry.pop('current_replay',None);entry.pop('current_bootstrap',None)
+        entry.update(no_live_producer_claimed=True,current_repair_owner='/root',repair_open=True,state='verification',
+             current_home_floor_stop=observed['closures'][str(e)],current_status_scope='HOME floor guard stopped the producer.')
+    entry=lookup[169];entry.pop('current_private_diagnostic',None)
+    entry.update(no_live_producer_claimed=True,current_repair_owner='/root',repair_open=True,state='verification',
+           current_status_scope='Private diagnostic stopped; canonical repair remains open.',focused169_terminal=observed['focused169']['terminal'])
+    lookup[172].update(current_replay=c.full172_row,current_repair_owner=None,no_live_producer_claimed=False,state='executing')
+    initial=checked(bridge['fleet'])
+    diag=next(r for r in initial['actual_active_private_diagnostics'] if r['epoch']==169)
+    fleet.update(survivor172_incident=bound(ROOT/'HANDOFF.json'),previous_Root_operational_review=c.fleet_ref,
+          sampled_at_utc=c.stamp,recorded_unix_seconds=observed['audit']['observed_at'],observer=c.sample_ref,
+          sole_next_timer=timer,sole_next_observer=nref,actual_executing_replays=[c.full172_row],actual_active_bootstraps=[],
+          bootstrap_count=0,guarded_bootstrap_owner_count=0,actual_active_private_diagnostics=[],active_private_diagnostic_count=0,
+          useful_replay_count=int(c.advancing[172]),live_replay_count=1,active_producer_count=1,canonical_producer_count=1,
+          authenticated_status_audit=statusref,effective_status_receipts=checked(statusref)['receipts'],
+          complete_active_status_audit=allref,complete_active_status_count=20,complete_active_status_receipts=a['receipts'],
+          current_private140_status_receipt=a['receipts']['140'],current_home_cycle_capacity=hr,current_four_homefloor_stops=bridge['corrected_stop_events'],
+          historical_focused169_worker=diag,focused169_terminal=observed['focused169']['terminal'],
+          current_private_169_observer_result=observed['focused169'],current_audit_progress=dict(observation=ar,field='progress'),
+          current_audit_child=dict(observation=ar,field='child'),last_accepted_audit_summary=dict(observation=ar,field='summary'),
+          audit_progress_at_recovery_overlay=observed['audit']['progress'],audit_summary_at_recovery_overlay=observed['audit']['summary'],
+          audit_progress_capture_unix_at_recovery_overlay=observed['audit']['observed_at'],
+          same_sample_conservative_free_DATA_bytes=disk,complete_cycle_conservative_available_DATA_bytes=disk,
+          all_reservation_ending_bytes=0,resource_credit_bytes=0,
+          cycle_reconciliation_scope='Single surviving canonical replay 172. Four HOME guard closures and terminal 169. All twenty status keys are authenticated.')
+    fleet['current_replay_lane_recovery']='Recover interrupted 166/167/168/170 from retained inputs under fresh funding.'
+    fleet['next_lane_recovery']=fleet['current_replay_lane_recovery']
+    if observed['focused169']['guard_retirement']:
+        fleet['focused169_guard_retirement']=observed['focused169']['guard_retirement']
+    for key in ('current_metered168_observation','original_disk_guard_recovery_workers','recovered_workers_observation'):
+        if key in fleet: fleet['historical_pre_homefloor_'+key]=fleet.pop(key)
+    cap=observed['capacity'];fleet['complete_DATA_authority']['current_audit_growth']=hr
+    fleet['complete_DATA_with_remaining_audit_growth_bytes']=fleet['complete_DATA_bytes']+cap['audit_storage']['remaining_DATA_growth_bytes']
+    ready_audit_growth.reconcile(fleet,observed['audit'],cap,ar)
+    prefix140_storage.reconcile(fleet,cap)
+    return fleet
+
+def track_timer(ref):
+    cfg=sealed(ref);due=utc(cfg['not_before_utc']);sample=Path(cfg['output'])
+    timer=names(cfg['not_before_utc'])['timer'];unit=timer.replace('.timer','.service')
+    if not sample.exists() and now()<due:
+        schedule(ref)
+        time.sleep(max(0,(due-now()).total_seconds()+2))
+    if not sample.exists() and now()>=due:
+        state=owners.show(unit,('ActiveState','SubState','Result','Job','LoadState'))
+        # A delayed controller can recover its already armed timer or start a new clock.
+        if state['LoadState']=='not-found' and timer not in timer_names():
+            return None,'elapsed before arming'
+    while True:
+        state=owners.show(unit,('ActiveState','SubState','Result','Job','LoadState'))
+        if sample.exists() and state['ActiveState'] not in ('activating','active'):
+            need(state['Result']=='success','native sampler failed after creating evidence')
+            return bound(sample),None
+        if state['ActiveState']=='failed':
+            return None,'native sampler failed'
+        if not sample.exists() and state['ActiveState']=='inactive' and now()>due+dt.timedelta(seconds=120):
+            return None,'native output absent after timer expiration'
+        need(now()<due+dt.timedelta(seconds=2100),'native observer exceeded original time bound')
+        time.sleep(3)
+
+def registered(cycle_dir,fleet):
+    marker=cycle_dir/'REGISTERED.json'
+    if marker.exists():
+        receipt=read_ref(marker)
+        need(receipt['predecessor']==bound(Path(fleet['observer']['path'])),'foreign recovery clock')
+        return receipt['config']
+    prior=sealed(fleet['sole_next_observer'])
+    due=max(now()+dt.timedelta(seconds=20), utc(checked(fleet['observer'])['recorded_at_utc'])+dt.timedelta(seconds=1800))
+    ref=config(cycle_dir,project(prior,stamp(due),fleet['observer']))
+    durable(marker,dict(predecessor=fleet['observer'],config=ref))
+    return ref
+
+def advance_sample(head,fleet,ref):
+    while True:
+        cfg=sealed(ref);state=names(cfg['not_before_utc']);existing=state['out']/'ROOT_COMPLETE_OPERATIONAL_FLEET.json'
+        if existing.exists():
+            new=read_ref(existing)
+            need(new['previous_Root_operational_review']==head and new['survivor172_incident']==bound(ROOT/'HANDOFF.json'),
+                 'different owner of completed cycle')
+            return None,None,bound(existing)
+        replacement=ROOT/('recover-'+ref['sha256'][:20])
+        if (replacement/'REGISTERED.json').exists():
+            ref=read_ref(replacement/'REGISTERED.json')['config'];continue
+        sample_ref,error=track_timer(ref)
+        if sample_ref:
+            sample=checked(sample_ref)
+            if not resident_clock.incomplete(sample):
+                check_sample(fleet,sample,cfg)
+                return ref,sample_ref,None
+            error='native HOST RSS unavailable'
+        ensure_dir(replacement)
+        log=replacement/'TERMINAL.json'
+        if not log.exists():
+            durable(log,dict(fleet=head,prior_config=ref,failed_sample=sample_ref,error=error))
+        record=read_ref(log)
+        need(record['prior_config']==ref and record['fleet']==head,'different retired clock')
+        last=utc(checked(sample_ref)['recorded_at_utc']) if sample_ref else utc(cfg['not_before_utc'])
+        due=max(now()+dt.timedelta(seconds=20),last+dt.timedelta(seconds=1800))
+        replacement_ref=config(replacement,project(cfg,stamp(due),fleet['observer']))
+        durable(replacement/'REGISTERED.json',dict(config=replacement_ref,terminal=bound(log)))
+        ref=replacement_ref
+
+def one_cycle(head,ref,bridge):
+    fleet=checked(head);closure_members(head,bridge)
+    config_ref,sample,already=advance_sample(head,fleet,ref)
+    if already:return already
+    cfg=sealed(config_ref);out=names(cfg['not_before_utc'])['out'];ensure_dir(out)
+    c=make_context(head,fleet,sample,cfg,out)
+    observed=census(c,bridge)
+    store=status.Storage()
+    legacy,whole=publish_all(c,bridge,store,observed)
+    marker=out/'NEXT_DUE.json'
+    if not marker.exists():
+        due=max(now()+dt.timedelta(seconds=20),utc(c.stamp)+dt.timedelta(seconds=1800))
+        durable(marker,dict(due=stamp(due),observer=sample))
+    when=read_ref(marker);need(when['observer']==sample,'different recorded next phase')
+    nextref=config(out,project(cfg,when['due'],sample))
+    # Commit the next active schedule before exposing the fleet as the new head.
+    if utc(when['due'])>now():
+        timer=schedule(nextref)
+    else:
+        # A publishing retry can occur after its intended time. Arm a later sole timer
+        # that still uses the original sample as cadence predecessor.
+        alt=out/'recovery-clock';ensure_dir(alt)
+        altref=alt/'REGISTERED.json'
+        if not altref.exists():
+            r=config(alt,project(cfg,stamp(now()+dt.timedelta(seconds=20)),sample))
+            durable(altref,dict(config=r))
+        nextref=read_ref(altref)['config'];timer=schedule(nextref)
+    result=fleet_successor(c,bridge,observed,legacy,whole,nextref,timer)
+    target=out/'ROOT_COMPLETE_OPERATIONAL_FLEET.json';durable(target,result)
+    print(json.dumps(dict(fleet=bound(target),timer=timer,status_count=20,replay_lanes=1,advancing=c.advancing[172])),
+          flush=True)
+    return bound(target)
+
+def main():
+    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools/status_cycle.py','expected deployed sole controller')
+    os.umask(0o077)
+    fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
+    try:
+        state=owners.show(CONTROLLER,('MainPID','ControlGroup','Job','ActiveState'))
+        need(state['MainPID']==str(os.getpid()) and Path('/proc/self/cgroup').read_text().strip()=='0::'+state['ControlGroup'],
+             'outside original status service')
+        validate_package()
+        proof=handoff()
+        durable(ROOT/'HANDOFF.json',proof)
+        initial=ROOT/'first-clock';ensure_dir(initial)
+        head=proof['fleet'];ref=registered(initial,checked(head))
+        while True:
+            head=one_cycle(head,ref,proof);ref=checked(head)['sole_next_observer']
+    finally:
+        os.close(fd)
+
+if __name__=='__main__':
+    main()
