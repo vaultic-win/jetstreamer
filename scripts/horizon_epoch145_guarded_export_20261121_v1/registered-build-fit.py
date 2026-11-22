@@ -8,7 +8,11 @@ import time
 
 out, source, group = map(Path, sys.argv[1:])
 assert os.geteuid() == 0 and sys.flags.isolated and __debug__
-assert group.name == "horizon-incident-145-post-registered-build-v1.service"
+expected_service = {
+    "tools-v18-registered136": "horizon-incident-145-post-registered-build-v1.service",
+    "tools-v20-prestart": "horizon-incident-145-fixture-rejoin-build-v1.service",
+}
+assert group.name == expected_service[source.parent.name]
 assert group.parent.name == "horizonaudit.slice"
 assert (group.parent / "cpu.max").read_text().split() == ["1200000", "100000"]
 assert (group.parent / "cpu.idle").read_text().strip() == "1"

@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_timer145_only)]
+#[cfg(incident_fixture145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5f/export145";
+#[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5e/export145";
 #[cfg(all(incident_focused145_only, not(incident_timer145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5d/export145";
@@ -408,6 +410,61 @@ fn failed_observation(
         json!({"current_boot_failure":failed,"prior_started":started,"advancing":progress,"prior_manager":manager,
               "original_candidate":original_identity,"source_checkpoint_exists":false,"resource_credit_bytes":0}),
     )
+}
+
+#[cfg(incident_fixture145_only)]
+fn original_fixture_census(trace: &str, provider: &str) -> bool {
+    trace.starts_with(&format!(
+        "Traceback (most recent call last):\n  File \"{provider}\", line "
+    )) && trace.contains(&format!("  File \"{provider}\", line 543, in census\n"))
+        && trace
+            .trim_end()
+            .ends_with("ValueError: unregistered replay process 227497")
+}
+
+#[cfg(incident_fixture145_only)]
+pub fn failed_qualification_census() -> Result<Value> {
+    failed_observation(FailedObservation {
+        iid: "a99ed8b51e8a482b805b8a36a11b2700",
+        failure_hash: "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43",
+        start_hash: "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624",
+        progress_name: "V5E_ACTUAL_ADVANCING_WORKER.json",
+        progress_sha: "073711680a623bf30c08f3305c08dd711481b31335f6b6d40de49ec8b378b0e2",
+        manager_sha: "2397790bdcf978bfda5fe9a2dfe3eb1d2954448d86152231c8433c65e7d424d0",
+        prior_image: "148804337a0c47093f67ae642fe01dc3a529cb07dbc809bfd9ab0ff9ca714a7c",
+        provider: "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit",
+        recognize: original_fixture_census,
+        parent: (94449, 365122971),
+        child: (94696, 365125891),
+    })
+}
+
+#[cfg(all(test, incident_fixture145_only))]
+#[test]
+#[ignore = "requires the original 145 terminal journal and frozen candidate"]
+fn authenticates_the_failed_fixture_census_and_frozen_inode() {
+    let evidence = failed_qualification_census().unwrap();
+    assert_eq!(evidence["original_candidate"]["inode"], 103237059);
+    let failure = custody::evidence(
+        &serde_json::from_value(evidence["current_boot_failure"]["failure"].clone()).unwrap(),
+    )
+    .unwrap();
+    let trace = failure["error"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("complete 145 capacity observation failed exit status: 1: ")
+        .unwrap();
+    let provider = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
+    assert!(original_fixture_census(trace, provider));
+    assert!(!original_fixture_census(
+        &trace.replace("227497", "227498"),
+        provider
+    ));
+    assert!(!original_fixture_census(
+        &trace.replace("in census", "in other"),
+        provider
+    ));
+    assert!(!original_fixture_census(trace, "/another/provider"));
 }
 
 #[cfg(all(test, incident_timer145_only))]

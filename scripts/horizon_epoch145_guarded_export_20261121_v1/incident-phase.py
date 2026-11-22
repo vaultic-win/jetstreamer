@@ -8,10 +8,11 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-TIMER_REJOIN = VERSION == "tools-v5e"
-FOCUSED_REJOIN = VERSION in ("tools-v5d", "tools-v5e")
-TIMEOUT_REJOIN = VERSION in ("tools-v5c", "tools-v5d", "tools-v5e")
-REJOIN = VERSION in ("tools-v5b", "tools-v5c", "tools-v5d", "tools-v5e")
+FIXTURE_REJOIN = VERSION == "tools-v5f"
+TIMER_REJOIN = VERSION in ("tools-v5e", "tools-v5f")
+FOCUSED_REJOIN = VERSION in ("tools-v5d", "tools-v5e", "tools-v5f")
+TIMEOUT_REJOIN = VERSION in ("tools-v5c", "tools-v5d", "tools-v5e", "tools-v5f")
+REJOIN = VERSION in ("tools-v5b", "tools-v5c", "tools-v5d", "tools-v5e", "tools-v5f")
 PKG = BASE / "epoch145-semantic-continuity-20261121-v1" / (VERSION if REJOIN else "tools-v5")
 IMAGE = PKG / "export145"
 STATE = BASE / "epoch145-guarded-export-20261121-v1/state"
@@ -34,6 +35,10 @@ if TIMER_REJOIN:
     OLD = "e6551a0bb8a14b989902e15c9ecc0751"
     OLD_FAILURE = "9ef9c938290ea2b43d3b2ce4aa617f08b33f4c893961e63f53ba3f48768e215f"
     OLD_RECOVERY = "55d2a0504271e8a1eea2ca8c105a288be9497f1a2b80177279481692d06e041f"
+if FIXTURE_REJOIN:
+    OLD = "a99ed8b51e8a482b805b8a36a11b2700"
+    OLD_FAILURE = "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"
+    OLD_RECOVERY = "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"
 HOME = Path("/home/sol/.jetstreamer-private")
 OUTPUT = HOME / "epoch145-prefix-extract-funded-20261121-v1/.tmp36MvkN"
 SOURCE = HOME / "epoch145-cached-b2a09f57de39c384/work/diagnostic/epoch-145-through-63072070.jet"
@@ -90,6 +95,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         expected_failure = f["error"].rstrip().endswith("ValueError: cadence publisher absent")
     if TIMER_REJOIN:
         expected_failure = f["error"].rstrip().endswith("tools-v14/retire-original-timers.py'), 'inspect']' timed out after 20 seconds")
+    if FIXTURE_REJOIN:
+        expected_failure = f["error"].rstrip().endswith("ValueError: unregistered replay process 227497")
     s.need(f["iid"] == OLD and expected_failure, "foreign original failure")
     state = STATE / generation
     parent = Path(f"/proc/{pid}")
@@ -129,6 +136,8 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         predecessor = "failed_status_owner"
     if TIMER_REJOIN:
         predecessor = "failed_timer_inspection"
+    if FIXTURE_REJOIN:
+        predecessor = "failed_qualification_census"
     s.need(started["iid"] == generation and started["image"] == image_sha
            and started["r2_mutations"] is False and started["file"] == str(OUTPUT)
            and started["prior_frozen_recovery"][predecessor]["current_boot_failure"]["failure"] == failed

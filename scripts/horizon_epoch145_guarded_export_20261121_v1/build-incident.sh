@@ -13,9 +13,15 @@ if [[ $flavor == timer-rejoin || $flavor == focused-rejoin || $flavor == focused
   src=/home/sol/.jetstreamer-private/paid145-focused169-recovery-20261121-v1
 fi
 registered=false
-if [[ $flavor == registered-post ]]; then
-  registered=true
-  flavor=timer-post
+fixture_recovery=false
+if [[ $flavor == registered-post || $flavor == fixture-rejoin ]]; then
+  if [[ $flavor == registered-post ]]; then
+    registered=true
+    flavor=timer-post
+  else
+    fixture_recovery=true
+    flavor=timer-rejoin
+  fi
   focused=true
   src=$(cd -- "$(dirname "$(realpath -e "$0")")/../.." && pwd -P)
   exec 9>>/run/lock/horizon-epoch140-suffix-compiler.lock
@@ -45,6 +51,11 @@ post|current-post|timeout-post|focused-post|retry-post|timer-post) sources=(inci
       ;;
 *) exit 2 ;;
 esac
+if $fixture_recovery; then
+  extra+=(--cfg incident_fixture145_only)
+  sources+=(registered-build-fit.py)
+  fixture+=(incident145::authenticates_the_failed_fixture_census_and_frozen_inode)
+fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
 q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/incident-build-$INVOCATION_ID
 out="$current/tmp/incident145-$INVOCATION_ID"
@@ -85,7 +96,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=7caf7d7eb81ac5c0972649666e6d22273926c841640b537cd7fe336706514cd3
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == db71be720088b97a5fe0db694d0f863b77273cd7963112b61ac673b23213fda8 ]]
   fi
-  if [[ $flavor == timer-rejoin ]]; then
+  if [[ $flavor == timer-rejoin ]] && ! $fixture_recovery; then
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v15b-prestart/post-stop-fit
     signature=350295e25c3404b9e23f60969a378061e780ad5a580fdf71c8c29861722d953b
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 6222a205645ea6a2bf34b4b2c4085d30a0fda7349e4243524a2c52089fc19931 ]]
@@ -99,6 +110,18 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v18-registered136/post-stop-fit
     signature=c651d4d2b8d1c32a83ca7b6cfc77d711f19b0b97a78fd489fb11a399a00b7802
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 428442272e7b2d68c66533636b22600dba8daf3decc44ced6d3075d517acfd47 ]]
+  fi
+  if $fixture_recovery; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20-prestart/post-stop-fit
+    signature=${3:?expected qualified terminal price digest}
+    seal_digest=${4:?expected qualified terminal deployment digest}
+    [[ $signature =~ ^[a-f0-9]{64}$ && $seal_digest =~ ^[a-f0-9]{64}$ ]]
+    [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == "$seal_digest" ]]
+    jq -e --arg hash "$signature" --arg dir "${provider%/*}" '
+      .destination == $dir and .remote_mutations == false
+      and .sealer_sha256 == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+      and ([.members[] | select(.name == "post-stop-fit" and .mode == "0555" and .sha256 == $hash)] | length == 1)
+    ' "${provider%/*}/deployment-seal-receipt.json" >/dev/null
   fi
   [[ $(sha256sum "$provider" | cut -d' ' -f1) == "$signature" ]]
   mkdir -m0700 "$q"
@@ -123,7 +146,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     sleep "$((2+probe))"
   done
   python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory"
-  if $registered; then
+  if $registered || $fixture_recovery; then
     python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/registered-build-fit.py" "$q" "$provider" "$cg"
   fi
   image="$q/cache.ext4"
