@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+homefloor_rejoin=false
+if [[ $flavor == homefloor-rejoin ]]; then
+  homefloor_rejoin=true
+  flavor=fixture-rejoin
+fi
 registered_v7b=false
 registered_v7c=false
 if [[ $flavor == fixture-post-v7c ]]; then
@@ -71,6 +76,11 @@ if $fixture_recovery; then
   sources+=(registered-build-fit.py)
   fixture+=(incident145::authenticates_the_failed_fixture_census_and_frozen_inode)
 fi
+if $homefloor_rejoin; then
+  extra+=(--cfg incident_homefloor145_only)
+  sources+=(homefloor-phase-test.py)
+  fixture+=(incident145::accepts_only_the_actual_stopped_retry1_and_retained_candidate)
+fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
@@ -104,7 +114,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     signature=d5ed981b98ad6fc2c54843667852e9d3c3567c764398b644afac00231cd2940d
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == d32722386d1511d8db85801e349dd645107b2f3c0043a7debebb22c9eae60085 ]]
   fi
-  if $focused; then
+  if $focused && ! $homefloor_rejoin; then
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v14-bootstrap/post-stop-fit
     signature=63538fb9ff385f34b9b7b592c6b61b296e649f7eb3a70de017d9edeb0326ad50
     [[ $(sha256sum "${provider%/*}/deployment-seal-receipt.json" | cut -d' ' -f1) == 54083064203f8e64629ccfaf0b5411181bc90b0489028493795804ea757d27fe ]]
@@ -134,6 +144,9 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     if $fixture_post; then
       native_package=${5:?expected build price generation}
       [[ $native_package == tools-v20-prestart || $native_package == tools-v20 ]]
+    elif $homefloor_rejoin; then
+      native_package=${5:?expected sealed HOME provider directory}
+      [[ $native_package == tools-homefloor-* && $native_package =~ ^[a-z0-9-]+$ ]]
     fi
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/$native_package/post-stop-fit
     signature=${3:?expected qualified terminal price digest}
@@ -213,8 +226,33 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
        { cat "$q/fit-$probe.stderr" >&2; exit 1; }
     sleep "$((2+probe))"
   done
-  python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=117440512 and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory"
-  if $registered || $fixture_recovery; then
+  disk=117440512
+  if $homefloor_rejoin; then disk=$((92274688 + 16777216)); fi
+  python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=int(sys.argv[3]) and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory" "$disk"
+  if $homefloor_rejoin; then
+    slice=/sys/fs/cgroup/horizonaudit.slice
+    [[ $cg == "$slice/horizon-145-homefloor-rejoin-build-v1.service" ]]
+    [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
+    [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
+    (( $(cat "$slice/memory.current") + memory <= $(cat "$slice/memory.high") ))
+    (( $(cat "$slice/pids.current") + 128 <= $(cat "$slice/pids.max") ))
+    jq -e --arg fleet "$1" --arg hash "$fleet_sha" '
+        .fleet == {path:$fleet,sha256:$hash} and now-.recorded_unix_seconds >= 0
+        and now-.recorded_unix_seconds <= 120' "$q/before.json" >/dev/null
+    jq -e '.epoch == 145 and .fits and .candidate == null and .replay_launch_authorized == false
+           and .phase145.InvocationID == "afcf6cdd1ec0400ea2757f81472987b3"
+           and .phase145.failure.sha256 == "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366"
+           and .phase145.candidate.inode == 103237059
+           and .phase145.source_checkpoint_exists == false
+           and .recovery_obligations.public_storage.remaining_archive_growth_bytes == 0
+           and .recovery_obligations.prefix.maximum_HOME_allocation_bytes == 16777216
+           and .recovery_obligations.missing_mirror_bytes >= 0 and .candidate136.cap == 77309411328' "$q/before.json" >/dev/null
+    [[ $(sha256sum "$1" | cut -d' ' -f1) == "$fleet_sha" ]]
+    jq -e '.retry9_auxiliary_commitments | .build_and_native_qualification_serial and
+           .holding_and_build_may_overlap and .build_cpu_quota_micros >= 1000000 and
+           .build_memory_bytes >= 805306368 and .build_fixed_image_bytes >= 92274688 and
+           .build_outside_allowance_bytes >= 16777216' "$1" >/dev/null
+  elif $registered || $fixture_recovery; then
     python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/registered-build-fit.py" "$q" "$provider" "$cg"
   fi
   image="$q/cache.ext4"
@@ -252,10 +290,24 @@ find . -type f -print0 | sort -z | xargs -0 sha256sum > "$q/sources"
 export TMPDIR="$out/tmp"
 export PATH=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin
 export INCIDENT_FLEET="$1"
+if $homefloor_rejoin; then export INCIDENT_HOMEFLOOR_PRICE="$q/before.json"; fi
 args=("${extra[@]}" --cfg incident145_only --cfg continuity145_only --cfg materialized145_only --cfg partial145_only -Adead_code -L "dependency=$d/deps" -Copt-level=2 -Cstrip=symbols -Ccodegen-units=1 -Clink-arg=-Wl,--threads=1 -Clink-arg=-lstdc++)
 for o in "$d"/build/*/out; do args+=(-L "native=$o"); done
 ulimit -c 0
 args+=(@"$base/epoch145-aligned-prefix-integration-20261120-g1/rustc.args")
+if $homefloor_rejoin; then
+  /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
+  # Both the real source inode and its read-only test mounts are inside this build's own image.
+  projection="$out/tmp/paid-projection"
+  mkdir -m0700 "$projection" "$projection/view"
+  export RECOVERY_FIXTURE_SOURCE="$projection/source" RECOVERY_FIXTURE_VIEW="$projection/view/fixture"
+  echo paid-fixture > "$RECOVERY_FIXTURE_SOURCE"
+  touch "$RECOVERY_FIXTURE_VIEW"
+  mount --bind "$projection/view" "$projection/view"
+  mount --bind "$RECOVERY_FIXTURE_SOURCE" "$RECOVERY_FIXTURE_VIEW"
+  mount -o remount,bind,ro "$RECOVERY_FIXTURE_VIEW"
+  mount -o remount,bind,ro "$projection/view"
+fi
 rustc --edition=2024 --test "${args[@]}" "$s/main.rs" -o "$out/tests"
 "$out/tests" --test-threads=1
 for name in "${fixture[@]}"; do "$out/tests" --ignored --exact "$name"; done
@@ -282,6 +334,12 @@ du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
 if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then
   mkdir -m0700 "$q/products"
-  cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
+  if $homefloor_rejoin; then
+    # Keep the test binary inside the paid image. The 16 MiB outside allocation covers the retained source, binary and deployment image.
+    cp -R "$out/source" "$out/export145" "$q/products/"
+    test "$(du -s -B1 "$q/products" | cut -f1)" -le 7340032
+  else
+    cp -R "$out/source" "$out/tests" "$out/export145" "$q/products/"
+  fi
   test "$(du -s -B1 "$q/products" | cut -f1)" -le 24117248
 fi

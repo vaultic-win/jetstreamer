@@ -103,6 +103,10 @@ pub fn predecessor() -> Result<Value> {
             evidence["failed_qualification_census"] =
                 crate::incident145::failed_qualification_census()?;
         }
+        #[cfg(incident_homefloor145_only)]
+        {
+            evidence["failed_retry1"] = crate::incident145::failed_retry1()?;
+        }
         evidence
     };
     Ok(previous)

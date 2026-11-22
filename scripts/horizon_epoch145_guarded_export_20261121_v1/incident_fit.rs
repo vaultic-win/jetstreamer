@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_fixture145_only)]
+#[cfg(incident_homefloor145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_fixture145_only, not(incident_homefloor145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20/post-stop-fit";
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
@@ -19,7 +21,10 @@ const PROVIDER: &str = if cfg!(incident_v7c_post145_only) {
 } else {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v21/post-stop-fit"
 };
-#[cfg(all(incident_registered136_post145_only, not(incident_fixture_post145_only)))]
+#[cfg(all(
+    incident_registered136_post145_only,
+    not(incident_fixture_post145_only)
+))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v19/post-stop-fit";
 #[cfg(all(incident_timer_post145_only, not(incident_registered136_post145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v17/post-stop-fit";
@@ -298,6 +303,18 @@ fn pending_join(error: &str) -> Result<Option<u64>> {
         return held_170();
     }
     for (epoch, unit, directory) in [
+        #[cfg(incident_homefloor145_only)]
+        (
+            166,
+            "horizon-qualify-166-independent-retry11-20261122.service",
+            "epoch166-retry11-rebook-20261122-v1",
+        ),
+        #[cfg(incident_homefloor145_only)]
+        (
+            170,
+            "horizon-qualify-170-replacement-local3retry11-20261122.service",
+            "epoch170-retry11-rebook-20261122-v1",
+        ),
         (
             166,
             "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -455,6 +472,30 @@ pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
         && lines.next_back() == Some(expected.as_str())
 }
 
+fn reserved_memory(_complete: &Value) -> Result<u64> {
+    #[cfg(incident_homefloor145_only)]
+    let qualification_memory = match &_complete["bounded_qualification"] {
+        Value::Null => 0,
+        q => {
+            ensure!(
+                q["unit"] == "horizon-142-full-local-qualification-20261122-v1.service"
+                    && q["invocation_id"] == "42466cf599e7429889a778a68376c5ed"
+                    && q["pid"] == 227497
+                    && q["memory_bytes"] == 192u64 << 20
+                    && q["scratch_bytes"] == 8u64 << 20
+                    && q["additional_cpu_quota_micros"] == 0,
+                "foreign bounded native qualification"
+            );
+            capacity::n(q, "memory_bytes")?
+        }
+    };
+    #[cfg(not(incident_homefloor145_only))]
+    let qualification_memory = 0;
+    HOST_MEMORY
+        .checked_add(qualification_memory)
+        .context("qualified memory budget")
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -535,6 +576,28 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             && complete["replay_launch_authorized"] == false,
         "foreign incident capacity or 145 phase"
     );
+    #[cfg(incident_homefloor145_only)]
+    {
+        let holding = &complete["registered_retry11_holding"];
+        let obligations = &complete["recovery_obligations"];
+        ensure!(
+            complete["candidate"].is_null()
+                && holding["stage"] == "completed-copy"
+                && holding["stage_bytes"] == 0
+                && holding["resource_credit_bytes"] == 0
+                && holding["additional_reservation_bytes"] == 0
+                && holding["restore_overlap_bytes"] == 64922604512u64
+                && obligations["public_storage"]["remaining_archive_growth_bytes"] == 0
+                && obligations["public_storage"]["maximum_host_allocation_bytes"] == 256u64 << 20
+                && obligations["prefix"]["maximum_HOME_allocation_bytes"] == 16u64 << 20
+                && obligations["prefix"]["resource_credit_bytes"] == 0
+                && complete["status_registration"]["consumer_seal"]["sha256"]
+                    .as_str()
+                    .is_some_and(|sha| custody::hex(sha, 64))
+                && complete["candidate136"]["cap"] == 72u64 << 30,
+            "145 requires the current paid HOME, holding and sole writer census"
+        );
+    }
     let actors = active_population()?;
     let expected: BTreeMap<_, _> = actors
         .iter()
@@ -576,15 +639,16 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             .checked_add(n.as_u64().context("joined resident")?)
             .context("joined resident total")?;
     }
+    let reserved_ram = reserved_memory(&complete)?;
     ensure!(
-        required_ram.checked_add(resident) == Some(HOST_MEMORY),
+        required_ram.checked_add(resident) == Some(reserved_ram),
         "registered memory equation changed"
     );
     let fits = home >= required_home && ram >= required_ram;
     ensure!(
         required_home >= capacity::n(&complete, "protected_raw_floor_bytes")?
             && required_ram > 0
-            && required_ram <= HOST_MEMORY
+            && required_ram <= reserved_ram
             && complete["fits"] == fits
             && fits == out.status.success(),
         "inconsistent provider result"
@@ -699,9 +763,11 @@ fn observe_idle<T>(mut observe: impl FnMut() -> Result<T>) -> Result<T> {
         match observe() {
             Err(e)
                 if cfg!(any(incident_timeout145_only, incident_timeout_post145_only))
-                    && e.is::<capacity::TopologyTimeout>() =>
+                    && (e.is::<capacity::TopologyTimeout>()
+                        || (cfg!(incident_homefloor145_only)
+                            && e.is::<crate::peer_terminal::Pending>())) =>
             {
-                eprintln!("epoch145 waiting for a complete PID1 census: {e:#}");
+                eprintln!("epoch145 waiting for a complete census: {e:#}");
                 thread::sleep(if cfg!(test) {
                     Duration::from_millis(20)
                 } else {
@@ -874,7 +940,9 @@ impl Fit {
                 )
                 .context("resident sum")?;
         }
-        let memory = HOST_MEMORY.checked_sub(resident).context("memory budget")?;
+        let memory = reserved_memory(s)?
+            .checked_sub(resident)
+            .context("memory budget")?;
         let available = capacity::meminfo("MemAvailable:")?;
         if free < required || available < memory {
             return Err(capacity::Reprice(format!(
@@ -968,6 +1036,21 @@ fn remaining136(sample: &Value) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(incident_homefloor145_only)]
+    #[test]
+    fn complete_and_live_prices_keep_the_bounded_qualification() {
+        let mut observed = json!({"bounded_qualification":null});
+        assert_eq!(reserved_memory(&observed).unwrap(), HOST_MEMORY);
+        observed["bounded_qualification"] = json!({"unit":"horizon-142-full-local-qualification-20261122-v1.service",
+            "invocation_id":"42466cf599e7429889a778a68376c5ed","pid":227497,"memory_bytes":192u64<<20,
+            "scratch_bytes":8u64<<20,"additional_cpu_quota_micros":0});
+        assert_eq!(
+            reserved_memory(&observed).unwrap(),
+            HOST_MEMORY + (192 << 20)
+        );
+        observed["bounded_qualification"]["pid"] = 42.into();
+        assert!(reserved_memory(&observed).is_err());
+    }
     #[test]
     fn private_136_keeps_the_unspent_reservation_outside_its_guarded_subtree() {
         let cap = joint_candidate::ROOT_CAP;
@@ -991,6 +1074,7 @@ mod tests {
             serde_json::from_slice(&custody::bytes(&current, 32 << 20, false).unwrap()).unwrap();
         assert_eq!(v["owner"], "/root");
         let a = active_population().unwrap();
+        #[cfg(not(incident_homefloor145_only))]
         for unit in [
             "horizon-qualify-172-full-half-core-20261120-v1.service",
             "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -998,6 +1082,32 @@ mod tests {
             let ps = a.get(unit).unwrap();
             assert_eq!(ps.len(), 2);
             assert!(ps[0].0 != ps[1].0 && ps.iter().all(|p| p.1 > 0 && p.3 > 0));
+        }
+        #[cfg(incident_homefloor145_only)]
+        {
+            // The last cadence can predate a just-admitted producer. The sealed
+            // provider prices those replacements and fingerprints every native PID.
+            let price = PathBuf::from(std::env::var("INCIDENT_HOMEFLOOR_PRICE").unwrap());
+            let (_, before) = original(&price, 32 << 20).unwrap();
+            assert_eq!(before["fleet"], json!(binding));
+            assert_eq!(
+                before["phase145"]["InvocationID"],
+                "afcf6cdd1ec0400ea2757f81472987b3"
+            );
+            let observed: BTreeMap<_, _> = a
+                .iter()
+                .map(|(unit, members)| {
+                    assert!(members.iter().all(|p| p.1 > 0 && p.3 > 0));
+                    (
+                        unit,
+                        members
+                            .iter()
+                            .map(|p| [u64::from(p.0), p.1])
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect();
+            assert_eq!(before["population"], json!(observed));
         }
         assert!(
             current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus").is_err()

@@ -414,7 +414,8 @@ def fixture_post_directory(here):
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
         post_directory = fixture_post_directory(here)
-        profiles = {"semantic": ("profile145-focused-semantic.json", "tools-v5d"),
+        profiles = {"homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
+                    "semantic": ("profile145-focused-semantic.json", "tools-v5d"),
                     "post": ("profile145-focused-post.json", "tools-v9"),
                     "retry-post": ("profile145-retried-post.json", "tools-v10"),
                     "timer-semantic": ("profile145-timer-semantic.json", "tools-v5e"),
@@ -454,6 +455,16 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
 
 def phase145(epoch):
     if HOMEFLOOR:
+        # The existing terminal proof still prices an unstarted retry. A new
+        # live generation must pass its own sealed verifier and native lease checks.
+        here = Path(__file__).resolve()
+        if (here.parent / "profile145-homefloor-semantic.json").is_file() and fit.members(fit.A145):
+            cfg, adapter, _ = profile145(here.parent, focused="homefloor-semantic")
+            reader = runpy.run_path(str(adapter))
+            phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), fit.members(fit.A145),
+                                      epoch, here, cfg)
+            s.need(phase is not None, "unexpected HOME verifier image")
+            return phase
         return registrations["phase145"](s, fit, epoch)
     m=s.show(fit.A145);ps=fit.members(fit.A145)
     if Path(__file__).resolve().parent.name == "tools-v20-prestart":

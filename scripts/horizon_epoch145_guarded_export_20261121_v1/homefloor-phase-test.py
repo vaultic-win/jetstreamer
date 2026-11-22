@@ -1,0 +1,144 @@
+"""Exercise the 145 self-probe, six original leases and successor registration offline."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import runpy
+import tempfile
+from unittest import TestCase, main
+from unittest.mock import patch
+
+
+SCRIPT = Path(__file__).with_name("incident-phase.py")
+UNIT = "horizon-holding-export145-20261121-v1.service"
+GROUP = "0::/system.slice/" + UNIT
+
+
+class Status:
+    @staticmethod
+    def need(valid, reason):
+        if not valid:
+            raise ValueError(reason)
+
+    @staticmethod
+    def read(path, expected=None):
+        raw = path.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        Status.need(expected is None or expected == digest, "different fixture digest")
+        return json.loads(raw), dict(path=str(path), sha256=digest)
+
+    @staticmethod
+    def process(pid):
+        return (0 if pid == 10 else 10, pid + 100, GROUP)
+
+    @staticmethod
+    def iid(value):
+        return len(value) == 32 and int(value, 16) != 0
+
+    same_file = staticmethod(os.path.samefile)
+
+
+class HomefloorPhase(TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR", "/home/sol/.jetstreamer-private"))
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        pkg = root / "tools-v5g"
+        pkg.mkdir()
+        (pkg / SCRIPT.name).write_bytes(SCRIPT.read_bytes())
+        self.reader = runpy.run_path(str(pkg / SCRIPT.name))["inspect"]
+        g = self.reader.__globals__
+        self.assertTrue(g["HOMEFLOOR_REJOIN"])
+        self.generation = "1" * 32
+        image = pkg / "export145"
+        image.write_bytes(b"offline fixture")
+        self.sha = hashlib.sha256(image.read_bytes()).hexdigest()
+        self.provider = g["BASE"] / "incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v1/post-stop-fit"
+        self.fleet = g["BASE"] / "root214757-live166167170-20261122-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
+
+        def record(p, value):
+            p.write_text(json.dumps(value))
+            return Status.read(p)[1]
+
+        build = record(pkg / "build-proof.json", dict(verifier_sha256=self.sha))
+        seal = record(pkg / "deployment-seal-receipt.json",
+                      dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
+                           dict(name="build-proof.json", sha256=build["sha256"])]))
+        self.profile = dict(seal_sha256=seal["sha256"], build_sha256=build["sha256"], image_sha256=self.sha)
+        state = root / "state"
+        self.session = state / self.generation
+        self.session.mkdir(parents=True)
+        prior = g["STATE"] / g["OLD"]
+        (state / g["OLD"]).symlink_to(prior, target_is_directory=True)
+        self.old = Status.read(state / g["OLD"] / "failed.json", g["OLD_FAILURE"])[1]
+        self.proc = root / "proc"
+        self.parent = self.proc / "10"
+        self.worker = self.proc / "20"
+        for proc in (self.parent, self.worker):
+            proc.mkdir(parents=True)
+            (proc / "exe").symlink_to(image)
+            (proc / "environ").write_bytes(b"INVOCATION_ID=" + self.generation.encode() + b"\0")
+        for sub in ("fd", "fdinfo"):
+            (self.parent / sub).mkdir()
+        (self.parent / "fd/7").symlink_to(g["LOCK"])
+        (self.parent / "fdinfo/7").write_text("lock: 1: FLOCK ADVISORY WRITE 10 fc:00:95818311 0 EOF\n")
+        def proc_path(*parts):
+            path = Path(*parts)
+            return self.proc / path.relative_to("/proc") if path.is_relative_to("/proc") else path
+
+        self.argv = {10: [str(image),"recover-full-output",str(self.fleet),Status.read(self.fleet)[1]["sha256"],self.sha],
+                     20: [str(image),"recover-worker","10",self.sha]}
+        g.update(PKG=pkg, IMAGE=image, STATE=state, Path=proc_path, argv=self.argv.__getitem__)
+        self.manager = dict(MainPID="10", InvocationID=self.generation, Id=UNIT, ControlGroup=GROUP[3:],
+                            ActiveState="active", SubState="running", Job="", NRestarts="0", ControlPID="0",
+                            CPUQuotaPerSecUSec="1s", MemoryMax=str(2 << 30), MemorySwapMax="0")
+        self.started = dict(iid=self.generation, image=self.sha, file=str(g["OUTPUT"]), r2_mutations=False,
+                            fresh_fit=dict(schema="horizon-incident-replay-fit-v1", epoch=145, fits=True,
+                                phase145=dict(invocation_id=self.generation, stage="controller",
+                                   window=dict(native_parent=dict(pid=10,start_ticks=110),failed_predecessor=self.old)),
+                                provider_seal=dict(path=str(self.provider.with_name("deployment-seal-receipt.json")))),
+                            prior_frozen_recovery=dict(failed_retry1=dict(current_boot_failure=dict(failure=self.old))))
+        self.write = lambda: record(self.session / "recovery-started.json", self.started)
+
+    def inspect(self, members):
+        # Only the kernel self-probe is replaced. All phase and original inode checks use production code.
+        return self.reader(Status, lambda pid, obj: {str(k[1]):pid for k in obj}, self.manager,
+                           members, 145, self.provider, self.profile)
+
+    def test_bootstrap_and_leased_worker(self):
+        with patch.dict(self.reader.__globals__, own_probe=lambda *args:(10,)):
+            with patch("os.getpid", return_value=30):
+                boot = self.inspect((10,30))
+                self.assertEqual(boot["stage"], "controller")
+        self.write()
+        active = self.inspect((10,20))
+        self.assertEqual(active["stage"], "leased-worker")
+        for k in ("leases_parent","leases_worker"):
+            self.assertEqual(set(active["window"][k]), {"100214429","100214450","103237059"})
+
+    def test_does_not_admit_another_predecessor_probe_or_topology(self):
+        self.write()
+        with self.assertRaises(ValueError):
+            self.inspect((10,))
+        with self.assertRaises(ValueError):
+            self.inspect((10,20,30))
+        seal = self.started["fresh_fit"]["provider_seal"]
+        old_path = seal["path"]
+        seal["path"] = str(self.provider.parent.parent / "tools-v20/deployment-seal-receipt.json")
+        self.write()
+        with self.assertRaisesRegex(ValueError, "foreign 145 pre-worker"):
+            self.inspect((10,20))
+        seal["path"] = old_path
+        self.started["fresh_fit"]["phase145"]["invocation_id"] = "2" * 32
+        self.write()
+        with self.assertRaisesRegex(ValueError,"foreign 145 pre-worker"):
+            self.inspect((10,20))
+        self.started["fresh_fit"]["phase145"]["invocation_id"] = self.generation
+        self.started["prior_frozen_recovery"]["failed_retry1"]["current_boot_failure"]["failure"] = {}
+        self.write()
+        with self.assertRaisesRegex(ValueError,"left its native frozen"):
+            self.inspect((10,20))
+
+
+if __name__ == "__main__":
+    main()
