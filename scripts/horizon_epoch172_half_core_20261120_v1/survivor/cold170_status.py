@@ -7,8 +7,9 @@ import cold167_status as cold167
 from evidence import BASE, bound, checked, need
 
 LOCAL = Path(__file__).resolve().parent
-RETRY12 = (LOCAL/'retry12-170-generation.json').is_file()
-ATTEMPT = 'retry12' if RETRY12 else 'retry11'
+REGISTRATIONS = [attempt for attempt in ('retry11','retry12','retry13') if (LOCAL/f'{attempt}-170-generation.json').is_file()]
+need(len(REGISTRATIONS)==1, 'ambiguous 170 generation')
+ATTEMPT = REGISTRATIONS[0]
 ROOT = BASE / f'epoch170-{ATTEMPT}-rebook-20261122-v1'
 GUARD = BASE / f'epoch170-{ATTEMPT}-guard-20261122-v1'
 NAME = f'170-replacement-local3{ATTEMPT}-20261122'
@@ -18,9 +19,21 @@ RUN = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/re
 STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
 BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
-ANCHOR_SHA = '466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if RETRY12 else '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728'
-GUARD_SHA = '7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if RETRY12 else '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d'
-INODE = 113836033 if RETRY12 else 113704962
+ENROLLMENTS = {
+    'retry11': ('8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728',
+                '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d', 113704962),
+    'retry12': ('466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19',
+                '7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c', 113836033),
+    'retry13': ('654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69',
+                '34ee106fc4dd290e8ad447f1ff5ab15cfe538b7ca522785a87df106566e0645c', 113981945),
+}
+ANCHOR_SHA, GUARD_SHA, INODE = ENROLLMENTS[ATTEMPT]
+FAILURES = {
+    'retry12': ('60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801',
+                '7a9f41a86d9240be89e3484fc01c3a31', 'post-guard floor or actor changed'),
+    'retry13': ('ff337e45c1f4a3af3e0f44654a80ee00ffef2c9405ddc27e16c6883611a53151',
+                'f26354f4e63748059e441cbbee250fdb', 'post-guard floor 8829245547088 exceeds armed floor 8739050197584'),
+}
 
 
 def generation():
@@ -30,11 +43,12 @@ def generation():
          and witness == dict(path=str(GUARD/'GUARD_QUALIFIED.json'), sha256=GUARD_SHA),
          'foreign 170 enrollment')
     original, proof = checked(anchor), checked(witness)
-    if RETRY12:
+    if ATTEMPT in FAILURES:
+        digest, iid, error = FAILURES[ATTEMPT]
         failure = checked(original['previous_start_failure'])
-        need(original['previous_start_failure']['sha256'] == '60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801'
-             and failure['cgroup'] == [] and failure['producer_invocation_id'] == '7a9f41a86d9240be89e3484fc01c3a31'
-             and failure['error'] == 'post-guard floor or actor changed', 'different preceding 170 startup failure')
+        need(original['previous_start_failure']['sha256'] == digest
+             and failure['cgroup'] == [] and failure['producer_invocation_id'] == iid
+             and failure['error'] == error, 'different preceding 170 startup failure')
     meta = RUN.lstat()
     identity = dict(path=str(RUN), device=meta.st_dev, inode=meta.st_ino)
     need((original['root'], original['device'], original['inode']) == (str(RUN), 64512, INODE)
@@ -76,6 +90,9 @@ def check_generation(fleet_ref, fleet, state):
     registration = checked(prepared)
     # The native session can carry the root identity inline or by immutable receipt.
     baseline = registration.get('baseline',registration)
+    if ATTEMPT=='retry13':
+        expected=checked(anchor)['previous_start_failure']
+        need(baseline['previous_cold_failure']==expected,'170 predecessor failure changed')
     stable_root = baseline.get('root',baseline.get('stable_root'))
     need(stable_root in (anchor,identity), '170 preparation belongs to another filesystem object')
     intent_ref = bound(ROOT/'START_INTENT.json')
