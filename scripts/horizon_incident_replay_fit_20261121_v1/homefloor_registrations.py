@@ -88,8 +88,8 @@ def selected_status(s, fit):
 
 def cold_status(s, fit, prior, epoch, attempt=11):
     """Follow the sealed 166 or 170 handoff from its previously qualified writer."""
-    s.need((epoch, attempt) in ((166, 11), (170, 11), (170, 12)), 'unknown cold generation')
-    prefix = f'COLD{epoch}_RETRY{attempt}_STATUS_'
+    s.need((epoch, attempt) in ((166, 11), (170, 11), (170, 12), (170, 13)), 'unknown cold generation')
+    prefix = f'COLD{epoch}_RETRY{attempt}_V2_STATUS_' if attempt == 13 else f'COLD{epoch}_RETRY{attempt}_STATUS_'
     active_path = STATUS / (prefix + 'ACTIVE.json')
     rollback_path = STATUS / (prefix + 'ROLLBACK.json')
     if not active_path.exists() and not rollback_path.exists():
@@ -109,7 +109,7 @@ def cold_status(s, fit, prior, epoch, attempt=11):
                                      'bf5e7c55b8d6dd1c943b424a70427fcaeea17dc2a8cfd77b6de2fae5caa00a82'),
                'cold launch must inherit the admitted 167/172 writer')
     s.need(old_iid == old_actor['invocation_id'], 'different previous writer invocation')
-    package = STATUS / f'tools-cold{epoch}-retry{attempt}'
+    package = STATUS / (f'tools-cold{epoch}-retry{attempt}-v2' if attempt == 13 else f'tools-cold{epoch}-retry{attempt}')
     qualified_digest, seal_digest, producer_unit = {
         (166, 11): ('5ecd660bf949538b23838b68a90798843b586d61671c983528e148ea2344c017',
               '17387e4cb210b1832d11fb2c3fe3879d409dce3c0c686d189ee9b1dd27d80e10',
@@ -120,6 +120,9 @@ def cold_status(s, fit, prior, epoch, attempt=11):
         (170, 12): ('537cccbdc4bcb9bfb7b029eb87cee6f9aaf0000c5b1d8f0aa03f6808ab68c269',
                     '4a95447cb4b978ecfa0faf28fb8e3a8f63b6fd9ed88a2ed583b6bdff253b7b33',
                     'horizon-qualify-170-replacement-local3retry12-20261122.service'),
+        (170, 13): ('c1ec33c2d6464b76ac96fc2a24a7f039cfff03f14a362558d7573e7504897e81',
+                    'f1b4781788205dbc065f5b116577c2e263e523f65e19cd658c31a9ae7e86fdb4',
+                    'horizon-qualify-170-replacement-local3retry13-20261122.service'),
     }[epoch, attempt]
     qualified, qr = s.read(STATUS / (prefix + 'QUALIFIED.json'), qualified_digest)
     intent, ir = s.read(STATUS / (prefix + 'INTENT.json'))

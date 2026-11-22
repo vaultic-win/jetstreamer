@@ -699,7 +699,7 @@ def joined_resident(active):
 
 def registered_status():
     if HOMEFLOOR:
-        return registrations["registered_status"](s, fit, 12 if RETRY12_170 else 11)
+        return registrations["registered_status"](s, fit, cold170["ATTEMPT"] if COLD170 else 11)
     registration=s.read(fit.READY,"02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")[1]
     m=s.show(fit.PUBLISHER);pid=int(m["MainPID"])
     proc=Path(f"/proc/{pid}")
