@@ -462,7 +462,7 @@ fn dispatch() -> Result<Value> {
             == base().join(if EPOCH == 167 {
                 "tools-v2/recover167"
             } else if cfg!(epoch166_retry11) {
-                "tools-v2/recover166"
+                "tools-v3/recover166"
             } else {
                 "tools/recover166"
             }),
