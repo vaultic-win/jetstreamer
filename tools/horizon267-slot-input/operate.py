@@ -1,5 +1,5 @@
 """Main-only preparation, guarded first activation and original terminal capture."""
-import argparse,hashlib,json,os,re,shutil,stat,subprocess,sys,time
+import argparse,hashlib,json,os,re,runpy,shutil,stat,subprocess,sys,time
 from pathlib import Path
 
 HERE=Path(__file__).resolve().parent
@@ -13,7 +13,7 @@ SEALER_SHA='faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a'
 CONTRACT='2be7ff5b50e1013dbea7b34c718c3cc6dce0ef9b04912246643517d027779b75'
 SYSTEM_SHA='27a7d8f6a005702618e92c88f20b829d38247ad3369e0c35b1ff219d15194bd1'
 ORIG=Path('/var/lib/jetstreamer/horizon265-prestart-accepted-20261120-v3')
-FILES=('payload.py','guard.py','phase-contract.json','indexes.json','267-car.bin','267-slot-to-cid.bin','slot267.rs')
+FILES=('payload.py','guard.py','phase-contract.json','indexes.json','267-car.bin','267-slot-to-cid.bin','slot267.rs','toolchain.py','toolchain.json')
 DONE='7ad2d189f7e94e70a38c781354912448'
 FAILED='d9b373ed55a64feb8242e02dbe79a49c'
 
@@ -51,9 +51,16 @@ def seal(plan_path,dest,members):
     need(digest(SEALER)==SEALER_SHA and not os.path.lexists(dest),'sealer or destination')
     plan={'schema':'jetstreamer-sealed-deployment-plan-v1','destination':str(dest),'members':members}
     data(plan_path,plan)
-    subprocess.run([SEALER,plan_path,'--plan-sha256',digest(plan_path),'--self-sha256',SEALER_SHA],check=True,timeout=15,umask=0o022)
+    subprocess.run([SEALER,plan_path,'--plan-sha256',digest(plan_path),'--self-sha256',SEALER_SHA],check=True,timeout=15,umask=0o022,env={'PATH':'/usr/bin:/bin','LC_ALL':'C'})
     result=fixed(dest/'deployment-seal-receipt.json')
     need(result['destination']==str(dest) and result['plan_sha256']==digest(plan_path) and result['sealer_sha256']==SEALER_SHA and {m['name']:m['sha256'] for m in result['members']}=={m['name']:m['sha256'] for m in members},'sealer receipt')
+def compiler_tools():
+    path=HERE/'toolchain.py'
+    need(digest(path)=='4dd32fac995c3af2f8a848683fd7f76daea317239bb26eb2ab329d58da3a0f82','compiler verifier source changed')
+    return runpy.run_path(str(path))
+def compiler_binds():
+    tc=compiler_tools()
+    return [[str(host),str(target),False,0] for host,target in tc['files'](tc['manifest']())]
 def prepare(manifest_sha):
     root()
     p=HERE/'SHA256SUMS';need(digest(p)==manifest_sha and re.fullmatch('[0-9a-f]{64}',manifest_sha),'packet manifest')
@@ -61,6 +68,7 @@ def prepare(manifest_sha):
     need(all(digest(HERE/name)==sha for name,sha in hashes.items()) and hashes['phase-contract.json']==CONTRACT and hashes['operate.py']==digest(Path(__file__).resolve()),'packet drift')
     need(not BASE.exists(),'used preparation namespace');mkdir(BASE,0o711)
     seal(BASE/'source-plan.json',SRC,[dict(source=str(HERE/f),name=f,sha256=hashes[f],mode=0o444) for f in FILES])
+    tc=compiler_tools();tc['setup'](tc['manifest']())
     for phase in ('transfer','verify'):
         mkdir(BASE/phase,0o711);ctl=BASE/(phase+'-control');mkdir(ctl,0o700);mkdir(ctl/'tokens',0o700)
     data(BASE/'prepared.json',dict(packet_manifest=ref(p),source_seal=ref(SRC/'deployment-seal-receipt.json'),operator=ref(Path(__file__).resolve()),authority=False))
@@ -78,6 +86,9 @@ def actor_command(phase,l):
     unit=l['unit'];out=BASE/phase;ctl=BASE/(phase+'-control');token=str(ctl)+'/tokens/${INVOCATION_ID}/guard-admission.json'
     caps=(1<<0)|(1<<2)|(1<<6)|(1<<7) if phase=='verify' else 0
     p=[('Description','s','Epoch 267 bounded slot-index '+phase),('Type','s','exec'),('User','s','root'),('Group','s','root'),('Restart','s','no'),('KillMode','s','control-group'),('UMask','u','63'),('NoNewPrivileges','b','true'),('ProtectSystem','s','strict'),('ProtectHome','s','read-only' if phase=='verify' else 'yes'),('PrivateNetwork','b','true' if phase=='verify' else 'false'),('PrivateDevices','b','true'),('CapabilityBoundingSet','t',str(caps)),('ReadWritePaths','as','1',str(out)),('MemoryMax','t',str(l['memory_max_bytes'])),('MemorySwapMax','t','0'),('TasksMax','t',str(l['tasks_max'])),('LimitFSIZE','t',str(32<<20 if phase=='verify' else 15166712)),('LimitFSIZESoft','t',str(32<<20 if phase=='verify' else 15166712)),('AllowedCPUs','ay','8','0','0','0','0','0','0','0','1'),('CPUQuotaPerSecUSec','t','1000000'),('CPUQuotaPeriodUSec','t','100000'),('TimeoutStartUSec','t','75000000'),('TimeoutStopUSec','t','10000000'),('RuntimeMaxUSec','t',str(1000000*l['runtime_seconds'])),('ExecStartPre','a(sasb)','3',*cmd('/usr/bin/sleep','60'),*cmd('/usr/bin/test','-f',token),*cmd('/usr/bin/test','!','-L',token)),('ExecStart','a(sasb)','1',*cmd('/usr/bin/python3','-I','-B',SRC/'payload.py',phase))]
+    if phase=='verify':
+        binds=compiler_binds()
+        p.append(('BindReadOnlyPaths','a(ssbt)',str(len(binds)),*[word for src,dest,_,_ in binds for word in (src,dest,'false','0')]))
     return ['/usr/bin/busctl','--system','call','org.freedesktop.systemd1','/org/freedesktop/systemd1','org.freedesktop.systemd1.Manager','StartTransientUnit','ssa(sv)a(sa(sv))',unit,'fail',str(len(p)),*[word for item in p for word in item],'0']
 def dbus_prop(unit,property_name):
     escaped=''.join(ch if ch.isalnum() else '_'+format(ord(ch),'02x') for ch in unit)
@@ -88,6 +99,9 @@ def exact_gate(phase,unit):
     ctl=BASE/(phase+'-control');token=str(ctl)+'/tokens/${INVOCATION_ID}/guard-admission.json'
     for name,typ in [('Environment','as'),('EnvironmentFiles','a(sb)'),('PassEnvironment','as'),('UnsetEnvironment','as')]:
         x=dbus_prop(unit,name);need(x['type']==typ and x['data']==[],'unexpected '+name)
+    bind=dbus_prop(unit,'BindReadOnlyPaths')
+    expected=compiler_binds() if phase=='verify' else []
+    need(bind['type']=='a(ssbt)' and sorted(bind['data'])==sorted(expected),'effective compiler file bindings')
     for name,want in [('ExecStartPre',[['/usr/bin/sleep','60'],['/usr/bin/test','-f',token],['/usr/bin/test','!','-L',token]]),('ExecStart',[['/usr/bin/python3','-I','-B',str(SRC/'payload.py'),phase]])]:
         x=dbus_prop(unit,name)
         need(x['type']=='a(sasbttttuii)' and [r[1] for r in x['data']]==want and all(r[0]==r[1][0] and r[2] is False for r in x['data']),'different native '+name)

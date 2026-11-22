@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import runpy
 import stat
 import subprocess
 import sys
@@ -14,11 +15,11 @@ SRC=Path(__file__).resolve().parent
 BASE=Path('/var/lib/jetstreamer/horizon267-slot-input-v1')
 CURL=Path('/usr/bin/curl')
 SEALER=Path('/var/lib/jetstreamer/horizon251-published-sealer-20261118-v1/horizon251-sealer')
-RUSTC=Path('/home/ubuntu/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin/rustc')
+RUSTC=BASE/'toolchain/bin/rustc'
 RUSTC_SHA='3690cc576ede140504698405d5d8fa3826aaadbe71699c6c4ed0a565d6f493e2'
 SEALER_SHA='faf7aa8270b3472969bf394d4486cdf94445e30e4f15bc6acd38bed56880877a'
 CURL_SHA='d90fe31761b6ac228a75507b62186b3ed00ccf1f0fc5c7ce704bbe3936e31343'
-PINS={'indexes.json':'e78d9f9fcd94552f289b36af51fe5d72b639ac17a8db4c76c94b98fd9077c75b',
+PINS={'toolchain.py':'4dd32fac995c3af2f8a848683fd7f76daea317239bb26eb2ab329d58da3a0f82','toolchain.json':'de5155665ce8d8975bf8aad79e24909f05942b4c235125a33cf98d123da2067f','indexes.json':'e78d9f9fcd94552f289b36af51fe5d72b639ac17a8db4c76c94b98fd9077c75b',
       '267-slot-to-cid.bin':'add8388b9cc822c6fcadeffe06885c37cd8d8172ba8f0049ac2ac9cb846127c7',
       '267-car.bin':'6de6caf41e8c666071c32e01ca73efd28f214097bfd940f7fb7552a137654221',
       'slot267.rs':'d2f00493ffa20a4946bee64b4dcbbfa7a500d6b26f8c0fbb047953c8d86400ff'}
@@ -88,10 +89,18 @@ def verify(out,rows):
     transfer_path=BASE/'transfer'/'result.json'
     tr=json.loads(transfer_path.read_bytes());body=BASE/'transfer'/'slot.body'
     need(tr['phase']=='transfer' and tr['inputs']==PINS and tr['body']['url']==rows[1]['url'] and tr['body']['identity']==stamp(body) and tr['body']['bytes']==SIZE and tr['body']['sha256']==sha(body),'transfer receipt or source drift')
+    tc=runpy.run_path(str(SRC/'toolchain.py'))
+    revision=tc['manifest']()
+    before_inputs=tc['check_view'](revision,True)
     need(sha(RUSTC)==RUSTC_SHA and sha(SEALER)==SEALER_SHA,'compiler/sealer changed')
     work=out/'compile';work.mkdir(mode=0o700);os.chown(work,1000,1000)
-    args=[str(RUSTC),'--edition=2021','-Dwarnings','-Copt-level=0','-Cdebuginfo=0','-Ccodegen-units=1','-Clinker=/usr/bin/cc','-Clink-arg=-Wl,--no-keep-memory',str(SRC/'slot267.rs')]
+    access=child(['/usr/bin/python3.14','-I','-B','-c',
+        "import os,pathlib,sys; p=pathlib.Path.cwd()/'access.fixture'; assert os.getuid()==os.getgid()==1000 and not os.getgroups(); p.write_bytes(b'probe'); assert p.read_bytes()==b'probe';p.unlink(); assert pathlib.Path(sys.argv[1]).open('rb').read(1); assert pathlib.Path(sys.argv[2]).open('rb').read(1); assert os.access(sys.argv[3],os.X_OK) and not os.access(sys.argv[4],os.W_OK) and not os.access(sys.argv[5],os.R_OK); print('uid1000 verified')",
+        SRC/'slot267.rs',body,RUSTC,out,BASE/'verify-control/booking.json'],work)
+    need(access.strip()=='uid1000 verified','compiler UID path access probe')
+    args=[str(RUSTC),'--sysroot',str(tc['VIEW']),'--edition=2021','-Dwarnings','-Copt-level=0','-Cdebuginfo=0','-Ccodegen-units=1','-Clinker=/usr/bin/gcc-15','-Clink-arg=-fuse-ld=bfd','-Clink-arg=-Wl,--no-keep-memory',str(SRC/'slot267.rs')]
     compiler=child([RUSTC,'--version','--verbose'],work)
+    need(child([RUSTC,'--print','sysroot','--sysroot',str(tc['VIEW'])],work).strip()==str(tc['VIEW']),'compiler sysroot')
     child([*args,'--test','-o',work/'tests'],work)
     tests=child([work/'tests','--test-threads=1'],work)
     need('2 passed; 0 failed;' in tests,'native fixture tests')
@@ -111,17 +120,19 @@ def verify(out,rows):
         dst.write(piece);dst.flush();os.fchmod(dst.fileno(),0o555);os.fsync(dst.fileno())
     before=stamp(chk);native=json.loads(child([chk,body],work))
     need(native=={'epoch':267,'kind':'slot-to-cid','bytes':SIZE,'entries':388871,'buckets':39,'all_cid_types_checked':True,'all_search_trees_checked':True,'car_lookups_verified':False,'admission_authorized':False} and stamp(chk)==before and stamp(body)==tr['body']['identity'],'native result/source identity')
+    after_inputs=tc['check_view'](revision,True)
+    need(after_inputs==before_inputs,'compiler input envelope changed')
     name=rows[1]['url'].rsplit('/',1)[1]
     dst=out/'sealed'
     plan=dict(schema='jetstreamer-sealed-deployment-plan-v1',destination=str(dst),members=[dict(name=name,source=str(body),mode=0o444,sha256=tr['body']['sha256'])])
     record(out/'seal-plan.json',plan)
-    subprocess.run([SEALER,out/'seal-plan.json','--plan-sha256',sha(out/'seal-plan.json'),'--self-sha256',SEALER_SHA],check=True,umask=0o022)
+    subprocess.run([SEALER,out/'seal-plan.json','--plan-sha256',sha(out/'seal-plan.json'),'--self-sha256',SEALER_SHA],check=True,umask=0o022,env={'PATH':'/usr/bin:/bin','LC_ALL':'C'})
     receipt=dst/'deployment-seal-receipt.json';seal=json.loads(receipt.read_bytes())
     m,=seal['members'];sealed=dst/name
     need(seal['destination']==str(dst) and seal['plan_sha256']==sha(out/'seal-plan.json') and seal['sealer_sha256']==SEALER_SHA and m['name']==name and m['sha256']==tr['body']['sha256'] and m['bytes']==SIZE and m['mode']=='0444','seal binding')
     st=sealed.lstat()
     need(st.st_uid==st.st_gid==0 and stat.S_IMODE(st.st_mode)==0o444 and stamp(sealed)[2]==SIZE and sha(sealed)==tr['body']['sha256'] and stamp(body)==tr['body']['identity'],'sealed body')
-    return dict(transfer_receipt_sha256=sha(transfer_path),transfer_invocation=tr['invocation'],checker_sha256=sha(chk),compiler=compiler,compiler_sha256=RUSTC_SHA,fixture_result=tests,structure=native,full_sha256=m['sha256'],cache_path=str(sealed),seal_sha256=sha(receipt))
+    return dict(compiler_inputs_before=before_inputs,compiler_inputs_after=after_inputs,compiler_uid_probe=access.strip(),transfer_receipt_sha256=sha(transfer_path),transfer_invocation=tr['invocation'],checker_sha256=sha(chk),compiler=compiler,compiler_sha256=RUSTC_SHA,fixture_result=tests,structure=native,full_sha256=m['sha256'],cache_path=str(sealed),seal_sha256=sha(receipt))
 def watch(phase,iid):
     ctl=BASE/(phase+'-control')
     book=ctl/'booking.json'
@@ -142,6 +153,7 @@ def main():
     phase,=sys.argv[1:]
     need(phase in ('transfer','verify') and os.geteuid()==0,'invalid phase or UID')
     rootdir(BASE,0o711)
+    need(Path(sys.executable).resolve()==Path('/usr/bin/python3.14') and sys.version_info[:2]==(3,14) and sha(Path('/usr/bin/python3.14'))=='be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd','original Python base')
     iid=os.environ['INVOCATION_ID']
     unit='horizon267-slot-'+phase+'-v1.service'
     need(re.fullmatch('[a-f0-9]{32}',iid) and Path('/proc/self/cgroup').read_text().strip()=='0::/system.slice/'+unit,'wrong cgroup or invocation')
