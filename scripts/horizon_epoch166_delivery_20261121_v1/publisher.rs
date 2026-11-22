@@ -37,7 +37,10 @@ struct PublicationProfile {
     boundaries_sha: &'static str,
 }
 
+#[cfg(all(feature = "cold167", not(feature = "source167")))]
+compile_error!("cold167 requires the source167 singleton profile");
 #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg_attr(feature = "cold167", path = "cold167_profile.rs")]
 mod peer_profile;
 
 #[cfg(not(any(
@@ -264,7 +267,7 @@ fn scope(h: &Handoff, source: &Path, a: &Authority) -> Result<u64> {
     );
     root_dir(&a.root)?;
     let live_path = a.root.join("LIVE.json");
-    let live = document(&live_path, &a.live_sha, true)?;
+    let live = document(&live_path, &a.live_sha, !cfg!(feature = "cold167"))?;
     #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
     ensure!(
         live["schema"] == peer_profile::LIVE_SCHEMA,

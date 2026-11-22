@@ -17,6 +17,9 @@ pkg=$(dirname "$(realpath -- "${BASH_SOURCE[0]}")")
 delivery=$(dirname "$pkg")
 quota=100%
 case "$delivery" in
+    "$rt/epoch167-cold-delivery-20261122-v3")
+        epoch=167
+        unit=horizon-publish-167-cold-source-index-committed.service ;;
     "$rt/epoch167-current-delivery-20261121-v1")
         epoch=167
         unit=horizon-publish-167-source-index-committed.service ;;

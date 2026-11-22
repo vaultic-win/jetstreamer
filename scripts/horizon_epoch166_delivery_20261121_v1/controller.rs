@@ -16,7 +16,10 @@ use std::{
 };
 
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
+#[cfg(all(feature = "cold167", not(feature = "source167")))]
+compile_error!("cold167 requires the source167 singleton profile");
 #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg_attr(feature = "cold167", path = "cold167_profile.rs")]
 mod peer_profile;
 
 #[cfg(not(any(
@@ -139,6 +142,11 @@ const EPOCH: u64 = 166;
 use deployment::*;
 const NATIVE: &str = "dea7acbfa01d0beae046549823ebce48e7086a7276349b4530ed35c04a2d4efb";
 const MEMORY: u64 = 2 << 30;
+const WITNESS_MODE: u32 = if cfg!(feature = "cold167") {
+    0o400
+} else {
+    0o600
+};
 const PUBLICATION_CPU_MICROS: u64 = if EPOCH == 172 { 500_000 } else { 1_000_000 };
 
 fn sha(bytes: &[u8]) -> String {
@@ -436,7 +444,7 @@ fn main() -> Result<()> {
     let rt = Path::new(RT);
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
     let boot = boot.trim();
-    let (live, live_ref) = read_json(&rt.join(WITNESS).join("LIVE.json"), 0o600, 1 << 20)?;
+    let (live, live_ref) = read_json(&rt.join(WITNESS).join("LIVE.json"), WITNESS_MODE, 1 << 20)?;
     ensure!(live_ref["sha256"] == LIVE, "wrong live witness");
     let (terminal, term_ref) = read_json(
         &rt.join(WITNESS).join("TERMINAL_SUCCESS.json"),
@@ -560,7 +568,7 @@ mod tests {
     fn committed_source_prepares_under_the_original_receiver() -> Result<()> {
         let fixture = PathBuf::from(std::env::var_os("HORIZON_166_QA_BASE").context("QA dir")?);
         let auth = fixture.join("authority");
-        let (live, live_ref) = read_json(&auth.join("LIVE.json"), 0o600, 1 << 20)?;
+        let (live, live_ref) = read_json(&auth.join("LIVE.json"), WITNESS_MODE, 1 << 20)?;
         let (terminal, term_ref) = read_json(&auth.join("TERMINAL_SUCCESS.json"), 0o400, 1 << 20)?;
         let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
         validate_terminal(&live, &live_ref, &terminal, boot.trim())?;
