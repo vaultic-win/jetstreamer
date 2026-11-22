@@ -120,7 +120,7 @@ fn registration() -> Result<(Value, Value)> {
         "foreign selector registration"
     );
     compare_lock_identity(&fs::symlink_metadata(LOCK)?, &ready["operation_lock"])?;
-    let pkg = rt(DIR).join("tools");
+    let pkg = rt(DIR).join("tools-v2");
     let seal = bound(&pkg.join("deployment-seal-receipt.json"))?;
     ensure!(ready["deployment"] == seal, "different selector deployment");
     let image = check_member(&pkg, text(&seal["sha256"])?, "follow145")?;
@@ -269,99 +269,64 @@ fn empty_candidate() -> Result<()> {
     Ok(())
 }
 
-// A failure after a donor mutation requires the writer's own positive release.
-// A successful session may start the post verifier as soon as the same guarded
-// payload appears in the accepted fleet. Its native V19 price checks it again.
+// V19 checks the native release and the accepted roster on each price. Retain
+// the post submission until both agree that the selected donation ended.
 fn settled(offer: &Value, selector: &Value, ready: &Value) -> Result<File> {
-    loop {
-        let operation = open_operation(ready)?;
+    let operation = open_operation(ready)?;
+    let (_, image) = offered_plan(offer, selector)?;
+    let intent_path = Path::new(BASE).join("prestart-intent.json");
+    if !intent_path.try_exists()? {
         drained(&native(W)?, W)?;
-        let (plan, image) = offered_plan(offer, selector)?;
-        let base = Path::new(BASE);
-        if !base.join("prestart-intent.json").try_exists()? {
-            empty_candidate()?;
-            return Ok(operation);
-        }
-        let intent = from_ref(&bound(&base.join("prestart-intent.json"))?)?;
-        ensure!(
-            intent["selector"] == *selector
-                && intent["writer_plan"] == offer["writer_plan"]
-                && intent["boot_id"] == boot()?
-                && intent["writer"] == plan["controller"],
-            "different selected writer"
-        );
-        if base.join("prestart-released.json").try_exists()? {
-            let actual: Value = serde_json::from_slice(&command(
-                &image,
-                &[
-                    "verify-release",
-                    text(&offer["writer_plan"]["path"])?,
-                    text(&offer["writer_plan"]["sha256"])?,
-                ],
-            )?)?;
-            ensure!(
-                actual == bound(&base.join("prestart-released.json"))?,
-                "unverified terminal 136"
-            );
-            return Ok(operation);
-        }
-        let head = incident::fleet()?;
-        let fleet = from_ref(&head)?;
-        let release = base.join("reproduction/receipts/parent-release.json");
-        if release.try_exists()? {
-            let v = from_ref(&bound(&release)?)?;
-            ensure!(
-                v["schema"] == "horizon-epoch136-actual-parent-release-v1"
-                    && v["unit"] == PAYLOAD
-                    && v["writer"] == intent["writer"]
-                    && v["writer_invocation_id"] == intent["writer_invocation_id"]
-                    && v["node_spawn_authorized"] == true,
-                "unrelated parent release"
-            );
-            let n = native(PAYLOAD)?;
-            if n["ActiveState"] == "active"
-                && n["InvocationID"] == v["invocation_id"]
-                && fleet["actual_active_private_diagnostics"]
-                    .as_array()
-                    .context("fleet diagnostics")?
-                    .iter()
-                    .any(|r| {
-                        r["epoch"] == 136
-                            && r["unit"]["Id"] == PAYLOAD
-                            && r["unit"]["InvocationID"] == v["invocation_id"]
-                    })
-            {
-                return Ok(operation);
-            }
-        }
-        // Release may arrive before the next accepted fleet. Wake on either.
-        drop(operation);
-        wait_for_either(
-            &outcome::next(&fleet)?,
-            &base.join("prestart-released.json"),
-        )?;
+        empty_candidate()?;
+        return Ok(operation);
     }
+    let intent = from_ref(&bound(&intent_path)?)?;
+    drop(operation);
+    terminal136::release_before_post(&offer["writer_plan"], &image, &intent)?;
+    let operation = open_operation(ready)?;
+    ensure!(
+        from_ref(&bound(&intent_path)?)? == intent,
+        "donor intent changed after release"
+    );
+    let verified: Value = serde_json::from_slice(&command(
+        &image,
+        &[
+            "verify-release",
+            text(&offer["writer_plan"]["path"])?,
+            text(&offer["writer_plan"]["sha256"])?,
+        ],
+    )?)?;
+    ensure!(
+        verified == bound(&Path::new(BASE).join("prestart-released.json"))?,
+        "donor release changed"
+    );
+    Ok(operation)
 }
 
-fn wait_for_either(head: &Path, release: &Path) -> Result<()> {
-    let fd = events::owned(unsafe { libc::inotify_init1(libc::IN_CLOEXEC) })?;
-    for f in [head, release] {
-        let parent = f.parent().context("receipt directory")?;
-        events::watch(
-            &fd,
-            if parent.is_dir() {
-                parent
-            } else {
-                parent.parent().context("fleet root")?
-            },
-        )?;
-    }
-    if !head.try_exists()? && !release.try_exists()? {
-        let mut bytes = [0u8; 4096];
-        let n = unsafe { libc::read(fd.as_raw_fd(), bytes.as_mut_ptr().cast(), bytes.len()) };
-        ensure!(n > 0, "lost 136 release or fleet notification");
-    }
-    Ok(())
+pub(super) fn selected_boundary() -> Result<Value> {
+    let state = rt(DIR).join("state");
+    let writer = state.join(SELECTED);
+    let post = state.join("post-selected.json");
+    let selector = bound(&ready_path())?;
+    let done = incident::completed_semantics()?;
+    let (record, registered) = match (writer.try_exists()?, post.try_exists()?) {
+        (true, false) => {
+            let record = bound(&writer)?;
+            let offer = from_ref(&from_ref(&record)?["offer"])?;
+            (record, offer["selector"].clone())
+        }
+        (false, true) => {
+            let record = bound(&post)?;
+            let registered = from_ref(&record)?["selector"].clone();
+            (record, registered)
+        }
+        _ => bail!("expected one registered 145 boundary decision"),
+    };
+    ensure!(
+        registered == selector && from_ref(&record)?["semantic_complete"] == done,
+        "foreign selector decision"
+    );
+    Ok(json!({"selector":selector,"decision":record}))
 }
 
 fn prepare_mirrors(offer: &Value, fleet: &Value, parent: &Path) -> Result<bool> {
@@ -480,11 +445,15 @@ fn run_session(
     // The writer has its own finite RuntimeMaxSec and activation expiry.
     // Leave native ownership and all failure evidence intact if dispatch fails.
     let status = launch.wait()?;
-    let parent_result = dispatcher?;
-    Ok(
-        json!({"exit_code":status.code(),"parent":parent_result.map(|(iid,exit)|
-        json!({"writer_invocation_id":iid,"exit_code":exit.code()}))}),
-    )
+    let parent = match dispatcher {
+        Ok(value) => {
+            value.map(|(iid, exit)| json!({"writer_invocation_id":iid,"exit_code":exit.code()}))
+        }
+        Err(error) => {
+            Some(json!({"error":format!("{error:#}").chars().take(1800).collect::<String>()}))
+        }
+    };
+    Ok(json!({"exit_code":status.code(),"parent":parent}))
 }
 
 struct WriterOffer {

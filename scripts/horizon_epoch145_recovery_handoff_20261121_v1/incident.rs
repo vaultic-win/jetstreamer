@@ -308,6 +308,22 @@ fn socket() -> Result<PathBuf> {
     }
     bail!("no active login SSH agent could validate the publication branch")
 }
+#[cfg(feature = "registered-post")]
+fn check_selected_submission(
+    actor: Option<&Value>,
+    submission: &Value,
+    intent: &Value,
+    launcher: &Value,
+    boundary: &Value,
+) -> Result<()> {
+    ensure!(
+        actor.is_none_or(|row| row["submission"] == *submission)
+            && intent["launcher"] == *launcher
+            && intent["boundary"] == *boundary,
+        "recorded actor belongs to a different post-verification deployment or selector"
+    );
+    Ok(())
+}
 fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
     let state = rt(STATE_PATH);
     let receipt = state.join(format!("{mode}-actor.json"));
@@ -315,6 +331,7 @@ fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
         rt(PKG).join("export145").display().to_string(),
         mode.to_owned(),
     ];
+    let intent = state.join(format!("{mode}-submission.json"));
     if receipt.try_exists()? {
         let v = from_ref(&bound(&receipt)?)?;
         let iid = text(&v["invocation"])?;
@@ -325,9 +342,26 @@ fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
                 && valid_iid(iid),
             "foreign recorded stage"
         );
+        #[cfg(feature = "registered-post")]
+        {
+            let reference = bound(&intent)?;
+            let submission = from_ref(&reference)?;
+            ensure!(
+                submission["prior"] == prior
+                    && submission["prerequisite"] == *prerequisite
+                    && submission["mode"] == mode,
+                "crossed recorded submission"
+            );
+            check_selected_submission(
+                Some(&v),
+                &reference,
+                &submission,
+                &bound(&check_member(&rt(PKG), SEAL, "run-post")?)?,
+                &boundary::selected_boundary()?,
+            )?;
+        }
         return Ok(iid.to_owned());
     }
-    let intent = state.join(format!("{mode}-submission.json"));
     let before = native(E)?;
     let already = before["ActiveState"] == "active";
     if !already {
@@ -348,10 +382,14 @@ fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
         if mode == "publish" {
             argv.extend([prior.to_owned(), socket()?.display().to_string()]);
         }
-        platform::save(
-            &intent,
-            &json!({"mode":mode,"prior":prior,"prerequisite":prerequisite,"fleet":head,"launcher":bound(&launcher)?}),
-        )?;
+        let submission = json!({"mode":mode,"prior":prior,"prerequisite":prerequisite,"fleet":head,"launcher":bound(&launcher)?});
+        #[cfg(feature = "registered-post")]
+        let submission = {
+            let mut submission = submission;
+            submission["boundary"] = boundary::selected_boundary()?;
+            submission
+        };
+        platform::save(&intent, &submission)?;
         let args = argv.iter().map(String::as_str).collect::<Vec<_>>();
         command(&launcher, &args)?;
     }
@@ -360,6 +398,14 @@ fn stage(mode: &str, prior: &str, prerequisite: &Value) -> Result<String> {
         v["prior"] == prior && v["mode"] == mode && v["prerequisite"] == *prerequisite,
         "crossed submission"
     );
+    #[cfg(feature = "registered-post")]
+    check_selected_submission(
+        None,
+        &bound(&intent)?,
+        &v,
+        &bound(&check_member(&rt(PKG), SEAL, "run-post")?)?,
+        &boundary::selected_boundary()?,
+    )?;
     let (pid, iid) = stable(&native(E)?, E)?;
     let cmd = fs::read(format!("/proc/{pid}/cmdline"))?;
     let mut expected = Vec::from(argv_head);
@@ -461,6 +507,40 @@ pub fn run(mode: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "registered-post")]
+    #[test]
+    fn previous_actor_cannot_cross_the_registered_post_boundary() {
+        let reference = json!({"path":"post-full-submission.json","sha256":"current"});
+        let actor = json!({"submission":reference});
+        let boundary = json!({"selector":"ready","decision":"selected"});
+        let launcher = json!({"path":"v12/run-post","sha256":"current"});
+        let mut intent = json!({"launcher":launcher,"boundary":boundary});
+        assert!(
+            check_selected_submission(Some(&actor), &reference, &intent, &launcher, &boundary)
+                .is_ok()
+        );
+        assert!(
+            check_selected_submission(
+                Some(&json!({"submission":"old"})),
+                &reference,
+                &intent,
+                &launcher,
+                &boundary
+            )
+            .is_err()
+        );
+        intent["launcher"]["path"] = json!("v11/run-post");
+        assert!(
+            check_selected_submission(None, &reference, &intent, &launcher, &boundary).is_err()
+        );
+        intent["launcher"] = launcher.clone();
+        intent["boundary"]["decision"] = json!("old");
+        assert!(
+            check_selected_submission(Some(&actor), &reference, &intent, &launcher, &boundary)
+                .is_err()
+        );
+    }
+
     #[test]
     fn publication_waits_for_both_matching_current_local_results() {
         let mut d = json!({"schema":"horizon-145-current-native-full-acceptance-v1","exit_code":0,"r2_mutations":false,"epoch":145,

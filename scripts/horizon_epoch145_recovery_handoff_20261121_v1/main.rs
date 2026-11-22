@@ -15,6 +15,8 @@ mod outcome;
 #[allow(dead_code)]
 #[path = "../horizon_public_audit_v14_cutover_20261121_v1/platform.rs"]
 mod platform;
+#[cfg(feature = "registered-post")]
+mod terminal136;
 use platform::{bound, from_ref, pinned, read, text};
 const RT: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const E: &str = "horizon-holding-export145-20261121-v1.service";
