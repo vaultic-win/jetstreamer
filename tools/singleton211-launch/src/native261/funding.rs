@@ -138,7 +138,6 @@ fn candidate_capacity(
 
 pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
     let controller = text(r, "controller_unit")?;
-    let envelope = charges(&r["control_units"], controller)?;
     let iid = std::env::var("INVOCATION_ID")?;
     let own = || -> Result<()> {
         ensure!(
@@ -177,6 +176,49 @@ pub(super) fn current(n: &mut Native, r: &Value, held: bool) -> Result<Value> {
             HARNESS,
         )?;
     }
+    if let Some(request) = r.get("turnover_funding") {
+        let source = native266_full::peer261::trace();
+        ensure!(
+            EPOCH == 261 && *request == json!(source),
+            "unregistered 261 source"
+        );
+        let f = binding(&r["fleet"])?;
+        let t = source.json()?;
+        let fleet = f.json()?;
+        ensure!(
+            r["reservation_ledger"] == t["original_ledger"]
+                && r["observer"]
+                    == json!(Bound::new(
+                        text(&fleet, "observer_receipt")?,
+                        text(&fleet, "observer_sha256")?
+                    ))
+                && units::affinity(r)? == "48 49 50 51 52 53 54 55"
+                && r["control_units"]
+                    == json!([{"unit":controller,"maximum_memory_bytes":CONTROLLER_MEMORY}]),
+            "turnover ledger, observer, controls or CPUs differ"
+        );
+        let device = disk_fd.metadata()?.dev();
+        let mount = pristine(device)?;
+        let mut result = native266_full::peer261::assess(n, &f, controller, held)?;
+        ensure!(
+            r["reviewed_cpu_overlap"] == result["reviewed_cpu_overlap"]
+                && fs::metadata(path)?.dev() == device
+                && pristine(device)? == mount,
+            "CPU sharing or scratch changed"
+        );
+        let after = n.show(controller)?;
+        live::same_owner(&owner, &after)?;
+        live::finite_owner(&after, controller, &iid, CONTROLLER_MEMORY)?;
+        own()?;
+        result["controller"] = after;
+        result["disk_filesystem"] = json!(FILESYSTEM);
+        result["disk_device"] = json!(device);
+        result["tmpfs"] = mount;
+        result["boot_id"] = json!(fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim());
+        n.check()?;
+        return Ok(result);
+    }
+    let envelope = charges(&r["control_units"], controller)?;
     let mut host = native257_fit::booked_host_candidate(
         n,
         r,

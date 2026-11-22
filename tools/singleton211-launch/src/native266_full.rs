@@ -8,10 +8,12 @@ mod epoch228_storage;
 mod funding;
 mod gate;
 mod peer228_extents;
+pub(crate) mod peer261;
 mod start;
 mod stopped;
 mod successor;
 mod turnover;
+pub(crate) mod turnover_window;
 
 const V: &str = "/var/lib/jetstreamer";
 const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a2";
@@ -226,6 +228,49 @@ pub fn dispatch_instructions(args: &[String]) -> Result<Value> {
     controller(Lane::Instructions266, args)
 }
 pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
+    observed_turnover(path, "allocation-", "allocation.json", turnover::allocation)
+}
+
+/// Read-only candidate census under the finite qualification booking.
+pub fn measure_261_turnover(path: &Path, fleet: &Path, sha: &str) -> Result<Value> {
+    let controller = fs::read_to_string("/proc/self/cgroup")?;
+    let unit = controller
+        .trim()
+        .strip_prefix("0::/system.slice/")
+        .context("funded qualification controller")?;
+    ensure!(
+        unit.starts_with("horizon261-turnover-fit-check-") && unit.ends_with(".service"),
+        "unexpected qualification controller"
+    );
+    observed_turnover(path, "fit-261-", "assessment.json", |n| {
+        let owner = n.show(unit)?;
+        let iid = std::env::var("INVOCATION_ID")?;
+        ensure!(
+            text(&owner, "MainPID")?.parse::<u32>()? == std::process::id(),
+            "not the controller process"
+        );
+        live::finite_owner(&owner, unit, &iid, 256 << 20)?;
+        let result = peer261::assess(n, &Bound::new(fleet, sha), unit, false)?;
+        live::same_owner(&owner, &n.show(unit)?)?;
+        Ok(json!({"assessment":result,"admission_authorized":false,"producer_started":false}))
+    })
+}
+
+pub fn qualify_turnover_window(path: &Path) -> Result<Value> {
+    observed_turnover(
+        path,
+        "peer-window-",
+        "qualification.json",
+        turnover_window::qualify,
+    )
+}
+
+fn observed_turnover(
+    path: &Path,
+    prefix: &str,
+    file: &str,
+    observe: impl FnOnce(&mut Native) -> Result<Value>,
+) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0
             && std::env::var("CODEX_THREAD_ID")? == MAIN
@@ -233,7 +278,7 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
             && path
                 .file_name()
                 .and_then(|s| s.to_str())
-                .is_some_and(|s| s.starts_with("allocation-")),
+                .is_some_and(|s| s.starts_with(prefix)),
         "turnover allocation evidence namespace or owner"
     );
     trusted_parents(path)?;
@@ -243,8 +288,8 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
         counter: 0,
         deadline: Some(mono()? + 90_000_000),
     };
-    let report = turnover::allocation(&mut n)?;
-    Ok(json!(save_json(path, "allocation.json", &report)?))
+    let report = observe(&mut n)?;
+    Ok(json!(save_json(path, file, &report)?))
 }
 
 pub fn dispatch_turnover(args: &[String]) -> Result<Value> {

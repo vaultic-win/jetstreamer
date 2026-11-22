@@ -11,14 +11,14 @@ const OLD_IMAGE: &str =
 const GUEST: &str =
     "/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v169";
 
-fn cut() -> Bound {
+pub(super) fn cut() -> Bound {
     Bound::new(
         Path::new(D).join("horizon-replacement-fit-v194-a1/assessment.json"),
         "44841a0d9903da4a23f705b154ed6b252af80696c9d9d1abc533b4d2989a2e77",
     )
 }
 
-fn dormant(n: &mut Native, unit: &str) -> Result<()> {
+pub(super) fn dormant(n: &mut Native, unit: &str) -> Result<()> {
     let v = n.show(unit)?;
     ensure!(
         v["ActiveState"] == "inactive"
@@ -36,7 +36,7 @@ fn dormant(n: &mut Native, unit: &str) -> Result<()> {
     Ok(())
 }
 
-fn closed_singletons(n: &mut Native, basis: &Value, fleet: &Value) -> Result<()> {
+pub(super) fn closed_singletons(n: &mut Native, basis: &Value, fleet: &Value) -> Result<()> {
     let helper = Bound::new(
         "/run/horizon211-drain-recheck-v191-a1-output/sealed/horizon-singleton-delivery-handoff",
         "81fe9dc2536e9a8d9d724fdaf6334c8c6f8d6ed9b330753658479a5ba3d67da4",
@@ -111,7 +111,7 @@ fn closed_singletons(n: &mut Native, basis: &Value, fleet: &Value) -> Result<()>
     Ok(())
 }
 
-fn frozen_root(n: &mut Native) -> Result<()> {
+pub(super) fn frozen_root(n: &mut Native) -> Result<()> {
     dormant(n, STOPPED_UNIT)?;
     let receipt = Bound::new(
         "/var/lib/jetstreamer/horizon266-stopped-scratch-v173-state/closed",

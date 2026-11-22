@@ -145,6 +145,7 @@ pub(super) fn healthy_sample(c: &periodic::Control, p: &Value, gid: &str) -> Res
 pub(super) struct Window {
     peers: Vec<Peer>,
     full211: Option<full211_window::Window>,
+    turnover266: Option<native266_full::turnover_window::Window>,
     pub(super) limit: u64,
     pub(super) receipt: Bound,
 }
@@ -157,6 +158,9 @@ fn original_state(claimed: (&str, &str, u64), actual: (&str, &str, u64)) -> Resu
 }
 impl Window {
     pub(super) fn verify(&mut self, n: &mut Native) -> Result<()> {
+        if let Some(window) = &mut self.turnover266 {
+            window.verify(n)?;
+        }
         if let Some(window) = &mut self.full211 {
             window.verify(n)?;
         }
@@ -181,10 +185,12 @@ pub(super) fn protected_owner(candidate: u64, row: &Value) -> Option<&Value> {
     {
         Some(&row["producer"])
     } else if row["phase"] == "private-cold-snapshot-verification"
-        && (candidate == 266 || candidate == 212 && matches!(
-            row["unit"]["Id"].as_str(),
-            Some(native257::UNIT | native261::UNIT)
-        ))
+        && (candidate == 266
+            || candidate == 212
+                && matches!(
+                    row["unit"]["Id"].as_str(),
+                    Some(native257::UNIT | native261::UNIT)
+                ))
     {
         Some(&row["unit"])
     } else {
@@ -236,6 +242,59 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
     Ok(entries)
 }
 pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+    if review.get("turnover_funding").is_some() {
+        let origin = native266_full::peer261::trace();
+        ensure!(
+            a["epoch"] == 261 && review["turnover_funding"] == json!(origin),
+            "unknown turnover window"
+        );
+        let proof = Bound::new(
+            "/var/lib/jetstreamer/horizon266-instructions-2789f821-v194-control/peer-window-261-v196-a1/qualification.json",
+            "ab9d5b9b189626e6512fd15401d1a08bf25de1a45b4410d05239cbbd636a8f5c",
+        );
+        let old = proof.sealed()?;
+        ensure!(
+            review["turnover_peer_qualification"] == json!(proof)
+                && old["handoff"] == json!(native266_full::turnover_window::handoff())
+                && old["before"]["iid"] != old["after"]["iid"],
+            "missing original 266 rollover qualification"
+        );
+        let fleet = native266_full::peer261::latest(&binding(&review["fleet"])?)?;
+        let active = fleet["active"].as_array().context("fleet peers")?;
+        let mut expected = BTreeSet::new();
+        for row in active {
+            let owner = match (row["epoch"].as_u64(), row["phase"].as_str()) {
+                (Some(247), Some("upload-readback")) => &row["unit"],
+                (Some(266), Some("diagnostic-qualification")) => &row["producer"],
+                _ => bail!("unexpected 261 turnover peer"),
+            };
+            expected.insert(text(owner, "Id")?);
+        }
+        ensure!(
+            expected.len() == 2
+                && active.len() == 2
+                && a["actual_current_memory"]
+                    .as_object()
+                    .is_some_and(|v| v.len() == 2 && expected.iter().all(|k| v.contains_key(*k))),
+            "incomplete 261 peer census"
+        );
+        let window = native266_full::turnover_window::Window::open(n)?;
+        let limit = n.deadline.context("finite operator window")?;
+        let receipt = save_json(
+            &n.root,
+            "peer-window.json",
+            &json!({"schema":"horizon-singleton211-original-peer-window-v1",
+            "review":a["review"],"boot_id":a["boot_id"],"peers":[{"epoch":266,"qualification":proof,"firing":window.current}],
+            "delivery":delivery247::SUCCESSOR_UNIT,"deadline_with_margin_monotonic_us":limit,"recorded_monotonic_us":mono()?}),
+        )?;
+        return Ok(Window {
+            peers: Vec::new(),
+            full211: None,
+            turnover266: Some(window),
+            limit,
+            receipt,
+        });
+    }
     capture_roster(n, review, a, roster(review, a)?)
 }
 fn capture_roster(
@@ -284,6 +343,7 @@ fn capture_roster(
     Ok(Window {
         peers,
         full211,
+        turnover266: None,
         limit,
         receipt,
     })
