@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+registered_v7b=false
+if [[ $flavor == fixture-post-v7b ]]; then
+  registered_v7b=true
+  flavor=fixture-post
+fi
 if [[ $flavor == registered-post || $flavor == fixture-rejoin || $flavor == fixture-post ]]; then
   if [[ $flavor == fixture-post ]]; then
     fixture_post=true
@@ -62,6 +67,7 @@ if $fixture_recovery; then
   fixture+=(incident145::authenticates_the_failed_fixture_census_and_frozen_inode)
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
+if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
 q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/incident-build-$INVOCATION_ID
 out="$current/tmp/incident145-$INVOCATION_ID"
@@ -246,6 +252,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if [[ $flavor == timer-post ]]; then phase_package=tools-v11; fi
   if $registered; then phase_package=tools-v12; fi
   if $fixture_post; then phase_package=tools-v13; fi
+  if $registered_v7b; then phase_package=tools-v13b; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"

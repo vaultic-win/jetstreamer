@@ -10,9 +10,9 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-FIXTURE_SUCCESSOR = VERSION == "tools-v13"
-TIMER_SUCCESSOR = VERSION in ("tools-v11", "tools-v12", "tools-v13")
-TIMEOUT_SUCCESSOR = VERSION in ("tools-v8", "tools-v9", "tools-v10", "tools-v11", "tools-v12", "tools-v13")
+FIXTURE_SUCCESSOR = VERSION in ("tools-v13", "tools-v13b")
+TIMER_SUCCESSOR = FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
+TIMEOUT_SUCCESSOR = TIMER_SUCCESSOR or VERSION in ("tools-v8", "tools-v9", "tools-v10")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
 IMAGE = PKG / "export145"
