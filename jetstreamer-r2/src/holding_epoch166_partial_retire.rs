@@ -147,15 +147,16 @@ fn preserved() -> Result<Value> {
             ))
         })
         .collect::<Result<_>>()?;
-    Ok(
-        json!({"run":preserved_entry(run)?,"scratch":preserved_entry(&scratch)?,"state":state_id,
+    let mut retained = json!({"run":preserved_entry(run)?,"scratch":preserved_entry(&scratch)?,"state":state_id,
         "state_sha256":STATE_SHA,"inputs":inputs,"ancestors":ancestors,
-        "archives_directory":stable_directory(&directory(&run.join("archives"))?.metadata()?)}),
-    )
+        "archives_directory":stable_directory(&directory(&run.join("archives"))?.metadata()?)});
+    retain_profile_inputs(&mut retained)?;
+    Ok(retained)
 }
 fn locks() -> Result<Vec<(PathBuf, File, Value)>> {
     [(MUTATION_LOCK, 101135013), (EPOCH_LOCK, EPOCH_LOCK_INODE)]
         .into_iter()
+        .chain(SIBLING_LOCK)
         .map(|(path, inode)| {
             let path = PathBuf::from(path);
             let _parent = directory(path.parent().context("lock parent")?)?;
@@ -323,36 +324,11 @@ fn scope(p: &Retire) -> Result<Value> {
             && park_plan.sha256 == SHA
             && park_plan.length == LENGTH
             && same_bound(&park_plan.mapping, &p.mapping)
-            && same_bound(&park_plan.eligibility, &p.eligibility)
-            && e["inspection"] == serde_json::to_value(binding(INSPECTION, INSPECTION_SHA))?,
+            && same_bound(&park_plan.eligibility, &p.eligibility),
         "epoch 166 park/eligibility binding differs"
     );
     let inspected = bound(&p.inspection)?;
-    ensure!(
-        inspected["schema"] == INSPECTION_SCHEMA
-            && inspected["source"] == SOURCE
-            && inspected["sha256"] == SHA
-            && inspected["length"] == LENGTH
-            && inspected["source_stable"] == true
-            && inspected["native_consumers_clear"] == true
-            && inspected["source_identity"]
-                == json!([
-                    64512,
-                    INODE,
-                    LENGTH,
-                    ALLOCATED / 512,
-                    1001,
-                    1003,
-                    33152,
-                    1,
-                    MTIME_SEC,
-                    MTIME_NSEC,
-                    MTIME_SEC,
-                    MTIME_NSEC
-                ])
-            && inspected["complete_transitive_consumer_graph_qualified"] == false,
-        "exact historical inspection differs"
-    );
+    validate_inspection(&inspected, &e)?;
     // That historical false is preserved. The distinct fresh consumer graph below
     // must supply the missing authority; it is never inferred from this inspection.
     Ok(inspected)

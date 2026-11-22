@@ -75,4 +75,5 @@ fn validate_terminal_custody(_: &Retire, _: &Value) -> Result<()> {
     // The independent exact_custody and remote checks bind its original archive.
     Ok(())
 }
+include!("holding_epoch166_prior_inspection.rs");
 include!("holding_epoch166_partial_retire.rs");

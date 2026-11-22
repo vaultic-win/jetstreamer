@@ -45,5 +45,11 @@ macro_rules! profile {
         concat!($prefix, "retry7", $suffix)
     };
 }
+const BOOKING: &str = "/var/lib/jetstreamer/horizon_runtime_data/root0145-zero-recovery-20261120-v1/PARK_SERIAL_ADMISSION.json";
+const BOOKING_SHA: &str = "6a9ec7435903516e7c0f8a4531fd6d6de184e0f16eccb40d01cc32c0cd6918a1";
+fn validate_profile_rows(proof: &Value, iid: &str, start: &Value, booking: &Value) -> Result<()> {
+    validate_rows(proof, iid, start, booking)
+}
 include!("holding_epoch166_partial_terminal.rs");
+include!("holding_epoch166_prior_inspection.rs");
 include!("holding_epoch166_partial_retire.rs");

@@ -1,5 +1,3 @@
-const BOOKING: &str = "/var/lib/jetstreamer/horizon_runtime_data/root0145-zero-recovery-20261120-v1/PARK_SERIAL_ADMISSION.json";
-const BOOKING_SHA: &str = "6a9ec7435903516e7c0f8a4531fd6d6de184e0f16eccb40d01cc32c0cd6918a1";
 fn validate_transfer_provenance(proof: &Value, iid: &str) -> Result<()> {
     let booking = evidence_with_limit(&binding(BOOKING, BOOKING_SHA), false, 1 << 20)?;
     let start_ref: Bound = serde_json::from_value(proof["start"].clone())?;
@@ -8,7 +6,7 @@ fn validate_transfer_provenance(proof: &Value, iid: &str) -> Result<()> {
         "unexpected park start receipt"
     );
     let start = evidence_with_limit(&start_ref, false, 1 << 20)?;
-    validate_rows(proof, iid, &start, &booking)
+    validate_profile_rows(proof, iid, &start, &booking)
 }
 fn validate_rows(proof: &Value, iid: &str, start: &Value, booking: &Value) -> Result<()> {
     let plan = serde_json::to_value(binding(PARK_PLAN, PARK_PLAN_SHA))?;
