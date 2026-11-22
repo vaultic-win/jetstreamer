@@ -6,30 +6,41 @@ import cold166_status as retry166
 import cold167_status as cold167
 from evidence import BASE, bound, checked, need
 
-ROOT = BASE / 'epoch170-retry11-rebook-20261122-v1'
-GUARD = BASE / 'epoch170-retry11-guard-20261122-v1'
-NAME = '170-replacement-local3retry11-20261122'
+LOCAL = Path(__file__).resolve().parent
+RETRY12 = (LOCAL/'retry12-170-generation.json').is_file()
+ATTEMPT = 'retry12' if RETRY12 else 'retry11'
+ROOT = BASE / f'epoch170-{ATTEMPT}-rebook-20261122-v1'
+GUARD = BASE / f'epoch170-{ATTEMPT}-guard-20261122-v1'
+NAME = f'170-replacement-local3{ATTEMPT}-20261122'
 UNIT = 'horizon-qualify-' + NAME + '.service'
 TIMER = 'horizon-guard-' + NAME + '.timer'
-RUN = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122')
+RUN = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1') / f'cold-{ATTEMPT}-20261122'
 STOP = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
 FIELD = 'current_homefloor_cold166_167_170_owners'
-BINDING = Path(__file__).resolve().with_name('retry11-170-generation.json')
+BINDING = LOCAL / f'{ATTEMPT}-170-generation.json'
+ANCHOR_SHA = '466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if RETRY12 else '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728'
+GUARD_SHA = '7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if RETRY12 else '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d'
+INODE = 113836033 if RETRY12 else 113704962
 
 
 def generation():
     binding = checked(bound(BINDING))
     anchor, witness = binding['successor_root'], binding['guard_qualification']
-    need(anchor == dict(path=str(ROOT/'SUCCESSOR_ROOT.json'), sha256='8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
-         and witness == dict(path=str(GUARD/'GUARD_QUALIFIED.json'), sha256='36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d'),
+    need(anchor == dict(path=str(ROOT/'SUCCESSOR_ROOT.json'), sha256=ANCHOR_SHA)
+         and witness == dict(path=str(GUARD/'GUARD_QUALIFIED.json'), sha256=GUARD_SHA),
          'foreign 170 enrollment')
     original, proof = checked(anchor), checked(witness)
+    if RETRY12:
+        failure = checked(original['previous_start_failure'])
+        need(original['previous_start_failure']['sha256'] == '60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801'
+             and failure['cgroup'] == [] and failure['producer_invocation_id'] == '7a9f41a86d9240be89e3484fc01c3a31'
+             and failure['error'] == 'post-guard floor or actor changed', 'different preceding 170 startup failure')
     meta = RUN.lstat()
     identity = dict(path=str(RUN), device=meta.st_dev, inode=meta.st_ino)
-    need((original['root'], original['device'], original['inode']) == (str(RUN), 64512, 113704962)
-         and (meta.st_dev, meta.st_ino) == (64512, 113704962) and RUN.resolve(strict=True) == RUN
+    need((original['root'], original['device'], original['inode']) == (str(RUN), 64512, INODE)
+         and (meta.st_dev, meta.st_ino) == (64512, INODE) and RUN.resolve(strict=True) == RUN
          and (meta.st_uid, meta.st_gid, stat.S_IMODE(meta.st_mode)) == (1001, 1003, 0o700), '170 enrollment root changed')
-    need(proof['schema'] == 'horizon-170-retry11-native-guard-qualified-v1' and not proof['physical_launch']
+    need(proof['schema'] == f'horizon-170-{ATTEMPT}-native-guard-qualified-v1' and not proof['physical_launch']
          and proof['guard'] == bound(GUARD/'tools/guard') and proof['seal'] == bound(GUARD/'tools/deployment-seal-receipt.json'),
          'different 170 guard')
     seal = checked(proof['seal'])

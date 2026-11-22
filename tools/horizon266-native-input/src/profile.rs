@@ -1,10 +1,22 @@
+#[cfg(feature = "capped-worker")]
+pub(crate) use super::capped::{
+    INPUT_SCHEMA, PACKET, PACKET_SHA, measurement_verified, validate_extra,
+};
+#[cfg(feature = "capped-worker")]
+pub(crate) use super::capped_site::TOKENS;
+#[cfg(feature = "capped-worker")]
+pub(crate) use super::capped_site::{GUARD_UNIT, HARNESS, ROOT, UNIT};
 pub(crate) const MEMORY: u64 = 192_000_000_000;
 pub(crate) const ROOT_CAP: u64 = 124 << 30;
 pub(crate) const RESERVATION: u64 = 268_435_456;
 // Closed epoch-specific production bindings.
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const GUARD_UNIT: &str = "horizon-native266-protective-v1.service";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const UNIT: &str = "horizon-266-native-input-20261121-v1.service";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const TOKENS: &str = "/var/lib/jetstreamer/horizon-native266-startup-tokens";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const ROOT: &str = "/run/horizon266-native-cold-v1";
 pub(crate) const TOKEN_SCHEMA: &str = "horizon-native266-first-guard-token-v1";
 pub(crate) const PLAN_SCHEMA: &str = "horizon-native266-startup-plan-v1";
@@ -20,15 +32,21 @@ pub(crate) const ACCOUNTS_HASH: &str = "HnePfSpTtWaPDFx9RrPeuamDZREhoUXa7xpK6fbt
 pub(crate) const SNAPSHOT_SHA: &str =
     "c3bfdbf63b7941a9c111a668bc03f71b197203eb52a45c9ea39e94797272babb";
 pub(crate) const SNAPSHOT: &str = "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/snapshot-114910768-HnePfSpTtWaPDFx9RrPeuamDZREhoUXa7xpK6fbtPGyK.tar.zst";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const PACKET: &str =
     "/var/lib/jetstreamer/horizon266-bootstrap-measure-067e29e0-v155-v1/inputs.json";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const PACKET_SHA: &str =
     "383502fd0018bfc694e6a3fd2328ddb4e26afa4315551eb42037a513a522c169";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const INPUT_SCHEMA: &str = "horizon266-bootstrap-measure-v1";
 
+#[cfg(not(feature = "capped-worker"))]
 const NODE: &str =
     "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-node";
+#[cfg(not(feature = "capped-worker"))]
 const NODE_SHA: &str = "362e928c778c171dff190c2efcf631a7fc9675b96be4f1b699e433993ac365a1";
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) const HARNESS: &str =
     "/var/lib/jetstreamer/horizon266-native-input-tmpfs-20261121-v1/horizon266-native-input";
 pub(crate) fn harness_allowed(path: &std::path::Path) -> bool {
@@ -36,10 +54,14 @@ pub(crate) fn harness_allowed(path: &std::path::Path) -> bool {
 }
 pub(crate) const FILESYSTEM: &str = "/var/lib/jetstreamer";
 
+#[cfg(not(feature = "capped-worker"))]
 use anyhow::{Context, Result, ensure};
+#[cfg(not(feature = "capped-worker"))]
 use serde_json::Value;
+#[cfg(not(feature = "capped-worker"))]
 use std::path::Path;
 
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) fn measurement_verified(v: &Value) -> bool {
     let layout = &v["snapshot_layout"];
     v["bootstrap_slot"] == SLOT
@@ -61,6 +83,7 @@ pub(crate) fn measurement_verified(v: &Value) -> bool {
         && layout["sparse_files"] == 0
 }
 
+#[cfg(not(feature = "capped-worker"))]
 pub(crate) fn validate_extra(v: &Value) -> Result<()> {
     let files = v["files"].as_array().context("input rows")?;
     let node = super::identity(Path::new(NODE))?;
