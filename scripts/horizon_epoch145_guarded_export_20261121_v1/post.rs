@@ -6,7 +6,12 @@ use std::os::unix::fs::PermissionsExt;
 
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
-#[cfg(all(incident_timer_post145_only, incident_registered136_post145_only))]
+#[cfg(incident_fixture_post145_only)]
+pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13/export145";
+#[cfg(all(
+    incident_registered136_post145_only,
+    not(incident_fixture_post145_only)
+))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v12/export145";
 #[cfg(all(incident_timer_post145_only, not(incident_registered136_post145_only)))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v11/export145";
@@ -517,6 +522,46 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     Ok((full, pipe, qualified))
 }
 
+#[cfg(incident_fixture_post145_only)]
+pub(super) fn fixture_semantic_owner(export: &str) -> Result<()> {
+    let package = Path::new(INCIDENT_POST_IMAGE).parent().unwrap();
+    let (_, seal) = publication::frozen_json(&package.join("deployment-seal-receipt.json"))?;
+    let (proof, build) = publication::frozen_json(&package.join("build-proof.json"))?;
+    ensure!(
+        seal["destination"] == json!(package)
+            && seal["members"].as_array().is_some_and(|members| members
+                .iter()
+                .any(|m| m["name"] == "build-proof.json"
+                    && m["mode"] == "0444"
+                    && m["sha256"] == proof.sha256)),
+        "post build is outside the sealed deployment"
+    );
+    let progress: Bound = serde_json::from_value(build["prior_phase"].clone())?;
+    ensure!(
+        progress.path
+            == package
+                .parent()
+                .unwrap()
+                .join("V5F_ACTUAL_ADVANCING_WORKER.json"),
+        "different semantic worker proof"
+    );
+    let worker = custody::json(&progress, true)?;
+    let state = Path::new(BASE).join("state");
+    ensure!(
+        custody::hex(export, 32)
+            && export != "a99ed8b51e8a482b805b8a36a11b2700"
+            && worker["invocation_id"] == export
+            && worker["start"] == build["semantic_start"]
+            && worker["manager"] == build["semantic_manager"]
+            && worker["start"]["path"] == json!(state.join(export).join("recovery-started.json"))
+            && build["old_failure"]
+                == json!({"path":state.join("a99ed8b51e8a482b805b8a36a11b2700/failed.json"),
+                "sha256":"da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"}),
+        "promoted epoch does not belong to the sealed V5F generation"
+    );
+    Ok(())
+}
+
 pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let image = if cfg!(incident_post145_only) {
         PathBuf::from(INCIDENT_POST_IMAGE)
@@ -546,6 +591,8 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
             "unexpected recovered export owner"
         );
     }
+    #[cfg(incident_fixture_post145_only)]
+    fixture_semantic_owner(&export)?;
     terminal(&export)?;
     let completed = Path::new(BASE).join("state").join(&export);
     let done = custody::binding(&completed.join("complete.json"))?;

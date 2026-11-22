@@ -16,7 +16,7 @@ fn bound(path: PathBuf, sha: &str) -> Bound {
     }
 }
 
-fn frozen_json(path: &Path) -> Result<(Bound, Value)> {
+pub(super) fn frozen_json(path: &Path) -> Result<(Bound, Value)> {
     let m = custody::frozen_identity(path)?;
     ensure!(m.bytes <= 8 << 20, "oversized receipt");
     let b = bound(path.into(), &custody::sha(&fs::read(path)?));
@@ -54,6 +54,19 @@ fn uploader(root: &Path) -> Result<PathBuf> {
 fn local(full: &Path, iid: &str, archive: &Path) -> Result<(Bound, String)> {
     let (_, v) = frozen_json(&full.join("verified.json"))?;
     let (_, p) = frozen_json(&full.join("verified-plugin.json"))?;
+    #[cfg(incident_fixture_post145_only)]
+    {
+        let exporter = materialized::completion_owner()?;
+        post::fixture_semantic_owner(&exporter)?;
+        let extraction = Path::new(BASE)
+            .join("state")
+            .join(exporter)
+            .join("extraction-complete.json");
+        ensure!(
+            v["export_completion"] == json!(custody::binding(&extraction)?),
+            "local verification used a different semantic promotion"
+        );
+    }
     let id = custody::frozen_identity(archive)?;
     let hash = v["archive_sha256"].as_str().context("local digest")?;
     let plan: Bound = serde_json::from_value(v["delivery_plan"].clone())?;

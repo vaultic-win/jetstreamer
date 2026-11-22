@@ -12,7 +12,11 @@ expected_service = {
     "tools-v18-registered136": "horizon-incident-145-post-registered-build-v1.service",
     "tools-v20-prestart": "horizon-incident-145-fixture-rejoin-build-v1.service",
 }
-assert group.name == expected_service[source.parent.name]
+fixture_post = group.name == "horizon-incident-145-post-fixture-build-v1.service"
+if fixture_post:
+    assert source.parent.name in ("tools-v20-prestart", "tools-v20")
+else:
+    assert group.name == expected_service[source.parent.name]
 assert group.parent.name == "horizonaudit.slice"
 assert (group.parent / "cpu.max").read_text().split() == ["1200000", "100000"]
 assert (group.parent / "cpu.idle").read_text().strip() == "1"
@@ -41,7 +45,7 @@ prefix = storage()
 assert prefix["registration"] == fleet["current_private_prefix140_obligation"]["registration"]
 growth = prefix["remaining_DATA_growth_bytes"]
 assert 0 <= growth <= 16 << 20
-if source.parent.name == "tools-v20-prestart":
+if source.parent.name in ("tools-v20-prestart", "tools-v20"):
     assert native["bounded_qualification"] is None
     assert ordinary == native["native_before_registered_floor"] and zero == native["zero_candidate_floor"]
     snapshots = (native["prefix_before"], native["prefix_after"], prefix)
@@ -59,6 +63,15 @@ assert out.stat().st_dev == Path("/home/sol").stat().st_dev
 fs = os.statvfs(out)
 available = min(native["available_HOME_bytes"], fs.f_bavail * fs.f_frsize)
 scratch, retained = 88 << 20, 24 << 20
+if fixture_post:
+    quote = json.loads((out / "build-mirrors.json").read_bytes())
+    assert quote["native"] == native and quote["fleet"] == native["fleet"] and quote["mirrors_fit"]
+    assert quote["admission_granted"] is False and quote["actual_mirror_writes"] == 0
+    assert quote["resource_credit_bytes"] == 0
+    available = min(available, quote["available_HOME_bytes"])
+    audit_growth = max(quote[key]["remaining_DATA_growth_bytes"] for key in ("ready_growth_before", "ready_growth_after"))
+    assert 0 <= audit_growth <= 256 << 20
+    protected = max(protected + quote["missing_mirror_bytes"], quote["required_with_mirrors_bytes"]) + audit_growth
 required = protected + scratch + retained
 assert available >= required, (available, required)
 assert native["available_memory_bytes"] >= native["required_available_memory_bytes"] + (768 << 20)
