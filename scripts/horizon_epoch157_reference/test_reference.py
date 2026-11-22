@@ -4,7 +4,7 @@ import struct
 import unittest
 from types import SimpleNamespace
 
-from car import original_block
+from car import CORRECTIONS, original_block
 from native import Body, Session, U32, U64, outcomes, vec, writes
 
 
@@ -59,6 +59,13 @@ class ReferenceTest(unittest.TestCase):
             else:
                 with self.assertRaises(ValueError):
                     session.process(32, [(1, bytes(32), [tx])])
+
+    def test_corrections_match_the_original_finalized_headers(self):
+        self.assertEqual(set(CORRECTIONS), {68254833, 68255841, 68261681})
+        for slot, row in CORRECTIONS.items():
+            self.assertEqual((row["parent"], row["blockhash"]),
+                             (row["finalized_rpc"]["parentSlot"], row["finalized_rpc"]["blockhash"]))
+            self.assertEqual(row["parent"], slot - 2)
 
     def test_truncated_car(self):
         with self.assertRaises(ValueError):

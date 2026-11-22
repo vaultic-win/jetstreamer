@@ -9,8 +9,8 @@ list, make an archive, start a producer, or publish to R2.
 Install Python 3.12 and cbor2 5.7.1 in the campaign environment. The x86-64
 CPython 3.12 manylinux wheel used on Anza has SHA-256
 `9fc81da8c0e09beb42923e455e477b36ff14a03b9ca18a8a2e9b462de9a953e8`.
-The script uses the system curl with HTTP/2, findmnt and losetup.
-Run `python3 reference.py probe` for two real CAR blocks and the native worker
+The script uses the system curl with HTTP/2, findmnt and the loop device sysfs backing-file record.
+Run `python3 reference.py probe` for the two boundary blocks, three recovered CAR blocks and the native worker
 handshakes. Run `python3 -m unittest test_reference` from this directory to
 exercise the response and account-write boundaries.
 
@@ -23,7 +23,7 @@ input snapshot, genesis, scripts, Python packages and both worker executables
 in the existing protected launcher. Keep the attempt's receipt directory and
 scratch mount writable. Allocate the image only after the complete fleet price
 and the exclusive holder permit it. The hard image cap also contains a failed
-or interrupted attempt. An interrupted run retains its receipts and evidence.
+or interrupted attempt. An interrupted run retains its receipts and evidence. Disable discard while formatting and mounting the image to preserve its preallocated blocks. Direct the service stdout and stderr to bounded HOME logs.
 Use a fresh attempt after inspection.
 
 The command inside that allocation is
@@ -33,7 +33,13 @@ python3 reference.py replay /absolute/attempt/scratch /home/sol/.jetstreamer-pri
 ```
 
 The driver pins the index slices, checks lengths and HTTP ranges, verifies every
-selected CAR section CID, follows the block's original entry and transaction
+selected CAR section CID, and requires contiguous physical CAR coverage.
+The original indices omit 68,254,833, 68,255,841, and 68,261,681. The private
+correction supplies the original byte spans, full SHA-256, parent slot and PoH
+endpoint for exactly those three finalized blocks. All three were recovered
+from the gap between neighboring CAR ranges and matched independently against
+finalized getBlock responses. The neighboring slots 68,254,832, 68,255,840 and
+68,261,680 are skipped. The driver follows each block's original entry and transaction
 links, and checks every produced parent. Each native worker verifies the PoH,
 executes the original transactions, and computes its own full frozen Bank
 checkpoint and legacy accounts hash. The protocol reader checks the signature

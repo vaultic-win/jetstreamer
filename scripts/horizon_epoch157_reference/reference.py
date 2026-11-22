@@ -12,7 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from car import blocks, require
+from car import CORRECTIONS, blocks, require
 from native import base58, worker
 
 BOOT, ROOT, END, NEXT, DOWNSTREAM = 68249460, 68255828, 68255999, 68256004, 68262721
@@ -56,7 +56,10 @@ def utc():
 
 def source_probe():
     proofs = []
-    for ep, target, parent, poh in [(157, END, END-1, TERMINAL_POH), (158, NEXT, END, SUCCESSOR_POH)]:
+    edges = [(157, END, END-1, TERMINAL_POH), (158, NEXT, END, SUCCESSOR_POH)]
+    edges.extend((slot//432000, slot, row["parent"], row["blockhash"])
+                 for slot, row in CORRECTIONS.items())
+    for ep, target, parent, poh in sorted(edges):
         [(slot, actual_parent, entries)] = blocks(ep, target, target)
         require((slot, actual_parent, base58(entries[-1][1])) == (target, parent, poh), "edge")
         proofs.append(dict(slot=slot, parent=actual_parent, last_entry=poh, entries=len(entries),
@@ -83,10 +86,11 @@ def admitted(scratch, receipts):
     vol = os.statvfs(scratch)
     require(scratch.is_mount() and 80 << 30 <= vol.f_bavail * vol.f_frsize <= SCRATCH and
             vol.f_files > 400000, "reference filesystem envelope")
-    source = subprocess.check_output(["findmnt", "-n", "-o", "SOURCE", "-T", scratch], text=True).strip()
-    require(source.startswith("/dev/loop") and source[9:].isdecimal(), "reference scratch loop device")
-    backing = Path(subprocess.check_output(["losetup", "-n", "-O", "BACK-FILE", source],
-                                            text=True).strip())
+    source, filesystem = subprocess.check_output(
+        ["findmnt", "-n", "-o", "SOURCE,FSTYPE", "-T", scratch], text=True).split()
+    require(filesystem == "ext4" and source.startswith("/dev/loop") and source[9:].isdecimal(),
+            "reference scratch loop device")
+    backing = Path((Path("/sys/block") / Path(source).name / "loop/backing_file").read_text().strip())
     backing_stat = backing.stat()
     require(backing.is_relative_to(Path("/home/sol/.jetstreamer-private")) and
             backing_stat.st_dev == receipts.stat().st_dev and backing_stat.st_size == SCRATCH and

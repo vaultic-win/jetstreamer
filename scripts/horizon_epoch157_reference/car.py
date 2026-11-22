@@ -1,6 +1,8 @@
 """Read pinned Old Faithful block ranges and resolve their original entry/transaction CIDs."""
 import hashlib
 import io
+import json
+from pathlib import Path
 import re
 import struct
 import subprocess
@@ -15,6 +17,20 @@ RANGES = {
     157: (68249461, 68255999, "bd385b75d583675ab04cdc59c745d7ddafc3df46c2d5919fa4473cf9e9fe7d0c"),
     158: (68256000, 68262721, "580d4d5de97d03d61c484ce9f9edc1a617629540492327dc179afae0eb653a56"),
 }
+
+# Hash of all produced slot numbers (little-endian u64), independently
+# confirmed over these entire intervals against the pinned Compact V2 indices.
+PRODUCED_SLOTS = {
+    157: "344df4aff354f16481b3975e2afc2aada30ae571644c784071f4ab87a59d885a",
+    158: "c21a3aa9f93704199b8d86ad890fed382d1191af8de8f23926f5e50e0240de74",
+}
+
+
+# All three corrections are private to this two-epoch diagnostic. The
+# repository retains the exact CAR identity and independently finalized RPC
+# header for each original. The public slot-range files remain unchanged.
+CORRECTIONS = {v["slot"]: v for v in json.loads(
+    Path(__file__).with_name("original_blocks.json").read_bytes())}
 
 
 def require(value, message):
@@ -53,12 +69,19 @@ def index(epoch):
     require(total == 432000 * 12 and hashlib.sha256(raw).hexdigest() == digest, "index identity")
     rows = []
     for i, (offset, length) in enumerate(struct.iter_unpack("<QI", raw)):
-        if not length:
+        slot = first + i
+        if slot in CORRECTIONS:
+            require((offset, length) == (0, 0), "correction no longer matches original index")
+            correction = CORRECTIONS[slot]
+            offset, length = correction["offset"], correction["length"]
+        elif not length:
             require(offset == 0, "invalid absent slot")
             continue
         require(0 < length <= MAX_RANGE and offset >= 59, "invalid CAR span")
-        require(not rows or offset >= rows[-1][1] + rows[-1][2], "CAR spans overlap")
+        require(not rows or offset == rows[-1][1] + rows[-1][2], "incomplete physical CAR coverage")
         rows.append((first + i, offset, length))
+    coverage = hashlib.sha256(b"".join(struct.pack("<Q", slot) for slot, _, _ in rows)).hexdigest()
+    require(coverage == PRODUCED_SLOTS[epoch], "independent produced-slot census")
     return rows
 
 
@@ -163,5 +186,11 @@ def blocks(epoch, start, stop):
         require(identity is None or identity == total, "CAR length changed")
         identity = total
         for slot, pos, size in window:
-            parent, entries = original_block(raw[pos - offset:pos - offset + size], slot)
+            piece = raw[pos - offset:pos - offset + size]
+            parent, entries = original_block(piece, slot)
+            if slot in CORRECTIONS:
+                correction = CORRECTIONS[slot]
+                require(hashlib.sha256(piece).hexdigest() == correction["sha256"] and
+                        (parent, entries[-1][1].hex()) == (correction["parent"], correction["poh_hex"]),
+                        "original CAR correction changed")
             yield slot, parent, entries
