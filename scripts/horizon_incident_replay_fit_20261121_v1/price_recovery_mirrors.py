@@ -20,7 +20,7 @@ CLOSED = R / "ready-range-audit-20261121-v1/accepted/144-144.json"
 CLOSED_SHA = "4565e2da06301ac2cc738eaa060af1decb1a50949c9738bbaba02d29c8bccac2"
 
 
-def capture(path, digest):
+def capture(path, digest, active_seal=None):
     # Start with the same root-owned sealed loader and the V6 mirror, prefix and host budget routines.
     import hashlib
     def pinned(p,sha):
@@ -31,7 +31,12 @@ def capture(path, digest):
     require=v6["require"]
     require(os.geteuid()==0 and sys.flags.isolated and __debug__ and path.parent.parent==R and
             path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json","foreign caller or fleet")
-    for package,sha in ((V6,V6_SEAL),(CADENCE,CADENCE_SEAL),(NATIVE,SEAL)):
+    native_package = NATIVE if active_seal is None else BASE / "tools-v20"
+    native_seal = SEAL if active_seal is None else active_seal
+    if active_seal is not None:
+        require(Path(__file__).resolve().parent == native_package and len(active_seal) == 64,
+                "active mirror price requires the original V20 package and seal")
+    for package,sha in ((V6,V6_SEAL),(CADENCE,CADENCE_SEAL),(native_package,native_seal)):
         v6["check_package"](package,sha)
     v6["pin"](ADAPTER,v6["ADAPTER_SHA"])
     mirrors=runpy.run_path(str(V6/"price-mirrors"))
@@ -65,10 +70,27 @@ def capture(path, digest):
     witness,workers,ready_before=audit()
     prefix_before=storage()
     adapter=runpy.run_path(str(ADAPTER))
-    native=json.loads(adapter["capture_provider"](NATIVE/"post-stop-fit",str(path),digest))
+    native=json.loads(adapter["capture_provider"](native_package/"post-stop-fit",str(path),digest))
+    phase = native["phase145"]
+    if active_seal is None:
+        require(phase["InvocationID"]=="a99ed8b51e8a482b805b8a36a11b2700" and
+                phase["source_checkpoint_exists"] is False,"foreign terminal 145 price")
+        semantic_worker = None
+    else:
+        from evidence import bound
+        progress = R / "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_ADVANCING_WORKER.json"
+        semantic_worker = bound(progress)
+        worker = checked(semantic_worker)
+        generation = phase["invocation_id"]
+        start = checked(worker["start"])
+        failed = start["prior_frozen_recovery"]["failed_qualification_census"]["current_boot_failure"]["failure"]
+        require(phase["stage"]=="leased-worker" and generation==worker["invocation_id"]==start["iid"]
+                and len(worker["observations"])==2 and worker["start"]["path"]==str(
+                    R / "epoch145-guarded-export-20261121-v1/state" / generation / "recovery-started.json")
+                and failed==dict(path=str(R / "epoch145-guarded-export-20261121-v1/state/a99ed8b51e8a482b805b8a36a11b2700/failed.json"),
+                                 sha256="da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"),
+                "foreign leased V5f semantic worker or predecessor")
     require(native["fits"] and native["epoch"]==145 and native["fleet"]==ref and
-            native["phase145"]["InvocationID"]=="a99ed8b51e8a482b805b8a36a11b2700" and
-            native["phase145"]["source_checkpoint_exists"] is False and
             0<=time.time()-native["recorded_unix_seconds"]<120,"foreign terminal or native price")
     last,last_workers,ready_after=audit()
     prefix_after=storage()
@@ -86,7 +108,8 @@ def capture(path, digest):
     missing=sum(x["required_bytes"] for x in inputs)
     floor=basis["complete_required_HOME_bytes"]+missing
     return dict(schema="horizon-145-bootstrap-136-mirror-price-v1",fleet=ref,native=native,
-                provider=dict(path=str(NATIVE/"deployment-seal-receipt.json"),sha256=SEAL),basis=basis,
+                provider=dict(path=str(native_package/"deployment-seal-receipt.json"),sha256=native_seal),basis=basis,
+                semantic_worker=semantic_worker,
                 audit=witness,ready_workers=workers,ready_growth_before=ready_before,ready_growth_after=ready_after,
                 accepted144=terminal,prefix_before=prefix_before,prefix_after=prefix_after,
                 mirror_inputs=inputs,missing_mirror_bytes=missing,required_with_mirrors_bytes=floor,
@@ -96,6 +119,8 @@ def capture(path, digest):
 
 
 if __name__=="__main__":
-    result=capture(Path(sys.argv[1]),sys.argv[2])
+    if len(sys.argv) not in (3,4):
+        raise SystemExit("price_recovery_mirrors.py FLEET_PATH FLEET_SHA256 [ACTIVE_V20_SEAL_SHA256]")
+    result=capture(Path(sys.argv[1]),sys.argv[2],sys.argv[3] if len(sys.argv)==4 else None)
     print(json.dumps(result,sort_keys=True))
     sys.exit(0 if result["mirrors_fit"] else 1)
