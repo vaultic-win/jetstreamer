@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-COLD170 = HERE.name == "tools-homefloor-retry11-170-v1"
+COLD170 = HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted",
+                        "tools-homefloor-145-rejoin-v1"}
 RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2", "tools-homefloor-retry11-166-v2-adopted"}
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
