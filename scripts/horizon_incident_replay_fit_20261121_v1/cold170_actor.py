@@ -6,7 +6,8 @@ import stat
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
 LANE = Path('/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1')
 PREVIOUS_RUN = LANE / 'replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1'
-ATTEMPT = 12 if RETRY12 else 11
+RETRY13 = globals().get('RETRY13', False)
+ATTEMPT = 13 if RETRY13 else 12 if RETRY12 else 11
 RUN = PREVIOUS_RUN / f'cold-retry{ATTEMPT}-20261122'
 NAME = f'170-replacement-local3retry{ATTEMPT}-20261122'
 DIRECTORY = f'epoch170-retry{ATTEMPT}-rebook-20261122-v1'
@@ -17,10 +18,12 @@ GUARD = R / f'epoch170-retry{ATTEMPT}-guard-20261122-v1'
 PRIOR_IID = 'a456b826ce1c4634a2df66d66c5cc07f'
 PRIOR_UNIT = 'horizon-qualify-170-replacement-local3retry10-20261121-v1.service'
 STOP_SHA = 'd670ce226f7ee5e24660dbd99b2d8174d72cd38f39487d10b17bcc4c0a85d50a'
-ROOT_SHA = ('466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if RETRY12 else
+ROOT_SHA = ('654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69' if RETRY13 else
+            '466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19' if RETRY12 else
             '8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728')
-ROOT_INODE = 113836033 if RETRY12 else 113704962
-GUARD_SHA = ('7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if RETRY12 else
+ROOT_INODE = {11: 113704962, 12: 113836033, 13: 113981945}[ATTEMPT]
+GUARD_SHA = ('34ee106fc4dd290e8ad447f1ff5ab15cfe538b7ca522785a87df106566e0645c' if RETRY13 else
+             '7ed9e4bffff3cdaad1bd8d0eda700c3b107e85a4b585bb067e4eca50bbab123c' if RETRY12 else
              '36d057cd24d412190ca41f2d910969a1b37fd175cab51ab8c00bd61f6826416d')
 FAILED = R / 'epoch170-retry11-rebook-20261122-v1'
 FAILURE_SHA = '60b0ff3a1b09b8c684fdf07ff300ddaebb89b4c80581a9b475a057a2d6aee801'
@@ -31,6 +34,18 @@ RETURN_SHA = 'c9cf86c9b00d3403e715c14e7af22ea8162e105a222c1d8b9b79be190e97865d'
 SCOPES_SHA = '989f450ba2bea735593b0278ff996ff877d7984439da48522198421dd5249025'
 OLD_PROFILE_SHA = '1596f281f699b48f4e4c7e65adf1070e4961d604d38997a7747ffe60dc536782'
 CAP = 384 << 30
+
+
+PREVIOUS_FAILURES = [
+    (FAILED, FAILURE_SHA, FAILED_IID, FAILED_UNIT, FAILED_GUARD,
+     '9afecd75bf867464a8c41cbab5819a481d530da394a039d9c7c00c97317fe439'),
+]
+if RETRY13:
+    PREVIOUS_FAILURES.append((R / 'epoch170-retry12-rebook-20261122-v1',
+        'ff337e45c1f4a3af3e0f44654a80ee00ffef2c9405ddc27e16c6883611a53151',
+        'f26354f4e63748059e441cbbee250fdb', 'horizon-qualify-170-replacement-local3retry12-20261122.service',
+        'horizon-guard-170-replacement-local3retry12-20261122',
+        'b3d5c6a79b5122083732999ab54ac89ec650c752de596f337f8cab699c60f735'))
 
 
 def stable(s):
@@ -62,15 +77,16 @@ def stable(s):
            'incomplete 170 physical cleanup')
     result = dict(stable_root=source, cleanup=proof, original_cap=CAP, resource_credit_bytes=0)
     if RETRY12:
-        failure, fr = s.read(FAILED / 'START_FAILURE.json', FAILURE_SHA)
-        intent = s.bound(failure['intent'], FAILED / 'START_INTENT.json')
-        actor, _ = s.read(FAILED / 'ACTUAL_PRODUCER_NATIVE.json',
-                          '9afecd75bf867464a8c41cbab5819a481d530da394a039d9c7c00c97317fe439')
-        s.need(root['previous_start_failure'] == fr and failure['cgroup'] == [] and failure['partial_retained']
-               and failure['producer_invocation_id'] == actor['producer_invocation_id'] == FAILED_IID
-               and intent['producer_unit'] == actor['producer_unit'] == FAILED_UNIT
-               and not (FAILED / 'ACTUAL_ADMISSION_AND_PROTECTION.json').exists(),
-               'different unadmitted 170 retry11 failure')
+        for directory, failure_sha, iid, unit, _, actor_sha in PREVIOUS_FAILURES:
+            failure, fr = s.read(directory / 'START_FAILURE.json', failure_sha)
+            intent = s.bound(failure['intent'], directory / 'START_INTENT.json')
+            actor, _ = s.read(directory / 'ACTUAL_PRODUCER_NATIVE.json', actor_sha)
+            s.need(failure['cgroup'] == [] and failure['partial_retained']
+                   and failure['producer_invocation_id'] == actor['producer_invocation_id'] == iid
+                   and intent['producer_unit'] == actor['producer_unit'] == unit
+                   and not (directory / 'ACTUAL_ADMISSION_AND_PROTECTION.json').exists(),
+                   'different unadmitted 170 failure')
+        s.need(root['previous_start_failure'] == fr, 'unbound most recent 170 failure')
         result['previous_start_failure'] = fr
     return result
 
@@ -135,10 +151,11 @@ def guard(s, prepared):
 def observe(s, fit, native_actor, own):
     state = stable(s)
     if RETRY12:
-        for unit in (FAILED_UNIT, FAILED_GUARD + '.service', FAILED_GUARD + '.timer'):
-            manager = s.show(unit)
-            s.need(manager['ActiveState'] == 'inactive' and not manager['Job'] and
-                   (unit.endswith('.timer') or not fit.members(unit)), 'failed 170 retry11 actor returned')
+        for _, _, _, failed_unit, failed_guard, _ in PREVIOUS_FAILURES:
+            for unit in (failed_unit, failed_guard + '.service', failed_guard + '.timer'):
+                manager = s.show(unit)
+                s.need(manager['ActiveState'] == 'inactive' and not manager['Job'] and
+                       (unit.endswith('.timer') or not fit.members(unit)), 'failed 170 generation returned')
     stopped, ref = s.read(OLD / 'guard-receipts/stop-completion.json', STOP_SHA)
     s.need(stopped['producer_invocation_id'] == PRIOR_IID and stopped['terminal']['active'] == 'inactive'
            and stopped['terminal']['pid'] == 0 and s.show(PRIOR_UNIT)['ActiveState'] == 'inactive'
@@ -147,6 +164,56 @@ def observe(s, fit, native_actor, own):
     row = native_actor(170, own, LANE, RUN, predecessor, generation=(DIRECTORY, NAME))
     if row is not None and RETRY12:
         prepared, _ = s.read(NEW / 'PREPARED.json')
-        s.need(row['producer_invocation_id'] != FAILED_IID and prepared['baseline']['previous_cold_failure'] ==
+        s.need(all(row['producer_invocation_id'] != item[2] for item in PREVIOUS_FAILURES)
+               and prepared['baseline']['previous_cold_failure'] ==
                state['previous_start_failure'], 'different 170 retry12 predecessor')
     return row
+
+
+def fund_prestart(s, price, retained167, budget, registered_floor):
+    """Reprice both live peer bookings under the exact nonexact-walk fallback."""
+    peers = price['survivors']
+    charged = price['bookings']
+    s.need(price['epoch'] == 170 and price['candidate'] is None
+           and '167' in price['replacements'] and '172' in peers,
+           'nonexact startup price requires the two live peers and an unstarted 170')
+    book167 = charged['167']
+    guard172 = peers['172']['guard']
+    paid172 = guard172['cap'] - guard172['remaining']
+    s.need(0 <= paid172 <= guard172['cap'] == 288 << 30
+           and 0 < retained167 <= book167['physical_bytes'] <= book167['cap_bytes'] == 512 << 30,
+           'invalid current credit for 167 or 172')
+    books = dict(charged, **{'167': dict(book167, physical_bytes=retained167,
+                                         remaining_bytes=book167['cap_bytes'] - retained167)})
+    charged_peers = dict(peers, **{'172': dict(peers['172'], guard=dict(guard172, remaining=guard172['cap']))})
+    # The original 172 host equation adds its remaining allowance once, after
+    # the maximum of incumbent guard floors. Replacing occupancy with zero
+    # adds exactly paid172 to that aggregate. disk_budget computes the rest.
+    raw = price['original_aggregate_HOME_bytes'] + paid172
+    candidate136 = price['candidate136']
+    actors = price['replacements']
+    def evaluate(candidate, epoch):
+        return budget(raw, candidate, books, epoch, charged_peers, actors,
+                      price['active168_guard_floor'], price['closed_prestart_remaining'])
+    required, protected, _ = evaluate(candidate136, 170)
+    zero, _, _ = evaluate(dict(remaining=0), 145)
+    obligations = price['recovery_obligations']
+    growth = obligations['prefix']['remaining_DATA_growth_bytes']
+    total = max(required + growth, registered_floor(0, zero, candidate136, growth)) + obligations['missing_mirror_bytes']
+    if price['bounded_qualification']:
+        total += price['bounded_qualification']['scratch_bytes']
+    worst = protected + total - required
+    original_floor = price['protected_raw_floor_bytes']
+    original_required = price['complete_required_HOME_bytes']
+    headroom = price['available_HOME_bytes'] - original_required
+    exposure = worst - original_floor
+    s.need(total == worst + books['170']['remaining_bytes'] and exposure == total - original_required
+           and exposure >= 0, 'peer fallback did not preserve the complete 170 booking')
+    details = dict(schema='horizon-170-nonexact-peer-prestart-v1', ordinary_protected_raw_floor_bytes=original_floor,
+                   ordinary_required_HOME_bytes=original_required, protected_raw_floor_bytes=worst,
+                   complete_required_HOME_bytes=total, allowance_needed=exposure, initial_headroom_bytes=headroom,
+                   funded=exposure <= headroom, retained167_bytes=retained167,
+                   occupied172_credit_bytes=0, full172_cap_bytes=guard172['cap'],
+                   candidate_remaining_bytes=books['170']['remaining_bytes'], guard172=guard172['guard'])
+    price.update(protected_raw_floor_bytes=worst, complete_required_HOME_bytes=total,
+                 startup_nonexact_peer_floor=details, fits=bool(price['fits'] and details['funded']))
