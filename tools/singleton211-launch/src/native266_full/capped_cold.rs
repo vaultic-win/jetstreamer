@@ -67,7 +67,12 @@ fn terminal_manager(n: &mut Native, expected: &Value) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn assess(n: &mut Native, fleet_ref: &Bound, controller: &str) -> Result<Value> {
+pub(crate) fn assess(
+    n: &mut Native,
+    fleet_ref: &Bound,
+    controller: &str,
+    held: bool,
+) -> Result<Value> {
     original_boot()?;
     let review = Bound::new(REVIEW, REVIEW_SHA).json()?;
     let fleet = peer261::latest(fleet_ref)?;
@@ -131,6 +136,12 @@ pub(super) fn assess(n: &mut Native, fleet_ref: &Bound, controller: &str) -> Res
         .into_iter()
         .map(str::to_owned),
     );
+    if held {
+        allowed.extend([
+            native266_capped::UNIT.to_owned(),
+            native266_capped::GUARD_UNIT.to_owned(),
+        ]);
+    }
     let check = |n: &mut Native| -> Result<(u64, Value)> {
         ensure!(
             funding::manager_units(n)?.is_subset(&allowed),

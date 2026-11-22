@@ -10,33 +10,44 @@ pub(super) const EPOCH: u64 = 170;
 pub(super) const PRODUCER_UNIT: &str = "horizon-qualify-167-source-index-v1-20261121.service";
 #[cfg(feature = "cold167")]
 pub(super) const PRODUCER_UNIT: &str = "horizon-qualify-167-source-index-v3-20261122.service";
-#[cfg(feature = "retry170")]
+#[cfg(all(feature = "retry170", not(feature = "cold170")))]
 pub(super) const PRODUCER_UNIT: &str =
     "horizon-qualify-170-replacement-local3retry10-20261121-v1.service";
+#[cfg(feature = "cold170")]
+pub(super) const PRODUCER_UNIT: &str =
+    "horizon-qualify-170-replacement-local3retry13-20261122.service";
 #[cfg(all(feature = "source167", not(feature = "cold167")))]
 pub(super) const PRODUCER_IID: &str = "0876e9944c784b41afeff1b666539ead";
 #[cfg(feature = "cold167")]
 pub(super) const PRODUCER_IID: &str = "6e4b569b61d7420fb30a24a4ad0609dd";
-#[cfg(feature = "retry170")]
+#[cfg(all(feature = "retry170", not(feature = "cold170")))]
 pub(super) const PRODUCER_IID: &str = "a456b826ce1c4634a2df66d66c5cc07f";
+#[cfg(feature = "cold170")]
+pub(super) const PRODUCER_IID: &str = "c44b5215f8d949159e7ce9cf911e9be1";
 #[cfg(all(feature = "source167", not(feature = "cold167")))]
 pub(super) const LIVE_SHA: &str =
     "f9b3e1fbdddfd983f1589ead46439a5bde07762cfc6151a8cfbb6f5580e818be";
 #[cfg(feature = "cold167")]
 pub(super) const LIVE_SHA: &str =
     "525b8104545f5d8a5716291e8540386932f49b1cfc096898fb380c602713c16e";
-#[cfg(feature = "retry170")]
+#[cfg(all(feature = "retry170", not(feature = "cold170")))]
 pub(super) const LIVE_SHA: &str =
     "8221f8f31df8bd360b7ef95a82b6cbf04c27fff2a0dc53508f6c79d1731dff7b";
+#[cfg(feature = "cold170")]
+pub(super) const LIVE_SHA: &str =
+    "c73815d49529c42cc70f0e7ba11ab171f9b1ecdfb92c418afbe1b7631e57d898";
 #[cfg(all(feature = "source167", not(feature = "cold167")))]
 pub(super) const TERMINAL_ROOT: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-current-delivery-20261121-v1";
 #[cfg(feature = "cold167")]
 pub(super) const TERMINAL_ROOT: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-cold-delivery-20261122-v3";
-#[cfg(feature = "retry170")]
+#[cfg(all(feature = "retry170", not(feature = "cold170")))]
 pub(super) const TERMINAL_ROOT: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-current-delivery-20261121-v1";
+#[cfg(feature = "cold170")]
+pub(super) const TERMINAL_ROOT: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-cold-delivery-20261122-v13";
 
 #[cfg(feature = "full172")]
 pub(super) const EPOCH: u64 = 172;

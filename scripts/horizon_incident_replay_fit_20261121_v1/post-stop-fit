@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-RETRY13_170 = HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
+FOURTH166 = HERE.name == "tools-homefloor-166-after170-v1"
+RETRY13_170 = FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
                             "tools-homefloor-145-rejoin-v1"}
 RETRY12_170 = RETRY13_170 or HERE.name in {"tools-homefloor-retry12-170-v1", "tools-homefloor-retry12-170-adopted"}
 COLD170 = RETRY12_170 or HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted"}
@@ -699,7 +700,7 @@ def joined_resident(active):
 
 def registered_status():
     if HOMEFLOOR:
-        return registrations["registered_status"](s, fit, 12 if RETRY12_170 else 11)
+        return registrations["registered_status"](s, fit, cold170["ATTEMPT"] if COLD170 else 11)
     registration=s.read(fit.READY,"02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")[1]
     m=s.show(fit.PUBLISHER);pid=int(m["MainPID"])
     proc=Path(f"/proc/{pid}")
@@ -1066,18 +1067,29 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
-    if not RETRY13_170 or epoch != 170 or fit.members('horizon-qualify-' + cold170['NAME'] + '.service'):
+    prestart166 = FOURTH166 and epoch == 166 and not fit.members(retry11['UNIT'])
+    prestart170 = RETRY13_170 and epoch == 170 and not fit.members('horizon-qualify-' + cold170['NAME'] + '.service')
+    if not (prestart166 or prestart170):
         return capture_native(epoch, ref, prestart136)
 
-    # Price the peer fallback before the fresh native census, so its receipts and
-    # free-space sample do not age during these walks of the inactive siblings.
-    root, run = cold167['LANE'], cold167['RUN']
-    cap = CAPS[167]
-    retained = tree_size(root, cap, run)
-    s.need(tree_size(root, cap, run) == retained, 'retained epoch 167 siblings changed')
+    # Walk only inactive siblings before the full native census. Charge the entire
+    # 172 cap and make no assumption about occupancy within an active peer run.
+    live = {167: cold167}
+    if prestart166:
+        live[170] = cold170
+    retained = {}
+    for peer, source in live.items():
+        root, run = source['LANE'], source['RUN']
+        cap = cold170['CAP'] if peer == 170 else CAPS[peer]
+        size = tree_size(root, cap, run)
+        s.need(tree_size(root, cap, run) == size, f'retained epoch {peer} siblings changed')
+        retained[peer] = size
     result = capture_native(epoch, ref, prestart136)
-    s.need(result['candidate'] is None and result['bookings']['167']['root'] == str(root)
-           and result['bookings']['167']['run'] == str(run), '170 or its charged 167 siblings changed')
+    s.need(result['candidate'] is None, 'candidate started during prestart capture')
+    for peer, source in live.items():
+        booking = result['bookings'][str(peer)]
+        s.need(booking['root'] == str(source['LANE']) and booking['run'] == str(source['RUN']),
+               f'different active path for peer {peer}')
     cold170['fund_prestart'](s, result, retained, disk_budget, post145_floor)
     return result
 

@@ -170,21 +170,26 @@ def observe(s, fit, native_actor, own):
     return row
 
 
-def fund_prestart(s, price, retained167, budget, registered_floor):
-    """Reprice both live peer bookings under the exact nonexact-walk fallback."""
+def fund_prestart(s, price, retained, budget, registered_floor):
+    """Price an unstarted epoch against the occupied bytes guaranteed by inactive peer siblings."""
+    epoch = price['epoch']
     peers = price['survivors']
     charged = price['bookings']
-    s.need(price['epoch'] == 170 and price['candidate'] is None
-           and '167' in price['replacements'] and '172' in peers,
-           'nonexact startup price requires the two live peers and an unstarted 170')
-    book167 = charged['167']
+    expected = {167, 170} if epoch == 166 else {167}
+    s.need(epoch in (166, 170) and price['candidate'] is None and set(retained) == expected
+           and all(str(peer) in price['replacements'] for peer in expected)
+           and '172' in peers, 'unexpected candidate or peers for nonexact startup price')
     guard172 = peers['172']['guard']
     paid172 = guard172['cap'] - guard172['remaining']
-    s.need(0 <= paid172 <= guard172['cap'] == 288 << 30
-           and 0 < retained167 <= book167['physical_bytes'] <= book167['cap_bytes'] == 512 << 30,
-           'invalid current credit for 167 or 172')
-    books = dict(charged, **{'167': dict(book167, physical_bytes=retained167,
-                                         remaining_bytes=book167['cap_bytes'] - retained167)})
+    s.need(0 <= paid172 <= guard172['cap'] == 288 << 30, 'invalid current occupancy for 172')
+    books = dict(charged)
+    for peer in sorted(retained):
+        key = str(peer)
+        book = charged[key]
+        cap = {167: 512 << 30, 170: 384 << 30}[peer]
+        s.need(0 < retained[peer] <= book['physical_bytes'] <= book['cap_bytes'] == cap,
+               f'invalid current occupancy for {peer}')
+        books[key] = dict(book, physical_bytes=retained[peer], remaining_bytes=cap - retained[peer])
     charged_peers = dict(peers, **{'172': dict(peers['172'], guard=dict(guard172, remaining=guard172['cap']))})
     # The original 172 host equation adds its remaining allowance once, after
     # the maximum of incumbent guard floors. Replacing occupancy with zero
@@ -195,7 +200,7 @@ def fund_prestart(s, price, retained167, budget, registered_floor):
     def evaluate(candidate, epoch):
         return budget(raw, candidate, books, epoch, charged_peers, actors,
                       price['active168_guard_floor'], price['closed_prestart_remaining'])
-    required, protected, _ = evaluate(candidate136, 170)
+    required, protected, _ = evaluate(candidate136, epoch)
     zero, _, _ = evaluate(dict(remaining=0), 145)
     obligations = price['recovery_obligations']
     growth = obligations['prefix']['remaining_DATA_growth_bytes']
@@ -207,13 +212,17 @@ def fund_prestart(s, price, retained167, budget, registered_floor):
     original_required = price['complete_required_HOME_bytes']
     headroom = price['available_HOME_bytes'] - original_required
     exposure = worst - original_floor
-    s.need(total == worst + books['170']['remaining_bytes'] and exposure == total - original_required
-           and exposure >= 0, 'peer fallback did not preserve the complete 170 booking')
-    details = dict(schema='horizon-170-nonexact-peer-prestart-v1', ordinary_protected_raw_floor_bytes=original_floor,
+    candidate = books[str(epoch)]
+    s.need(total == worst + candidate['remaining_bytes'] and exposure == total - original_required
+           and exposure >= 0, 'peer fallback did not preserve the complete candidate booking')
+    details = dict(schema=f'horizon-{epoch}-nonexact-peer-prestart-v1', ordinary_protected_raw_floor_bytes=original_floor,
                    ordinary_required_HOME_bytes=original_required, protected_raw_floor_bytes=worst,
                    complete_required_HOME_bytes=total, allowance_needed=exposure, initial_headroom_bytes=headroom,
-                   funded=exposure <= headroom, retained167_bytes=retained167,
+                   funded=exposure <= headroom, retained167_bytes=retained[167],
                    occupied172_credit_bytes=0, full172_cap_bytes=guard172['cap'],
-                   candidate_remaining_bytes=books['170']['remaining_bytes'], guard172=guard172['guard'])
+                   candidate_remaining_bytes=candidate['remaining_bytes'], guard172=guard172['guard'])
+    if epoch == 166:
+        details.update(retained170_bytes=retained[170], candidate_cap_bytes=candidate['cap_bytes'],
+                       peer_167_guard=actors['167']['guard'], peer_170_guard=actors['170']['guard'])
     price.update(protected_raw_floor_bytes=worst, complete_required_HOME_bytes=total,
                  startup_nonexact_peer_floor=details, fits=bool(price['fits'] and details['funded']))

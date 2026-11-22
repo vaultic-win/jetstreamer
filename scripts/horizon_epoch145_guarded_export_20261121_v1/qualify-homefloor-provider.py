@@ -1,4 +1,4 @@
-"""Qualify an identical copy of the sealed retry12 provider in the semantic reader's fixed directory."""
+"""Qualify an identical copy of the sealed retry13 provider in the semantic reader's fixed directory."""
 import argparse
 import hashlib
 import json
@@ -13,7 +13,7 @@ import tempfile
 
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 D = R / "incident-replay-fit-20261121-v1"
-DONOR = D / "tools-homefloor-retry12-170-adopted"
+DONOR = D / "tools-homefloor-retry13-170-adopted"
 DEST = D / "tools-homefloor-145-rejoin-v1"
 VERIFIER = R / "epoch145-semantic-continuity-20261121-v1/tools-v5g"
 SEAL = "deployment-seal-receipt.json"
@@ -78,7 +78,7 @@ def members(path, seal_hash):
 
 def inspect(package, fleet, fleet_sha, output):
     native = runpy.run_path(str(package / "post-stop-fit"))
-    need(all(native[k] for k in ("HOMEFLOOR", "RETRY11", "COLD170", "RETRY12_170")),
+    need(all(native[k] for k in ("HOMEFLOOR", "RETRY11", "COLD170", "RETRY13_170")),
          "directory selected a different producer family")
     cfg, adapter, refs = native["profile145"](package, focused="homefloor-semantic")
     need(adapter == VERIFIER / "incident-phase.py" and refs["seal"] == ref(VERIFIER / SEAL)
@@ -89,11 +89,22 @@ def inspect(package, fleet, fleet_sha, output):
     v = json.loads(proc.stdout)
     holding = v["registered_retry11_holding"]
     obligations = v["recovery_obligations"]
+    actor170 = v["replacements"]["170"]
+    cadence = R / "survivor172-cadence-20261122-v1/COLD170_RETRY13_V2_STATUS_ACTIVE.json"
+    need(ref(cadence)["sha256"] == "6b180fd6e5fab24a547e4951b290b50404d8d39fae5e0a9374db0bb27800f486",
+         "different retry13 writer activation")
+    writer = json.loads(cadence.read_bytes())
+    need(actor170["admission"] == writer["admission"]
+         and actor170["producer_invocation_id"] == "c44b5215f8d949159e7ce9cf911e9be1"
+         and v["status_registration"]["invocation_id"] == writer["new"]["invocation_id"]
+         and v["survivors"]["172"]["invocation_id"] == "0e17b745938546608b0bdc52815151d0"
+         and v["replacements"]["167"]["producer_invocation_id"] == "6e4b569b61d7420fb30a24a4ad0609dd",
+         "different admitted producers or status writer")
     need(v["epoch"] == 145 and v["fleet"] == dict(path=str(fleet), sha256=fleet_sha) and v["fits"]
          and v["candidate"] is None and not v["replay_launch_authorized"] and v["resource_credit_bytes"] == 0
          and v["phase145"]["InvocationID"] == ORIGINAL and v["phase145"]["failure"]["sha256"] == FAILURE_SHA
          and v["phase145"]["candidate"]["inode"] == 103237059 and not v["phase145"]["source_checkpoint_exists"]
-         and v["cold170"]["stable_root"]["sha256"] == "466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19"
+         and v["cold170"]["stable_root"]["sha256"] == "654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69"
          and v["bookings"]["170"]["cap_bytes"] == 384 << 30 and v["candidate136"]["cap"] == 72 << 30
          and holding["stage"] in ("copy-only", "completed-copy") and holding["restore_overlap_bytes"] == 64922604512
          and holding["stage_bytes"] == holding["resource_credit_bytes"] == holding["additional_reservation_bytes"] == 0
@@ -110,6 +121,8 @@ def main(donor_sha, fleet_name, fleet_sha, stage_only=False):
     fleet = Path(fleet_name)
     need(fleet.parent.parent == R and fleet.name == "ROOT_COMPLETE_OPERATIONAL_FLEET.json"
          and fleet.resolve(strict=True) == fleet and ref(fleet)["sha256"] == fleet_sha, "foreign fleet")
+    need(donor_sha == "7bd459de59d3381b45f0c9b22de2f53db8dc5d91e70b2312d3facc95d367ac91",
+         "different 170 adopted provider")
     source = members(DONOR, donor_sha)
     need(ref(SEALER)["sha256"] == SEALER_SHA, "foreign sealer")
     qa = Path(tempfile.mkdtemp(prefix="semantic145-", dir=D / "homefloor-qualification"))
