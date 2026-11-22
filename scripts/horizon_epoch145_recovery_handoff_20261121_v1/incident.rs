@@ -127,17 +127,41 @@ mod generation {
 
 #[cfg(feature = "fixture-post")]
 pub(super) mod generation {
-    pub(crate) const SOURCE: &str = "50af3d8ab5da47e8bdc2828feab53908";
-    pub(crate) const START: &str =
-        "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_ADVANCING_WORKER.json";
-    pub(crate) const ADVANCING: &str =
-        "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496";
-    pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13b";
+    #[cfg(not(feature = "retry-post"))]
+    mod selected {
+        pub(crate) const SOURCE: &str = "50af3d8ab5da47e8bdc2828feab53908";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_ADVANCING_WORKER.json";
+        pub(crate) const MANAGER: &str =
+            "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_MANAGER.json";
+        pub(crate) const ADVANCING: &str =
+            "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13b";
+        pub(crate) const STATE_PATH: &str = "epoch145-fixture-phase-dispatch-20261122-v1/state";
+        pub(crate) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v21b";
+        pub(crate) const PRIOR: &str = "a99ed8b51e8a482b805b8a36a11b2700";
+        pub(crate) const FAILURE: &str =
+            "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43";
+    }
+    #[cfg(feature = "retry-post")]
+    mod selected {
+        pub(crate) const SOURCE: &str = "afcf6cdd1ec0400ea2757f81472987b3";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json";
+        pub(crate) const MANAGER: &str =
+            "epoch145-semantic-continuity-20261121-v1/V5F_RETRY1_ACTUAL_MANAGER.json";
+        pub(crate) const ADVANCING: &str =
+            "1b16ce2d061e2ec97ab8c1ba81cd2dbcff9d0a759f317fbaf53b64e731a19501";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13c";
+        pub(crate) const STATE_PATH: &str = "epoch145-fixture-retry1-dispatch-20261122-v1/state";
+        pub(crate) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v23";
+        pub(crate) const PRIOR: &str = "50af3d8ab5da47e8bdc2828feab53908";
+        pub(crate) const FAILURE: &str =
+            "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd";
+    }
+    pub(crate) use selected::*;
     pub(crate) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
-    pub(crate) const STATE_PATH: &str = "epoch145-fixture-phase-dispatch-20261122-v1/state";
-    pub(crate) const FIT_PKG: &str = "incident-replay-fit-20261121-v1/tools-v21b";
     pub(crate) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
-    pub(crate) const PRIOR: &str = "a99ed8b51e8a482b805b8a36a11b2700";
     pub(crate) const IMAGE: &str =
         "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21";
     pub(crate) const SEMANTIC: &str =
@@ -267,20 +291,35 @@ fn original() -> Result<Value> {
     {
         let state = rt("epoch145-guarded-export-20261121-v1/state");
         let failed = json!({"path":state.join(PRIOR).join("failed.json"),
+            "sha256":FAILURE});
+        let inner = json!({"path":state.join("a99ed8b51e8a482b805b8a36a11b2700/failed.json"),
             "sha256":"da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"});
         ensure!(
             a["start"] == bound(&state.join(SOURCE).join("recovery-started.json"))?
-                && a["manager"]
-                    == bound(&rt(
-                        "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_MANAGER.json"
-                    ))?
+                && a["manager"] == bound(&rt(MANAGER))?
                 && start["prior_frozen_recovery"]["failed_qualification_census"]["current_boot_failure"]
                     ["failure"]
-                    == failed
+                    == inner
                 && launch["failure"] == failed
                 && from_ref(&failed)?["iid"] == PRIOR,
             "different V5f registration or predecessor"
         );
+        #[cfg(feature = "retry-post")]
+        {
+            let family = rt("epoch145-semantic-continuity-20261121-v1");
+            ensure!(
+                manager["intent"] == bound(&family.join("V5F_RETRY1_START_INTENT.json"))?
+                    && launch["previous_advancement"]
+                        == bound(&family.join("V5F_ACTUAL_ADVANCING_WORKER.json"))?
+                    && launch["recovery"]
+                        == bound(&state.join(PRIOR).join("recovery-started.json"))?
+                    && from_ref(&launch["previous_advancement"])?["invocation_id"] == PRIOR
+                    && launch["verifier"]
+                        == bound(&family.join("tools-v5f/deployment-seal-receipt.json"))?
+                    && from_ref(&inner)?["iid"] == "a99ed8b51e8a482b805b8a36a11b2700",
+                "same-image retry did not follow the original failed worker"
+            );
+        }
     }
     Ok(a)
 }

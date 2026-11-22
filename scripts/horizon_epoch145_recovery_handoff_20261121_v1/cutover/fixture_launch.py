@@ -13,15 +13,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import envelope
 from qualify import cmd_json, fixture, need, pathcheck
 
-DIRECTORY = envelope.R / "epoch145-fixture-phase-dispatch-20261122-v1"
+RETRY = __name__ == "__main__" and "--retry1" in sys.argv[1:]
+FIRST = envelope.R / "epoch145-fixture-phase-dispatch-20261122-v1"
+DIRECTORY = envelope.R / "epoch145-fixture-retry1-dispatch-20261122-v1" if RETRY else FIRST
 STATE = DIRECTORY / "state"
 PACKAGE = DIRECTORY / "tools"
-UNIT = "horizon-145-fixture-phase-dispatch-20261122-v1.service"
-PROBE_PREFIX = "horizon-145-fixture-sandbox-20261122-"
+UNIT = ("horizon-145-fixture-retry1-dispatch-20261122-v1.service" if RETRY else
+        "horizon-145-fixture-phase-dispatch-20261122-v1.service")
+PROBE_PREFIX = "horizon-145-retry1-sandbox-20261122-" if RETRY else "horizon-145-fixture-sandbox-20261122-"
 GROUP = Path("/sys/fs/cgroup/system.slice") / UNIT
 LEGACY_LOCK = envelope.OLD_DIR / "state/controller.lock"
 PRED = DIRECTORY / "PREDECESSOR_DRAINED.json"
-PRED_HASH = "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07"
+PRED_HASH = ("e292ddb3e46ff8e5fb0d0dd39bacc6bb5376ac238c4868b622ccfdb42df47b5a" if RETRY else
+             "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07")
+LOCKS = {"controller_lock": LEGACY_LOCK}
+if RETRY:
+    LOCKS["recent_controller_lock"] = FIRST / "state/controller.lock"
 SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
 
@@ -45,7 +52,7 @@ def manager(unit):
 
 def check_predecessors():
     witness = json.loads(checked(PRED, PRED_HASH))
-    for kind in ("previous", "earlier"):
+    for kind in (("previous", "earlier", "earliest") if RETRY else ("previous", "earlier")):
         previous = witness[kind]
         current = manager(previous["Id"])
         # PID1 can collect a failed transient service after its receipt is captured.
@@ -55,7 +62,7 @@ def check_predecessors():
         need(current["MainPID"] == current["ControlPID"] == "0" and
              not any(current[k] for k in ("ControlGroup", "Job", "Triggers", "TriggeredBy")) and
              not (GROUP.parent / current["Id"]).exists(), "predecessor still owns work")
-    for tag in ("operation_lock", "controller_lock"):
+    for tag in ("operation_lock", *LOCKS):
         bound = witness[tag]
         p = Path(bound["path"])
         s = p.lstat()
@@ -98,13 +105,15 @@ def sandbox():
     for path in (LEGACY_LOCK.parent, DIRECTORY, envelope.BASE/"tools",
                  envelope.BASE/"controller", Path("/run/systemd/transient"), Path("/etc/jetstreamer")):
         need(os.statvfs(path).f_flag & os.ST_RDONLY, f"{path} must be read-only")
-    fd = os.open(LEGACY_LOCK, os.O_RDONLY | os.O_NOFOLLOW)
-    try:
-        meta = os.fstat(fd)
-        expected = witness["controller_lock"]
-        need((meta.st_dev, meta.st_ino) == (expected["device"], expected["inode"]), "wrong projected lock")
-    finally:
-        os.close(fd)
+    for role, lock in LOCKS.items():
+        need(os.statvfs(lock.parent).f_flag & os.ST_RDONLY, "previous controller directory writable")
+        fd = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            meta = os.fstat(fd)
+            expected = witness[role]
+            need((meta.st_dev, meta.st_ino) == (expected["device"], expected["inode"]), "wrong projected lock")
+        finally:
+            os.close(fd)
     fixture()
     need(group.name.startswith(PROBE_PREFIX) and group.name.endswith(".service"), "unexpected qualification unit")
     return dict(service_properties=envelope.props(**settings()), predecessor=PRED_HASH, requests=0,
@@ -129,7 +138,7 @@ def owner(actor):
          (proc/"exe").samefile(PACKAGE/"follow145") and
          (proc/"cmdline").read_bytes().split(b"\0") == [os.fsencode(PACKAGE/"follow145"), b"follow-v5f", b""],
          "different dispatcher executable")
-    if all(p.exists() and own_lock(pid, p) for p in (LEGACY_LOCK, STATE/"controller.lock")):
+    if all(p.exists() and own_lock(pid, p) for p in (*LOCKS.values(), STATE/"controller.lock")):
         need(manager(UNIT) == actor, "dispatcher changed while inspecting its locks")
         return actor
     return None
@@ -175,6 +184,7 @@ def check_price(path, digest, inspected, witness):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices=("sandbox", "start"))
+    parser.add_argument("--retry1", action="store_true", help="select the first same-image V5F retry")
     parser.add_argument("--deployment")
     parser.add_argument("--sandbox-proof", type=Path)
     parser.add_argument("--proof-sha")

@@ -25,11 +25,26 @@ pub(super) mod profile {
 #[cfg(feature = "fixture-post")]
 pub(super) mod profile {
     pub(crate) use crate::incident::generation::{FOLLOW, SOURCE as SEMANTIC, STATE_PATH as STATE};
-    pub(crate) const DIR: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
+    #[cfg(not(feature = "retry-post"))]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-fixture-phase-dispatch-20261122-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-phase-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v7b";
+        pub(crate) const CLOSED: &str =
+            "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07";
+    }
+    #[cfg(feature = "retry-post")]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-fixture-phase-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v7c";
+        pub(crate) const CLOSED: &str =
+            "e292ddb3e46ff8e5fb0d0dd39bacc6bb5376ac238c4868b622ccfdb42df47b5a";
+    }
+    pub(crate) use selected::*;
     pub(crate) const DEPLOY: &str = "tools";
-    pub(crate) const DISPATCH: &str = "horizon-145-fixture-phase-dispatch-20261122-v1.service";
-    pub(crate) const OLD: &str = "horizon-145-phase-dispatch-20261122-v1.service";
-    pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v7b";
     pub(crate) const WRITER_SEAL: &str = env!("HORIZON_136_WRITER_SEAL_SHA256");
     pub(crate) const MIRROR_SEAL: &str = env!("HORIZON_136_MIRROR_SEAL_SHA256");
     pub(crate) const PARENT_SEAL: &str = env!("HORIZON_136_PARENT_SEAL_SHA256");
@@ -197,36 +212,54 @@ fn registration() -> Result<(Value, Value)> {
     #[cfg(not(feature = "fixture-post"))]
     drained(&native(OLD)?, OLD)?;
     #[cfg(feature = "fixture-post")]
-    owned_lock(pid, &previous_lock()?)?;
+    for path in previous_locks()? {
+        owned_lock(pid, &path)?;
+    }
     Ok((pin, ready))
 }
 
 #[cfg(feature = "fixture-post")]
-fn previous_lock() -> Result<PathBuf> {
-    let receipt = pinned(
-        &rt(DIR).join("PREDECESSOR_DRAINED.json"),
-        "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07",
-    )?;
-    let path = rt("epoch145-v5e-delivery-handoff-20261121-v1/state/controller.lock");
-    let prior = &receipt["controller_lock"];
-    let m = fs::symlink_metadata(&path)?;
-    ensure!(
-        prior == &json!({"path":path,"device":m.dev(),"inode":m.ino()})
-            && m.is_file()
-            && m.nlink() == 1
-            && m.len() == 0
-            && m.uid() == 0
-            && m.gid() == 0
-            && m.mode() & 0o7777 == 0o600,
-        "original controller lock changed"
+fn previous_locks() -> Result<Vec<PathBuf>> {
+    let receipt = pinned(&rt(DIR).join("PREDECESSOR_DRAINED.json"), profile::CLOSED)?;
+    let original = rt("epoch145-v5e-delivery-handoff-20261121-v1/state/controller.lock");
+    let earlier = "horizon-145-v5e-delivery-follow-20261121-v1.service";
+    #[cfg(not(feature = "retry-post"))]
+    let (locks, units) = (
+        vec![(original, "controller_lock")],
+        vec![(OLD, "previous"), (earlier, "earlier")],
     );
-    for (unit, recorded) in [
-        (OLD, &receipt["previous"]),
-        (
-            "horizon-145-v5e-delivery-follow-20261121-v1.service",
-            &receipt["earlier"],
-        ),
-    ] {
+    #[cfg(feature = "retry-post")]
+    let (locks, units) = (
+        vec![
+            (original, "controller_lock"),
+            (
+                rt("epoch145-fixture-phase-dispatch-20261122-v1/state/controller.lock"),
+                "recent_controller_lock",
+            ),
+        ],
+        vec![
+            (OLD, "previous"),
+            ("horizon-145-phase-dispatch-20261122-v1.service", "earlier"),
+            (earlier, "earliest"),
+        ],
+    );
+    let mut paths = Vec::new();
+    for (path, field) in locks {
+        let m = fs::symlink_metadata(&path)?;
+        ensure!(
+            receipt[field] == json!({"path":path,"device":m.dev(),"inode":m.ino()})
+                && m.is_file()
+                && m.nlink() == 1
+                && m.len() == 0
+                && m.uid() == 0
+                && m.gid() == 0
+                && m.mode() & 0o7777 == 0o600,
+            "predecessor controller lock changed"
+        );
+        paths.push(path);
+    }
+    for (unit, field) in units {
+        let recorded = &receipt[field];
         let live = terminal136::unit_state(unit)?;
         ensure!(
             live["Id"] == recorded["Id"]
@@ -244,29 +277,33 @@ fn previous_lock() -> Result<PathBuf> {
             "previous dispatcher still owns work or has changed"
         );
     }
-    Ok(path)
+    Ok(paths)
 }
 
 #[cfg(feature = "fixture-post")]
-pub(super) fn guard_predecessor() -> Result<File> {
-    let path = previous_lock()?;
-    let original = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
-        .open(&path)?;
-    ensure!(
-        same_inode(&original.metadata()?, &fs::symlink_metadata(&path)?)
-            && unsafe { libc::flock(original.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-        "previous dispatcher owns its controller lock"
-    );
-    ensure!(
-        same_inode(
-            &original.metadata()?,
-            &fs::symlink_metadata(previous_lock()?)?
-        ),
-        "previous lock changed"
-    );
-    Ok(original)
+pub(super) fn guard_predecessor() -> Result<Vec<File>> {
+    let paths = previous_locks()?;
+    let mut retained = Vec::new();
+    for path in &paths {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+            .open(path)?;
+        ensure!(
+            same_inode(&file.metadata()?, &fs::symlink_metadata(path)?)
+                && unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+            "previous dispatcher owns its controller lock"
+        );
+        retained.push(file);
+    }
+    ensure!(paths == previous_locks()?, "predecessor set changed");
+    for (path, file) in paths.iter().zip(&retained) {
+        ensure!(
+            same_inode(&file.metadata()?, &fs::symlink_metadata(path)?),
+            "previous lock replaced"
+        );
+    }
+    Ok(retained)
 }
 
 fn before_submission() -> Result<()> {
@@ -771,8 +808,7 @@ mod tests {
         assert!(crate::incident::handles("follow-v5f"));
         // Read-only inspection of the recorded closure leaves the original controller lock free.
         assert!(
-            previous_lock()
-                .unwrap()
+            previous_locks().unwrap()[0]
                 .ends_with("epoch145-v5e-delivery-handoff-20261121-v1/state/controller.lock")
         );
     }

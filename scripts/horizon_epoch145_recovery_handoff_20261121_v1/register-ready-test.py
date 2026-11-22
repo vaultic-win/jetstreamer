@@ -11,8 +11,15 @@ import tempfile
 
 REG = runpy.run_path(str(Path(__file__).with_name("register-ready.py")))
 FIXTURE = len(sys.argv) == 3 and sys.argv[2] == "--fixture"
-assert len(sys.argv) == 2 or FIXTURE
+RETRY = len(sys.argv) == 5 and sys.argv[2] == "--retry1"
+assert len(sys.argv) == 2 or FIXTURE or RETRY
 FAMILY = runpy.run_path(str(Path(__file__).with_name("register-fixture-ready.py"))) if FIXTURE else REG
+if RETRY:
+    retry = runpy.run_path(str(Path(__file__).with_name("register-retry-ready.py")))
+    # Resolve the compiled inputs while the sealed selector is still visible in this namespace.
+    bindings = retry["compiled_refs"](sys.argv[3])
+    handoff = retry["inputs"](bindings, sys.argv[4])
+    FAMILY = dict(DIRECTORY=retry["directory"], SEMANTIC=retry["iid"], handoff_inputs=lambda: handoff)
 ROOT = Path(sys.argv[1]).resolve(strict=True)
 assert ROOT.is_relative_to("/home/sol/.jetstreamer-private") and os.geteuid() == 0 and sys.flags.isolated
 
@@ -26,7 +33,7 @@ def exercise(base, fail_after=None, change_owner=False, native=False):
     writer=base/"writer"
     for p in (directory, directory/"state", writer):
         p.mkdir(mode=0o700)
-    if FIXTURE and native:
+    if (FIXTURE or RETRY) and native:
         # The native parent authenticates the canonical READY path before it exists.
         # Expose this empty test directory there only in a private mount namespace.
         target=FAMILY["DIRECTORY"]
