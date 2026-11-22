@@ -3,23 +3,12 @@ use super::*;
 
 pub const EPOCH: u64 = 170;
 pub const CAP: u64 = 384 << 30;
-const ROOT_INODE: u64 = 113704962;
-const LOG_INODE: u64 = 113704964;
 const BOOT_SLOT: u64 = 73439777;
 const CHECKPOINT_SLOT: u64 = 73871796;
-pub const BASE: &str = "epoch170-retry11-rebook-20261122-v1";
-pub const UNIT: &str = "horizon-qualify-170-replacement-local3retry11-20261122.service";
-pub const TIMER: &str = "horizon-guard-170-replacement-local3retry11-20261122.timer";
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1";
-pub const ATTEMPT: &str = "replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122";
 pub const OLD: &str = "epoch170-retry9-recovery-20261120-v1";
 pub const PREVIOUS_GUARD_ARGV: &str =
     "a2fee2fead63561e983cf9cc489962e671ee2b3e6a734d0bf74e4d572b11d4b3";
-pub const GUARD_SHA: &str = "c7d8990d133ff6cb479404ff5fc875780661446bb1aab185265bb37b52e54a40";
-pub const GSEAL: &str = "81cdd3363f2d3d990c52d420dddc5ed854e1a7a9663aa52b21e169bf4352e662";
-pub const CSEAL: &str = "a7f77d90caad5fb8d844fc2c9f631e57dbd42c585267a2a3c8ba93389057acd3";
-pub const CONTRACT: &str = "01c4787ae97e430c2edc027e050be6c556fdbe2c3b0351f9bee42841dab3d8ac";
-pub const WITNESS: &str = "3069ae493d675e446476fca29b156857e355bd6bf5ac8f2c96cf4bcfd290f086";
 const PREVIOUS: &str = "replacement-local3retry7-20261110-v1/replacement-local3retry9-20261110-v1";
 const OLD_UNIT: &str = "horizon-qualify-170-replacement-local3retry9-20261110-v1.service";
 const PRIOR_UNIT: &str = "horizon-qualify-170-replacement-local3retry10-20261121-v1.service";
@@ -40,6 +29,30 @@ const CLEAN: &str = "epoch170-closed-accounts-20261122-v1";
 const PREDECESSOR: &str = "epoch170-retry10-recovery-20261121-v1";
 const ORIGINAL_PROFILE_SHA: &str =
     "1596f281f699b48f4e4c7e65adf1070e4961d604d38997a7747ffe60dc536782";
+
+#[cfg(epoch170_retry11)]
+mod generation {
+    pub(super) const ROOT_INODE: u64 = 113704962;
+    pub(super) const LOG_INODE: u64 = 113704964;
+    pub const BASE: &str = "epoch170-retry11-rebook-20261122-v1";
+    pub const UNIT: &str = "horizon-qualify-170-replacement-local3retry11-20261122.service";
+    pub const TIMER: &str = "horizon-guard-170-replacement-local3retry11-20261122.timer";
+    pub const ATTEMPT: &str = "replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry11-20261122";
+    pub const GUARD_SHA: &str = "c7d8990d133ff6cb479404ff5fc875780661446bb1aab185265bb37b52e54a40";
+    pub const GSEAL: &str = "81cdd3363f2d3d990c52d420dddc5ed854e1a7a9663aa52b21e169bf4352e662";
+    pub const CSEAL: &str = "a7f77d90caad5fb8d844fc2c9f631e57dbd42c585267a2a3c8ba93389057acd3";
+    pub const CONTRACT: &str = "01c4787ae97e430c2edc027e050be6c556fdbe2c3b0351f9bee42841dab3d8ac";
+    pub const WITNESS: &str = "3069ae493d675e446476fca29b156857e355bd6bf5ac8f2c96cf4bcfd290f086";
+    pub(super) const ROOT_RECEIPT: &str =
+        "8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728";
+}
+#[cfg(epoch170_retry12)]
+#[path = "retry12.rs"]
+mod generation;
+#[cfg(epoch170_retry12)]
+pub use generation::funded_guard_floor;
+pub use generation::{ATTEMPT, BASE, CONTRACT, CSEAL, GSEAL, GUARD_SHA, TIMER, UNIT, WITNESS};
+use generation::{LOG_INODE, ROOT_INODE, ROOT_RECEIPT};
 
 struct Index(&'static str, u64, u64, i64, i64, &'static str);
 const INDEXES: &[Index] = &[
@@ -127,10 +140,7 @@ mod retry11 {
 }
 
 pub fn files() -> Result<Value> {
-    let (root, rr) = doc(
-        &base().join("SUCCESSOR_ROOT.json"),
-        Some("8420a1b00afa2d643a24e36c5b12c82fdd0b43d5238c9045c0c0c53097021728"),
-    )?;
+    let (root, rr) = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT_RECEIPT))?;
     let m = fs::symlink_metadata(run())?;
     ensure!(
         run().canonicalize()? == run()
@@ -141,6 +151,8 @@ pub fn files() -> Result<Value> {
             && root["log"]["inode"] == LOG_INODE,
         "unexpected successor root or predecessor"
     );
+    #[cfg(epoch170_retry12)]
+    let previous_failure = generation::previous_attempt(&root)?;
     let source = doc(
         &rt(PREDECESSOR).join("profile.json"),
         Some(ORIGINAL_PROFILE_SHA),
@@ -206,10 +218,15 @@ pub fn files() -> Result<Value> {
         &Path::new(PACKAGE).join("preflight-170-v4.json"),
         Some(MANIFEST_SHA),
     )?;
-    Ok(
-        json!({"predecessor_stop":sr,"predecessor_intent":ir,"stable_roots":rr,"root":{"path":run(),"device":m.dev(),"inode":m.ino()},
-        "snapshot":retry11::snapshot(false)?,"manifest":manifest,"profile":profile()?}),
-    )
+    let baseline = json!({"predecessor_stop":sr,"predecessor_intent":ir,"stable_roots":rr,"root":{"path":run(),"device":m.dev(),"inode":m.ino()},
+        "snapshot":retry11::snapshot(false)?,"manifest":manifest,"profile":profile()?});
+    #[cfg(epoch170_retry12)]
+    let baseline = {
+        let mut baseline = baseline;
+        baseline["previous_cold_failure"] = previous_failure;
+        baseline
+    };
+    Ok(baseline)
 }
 
 #[cfg(test)]

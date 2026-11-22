@@ -7,13 +7,14 @@ base=/var/lib/jetstreamer/horizon_runtime_data/epoch166-independent-cold-recover
 scratch=$work
 cfg=epoch166_recovery
 epoch=166
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 ) ]]; then
-    if [[ $1 == epoch170-retry11 ]]; then epoch=170; fi
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 ) ]]; then
+    if [[ $1 == epoch170-* ]]; then epoch=170; fi
+    retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-    base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-retry11-rebook-20261122-v1"
+    base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-$retry-rebook-20261122-v1"
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
     test "$(findmnt -n -T "$scratch" -o SOURCE)" = /dev/loop3
-    cfg="epoch${epoch}_retry11"
+    cfg="epoch${epoch}_$retry"
 else
     test $# == 0
 fi
@@ -34,11 +35,11 @@ cd "$src"
 shared=scripts/horizon_epoch167_source_index_recovery_20261121_v1
 own=scripts/horizon_epoch166_guard_recovery_20261121_v1
 cp --parents "$shared"/*.rs "$own/source166.rs" "$own/build-session.sh" "$out"
-if [[ $cfg == epoch166_retry11 || $cfg == epoch170_retry11 ]]; then
+if [[ $cfg == epoch166_retry11 || $epoch == 170 ]]; then
     cp --parents "$own/retry11.rs" "$out"
 fi
-if [[ $cfg == epoch170_retry11 ]]; then
-    cp --parents scripts/horizon_epoch170_guard_recovery_20261121_v1/source170.rs "$out"
+if [[ $epoch == 170 ]]; then
+    cp --parents scripts/horizon_epoch170_guard_recovery_20261121_v1/*.rs "$out"
 fi
 cd "$out"
 find scripts -type f -print0 | sort -z | xargs -0 sha256sum > "$stage/sources"
@@ -47,7 +48,11 @@ for lib in anyhow-fcfd55939853d71f serde-8c11d906d3ff8a0b serde_json-c069c0f2e8c
 ulimit -c 0
 rustc "${args[@]}" --cfg "$cfg" --test "$shared/main.rs" -o "$out/tests$epoch"
 "$out/tests$epoch" --test-threads=1
-if [[ $cfg == epoch170_retry11 ]]; then
+if [[ $cfg == epoch170_retry12 ]]; then
+    rustc "${args[@]}" --cfg epoch170_retry11 --test "$shared/main.rs" -o "$out/tests170-prior"
+    "$out/tests170-prior" --test-threads=1
+fi
+if [[ $epoch == 170 ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --test "$shared/main.rs" -o "$out/tests166"
     "$out/tests166" --test-threads=1
 fi
