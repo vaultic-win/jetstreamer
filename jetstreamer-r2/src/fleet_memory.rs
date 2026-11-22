@@ -1,14 +1,17 @@
 //! Reuse one coordinated sample for the 201–300 resident-memory target.
 //! Private long-running prefix qualifications are comparable replay lanes;
 //! restore/repair/delivery stages consume RSS separately. No admission authority.
+#[path = "../../tools/horizon247_recovery_delivery.rs"]
+mod fourth;
 use anyhow::{Context, Result, ensure};
 use jetstreamer_horizon_observe::successor247 as successor;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
-    let belongs =
-        |r: &&Value| r["unit"]["Id"] == successor::UNIT || r["expected_invocation_id"] == owner.iid;
+    let belongs = |r: &&Value| {
+        r["unit"]["Id"] == fourth::unit(owner) || r["expected_invocation_id"] == owner.iid
+    };
     let mut entries = fleet["pipelines"]
         .as_array()
         .context("successor pipeline census")?
@@ -21,8 +24,8 @@ fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
             && e["phase"] == "upload-readback"
             && e["live"] == true
             && e["sampled_at_utc"] == fleet["sampled_at_utc"]
-            && e["unit"] == fleet["unit_census"][successor::UNIT]
-            && e["unit"]["Id"] == successor::UNIT
+            && e["unit"] == fleet["unit_census"][fourth::unit(owner)]
+            && e["unit"]["Id"] == fourth::unit(owner)
             && e["expected_invocation_id"] == owner.iid
             && e["unit"]["InvocationID"] == owner.iid
             && e["unit"]["MainPID"]
@@ -37,6 +40,60 @@ fn registered_upload(fleet: &Value, owner: &successor::Owner) -> Result<()> {
                 .filter(belongs)
                 .eq(std::iter::once(e)),
         "successor claim, native census and active fleet differ"
+    );
+    Ok(())
+}
+
+fn recovery_history(fleet: &Value, owner: &successor::Owner) -> Result<()> {
+    if !fourth::is_fourth(owner) {
+        return successor::historical_claims(fleet);
+    }
+    let reg = &owner.proof["old_claim_evidence"];
+    let mut older = fleet.clone();
+    for field in ["pipelines", "active"] {
+        let entries = older[field]
+            .as_array_mut()
+            .context("fourth 247 fleet history")?;
+        let original = entries.len();
+        entries.retain(|r| {
+            r["unit"]["Id"] != fourth::UNIT || r["expected_invocation_id"] != owner.iid
+        });
+        ensure!(
+            original == entries.len() + 1,
+            "fourth 247 owner duplicated or missing"
+        );
+    }
+    successor::historical_claims(&older)?;
+    let rows = older["pipelines"]
+        .as_array()
+        .context("old 247 pipelines")?
+        .iter()
+        .filter(|r| {
+            r["unit"]["Id"] == successor::UNIT || r["expected_invocation_id"] == fourth::OLD
+        })
+        .collect::<Vec<_>>();
+    let [r] = rows.as_slice() else {
+        anyhow::bail!("missing or duplicated e434 claim");
+    };
+    let u = &r["unit"];
+    ensure!(
+        r["epoch"] == 247
+            && r["phase"] == "upload-readback"
+            && r["live"] == false
+            && r["expected_invocation_id"] == fourth::OLD
+            && r["evidence"] == *reg
+            && u == &older["unit_census"][successor::UNIT]
+            && u["Id"] == successor::UNIT
+            && u["LoadState"] == "not-found"
+            && u["ActiveState"] == "inactive"
+            && u["MainPID"] == "0"
+            && !older["active"]
+                .as_array()
+                .context("active owners")?
+                .iter()
+                .any(|r| r["unit"]["Id"] == successor::UNIT
+                    || r["expected_invocation_id"] == fourth::OLD),
+        "e434 history changed"
     );
     Ok(())
 }
@@ -75,7 +132,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             ensure!(
                 matches!(
                     name,
-                    successor::ORIGINAL | successor::PRIOR_UNIT | successor::UNIT
+                    successor::ORIGINAL | successor::PRIOR_UNIT | successor::UNIT | fourth::UNIT
                 ),
                 "unregistered epoch 247 uploader"
             );
@@ -147,7 +204,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             );
             jetstreamer_horizon_observe::staged247_rss::validate(row)?;
         }
-        if name == successor::UNIT {
+        if matches!(name, successor::UNIT | fourth::UNIT) {
             ensure!(
                 row["sampled_unix_seconds"]
                     == super::fleet::utc_seconds(
@@ -155,7 +212,11 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                     )?,
                 "stale successor RSS"
             );
-            let owner = successor::load(&row["successor_owner"]["claim"])?;
+            let owner = fourth::load(&row["successor_owner"]["claim"])?;
+            ensure!(
+                name == fourth::unit(&owner),
+                "fourth 247 resource/claim alias"
+            );
             registered_upload(ledger, &owner)?;
             ensure!(
                 o["delivery_resources"]
@@ -171,8 +232,8 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
                     == 1,
                 "missing or duplicate successor RSS"
             );
-            jetstreamer_horizon_observe::staged247_rss::validate_sample(row, &owner)?;
-            successor::historical_claims(ledger)?;
+            fourth::validate_sample(row, &owner)?;
+            recovery_history(ledger, &owner)?;
         }
         if !owners.contains_key(name) && super::fleet::terminal247::historical_row(ledger, row)? {
             ensure!(
