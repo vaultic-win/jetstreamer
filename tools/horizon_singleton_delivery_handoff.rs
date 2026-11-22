@@ -119,9 +119,101 @@ fn checkpoint_hash(v: &Value) -> Result<[u8; 32]> {
         .try_into()
         .map_err(|_| anyhow::anyhow!("snapshot hash length"))
 }
+const UNIT_211: &str = "horizon-singleton-211-capped-4aeca563-v1.service";
+const PLAN_211_SHA: &str = "802d597d92490396e39b5306d2319a980d3f6408fa4ac1554be2af06fee879a3";
+
+fn bound_211_command(p: &Plan, startup: &Value, manifest: &Value) -> Result<()> {
+    // PID 1 recorded the launcher. The same PID subsequently exec'd the node.
+    let observed = json_bound(&Bound {
+        path: "/home/ubuntu/.codex/diagnostics/horizon211-delivery-inputs-v187-a1/observed.json"
+            .into(),
+        sha256: "d00e8030f1a146ede14b66f4568e7c862818a7fddb4f45dfa609fa50389f361d".into(),
+    })?;
+    let capability: Bound = serde_json::from_value(startup["input_capability"].clone())?;
+    let evidence = json_bound(&capability)?;
+    let archive = observed["actual_argv"]
+        .get(7)
+        .and_then(Value::as_str)
+        .and_then(|argument| argument.strip_prefix("--snapshot-archive="))
+        .context("epoch 211 snapshot argument")?;
+    let snapshot_name = manifest["manifest"]["verification_cohorts"][0]["bootstrap"]["uri"]
+        .as_str()
+        .and_then(|uri| uri.rsplit_once('/'))
+        .map(|(_, name)| name)
+        .context("epoch 211 bootstrap URI")?;
+    ensure!(
+        Path::new(archive).file_name().and_then(|s| s.to_str()) == Some(snapshot_name)
+            && observed["input_capability"] == startup["input_capability"]
+            && observed["observed_epoch"] == 211
+            && observed["worker"] == startup["worker"]
+            && evidence["all_inputs_rehashed"] == true
+            && evidence["manifest_fingerprint"] == manifest["manifest_fingerprint"]
+            && evidence["files"]
+                .as_array()
+                .is_some_and(
+                    |files| files.iter().any(|row| row["binding"]["path"] == archive
+                        && row["binding"]["sha256"]
+                            == "958a8e5aad2423350f04470dffbd90fd8d7e458f7f8e774e15dd86d43291b5fb")
+                ),
+        "epoch 211 executed snapshot differs"
+    );
+    let argv = observed["actual_argv"]
+        .as_array()
+        .context("missing executed argv")?;
+    ensure!(
+        observed["plan"]["sha256"] == PLAN_211_SHA
+            && observed["original_startup"] == serde_json::to_value(&p.startup_handoff)?
+            && observed["pid"] == startup["main_pid"]
+            && observed["producer_properties"]["InvocationID"] == p.producer_invocation_id
+            && observed["node"] == startup["node"]
+            && startup["same_pid_exec_observed"] == true
+            && startup["producer"]["ExecStart"]
+                .as_str()
+                .and_then(|s| s.split_once(" ; ignore_errors="))
+                .is_some_and(|(prefix, _)| prefix == p.expected_exec_prefix)
+            && argv.len() == 8
+            && argv[0] == startup["node"]["path"]
+            && argv[1] == "211"
+            && argv[2] == p.output_directory.to_string_lossy().as_ref()
+            && argv[3] == "--verify"
+            && argv[4] == "--root-checkpoint-cohort"
+            && argv[5] == format!("--cohort-manifest={}", p.manifest.path.display())
+            && argv[6]
+                == format!(
+                    "--cohort-manifest-fingerprint={}",
+                    manifest["manifest_fingerprint"]
+                        .as_str()
+                        .context("manifest fingerprint")?
+                ),
+        "epoch 211 executed command differs"
+    );
+    Ok(())
+}
+
 fn validate_manifest(p: &Plan, manifest: &Value) -> Result<()> {
     fingerprint(manifest)?;
     let m = &manifest["manifest"];
+    if p.epoch == 211 {
+        let cohorts = m["verification_cohorts"]
+            .as_array()
+            .context("singleton cohort")?;
+        ensure!(
+            m["first_epoch"] == 211
+                && m["last_epoch"] == 211
+                && m["epoch_slots"] == 432000
+                && cohorts.len() == 1
+                && cohorts[0]["first_epoch"] == 211
+                && cohorts[0]["last_epoch"] == 211
+                && cohorts[0]["publication_gate"]
+                    == "all-archives-validated-and-final-root-verified"
+                && cohorts[0]["bootstrap"]["slot"] == 91151575
+                && cohorts[0]["root_checkpoints"]
+                    .as_array()
+                    .is_some_and(|rows| rows.len() == 1 && rows[0]["slot"] == 91583512),
+            "epoch 211 singleton manifest differs"
+        );
+        return Ok(());
+    }
     ensure!(
         m["first_epoch"] == p.epoch
             && m["last_epoch"] == p.epoch
@@ -136,12 +228,16 @@ fn validate_manifest(p: &Plan, manifest: &Value) -> Result<()> {
 fn validate_plan(p: &Plan) -> Result<Value> {
     ensure!(
         p.schema == "horizon-singleton-delivery-handoff-plan-v1"
-            && ((247..=251).contains(&p.epoch) || p.epoch == 265)
+            && ((247..=251).contains(&p.epoch) || matches!(p.epoch, 211 | 265))
             && p.source_uid == 1000
             && p.source_gid == 1000
             && hex(&p.producer_invocation_id, 32)
-            && p.producer_unit
-                .starts_with(&format!("horizon-qualify-{}-", p.epoch))
+            && (if p.epoch == 211 {
+                p.producer_unit == UNIT_211
+            } else {
+                p.producer_unit
+                    .starts_with(&format!("horizon-qualify-{}-", p.epoch))
+            })
             && p.producer_unit.ends_with(".service")
             && p.producer_unit
                 .bytes()
@@ -195,6 +291,10 @@ fn validate_plan(p: &Plan) -> Result<Value> {
                 .is_some_and(|s| (p.epoch * 432000..(p.epoch + 1) * 432000).contains(&s)),
         "independent terminal expectation differs"
     );
+    if p.epoch == 211 {
+        bound_211_command(p, &startup, &manifest)?;
+        return Ok(manifest);
+    }
     ensure!(
         p.expected_exec_prefix.contains(&format!(
             " {} {} --verify --root-checkpoint-cohort ",
@@ -570,7 +670,17 @@ fn source(p: &Plan, manifest: &Value) -> Result<Value> {
                 == checkpoint_hash(&expectation["terminal_blockhash"])?,
         "native terminal does not match independent final block"
     );
-    let e = &manifest["manifest"]["epochs"][0];
+    let (e, checkpoints) = if p.epoch == 211 {
+        (
+            &manifest["manifest"]["verification_cohorts"][0],
+            "root_checkpoints",
+        )
+    } else {
+        (
+            &manifest["manifest"]["epochs"][0],
+            "post_bootstrap_root_checkpoints",
+        )
+    };
     ensure!(
         gate.members.len() == 1
             && gate.members[0].epoch == p.epoch
@@ -579,9 +689,7 @@ fn source(p: &Plan, manifest: &Value) -> Result<Value> {
                 == checkpoint_hash(&e["bootstrap"]["accounts_hash"])?,
         "bootstrap evidence differs from sealed manifest"
     );
-    let expected = e["post_bootstrap_root_checkpoints"]
-        .as_array()
-        .context("manifest checkpoints")?;
+    let expected = e[checkpoints].as_array().context("manifest checkpoints")?;
     ensure!(
         !expected.is_empty() && gate.verified_manifest_checkpoints.len() == expected.len(),
         "root checkpoint census differs"
@@ -637,6 +745,10 @@ fn run(args: &[String]) -> Result<()> {
         sha256: args[3].clone(),
     };
     let p: Plan = serde_json::from_slice(&bound(&binding)?)?;
+    ensure!(
+        p.epoch != 211 || binding.sha256 == PLAN_211_SHA,
+        "unexpected epoch 211 delivery plan"
+    );
     if matches!(args[0].as_str(), "source" | "check-source-inputs") {
         // The root parent checks private startup evidence before dropping UID.
         // The child needs only the sealed plan/manifest and owner-readable source.
@@ -735,6 +847,41 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn epoch211_manifest_requires_original_bootstrap_and_terminal_checkpoint() {
+        let (mut p, _, _) = fixture();
+        p.epoch = 211;
+        let original = json!({"manifest_fingerprint":format!("sha256:{}","a".repeat(64)),
+            "manifest":{"first_epoch":211,"last_epoch":211,"epoch_slots":432000,
+            "verification_cohorts":[{"first_epoch":211,"last_epoch":211,
+            "bootstrap":{"slot":91151575},"root_checkpoints":[{"slot":91583512}],
+            "publication_gate":"all-archives-validated-and-final-root-verified"}]}});
+        validate_manifest(&p, &original).unwrap();
+        for (pointer, value) in [
+            ("/manifest/last_epoch", json!(212)),
+            ("/manifest/verification_cohorts/0/first_epoch", json!(210)),
+            (
+                "/manifest/verification_cohorts/0/bootstrap/slot",
+                json!(91151999),
+            ),
+            (
+                "/manifest/verification_cohorts/0/root_checkpoints",
+                json!([]),
+            ),
+            (
+                "/manifest/verification_cohorts/0/root_checkpoints/0/slot",
+                json!(91583999),
+            ),
+            (
+                "/manifest/verification_cohorts/0/publication_gate",
+                json!(""),
+            ),
+        ] {
+            let mut invalid = original.clone();
+            *invalid.pointer_mut(pointer).unwrap() = value;
+            assert!(validate_manifest(&p, &invalid).is_err(), "{pointer}");
+        }
+    }
     #[test]
     fn full265_terminal_delivery_keeps_original_identity_and_requires_clean_pid1_pair() {
         let (mut p, mut u, mut rows) = fixture();
