@@ -1,6 +1,8 @@
 //! Exact live delivery owner, measured inside the coordinated observer cadence.
 //! Reuses native process-image checks and ordinary unit/cgroup/RSS sampling.
 use super::*;
+#[path = "../../tools/horizon247_recovery_delivery.rs"]
+mod fourth;
 use jetstreamer_horizon_observe::staged247_rss as staged;
 use jetstreamer_horizon_observe::successor247 as next;
 use serde_json::json;
@@ -122,7 +124,7 @@ pub(super) fn validate(c: &Config) -> Result<()> {
             c.staged247_resource_only,
             "successor needs exclusive staged delivery RSS selection"
         );
-        registered = next::load(reference)?;
+        registered = fourth::load(reference)?;
         successor_owner(&registered)
     } else if c.staged247_resource_only {
         STAGED
@@ -208,17 +210,64 @@ fn endpoint(u: &UnitObservation, owner: Owner<'_>) -> Result<u64> {
 }
 fn successor_owner(info: &next::Owner) -> Owner<'_> {
     Owner {
-        unit: next::UNIT,
+        unit: fourth::unit(info),
         iid: &info.iid,
         pid: info.pid,
-        image: next::IMAGE,
-        sha: next::IMAGE_SHA,
+        image: if fourth::is_fourth(info) {
+            fourth::IMAGE
+        } else {
+            next::IMAGE
+        },
+        sha: if fourth::is_fourth(info) {
+            fourth::IMAGE_SHA
+        } else {
+            next::IMAGE_SHA
+        },
         cap: next::HARD,
     }
 }
 fn successor_input(reference: &Value, info: &next::Owner) -> Result<()> {
     next::verify_drains()?;
-    let again = next::load(reference)?;
+    if fourth::is_fourth(info) {
+        ensure!(
+            fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+                .trim()
+                .replace('-', "")
+                == "3b17d0055c3a4a0e8841da097e0957b5",
+            "fourth 247 boot changed"
+        );
+        ensure!(
+            !Path::new("/sys/fs/cgroup/system.slice")
+                .join(next::UNIT)
+                .try_exists()?,
+            "e434 cgroup returned"
+        );
+        let m = Command::new("/usr/bin/systemctl")
+            .args([
+                "show",
+                next::UNIT,
+                "-p",
+                "LoadState,ActiveState,MainPID,ControlPID,Job",
+            ])
+            .output()?;
+        let state = std::str::from_utf8(&m.stdout)?
+            .lines()
+            .collect::<std::collections::BTreeSet<_>>();
+        ensure!(
+            matches!(m.status.code(), Some(0 | 4))
+                && [
+                    "LoadState=not-found",
+                    "ActiveState=inactive",
+                    "MainPID=0",
+                    "ControlPID=0",
+                    "Job="
+                ]
+                .into_iter()
+                .all(|s| state.contains(s)),
+            "e434 reactivated"
+        );
+    }
+    let again = fourth::load(reference)?;
     ensure!(
         again.proof == info.proof && again.iid == info.iid && again.pid == info.pid,
         "changed successor evidence"
@@ -232,7 +281,12 @@ fn successor_input(reference: &Value, info: &next::Owner) -> Result<()> {
         .collect::<std::result::Result<Vec<_>, _>>()?;
     ensure!(json!(args) == info.argv, "successor argv differs");
     let manager = Command::new("/usr/bin/systemctl")
-        .args(["show", next::UNIT, "--property=ExecStart", "--value"])
+        .args([
+            "show",
+            fourth::unit(info),
+            "--property=ExecStart",
+            "--value",
+        ])
         .output()?;
     ensure!(
         manager.status.success()
@@ -295,7 +349,7 @@ fn observe(
     if let Some((reference, info)) = successor {
         successor_input(reference, info)?;
         sample["successor_owner"] = info.proof.clone();
-        staged::validate_sample(&sample, info)?;
+        fourth::validate_sample(&sample, info)?;
     }
     Ok(sample)
 }
@@ -316,7 +370,7 @@ pub(super) fn sample(
     clock: u64,
 ) -> Vec<Value> {
     if let Some(r) = reference {
-        return match next::load(r) {
+        return match fourth::load(r) {
             Ok(info) => {
                 let owner = successor_owner(&info);
                 vec![row(observe(clock, owner, Some((r, &info))), owner)]
@@ -324,7 +378,11 @@ pub(super) fn sample(
             Err(e) => vec![row(
                 Err(e),
                 Owner {
-                    unit: next::UNIT,
+                    unit: if fourth::selected(r) {
+                        fourth::UNIT
+                    } else {
+                        next::UNIT
+                    },
                     iid: "",
                     pid: 0,
                     image: next::IMAGE,
@@ -348,13 +406,15 @@ mod tests {
     fn bounded_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!("fixtures/successor247-history.json"))?;
         let old = &f["recovery"];
-        let tier: Value = serde_json::from_str(include_str!("fixtures/successor247-fadfe2d4.json"))?;
+        let tier: Value =
+            serde_json::from_str(include_str!("fixtures/successor247-fadfe2d4.json"))?;
         let recovery = &tier["recovery"];
         let plan = &tier["plan"];
         let acceptance = &tier["main_acceptance"];
         let source = &tier["source_acceptance"];
         next::reader_source(plan, acceptance, source)?;
-        let previous: Value = serde_json::from_str(include_str!("fixtures/successor247-cf4d.json"))?;
+        let previous: Value =
+            serde_json::from_str(include_str!("fixtures/successor247-cf4d.json"))?;
         assert!(next::reader_source(plan, acceptance, &previous["source_acceptance"]).is_err());
         let mut foreign = source.clone();
         foreign["published_head"] = json!("0".repeat(40));
