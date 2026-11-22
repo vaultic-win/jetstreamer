@@ -99,3 +99,17 @@ with tempfile.TemporaryDirectory(dir=scratch) as temporary, ExitStack() as mocks
     write(intent_path,dict(intent,writer={}))
     refused(lambda:check({},None))
 print("Released-136 custody fixtures passed with full reservation and zero credit; sealed controller and its ordinary absent route checked.")
+
+price = module["post145_floor"]
+G = 1 << 30
+prefix = 12 << 20
+empty = dict(cap=72*G, occupied=False, remaining=72*G, loan_micros=0)
+active = dict(empty, occupied=True, remaining=8*G, guard_floor=101*G)
+assert price(169*G, 100*G, empty, prefix) == 172*G + prefix
+assert price(105*G, 100*G, active, prefix) == 109*G
+assert price(105*G, 110*G, active, prefix) == 118*G + prefix
+assert price(200*G, 100*G, active, prefix) == 200*G
+refused(lambda:price(1, 1, dict(empty,remaining=71*G),0))
+refused(lambda:price(1, 1, dict(active,remaining=8*G-1),0))
+refused(lambda:price(1, 1, active,(16<<20)+1))
+print("Native floor fixtures passed for idle, released, guarded and unstable 136 reservations.")

@@ -607,6 +607,32 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0,close
     protected=max(required-allowance,absolute)
     return protected+allowance,protected,deficit
 
+def post145_floor(native, zero_candidate_floor, candidate, prefix):
+    remaining = candidate["remaining"]
+    s.need(candidate["cap"] == 72*G and 0 <= remaining <= candidate["cap"]
+           and (remaining >= 8*G if candidate["occupied"] else remaining == 72*G)
+           and 0 <= prefix <= 16 << 20, "invalid 145 candidate or prefix liability")
+    protected = max(zero_candidate_floor + prefix, candidate.get("guard_floor", 0))
+    return max(native, protected + remaining)
+
+
+def prefix145(fleet):
+    directory = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+    loader["load_package"](directory, "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e")
+    sys.path.insert(0, str(directory))
+    try:
+        from prefix140_storage import storage
+        s.need(Path(sys.modules["prefix140_storage"].__file__).parent == directory, "foreign prefix140 provider")
+        prefix = storage()
+    finally:
+        sys.path.pop(0)
+    s.need(prefix["registration"] == fleet["current_private_prefix140_obligation"]["registration"]
+           and prefix["maximum_HOME_allocation_bytes"] == 16 << 20
+           and prefix["resource_credit_bytes"] == prefix["additional_cpu_quota_micros"] ==
+           prefix["additional_memory_bytes"] == 0, "changed prefix140 reservation")
+    return prefix
+
+
 def registered136(fleet, registration):
     root = H / "epoch136-actual-20261120-g1"
     intent_path = root / "prestart-intent.json"
@@ -651,6 +677,8 @@ def capture_once(epoch,ref,prestart136=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
+    post_price = epoch == 145 and prestart136 is None
+    prefix_before = prefix145(f) if post_price else None
     closed169=focused169_terminal(f,rows)
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status()
@@ -765,6 +793,19 @@ def capture_once(epoch,ref,prestart136=None):
         m=s.show(v["unit"]);t=s.show(v["timer"])
         s.need(m["InvocationID"]==v["invocation_id"] and m["ActiveState"]=="active" and not m["Job"] and
                t["InvocationID"]==v["timer_invocation_id"] and t["ActiveState"]=="active","surviving guard generation changed")
+    registered_price = {}
+    if post_price:
+        prefix_after = prefix145(f)
+        s.need(prefix_before["registration"] == prefix_after["registration"] and
+               prefix_before["child"]["InvocationID"] == prefix_after["child"]["InvocationID"],
+               "prefix140 generation changed during 145 capture")
+        growth = max(p["remaining_DATA_growth_bytes"] for p in (prefix_before, prefix_after))
+        zero, _, _ = disk_budget(raw, dict(remaining=0), books, epoch, peers, rep, floor168, closed_prepaid)
+        old_need = need
+        need = post145_floor(old_need, zero, c136, growth)
+        protected += need - old_need
+        registered_price = dict(native_before_registered_floor=old_need, zero_candidate_floor=zero,
+                                remaining_prefix140_bytes=growth, prefix_before=prefix_before, prefix_after=prefix_after)
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
     own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
@@ -773,7 +814,7 @@ def capture_once(epoch,ref,prestart136=None):
         complete_required_HOME_bytes=need,protected_raw_floor_bytes=protected,available_HOME_bytes=avail,
         historical_baseline_deficit_bytes=deficit,original_aggregate_HOME_bytes=raw,complete_cpu_quota_micros=64000000,
         complete_memory_plus_reserve_bytes=fit.MEM,required_available_memory_bytes=needmem,available_memory_bytes=mem["MemAvailable:"],
-        candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,active168_guard_floor=floor168,
+        candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,**registered_price,active168_guard_floor=floor168,
         population=population,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
 def capture(epoch,ref,prestart136=None):
