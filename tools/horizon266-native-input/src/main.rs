@@ -1,5 +1,10 @@
 //! Epoch 266 exact-worker bootstrap harness.
 #![recursion_limit = "256"]
+#[cfg(feature = "capped-worker")]
+mod capped;
+#[cfg(feature = "capped-worker")]
+#[path = "capped_site.rs"]
+mod capped_site;
 #[path = "../../horizon265-native-input/src/gate.rs"]
 mod first_guard;
 #[path = "../../horizon261-native-input/src/gate.rs"]
@@ -29,8 +34,12 @@ fn validate_inputs() -> Result<()> {
     );
     Ok(())
 }
+#[cfg(not(feature = "capped-worker"))]
 const WORKER: &str = "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-historical-worker-v1-8-11";
+#[cfg(not(feature = "capped-worker"))]
 const WORKER_SHA: &str = "9f7763ff57c27bcfa112814701314c1b36366a35c7e171a7d6f3ee97ee7330ae";
+#[cfg(feature = "capped-worker")]
+use capped_site::{WORKER, WORKER_SHA};
 const GENESIS: &str = "/var/lib/jetstreamer/horizon-stage227-bootstrap-dcaafc6-v1/genesis.tar.bz2";
 const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218c6c125ea945";
 const BACKEND: &str = "solana-v1.8.11";
@@ -43,6 +52,10 @@ struct Checks;
 impl RuntimeChecks for Checks {
     const DEADLINE_SECS: u64 = 7200;
 
+    #[cfg(feature = "capped-worker")]
+    fn match_original(packet: &Value, initial: &Initialized, bank: &Checkpoint) -> Result<()> {
+        capped::match_original(packet, initial, bank)
+    }
     fn fingerprint(h: &Handshake) -> Result<()> {
         ensure!(
             h.solana_tag == "v1.8.11"

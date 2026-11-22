@@ -407,6 +407,9 @@ impl Drop for Session {
 /// Additional historical checks run before the next worker request.
 trait RuntimeChecks {
     const DEADLINE_SECS: u64 = 2700;
+    fn match_original(_: &Value, _: &Initialized, _: &Checkpoint) -> Result<()> {
+        Ok(())
+    }
     fn fingerprint(_: &Handshake) -> Result<()> {
         Ok(())
     }
@@ -465,6 +468,7 @@ fn run_with<C: RuntimeChecks>() -> Result<()> {
     };
     checkpoint(&c, i.next_write_version)?;
     C::frozen(&i, &c)?;
+    C::match_original(&packet, &i, &c)?;
     let log_bytes = session.shutdown()?;
     ensure!(
         inputs()? == packet,
