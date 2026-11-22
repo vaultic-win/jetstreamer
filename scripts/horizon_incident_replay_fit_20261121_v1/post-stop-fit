@@ -47,9 +47,12 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOMEFLOOR = HERE.name in {"tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"} and (
+RETRY11 = HERE.name == "tools-homefloor-retry11-166-v1"
+HOMEFLOOR = HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"} and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
+if RETRY11:
+    retry11 = runpy.run_path(str(HERE / "retry11_actor.py"))
 if HOMEFLOOR:
     recover = runpy.run_path(str(Path(__file__).with_name("homefloor_fit.py")))
     cold167 = runpy.run_path(str(Path(__file__).with_name("cold167_actor.py")))
@@ -260,6 +263,16 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
                "different cold 167 witness or guard contract")
         s.need(member["destination"]==str(image.parent) and any(r["name"]=="guard" and r["sha256"]==guard_image for r in member["members"])
                and hashlib.sha256(image.read_bytes()).hexdigest()==guard_image, "foreign cold guard")
+    if RETRY11 and e == 166 and generation is not None:
+        prepared, prepared_ref = s.read(d / "PREPARED.json")
+        s.need(intent["prepared"] == prepared_ref and prepared["profile"]["producer_unit"] == unit
+               and prepared["profile"]["fresh_attempt"] == str(run) and prepared["profile"]["guard_timer"] == timer
+               and prepared["profile"]["guard_worker_root"] == str(tree), "wrong retry11 startup registration")
+        argv = prepared["profile"]["producer_argv"]
+        actual_argv = (pr/"cmdline").read_bytes().split(b"\0")
+        s.need(actual_argv == [os.fsencode(x) for x in argv[argv.index(str(pkg/"jetstreamer-node")):]] + [b""],
+               "different cold epoch 166 executable arguments")
+        guard_image, contract = retry11["guard"](s, prepared)
     if e==170:
         wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
     plan,pref=s.read(d/"ACTUAL_GUARD_PLAN.json");first,fr=s.read(d/"FIRST_GUARD.json")
@@ -350,6 +363,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     return row
 
 def observe_actor(e, own, tree, run, stop, terminal=None):
+    if RETRY11 and e == 166:
+        return retry11["observe"](s, fit, native_actor, own)
     if HOMEFLOOR and e == 167:
         return cold167["observe"](s, fit, native_actor, own)
     return native_actor(e, own, tree, run, stop, terminal)
@@ -820,6 +835,7 @@ def capture_once(epoch,ref,prestart136=None):
     closed172=full172_terminal(f,rows)
     peers=survivors(rows,ledger);status=registered_status()
     phase=phase145(epoch)
+    parked166=retry11["holding"](s,fit,f) if RETRY11 else None
     if prestart136 is None:
         c136=registered136(f,status["registration"])
         s.need((136 in rows)==c136["occupied"],"136 registration drift")
@@ -857,6 +873,8 @@ def capture_once(epoch,ref,prestart136=None):
             closed_prepaid[str(e)]=closed_allowance(e,settlement,row,root,run,effective,extension)
         a=observe_actor(e,epoch,root,run,row,settlement)
         active_run = cold167["RUN"] if HOMEFLOOR and e == 167 else run
+        if RETRY11 and e == 166:
+            active_run = retry11["RUN"]
 
         if a:rep[str(e)]=a
         if a and a["physical"] is not None:
@@ -971,6 +989,9 @@ def capture_once(epoch,ref,prestart136=None):
         protected += required - need
         need = required
         recovered_price = dict(homefloor_stops=interrupted, recovery_obligations=after)
+    if RETRY11:
+        s.need(retry11["holding"](s,fit,f)==parked166, "166 holding stage changed during complete fit")
+        recovered_price.update(registered_retry11_holding=parked166, retry11_root=retry11["stable"](s))
     if qualification:
         need += qualification["scratch_bytes"]
         protected += qualification["scratch_bytes"]
