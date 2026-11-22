@@ -74,12 +74,33 @@ fn parts(f: &Fake, d: &Path) -> R<Vec<String>> {
 }
 fn publish_fixture(f: &Fake, d: &Path, hashes: &[String]) -> R<()> {
     let m = manifest(PROFILE, hashes);
+    let length = m.len() as u64;
     let scratch = Scratch::new(d, "manifest", &m)?;
     f.small(
         &format!("{PREFIX}/manifests/{}.manifest", hash_bytes(&m)?),
         &scratch.0,
+        length,
     )?;
-    f.small(&fixed(), &scratch.0)
+    f.small(&fixed(), &scratch.0, length)
+}
+#[test]
+fn archived_epoch_geometry_round_trips_both_manifests() {
+    let size = 185_599_540_324u64;
+    let digest = "ab".repeat(32);
+    let parts = vec![digest; size.div_ceil(PART as u64) as usize];
+    let length = manifest_length(PROFILE, size, PART).unwrap();
+    assert!(length > 65536);
+    let f = Fake::default();
+    let d = Dir::new();
+    publish_fixture(&f, &d.0, &parts).unwrap();
+    assert_eq!(remote_manifest(&f, PROFILE, size, PART).unwrap().0, parts);
+    let malformed = Scratch::new(&d.0, "oversize", &vec![0; length as usize + 1]).unwrap();
+    assert!(f.small(&fixed(), &malformed.0, length).is_err());
+    f.data.borrow_mut().get_mut(&fixed()).unwrap().push(b'\n');
+    assert!(remote_manifest(&f, PROFILE, size, PART).is_err());
+    assert!(manifest_length(PROFILE, size, 0).is_err());
+    assert!(manifest_length(PROFILE, 0, 1).is_err());
+    assert!(manifest_length(PROFILE, u64::MAX, 1).is_err());
 }
 #[test]
 fn exact_geometry() {

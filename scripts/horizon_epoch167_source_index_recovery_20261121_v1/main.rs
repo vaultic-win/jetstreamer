@@ -21,20 +21,24 @@ mod actor;
     any(epoch166_recovery, epoch166_retry11),
     path = "../horizon_epoch166_guard_recovery_20261121_v1/source166.rs"
 )]
+#[cfg_attr(
+    epoch170_retry11,
+    path = "../horizon_epoch170_guard_recovery_20261121_v1/source170.rs"
+)]
 #[cfg_attr(epoch167_cold_rebook, path = "cold167.rs")]
 mod source;
 use source::{ATTEMPT, BASE, CAP, EPOCH, LANE, OLD, PREVIOUS_GUARD_ARGV, TIMER, UNIT};
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
 const GUARD_SHA: &str = "07f6924ee1cf8d8311aa7bed6620dcf1af580a5546e948206af628c57aa3443b";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
 const GSEAL: &str = "736a46ffcea86d0937518c728791a4843c57862e37c301bf81095fd5779aed1d";
 #[cfg(epoch167_cold_rebook)]
 const GUARD_SHA: &str = "0d02c342a3993dea74f5a452d91c8ed655e551f28794b0333093fb767d18251b";
 #[cfg(epoch167_cold_rebook)]
 const GSEAL: &str = "0fd5e8a3f7113e5c373222b6aa647b179617876a6855253461a6633f5f9c5cb3";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
 const CONTRACT: &str = "9dc683e3b5eef14b4ead27f626cc2421a31442ba1c85a376e98881938abd0ba2";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
 const CSEAL: &str = "11879726e524215d4f0581a33619bc707dee1f01d59f37863886dea37871ba3b";
 #[cfg(epoch167_cold_rebook)]
 const CONTRACT: &str = "5be3255e74b43ada890dc3c0ba9d60c3cec4a2585dcbe15a8dfe336bf2eede65";
@@ -42,9 +46,9 @@ const CONTRACT: &str = "5be3255e74b43ada890dc3c0ba9d60c3cec4a2585dcbe15a8dfe336b
 const CSEAL: &str = "891f54b03201bcb2e0811400a9906bf9e04a3b789231b176e5b20f011195dccf";
 #[cfg(epoch167_cold_rebook)]
 const WITNESS: &str = "62a24a8bc04d1f6615367428a725f00c6062b6d81a32d255c5d2f96b54eec296";
-#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+#[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
 const WITNESS: &str = "33e62f01194935876985fabdc18a283ac00baccef58e30e97c65360420bb7f91";
-#[cfg(epoch166_retry11)]
+#[cfg(any(epoch166_retry11, epoch170_retry11))]
 use source::{CONTRACT, CSEAL, GSEAL, GUARD_SHA, WITNESS};
 fn member(path: &Path, sealdigest: &str) -> Result<Value> {
     let d = path.parent().context("package")?;
@@ -75,7 +79,7 @@ fn member(path: &Path, sealdigest: &str) -> Result<Value> {
 fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     #[cfg(epoch167_cold_rebook)]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-cold167-v3/post-stop-fit");
-    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
     let path = if fit_seal == "e8ba73178277950ed2bcc976534f49af21413745c8244026fcb1502bea9adc7e" {
         rt(PROVIDER)
     } else {
@@ -83,6 +87,8 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     };
     #[cfg(epoch166_retry11)]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-166-v2/post-stop-fit");
+    #[cfg(epoch170_retry11)]
+    let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-170-v1/post-stop-fit");
     let se = member(&path, fit_seal)?;
     let b = command(
         path.to_str().unwrap(),
@@ -98,7 +104,7 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
             && n(&v, "protected_raw_floor_bytes")? >= 8_297_502_499_408u64,
         "unfunded original replay booking"
     );
-    #[cfg(any(epoch167_cold_rebook, epoch166_retry11))]
+    #[cfg(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11))]
     ensure!(
         v["epoch"] == EPOCH
             && v["fleet"] == *fleet
@@ -142,19 +148,23 @@ fn require_missing() -> Result<Value> {
 fn pkg() -> PathBuf {
     #[cfg(epoch167_cold_rebook)]
     let guard = rt("epoch167-cold-guard-20261122-v3/tools/guard");
-    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
     let guard = rt(COMMON).join("tools/guard");
     #[cfg(epoch166_retry11)]
     let guard = rt("epoch166-retry11-guard-20261122-v1/tools/guard");
+    #[cfg(epoch170_retry11)]
+    let guard = rt("epoch170-retry11-guard-20261122-v1/tools/guard");
     guard
 }
 fn contract() -> Result<Value> {
     #[cfg(epoch167_cold_rebook)]
     let path = rt("epoch167-cold-guard-20261122-v3/contract/contract.json");
-    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+    #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
     let path = rt(COMMON).join("contract/contract.json");
     #[cfg(epoch166_retry11)]
     let path = rt("epoch166-retry11-guard-20261122-v1/contract/contract.json");
+    #[cfg(epoch170_retry11)]
+    let path = rt("epoch170-retry11-guard-20261122-v1/contract/contract.json");
     let (v, cr) = doc(&path, Some(CONTRACT))?;
     let sr = member(&path, CSEAL)?;
     let gb = member(&pkg(), GSEAL)?;
@@ -169,7 +179,7 @@ fn contract() -> Result<Value> {
 fn guard_plan(iid: &Value, floor: u64, binding: &Value) -> Value {
     json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"worker_root":LANE,"filesystem":"/home/sol","minimum_free_bytes":floor,"maximum_root_physical_bytes":CAP,"maximum_worker_vmas":3500000,"receipt_directory":base().join("guard-receipts"),"data_fulfillment":binding})
 }
-#[cfg(any(epoch167_cold_rebook, epoch166_retry11))]
+#[cfg(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11))]
 fn verify_guard_route(binding: &Value) -> Result<()> {
     let expected = guard_plan(
         &json!("00000000000000000000000000000001"),
@@ -378,7 +388,7 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
     );
     ensure!(source::ready()? == pr, "fresh index profile changed");
     let binding = contract()?;
-    #[cfg(any(epoch167_cold_rebook, epoch166_retry11))]
+    #[cfg(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11))]
     verify_guard_route(&binding)?;
     let inv = record("INVENTORY_PRESTART.json", &require_missing()?)?;
     #[cfg(epoch166_retry11)]
@@ -461,6 +471,8 @@ fn dispatch() -> Result<Value> {
         env::current_exe()?
             == base().join(if EPOCH == 167 {
                 "tools-v2/recover167"
+            } else if cfg!(epoch170_retry11) {
+                "tools/recover170"
             } else if cfg!(epoch166_retry11) {
                 "tools-v3/recover166"
             } else {
@@ -483,9 +495,9 @@ fn dispatch() -> Result<Value> {
                 start(&fleet, seal)
             } else {
                 source::files()?;
-                #[cfg(any(epoch167_cold_rebook, epoch166_retry11))]
+                #[cfg(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11))]
                 verify_guard_route(&contract()?)?;
-                #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11)))]
+                #[cfg(not(any(epoch167_cold_rebook, epoch166_retry11, epoch170_retry11)))]
                 contract()?;
                 fit(&fleet, seal)
             }
@@ -506,7 +518,12 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(any(epoch166_recovery, epoch166_retry11, epoch167_cold_rebook)))]
+    #[cfg(not(any(
+        epoch166_recovery,
+        epoch166_retry11,
+        epoch167_cold_rebook,
+        epoch170_retry11
+    )))]
     #[test]
     fn original_stop_and_permanent_witness_roots() {
         let v = source::files().unwrap();
