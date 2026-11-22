@@ -75,7 +75,7 @@ pub fn profile() -> Result<Value> {
     bindings.push(format!(
         "{INPUTS}/genesis.tar.bz2:{after}/output/genesis.tar.bz2"
     ));
-    #[cfg(any(epoch166_retry11, epoch170_retry11))]
+    #[cfg(any(epoch166_retry11, epoch170_retry11, epoch170_retry12))]
     bindings.push(format!(
         "{}:{INPUTS}/{BOOT}",
         retry11::bootstrap().display()
@@ -118,7 +118,7 @@ pub fn profile() -> Result<Value> {
         "different original producer profile"
     );
     let p = json!({"producer_argv":argv,"source_argv":ar,"fresh_attempt":run(),"indexes":INDEXES.iter().map(|i|cache(i,false)).collect::<Result<Vec<_>>>()?});
-    #[cfg(any(epoch166_retry11, epoch170_retry11))]
+    #[cfg(any(epoch166_retry11, epoch170_retry11, epoch170_retry12))]
     let p = {
         let mut registered = p;
         registered["producer_unit"] = json!(UNIT);
@@ -158,7 +158,7 @@ pub fn prepare() -> Result<Value> {
     for (path, digest) in [
         (node(), NODE_SHA),
         (worker_image(), WORKER_SHA),
-        #[cfg(not(any(epoch166_retry11, epoch170_retry11)))]
+        #[cfg(not(any(epoch166_retry11, epoch170_retry11, epoch170_retry12)))]
         (Path::new(INPUTS).join(BOOT), BOOT_SHA),
         (Path::new(INPUTS).join("genesis.tar.bz2"), GENESIS_SHA),
     ] {
@@ -168,7 +168,7 @@ pub fn prepare() -> Result<Value> {
             path.display()
         );
     }
-    #[cfg(any(epoch166_retry11, epoch170_retry11))]
+    #[cfg(any(epoch166_retry11, epoch170_retry11, epoch170_retry12))]
     retry11::snapshot(true)?;
     let mut verified = Vec::new();
     for i in INDEXES {
@@ -256,7 +256,7 @@ pub fn prepare() -> Result<Value> {
     }
     let prepared = json!({"schema":format!("horizon-{EPOCH}-replay-recovery-preparation-v1"),"epoch":EPOCH,"baseline":baseline,
         "indexes":verified,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"original_run_retained":true,"replay_launch_authorized":false});
-    #[cfg(any(epoch166_retry11, epoch170_retry11))]
+    #[cfg(any(epoch166_retry11, epoch170_retry11, epoch170_retry12))]
     let prepared = {
         let mut registered = prepared;
         registered["profile"] = registered["baseline"]["profile"].clone();
@@ -304,9 +304,9 @@ pub fn index_selected() -> Result<()> {
     ensure!(pid > 1, "missing actual producer");
     let p = Path::new("/proc").join(pid.to_string());
     let mounts = fs::read_to_string(p.join("mountinfo"))?;
-    #[cfg(any(epoch166_retry11, epoch170_retry11))]
+    #[cfg(any(epoch166_retry11, epoch170_retry11, epoch170_retry12))]
     let extra = Some((retry11::bootstrap(), Path::new(INPUTS).join(BOOT)));
-    #[cfg(not(any(epoch166_retry11, epoch170_retry11)))]
+    #[cfg(not(any(epoch166_retry11, epoch170_retry11, epoch170_retry12)))]
     let extra: Option<(PathBuf, PathBuf)> = None;
     for (src, target) in INDEXES
         .iter()

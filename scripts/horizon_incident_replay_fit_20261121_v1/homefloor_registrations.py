@@ -86,9 +86,10 @@ def selected_status(s, fit):
     return package, seal_ref, current["invocation_id"], current
 
 
-def cold_status(s, fit, prior, epoch):
+def cold_status(s, fit, prior, epoch, attempt=11):
     """Follow the sealed 166 or 170 handoff from its previously qualified writer."""
-    prefix = f'COLD{epoch}_RETRY11_STATUS_'
+    s.need((epoch, attempt) in ((166, 11), (170, 11), (170, 12)), 'unknown cold generation')
+    prefix = f'COLD{epoch}_RETRY{attempt}_STATUS_'
     active_path = STATUS / (prefix + 'ACTIVE.json')
     rollback_path = STATUS / (prefix + 'ROLLBACK.json')
     if not active_path.exists() and not rollback_path.exists():
@@ -108,15 +109,18 @@ def cold_status(s, fit, prior, epoch):
                                      'bf5e7c55b8d6dd1c943b424a70427fcaeea17dc2a8cfd77b6de2fae5caa00a82'),
                'cold launch must inherit the admitted 167/172 writer')
     s.need(old_iid == old_actor['invocation_id'], 'different previous writer invocation')
-    package = STATUS / f'tools-cold{epoch}-retry11'
+    package = STATUS / f'tools-cold{epoch}-retry{attempt}'
     qualified_digest, seal_digest, producer_unit = {
-        166: ('5ecd660bf949538b23838b68a90798843b586d61671c983528e148ea2344c017',
+        (166, 11): ('5ecd660bf949538b23838b68a90798843b586d61671c983528e148ea2344c017',
               '17387e4cb210b1832d11fb2c3fe3879d409dce3c0c686d189ee9b1dd27d80e10',
               'horizon-qualify-166-independent-retry11-20261122.service'),
-        170: ('fb28cff86f6e4bc79ebad9265547012d98783f085b7248b8aca3f2f2418d48bc',
+        (170, 11): ('fb28cff86f6e4bc79ebad9265547012d98783f085b7248b8aca3f2f2418d48bc',
               '6d3630879f70d48a471294e22ac8f0a157104807b79daa5dc8d670c2a364bd0f',
               'horizon-qualify-170-replacement-local3retry11-20261122.service'),
-    }[epoch]
+        (170, 12): ('537cccbdc4bcb9bfb7b029eb87cee6f9aaf0000c5b1d8f0aa03f6808ab68c269',
+                    '4a95447cb4b978ecfa0faf28fb8e3a8f63b6fd9ed88a2ed583b6bdff253b7b33',
+                    'horizon-qualify-170-replacement-local3retry12-20261122.service'),
+    }[epoch, attempt]
     qualified, qr = s.read(STATUS / (prefix + 'QUALIFIED.json'), qualified_digest)
     intent, ir = s.read(STATUS / (prefix + 'INTENT.json'))
     s.need(intent['old'] == old_actor and intent['qualified'] == qr, 'foreign cold handoff')
@@ -135,7 +139,7 @@ def cold_status(s, fit, prior, epoch):
                and active['schedule'] == intent['schedule'] and active['admission'] == intent['admission']
                and seal == s.ref(package / 'deployment-seal-receipt.json', seal_digest),
                'foreign cold activation')
-        candidate = R / f'epoch{epoch}-retry11-rebook-20261122-v1'
+        candidate = R / f'epoch{epoch}-retry{attempt}-rebook-20261122-v1'
         admission = s.bound(active['admission'], candidate / 'ACTUAL_ADMISSION_AND_PROTECTION.json')
         s.need(admission['epoch'] == epoch and admission['producer_unit'] == producer_unit
                and s.iid(admission['producer_invocation_id']), 'foreign cold admission')
@@ -162,11 +166,11 @@ def cold_status(s, fit, prior, epoch):
     return package, seal, actor['invocation_id'], actor
 
 
-def registered_status(s, fit):
+def registered_status(s, fit, attempt170=11):
     _, registration = s.read(fit.READY, "02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")
     prior = selected_status(s, fit)
     third = cold_status(s, fit, prior, 166)
-    package, seal_ref, iid, adopted = cold_status(s, fit, third, 170)
+    package, seal_ref, iid, adopted = cold_status(s, fit, third, 170, attempt170)
     seal = s.bound(seal_ref, package / "deployment-seal-receipt.json")
     program = package / "status_cycle.py"
     s.need(seal["destination"] == str(package), "foreign status deployment")

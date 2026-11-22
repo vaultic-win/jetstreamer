@@ -47,14 +47,15 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-COLD170 = HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted",
-                        "tools-homefloor-145-rejoin-v1"}
+RETRY12_170 = HERE.name in {"tools-homefloor-retry12-170-v1", "tools-homefloor-retry12-170-adopted",
+                            "tools-homefloor-145-rejoin-v1"}
+COLD170 = RETRY12_170 or HERE.name in {"tools-homefloor-retry11-170-v1", "tools-homefloor-retry11-170-adopted"}
 RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-homefloor-retry11-166-v2", "tools-homefloor-retry11-166-v2-adopted"}
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
 if COLD170:
-    cold170 = runpy.run_path(str(HERE / "cold170_actor.py"))
+    cold170 = runpy.run_path(str(HERE / "cold170_actor.py"), init_globals={"RETRY12": RETRY12_170})
 if RETRY11:
     retry11 = runpy.run_path(str(HERE / "retry11_actor.py"))
 if HOMEFLOOR:
@@ -697,7 +698,7 @@ def joined_resident(active):
 
 def registered_status():
     if HOMEFLOOR:
-        return registrations["registered_status"](s, fit)
+        return registrations["registered_status"](s, fit, 12 if RETRY12_170 else 11)
     registration=s.read(fit.READY,"02027e3e35364f64913b34162fde295bfb96b3123a9d9794545ce4e0b1a4e8ba")[1]
     m=s.show(fit.PUBLISHER);pid=int(m["MainPID"])
     proc=Path(f"/proc/{pid}")
