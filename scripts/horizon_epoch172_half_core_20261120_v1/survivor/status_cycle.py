@@ -213,6 +213,14 @@ def publish(c,store,refs,out,epoch,archive=None):
         elif epoch in getattr(c,'new_rows',{}):
             after,archive=cold_workers.reader().forecast(c,epoch,prior,old)
             actor=c.new_rows[epoch]
+            if (after['phase']=='verification' and prior['phase']=='replay' and old.get('current_guarded_admission')
+                    and old.get('producer_invocation_id')==actor['unit']['InvocationID']):
+                # A guarded worker may begin replay after the current native sampler was armed.
+                # Its authenticated event remains valid for this admission until a new sample measures it.
+                need(old['current_guarded_admission']==actor['admission'],'prior replay belongs to another admission')
+                need(not c.advancing[epoch],'advancing worker reported bootstrap')
+                after['phase']='replay'
+                extra['carried_replay_status']=original
             extra.update(delivery_forecast=c.delivery_forecasts[epoch],producer_invocation_id=actor['unit']['InvocationID'],
                          measured_canonical_progress=c.advancing[epoch],current_repair_owner=None,archive_sample=archive,
                          current_guarded_admission=actor['admission'],current_guard=actor['guard_protection'])

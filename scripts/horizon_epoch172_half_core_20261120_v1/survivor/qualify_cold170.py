@@ -69,7 +69,7 @@ def main():
     store=Mirror(refs)
     parent=Path(sys.argv[1]);c.ensure_dir(parent)
     with tempfile.TemporaryDirectory(dir=parent) as work:
-        for i,context in enumerate((third,measured)):
+        for i,context in enumerate((third,measured,third)):
             dest=Path(work)/str(i);c.ensure_dir(dest)
             context.now=c.now()+c.dt.timedelta(seconds=i);context.stamp=c.stamp(context.now)
             with patch.object(c.status,'observed_archive',return_value=result['archive_sample']):
@@ -77,10 +77,21 @@ def main():
                 refs['170']=before;c.publish(context,store,refs,dest,170)
             accepted=c.authenticated(store,170,refs['170'])
             assert accepted['previous_receipt']==before and accepted['producer_invocation_id']==original['unit']['InvocationID']
-    assert store.writes==[170,170] and accepted['measured_canonical_progress']
+            if i==1:
+                assert accepted['measured_canonical_progress'] and accepted['after_status']['phase']=='replay'
+            if i==2:
+                assert not accepted['measured_canonical_progress'] and accepted['after_status']['phase']=='replay'
+                assert accepted['carried_replay_status']==before
+                foreign=dict(c.checked(before),current_guarded_admission={'path':'foreign','sha256':'0'*64})
+                mismatch=Path(work)/'wrong-admission.json'; c.durable(mismatch,foreign)
+                bad={'170':c.bound(mismatch)}
+                wrong_dir=Path(work)/'rejected';c.ensure_dir(wrong_dir)
+                with patch.object(c.status,'observed_archive',return_value=result['archive_sample']):
+                    fail(lambda:c.publish(context,Mirror(bad),bad,wrong_dir,170))
+    assert store.writes==[170,170,170]
     return dict(original_capture=signed, launch_orders=[[167,170,166],[166,167,170]],
                 measured_lanes=4, measured_170_tps=original['progress']['transactions_per_second'],
-                changed_native_identity_rejected=True, authenticated_fixture_writes=2, remote_writes=0)
+                changed_native_identity_rejected=True, authenticated_fixture_writes=3, carried_authenticated_replay_writes=1, remote_writes=0)
 
 
 if __name__=='__main__':

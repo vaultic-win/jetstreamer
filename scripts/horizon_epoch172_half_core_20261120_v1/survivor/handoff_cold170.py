@@ -68,7 +68,9 @@ def prepare(c, shared, commit):
     if not QUAL.exists():
         qa=ROOT/f'{ATTEMPT}-170-status-qa-v2';c['ensure_dir'](qa)
         suites={n:json.loads(shared['output']('/usr/bin/python3','-IB',TARGET/n,qa)) for n in MEMBERS if n.startswith('qualify')}
-        need(suites['qualify_cold170.py']['measured_lanes']==4 and suites['qualify_cold170.py']['authenticated_fixture_writes']==2
+        population=suites['qualify_cold170.py']
+        writes=(population['authenticated_fixture_writes'],population.get('carried_authenticated_replay_writes',0))
+        need(population['measured_lanes']==4 and writes in ((2,0),(3,1))
              and suites['qualify_cold166.py']['counted_native_workers']==3
              and len(set(suites['qualify.py']['conditional_epochs']))==20,'incomplete 170 qualification')
         entry=json.loads(shared['output']('/usr/bin/python3','-IB',TARGET/'status_cycle.py','--check-entry'))
