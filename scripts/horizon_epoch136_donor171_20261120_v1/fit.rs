@@ -1,16 +1,16 @@
 //! Fit the existing 168 standard reservation and every live peer/auxiliary obligation.
 //! This measurement has no side effects and returns no reusable capacity credits.
-#[allow(dead_code)]
-#[path = "../horizon_audit79_budget_v10_20261120_v1/audit_budget.rs"]
-mod previous_audit_budget;
+#[path = "fit_audit.rs"]
+mod audit;
 #[path = "../horizon_audit90_budget_v11_20261120_v1/fit.rs"]
 mod audit_budget;
 #[path = "../horizon_independent_cold166_20261120_v1/prepare/auxiliary_phases.rs"]
 mod auxiliary_phases;
 #[path = "../horizon_epoch168_trace_admission_20261120_v1/fit_disk.rs"]
 mod disk;
-#[path = "fit_audit.rs"]
-mod audit;
+#[allow(dead_code)]
+#[path = "../horizon_audit79_budget_v10_20261120_v1/audit_budget.rs"]
+mod previous_audit_budget;
 pub(super) use audit::observe as observe_audit;
 #[path = "fit_peers.rs"]
 mod live;

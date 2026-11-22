@@ -420,6 +420,14 @@ pub(super) fn inspect(
     if fleet.get("active_ready_range_audit_obligation").is_some() {
         let own = candidate(waiting_iid)?;
         let active = observe_145()?;
+        let fence = if require_activation_compatible
+            && Path::new("/run/horizon-epoch171-exclusive-to136-g1/standard169-cpu.json")
+                .try_exists()?
+        {
+            fence::check(true)?
+        } else {
+            Value::Null
+        };
         let mut cmd = Command::new("/usr/bin/python3");
         let result = cmd
             .args(["-I", "-B", "-c", include_str!("incident_prestart.py")])
@@ -432,6 +440,7 @@ pub(super) fn inspect(
                 "preflight"
             })
             .arg(serde_json::to_string(&plan["joint_fit_145"])?)
+            .arg(serde_json::to_string(&fence)?)
             .stdin(Stdio::null())
             .output()
             .context("capture epoch 136 incident prestart")?;

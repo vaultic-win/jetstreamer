@@ -360,6 +360,60 @@ pub fn release() -> Result<()> {
     fs::remove_dir(REG)?;
     Ok(())
 }
+/// Idempotent native closure for an interrupted or completed incident session.
+pub(super) fn confirm_released(cpu: &BTreeSet<String>) -> Result<()> {
+    candidate_state(None)?;
+    for unit in [
+        WRITER_UNIT.to_owned(),
+        format!("{GUARD}.service"),
+        format!("{GUARD}.timer"),
+    ] {
+        ensure!(
+            closed(&show(&unit)?),
+            "136 producer, writer or guard is live: {unit}"
+        );
+        cgroup_empty(&unit)?;
+    }
+    ensure!(
+        fs::symlink_metadata(REG).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound),
+        "donor registry still present"
+    );
+    for unit in combined(&paths()?, Some(cpu)) {
+        ensure!(
+            fs::symlink_metadata(Path::new(HIGH).join(&unit))
+                .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+                && closed(&show(&unit)?),
+            "unexpected mask, queued or active donor {unit}"
+        );
+        cgroup_empty(&unit)?;
+    }
+    Ok(())
+}
+pub(super) fn finish_release(cpu: &BTreeSet<String>) -> Result<()> {
+    candidate_state(None)?;
+    for unit in [
+        WRITER_UNIT.to_owned(),
+        format!("{GUARD}.service"),
+        format!("{GUARD}.timer"),
+    ] {
+        ensure!(
+            closed(&show(&unit)?),
+            "cannot release a live or queued 136 owner: {unit}"
+        );
+        cgroup_empty(&unit)?;
+    }
+    if fs::symlink_metadata(REG).is_ok() {
+        safe_dir(Path::new(REG))?;
+        if fs::read_dir(REG)?.next().is_none() {
+            // The writer may have failed just after mkdir, or the releaser after unlinking its anchor.
+            fs::remove_dir(REG)?;
+        } else {
+            release()?;
+        }
+    }
+    confirm_released(cpu)
+}
+
 pub fn ancestry() -> Result<Value> {
     let b = json_pin(Path::new(BOOK), BOOK_SHA)?;
     let pt = &b["qualified_remaining_growth_memory_point"];

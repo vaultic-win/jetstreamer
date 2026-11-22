@@ -42,10 +42,10 @@ def check_package(path, digest):
         pin(path / row["name"], row["sha256"])
 
 
-def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_total):
+def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_total, waiter=None):
     candidate = native["candidate136"]
     require(candidate["cap"] == CAP and candidate["remaining"] == CAP
-            and not candidate["occupied"] and native["complete_cpu_quota_micros"] == 64_000_000
+            and candidate["occupied"] is (waiter is not None) and native["complete_cpu_quota_micros"] == 64_000_000
             and native["resource_credit_bytes"] == native["stopped_generation_resident_credit_bytes"] == 0
             and native["replay_launch_authorized"] is False, "incompatible or occupied native reservation")
     require(prefix_before["registration"] == prefix_after["registration"]
@@ -59,7 +59,8 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
     prefix = max(s["remaining_DATA_growth_bytes"] for s in (prefix_before, prefix_after))
     # The payload keeps every absolute incumbent stop floor *before* adding the 72 GiB.
     # V17 also books those 72 GiB, so recompute without it on the very same measured trees.
-    protected = max(native_floor, native["complete_required_HOME_bytes"] - CAP) + prefix
+    protected = max(native_floor + prefix, candidate.get("guard_floor", 0))
+    require(protected + CAP >= native["complete_required_HOME_bytes"], "incomplete absolute home floor")
     available = min(disk_now, native["available_HOME_bytes"])
     require(memory_total >= native["complete_memory_plus_reserve_bytes"], "physical RAM changed")
     return dict(protected_raw_floor_bytes=protected, candidate_remaining_growth_bytes=CAP,
@@ -71,7 +72,7 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
                 unfenced_with_candidate_cpu_micros=68_250_000, new_resource_credit_bytes=0)
 
 
-def inspect(path, digest, waiter, mode, provider):
+def inspect(path, digest, waiter, mode, provider, fence=None):
     require(mode in ("preflight", "session"), "unknown writer mode")
     expected = dict(image=dict(path=str(NATIVE / "post-stop-fit"), sha256=PRICE),
                     seal=dict(path=str(NATIVE / "deployment-seal-receipt.json"), sha256=NATIVE_SEAL))
@@ -104,10 +105,25 @@ def inspect(path, digest, waiter, mode, provider):
         return witness, seen["active_ready_workers"], paid
     first, workers, before_ready = audit()
     before = storage()
-    require(waiter is None and mode == "preflight",
-            "136 session requires the jointly registered, drained 145 prestart boundary")
-    bridge = runpy.run_path(str(ADAPTER))
-    native = json.loads(bridge["capture_provider"](NATIVE / "post-stop-fit", str(path), digest))
+    if mode == "preflight":
+        require(waiter is None and fence is None, "preflight cannot claim an actor or donor")
+        bridge = runpy.run_path(str(ADAPTER))
+        native = json.loads(bridge["capture_provider"](NATIVE / "post-stop-fit", str(path), digest))
+    else:
+        proc = Path("/proc") / str(os.getppid())
+        argv = [os.fsdecode(v) for v in (proc / "cmdline").read_bytes().split(b"\0") if v]
+        require(len(argv) == 6 and argv[1] == "session", "foreign session owner")
+        plan = json.loads(pin(Path(argv[2]), argv[3]))
+        require("holding145_prestart_ready" in plan, "136 session requires a registered and drained 145 boundary")
+        owner = plan["controller_deployment"]
+        package = Path(owner["path"]).parent
+        check_package(package, owner["sha256"])
+        require(package.parent.parent == ROOT and package.name == "controller"
+                and (package / "admit136").samefile(proc / "exe"), "wrong writer deployment")
+        from private136 import observation
+        session = runpy.run_path(str(package / "prestart_session.py"))
+        native = session["capture_context"](ref, fence, waiter, pin=pin, checked=checked,
+                                            runpy=runpy, json=json, observation=observation)
     require(native["fleet"] == ref and native["schema"] == "horizon-incident-replay-fit-v1"
             and 0 <= time.time() - native["recorded_unix_seconds"] < 120, "wrong native price")
     module = runpy.run_path(str(NATIVE / "post-stop-fit"))
@@ -119,15 +135,17 @@ def inspect(path, digest, waiter, mode, provider):
     require(first == last and workers == last_workers, "audit changed during native fit")
     disk = os.statvfs("/home/sol")
     total = int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) * 1024
-    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total)
+    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total, waiter)
     return dict(result, schema="horizon-136-writer-joint-fit-v1", fleet=ref, provider_seal=expected["seal"],
                 authoritative_joint_fit=native, audit=first, ready_workers=workers,
                 ready_growth_before=before_ready, ready_growth_after=after_ready,
                 prefix_before=before, prefix_after=after, waiting_candidate=waiter,
-                activation_compatible=False, replay_launch_authorized=False,
+                activation_compatible=mode == "session" and result["disk_fits"] and result["memory_fits"],
+                replay_launch_authorized=False,
                 next_gate="successful V5e completion and exclusive prestart before V11")
 
 
 if __name__ == "__main__":
     print(json.dumps(inspect(Path(sys.argv[1]), sys.argv[2], json.loads(sys.argv[3]),
-                             sys.argv[4], json.loads(sys.argv[5])), sort_keys=True))
+                             sys.argv[4], json.loads(sys.argv[5]),
+                             json.loads(sys.argv[6]) if len(sys.argv) == 7 else None), sort_keys=True))

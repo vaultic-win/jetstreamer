@@ -604,15 +604,25 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0,close
     protected=max(required-allowance,absolute)
     return protected+allowance,protected,deficit
 
-def capture_once(epoch,ref):
+def capture_once(epoch,ref,prestart136=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     closed169=focused169_terminal(f,rows)
     closed172=full172_terminal(f,rows)
-    peers=survivors(rows,ledger);status=registered_status();c136=fit.candidate136(f,status["registration"])
-    s.need((136 in rows)==c136["occupied"],"136 registration drift")
+    peers=survivors(rows,ledger);status=registered_status()
     phase=phase145(epoch)
+    if prestart136 is None:
+        c136=fit.candidate136(f,status["registration"])
+        s.need((136 in rows)==c136["occupied"],"136 registration drift")
+    else:
+        # Only the 136 writer uses the pre-registration price. Independently verify the
+        # stopped holding actor, donor and waiting payload, then use the ordinary census.
+        s.need(epoch==145 and 136 not in rows and phase.get("MainPID")=="0"
+               and phase.get("ActiveState")=="inactive","prestart requires drained holding generation")
+        c136=prestart136(f,status)
+        s.need(c136["cap"]==c136["remaining"]==72*G and
+               c136["loan_micros"] in (0,4250000),"unfunded private prestart")
     extension=extensions["funding"](s,epoch)
     closed=replacement_terminals(f,rows)
     closed_prepaid={}
@@ -700,6 +710,8 @@ def capture_once(epoch,ref):
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
     s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==population,
            "capacity generation changed during collection")
+    if prestart136 is not None:
+        s.need(prestart136(f,status)==c136,"136 prestart owner changed during collection")
     s.need(focused169_terminal(f,rows)==closed169,"focused 169 terminal changed during capture")
     s.need(full172_terminal(f,rows)==closed172,"full 172 guard or terminal changed during capture")
     if closed168:s.need(metered168_terminal(f,rows)==closed168,"metered 168 terminal changed during capture")
@@ -719,9 +731,9 @@ def capture_once(epoch,ref):
         candidate136=c136,phase145=phase,status_registration=status,registered_host_equation=ledger_proof,active168_guard_floor=floor168,
         population=population,joined_resident_lower_bounds=resident,stopped_generation_resident_credit_bytes=0,resource_credit_bytes=0,replay_launch_authorized=False)
 
-def capture(epoch,ref):
+def capture(epoch,ref,prestart136=None):
     try:
-        return capture_once(epoch,ref)
+        return capture_once(epoch,ref,prestart136)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
         after=confirm_fork(e,epoch,before,proof_stops()[str(e)])
@@ -729,7 +741,7 @@ def capture(epoch,ref):
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
     # fails the capture instead of chaining unbounded retries.
-    result=capture_once(epoch,ref)
+    result=capture_once(epoch,ref,prestart136)
     row=result["candidate"] if e==epoch else result["replacements"].get(str(e))
     s.need(row is not None,"replacement disappeared during complete reprice")
     same_fork(after,row,False)

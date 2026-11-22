@@ -765,6 +765,17 @@ fn run() -> Result<()> {
         );
         return session::register_status(&a[1..]);
     }
+    if a[0] == "verify-release" {
+        ensure!(a.len() == 3, "verify-release PLAN SHA");
+        let path = Path::new(BASE).join("prestart-intent.json");
+        let (intent, _) = session::immutable(&path)?;
+        ensure!(
+            intent["writer_plan"] == binding(Path::new(&a[1]), &a[2]),
+            "foreign release plan"
+        );
+        println!("{}", session::release_incident(&path, false)?);
+        return Ok(());
+    }
     let lock = fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -796,7 +807,12 @@ fn run() -> Result<()> {
             );
         }
         ensure!(closed(&show(WRITER_UNIT)?), "writer still active");
-        fence::release()?;
+        let intent = base.join("prestart-intent.json");
+        if intent.try_exists()? {
+            println!("{}", session::release_incident(&intent, true)?);
+        } else {
+            fence::release()?;
+        }
         return Ok(());
     }
     if a[0] == "session" {
@@ -824,7 +840,28 @@ fn phase(a: &[String]) -> Result<Value> {
     let anc = fence::ancestry()?;
     if a[0] == "establish" {
         let cpu = joint_mode(&plan)?;
-        inspect_fit(&plan, fpath, &a[4], None, true)?;
+        let initial = inspect_fit(&plan, fpath, &a[4], None, true)?;
+        if let Some(selector) = plan.get("holding145_prestart_ready") {
+            let stage = &initial["authoritative_joint_fit"]["candidate136"];
+            ensure!(
+                initial["activation_compatible"] == true
+                    && stage["selector"] == *selector
+                    && stage["writer"]["invocation_id"] == iid
+                    && !stage["semantic_complete"].is_null(),
+                "missing original registered 145/136 handoff"
+            );
+            file_write(
+                &base.join("prestart-intent.json"),
+                &json!({
+                    "schema":"horizon-136-incident-donor-intent-v1", "epoch":136, "writer":author,
+                    "writer_invocation_id":iid, "writer_plan":plan_ref, "fleet":fleet,
+                    "selector":selector, "semantic_complete":stage["semantic_complete"],
+                    "standard_routes":initial["standard169_preflight"]["current_standard_routes"],
+                    "recorded_unix_seconds":now()?, "boot_id":fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),
+                    "admission_granted":false
+                }),
+            )?;
+        }
         let native = fence::establish(cpu)?;
         let mut fenced_fit = inspect_fit(&plan, fpath, &a[4], None, true)?;
         if cpu {

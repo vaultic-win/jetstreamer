@@ -24,7 +24,7 @@ fn digest(s: &str, len: usize) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         && s.bytes().any(|b| b != b'0')
 }
-fn immutable(path: &Path) -> Result<(Value, Value)> {
+pub(super) fn immutable(path: &Path) -> Result<(Value, Value)> {
     let m = fs::symlink_metadata(path)?;
     ensure!(m.mode() & 0o222 == 0, "handoff receipt must be immutable");
     let bytes = root_file(path, 16 << 20)?;
@@ -273,6 +273,78 @@ fn wait_file(path: &Path, deadline: u64, budget: Duration) -> Result<(Value, Val
         }
     }
 }
+pub(super) fn release_incident(path: &Path, allow_release: bool) -> Result<Value> {
+    let (intent, original) = immutable(path)?;
+    let iid = text(&intent, "writer_invocation_id")?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    let (plan, source) = immutable(Path::new(text(&intent["writer_plan"], "path")?))?;
+    ensure!(
+        intent["schema"] == "horizon-136-incident-donor-intent-v1"
+            && intent["boot_id"] == boot.trim()
+            && guard168::iid(iid)
+            && source == intent["writer_plan"]
+            && plan["controller"] == intent["writer"]
+            && plan["holding145_prestart_ready"] == intent["selector"],
+        "foreign donor intent"
+    );
+    let image = fs::read("/proc/self/exe")?;
+    ensure!(
+        format!("{:x}", Sha256::digest(image)) == text(&intent["writer"], "sha256")?,
+        "release requires the original verified controller"
+    );
+    let admission = Path::new(BASE).join("admission.json");
+    let admitted = if admission.try_exists()? {
+        let (a, binding) = immutable(&admission)?;
+        ensure!(
+            a["writer_invocation_id"] == iid
+                && a["writer"] == intent["writer"]
+                && now()? >= n(&a, "launch_expires_unix_seconds")?,
+            "different or unexpired admission"
+        );
+        Some(binding)
+    } else {
+        None
+    };
+    let registered = intent["standard_routes"]
+        .as_object()
+        .context("original standard CPU routes")?;
+    let routes = registered.keys().cloned().collect::<BTreeSet<_>>();
+    ensure!(
+        !routes.is_empty() && routes.iter().all(|u| standard169::valid_name(u)),
+        "foreign donor routes"
+    );
+    let result_path = Path::new(BASE).join("prestart-released.json");
+    if result_path.try_exists()? {
+        let (receipt, binding) = immutable(&result_path)?;
+        ensure!(
+            receipt["schema"] == "horizon-136-incident-donor-released-v1"
+                && receipt["epoch"] == 136
+                && receipt["writer_invocation_id"] == iid
+                && receipt["boot_id"] == boot.trim()
+                && receipt["intent"] == original
+                && receipt["admission"] == json!(admitted)
+                && receipt["donor_restored"] == true
+                && receipt["candidate_physically_drained"] == true
+                && receipt["resource_credit_bytes"] == 0
+                && receipt["original_routes"] == json!(routes),
+            "released another 136 generation"
+        );
+        fence::confirm_released(&routes)?;
+        return Ok(binding);
+    }
+    ensure!(allow_release, "no completed donor release receipt");
+    fence::finish_release(&routes)?;
+    file_write(
+        &result_path,
+        &json!({
+            "schema":"horizon-136-incident-donor-released-v1","epoch":136,"intent":original,
+            "writer_invocation_id":iid,"admission":admitted,"boot_id":boot.trim(),
+            "recorded_unix_seconds":now()?,"original_routes":routes,"donor_restored":true,
+            "candidate_physically_drained":true,"all_physical_outputs_retained":true,"resource_credit_bytes":0
+        }),
+    )
+}
+
 fn phase_args(name: &str, args: &[String], iid: Option<&str>) -> Vec<String> {
     let mut out = vec![name.to_owned()];
     out.extend_from_slice(args);
@@ -286,6 +358,8 @@ pub(super) fn run(args: &[String]) -> Result<()> {
     // All immutable outputs are no-clobber. Restart cannot mint another lease.
     let base = Path::new(BASE);
     for name in [
+        "prestart-intent.json",
+        "prestart-released.json",
         "donor171.json",
         "capacity.json",
         "admission.json",
