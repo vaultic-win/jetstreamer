@@ -36,8 +36,8 @@ def transition(src,state,key,validate,closure,free,checkpoint=lambda _:None):
     # Two separately writable systemd bind mounts can report the same st_dev
     # while renameat2 between them fails with EXDEV. Keep new renames within
     # the original directory and resume an already quarantined older run.
-    legacy=state/'quarantine-c4555600.body'
-    adjacent=src.parent/'.horizon268-quarantine-c4555600.body'
+    legacy=state/f'quarantine-{op.SHA[:8]}.body'
+    adjacent=src.parent/f'.horizon{op.EPOCH}-quarantine-{op.SHA[:8]}.body'
     op.need(not (exists(legacy) and exists(adjacent)), 'two occupied quarantine names')
     q=legacy if exists(legacy) else adjacent
     intent,unlink,done=(state/n for n in ('retire-intent.json','unlink-intent.json','retired.json'))
@@ -112,5 +112,8 @@ def run(booking_ref):
              postcomparison=grant['postcomparison'],release=book['local_release'])
     return transition(op.SRC,c.STATE,key,validate,closure,free)
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('booking',type=Path);p.add_argument('sha256')
-    a=p.parse_args();print(json.dumps(run(dict(path=str(a.booking),sha256=a.sha256)),sort_keys=True))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--epoch',type=int,choices=(267,268),default=268);p.add_argument('booking',type=Path);p.add_argument('sha256')
+    a=p.parse_args()
+    if a.epoch==267:
+        c.select_epoch267()
+    print(json.dumps(run(dict(path=str(a.booking),sha256=a.sha256)),sort_keys=True))

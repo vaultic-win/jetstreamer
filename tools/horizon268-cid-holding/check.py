@@ -56,8 +56,14 @@ def tests():
     print('Offline fixture groups passed: complete-fit and retained accounting; additive/serial and disk thresholds; roster/ledger/terminal drift; independent park/verify custody; original remote endpoint; exact profile; durable no-replace/idempotence.')
 if __name__=='__main__':tests()
 
-def retirement_tests():
+def retirement_tests(epoch=268):
     r=module('retire268')
+    if epoch==267:
+        r.c.select_epoch267()
+        actual=dict(operation='verify',kind='cid-to-offset-and-size',epoch=267,bytes=10_392_794_246,sha256=r.op.SHA,parts=310,manifest_sha256='a'*64,capacity_credit=0,canonical_publication=False)
+        r.c.gate(actual,'verify')
+        rejects(lambda:r.c.gate(dict(actual,epoch=268),'verify'))
+        rejects(lambda:r.c.gate(dict(actual,parts=363),'verify'))
     import hashlib
     secret=b'fixture closed bytes'
     class Crash(Exception):pass
@@ -93,11 +99,13 @@ def retirement_tests():
         with patch.object(r,'rename',same_mount_rename):
             try:r.transition(*args,stop_after_rename)
             except Crash:pass
-        adjacent=src.with_name('.horizon268-quarantine-c4555600.body')
-        legacy=state/'quarantine-c4555600.body'
+        adjacent=src.with_name(f'.horizon{epoch}-quarantine-{r.op.SHA[:8]}.body')
+        legacy=state/f'quarantine-{r.op.SHA[:8]}.body'
         legacy.write_bytes(b'conflict')
         rejects(lambda:r.transition(*args))
         legacy.unlink();adjacent.rename(legacy)
         assert r.transition(*args)['quarantine_name_absent'] and not legacy.exists()
     print('Retirement fixtures passed: interruption at all four durable boundaries, exact-identity binding, conflicting operation, repeated success, live-reference rejection and neighbor preservation.')
-if __name__=='__main__':retirement_tests()
+if __name__=='__main__':
+    retirement_tests()
+    retirement_tests(267)
