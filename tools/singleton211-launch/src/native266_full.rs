@@ -12,6 +12,7 @@ mod start;
 mod stopped;
 mod successor;
 mod turnover;
+pub(crate) mod turnover_window;
 
 const V: &str = "/var/lib/jetstreamer";
 const STATE: &str = "/var/lib/jetstreamer/horizon266-native-full-v165-a2";
@@ -226,6 +227,24 @@ pub fn dispatch_instructions(args: &[String]) -> Result<Value> {
     controller(Lane::Instructions266, args)
 }
 pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
+    observed_turnover(path, "allocation-", "allocation.json", turnover::allocation)
+}
+
+pub fn qualify_turnover_window(path: &Path) -> Result<Value> {
+    observed_turnover(
+        path,
+        "peer-window-",
+        "qualification.json",
+        turnover_window::qualify,
+    )
+}
+
+fn observed_turnover(
+    path: &Path,
+    prefix: &str,
+    file: &str,
+    observe: fn(&mut Native) -> Result<Value>,
+) -> Result<Value> {
     ensure!(
         unsafe { libc::geteuid() } == 0
             && std::env::var("CODEX_THREAD_ID")? == MAIN
@@ -233,7 +252,7 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
             && path
                 .file_name()
                 .and_then(|s| s.to_str())
-                .is_some_and(|s| s.starts_with("allocation-")),
+                .is_some_and(|s| s.starts_with(prefix)),
         "turnover allocation evidence namespace or owner"
     );
     trusted_parents(path)?;
@@ -243,8 +262,8 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
         counter: 0,
         deadline: Some(mono()? + 90_000_000),
     };
-    let report = turnover::allocation(&mut n)?;
-    Ok(json!(save_json(path, "allocation.json", &report)?))
+    let report = observe(&mut n)?;
+    Ok(json!(save_json(path, file, &report)?))
 }
 
 pub fn dispatch_turnover(args: &[String]) -> Result<Value> {
