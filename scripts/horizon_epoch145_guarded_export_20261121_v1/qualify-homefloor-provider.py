@@ -1,4 +1,5 @@
 """Qualify an identical copy of the sealed retry12 provider in the semantic reader's fixed directory."""
+import argparse
 import hashlib
 import json
 import os
@@ -104,7 +105,7 @@ def inspect(package, fleet, fleet_sha, output):
     return ref(path)
 
 
-def main(donor_sha, fleet_name, fleet_sha):
+def main(donor_sha, fleet_name, fleet_sha, stage_only=False):
     need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "expected isolated native root qualification")
     fleet = Path(fleet_name)
     need(fleet.parent.parent == R and fleet.name == "ROOT_COMPLETE_OPERATIONAL_FLEET.json"
@@ -117,6 +118,11 @@ def main(donor_sha, fleet_name, fleet_sha):
     for name, row in source.items():
         write(stage / name, (DONOR / name).read_bytes(), row["mode"])
     staged = inspect(stage, fleet, fleet_sha, qa)
+    if stage_only:
+        print(json.dumps(record(qa / "SEMANTIC145_PROVIDER_STAGED.json",
+                         dict(source_seal=ref(DONOR / SEAL), staged_price=staged, profile=ref(stage / PROFILE),
+                              members_validated=len(source), verifier_started=False, deployed=False))))
+        return
     plan = dict(schema="jetstreamer-sealed-deployment-plan-v1", destination=str(DEST),
                 members=[dict(row, source=str(DONOR / name)) for name, row in source.items()])
     plan_path = qa / "plan.json"
@@ -135,4 +141,9 @@ def main(donor_sha, fleet_name, fleet_sha):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("donor_sha")
+    parser.add_argument("fleet_name")
+    parser.add_argument("fleet_sha")
+    parser.add_argument("--stage-only", action="store_true", help="retain qualification evidence without installing the provider")
+    main(**vars(parser.parse_args()))
