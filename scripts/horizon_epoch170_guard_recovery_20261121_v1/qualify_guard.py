@@ -1,10 +1,10 @@
 import hashlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 work=Path(__file__).resolve().parents[2]
-assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch166-retry11','epoch170-retry11','epoch170-retry12'))
+assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
 cold167=sys.argv[3:]==['epoch167-cold-v3']
 retry11=sys.argv[3:]==['epoch166-retry11']
-retry170=sys.argv[3:] in (['epoch170-retry11'],['epoch170-retry12'])
+retry170=sys.argv[3:] in (['epoch170-retry11'],['epoch170-retry12'],['epoch170-retry13'])
 attempt=sys.argv[3].split('-')[-1] if retry170 else None
 cold=cold167 or retry11 or retry170
 runtime=Path('/var/lib/jetstreamer/horizon_runtime_data')
@@ -101,8 +101,9 @@ cases=[("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=(384
                 ("wrong-root",dict(plan,worker_root="/home/sol/.jetstreamer-private")),
                 ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]
 if retry170:
- old_170_contract=runtime/('epoch170-retry11-guard-20261122-v1/contract' if attempt=='retry12' else 'epoch170-retry10-guard384-20261121-v1/contract')
- old_170_unit='horizon-qualify-170-replacement-local3retry11-20261122.service' if attempt=='retry12' else unit
+ predecessor={'retry11':'retry10','retry12':'retry11','retry13':'retry12'}[attempt]
+ old_170_contract=runtime/(f'epoch170-{predecessor}-guard-20261122-v1/contract' if predecessor!='retry10' else 'epoch170-retry10-guard384-20261121-v1/contract')
+ old_170_unit=f'horizon-qualify-170-replacement-local3{predecessor}-20261122.service' if predecessor!='retry10' else unit
  cases.extend([('wrong-predecessor-170',dict(plan,unit=old_170_unit)),
                ('wrong-predecessor-170-contract',dict(plan,data_fulfillment={'contract':ref(old_170_contract/'contract.json'),
                     'deployment_seal':ref(old_170_contract/'deployment-seal-receipt.json')}))])
