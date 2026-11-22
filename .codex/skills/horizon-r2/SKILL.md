@@ -18,9 +18,11 @@ small system service/mount definitions on root. Migrate existing storage at a
 safe owner boundary, preserving receipts, hashes, locks and recovery state;
 do not restart healthy replay just to change a path. Charge copied bytes and
 remaining growth to the home filesystem's existing complete fleet commitments.
-The chronological archive audit streams public HTTP ranges. Budget bounded reader memory,
-logs and per-epoch receipts on home. Reserve archive-sized disk only for an operation that
-actually restores a local copy.
+For verification of archives already in R2, stream the canonical public URL through the
+[Jetstreamer verification plugin](#public-playback-for-archive-publication-and-historical-audits).
+Book zero bytes for archive staging. Budget bounded decoder memory and HOME space for the
+pinned inventory, logs and verification receipts. Price a local restore separately when a
+downstream operation actually needs a file.
 
 Keep one controlling conversation per host and assigned campaign. Before booking resources or
 starting shared builds, admissions, launches or status writers, check the recorded owner and any
@@ -137,18 +139,28 @@ An unpublished sidecar stays pending if the public reader fails. Keep local sour
 failure evidence for a retry. No archive-sized playback scratch is needed on the ordinary
 upload path.
 
-**For a historical audit**, list the authenticated inventory, select canonical
-`epoch-N.jet` keys, sort numerically and group them into maximal consecutive ranges.
-Account for staged archives and sidecar anomalies explicitly. Pass each range to one process. Supply an absolute
-inventory path and an existing private report directory.
+**To verify an epoch already in R2**, run the public Jetstreamer verification plugin directly.
+For one ready epoch set `first` and `last` to that epoch. For a range audit, list the
+authenticated inventory and select canonical archives with matching readiness sidecars.
+Group consecutive ready epochs and run one process per contiguous range. Record staged
+objects and sidecar anomalies separately. Use the public bucket base URL, an absolute
+path to the authenticated inventory and an existing private report directory.
 
 ```sh
-horizon_pipeline "$first:$last" "$public_origin" --verify-only --threads "$threads" \
-  --archive-inventory "$inventory" --verification-report-dir "$reports"
+horizon_pipeline "$first:$last" "$public_origin" --verify-only --slot-ranges \
+  --threads "$threads" --archive-inventory "$inventory" --verification-report-dir "$reports"
 ```
 
-This reuses one verification plugin across the range and streams directly from R2.
-Keep a durable per-epoch receipt and report the first incomplete epoch on interruption.
+This uses the standard Horizon consumer's slot partitioner. The thread count applies
+across the range. Use `--max-active-partitions` when admission limits the number of
+concurrent decoders. Accept the range after a successful exit, a finalized report for
+every epoch with complete slot coverage, and an authenticated recheck of archive and
+sidecar identities. Store these small reports and keep the archive in R2. A progress
+pulse is insufficient for acceptance.
+
+When progressive per-epoch receipts are required, omit `--slot-ranges` and keep
+the same pinned origin, inventory and report directory. Record the first incomplete
+epoch on interruption.
 If the branch advances during playback, keep the range running when the freshly fetched
 source and build inputs qualify the same sealed reader. Bind subsequent receipts to the
 new proof. When inputs change, qualify a build from the current branch. If the plugin
@@ -161,14 +173,9 @@ If the executable differs or the report cannot be recovered, replay that epoch f
 beginning with the current reader. Keep earlier accepted receipts. A methodology restart begins at the first epoch
 and keeps its receipts and counts separate from prior runs.
 
-For a throughput run over a continuous range, add `--slot-ranges` to the pinned
-`horizon_pipeline` invocation. This uses the Horizon consumer's full-range slot
-partitions. `--threads` or `JETSTREAMER_THREADS` sets the worker total across all
-archives. Capture the native cumulative `horizon_tps` pulses and final per-epoch
-receipts. This mode emits its receipts after the whole range succeeds. For digest
-comparisons, use identical range endpoints, partitioning mode and worker count on
-both sources. Keep the progressive chronological audit on its receipt-producing
-invocation when per-epoch resumption is required.
+Capture native cumulative `horizon_tps` pulses during playback. The slot-partitioned
+verifier emits per-epoch reports after the entire range succeeds. Digest comparisons
+require the same range endpoints, partitioning mode and worker count on both sources.
 
 Give failed historical audits first priority in the next repair slot. Record whether the
 failure occurred during transport, decoding, or plugin validation. Retry interrupted
@@ -1532,7 +1539,7 @@ sidecar to match the verified local sidecar byte-for-byte, creates the archive w
 preconditions, performs a whole-object SHA-256 readback, and leaves the existing sidecar untouched.
 It never admits a mismatching sidecar and is mutually exclusive with `--overwrite-existing`.
 
-Use `jetstreamer-r2 restore` when an ordered-chain or boundary audit needs an archive that has already been retired locally. Restore only into an explicit scratch directory, require `--epochs` and the private `--receipt-directory`, and let the Rust command enforce the recorded length, ETag, whole-file SHA-256, canonical sidecar, resumable conditional ranged GET, and no-clobber publication. Never download directly over a public Horizon archive.
+For an ordered-chain or boundary tool that requires a local file, use `jetstreamer-r2 restore` to retrieve that specific input. Restore only into an explicit scratch directory, require `--epochs` and the private `--receipt-directory`, and let the Rust command enforce the recorded length, ETag, whole-file SHA-256, canonical sidecar, resumable conditional ranged GET, and no-clobber publication. Never download directly over a public Horizon archive.
 
 Use `jetstreamer-r2 retire-local` only when local retirement has already been authorized by the
 normal boundary gates or by an explicit user-approved backup/emergency policy. It makes no R2
