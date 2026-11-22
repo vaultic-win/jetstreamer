@@ -242,6 +242,40 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
     Ok(entries)
 }
 pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+    if review.get("capped_cold_fit").is_some() {
+        native266_capped::checked_review(review)?;
+        let fleet = native266_full::peer261::latest(&binding(&review["fleet"])?)?;
+        let active = fleet["active"].as_array().context("missing capped fleet owners")?;
+        ensure!(
+            active.len() == 1
+                && active[0]["epoch"] == 247
+                && active[0]["phase"] == "upload-readback"
+                && active[0]["unit"]["Id"] == delivery247::SUCCESSOR_UNIT
+                && a["epoch"] == 266
+                && a["actual_current_memory"]
+                    .as_object()
+                    .is_some_and(|m| m.len() == 1 && m.contains_key(delivery247::SUCCESSOR_UNIT)),
+            "unexpected active owner during capped cold admission"
+        );
+        // The sole delivery owner has no replay timer. Bound this window by the
+        // controller deadline and recheck its exact ownership at each funding pass.
+        let limit = n.deadline.context("finite controller deadline")?;
+        let receipt = save_json(
+            &n.root,
+            "peer-window.json",
+            &json!({"schema":"horizon-singleton211-original-peer-window-v1",
+            "review":a["review"],"boot_id":a["boot_id"],"peers":[],"delivery":active[0]["unit"]["Id"],
+            "delivery_invocation_id":active[0]["unit"]["InvocationID"],"deadline_with_margin_monotonic_us":limit,
+            "recorded_monotonic_us":mono()?}),
+        )?;
+        return Ok(Window {
+            peers: Vec::new(),
+            full211: None,
+            turnover266: None,
+            limit,
+            receipt,
+        });
+    }
     if review.get("turnover_funding").is_some() {
         let origin = native266_full::peer261::trace();
         ensure!(

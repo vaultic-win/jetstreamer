@@ -1,7 +1,7 @@
 //! First finite epoch 266 entry replay, using the original v165 delivery booking.
 use super::*;
 use std::os::unix::process::CommandExt;
-mod capped_cold;
+pub(crate) mod capped_cold;
 mod entries;
 mod epoch228;
 mod epoch228_peer;
@@ -266,7 +266,7 @@ fn measure_cold_fit(path: &Path, fleet: &Path, sha: &str, capped: bool) -> Resul
         live::finite_owner(&owner, unit, &iid, 256 << 20)?;
         let f = Bound::new(fleet, sha);
         let result = if capped {
-            capped_cold::assess(n, &f, unit)?
+            capped_cold::assess(n, &f, unit, false)?
         } else {
             peer261::assess(n, &f, unit, false)?
         };

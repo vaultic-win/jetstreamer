@@ -446,7 +446,7 @@ pub(crate) fn select_minimum(
         (30 * SECOND..=65 * SECOND).contains(&minimum),
         "peer guard cadence cannot accommodate required time"
     );
-    if review.get("turnover_funding").is_some() {
+    if review.get("turnover_funding").is_some() || review.get("capped_cold_fit").is_some() {
         return capture(n, review, a);
     }
     let end = mono()?
