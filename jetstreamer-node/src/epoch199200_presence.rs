@@ -10,6 +10,7 @@ use std::{env, fs::OpenOptions, io::Read, os::unix::fs::OpenOptionsExt};
 const MANIFEST_SHA: &str = "cc4250c62eee9136933a87909891041c40bf5f2bc28fde36906e071a1b7156d0";
 const COHORT_267_268_MANIFEST_SHA: &str =
     "80245e30eb7dbe2ccfdac4b17110799100f6ffd2356b455751735cd93a3f4802";
+const COHORT_267_270_SHA: &str = "3e0bfe7153bb17f13dc75caac88b8e4f6ff06760520d48b7f92b5d66e6c5027d";
 const SLOTS: u64 = 432_000;
 const TABLE_BYTES: usize = SLOTS as usize * 12;
 
@@ -62,6 +63,24 @@ const EPOCH_268: Profile = Profile {
     ],
 };
 
+const EPOCH_269: Profile = Profile {
+    epoch: 269,
+    raw_sha: "c36b80da05b7b8f1c7ceb0eb4eb493c5c6c71a7a6d39c26013ed6d57bef146b1",
+    compact_sha: "760af23b1f4ce08bfbb82d320846c49a18fe53a6550b3e2b6f403d8633280447",
+    proven_skips: &[
+        116260388, 116261511, 116271319, 116282125, 116311334, 116348641, 116383321, 116419950,
+        116423577, 116448001, 116457771, 116473569, 116493388, 116562945,
+    ],
+};
+const EPOCH_270: Profile = Profile {
+    epoch: 270,
+    raw_sha: "8bf3e296ee3a944cb6fcd1c9ff70eaa6a59f5269a9009eaa1649cc19608434b9",
+    compact_sha: "a40fecc69aef805155d276acf93c680f5628dd7eb089dad68bb6bd21fdc6e167",
+    proven_skips: &[
+        116667934, 116682966, 116715243, 116761379, 116807097, 116836992, 116846916, 116990228,
+        117008024, 117010075, 117037937,
+    ],
+};
 const EPOCH_267: Profile = Profile {
     epoch: 267,
     raw_sha: "b60ac1831d3f8850e426a6b47ee393e8260e67a9c7c473f1aea370fedd92c5e0",
@@ -93,12 +112,21 @@ impl RootedSlotPresence {
                 &EPOCH_268,
                 "92a805a982c8edfc24f0f4c02192c26e2ad2ab57db6a4bd9355f36eca7d26642",
             ),
+            269 => (
+                &EPOCH_269,
+                "7428b7e662df64fdab109021fdf38fa464650744270b34ee66f4b2e630e27a1c",
+            ),
+            270 => (
+                &EPOCH_270,
+                "930dd2337cfa4abf31ca4423e9f3a3b3825c3dfae271db6ddaaccb1fbc446fb3",
+            ),
             _ => return Ok(None),
         };
         let configured = env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").ok();
         let combined = matches!(epoch, 267 | 268)
             && configured.as_deref() == Some(COHORT_267_268_MANIFEST_SHA);
-        if configured.as_deref() != Some(manifest_sha) && !combined {
+        let four = matches!(epoch, 267..=270) && configured.as_deref() == Some(COHORT_267_270_SHA);
+        if configured.as_deref() != Some(manifest_sha) && !combined && !four {
             return Ok(None);
         }
         if env::var_os("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST").is_none() {
@@ -181,7 +209,7 @@ impl RootedSlotPresence {
 #[cfg(test)]
 mod qualified_epoch268 {
     use super::super::{LocalSlotIndex, SlotPresenceState, build_slot_presence_map};
-    use super::{EPOCH_268, RootedSlotPresence};
+    use super::{Profile, RootedSlotPresence, SLOTS};
     use std::{
         env, fs,
         path::PathBuf,
@@ -190,13 +218,66 @@ mod qualified_epoch268 {
     #[tokio::test]
     #[ignore = "requires sealed epoch 268 evidence and isolated CAR-header fixture"]
     async fn scheduler_uses_rooted_map() {
-        let ledger = PathBuf::from(env::var_os("HORIZON268_QUALIFIED_LEDGER").unwrap());
-        let compact=ledger.join("compact-indexes/268/epoch-268-bafyreiadrsuockl4wyx2s2nu247atdi7xhc6pc7ynhmetagg7mdkjdktgu-mainnet-slot-to-cid.index");
-        let bytes = fs::read(compact).unwrap();
-        let raw = fs::read(
-            "/var/lib/jetstreamer/horizon268-rooted-slot-ranges-v1/epoch-268-slot-ranges.raw",
+        check(
+            &super::EPOCH_268,
+            "bafyreiadrsuockl4wyx2s2nu247atdi7xhc6pc7ynhmetagg7mdkjdktgu",
         )
-        .unwrap();
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 267 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch267_map() {
+        check(
+            &super::EPOCH_267,
+            "bafyreifn4ykgns5ih2lzfzrvky2u5vfh4jvqcqy7tdylujrbvl6pqavi4m",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 269 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch269_map() {
+        check(
+            &super::EPOCH_269,
+            "bafyreihyxzt42dpkxrmluxqvkxqfnkas7czh5igcvorg5a7fr4ckvewxzm",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires sealed epoch 270 evidence and isolated CAR-header fixture"]
+    async fn scheduler_uses_epoch270_map() {
+        check(
+            &super::EPOCH_270,
+            "bafyreiewpp2gte55lvp5ml7labmgudq72juwvj5o5j3jd6xyjjbaxpudcu",
+        )
+        .await;
+    }
+
+    async fn check(profile: &Profile, car_root: &str) {
+        let epoch = profile.epoch;
+        let first = epoch * SLOTS;
+        let last = first + SLOTS - 1;
+        let ledger =
+            PathBuf::from(env::var_os(format!("HORIZON{epoch}_QUALIFIED_LEDGER")).unwrap());
+        let compact = ledger.join(format!(
+            "compact-indexes/{epoch}/epoch-{epoch}-{car_root}-mainnet-slot-to-cid.index"
+        ));
+        let bytes = fs::read(compact).unwrap();
+        let raw = fs::read(format!("/var/lib/jetstreamer/horizon{epoch}-rooted-slot-ranges-v1/epoch-{epoch}-slot-ranges.raw")).unwrap();
+        if env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref()
+            == Ok(super::COHORT_267_270_SHA)
+        {
+            for sibling in 267..=270 {
+                assert!(
+                    RootedSlotPresence::configured(sibling)
+                        .await
+                        .unwrap()
+                        .is_some()
+                );
+            }
+        }
         if env::var("JETSTREAMER_SLOT_RANGES_OVERRIDE_MANIFEST_SHA256").as_deref()
             == Ok(super::COHORT_267_268_MANIFEST_SHA)
         {
@@ -204,24 +285,27 @@ mod qualified_epoch268 {
             let skip = super::EPOCH_267.proven_skips[0];
             assert!(!previous.present(skip, true).unwrap());
         }
-        let source = RootedSlotPresence::configured(268).await.unwrap().unwrap();
+        let source = RootedSlotPresence::configured(epoch)
+            .await
+            .unwrap()
+            .unwrap();
         source.verify_compact(&bytes).unwrap();
         assert!(source.verify_compact(&bytes[..bytes.len() - 1]).is_err());
         let legacy = LocalSlotIndex::from_bytes(bytes).unwrap();
-        assert_eq!(legacy.header.metadata_epoch(), Some(268));
+        assert_eq!(legacy.header.metadata_epoch(), Some(epoch));
         let m = build_slot_presence_map(
-            115776000,
-            116207999,
+            first,
+            last,
             Arc::new(AtomicBool::new(false)),
             &ledger,
-            268,
+            epoch,
         )
         .await
         .unwrap();
         let mut next = None;
         let mut false_positives = Vec::new();
-        for i in (0..432000).rev() {
-            let slot = 115776000 + i as u64;
+        for i in (0..SLOTS as usize).rev() {
+            let slot = first + i as u64;
             let offset = i * 12;
             let expected =
                 u32::from_le_bytes(raw[offset + 8..offset + 12].try_into().unwrap()) != 0;
@@ -244,8 +328,8 @@ mod qualified_epoch268 {
             }
         }
         false_positives.reverse();
-        assert_eq!(false_positives.as_slice(), EPOCH_268.proven_skips);
-        assert!(source.present(115775999, false).is_err());
-        assert!(source.present(116208000, false).is_err());
+        assert_eq!(false_positives.as_slice(), profile.proven_skips);
+        assert!(source.present(first - 1, false).is_err());
+        assert!(source.present(last + 1, false).is_err());
     }
 }
