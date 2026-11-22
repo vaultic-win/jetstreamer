@@ -16,8 +16,20 @@ use std::{
     process::Command,
 };
 
+#[cfg(not(feature = "independent166"))]
 const BASE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v2";
+
+#[cfg(feature = "independent166")]
+mod cold166;
+#[cfg(feature = "independent166")]
+use cold166::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
+#[cfg(not(feature = "independent166"))]
+const PROFILE: &[u8] = include_bytes!("profiles.json");
+#[cfg(not(feature = "independent166"))]
+const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
+#[cfg(not(feature = "independent166"))]
+const COMPLETE_SCHEMA: &str = "horizon167-closed-accounts-complete-v1";
 
 const DEVICE: u64 = 64512;
 const UID: u32 = 1001;
@@ -136,6 +148,7 @@ fn closed(name: &str) -> Result<()> {
     );
     Ok(())
 }
+#[cfg(not(feature = "independent166"))]
 fn preserved(p: &Value) -> Result<()> {
     let path = Path::new(string(p, "path")?);
     let m = path.symlink_metadata()?;
@@ -156,6 +169,7 @@ fn preserved(p: &Value) -> Result<()> {
     Ok(())
 }
 /// Check the two incomplete runs against their original stop, reservation and present owner.
+#[cfg(not(feature = "independent166"))]
 fn gates(p: &Value, manifest: &Value) -> Result<Value> {
     let target = Path::new(string(p, "target")?);
     let attempt = string(p, "attempt")?;
@@ -253,7 +267,13 @@ fn gates(p: &Value, manifest: &Value) -> Result<Value> {
             && children(&runtime.join("unpacked/snapshots/72143703"))? == ["72143703"],
         "additional retained Bank or runtime present"
     );
-    let witness = bound(&manifest["witness"])?;
+    witness_disjoint(target, &manifest["witness"])?;
+    Ok(
+        json!({"owner":p["iid"],"scope":p["target"],"retained":protected,"stop":p["stop"],"bootstrap_slot":72143703,"witness":manifest["witness"]}),
+    )
+}
+fn witness_disjoint(target: &Path, reference: &Value) -> Result<()> {
+    let witness = bound(reference)?;
     let rows = witness["allocation"]["first"]
         .as_array()
         .context("witness schedule")?;
@@ -286,9 +306,7 @@ fn gates(p: &Value, manifest: &Value) -> Result<Value> {
             );
         }
     }
-    Ok(
-        json!({"owner":p["iid"],"scope":p["target"],"retained":protected,"stop":p["stop"],"bootstrap_slot":72143703,"witness":manifest["witness"]}),
-    )
+    Ok(())
 }
 fn scan(target: &Path) -> Result<Value> {
     // A same-device bind inside the target could expose unrelated files with valid uid/gid.
@@ -359,7 +377,7 @@ fn run() -> Result<()> {
         "retire (inspect|check|execute) local3retryN"
     );
     let (mode, attempt) = (argv[1].as_str(), argv[2].as_str());
-    let manifest: Value = serde_json::from_slice(include_bytes!("profiles.json"))?;
+    let manifest: Value = serde_json::from_slice(PROFILE)?;
     let p = manifest["profiles"]
         .get(attempt)
         .context("unknown attempt")?;
@@ -373,6 +391,8 @@ fn run() -> Result<()> {
         unsafe { libc::flock(epoch_lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "campaign operation is occupied"
     );
+    #[cfg(feature = "independent166")]
+    let _leases = cold166::leases(&manifest)?;
     let anchors = gates(p, &manifest)?;
     let target = Path::new(string(p, "target")?);
     let fd = stopped_tree::open_root(target, DEVICE, p["inode"].as_u64().context("target inode")?)?;
@@ -394,7 +414,7 @@ fn run() -> Result<()> {
         fs::read_link("/proc/self/exe")? == elf && image == sha(&fs::read("/proc/self/exe")?),
         "sealed image required"
     );
-    let conf = sha(include_bytes!("profiles.json"));
+    let conf = sha(PROFILE);
     let dir: PathBuf = base.join("state").join(attempt);
     let checkpath = dir.join("CHECK.json");
     let ledgerpath = dir.join("LEDGER.json");
@@ -405,26 +425,27 @@ fn run() -> Result<()> {
             .arg(target)
             .output()?;
         ensure!(
-            du.status.success()
-                && du.stderr.is_empty()
-                && std::str::from_utf8(&du.stdout)?
-                    .split_whitespace()
-                    .next()
-                    .context("missing allocation")?
-                    .parse::<u64>()?
-                    == p["expected_bytes"]
-                        .as_u64()
-                        .context("expected allocation")?,
-            "retained allocation differs"
+            du.status.success() && du.stderr.is_empty(),
+            "allocation observation failed"
         );
+        let allocated = std::str::from_utf8(&du.stdout)?
+            .split_whitespace()
+            .next()
+            .context("missing allocation")?
+            .parse::<u64>()?;
         let first = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         let second = stopped_tree::capture(&fd, DEVICE, UID, GID)?;
         ensure!(
-            first == second
-                && first.contains_key("")
-                && p["expected_entries"] == (first.len() - 1) as u64,
+            first == second && first.contains_key(""),
             "old accounts inventory changed"
         );
+        #[cfg(not(feature = "independent166"))]
+        ensure!(
+            p["expected_bytes"] == allocated && p["expected_entries"] == (first.len() - 1) as u64,
+            "retained allocation or old accounts inventory differs"
+        );
+        #[cfg(feature = "independent166")]
+        cold166::check_inventory(p, &manifest, &first, allocated)?;
         drop(second);
         let bytes = serde_json::to_vec(&first)?;
         let count = first.len();
@@ -438,7 +459,13 @@ fn run() -> Result<()> {
         } else {
             output(&dir, "LEDGER.json", &bytes)?
         }
-        let check = json!({"schema":"horizon167-closed-accounts-check-v1","attempt":attempt,"target":target,"inode":p["inode"],"manifest":conf,"elf":image,"anchors":anchors,"ledger_sha256":hash,"entries":count,"references":process,"resource_credit_bytes":0});
+        let check = json!({"schema":CHECK_SCHEMA,"attempt":attempt,"target":target,"inode":p["inode"],"manifest":conf,"elf":image,"anchors":anchors,"ledger_sha256":hash,"entries":count,"references":process,"resource_credit_bytes":0});
+        #[cfg(feature = "independent166")]
+        let check = {
+            let mut measured = check;
+            measured["allocated_bytes"] = json!(allocated);
+            measured
+        };
         output(&dir, "CHECK.json", &serde_json::to_vec_pretty(&check)?)?;
         println!("{}", check);
         return Ok(());
@@ -446,7 +473,7 @@ fn run() -> Result<()> {
     let prior = evidence(&checkpath)?;
     let bytes = read(&ledgerpath, 220 << 20)?;
     ensure!(
-        prior["schema"] == "horizon167-closed-accounts-check-v1"
+        prior["schema"] == CHECK_SCHEMA
             && prior["attempt"] == attempt
             && prior["target"] == string(p, "target")?
             && prior["inode"] == p["inode"]
@@ -478,7 +505,11 @@ fn run() -> Result<()> {
     let removed = stopped_tree::remove_contents(&fd, &ledger, DEVICE, UID, GID)?;
     let after = gates(p, &manifest)?;
     ensure!(after == anchors, "post-retirement bindings changed");
-    let complete = json!({"schema":"horizon167-closed-accounts-complete-v1","attempt":attempt,"scope":target,"original_iid":p["iid"],"scope_empty":true,"entries_removed_this_invocation":removed,"check_sha256":intent["check_sha256"],"intent_sha256":sha(&read(&ip,1<<20)?),"retired_tree_before_bytes":p["expected_bytes"],"scope_root_remaining_bytes":fd.metadata()?.blocks()*512,"archive_or_snapshot_removed":false,"resource_credit_bytes":0});
+    #[cfg(feature = "independent166")]
+    let allocated = &prior["allocated_bytes"];
+    #[cfg(not(feature = "independent166"))]
+    let allocated = &p["expected_bytes"];
+    let complete = json!({"schema":COMPLETE_SCHEMA,"attempt":attempt,"scope":target,"original_iid":p["iid"],"scope_empty":true,"entries_removed_this_invocation":removed,"check_sha256":intent["check_sha256"],"intent_sha256":sha(&read(&ip,1<<20)?),"retired_tree_before_bytes":allocated,"scope_root_remaining_bytes":fd.metadata()?.blocks()*512,"archive_or_snapshot_removed":false,"resource_credit_bytes":0});
     if dir.join("COMPLETE.json").try_exists()? {
         let old = evidence(&dir.join("COMPLETE.json"))?;
         ensure!(

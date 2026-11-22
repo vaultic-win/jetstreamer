@@ -5,6 +5,9 @@ edition = "2024"
 
 [workspace]
 
+[features]
+independent166 = []
+
 [dependencies]
 anyhow = "1"
 libc = "0.2"
