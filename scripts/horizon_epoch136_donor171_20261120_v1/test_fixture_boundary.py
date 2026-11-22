@@ -59,7 +59,14 @@ class Fixture(unittest.TestCase):
             def run_path(self, s):
                 return s
 
-        return b["prepare"](self.planref, self.plan, self.readyref, self.ready, lambda r: self.rows[r["path"]],
+        start = str(b["STATE"] / iid / "recovery-started.json")
+        def sealed_read(ref):
+            self.assertNotEqual(ref["path"], start)
+            return self.rows[ref["path"]]
+        def state_read(ref):
+            self.assertEqual(ref["path"], start)
+            return self.rows[ref["path"]]
+        return b["prepare"](self.planref, self.plan, self.readyref, self.ready, sealed_read, state_read,
                             lambda path, sha: self.assertEqual(sha, "b"*64), provider, Manual())
 
     def test_selects_original_fixture_worker_post_and_registered_provider(self):

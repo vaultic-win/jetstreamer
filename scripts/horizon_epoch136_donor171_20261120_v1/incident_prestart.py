@@ -19,7 +19,7 @@ PRICE = "924c72177d61b8340f8ff75caba72d4cfe5228df4b27111e56d2656a9d8d2aa8"
 ADAPTER_SHA = "729ceda384e4def082967e24758f2e58f18f2d068ad41bae5358cf9cb60b5fb0"
 CAP = 72 << 30
 V20 = ROOT / "incident-replay-fit-20261121-v1/tools-v20"
-V7 = ROOT / "epoch136-joint-writer-20261122-v7"
+V7 = ROOT / "epoch136-joint-writer-20261122-v7b"
 SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
 

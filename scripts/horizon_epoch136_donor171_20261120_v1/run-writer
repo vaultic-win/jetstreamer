@@ -32,7 +32,7 @@ check_file "$fleet" "$fleet_sha"
 seal=$(jq -er '.controller_deployment.path' "$plan")
 check_file "$seal" "$(jq -er '.controller_deployment.sha256' "$plan")"
 pkg=$(dirname -- "$seal")
-fixture="$runtime/epoch136-joint-writer-20261122-v7"
+fixture="$runtime/epoch136-joint-writer-20261122-v7b"
 if [[ $(realpath -e -- "$0") == "$fixture/controller/run-writer" ]]; then
     [[ $pkg == "$fixture/controller" ]]
     if [[ $mode == session ]]; then

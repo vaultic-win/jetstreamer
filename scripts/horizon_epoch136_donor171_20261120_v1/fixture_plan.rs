@@ -25,7 +25,7 @@ fn reference(row: &Value, directory: &str, name: &str) -> Result<()> {
 pub fn validate(plan: &Value) -> Result<()> {
     reference(
         &plan["controller_deployment"],
-        "epoch136-joint-writer-20261122-v7/controller",
+        "epoch136-joint-writer-20261122-v7b/controller",
         "deployment-seal-receipt.json",
     )?;
     reference(&plan["joint_fit_145"]["image"], PRICE, "post-stop-fit")?;
@@ -70,7 +70,7 @@ mod tests {
         let key = |s: &str| json!({"path":format!("{RUNTIME}/{s}"),"sha256":"c".repeat(64)});
         let post = |s: &str| key(&format!("{FAMILY}/tools-v13/{s}"));
         let mut plan = json!({
-            "controller_deployment":key("epoch136-joint-writer-20261122-v7/controller/deployment-seal-receipt.json"),
+            "controller_deployment":key("epoch136-joint-writer-20261122-v7b/controller/deployment-seal-receipt.json"),
             "joint_fit_145":{"image":key(&format!("{PRICE}/post-stop-fit")),
                              "seal":key(&format!("{PRICE}/deployment-seal-receipt.json"))},
             "holding145_semantic_worker":key(&format!("{FAMILY}/V5F_ACTUAL_ADVANCING_WORKER.json")),
@@ -82,6 +82,10 @@ mod tests {
             key("epoch145-fixture-phase-dispatch-20261122-v1/READY.json");
         validate(&plan).unwrap();
         for (name, replacement) in [
+            (
+                "controller_deployment",
+                "epoch136-joint-writer-20261122-v7/controller/deployment-seal-receipt.json",
+            ),
             (
                 "holding145_prestart_ready",
                 "epoch145-phase-dispatch-20261122-v1/READY.json",

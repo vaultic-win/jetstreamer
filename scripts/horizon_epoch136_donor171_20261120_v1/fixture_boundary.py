@@ -6,9 +6,9 @@ RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FAMILY = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 STATE = RUNTIME / "epoch145-guarded-export-20261121-v1/state"
 DISPATCH = RUNTIME / "epoch145-fixture-phase-dispatch-20261122-v1"
-V7 = RUNTIME / "epoch136-joint-writer-20261122-v7"
+V7 = RUNTIME / "epoch136-joint-writer-20261122-v7b"
 V13 = FAMILY / "tools-v13"
-V21 = RUNTIME / "incident-replay-fit-20261121-v1/tools-v21"
+V21 = RUNTIME / "incident-replay-fit-20261121-v1/tools-v21b"
 OLD = "a99ed8b51e8a482b805b8a36a11b2700"
 FAILURE = dict(path=str(STATE / OLD / "failed.json"),
                sha256="da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43")
@@ -28,13 +28,13 @@ def bound(row, path):
     return row
 
 
-def semantic(plan, read):
+def semantic(plan, read, read_start):
     ref = bound(plan["holding145_semantic_worker"], FAMILY / "V5F_ACTUAL_ADVANCING_WORKER.json")
     worker = read(ref)
     iid = worker["invocation_id"]
     need(re.fullmatch("[0-9a-f]{32}", iid) and iid not in (OLD, "0"*32),
          "wrong fixture semantic invocation")
-    start = read(bound(worker["start"], STATE / iid / "recovery-started.json"))
+    start = read_start(bound(worker["start"], STATE / iid / "recovery-started.json"))
     manager = read(bound(worker["manager"], FAMILY / "V5F_ACTUAL_MANAGER.json"))
     samples = worker["observations"]
     need(start["iid"] == manager["new"]["InvocationID"] == iid and manager["new"]["Id"] == UNIT
@@ -73,7 +73,7 @@ def completion_tools(plan, read, pin, runpy):
 
 
 def ordinary_phase(plan, phase, read, pin, runpy, observer):
-    iid = semantic(plan, read)
+    iid = semantic(plan, read, read)
     if "stage" in phase:
         need(phase["stage"] == "leased-worker" and phase["invocation_id"] == iid,
              "ordinary price uses another semantic worker")
@@ -86,10 +86,10 @@ def ordinary_phase(plan, phase, read, pin, runpy, observer):
     need(extraction["epoch"] == 145, "unexpected semantic completion")
 
 
-def prepare(planref, plan, readyref, ready, read, pin, fixture_provider, runpy):
+def prepare(planref, plan, readyref, ready, read, read_start, pin, fixture_provider, runpy):
     bound(planref, V7 / "registered-production-plan.json")
     bound(readyref, DISPATCH / "READY.json")
-    iid = semantic(plan, read)
+    iid = semantic(plan, read, read_start)
     need(ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
          ready["original_semantic_invocation"] == iid and ready["operation_lock"] == ORIGINAL_LOCK,
          "different original lock or selector generation")

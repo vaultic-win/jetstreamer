@@ -162,11 +162,11 @@ def capture_context(fleetref, fence, waiter, *, pin, checked, runpy, json, obser
     executable = Path(checker["path"])
     require(executable.is_relative_to(RUNTIME) and executable.parent != Path("/"), "foreign boundary inspector")
     if fixture_provider is not None:
-        require(owner_pkg == RUNTIME / "epoch136-joint-writer-20261122-v7/controller", "foreign V7 controller")
+        require(owner_pkg == RUNTIME / "epoch136-joint-writer-20261122-v7b/controller", "foreign V7 controller")
         module = owner_pkg / "fixture_boundary.py"
         pin(module, members[module.name]["sha256"])
         fixture = runpy.run_path(str(module))
-        iid, price, build, verifier = fixture["prepare"](planref, plan, registered, ready, read, pin,
+        iid, price, build, verifier = fixture["prepare"](planref, plan, registered, ready, read, checked, pin,
                                                          fixture_provider, runpy)
     else:
         for name in ("admit136", "post-stop-fit", "retire-original-timers.py", "closure.py", "idle_floor.py",
