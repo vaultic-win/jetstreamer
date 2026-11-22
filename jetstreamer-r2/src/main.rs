@@ -3899,8 +3899,14 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-native266-input") {
         return fleet::capture_native266_input();
     }
+    if env::args().nth(1).as_deref() == Some("capture-native266-capped-input") {
+        return fleet::capture_native266_capped_input();
+    }
     if env::args().nth(1).as_deref() == Some("capture-native266-terminal") {
         return fleet::capture_native266_terminal();
+    }
+    if env::args().nth(1).as_deref() == Some("capture-native266-capped-terminal") {
+        return fleet::capture_native266_capped_terminal();
     }
 
     if env::args().nth(1).as_deref() == Some("capture-native212-input") {

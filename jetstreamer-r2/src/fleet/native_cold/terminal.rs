@@ -225,7 +225,7 @@ fn registered(s: &Spec) -> Result<(Value, Value, Value, Value)> {
     );
     let p = event::prior(&f)?;
     let origin=sealed(&s.running_origin)?;
-    if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA && event::owner(&p)?.is_none(){
+    if UNIT==native266::UNIT && origin["schema"]==native266_recovery::SCHEMA && event::owner(&p)?.is_none(){
         let claim: PipelineClaim=serde_json::from_value(json!({"epoch":EPOCH,"phase":c::PHASE,"unit":c::UNIT,"invocation_id":origin["invocation_id"],"expected_exec_start":origin["expected_exec_start"],"evidence":[private157::binding(&s.running_origin)]}))?;
         c::claim(&claim)?;
         let (h,a)=c::startup(&binding(&origin["startup_handoff"])?)?;
@@ -246,7 +246,7 @@ fn validate_parts(proof: &Value, output: &Path) -> Result<Vec<u64>> {
     let sb = binding(&proof["capture_spec"])?;
     let s: Spec = serde_json::from_value(sealed(&sb)?)?;
     let (origin, h, a, f) = registered(&s)?;
-    if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA {
+    if UNIT==native266::UNIT && origin["schema"]==native266_recovery::SCHEMA {
         native266_recovery::successor(&a,text(proof,"capture_helper_sha256")?,false)?;
     } else { c::helper(&a, text(proof, "capture_helper_sha256")?, false)?; }
     ensure!(
@@ -371,7 +371,7 @@ pub(in crate::fleet) fn capture() -> Result<()> {
     let (b, actor) = publication203::parsed_args(epoch_name!("capture-native", "-terminal"))?;
     let s: Spec = serde_json::from_value(sealed(&b)?)?;
     let (origin,h,a,f)=registered(&s)?;
-    let recovered=EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA;
+    let recovered=UNIT==native266::UNIT && origin["schema"]==native266_recovery::SCHEMA;
     if recovered {native266_recovery::successor(&a,&actor,true)?;} else {c::helper(&a,&actor,true)?;}
     ensure!(
         a["boot_id"] == fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim(),

@@ -242,7 +242,7 @@ pub(super) fn claim(c: &PipelineClaim) -> Result<()> {
         "intent.json",
     )?;
     let v = sealed(b)?;
-    if EPOCH == 266 && v["schema"] == native266_recovery::SCHEMA {
+    if UNIT == native266::UNIT && v["schema"] == native266_recovery::SCHEMA {
         return native266_recovery::claim(c,&v);
     }
     let sb = binding(&v["capture_spec"])?;

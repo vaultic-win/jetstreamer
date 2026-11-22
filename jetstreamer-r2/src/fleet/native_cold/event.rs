@@ -33,7 +33,7 @@ pub(in crate::fleet) fn predecessor(
         .as_ref()
         .context("native bootstrap event binding")?;
     let o = owner(p)?.context("native bootstrap event needs registered ownership")?;
-    let running = event["schema"] == c::SCHEMA || EPOCH==266 && event["schema"]==native266_recovery::SCHEMA;
+    let running = event["schema"] == c::SCHEMA || UNIT==native266::UNIT && event["schema"]==native266_recovery::SCHEMA;
     let start = if running {
         ensure!(
             o.evidence.first() == Some(b),
@@ -67,7 +67,7 @@ pub(in crate::fleet) fn predecessor(
         "native bootstrap event substituted resource observer or prior fleet"
     );
     let old = prior(previous)?;
-    let direct = EPOCH==266 && !running && owner(&old)?.is_none() && sealed(&o.evidence[0])?["schema"] == native266_recovery::SCHEMA;
+    let direct = UNIT==native266::UNIT && !running && owner(&old)?.is_none() && sealed(&o.evidence[0])?["schema"] == native266_recovery::SCHEMA;
     if direct { ensure!(event["running_origin"]==private157::binding(&o.evidence[0]) && event["sampled_at_utc"]==sampled,"different directly recovered terminal"); }
     if running || direct {
         ensure!(
@@ -301,7 +301,7 @@ pub(in crate::fleet) fn census_check(
     let event = p.metadata_event.as_ref().map(bound_json).transpose()?;
     let origin = sealed(&owner.evidence[0])?;
     let initial = p.metadata_event.as_ref() == owner.evidence.first();
-    let direct = EPOCH==266 && self::owner(&prior(previous)?)?.is_none() && origin["schema"] == native266_recovery::SCHEMA
+    let direct = UNIT==native266::UNIT && self::owner(&prior(previous)?)?.is_none() && origin["schema"] == native266_recovery::SCHEMA
         && event.as_ref().is_some_and(|e|e["schema"]==terminal::SCHEMA && e["running_origin"]==private157::binding(&owner.evidence[0]));
     if !initial && !direct {
         ensure!(
@@ -316,7 +316,7 @@ pub(in crate::fleet) fn census_check(
             && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
             && observation["cadence"]["previous_sample_recorded_at_utc"] == previous["sampled_at_utc"];
         if !continuous {
-            ensure!(EPOCH == 266 && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
+            ensure!(UNIT == native266::UNIT && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
                 "native bootstrap observation chain interrupted");
             horizon_singleton211_launch::native266::validate_observer_predecessor(
                 &predecessor.path, &predecessor.sha256, &p.observer.path, observation,
@@ -333,7 +333,7 @@ pub(in crate::fleet) fn census_check(
                 == private157::binding(predecessor),
             "native bootstrap predecessor mismatch"
         );
-        if EPOCH==266 && origin["schema"]==native266_recovery::SCHEMA {
+        if UNIT==native266::UNIT && origin["schema"]==native266_recovery::SCHEMA {
             native266_recovery::peers(previous,current,c::UNIT)?;
         } else { native265_capture::peers(previous, current, c::UNIT)?; }
     }
