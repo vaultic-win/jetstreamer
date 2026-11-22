@@ -1,0 +1,101 @@
+#!/usr/bin/python3 -IB
+"""Price the failed V5e bootstrap and the two original 136 mirror inputs on one accepted audit generation."""
+import json
+import os
+from pathlib import Path
+import runpy
+import sys
+import time
+
+R = Path("/var/lib/jetstreamer/horizon_runtime_data")
+BASE = R / "incident-replay-fit-20261121-v1"
+NATIVE = BASE / "tools-v20-prestart"
+SEAL = "952f6e40c056d57d4541728a56a31b3058c2b55337dc96ed88d76903af86631a"
+V6 = R / "epoch136-joint-writer-20261122-v6/preflight-tools"
+V6_SEAL = "404c245db5060e54e24295cb54de1d60d5549f657fc288c2185c4c72612a8ee8"
+CADENCE = R / "prefix140-status-cadence-20261122-v1/cadence-tools"
+CADENCE_SEAL = "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e"
+ADAPTER = R / "epoch166-retry10-delivery-20261121-v1/capacity-tools-bounded/publication-fit"
+CLOSED = R / "ready-range-audit-20261121-v1/accepted/144-144.json"
+CLOSED_SHA = "4565e2da06301ac2cc738eaa060af1decb1a50949c9738bbaba02d29c8bccac2"
+
+
+def capture(path, digest):
+    # Start with the same root-owned sealed loader and the V6 mirror, prefix and host budget routines.
+    import hashlib
+    def pinned(p,sha):
+        if p.resolve(strict=True)!=p or p.stat().st_uid!=0 or p.stat().st_mode & 0o222 or hashlib.sha256(p.read_bytes()).hexdigest()!=sha:
+            raise ValueError("changed price input " + str(p))
+    pinned(V6/"incident_prestart.py","ccb02a582afaadaefdebf824a1105ca6b0eb434c782fefd9fd70d0b39278fdf1")
+    v6=runpy.run_path(str(V6/"incident_prestart.py"))
+    require=v6["require"]
+    require(os.geteuid()==0 and sys.flags.isolated and __debug__ and path.parent.parent==R and
+            path.name=="ROOT_COMPLETE_OPERATIONAL_FLEET.json","foreign caller or fleet")
+    for package,sha in ((V6,V6_SEAL),(CADENCE,CADENCE_SEAL),(NATIVE,SEAL)):
+        v6["check_package"](package,sha)
+    v6["pin"](ADAPTER,v6["ADAPTER_SHA"])
+    mirrors=runpy.run_path(str(V6/"price-mirrors"))
+    sys.path.insert(0,str(CADENCE))
+    from evidence import checked
+    from retired_public_audit import observe_public
+    from prefix140_storage import storage
+    ref=dict(path=str(path),sha256=digest)
+    fleet=checked(ref)
+    ready=fleet["active_ready_range_audit_obligation"]
+    historical=fleet["continuing_audit_obligation"]
+    recorded=checked(fleet["current_home_cycle_capacity"])
+    observation=checked(fleet["current_audit_progress"]["observation"])
+    terminal=dict(path=str(CLOSED),sha256=CLOSED_SHA)
+    receipt=checked(terminal)
+    require(ready["current_observation"]==fleet["current_audit_progress"]["observation"] and
+            ready["current_storage"]==recorded["audit_storage"] and historical["current_storage"]["pricing_basis_only"] and
+            historical["current_storage"]["included_in_current_aggregate"] is False and
+            historical["current_storage"]["remaining_DATA_growth_bytes"]==18<<30 and
+            receipt["schema"]=="horizon-ready-range-verified-v1" and receipt["range"]==[144,144] and
+            receipt["exit"]["success"] is True and terminal in observation["summary"]["accepted_ranges"],"fleet lacks the original 144 terminal")
+    def audit():
+        seen,paid,witness=observe_public(Path("/home/sol").stat().st_dev,historical)
+        workers=seen["active_ready_workers"]
+        require(witness==recorded["audit_owner_witness"] and witness["native"]["ActiveState"]=="active" and
+                workers==observation["active_ready_workers"] and all(x["range"]!=[144,144] for x in workers) and
+                terminal in seen["summary"]["accepted_ranges"] and paid["output_budget"]==ready["current_storage"]["output_budget"] and
+                paid["maximum_host_allocation_bytes"]==ready["maximum_output_allocation_bytes"]==256<<20,
+                "public audit owner, accepted ranges, workers or budget changed")
+        return witness,workers,paid
+    witness,workers,ready_before=audit()
+    prefix_before=storage()
+    adapter=runpy.run_path(str(ADAPTER))
+    native=json.loads(adapter["capture_provider"](NATIVE/"post-stop-fit",str(path),digest))
+    require(native["fits"] and native["epoch"]==145 and native["fleet"]==ref and
+            native["phase145"]["InvocationID"]=="a99ed8b51e8a482b805b8a36a11b2700" and
+            native["phase145"]["source_checkpoint_exists"] is False and
+            0<=time.time()-native["recorded_unix_seconds"]<120,"foreign terminal or native price")
+    last,last_workers,ready_after=audit()
+    prefix_after=storage()
+    require(last==witness and workers==last_workers,"public generation changed during price")
+    store=mirrors["STORE"];metadata=store.lstat()
+    require(store.resolve(strict=True)==store and store.is_dir() and metadata.st_uid==0 and
+            metadata.st_mode & 0o7777==0o700 and metadata.st_dev==Path("/home/sol").stat().st_dev,
+            "foreign 136 mirror directory")
+    disk=os.statvfs(store)
+    total=int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1])*1024
+    basis=v6["price"](native,native["zero_candidate_floor"],prefix_before,prefix_after,
+                      disk.f_bavail*disk.f_frsize,total)
+    inputs=[mirrors["inspect_input"](p,h,disk.f_frsize) for p,h in
+            ((mirrors["DOWNLOAD"],mirrors["DOWNLOAD_SHA"]),(path,digest))]
+    missing=sum(x["required_bytes"] for x in inputs)
+    floor=basis["complete_required_HOME_bytes"]+missing
+    return dict(schema="horizon-145-bootstrap-136-mirror-price-v1",fleet=ref,native=native,
+                provider=dict(path=str(NATIVE/"deployment-seal-receipt.json"),sha256=SEAL),basis=basis,
+                audit=witness,ready_workers=workers,ready_growth_before=ready_before,ready_growth_after=ready_after,
+                accepted144=terminal,prefix_before=prefix_before,prefix_after=prefix_after,
+                mirror_inputs=inputs,missing_mirror_bytes=missing,required_with_mirrors_bytes=floor,
+                available_HOME_bytes=basis["available_HOME_bytes"],remaining_after_mirrors_bytes=basis["available_HOME_bytes"]-floor,
+                mirrors_fit=basis["memory_fits"] and basis["available_HOME_bytes"]>=floor,
+                actual_mirror_writes=0,resource_credit_bytes=0,admission_granted=False)
+
+
+if __name__=="__main__":
+    result=capture(Path(sys.argv[1]),sys.argv[2])
+    print(json.dumps(result,sort_keys=True))
+    sys.exit(0 if result["mirrors_fit"] else 1)
