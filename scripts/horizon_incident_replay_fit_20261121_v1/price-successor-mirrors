@@ -1,0 +1,208 @@
+#!/usr/bin/python3 -IB
+"""Price an observed same-image V5f successor, including both missing mirror inputs."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import sys
+import time
+
+
+BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
+FIT = BASE / "incident-replay-fit-20261121-v1"
+SEM = BASE / "epoch145-semantic-continuity-20261121-v1"
+STATE = BASE / "epoch145-guarded-export-20261121-v1/state"
+OLD = FIT / "tools-v20-mirror-retry/price-mirrors"
+if hashlib.sha256(OLD.read_bytes()).hexdigest() != "9a25fd06ca505ece49b1f75ff91fa3e56d7a95a340985382601d4b7252d0f723":
+    raise ValueError("changed original price reader")
+original = runpy.run_path(str(OLD))
+need, checked = original["need"], original["checked"]
+UNIT, GROUP = original["UNIT"], original["CGROUP"]
+NATIVE, IMAGE = original["NATIVE"], original["IMAGE"]
+IMAGE_SHA, SEAL = original["IMAGE_SHA"], original["V20_SEAL"]
+IID_PATTERN = re.compile(r"[0-9a-f]{32}")
+
+
+def read(ref, path, mode):
+    need(ref["path"] == str(path), "misrouted receipt " + str(path))
+    return json.loads(checked(path, ref["sha256"], mode))
+
+
+def price_context(fleet, ref):
+    path = Path(ref["path"])
+    name = re.fullmatch(r"(V5F_RETRY[1-9][0-9]*)_ACTUAL_ADVANCING_WORKER\.json", path.name)
+    need(path.parent == SEM and name, "unregistered successor worker receipt")
+    prefix = name.group(1)
+    worker = read(ref, path, 0o400)
+    manager = read(worker["manager"], SEM / (prefix + "_ACTUAL_MANAGER.json"), 0o400)
+    intent = read(manager["intent"], SEM / (prefix + "_START_INTENT.json"), 0o400)
+    iid, old = worker["invocation_id"], intent["old"]
+    need(IID_PATTERN.fullmatch(iid) and IID_PATTERN.fullmatch(old) and old != iid,
+         "invalid or reused verifier invocation")
+    initial = read(worker["start"], STATE / iid / "recovery-started.json", 0o600)
+    failure = read(intent["failure"], STATE / old / "failed.json", 0o600)
+    admitted = read(intent["fit"], Path(intent["fit"]["path"]), 0o400)
+    priced = read(intent["mirrors"], Path(intent["mirrors"]["path"]), 0o400)
+    seal = read(intent["semantic_provider"], NATIVE.parent / "deployment-seal-receipt.json", 0o444)
+    need(seal["destination"] == str(NATIVE.parent) and intent["semantic_provider"]["sha256"] == SEAL and
+         initial["fresh_fit"]["provider_seal"] == intent["semantic_provider"], "foreign native provider")
+    verifier = read(intent["verifier"], IMAGE.parent / "deployment-seal-receipt.json", 0o444)
+    need(verifier["destination"] == str(IMAGE.parent) and
+         any(m["name"] == "export145" and m["sha256"] == IMAGE_SHA for m in verifier["members"]),
+         "unbound semantic verifier")
+    checked(IMAGE, IMAGE_SHA, 0o555)
+    need(manager["new"]["InvocationID"] == iid == initial["iid"] and initial["image"] == IMAGE_SHA and
+         manager["new"]["Id"] == UNIT and manager["new"]["ActiveState"] == "active" and
+         initial["r2_mutations"] is False and initial["prior_frozen_recovery"]["failed_qualification_census"]
+         ["current_boot_failure"]["failure"]["sha256"] == "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43" and
+         failure["iid"] == old == admitted["phase145"]["InvocationID"] == intent["state"]["InvocationID"] and
+         intent["failure"] == admitted["phase145"]["failure"] and admitted["fits"] and
+         priced["native"] == admitted and priced["mirrors_fit"] and priced["provider"] == intent["provider"] and
+         intent["fleet"] == admitted["fleet"] and intent["boot"] == original["BOOT"] and
+         intent["resource_credit_bytes"] == worker["resource_credit_bytes"] == 0, "crossed same-image recovery")
+    a, b = worker["observations"]
+    owner = {k:b[k] for k in ("parent_pid","child_pid","parent_ticks","child_ticks")}
+    need(all(a[k] == v and type(v) is int and v > 1 for k,v in owner.items()) and
+         b["parent_pid"] != b["child_pid"] and manager["parent_pid"] == int(manager["new"]["MainPID"]) ==
+         b["parent_pid"] and manager["parent_start_ticks"] == b["parent_ticks"] and
+         a["monotonic_ns"] < b["monotonic_ns"] and a["source_offset"] < b["source_offset"] and
+         all(r["cgroup"] == "/sys/fs/cgroup" + GROUP and r["source_inode"] == 100214450 and
+             set(map(int,r["native_members"])) == {b["parent_pid"],b["child_pid"]} for r in (a,b)),
+         "changed, unmoving or crossed original process tuple")
+    return dict(owner, iid=iid, fleet=intent["fleet"], ref=ref, manager_ref=worker["manager"],
+                active_fleet=fleet, start=worker["start"], intent=manager["intent"])
+
+
+def checked_owners(ctx):
+    pid, child, iid = ctx["parent_pid"], ctx["child_pid"], ctx["iid"]
+    wanted = dict(Id=UNIT,MainPID=str(pid),InvocationID=iid,ControlGroup=GROUP,LoadState="loaded",
+                  ActiveState="active",SubState="running",ControlPID="0",NRestarts="0",Job="",
+                  CPUQuotaPerSecUSec="1s",MemoryMax=str(2<<30),MemorySwapMax="0")
+    raw = subprocess.check_output(["systemctl","show",UNIT,"-p",",".join(wanted)],text=True,timeout=8)
+    need(dict(line.split("=",1) for line in raw.splitlines()) == wanted and
+         Path("/proc/sys/kernel/random/boot_id").read_text().strip().replace("-","") == original["BOOT"],
+         "different current native manager")
+    fleet = ctx["fleet"]
+    for p,pp,ticks,args in ((pid,1,ctx["parent_ticks"],[str(IMAGE),"recover-full-output",fleet["path"],
+                                                        fleet["sha256"],IMAGE_SHA]),
+                            (child,pid,ctx["child_ticks"],[str(IMAGE),"recover-worker",str(pid),IMAGE_SHA])):
+        need(original["proc_info"](p) == (pp,ticks,args,"0::"+GROUP) and Path(f"/proc/{p}/exe").samefile(IMAGE),
+             "different native owner or child")
+
+
+def witness(ctx):
+    parent, child = ctx["parent_pid"], ctx["child_pid"]
+    extra = set(map(int,Path(f"/proc/{parent}/task/{parent}/children").read_text().split())) - {child}
+    if not extra:
+        return None
+    need(len(extra) == 1, "multiple direct verifier children")
+    pid = extra.pop()
+    try:
+        fd = os.pidfd_open(pid)
+    except ProcessLookupError:
+        return None
+    try:
+        pp, ticks, args, cg = original["proc_info"](pid)
+        fleet = ctx["active_fleet"]
+        need(pp == parent and ticks > 0 and cg == "0::"+GROUP and
+             args == ["/usr/bin/python3","-IB",str(NATIVE),"145",fleet["path"],fleet["sha256"]] and
+             Path(f"/proc/{pid}/exe").samefile("/usr/bin/python3") and pid in original["members"](),
+             "different direct capacity check")
+        return pid,ticks,fd
+    except (ProcessLookupError,FileNotFoundError):
+        os.close(fd)
+        return None
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def window(ctx, deadline):
+    checked_owners(ctx)
+    wanted = {ctx["parent_pid"],ctx["child_pid"]}
+    if original["members"]() != wanted:
+        seen = witness(ctx)
+        if seen:
+            try:
+                original["drain"](seen,deadline)
+            finally:
+                os.close(seen[2])
+        checked_owners(ctx)
+        need(original["members"]() == wanted, "foreign remaining verifier cgroup member")
+
+
+class Crossing(Exception):
+    pass
+
+
+def accepted_overlap(code, out, err, seen):
+    lines = err.rstrip().splitlines()
+    return (code == 1 and not out and seen is not None and
+            lines[-1:] == [b"ValueError: foreign 145 descendants"] and
+            any(('File "'+str(IMAGE.parent / "incident-phase.py")+'"').encode() in line and
+                b", in inspect" in line for line in lines) and
+            any(('File "'+str(NATIVE)+'"').encode() in line and b", in phase145" in line for line in lines))
+
+
+def observe(ctx, deadline, discarded, provider, path, digest):
+    need(provider == NATIVE and ctx["active_fleet"] == {"path":path,"sha256":digest}, "foreign native command")
+    seen = None
+    try:
+        with subprocess.Popen([provider,"145",path,digest],stdout=subprocess.PIPE,stderr=subprocess.PIPE) as proc:
+            try:
+                while True:
+                    need(time.monotonic() < deadline, "active mirror deadline elapsed")
+                    try:
+                        out, err = proc.communicate(timeout=.25)
+                        break
+                    except subprocess.TimeoutExpired:
+                        if seen is None:
+                            seen = witness(ctx)
+            except BaseException:
+                proc.kill()
+                raise
+        if accepted_overlap(proc.returncode,out,err,seen):
+            original["drain"](seen,deadline)
+            discarded.append(dict(pid=seen[0],ticks=seen[1],stderr_sha256=hashlib.sha256(err).hexdigest()))
+            raise Crossing()
+        need(proc.returncode == 0, "native verifier price failed " + err.decode(errors="replace")[-2300:])
+        return out
+    finally:
+        if seen:
+            os.close(seen[2])
+
+
+def capture(fleet, ref):
+    ctx = price_context(fleet,ref)
+    head = original["head_reader"]()
+    mirrors = runpy.run_path(str(Path(__file__).resolve().with_name("price_recovery_mirrors.py")))
+    deadline, discarded = time.monotonic()+240, []
+    for _ in range(3):
+        need(head() == fleet,"fleet superseded before whole price")
+        window(ctx,deadline)
+        try:
+            price = mirrors["capture"](Path(fleet["path"]),fleet["sha256"],SEAL,successor=ref,
+                capture_native=lambda *args: observe(ctx,deadline,discarded,*args))
+        except Crossing:
+            continue
+        window(ctx,deadline)
+        phase = price["native"]["phase145"]
+        need(price_context(fleet,ref) == ctx and head() == fleet and
+             0 <= time.time()-price["native"]["recorded_unix_seconds"] < 120 and price["native"]["fits"] and
+             phase["invocation_id"] == ctx["iid"] and phase["window"]["recovery"] == ctx["start"] and
+             phase["window"]["native_parent"] == dict(pid=ctx["parent_pid"],start_ticks=ctx["parent_ticks"]) and
+             phase["window"]["native_child"] == dict(pid=ctx["child_pid"],start_ticks=ctx["child_ticks"]),
+             "owner, semantic phase or current fleet crossed the complete price")
+        return dict(price,successor=ctx,discarded_native_overlaps=discarded)
+    raise ValueError("three whole prices crossed a genuine native self-check")
+
+
+if __name__ == "__main__":
+    need(len(sys.argv)==5 and os.geteuid()==0 and sys.flags.isolated and __debug__,
+         "price-mirrors FLEET FLEET_SHA WORKER WORKER_SHA")
+    result=capture(dict(path=sys.argv[1],sha256=sys.argv[2]),dict(path=sys.argv[3],sha256=sys.argv[4]))
+    print(json.dumps(result,sort_keys=True))
+    sys.exit(0 if result["mirrors_fit"] else 1)

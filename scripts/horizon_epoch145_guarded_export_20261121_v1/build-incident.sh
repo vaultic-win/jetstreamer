@@ -16,6 +16,11 @@ registered=false
 fixture_recovery=false
 fixture_post=false
 registered_v7b=false
+registered_v7c=false
+if [[ $flavor == fixture-post-v7c ]]; then
+  registered_v7c=true
+  flavor=fixture-post
+fi
 if [[ $flavor == fixture-post-v7b ]]; then
   registered_v7b=true
   flavor=fixture-post
@@ -67,6 +72,7 @@ if $fixture_recovery; then
   fixture+=(incident145::authenticates_the_failed_fixture_census_and_frozen_inode)
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
+if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
 q=/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/incident-build-$INVOCATION_ID
@@ -151,7 +157,18 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
       quote=${6:?expected full mirror price executable}
       quote_digest=${7:?expected qualification hash for mirror price}
       [[ $(realpath -e -- "$quote") == "$quote" ]]
-      if [[ $native_package == tools-v20 ]]; then
+      quote_mode=444
+      quote_args=("$1" "$fleet_sha")
+      if $registered_v7c; then
+        [[ $native_package == tools-v20 ]]
+        wrapper=${provider%/*/*}/tools-v22-active-mirrors
+        [[ $quote == "$wrapper/price-mirrors" && $quote_digest == a4d32f83e4d5ddf857fa0d0770690bafd765b05893fe7621b71586f16072d0d2 ]]
+        [[ $(sha256sum "$wrapper/deployment-seal-receipt.json" | cut -d' ' -f1) == 5085510c3899e1cb82846c99ad6f4bb05ee43ba6a54a23b5743b5f75942fe411 ]]
+        quote_mode=555
+        worker=${q%/*}/V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json
+        quote_args+=("$worker" 1b16ce2d061e2ec97ab8c1ba81cd2dbcff9d0a759f317fbaf53b64e731a19501)
+      elif [[ $native_package == tools-v20 ]]; then
+        quote_args+=("$seal_digest")
         [[ $quote == "${provider%/*}/price_recovery_mirrors.py" ]]
         jq -e --arg hash "$quote_digest" '
           [.members[] | select(.name == "price_recovery_mirrors.py" and .mode == "0444" and .sha256 == $hash)] | length == 1
@@ -159,10 +176,8 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
       else
         [[ $quote == "${provider%/*/*}/PRICE_V20_PRESTART_MIRRORS.py" ]]
       fi
-      [[ $(stat -c '%u %g %a %h' -- "$quote") == '0 0 444 1' && $quote_digest =~ ^[a-f0-9]{64}$ ]]
+      [[ $(stat -c '%u %g %a %h' -- "$quote") == "0 0 $quote_mode 1" && $quote_digest =~ ^[a-f0-9]{64}$ ]]
       [[ $(sha256sum -- "$quote" | cut -d' ' -f1) == "$quote_digest" ]]
-      quote_args=("$1" "$fleet_sha")
-      if [[ $native_package == tools-v20 ]]; then quote_args+=("$seal_digest"); fi
       if /usr/bin/python3 -IB "$quote" "${quote_args[@]}" > "$q/mirrors-$probe.json" 2> "$q/fit-$probe.stderr"; then
         jq -e --arg seal "$seal_digest" --arg path "${provider%/*}/deployment-seal-receipt.json" '
            .mirrors_fit and .admission_granted == false and .resource_credit_bytes == 0
@@ -253,6 +268,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $registered; then phase_package=tools-v12; fi
   if $fixture_post; then phase_package=tools-v13; fi
   if $registered_v7b; then phase_package=tools-v13b; fi
+  if $registered_v7c; then phase_package=tools-v13c; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"

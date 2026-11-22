@@ -10,7 +10,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-FIXTURE_SUCCESSOR = VERSION in ("tools-v13", "tools-v13b")
+SAME_IMAGE_RETRY = VERSION == "tools-v13c"
+FIXTURE_SUCCESSOR = SAME_IMAGE_RETRY or VERSION in ("tools-v13", "tools-v13b")
 TIMER_SUCCESSOR = FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
 TIMEOUT_SUCCESSOR = TIMER_SUCCESSOR or VERSION in ("tools-v8", "tools-v9", "tools-v10")
 if TIMEOUT_SUCCESSOR:
@@ -44,7 +45,11 @@ if RETRIED_SEMANTIC:
 
 if TIMER_SUCCESSOR:
     PIPE = Path("/usr/local/lib/jetstreamer/horizon-r2-audit-readers-20261118-v1/fast-range-residency-0f29fd116ef5/horizon_pipeline")
-    ADVANCING_NAME = "V5F_ACTUAL_ADVANCING_WORKER.json" if FIXTURE_SUCCESSOR else "V5E_ACTUAL_ADVANCING_WORKER.json"
+    if FIXTURE_SUCCESSOR:
+        SEMANTIC_PREFIX = "V5F_RETRY1" if SAME_IMAGE_RETRY else "V5F"
+        ADVANCING_NAME = SEMANTIC_PREFIX + "_ACTUAL_ADVANCING_WORKER.json"
+    else:
+        ADVANCING_NAME = "V5E_ACTUAL_ADVANCING_WORKER.json"
 
 
 def argv(pid):
@@ -90,16 +95,28 @@ def fixture_semantic(s, build):
                    "sha256": "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43"}
     old_start = {"path": str(STATE / failed / "recovery-started.json"),
                  "sha256": "6e06652ea695717b18fc29b955e463da8dc2dde16f8173da552df707c478e624"}
-    advancing = s.bound(build["prior_phase"], PKG.parent / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    advancing = s.bound(build["prior_phase"], PKG.parent / ADVANCING_NAME)
     new = advancing["invocation_id"]
-    manager = s.bound(advancing["manager"], PKG.parent / "V5F_ACTUAL_MANAGER.json")
-    intent = s.bound(manager["intent"], PKG.parent / "V5F_START_INTENT.json")
-    s.need(s.iid(new) and new != failed and manager["new"]["Id"] == UNIT
-           and manager["new"]["InvocationID"] == new and intent["old"] == failed
+    manager = s.bound(advancing["manager"], PKG.parent / (SEMANTIC_PREFIX + "_ACTUAL_MANAGER.json"))
+    intent = s.bound(manager["intent"], PKG.parent / (SEMANTIC_PREFIX + "_START_INTENT.json"))
+    predecessor, failure, recovery = failed, old_failure, old_start
+    if SAME_IMAGE_RETRY:
+        predecessor = "50af3d8ab5da47e8bdc2828feab53908"
+        failure = {"path": str(STATE / predecessor / "failed.json"),
+                   "sha256": "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd"}
+        recovery = {"path": str(STATE / predecessor / "recovery-started.json"),
+                    "sha256": "3dd15e821b9972e3f7f69f787d585bbe86fd9898ec1df5e8e5d08cab14231bb8"}
+        s.need(build["retry_failure"] == failure and build["retry_start"] == recovery
+               and intent["previous_advancement"] == {
+                   "path": str(PKG.parent / "V5F_ACTUAL_ADVANCING_WORKER.json"),
+                   "sha256": "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496"},
+               "different V5F same-image retry predecessor")
+    s.need(s.iid(new) and new not in (failed, predecessor) and manager["new"]["Id"] == UNIT
+           and manager["new"]["InvocationID"] == new and intent["old"] == predecessor
            and intent["schema"] == "horizon-145-retry-after-fixture-census-intent-v1"
            and build["semantic_manager"] == advancing["manager"] and build["semantic_intent"] == manager["intent"]
-           and build["old_failure"] == intent["failure"] == old_failure
-           and build["old_start"] == intent["recovery"] == old_start
+           and build["old_failure"] == old_failure and intent["failure"] == failure
+           and build["old_start"] == old_start and intent["recovery"] == recovery
            and build["semantic_start"] == advancing["start"], "different V5F recovery")
     start = s.bound(advancing["start"], STATE / new / "recovery-started.json")
     prior = start["prior_frozen_recovery"]["failed_qualification_census"]

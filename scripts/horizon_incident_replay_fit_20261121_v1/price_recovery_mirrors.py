@@ -20,7 +20,7 @@ CLOSED = R / "ready-range-audit-20261121-v1/accepted/144-144.json"
 CLOSED_SHA = "4565e2da06301ac2cc738eaa060af1decb1a50949c9738bbaba02d29c8bccac2"
 
 
-def capture(path, digest, active_seal=None):
+def capture(path, digest, active_seal=None, *, successor=None, capture_native=None):
     # Start with the same root-owned sealed loader and the V6 mirror, prefix and host budget routines.
     import hashlib
     def pinned(p,sha):
@@ -37,6 +37,10 @@ def capture(path, digest, active_seal=None):
     if guard_terminal:
         require(isinstance(active_seal,str) and len(active_seal)==64, "V22 bootstrap requires its sealed package")
         native_package = Path(__file__).resolve().parent
+    elif successor is not None:
+        require(Path(__file__).resolve().parent == BASE / "tools-v22-active-mirrors" and
+                active_seal == "87dae932c9b4b0773db56fcd04a1b882ac2b2db2c2b63428b7cb09bf306f546d" and
+                callable(capture_native), "unbound successor mirror price")
     elif active_seal is not None:
         require(Path(__file__).resolve().parent == native_package and len(active_seal) == 64,
                 "active mirror price requires the original V20 package and seal")
@@ -74,7 +78,8 @@ def capture(path, digest, active_seal=None):
     witness,workers,ready_before=audit()
     prefix_before=storage()
     adapter=runpy.run_path(str(ADAPTER))
-    native=json.loads(adapter["capture_provider"](native_package/"post-stop-fit",str(path),digest))
+    observe = capture_native if successor is not None else adapter["capture_provider"]
+    native=json.loads(observe(native_package/"post-stop-fit",str(path),digest))
     phase = native["phase145"]
     if guard_terminal:
         require(phase["InvocationID"] == "50af3d8ab5da47e8bdc2828feab53908" and
@@ -91,7 +96,7 @@ def capture(path, digest, active_seal=None):
     else:
         from evidence import bound
         progress = R / "epoch145-semantic-continuity-20261121-v1/V5F_ACTUAL_ADVANCING_WORKER.json"
-        semantic_worker = bound(progress)
+        semantic_worker = successor if successor is not None else bound(progress)
         worker = checked(semantic_worker)
         generation = phase["invocation_id"]
         start = checked(worker["start"])

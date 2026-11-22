@@ -28,14 +28,39 @@ def bound(row, path):
     return row
 
 
-def semantic(plan, read, read_start):
-    ref = bound(plan["holding145_semantic_worker"], FAMILY / "V5F_ACTUAL_ADVANCING_WORKER.json")
+RETRY_WRITER = RUNTIME / "epoch136-joint-writer-20261122-v7c"
+RETRY_DISPATCH = RUNTIME / "epoch145-fixture-retry1-dispatch-20261122-v1"
+RETRY_POST = FAMILY / "tools-v13c"
+RETRY_PROVIDER = RUNTIME / "incident-replay-fit-20261121-v1/tools-v23"
+PREVIOUS = "50af3d8ab5da47e8bdc2828feab53908"
+RETRY_WORKER_SHA = "1b16ce2d061e2ec97ab8c1ba81cd2dbcff9d0a759f317fbaf53b64e731a19501"
+
+
+def retry_lineage(ref, manager, read, read_state):
+    need(ref["sha256"] == RETRY_WORKER_SHA, "unexpected retry worker packet")
+    intent = read(bound(manager["intent"], FAMILY / "V5F_RETRY1_START_INTENT.json"))
+    failure = bound(intent["failure"], STATE / PREVIOUS / "failed.json")
+    recovery = bound(intent["recovery"], STATE / PREVIOUS / "recovery-started.json")
+    preceding = bound(intent["previous_advancement"], FAMILY / "V5F_ACTUAL_ADVANCING_WORKER.json")
+    need(intent["old"] == PREVIOUS and intent["resource_credit_bytes"] == 0
+         and failure["sha256"] == "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd"
+         and preceding["sha256"] == "a2a888054492a2be68c5e332ae36daa070b9688c143005cbc97e5cace7cfd496"
+         and read_state(failure)["iid"] == PREVIOUS and read(preceding)["start"] == recovery
+         and read_state(recovery)["iid"] == PREVIOUS, "retry did not follow the original failed V5F")
+
+
+def semantic(plan, read, read_start, *, retry=False):
+    generation = "V5F_RETRY1" if retry else "V5F"
+    ref = bound(plan["holding145_semantic_worker"], FAMILY / f"{generation}_ACTUAL_ADVANCING_WORKER.json")
     worker = read(ref)
     iid = worker["invocation_id"]
     need(re.fullmatch("[0-9a-f]{32}", iid) and iid not in (OLD, "0"*32),
          "wrong fixture semantic invocation")
     start = read_start(bound(worker["start"], STATE / iid / "recovery-started.json"))
-    manager = read(bound(worker["manager"], FAMILY / "V5F_ACTUAL_MANAGER.json"))
+    manager = read(bound(worker["manager"], FAMILY / f"{generation}_ACTUAL_MANAGER.json"))
+    if retry:
+        retry_lineage(ref, manager, read, read_start)
+        need(iid != PREVIOUS, "retry still identifies failed V5F")
     samples = worker["observations"]
     need(start["iid"] == manager["new"]["InvocationID"] == iid and manager["new"]["Id"] == UNIT
          and start["r2_mutations"] is False and
@@ -63,39 +88,42 @@ def sealed(package, seal_ref, members, read, pin):
         pin(package / name, binding["sha256"])
 
 
-def completion_tools(plan, read, pin, runpy):
+def completion_tools(plan, read, pin, runpy, *, retry=False):
+    package = RETRY_POST if retry else V13
     completion = plan["holding145_completion"]
-    sealed(V13, completion["seal"], [("build-proof.json", completion["build"], "0444"),
+    sealed(package, completion["seal"], [("build-proof.json", completion["build"], "0444"),
                                     ("incident-post-phase.py", completion["adapter"], "0444")], read, pin)
     build = read(completion["build"])
     need(build["prior_phase"] == plan["holding145_semantic_worker"], "V13 selects an older semantic worker")
-    return build, runpy.run_path(str(V13 / "incident-post-phase.py"))
+    return build, runpy.run_path(str(package / "incident-post-phase.py"))
 
 
-def ordinary_phase(plan, phase, read, pin, runpy, observer):
-    iid = semantic(plan, read, read)
+def ordinary_phase(plan, phase, read, pin, runpy, observer, *, retry=False):
+    iid = semantic(plan, read, read, retry=retry)
     if "stage" in phase:
         need(phase["stage"] == "leased-worker" and phase["invocation_id"] == iid,
              "ordinary price uses another semantic worker")
         return
     need(phase.get("ActiveState") == "inactive" and phase.get("SubState") == "dead" and phase.get("MainPID") == "0",
          "ordinary price uses a failed or changing semantic worker")
-    build, verifier = completion_tools(plan, read, pin, runpy)
+    build, verifier = completion_tools(plan, read, pin, runpy, retry=retry)
     done, extraction = verifier["completion"](observer, build)
     bound(done, STATE / iid / "complete.json")
     need(extraction["epoch"] == 145, "unexpected semantic completion")
 
 
-def prepare(planref, plan, readyref, ready, read, read_start, pin, fixture_provider, runpy):
-    bound(planref, V7 / "registered-production-plan.json")
-    bound(readyref, DISPATCH / "READY.json")
-    iid = semantic(plan, read, read_start)
+def prepare(planref, plan, readyref, ready, read, read_start, pin, fixture_provider, runpy, *, retry=False):
+    writer = RETRY_WRITER if retry else V7
+    dispatcher = RETRY_DISPATCH if retry else DISPATCH
+    bound(planref, writer / "registered-production-plan.json")
+    bound(readyref, dispatcher / "READY.json")
+    iid = semantic(plan, read, read_start, retry=retry)
     need(ready["schema"] == "horizon-145-136-prestart-selector-ready-v1" and
          ready["original_semantic_invocation"] == iid and ready["operation_lock"] == ORIGINAL_LOCK,
          "different original lock or selector generation")
     inspector = ready["boundary_inspector"]
-    package = DISPATCH / "tools"
+    package = dispatcher / "tools"
     sealed(package, ready["deployment"], [("boundary-inspector", inspector, "0555")], read, pin)
-    provider = fixture_provider(ready["registered_provider"], V21)
-    build, verifier = completion_tools(plan, read, pin, runpy)
+    provider = fixture_provider(ready["registered_provider"], RETRY_PROVIDER if retry else V21)
+    build, verifier = completion_tools(plan, read, pin, runpy, retry=retry)
     return iid, runpy.run_path(str(provider)), build, verifier

@@ -91,6 +91,14 @@ another lane:
 - I/O pressure, major faults, memory pressure, and any current verifier, uploader, or snapshot
   activity that materially contends with replay.
 
+When testing a guard alongside a live verifier, check the verifier's service-name
+and process selectors before starting the fixture. The Anza verifier inventories
+every active `horizon-qualify-*` service across all slices. A disposable sleep
+holder with that prefix stopped epoch 145 verification. Use a distinct fixture
+name when it exercises the same guard behavior. If the guard requires the
+production prefix, run that case under an isolated systemd manager or after
+the verifier finishes.
+
 On a busy host, a global systemd reload can block read-only manager queries long enough
 to terminate a guarded verifier. On dev-samjohnson, an eight-second `systemctl show`
 timed out during watcher installation and epoch 145 lost its in-memory verification progress.
