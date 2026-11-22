@@ -441,7 +441,13 @@ pub(super) fn inspect(
             })
             .arg(serde_json::to_string(&plan["joint_fit_145"])?)
             .arg(serde_json::to_string(&fence)?)
-            .args(cfg!(feature = "fixture-semantic").then_some("fixture-semantic"))
+            .args(cfg!(feature = "fixture-semantic").then_some(
+                if cfg!(feature = "retry-semantic") {
+                    "retry-semantic"
+                } else {
+                    "fixture-semantic"
+                },
+            ))
             .stdin(Stdio::null())
             .output()
             .context("capture epoch 136 incident prestart")?;

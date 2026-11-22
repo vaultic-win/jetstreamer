@@ -20,6 +20,7 @@ ADAPTER_SHA = "729ceda384e4def082967e24758f2e58f18f2d068ad41bae5358cf9cb60b5fb0"
 CAP = 72 << 30
 V20 = ROOT / "incident-replay-fit-20261121-v1/tools-v20"
 V7 = ROOT / "epoch136-joint-writer-20261122-v7b"
+RETRY_WRITER = ROOT / "epoch136-joint-writer-20261122-v7c"
 SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
 
@@ -111,7 +112,9 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
                 unfenced_with_candidate_cpu_micros=68_250_000, new_resource_credit_bytes=0)
 
 
-def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False):
+def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, retry=False):
+    require(not retry or fixture, "invalid worker profile")
+    writer = RETRY_WRITER if retry else V7
     require(mode in ("preflight", "session"), "unknown writer mode")
     expected = dict(image=dict(path=str(NATIVE / "post-stop-fit"), sha256=PRICE),
                     seal=dict(path=str(NATIVE / "deployment-seal-receipt.json"), sha256=NATIVE_SEAL))
@@ -168,25 +171,25 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False):
         require(package.parent.parent == ROOT and package.name == "controller"
                 and (package / "admit136").samefile(proc / "exe"), "wrong writer deployment")
         from private136 import observation
-        require(not fixture or package == V7 / "controller", "different V7 writer")
+        require(not fixture or package == writer / "controller", "different V7 writer")
         session = runpy.run_path(str(package / "prestart_session.py"))
-        context = {"fixture_provider": fixture_provider} if fixture else {}
+        context = {"fixture_provider": fixture_provider, "retry": retry} if fixture else {}
         native = session["capture_context"](ref, fence, waiter, **context, pin=pin, checked=checked,
                                             runpy=runpy, json=json, observation=observation)
     require(native["fleet"] == ref and native["schema"] == "horizon-incident-replay-fit-v1"
             and 0 <= time.time() - native["recorded_unix_seconds"] < 120, "wrong native price")
     module = runpy.run_path(str(directory / "post-stop-fit"))
     if fixture and mode == "preflight":
-        prospective = json.loads(immutable_bytes(V7 / "production-plan.json"))
+        prospective = json.loads(immutable_bytes(writer / "production-plan.json"))
         require(prospective["joint_fit_145"] == expected, "prospective native provider changed")
-        controller = V7 / "controller"
+        controller = writer / "controller"
         binding = prospective["controller_deployment"]
         require(binding["path"] == str(controller / "deployment-seal-receipt.json"), "wrong fixture controller")
         deployment = check_package(controller, binding["sha256"])
         member = [r for r in deployment["members"] if r["name"] == "fixture_boundary.py"]
         require(len(member) == 1 and member[0]["mode"] == "0444", "missing fixture semantic reader")
         fixture_module = runpy.run_path(str(controller / "fixture_boundary.py"))
-        fixture_module["ordinary_phase"](prospective, native["phase145"], checked, pin, runpy, module["s"])
+        fixture_module["ordinary_phase"](prospective, native["phase145"], checked, pin, runpy, module["s"], retry=retry)
     floor, _, _ = module["disk_budget"](native["original_aggregate_HOME_bytes"], dict(remaining=0),
         native["bookings"], 145, native["survivors"], native["replacements"], native["active168_guard_floor"],
         native["closed_prestart_remaining"])
@@ -210,4 +213,5 @@ if __name__ == "__main__":
     print(json.dumps(inspect(Path(sys.argv[1]), sys.argv[2], json.loads(sys.argv[3]),
                              sys.argv[4], json.loads(sys.argv[5]),
                              json.loads(sys.argv[6]) if len(sys.argv) >= 7 else None,
-                             fixture=sys.argv[7:] == ["fixture-semantic"]), sort_keys=True))
+                             fixture=sys.argv[7:] in (["fixture-semantic"], ["retry-semantic"]),
+                             retry=sys.argv[7:] == ["retry-semantic"]), sort_keys=True))

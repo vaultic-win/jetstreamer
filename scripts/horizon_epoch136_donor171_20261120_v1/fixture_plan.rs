@@ -8,6 +8,22 @@ const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const FAMILY: &str = "epoch145-semantic-continuity-20261121-v1";
 const PRICE: &str = "incident-replay-fit-20261121-v1/tools-v20";
 
+#[cfg(feature = "retry-semantic")]
+mod profile {
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7c/controller";
+    pub const DISPATCHER: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
+    pub const WORKER: &str = "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json";
+    pub const POST: &str = "tools-v13c";
+}
+#[cfg(not(feature = "retry-semantic"))]
+mod profile {
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7b/controller";
+    pub const DISPATCHER: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
+    pub const WORKER: &str = "V5F_ACTUAL_ADVANCING_WORKER.json";
+    pub const POST: &str = "tools-v13b";
+}
+use profile::*;
+
 fn reference(row: &Value, directory: &str, name: &str) -> Result<()> {
     let path = Path::new(RUNTIME).join(directory).join(name);
     ensure!(
@@ -25,7 +41,7 @@ fn reference(row: &Value, directory: &str, name: &str) -> Result<()> {
 pub fn validate(plan: &Value) -> Result<()> {
     reference(
         &plan["controller_deployment"],
-        "epoch136-joint-writer-20261122-v7b/controller",
+        CONTROLLER,
         "deployment-seal-receipt.json",
     )?;
     reference(&plan["joint_fit_145"]["image"], PRICE, "post-stop-fit")?;
@@ -34,11 +50,7 @@ pub fn validate(plan: &Value) -> Result<()> {
         PRICE,
         "deployment-seal-receipt.json",
     )?;
-    reference(
-        &plan["holding145_semantic_worker"],
-        FAMILY,
-        "V5F_ACTUAL_ADVANCING_WORKER.json",
-    )?;
+    reference(&plan["holding145_semantic_worker"], FAMILY, WORKER)?;
     for (key, name) in [
         ("seal", "deployment-seal-receipt.json"),
         ("build", "build-proof.json"),
@@ -47,15 +59,11 @@ pub fn validate(plan: &Value) -> Result<()> {
         reference(
             &plan["holding145_completion"][key],
             FAMILY,
-            &format!("tools-v13b/{name}"),
+            &format!("{POST}/{name}"),
         )?;
     }
     if let Some(selector) = plan.get("holding145_prestart_ready") {
-        reference(
-            selector,
-            "epoch145-fixture-phase-dispatch-20261122-v1",
-            "READY.json",
-        )?;
+        reference(selector, DISPATCHER, "READY.json")?;
     }
     Ok(())
 }
@@ -68,18 +76,17 @@ mod tests {
     #[test]
     fn only_the_selected_fixture_generation_can_pass_registration_inspection() {
         let key = |s: &str| json!({"path":format!("{RUNTIME}/{s}"),"sha256":"c".repeat(64)});
-        let post = |s: &str| key(&format!("{FAMILY}/tools-v13b/{s}"));
+        let post = |s: &str| key(&format!("{FAMILY}/{POST}/{s}"));
         let mut plan = json!({
-            "controller_deployment":key("epoch136-joint-writer-20261122-v7b/controller/deployment-seal-receipt.json"),
+            "controller_deployment":key(&format!("{CONTROLLER}/deployment-seal-receipt.json")),
             "joint_fit_145":{"image":key(&format!("{PRICE}/post-stop-fit")),
                              "seal":key(&format!("{PRICE}/deployment-seal-receipt.json"))},
-            "holding145_semantic_worker":key(&format!("{FAMILY}/V5F_ACTUAL_ADVANCING_WORKER.json")),
+            "holding145_semantic_worker":key(&format!("{FAMILY}/{WORKER}")),
             "holding145_completion":{"seal":post("deployment-seal-receipt.json"),
                                      "build":post("build-proof.json"),"adapter":post("incident-post-phase.py")}
         });
         validate(&plan).unwrap();
-        plan["holding145_prestart_ready"] =
-            key("epoch145-fixture-phase-dispatch-20261122-v1/READY.json");
+        plan["holding145_prestart_ready"] = key(&format!("{DISPATCHER}/READY.json"));
         validate(&plan).unwrap();
         for (name, replacement) in [
             (

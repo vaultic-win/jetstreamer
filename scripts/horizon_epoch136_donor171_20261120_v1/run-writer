@@ -33,11 +33,17 @@ seal=$(jq -er '.controller_deployment.path' "$plan")
 check_file "$seal" "$(jq -er '.controller_deployment.sha256' "$plan")"
 pkg=$(dirname -- "$seal")
 fixture="$runtime/epoch136-joint-writer-20261122-v7b"
+selector="$runtime/epoch145-fixture-phase-dispatch-20261122-v1/READY.json"
+retry="$runtime/epoch136-joint-writer-20261122-v7c"
+if [[ $(realpath -e -- "$0") == "$retry/controller/run-writer" ]]; then
+    fixture="$retry"
+    selector="$runtime/epoch145-fixture-retry1-dispatch-20261122-v1/READY.json"
+fi
 if [[ $(realpath -e -- "$0") == "$fixture/controller/run-writer" ]]; then
     [[ $pkg == "$fixture/controller" ]]
     if [[ $mode == session ]]; then
         [[ $plan == "$fixture/registered-production-plan.json" ]]
-        [[ $(jq -er '.holding145_prestart_ready.path' "$plan") == "$runtime/epoch145-fixture-phase-dispatch-20261122-v1/READY.json" ]]
+        [[ $(jq -er '.holding145_prestart_ready.path' "$plan") == "$selector" ]]
     else
         [[ $plan == "$fixture/production-plan.json" || $plan == "$fixture/registered-production-plan.json" ]]
     fi
