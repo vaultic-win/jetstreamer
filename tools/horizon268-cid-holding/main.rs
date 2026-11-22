@@ -1,4 +1,4 @@
-//! Exact Foundation CID-index byte custody for epochs 267 and 268.
+//! Private Foundation byte custody for the selected immutable source.
 mod transport;
 use std::{
     env,
@@ -13,7 +13,7 @@ const MAP: &str =
     "/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json";
 const MAP_SHA: &str = "50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6";
 const PART: usize = 32 << 20;
-#[cfg(not(epoch267))]
+#[cfg(not(any(epoch250, epoch267)))]
 mod profile {
     pub(super) const SRC: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
     pub(super) const SIZE: u64 = 12_161_495_866;
@@ -61,6 +61,38 @@ mod profile {
     pub(super) const INODE: u64 = 18336175;
     pub(super) const TIMES: (i64, i64, i64, i64) = (1795315093, 251462982, 1795315093, 465463670);
 }
+#[cfg(epoch250)]
+mod profile {
+    pub(super) const SRC: &str = "/home/ubuntu/.jetstreamer-private/qualification-250-reboot-20261117-v1/output/epoch-250.jet";
+    pub(super) const SIZE: u64 = 185_599_540_324;
+    pub(super) const SHA: &str = "070c6021b56452489de8ec8edf1a9fb92dd47715f30f4c9781fcbb10503aa0ce";
+    pub(super) const PREFIX: &str =
+        "foundation_node_01/closed-private-v1/epoch250-closed-archive-v1";
+    pub(super) const RECOVERY: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon250-closed-source-check-v200-a2/completion.json";
+    pub(super) const REC_SHA: &str =
+        "44de880ab329ab1fea9b9d812f2c185287ceb3c8e0e0ed599275847688f55b69";
+    pub(super) const STRUCTURAL: &str =
+        "/home/ubuntu/.codex/diagnostics/horizon250-holding-compat-v199-a1/completion.json";
+    pub(super) const STR_SHA: &str =
+        "60077cbc90a49c68d7f524b524ba88b2c4d27273ed6a8dc3fe113db6412ac0ab";
+    pub(super) const TMP: &str = "/run/horizon250-closed-archive-holding-work";
+    pub(super) const DEST: &str =
+        "/var/lib/jetstreamer/horizon250-closed-archive-holding-restore-v1";
+    pub(super) const KEY: &str = "archive-070c6021-v1.manifest";
+    pub(super) const EPOCH: u64 = 250;
+    pub(super) const INODE: u64 = 15_060_654;
+    pub(super) const TIMES: (i64, i64, i64, i64) =
+        (1_795_169_606, 173_593_399, 1_795_173_253, 625_459_056);
+}
+#[cfg(epoch250)]
+const SOURCE_OWNER_MODE: (u32, u32, u32) = (1000, 1000, 0o440);
+#[cfg(not(epoch250))]
+const SOURCE_OWNER_MODE: (u32, u32, u32) = (0, 0, 0o400);
+#[cfg(epoch250)]
+const RESTORE_FILE: &str = "epoch-250.jet";
+#[cfg(not(epoch250))]
+const RESTORE_FILE: &str = "index.body";
 use profile::*;
 fn ioe(e: io::Error) -> String {
     e.to_string()
@@ -123,13 +155,11 @@ fn original(path: &Path) -> R<File> {
                     m.dev(),
                     m.ino(),
                     m.len(),
-                    m.uid(),
-                    m.gid(),
-                    m.mode() & 0o7777,
+                    (m.uid(), m.gid(), m.mode() & 0o7777),
                     m.nlink(),
-                ) == (66305, INODE, SIZE, 0, 0, 0o400, 1)
+                ) == (66305, INODE, SIZE, SOURCE_OWNER_MODE, 1)
                 && (m.mtime(), m.mtime_nsec(), m.ctime(), m.ctime_nsec()) == TIMES,
-            "closed original CID table changed",
+            "closed original source changed",
         )?;
     }
     Ok(f)
@@ -196,6 +226,13 @@ fn fixed() -> String {
 fn manifest(header: &str, hashes: &[String]) -> Vec<u8> {
     format!("{header}\n{}\n", hashes.join("\n")).into_bytes()
 }
+#[cfg(epoch250)]
+fn header() -> String {
+    format!(
+        "horizon{EPOCH}-closed-archive-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} mapping={MAP_SHA} original_source={REC_SHA} recovery={STR_SHA} canonical=false"
+    )
+}
+#[cfg(not(epoch250))]
 fn header() -> String {
     format!(
         "horizon{EPOCH}-cid-index-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} car_bytes={CAR_BYTES} entries={ENTRIES} buckets={BUCKETS} mapping={MAP_SHA} recovery={REC_SHA} structural={STR_SHA} canonical=false"
@@ -366,7 +403,7 @@ fn restore<T: Transport>(
     sha: &str,
     dir: &Path,
 ) -> R<()> {
-    let out = dir.join("index.body");
+    let out = dir.join(RESTORE_FILE);
     if out.try_exists().map_err(ioe)? {
         completed(&out, size, sha)?;
         recover(c, parts, size, part, sha, &mut io::sink())?;

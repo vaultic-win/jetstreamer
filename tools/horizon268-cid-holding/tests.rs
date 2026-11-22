@@ -104,10 +104,11 @@ fn archived_epoch_geometry_round_trips_both_manifests() {
 }
 #[test]
 fn exact_geometry() {
-    let (parts, tail) = if EPOCH == 267 {
-        (310, 24474758)
-    } else {
-        (363, 14_791_482)
+    let (parts, tail) = match EPOCH {
+        250 => (5_532, 9_976_932),
+        267 => (310, 24_474_758),
+        268 => (363, 14_791_482),
+        _ => panic!("unknown source profile"),
     };
     assert_eq!(SIZE.div_ceil(PART as u64), parts);
     assert_eq!(SIZE % (PART as u64), tail);
@@ -202,7 +203,7 @@ fn interrupted_restore_resumes_and_reopens_existing_output() {
     let l = parts(&f, &d.0).unwrap();
     partial(&d.0, &SAMPLE[..5]);
     restore(&f, &l, 10, 4, &sha(), &d.0).unwrap();
-    let o = d.0.join("index.body");
+    let o = d.0.join(RESTORE_FILE);
     let m = o.metadata().unwrap();
     assert_eq!(m.mode() & 0o7777, 0o400);
     assert_eq!(fs::read(&o).unwrap(), SAMPLE);
@@ -226,7 +227,7 @@ fn conflicting_or_aliased_partial_and_existing_destination_preserved() {
     std::os::unix::fs::symlink(&other, d.0.join(".index.partial")).unwrap();
     assert!(restore(&f, &l, 10, 4, &sha(), &d.0).is_err());
     assert_eq!(fs::read(&other).unwrap(), b"secret");
-    let o = d.0.join("index.body");
+    let o = d.0.join(RESTORE_FILE);
     fs::write(&o, b"conflict").unwrap();
     assert!(restore(&f, &l, 10, 4, &sha(), &d.0).is_err());
     assert!(publish(&other, &o).is_err());
@@ -242,8 +243,13 @@ fn owner_and_profile_do_not_accept_another_namespace() {
         .unwrap()
         .replace("node_01", "node_02");
     assert!(approved_owner(200, foreign.as_bytes()).is_err());
+    let source_kind = if EPOCH == 250 {
+        "closed-archive"
+    } else {
+        "cid-index"
+    };
     assert!(fixed().starts_with(&format!(
-        "foundation_node_01/closed-private-v1/epoch{EPOCH}-cid-index-v1/"
+        "foundation_node_01/closed-private-v1/epoch{EPOCH}-{source_kind}-v1/"
     )));
     assert!(!key(&"0".repeat(64)).ends_with(".jet"));
 }
