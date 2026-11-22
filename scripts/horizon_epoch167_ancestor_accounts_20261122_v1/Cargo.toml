@@ -8,6 +8,7 @@ edition = "2024"
 [features]
 independent166 = []
 standard170 = []
+metered168 = []
 
 [dependencies]
 anyhow = "1"

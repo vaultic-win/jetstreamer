@@ -347,53 +347,13 @@ pub(super) fn gates(profile: &Value, manifest: &Value) -> Result<Value> {
     )
 }
 
-fn appendvec_name(path: &str, directory: bool) -> bool {
-    let shard = |s: &str| matches!(s, "0" | "1" | "2" | "3");
-    let number = |s: &str| !s.is_empty() && s.bytes().all(|v| v.is_ascii_digit());
-    if directory {
-        return path.is_empty() || shard(path);
-    }
-    path.split_once('/').is_some_and(|(s, base)| {
-        shard(s)
-            && base
-                .split_once('.')
-                .is_some_and(|(slot, index)| number(slot) && number(index))
-    })
-}
 pub(super) fn check_inventory(
     p: &Value,
     manifest: &Value,
     ledger: &stopped_tree::Ledger,
     allocated: u64,
 ) -> Result<()> {
-    let target = Path::new(string(p, "target")?);
-    let mut total = 0u64;
-    for (name, entry) in ledger {
-        let m = serde_json::to_value(entry)?;
-        let directory = m["directory"].as_bool().context("missing entry type")?;
-        ensure!(
-            appendvec_name(name, directory),
-            "foreign account file or directory: {name}"
-        );
-        if directory {
-            let inode = if name.is_empty() {
-                &p["inode"]
-            } else {
-                &p["shards"][name]
-            };
-            ensure!(m["inode"] == *inode, "changed account shard {name}");
-            total += fs::symlink_metadata(target.join(name))?.blocks() * 512;
-        } else {
-            total += m["blocks"].as_u64().context("missing file allocation")? * 512;
-        }
-    }
-    ensure!(
-        ledger.len() > 5
-            && ["0", "1", "2", "3"].iter().all(|n| ledger.contains_key(*n))
-            && (0..=CAP).contains(&allocated)
-            && total == allocated,
-        "incomplete accounts inventory"
-    );
+    check_appendvecs(p, ledger, allocated, CAP)?;
     #[cfg(not(feature = "standard170"))]
     if p["attempt"] == "local3retry9" {
         let census = bound(&manifest["earlier_census"])?;

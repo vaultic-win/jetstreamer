@@ -16,22 +16,53 @@ use std::{
     process::Command,
 };
 
-#[cfg(all(feature = "independent166", feature = "standard170"))]
+#[cfg(any(
+    all(feature = "independent166", feature = "standard170"),
+    all(
+        feature = "metered168",
+        any(feature = "independent166", feature = "standard170")
+    )
+))]
 compile_error!("select one epoch profile");
 
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 const BASE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch167-ancestor-accounts-20261122-v2";
 
 #[cfg(any(feature = "independent166", feature = "standard170"))]
 mod cold166;
 #[cfg(any(feature = "independent166", feature = "standard170"))]
-use cold166::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+use cold166 as specific;
+#[cfg(feature = "metered168")]
+#[path = "closed168.rs"]
+mod specific;
+#[cfg(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+))]
+use specific::{BASE, CHECK_SCHEMA, COMPLETE_SCHEMA, PROFILE, gates};
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 const PROFILE: &[u8] = include_bytes!("profiles.json");
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 const CHECK_SCHEMA: &str = "horizon167-closed-accounts-check-v1";
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 const COMPLETE_SCHEMA: &str = "horizon167-closed-accounts-complete-v1";
 
 const DEVICE: u64 = 64512;
@@ -151,7 +182,11 @@ fn closed(name: &str) -> Result<()> {
     );
     Ok(())
 }
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 fn preserved(p: &Value) -> Result<()> {
     let path = Path::new(string(p, "path")?);
     let m = path.symlink_metadata()?;
@@ -172,7 +207,11 @@ fn preserved(p: &Value) -> Result<()> {
     Ok(())
 }
 /// Check the two incomplete runs against their original stop, reservation and present owner.
-#[cfg(not(any(feature = "independent166", feature = "standard170")))]
+#[cfg(not(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+)))]
 fn gates(p: &Value, manifest: &Value) -> Result<Value> {
     let target = Path::new(string(p, "target")?);
     let attempt = string(p, "attempt")?;
@@ -311,6 +350,66 @@ fn witness_disjoint(target: &Path, reference: &Value) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+))]
+fn appendvec_name(path: &str, directory: bool) -> bool {
+    let shard = |s: &str| matches!(s, "0" | "1" | "2" | "3");
+    let number = |s: &str| !s.is_empty() && s.bytes().all(|v| v.is_ascii_digit());
+    if directory {
+        return path.is_empty() || shard(path);
+    }
+    path.split_once('/').is_some_and(|(s, base)| {
+        shard(s)
+            && base
+                .split_once('.')
+                .is_some_and(|(slot, index)| number(slot) && number(index))
+    })
+}
+#[cfg(any(
+    feature = "independent166",
+    feature = "standard170",
+    feature = "metered168"
+))]
+fn check_appendvecs(
+    p: &Value,
+    ledger: &stopped_tree::Ledger,
+    allocated: u64,
+    cap: u64,
+) -> Result<()> {
+    let target = Path::new(string(p, "target")?);
+    let mut total = 0u64;
+    for (name, entry) in ledger {
+        let m = serde_json::to_value(entry)?;
+        let directory = m["directory"].as_bool().context("missing entry type")?;
+        ensure!(
+            appendvec_name(name, directory),
+            "foreign account file or directory: {name}"
+        );
+        if directory {
+            let inode = if name.is_empty() {
+                &p["inode"]
+            } else {
+                &p["shards"][name]
+            };
+            ensure!(m["inode"] == *inode, "changed account shard {name}");
+            total += fs::symlink_metadata(target.join(name))?.blocks() * 512;
+        } else {
+            total += m["blocks"].as_u64().context("missing file allocation")? * 512;
+        }
+    }
+    ensure!(
+        ledger.len() > 5
+            && ["0", "1", "2", "3"].iter().all(|n| ledger.contains_key(*n))
+            && (0..=cap).contains(&allocated)
+            && total == allocated,
+        "incomplete accounts inventory"
+    );
+    Ok(())
+}
+
 fn scan(target: &Path) -> Result<Value> {
     // A same-device bind inside the target could expose unrelated files with valid uid/gid.
     // Bind aliases of the target can also hide consumers from process pathname matching.
@@ -394,8 +493,12 @@ fn run() -> Result<()> {
         unsafe { libc::flock(epoch_lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "campaign operation is occupied"
     );
-    #[cfg(any(feature = "independent166", feature = "standard170"))]
-    let _leases = cold166::leases(&manifest)?;
+    #[cfg(any(
+        feature = "independent166",
+        feature = "standard170",
+        feature = "metered168"
+    ))]
+    let _leases = specific::leases(&manifest)?;
     let anchors = gates(p, &manifest)?;
     let target = Path::new(string(p, "target")?);
     let fd = stopped_tree::open_root(target, DEVICE, p["inode"].as_u64().context("target inode")?)?;
@@ -442,13 +545,21 @@ fn run() -> Result<()> {
             first == second && first.contains_key(""),
             "old accounts inventory changed"
         );
-        #[cfg(not(any(feature = "independent166", feature = "standard170")))]
+        #[cfg(not(any(
+            feature = "independent166",
+            feature = "standard170",
+            feature = "metered168"
+        )))]
         ensure!(
             p["expected_bytes"] == allocated && p["expected_entries"] == (first.len() - 1) as u64,
             "retained allocation or old accounts inventory differs"
         );
-        #[cfg(any(feature = "independent166", feature = "standard170"))]
-        cold166::check_inventory(p, &manifest, &first, allocated)?;
+        #[cfg(any(
+            feature = "independent166",
+            feature = "standard170",
+            feature = "metered168"
+        ))]
+        specific::check_inventory(p, &manifest, &first, allocated)?;
         drop(second);
         let bytes = serde_json::to_vec(&first)?;
         let count = first.len();
@@ -463,7 +574,11 @@ fn run() -> Result<()> {
             output(&dir, "LEDGER.json", &bytes)?
         }
         let check = json!({"schema":CHECK_SCHEMA,"attempt":attempt,"target":target,"inode":p["inode"],"manifest":conf,"elf":image,"anchors":anchors,"ledger_sha256":hash,"entries":count,"references":process,"resource_credit_bytes":0});
-        #[cfg(any(feature = "independent166", feature = "standard170"))]
+        #[cfg(any(
+            feature = "independent166",
+            feature = "standard170",
+            feature = "metered168"
+        ))]
         let check = {
             let mut measured = check;
             measured["allocated_bytes"] = json!(allocated);
@@ -508,9 +623,17 @@ fn run() -> Result<()> {
     let removed = stopped_tree::remove_contents(&fd, &ledger, DEVICE, UID, GID)?;
     let after = gates(p, &manifest)?;
     ensure!(after == anchors, "post-retirement bindings changed");
-    #[cfg(any(feature = "independent166", feature = "standard170"))]
+    #[cfg(any(
+        feature = "independent166",
+        feature = "standard170",
+        feature = "metered168"
+    ))]
     let allocated = &prior["allocated_bytes"];
-    #[cfg(not(any(feature = "independent166", feature = "standard170")))]
+    #[cfg(not(any(
+        feature = "independent166",
+        feature = "standard170",
+        feature = "metered168"
+    )))]
     let allocated = &p["expected_bytes"];
     let complete = json!({"schema":COMPLETE_SCHEMA,"attempt":attempt,"scope":target,"original_iid":p["iid"],"scope_empty":true,"entries_removed_this_invocation":removed,"check_sha256":intent["check_sha256"],"intent_sha256":sha(&read(&ip,1<<20)?),"retired_tree_before_bytes":allocated,"scope_root_remaining_bytes":fd.metadata()?.blocks()*512,"archive_or_snapshot_removed":false,"resource_credit_bytes":0});
     if dir.join("COMPLETE.json").try_exists()? {
