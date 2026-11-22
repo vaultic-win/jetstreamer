@@ -93,6 +93,7 @@ fn known_root(e: u64) -> Result<&'static str> {
         199 => Ok("bafyreid5x4ci3xei4wy5rijuqfjh4y6svca3a7tkhhsirxuhu3bj7p5z7y"),
         200 => Ok("bafyreibhxmsejxsshqpplpyhrpvf3tbl2cgl7qj33snet5b3q2txorimfu"),
         267 => Ok("bafyreifn4ykgns5ih2lzfzrvky2u5vfh4jvqcqy7tdylujrbvl6pqavi4m"),
+        268 => Ok("bafyreiadrsuockl4wyx2s2nu247atdi7xhc6pc7ynhmetagg7mdkjdktgu"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -293,7 +294,11 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     }
     let mut corrected = raw.clone();
     let mut changes = Vec::new();
+    let mut verified_skips = Vec::new();
     for (slot, value) in witness {
+        if e == 268 && value.is_none() {
+            verified_skips.push(slot);
+        }
         let was = row(&raw, e, slot)?;
         let now = value.as_ref().map(|v| (v.0, v.1)).unwrap_or_default();
         if was != now {
@@ -325,8 +330,11 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
         )
         .into());
     }
-    let result = json!({"epoch":e,"root":known_root(e)?,"windows":partial,"changes":changes,"present":present,"skips":SLOTS-present as u64,
+    let mut result = json!({"epoch":e,"root":known_root(e)?,"windows":partial,"changes":changes,"present":present,"skips":SLOTS-present as u64,
         "physical_end":pos,"original_sha256":sha(&raw),"corrected_sha256":sha(&corrected)});
+    if e == 268 {
+        result["rooted_window_skips"] = json!(verified_skips);
+    }
     save(&out.join(format!("epoch-{e}-slot-ranges.raw")), &corrected)?;
     save(
         &out.join(format!("epoch-{e}-repair.json")),
@@ -337,9 +345,79 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     )
 }
 
+fn reviewed268(plan_path: &Path, expected: &str) -> Result<(String, u64, usize)> {
+    let len = fs::symlink_metadata(plan_path)?.len();
+    if len > 256_000 {
+        return Err("oversized epoch 268 capture plan".into());
+    }
+    let input = read(plan_path, len)?;
+    if sha(&input) != expected {
+        return Err("unrecognized epoch 268 capture plan".into());
+    }
+    let doc: Value = serde_json::from_slice(&input)?;
+    let epochs = doc["epochs"].as_array().ok_or("plan epochs")?;
+    if epochs.len() != 1 {
+        return Err("expected singleton 268".into());
+    }
+    let p = &epochs[0];
+    let car = number(p, "car_bytes")?;
+    let foot = number(p, "footer_at")?;
+    if number(p, "epoch")? != 268
+        || car != 476675176389
+        || text(p, "root")? != known_root(268)?
+        || text(p, "header_sha256")?
+            != "56e3dd997f05185be809c81914781ae69a5c65c5199b2aca467041e11af41333"
+        || foot < HEADER
+        || foot >= car
+        || car - foot > 32 << 20
+    {
+        return Err("wrong epoch 268 source geometry".into());
+    }
+    let ws = p["individual_windows"].as_array().ok_or("windows")?;
+    if ws.len() > 256 {
+        return Err("window count".into());
+    }
+    let mut bytes = HEADER + car - foot;
+    let mut seen = HashSet::new();
+    for w in ws {
+        let lo = number(w, "lo_slot")?;
+        let hi = number(w, "hi_slot")?;
+        let a = number(w, "start")?;
+        let b = number(w, "end")?;
+        if lo < 115776000
+            || hi > 116207999
+            || lo >= hi
+            || hi - lo > 64
+            || a < HEADER
+            || b > foot
+            || a >= b
+            || b - a > 20 << 20
+            || !seen.insert((a, b))
+        {
+            return Err("invalid or duplicate 268 window".into());
+        }
+        bytes += b - a;
+    }
+    let count = ws.len() + 2;
+    if bytes != number(&doc, "body_bytes")?
+        || bytes > 256 << 20
+        || count as u64 != number(&doc, "range_count")?
+    {
+        return Err("capture inventory differs".into());
+    }
+    Ok((String::from_utf8(input)?, bytes, count))
+}
 fn main() -> Result<()> {
     let mut command = env::args_os().skip(1).peekable();
-    let (profile, body_bytes, range_count) = if command.next_if(|s| s == "--epoch267").is_some() {
+    let owned;
+    let (profile, body_bytes, range_count) = if command.next_if(|s| s == "--epoch268").is_some() {
+        let path = command.next().ok_or("usage: repair --epoch268 PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let digest = command.next().ok_or("missing epoch 268 plan SHA-256")?;
+        let (plan, bytes, count) =
+            reviewed268(Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
+        owned = plan;
+        (owned.as_str(), bytes, count)
+    } else if command.next_if(|s| s == "--epoch267").is_some() {
         (
             include_str!("../horizon267-slot-input/repair-windows.json"),
             99_707_283,
@@ -351,7 +429,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch268 PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
