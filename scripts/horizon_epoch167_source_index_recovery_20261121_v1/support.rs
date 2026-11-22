@@ -1,6 +1,7 @@
 use super::*;
 
 pub const R: &str = "/var/lib/jetstreamer/horizon_runtime_data";
+#[cfg(not(epoch167_cold_rebook))]
 pub const COMMON: &str = "incident-replay-guard-20261121-v1";
 #[cfg(not(epoch167_cold_rebook))]
 pub const PROVIDER: &str = "incident-replay-fit-20261121-v1/tools/post-stop-fit";

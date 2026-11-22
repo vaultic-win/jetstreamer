@@ -47,8 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-HOMEFLOOR = HERE == D / "tools-homefloor" or (
-    HERE.name == "tools-homefloor" and HERE.parent.parent == D / "homefloor-qualification"
+HOMEFLOOR = HERE == D / "tools-homefloor-cold167-v3" or (
+    HERE.name == "tools-homefloor-cold167-v3" and HERE.parent.parent == D / "homefloor-qualification"
 )
 if HOMEFLOOR:
     recover = runpy.run_path(str(Path(__file__).with_name("homefloor_fit.py")))
@@ -245,6 +245,21 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     s.need(pg=="0::"+group and s.same_file(pr/"fd/1",run/"producer.log")
            and s.same_file(pr/"fd/2",run/"producer.log"),"foreign replacement executable or output")
     cap,guard_image,contract=CAPS[e],IMAGE,CONTRACT
+    if e==167 and generation is not None:
+        member = bound({"path":str(cold167["GUARD_DIR"]/"deployment-seal-receipt.json"),"sha256":cold167["GUARD_SEAL"]})
+        image = cold167["GUARD_DIR"]/"guard"
+        guard_image = cold167["GUARD_SHA"]
+        qroot = image.parent.parent
+        qualified = bound({"path":str(qroot/"GUARD_QUALIFIED.json"),"sha256":cold167["GUARD_QUAL"]})
+        contract = qualified["contract"]
+        terms = s.bound(contract["contract"],qroot/"contract/contract.json")
+        s.bound(contract["deployment_seal"],qroot/"contract/deployment-seal-receipt.json")
+        witness = s.bound(terms["qualified_native_witness"],qroot/"NATIVE_WITNESS.json")
+        s.need(qualified["guard"]=={"path":str(image),"sha256":guard_image}
+               and witness["native_identity"]["executable_sha256"]==guard_image,
+               "different cold 167 witness or guard contract")
+        s.need(member["destination"]==str(image.parent) and any(r["name"]=="guard" and r["sha256"]==guard_image for r in member["members"])
+               and hashlib.sha256(image.read_bytes()).hexdigest()==guard_image, "foreign cold guard")
     if e==170:
         wide=extensions["guard"](s);cap,guard_image,contract=extensions["CAP"],wide["image"],wide["contract"]
     plan,pref=s.read(d/"ACTUAL_GUARD_PLAN.json");first,fr=s.read(d/"FIRST_GUARD.json")

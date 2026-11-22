@@ -4,12 +4,12 @@ use std::collections::BTreeSet;
 
 pub const EPOCH: u64 = 167;
 pub const CAP: u64 = 512 << 30;
-pub const BASE: &str = "epoch167-source-index-rebook-20261122-v1";
+pub const BASE: &str = "epoch167-source-index-rebook-20261122-v3";
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1";
-pub const ATTEMPT: &str = "replacement-source-index-v1-20261121/cold-source-index-v2-20261122";
+pub const ATTEMPT: &str = "replacement-source-index-v1-20261121/cold-source-index-v3-20261122";
 pub const OLD: &str = "epoch167-retry8-recovery-20261120-v1";
-pub const UNIT: &str = "horizon-qualify-167-source-index-v2-20261122.service";
-pub const TIMER: &str = "horizon-guard-167-source-index-v2-20261122.timer";
+pub const UNIT: &str = "horizon-qualify-167-source-index-v3-20261122.service";
+pub const TIMER: &str = "horizon-guard-167-source-index-v3-20261122.timer";
 pub const PREVIOUS_GUARD_ARGV: &str =
     "4fbff52bb7cf7f7443cd7466289494b23c1b32c8c433e6ecf196356f6f8fc76f";
 const PREVIOUS: &str = "epoch167-source-index-recovery-20261121-v1";
@@ -145,6 +145,24 @@ fn indexes() -> Result<Vec<Value>> {
     Ok(rows)
 }
 pub fn files() -> Result<Value> {
+    let previous_runtime = rt("epoch167-source-index-rebook-20261122-v1");
+    let (failed, failure) = doc(
+        &previous_runtime.join("START_FAILURE.json"),
+        Some("bf7c9db02f21c189f4bbf479428522ef52a3c5d7f553dc1118dd0edac71533a9"),
+    )?;
+    let old_node = "horizon-qualify-167-source-index-v2-20261122.service";
+    let old_guard = "horizon-guard-167-source-index-v2-20261122.timer";
+    ensure!(
+        failed["producer_invocation_id"] == "cdcb80c45de340278a07418190d7c3c7"
+            && failed["partial_retained"] == true
+            && failed["cgroup"] == json!([])
+            && failed["intent"] == doc(&previous_runtime.join("START_INTENT.json"), None)?.1
+            && native(old_node)?["MainPID"] == "0"
+            && members(old_node)?.is_empty()
+            && native(old_guard)?["ActiveState"] == "inactive",
+        "failed cold predecessor still owns replay or guard"
+    );
+
     let (rr, ret) = doc(
         &rt("epoch167-ancestor-accounts-20261122-v2/RETURN.json"),
         Some("35c7b753caa4db4a4774fae5c716a12003422c84a106e35288b0278981df4ede"),
@@ -199,7 +217,7 @@ pub fn files() -> Result<Value> {
         "unsafe successor root"
     );
     Ok(
-        json!({"predecessor_stop":sr,"predecessor_sample":tr,"retirement":ret,"root":{"path":run(),"device":dir.dev(),"inode":dir.ino()},"snapshot":snapshot,"retained_prefix":archive,"indexes":indexes()?}),
+        json!({"previous_cold_failure":failure,"predecessor_stop":sr,"predecessor_sample":tr,"retirement":ret,"root":{"path":run(),"device":dir.dev(),"inode":dir.ino()},"snapshot":snapshot,"retained_prefix":archive,"indexes":indexes()?}),
     )
 }
 fn owned(p: &Path) -> Result<()> {

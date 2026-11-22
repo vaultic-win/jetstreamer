@@ -24,10 +24,26 @@ mod actor;
 #[cfg_attr(epoch167_cold_rebook, path = "cold167.rs")]
 mod source;
 use source::{ATTEMPT, BASE, CAP, EPOCH, LANE, OLD, PREVIOUS_GUARD_ARGV, TIMER, UNIT};
+#[cfg(not(epoch167_cold_rebook))]
 const GUARD_SHA: &str = "07f6924ee1cf8d8311aa7bed6620dcf1af580a5546e948206af628c57aa3443b";
+#[cfg(not(epoch167_cold_rebook))]
 const GSEAL: &str = "736a46ffcea86d0937518c728791a4843c57862e37c301bf81095fd5779aed1d";
+#[cfg(epoch167_cold_rebook)]
+const GUARD_SHA: &str = "0d02c342a3993dea74f5a452d91c8ed655e551f28794b0333093fb767d18251b";
+#[cfg(epoch167_cold_rebook)]
+const GSEAL: &str = "0fd5e8a3f7113e5c373222b6aa647b179617876a6855253461a6633f5f9c5cb3";
+#[cfg(not(epoch167_cold_rebook))]
 const CONTRACT: &str = "9dc683e3b5eef14b4ead27f626cc2421a31442ba1c85a376e98881938abd0ba2";
+#[cfg(not(epoch167_cold_rebook))]
 const CSEAL: &str = "11879726e524215d4f0581a33619bc707dee1f01d59f37863886dea37871ba3b";
+#[cfg(epoch167_cold_rebook)]
+const CONTRACT: &str = "5be3255e74b43ada890dc3c0ba9d60c3cec4a2585dcbe15a8dfe336bf2eede65";
+#[cfg(epoch167_cold_rebook)]
+const CSEAL: &str = "891f54b03201bcb2e0811400a9906bf9e04a3b789231b176e5b20f011195dccf";
+#[cfg(epoch167_cold_rebook)]
+const WITNESS: &str = "62a24a8bc04d1f6615367428a725f00c6062b6d81a32d255c5d2f96b54eec296";
+#[cfg(not(epoch167_cold_rebook))]
+const WITNESS: &str = "33e62f01194935876985fabdc18a283ac00baccef58e30e97c65360420bb7f91";
 fn member(path: &Path, sealdigest: &str) -> Result<Value> {
     let d = path.parent().context("package")?;
     let (seal, sr) = doc(&d.join("deployment-seal-receipt.json"), Some(sealdigest))?;
@@ -56,7 +72,7 @@ fn member(path: &Path, sealdigest: &str) -> Result<Value> {
 }
 fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     #[cfg(epoch167_cold_rebook)]
-    let path = rt("incident-replay-fit-20261121-v1/tools-homefloor/post-stop-fit");
+    let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-cold167-v3/post-stop-fit");
     #[cfg(not(epoch167_cold_rebook))]
     let path = if fit_seal == "e8ba73178277950ed2bcc976534f49af21413745c8244026fcb1502bea9adc7e" {
         rt(PROVIDER)
@@ -120,9 +136,16 @@ fn require_missing() -> Result<Value> {
     Ok(v)
 }
 fn pkg() -> PathBuf {
-    rt(COMMON).join("tools/guard")
+    #[cfg(epoch167_cold_rebook)]
+    let guard = rt("epoch167-cold-guard-20261122-v3/tools/guard");
+    #[cfg(not(epoch167_cold_rebook))]
+    let guard = rt(COMMON).join("tools/guard");
+    guard
 }
 fn contract() -> Result<Value> {
+    #[cfg(epoch167_cold_rebook)]
+    let path = rt("epoch167-cold-guard-20261122-v3/contract/contract.json");
+    #[cfg(not(epoch167_cold_rebook))]
     let path = rt(COMMON).join("contract/contract.json");
     let (v, cr) = doc(&path, Some(CONTRACT))?;
     let sr = member(&path, CSEAL)?;
@@ -130,16 +153,53 @@ fn contract() -> Result<Value> {
     ensure!(
         gb["sha256"] == GSEAL
             && file_digest(&pkg())? == GUARD_SHA
-            && v["qualified_native_witness"]["sha256"]
-                == "33e62f01194935876985fabdc18a283ac00baccef58e30e97c65360420bb7f91",
+            && v["qualified_native_witness"]["sha256"] == WITNESS,
         "changed incident guard"
     );
     Ok(json!({"contract":cr,"deployment_seal":sr}))
 }
+fn guard_plan(iid: &Value, floor: u64, binding: &Value) -> Value {
+    json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":iid,"worker_root":LANE,"filesystem":"/home/sol","minimum_free_bytes":floor,"maximum_root_physical_bytes":CAP,"maximum_worker_vmas":3500000,"receipt_directory":base().join("guard-receipts"),"data_fulfillment":binding})
+}
+#[cfg(epoch167_cold_rebook)]
+fn verify_guard_route(binding: &Value) -> Result<()> {
+    let expected = guard_plan(
+        &json!("00000000000000000000000000000001"),
+        8297502499408,
+        binding,
+    );
+    let path = base().join("STATIC_GUARD_ROUTE.json");
+    let plan = if path.try_exists()? {
+        let (saved, reference) = doc(&path, None)?;
+        ensure!(saved == expected, "different prestart guard route");
+        reference
+    } else {
+        record("STATIC_GUARD_ROUTE.json", &expected)?
+    };
+    let result: Value = serde_json::from_slice(&command(
+        pkg().to_str().unwrap(),
+        &[
+            st(&plan, "path")?,
+            "--plan-sha256",
+            st(&plan, "sha256")?,
+            "--self-sha256",
+            GUARD_SHA,
+            "--validate-plan-only",
+        ],
+        10,
+    )?)?;
+    ensure!(
+        result["validated"] == true
+            && result["unit"] == UNIT
+            && result["producer_signaled"] == false,
+        "new guard cannot enforce this exact generation"
+    );
+    Ok(())
+}
 fn guarded(actor: &Value, floor: u64, binding: &Value) -> Result<(Value, Value)> {
     let pr = record(
         "ACTUAL_GUARD_PLAN.json",
-        &json!({"schema":"jetstreamer-horizon-standalone-guard-plan-v1","unit":UNIT,"invocation_id":actor["producer_invocation_id"],"worker_root":LANE,"filesystem":"/home/sol","minimum_free_bytes":floor,"maximum_root_physical_bytes":CAP,"maximum_worker_vmas":3500000,"receipt_directory":base().join("guard-receipts"),"data_fulfillment":binding}),
+        &guard_plan(&actor["producer_invocation_id"], floor, binding),
     )?;
     let p = pkg();
     let tail = [
@@ -310,6 +370,8 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
     );
     ensure!(source::ready()? == pr, "fresh index profile changed");
     let binding = contract()?;
+    #[cfg(epoch167_cold_rebook)]
+    verify_guard_route(&binding)?;
     let inv = record("INVENTORY_PRESTART.json", &require_missing()?)?;
     let before = fit(fleet, fit_seal)?;
     ensure!(before["candidate"].is_null(), "candidate already active");
@@ -409,6 +471,9 @@ fn dispatch() -> Result<Value> {
                 start(&fleet, seal)
             } else {
                 source::files()?;
+                #[cfg(epoch167_cold_rebook)]
+                verify_guard_route(&contract()?)?;
+                #[cfg(not(epoch167_cold_rebook))]
                 contract()?;
                 fit(&fleet, seal)
             }
