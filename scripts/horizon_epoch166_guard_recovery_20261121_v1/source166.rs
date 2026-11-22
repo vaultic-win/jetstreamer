@@ -1,17 +1,37 @@
 //! Original epoch 166 cold bootstrap, completed input caches, and stopped-generation evidence.
 use super::*;
 
+#[cfg(epoch166_retry11)]
+#[path = "retry11.rs"]
+mod retry11;
+#[cfg(epoch166_retry11)]
+use retry11::LOG_INODE;
+#[cfg(all(test, epoch166_retry11))]
+use retry11::ROOT_INODE;
+#[cfg(epoch166_retry11)]
+pub(crate) use retry11::{
+    ATTEMPT, BASE, CONTRACT, CSEAL, GSEAL, GUARD_SHA, TIMER, UNIT, WITNESS, holding_complete,
+};
+#[cfg(not(epoch166_retry11))]
+const ROOT_INODE: u64 = 93782017;
+#[cfg(not(epoch166_retry11))]
+const LOG_INODE: u64 = 93782020;
 pub const EPOCH: u64 = 166;
+#[cfg(not(epoch166_retry11))]
 pub const BASE: &str = "epoch166-independent-cold-recovery-20261121-v1";
+#[cfg(not(epoch166_retry11))]
 pub const UNIT: &str = "horizon-qualify-166-independent-recovery-20261121-v1.service";
+#[cfg(not(epoch166_retry11))]
 pub const TIMER: &str = "horizon-guard-166-independent-recovery-20261121-v1.timer";
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch166-independent-cold-20261120-v1";
+#[cfg(not(epoch166_retry11))]
 pub const ATTEMPT: &str = "replacement-local3retry10-20261121-v1";
 pub const OLD: &str = "epoch166-independent-cold-20261120-v1";
 pub const CAP: u64 = 288 << 30;
 pub const PREVIOUS_GUARD_ARGV: &str =
     "d9065f60a113cec3b3562aba6717cd0908673546c1c5864332cf6de39d1ef5f2";
 const OLD_UNIT: &str = "horizon-qualify-independent-cold166-20261120-v1.service";
+#[cfg(not(epoch166_retry11))]
 const OLD_IID: &str = "fa16ee2f14fe44ecbc37c59e197553ac";
 const PREVIOUS: &str = "replacement-local3retry9-20261110-v1";
 const PACKAGE: &str =
@@ -25,6 +45,7 @@ const GENESIS_SHA: &str = "133f7eaefcd59466f3b291aadd1b0d3522432072cf5b539445218
 const NODE_SHA: &str = "a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65";
 const WORKER_SHA: &str = "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819";
 const ORIGINAL_ARGV_SHA: &str = "4ef45e34b3a21f03eeda2115d371de1558e8e0e70574f64897f8d5b9be7ff893";
+#[cfg(not(epoch166_retry11))]
 const ROOTS_SHA: &str = "cc7d780afe3d0180de6785cdad4f1e38e70feb82df1c95d21ab342c5974782e2";
 
 struct Index(&'static str, u64, u64, i64, i64, &'static str);
@@ -129,6 +150,11 @@ pub fn profile() -> Result<Value> {
     bindings.push(format!(
         "{INPUTS}/genesis.tar.bz2:{after}/output/genesis.tar.bz2"
     ));
+    #[cfg(epoch166_retry11)]
+    bindings.push(format!(
+        "{}:{INPUTS}/{BOOT}",
+        retry11::bootstrap().display()
+    ));
     for i in INDEXES {
         bindings.push(format!(
             "{}:{}",
@@ -166,18 +192,31 @@ pub fn profile() -> Result<Value> {
                 ],
         "different original producer profile"
     );
-    Ok(
-        json!({"producer_argv":argv,"source_argv":ar,"fresh_attempt":run(),"indexes":INDEXES.iter().map(|i|cache(i,false)).collect::<Result<Vec<_>>>()?}),
-    )
+    let p = json!({"producer_argv":argv,"source_argv":ar,"fresh_attempt":run(),"indexes":INDEXES.iter().map(|i|cache(i,false)).collect::<Result<Vec<_>>>()?});
+    #[cfg(epoch166_retry11)]
+    let p = {
+        let mut registered = p;
+        registered["producer_unit"] = json!(UNIT);
+        registered["guard_timer"] = json!(TIMER);
+        registered["guard_worker_root"] = json!(LANE);
+        registered["guard_binary_sha256"] = json!(GUARD_SHA);
+        registered
+    };
+    Ok(p)
 }
 
+#[cfg(epoch166_retry11)]
+pub fn files() -> Result<Value> {
+    retry11::files()
+}
+#[cfg(not(epoch166_retry11))]
 pub fn files() -> Result<Value> {
     let (roots, rr) = doc(&base().join("ROOTS_BEFORE_WITNESS.json"), Some(ROOTS_SHA))?;
     let m = fs::symlink_metadata(run())?;
     ensure!(
         run().canonicalize()? == run()
             && m.dev() == 64512
-            && m.ino() == 93782017
+            && m.ino() == ROOT_INODE
             && m.uid() == 1001
             && m.gid() == 1003
             && m.mode() & 0o7777 == 0o700
@@ -260,6 +299,7 @@ pub fn prepare() -> Result<Value> {
     for (path, digest) in [
         (node(), NODE_SHA),
         (worker_image(), WORKER_SHA),
+        #[cfg(not(epoch166_retry11))]
         (Path::new(INPUTS).join(BOOT), BOOT_SHA),
         (Path::new(INPUTS).join("genesis.tar.bz2"), GENESIS_SHA),
     ] {
@@ -269,6 +309,8 @@ pub fn prepare() -> Result<Value> {
             path.display()
         );
     }
+    #[cfg(epoch166_retry11)]
+    retry11::snapshot(true)?;
     let mut verified = Vec::new();
     for i in INDEXES {
         verified.push(cache(i, true)?);
@@ -281,7 +323,7 @@ pub fn prepare() -> Result<Value> {
     let lm = log_fd.metadata()?;
     ensure!(
         lm.dev() == 64512
-            && lm.ino() == 93782020
+            && lm.ino() == LOG_INODE
             && lm.is_file()
             && lm.nlink() == 1
             && lm.len() == 0
@@ -353,11 +395,15 @@ pub fn prepare() -> Result<Value> {
             "unsafe guard receipts"
         );
     }
-    record(
-        "PREPARED.json",
-        &json!({"schema":"horizon-166-replay-recovery-preparation-v1","epoch":166,"baseline":baseline,
-        "indexes":verified,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"original_run_retained":true,"replay_launch_authorized":false}),
-    )
+    let prepared = json!({"schema":"horizon-166-replay-recovery-preparation-v1","epoch":166,"baseline":baseline,
+        "indexes":verified,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,"original_run_retained":true,"replay_launch_authorized":false});
+    #[cfg(epoch166_retry11)]
+    let prepared = {
+        let mut registered = prepared;
+        registered["profile"] = registered["baseline"]["profile"].clone();
+        registered
+    };
+    record("PREPARED.json", &prepared)
 }
 
 pub fn ready() -> Result<Value> {
@@ -366,7 +412,7 @@ pub fn ready() -> Result<Value> {
     ensure!(
         p["baseline"] == files()?
             && m.dev() == 64512
-            && m.ino() == 93782020
+            && m.ino() == LOG_INODE
             && m.uid() == 0
             && m.gid() == 0
             && m.mode() & 0o7777 == 0o600
@@ -399,6 +445,10 @@ pub fn index_selected() -> Result<()> {
     ensure!(pid > 1, "missing actual producer");
     let p = Path::new("/proc").join(pid.to_string());
     let mounts = fs::read_to_string(p.join("mountinfo"))?;
+    #[cfg(epoch166_retry11)]
+    let extra = Some((retry11::bootstrap(), Path::new(INPUTS).join(BOOT)));
+    #[cfg(not(epoch166_retry11))]
+    let extra: Option<(PathBuf, PathBuf)> = None;
     for (src, target) in INDEXES
         .iter()
         .map(|i| (source_index(i), target_index(i)))
@@ -406,6 +456,7 @@ pub fn index_selected() -> Result<()> {
             Path::new(INPUTS).join("genesis.tar.bz2"),
             run().join("output/genesis.tar.bz2"),
         )))
+        .chain(extra)
     {
         let target_in_namespace = p.join("root").join(target.strip_prefix("/")?);
         ensure!(
@@ -433,7 +484,7 @@ mod tests {
     #[test]
     fn stopped_epoch166_bound_inputs_and_closed_continuation() {
         let v = files().unwrap();
-        assert_eq!(v["root"]["inode"], 93782017);
+        assert_eq!(v["root"]["inode"], ROOT_INODE);
         assert_eq!(v["snapshot"]["length"], 1968014870);
         assert_eq!(v["profile"]["indexes"].as_array().unwrap().len(), 3);
         assert_eq!(v["profile"]["producer_argv"][0], "/usr/bin/systemd-run");
@@ -454,7 +505,7 @@ pub fn prepare_log() -> Result<Value> {
     ensure!(
         m.is_file()
             && m.dev() == 64512
-            && m.ino() == 93782020
+            && m.ino() == LOG_INODE
             && m.uid() == 0
             && m.gid() == 0
             && m.nlink() == 1
