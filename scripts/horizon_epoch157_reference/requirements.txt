@@ -1,0 +1,1 @@
+cbor2==5.7.1 --hash=sha256:9fc81da8c0e09beb42923e455e477b36ff14a03b9ca18a8a2e9b462de9a953e8
