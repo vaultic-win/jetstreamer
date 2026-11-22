@@ -110,6 +110,9 @@ fn known_root(e: u64) -> Result<&'static str> {
         283 => Ok("bafyreid66hsdd2npjbab3zfwaop3c2xfhuslz5pozra6mc66ulet64jcj4"),
         284 => Ok("bafyreidt3s3do73p2hgffss7ch55joh5iabrygacb4ynjbxzpudxyf4i7a"),
         282 => Ok("bafyreibkincn5733dntwqsibbo6ehpxxsno5iwqtfkousxeah76inkol2u"),
+        285 => Ok("bafyreiam2ndwsov4oj4jelptiiat3l67kil4mj5tnovqkjv7n4bi3rjtoe"),
+        286 => Ok("bafyreibsdipvtbosqf75w3skclwjphlncov2is5iivnl5cccjqvm4exmbu"),
+        287 => Ok("bafyreiatkwxgebjpf57nclv3snf6tr3wfbk5b62xezxfjtouzxsgdwmqbq"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -312,7 +315,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     let mut changes = Vec::new();
     let mut verified_skips = Vec::new();
     for (slot, value) in witness {
-        if (268..=284).contains(&e) && value.is_none() {
+        if (268..=287).contains(&e) && value.is_none() {
             verified_skips.push(slot);
         }
         let was = row(&raw, e, slot)?;
@@ -348,7 +351,7 @@ fn run_epoch(plan: &Value, source: &Path, cap: &Captures<'_>, out: &Path) -> Res
     }
     let mut result = json!({"epoch":e,"root":known_root(e)?,"windows":partial,"changes":changes,"present":present,"skips":SLOTS-present as u64,
         "physical_end":pos,"original_sha256":sha(&raw),"corrected_sha256":sha(&corrected)});
-    if (268..=284).contains(&e) {
+    if (268..=287).contains(&e) {
         result["rooted_window_skips"] = json!(verified_skips);
     }
     save(&out.join(format!("epoch-{e}-slot-ranges.raw")), &corrected)?;
@@ -430,6 +433,18 @@ fn reviewed(epoch: u64, plan_path: &Path, expected: &str) -> Result<(String, u64
         284 => (
             495_320_593_672,
             "3c4b697ad835af1cb28df64329758e28b141704612aa5e66b2c095b74524d0a1",
+        ),
+        285 => (
+            489_731_879_514,
+            "b04fbcf049bb5f986eaaf4c5dc6ce47c106308406bef14cef36e6e5aa54f5999",
+        ),
+        286 => (
+            493_913_529_396,
+            "d86d2019aa2f98ba30cace55bcecbaf4e5bcd7c9dc5c4fd19e7b7cc27b383911",
+        ),
+        287 => (
+            471_816_188_164,
+            "cea1a636793d0f375af497b42d0fe14913af3a6e8aeceb99a1038db42cfbf89e",
         ),
         _ => return Err("unregistered dynamic epoch".into()),
     };
@@ -513,13 +528,16 @@ fn main() -> Result<()> {
         Some("--epoch281") => Some(281),
         Some("--epoch282") => Some(282),
         Some("--epoch284") => Some(284),
+        Some("--epoch285") => Some(285),
+        Some("--epoch286") => Some(286),
+        Some("--epoch287") => Some(287),
         Some("--epoch283") => Some(283),
         Some("--epoch280") => Some(280),
         _ => None,
     };
     let (profile, body_bytes, range_count) = if let Some(epoch) = dynamic_epoch {
         command.next();
-        let path = command.next().ok_or("usage: repair --epoch{268..284} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let path = command.next().ok_or("usage: repair --epoch{268..287} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
         let digest = command.next().ok_or("missing reviewed plan SHA-256")?;
         let (plan, bytes, count) =
             reviewed(epoch, Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
@@ -537,7 +555,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267 | --epoch{268..284} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch{268..287} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
