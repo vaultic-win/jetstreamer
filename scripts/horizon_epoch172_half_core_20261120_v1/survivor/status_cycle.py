@@ -525,8 +525,24 @@ def one_cycle(head,ref,bridge):
           flush=True)
     return bound(target)
 
+def entry():
+    package='tools-cold166-retry11'
+    if cold_workers is not cold166_status:
+        package=f'tools-cold170-{cold_workers.ATTEMPT}-v2'
+    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
+    receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
+    seal=checked(receipt)
+    member,=(v for v in seal['members'] if v['name']=='status_cycle.py')
+    need(seal['destination']==str(CURRENT.parent) and member['sha256']==bound(CURRENT)['sha256'],
+         'unsealed cadence entry')
+    return receipt
+
 def main():
-    need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/'tools-cold166-retry11/status_cycle.py','expected deployed sole controller')
+    receipt=entry()
+    if sys.argv[1:]==['--check-entry']:
+        print(json.dumps(receipt))
+        return
+    need(len(sys.argv)==1,'unexpected cadence argument')
     os.umask(0o077)
     fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
     try:
