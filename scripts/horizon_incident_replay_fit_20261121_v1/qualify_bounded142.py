@@ -39,8 +39,56 @@ def verify(bounded, s):
     for pid,comm,group in ((227498,actual["comm"],actual["cgroup"]), (227497,"historical-work",actual["cgroup"]),
                            (227497,actual["comm"],"0::/system.slice/"+m["Id"])):
         s.need(bounded["observe"](s,pid,comm,0,group) is None,"foreign live probe accepted")
+    # Replay just the census dispatch against a virtual /proc. Its positive identity was
+    # reconstructed above; another parent or historical-worker must still take the denial path.
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    provider = runpy.run_path(str(Path(__file__).with_name("post-stop-fit")))
+    census = provider["census"]
+    class Entry:
+        def __init__(self, pid, comm):
+            self.name = str(pid)
+            self.comm = comm
+        def __truediv__(self, name):
+            if name != "comm":
+                raise AssertionError(name)
+            return SimpleNamespace(read_text=lambda: self.comm)
+    class Proc:
+        def __init__(self, name):
+            if name != "/proc":
+                raise AssertionError(name)
+        def iterdir(self):
+            return [entry]
+    def simulated_observe(reader, pid, comm, tick, group):
+        if (pid, comm, group) != (bounded["PID"], "jetstreamer-nod", "0::"+bounded["GROUP"]):
+            return bounded["observe"](reader, pid, comm, tick, group)
+        bounded["check"](reader, current, expected)
+        return dict(pid=pid, invocation_id=current["manager"]["InvocationID"])
+    census_cases = []
+    for name, pid, comm, group, iid in (
+        ("authentic bounded route", 227497, actual["comm"], actual["cgroup"], m["InvocationID"]),
+        ("unregistered native replay", 227498, actual["comm"], "0::/system.slice/unregistered.service", m["InvocationID"]),
+        ("unregistered worker", 227498, "historical-work", actual["cgroup"], m["InvocationID"]),
+        ("reused PID in another replay", 227497, actual["comm"], "0::/system.slice/unregistered.service", m["InvocationID"]),
+        ("crossed qualifier generation", 227497, actual["comm"], actual["cgroup"], "f"*32)):
+        current=deepcopy(actual)
+        current["manager"]["InvocationID"]=iid
+        entry=Entry(pid, comm)
+        status=SimpleNamespace(need=s.need, process=lambda p: (1, 123, group))
+        replacements=dict(Path=Proc, s=status, fit=SimpleNamespace(units=lambda:set()),
+                          bounded142=dict(observe=simulated_observe))
+        with patch.dict(census.__globals__, replacements):
+            try:
+                population, matched = census({}, {}, None, {"occupied":False}, 145, {})
+            except ValueError as exc:
+                s.need(name != "authentic bounded route" and str(exc)=="unregistered replay process "+str(pid),
+                       "unrelated replay-census fixture failure")
+            else:
+                s.need(name=="authentic bounded route" and population=={} and matched==dict(pid=227497, invocation_id=bounded["IID"]),
+                       "foreign replay accepted by native census")
+        census_cases.append(name)
     return dict(incident=ref, exact_route=receipt["route"], confirmed_pid=int(m["ExecMainPID"]),
-                crossed_fields=sorted(tests), native_replay_started=False,
+                native_census_controls=census_cases, crossed_fields=sorted(tests), native_replay_started=False,
                 scope="Offline contract replay from native manager, input route and terminal receipt; no historical /proc image retained.")
 
 
