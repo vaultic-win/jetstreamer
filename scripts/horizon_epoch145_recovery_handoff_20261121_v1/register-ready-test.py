@@ -6,9 +6,13 @@ import json
 import os
 import runpy
 import sys
+import subprocess
 import tempfile
 
 REG = runpy.run_path(str(Path(__file__).with_name("register-ready.py")))
+FIXTURE = len(sys.argv) == 3 and sys.argv[2] == "--fixture"
+assert len(sys.argv) == 2 or FIXTURE
+FAMILY = runpy.run_path(str(Path(__file__).with_name("register-fixture-ready.py"))) if FIXTURE else REG
 ROOT = Path(sys.argv[1]).resolve(strict=True)
 assert ROOT.is_relative_to("/home/sol/.jetstreamer-private") and os.geteuid() == 0 and sys.flags.isolated
 
@@ -22,11 +26,22 @@ def exercise(base, fail_after=None, change_owner=False, native=False):
     writer=base/"writer"
     for p in (directory, directory/"state", writer):
         p.mkdir(mode=0o700)
+    if FIXTURE and native:
+        # The native parent authenticates the canonical READY path before it exists.
+        # Expose this empty test directory there only in a private mount namespace.
+        target=FAMILY["DIRECTORY"]
+        assert not Path("/proc/self/ns/mnt").samefile("/proc/1/ns/mnt")
+        mode=subprocess.check_output(["findmnt","-n","-o","PROPAGATION","-T",str(target)],text=True)
+        assert mode.strip()=="private" and not directory.samefile(target)
+        subprocess.run(["mount","--bind",directory,target],check=True)
+        mounted=subprocess.check_output(["findmnt","-n","-o","TARGET","--mountpoint",str(target)],text=True)
+        assert mounted.strip()==str(target) and directory.samefile(target)
+        directory=target
     op=base/"original-operation.lock"
     op.touch(mode=0o600)
     identity=REG["lock_identity"](op)
     flags={"held":False,"owner":41,"published":False,"crashed":False}
-    semantic="a99ed8b51e8a482b805b8a36a11b2700"
+    semantic=FAMILY["SEMANTIC"]
     events=[]
 
     def ready():
@@ -63,7 +78,7 @@ def exercise(base, fail_after=None, change_owner=False, native=False):
         return r
 
     if native:
-        inputs=REG["handoff_inputs"]
+        inputs=FAMILY["handoff_inputs"]
     else:
         def inputs():
             return {"original":"fixture"}, {"parent":{"path":"fixture-parent","sha256":"0"*64}}

@@ -166,24 +166,26 @@ def unit(name):
     return v
 
 
-def drained(name):
+def drained(name, failed_invocation=None):
     v=unit(name)
     group=Path("/sys/fs/cgroup/system.slice")/name
     try:
         empty="populated 0" in (group/"cgroup.events").read_text().splitlines()
     except FileNotFoundError:
         empty=not group.exists()
-    need(v["ActiveState"]=="inactive" and not v["Job"] and v.get("MainPID","0")==v.get("ControlPID","0")=="0"
+    finished = v["ActiveState"] == "inactive" or (failed_invocation is not None and
+        v["ActiveState"] == "failed" and v["InvocationID"] == failed_invocation)
+    need(finished and not v["Job"] and v.get("MainPID","0")==v.get("ControlPID","0")=="0"
          and empty, f"{name} still owns work")
 
 
-def clean_boundary():
+def clean_boundary(stage=SHARED, directory=DIR):
     for name in ("horizon-admit-136-actual-20261120-g1.service","horizon-qualify-136-actual-20261120-g1.service",
                  "horizon-guard-136-actual-20261120-g1.service","horizon-guard-136-actual-20261120-g1.timer"):
         drained(name)
-    paths = [SHARED/name for name in ("post-full-submission.json","post-full-actor.json","publish-submission.json",
+    paths = [stage/name for name in ("post-full-submission.json","post-full-actor.json","publish-submission.json",
                                       "publish-actor.json","completed.json")]
-    paths += [DIR/"state"/name for name in ("post-selected.json","writer-selected.json","writer-exit.json")]
+    paths += [directory/"state"/name for name in ("post-selected.json","writer-selected.json","writer-exit.json")]
     paths += [BASE/name for name in ("prestart-intent.json","prestart-released.json","admission.json","reproduction",
                                      "parent-launch-request.json","capacity.json","donor171.json")]
     paths.append(Path("/run/horizon-epoch171-exclusive-to136-g1"))
@@ -191,8 +193,7 @@ def clean_boundary():
         need(not os.path.lexists(p), f"registration crossed existing custody {p}")
 
 
-def observed_ready(seal_sha):
-    pkg=DIR/"tools-v2"
+def dispatcher_owner(pkg, seal_sha, unit_name, command, controller_locks):
     sealref=ref(pkg/"deployment-seal-receipt.json")
     need(sealref["sha256"]==seal_sha,"wrong dispatcher seal")
     seal=read_ref(sealref)
@@ -204,17 +205,31 @@ def observed_ready(seal_sha):
         rows=[m for m in seal["members"] if m["name"]==p.name]
         need(len(rows)==1 and rows[0]["mode"]=="0555" and rows[0]["sha256"]==ref(p)["sha256"]==checker["sha256"]
              and stat.S_IMODE(p.lstat().st_mode)==0o555, "selector image/inspector changed")
-    v=unit(DISPATCH)
+    v=unit(unit_name)
     pid=int(v["MainPID"])
     proc=Path("/proc")/str(pid)
-    cg="/system.slice/"+DISPATCH
+    cg="/system.slice/"+unit_name
     need(v["ActiveState"]=="active" and v["SubState"]=="running" and not v["Job"] and v["ControlPID"]=="0"
          and v["NRestarts"]=="0" and re.fullmatch("[0-9a-f]{32}",v["InvocationID"]) and pid>1
          and v["ControlGroup"]==cg and (proc/"cgroup").read_text().strip()=="0::"+cg
          and (proc/"exe").samefile(image) and (proc/"exe").readlink()==image
-         and (proc/"cmdline").read_bytes()==os.fsencode(image)+b"\0follow-v5e\0", "foreign selector generation")
+         and (proc/"cmdline").read_bytes()==os.fsencode(image)+b"\0"+os.fsencode(command)+b"\0", "foreign selector generation")
     start=int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19])
-    holder(lock_identity(LOCK),pid)
+    for path in controller_locks:
+        holder(lock_identity(path),pid)
+    return dict(dispatcher=dict(pid=pid,start_ticks=start,invocation_id=v["InvocationID"]),deployment=sealref,
+                boundary_inspector=checker)
+
+
+def same_dispatcher(unit_name, owner):
+    pid=owner["pid"]
+    need(unit(unit_name)["InvocationID"]==owner["invocation_id"] and
+         int((Path("/proc")/str(pid)/"stat").read_text().rsplit(") ",1)[1].split()[19])==owner["start_ticks"],
+         "dispatcher changed while checking")
+
+
+def observed_ready(seal_sha):
+    identity=dispatcher_owner(DIR/"tools-v2",seal_sha,DISPATCH,"follow-v5e",[LOCK])
     drained(OLD)
     need(ref(V19/"post-stop-fit")["sha256"]=="cecfa99996f3099672c6e58f837f4aeef8c2818af57b8585839f128e164fcff5"
          and ref(V19/"deployment-seal-receipt.json")["sha256"]=="0ca8e1a8d4a5c927c14aa8020882f352db1f5e75abd2c4810fc80433cc312c0a",
@@ -223,12 +238,10 @@ def observed_ready(seal_sha):
     status_seal=ref(CADENCE)
     need(status_seal["sha256"]=="7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e"
          and status["consumer_seal"]==status_seal,"different live status publisher")
-    need(unit(DISPATCH)["InvocationID"]==v["InvocationID"] and int((proc/"stat").read_text().rsplit(") ",1)[1].split()[19])==start,
-         "dispatcher changed while checking")
+    same_dispatcher(DISPATCH,identity["dispatcher"])
     return dict(schema="horizon-145-136-prestart-selector-ready-v1",boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
                 original_semantic_invocation=SEMANTIC,operation_lock=lock_identity(OP),
-                dispatcher=dict(pid=pid,start_ticks=start,invocation_id=v["InvocationID"]),deployment=sealref,
-                boundary_inspector=checker,status_consumer_seal=status_seal)
+                **identity,status_consumer_seal=status_seal)
 
 
 def handoff_inputs():
