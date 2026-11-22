@@ -47,6 +47,8 @@ class PostPhaseTest(unittest.TestCase):
         if "POST_PHASE_UNDER_TEST" in os.environ:
             self.assertTrue(phase["TIMEOUT_SUCCESSOR"])
             if phase["TIMER_SUCCESSOR"]:
+                self.assertEqual(phase["PKG"].name, Path(os.environ["POST_PHASE_UNDER_TEST"]).parent.name)
+                self.assertEqual(phase["IMAGE"], phase["PKG"] / "export145")
                 self.assertEqual(phase["ADVANCING_NAME"], "V5E_ACTUAL_ADVANCING_WORKER.json")
                 self.assertEqual(phase["PIPE"].parent.name, "fast-range-residency-0f29fd116ef5")
                 return

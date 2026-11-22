@@ -8,6 +8,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v8") pkg="${pkg%/*}/tools-v8" ;;
     "${pkg%/*}/tools-v9") pkg="${pkg%/*}/tools-v9" ;;
     "${pkg%/*}/tools-v10") pkg="${pkg%/*}/tools-v10" ;;
+    "${pkg%/*}/tools-v12") pkg="${pkg%/*}/tools-v12" ;;
     "${pkg%/*}/tools-v11") pkg="${pkg%/*}/tools-v11" ;;
 esac
 pub=/var/lib/jetstreamer/horizon_runtime_data/epoch145-publication-20261121-v1

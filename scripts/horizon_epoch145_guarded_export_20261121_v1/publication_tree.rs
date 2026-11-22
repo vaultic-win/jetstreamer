@@ -10,15 +10,22 @@ pub(super) struct Tree {
 impl Tree {
     pub(super) fn create() -> Result<Self> {
         let own = fs::read_to_string("/proc/self/cgroup")?;
+        let base = "/system.slice/";
+        #[cfg(all(test, incident_registered136_post145_only))]
+        let base = if own.trim() == "0::/horizonaudit.slice/horizon-incident-145-post-registered-build-v1.service" {
+            "/horizonaudit.slice/"
+        } else {
+            base
+        };
         let name = own
             .trim()
-            .strip_prefix("0::/system.slice/")
+            .strip_prefix(&format!("0::{base}"))
             .context("unexpected supervisor cgroup")?;
         ensure!(
             name.ends_with(".service") && !name.contains('/'),
             "expected one service"
         );
-        let parent = Path::new("/sys/fs/cgroup/system.slice").join(name);
+        let parent = Path::new("/sys/fs/cgroup").join(base.trim_matches('/')).join(name);
         let leaf = parent.join("publication");
         fs::create_dir(&leaf).context("create delegated publication cgroup")?;
         let group = Self { leaf };
