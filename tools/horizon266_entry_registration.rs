@@ -78,6 +78,20 @@ pub const SUCCESSOR266: Pilot = Pilot {
     target: 115343999,
     fixed: None,
 };
+pub const TURNOVER266: Pilot = Pilot {
+    unit: "horizon-qualify-266-instructions-2789f821-v194.service",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v194",
+    state: "/var/lib/jetstreamer/horizon266-instructions-2789f821-v194-control",
+    ..SUCCESSOR266
+};
+
+pub fn instruction_profile(receipt: &Path) -> &'static Pilot {
+    if receipt.starts_with(TURNOVER266.state) {
+        &TURNOVER266
+    } else {
+        &SUCCESSOR266
+    }
+}
 fn text<'a>(v: &'a Value, k: &str) -> Result<&'a str> {
     v[k].as_str()
         .with_context(|| format!("entry registration {k}"))
@@ -376,6 +390,12 @@ impl Pilot {
         Ok(registration)
     }
     fn original(&self, b: &Value, pins: Pins<'_>) -> Result<Value> {
+        let turnover = self.unit == TURNOVER266.unit;
+        let election_schema = if turnover {
+            "horizon266-closed-singleton-capacity-election-v1".to_owned()
+        } else {
+            format!("horizon{}-native-full-capacity-election-v1", self.epoch)
+        };
         let state = Path::new(self.state);
         let pilot = state.join("pilot");
         let iid = pins.iid;
@@ -424,8 +444,7 @@ impl Pilot {
                 && review["schema"]
                     == format!("horizon{}-first-entry-native-review-v1", self.epoch)
                 && fit["fleet"] == review["fleet"]
-                && fit["schema"]
-                    == format!("horizon{}-native-full-capacity-election-v1", self.epoch)
+                && fit["schema"] == election_schema
                 && fit["winner"]["fits"] == true
                 && fit["winner"]["root"] == s["root_cap"]
                 && gp["worker_root"] == self.root
@@ -452,7 +471,23 @@ impl Pilot {
                 && sample["root_physical_observation"].is_object(),
             "pilot original admission, first firing or release"
         );
-        if self.fixed.is_none() {
+        if turnover {
+            ensure!(
+                pins.handoff_sha
+                    == "fcab517e7281c8c1dde68c9e7f56cbabc294eff2154c181bdb72b1742170a4df"
+                    && pins.qa_disk
+                        == "a2f5a56df4c758d0c21e796de02b80d6516cd2de50b180eac41ead82d69d2cbf"
+                    && pins.qa_memory
+                        == "cb75f9c28e2c3ae53a013a9f0bbe58a10b118aea65a95d49a3443f8c1f504903"
+                    && pins.iid == "41cf6e5a5cd54d57adc5eba3f0c0ecef"
+                    && pins.pid == 3215067
+                    && fit["capacity_basis"] == review["capacity_basis"]
+                    && fit["winner"]["assigned_211"] == 177342177280u64
+                    && fit["winner"]["retained_265"] == 128000000000u64
+                    && fit["winner"]["root"] == 320u64 << 30,
+                "different epoch 266 turnover award or release"
+            );
+        } else if self.fixed.is_none() {
             validate_successor(self, &review, &fit, &s)?;
         }
         for (mode, sha) in [("qa-disk", pins.qa_disk), ("qa-memory", pins.qa_memory)] {
@@ -475,10 +510,11 @@ impl Pilot {
                 } else {
                     "qa-memory"
                 };
+                let generation = if turnover { "v194" } else { "v169" };
                 ensure!(
                     q["unit"]
                         == format!(
-                            "horizon-qualify-266-instructions-2789f821-{suffix}-v169.service"
+                            "horizon-qualify-266-instructions-2789f821-{suffix}-{generation}.service"
                         )
                         && q["terminal"]["MainPID"] == "0"
                         && q["terminal"]["ControlGroup"] == ""
@@ -505,7 +541,9 @@ impl Pilot {
         }
         let image = text(&review["controller_image"], "path")?;
         let target = pilot.join("spec.json");
-        let command = if self.fixed.is_none() {
+        let command = if turnover {
+            "epoch266-turnover".to_owned()
+        } else if self.fixed.is_none() {
             "epoch266-instructions".to_owned()
         } else {
             format!("epoch{}-full", self.epoch)
@@ -577,6 +615,35 @@ fn validate_successor(p: &Pilot, review: &Value, fit: &Value, spec: &Value) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "original admitted 320 GiB epoch 266 worker and stopped QA owners"]
+    fn turnover_266_requires_its_original_owner_and_pressure_stops() {
+        let pins = Pins {
+            iid: "41cf6e5a5cd54d57adc5eba3f0c0ecef",
+            pid: 3215067,
+            handoff_sha: "fcab517e7281c8c1dde68c9e7f56cbabc294eff2154c181bdb72b1742170a4df",
+            qa_disk: "a2f5a56df4c758d0c21e796de02b80d6516cd2de50b180eac41ead82d69d2cbf",
+            qa_memory: "cb75f9c28e2c3ae53a013a9f0bbe58a10b118aea65a95d49a3443f8c1f504903",
+        };
+        let path = Path::new(TURNOVER266.state).join("pilot/handoff.json");
+        let handoff = json!({"path":path,"sha256":pins.handoff_sha});
+        let pilot = instruction_profile(&path);
+        let accepted = pilot.original(&handoff, pins).unwrap();
+        assert_eq!(accepted["root_cap"], 320u64 << 30);
+        assert_eq!(accepted["pid"], pins.pid);
+        assert!(SUCCESSOR266.original(&handoff, pins).is_err());
+        assert!(
+            pilot
+                .original(
+                    &handoff,
+                    Pins {
+                        qa_disk: pins.qa_memory,
+                        ..pins
+                    }
+                )
+                .is_err()
+        );
+    }
     #[test]
     #[ignore = "original epoch 266 native handoff and both retained pressure qualifications"]
     fn authentic_original_guard_release_and_both_pressure_qualifications() {

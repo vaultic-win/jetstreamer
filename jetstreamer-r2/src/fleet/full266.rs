@@ -4,9 +4,14 @@ use super::*;
 pub(super) mod bridge;
 
 fn profile(c: &DiagnosticClaim) -> Option<&'static bridge::Pilot> {
-    [&bridge::FULL228, &bridge::FULL266, &bridge::SUCCESSOR266]
-        .into_iter()
-        .find(|p| c.unit == p.unit)
+    [
+        &bridge::FULL228,
+        &bridge::FULL266,
+        &bridge::SUCCESSOR266,
+        &bridge::TURNOVER266,
+    ]
+    .into_iter()
+    .find(|p| c.unit == p.unit)
 }
 pub(super) fn namespace(c: &DiagnosticClaim) -> bool {
     profile(c).is_some()

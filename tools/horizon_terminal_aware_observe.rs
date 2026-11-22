@@ -99,7 +99,14 @@ struct Plan {
 }
 impl Plan {
     fn entry_pilots(&self) -> [(&full266::Pilot, Option<&Bound>); 3] {
-        [(&full266::FULL228, self.full228_entries.as_ref()), (&full266::FULL266, self.full266_entries.as_ref()), (&full266::SUCCESSOR266,self.instruction266_registration.as_ref())]
+        let instruction_pilot = self.instruction266_registration.as_ref()
+            .map(|registration| full266::instruction_profile(&registration.path))
+            .unwrap_or(&full266::SUCCESSOR266);
+        [
+            (&full266::FULL228, self.full228_entries.as_ref()),
+            (&full266::FULL266, self.full266_entries.as_ref()),
+            (instruction_pilot, self.instruction266_registration.as_ref()),
+        ]
     }
 }
 fn sha(b: &[u8]) -> String {
