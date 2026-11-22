@@ -395,6 +395,41 @@ fn publish(p: &Path, d: &Path) -> R<()> {
     }
     Ok(())
 }
+fn recover_partial<T: Transport>(
+    c: &T,
+    parts: &[String],
+    size: u64,
+    part: usize,
+    sha: &str,
+    file: &mut File,
+) -> R<()> {
+    use std::io::Seek;
+    file.rewind().map_err(ioe)?;
+    let existing = file.metadata().map_err(ioe)?.len();
+    require(existing <= size, "oversized restore prefix")?;
+    // Verify each already written byte against its authenticated part and append only the remainder.
+    struct Resume<'a> {
+        f: &'a mut File,
+        existing: u64,
+    }
+    impl Write for Resume<'_> {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            let n = self.existing.min(data.len() as u64) as usize;
+            let mut old = vec![0; n];
+            self.f.read_exact(&mut old)?;
+            if old != data[..n] {
+                return Err(io::Error::other("restore partial prefix differs"));
+            }
+            self.f.write_all(&data[n..])?;
+            self.existing -= n as u64;
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            self.f.flush()
+        }
+    }
+    recover(c, parts, size, part, sha, &mut Resume { f: file, existing })
+}
 fn restore<T: Transport>(
     c: &T,
     parts: &[String],
@@ -441,38 +476,7 @@ fn restore<T: Transport>(
             && m.len() <= size,
         "unexpected restore partial",
     )?;
-    // Verify each already written byte against its authenticated part and append only the remainder.
-    struct Resume<'a> {
-        f: &'a mut File,
-        existing: u64,
-    }
-    impl Write for Resume<'_> {
-        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-            let n = self.existing.min(data.len() as u64) as usize;
-            let mut old = vec![0; n];
-            self.f.read_exact(&mut old)?;
-            if old != data[..n] {
-                return Err(io::Error::other("restore partial prefix differs"));
-            }
-            self.f.write_all(&data[n..])?;
-            self.existing -= n as u64;
-            Ok(data.len())
-        }
-        fn flush(&mut self) -> io::Result<()> {
-            self.f.flush()
-        }
-    }
-    recover(
-        c,
-        parts,
-        size,
-        part,
-        sha,
-        &mut Resume {
-            f: &mut file,
-            existing: m.len(),
-        },
-    )?;
+    recover_partial(c, parts, size, part, sha, &mut file)?;
     file.sync_all().map_err(ioe)?;
     require(hash(&p)? == sha, "local restoration digest")?;
     file.set_permissions(fs::Permissions::from_mode(0o400))
@@ -482,6 +486,78 @@ fn restore<T: Transport>(
     File::open(dir).and_then(|d| d.sync_all()).map_err(ioe)?;
     completed(&out, size, sha)
 }
+#[cfg(epoch250)]
+struct HeldInode {
+    device: u64,
+    inode: u64,
+    owner_mode: (u32, u32, u32),
+    modified: std::time::SystemTime,
+}
+
+#[cfg(epoch250)]
+impl HeldInode {
+    fn check(&self, metadata: &fs::Metadata) -> R<()> {
+        require(
+            metadata.is_file()
+                && metadata.nlink() == 1
+                && (metadata.dev(), metadata.ino()) == (self.device, self.inode)
+                && (metadata.uid(), metadata.gid(), metadata.mode() & 0o7777) == self.owner_mode,
+            "wrong quarantined original inode",
+        )
+    }
+
+    fn refill<T: Transport>(
+        &self,
+        path: &Path,
+        c: &T,
+        parts: &[String],
+        size: u64,
+        part: usize,
+        sha: &str,
+    ) -> R<()> {
+        self.check(&path.symlink_metadata().map_err(ioe)?)?;
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(0x20000)
+            .open(path)
+            .map_err(ioe)?;
+        file.try_lock().map_err(|e| e.to_string())?;
+        self.check(&file.metadata().map_err(ioe)?)?;
+        recover_partial(c, parts, size, part, sha, &mut file)?;
+        file.sync_all().map_err(ioe)?;
+        self.check(&path.symlink_metadata().map_err(ioe)?)?;
+        require(hash(path)? == sha, "refilled inode digest")?;
+        file.set_modified(self.modified).map_err(ioe)?;
+        file.sync_all().map_err(ioe)?;
+        let m = path.symlink_metadata().map_err(ioe)?;
+        self.check(&m)?;
+        require(
+            m.len() == size && m.modified().map_err(ioe)? == self.modified,
+            "refilled inode metadata",
+        )
+    }
+}
+
+#[cfg(epoch250)]
+fn refill_original(c: &Client, parts: &[String]) -> R<()> {
+    use std::time::{Duration, UNIX_EPOCH};
+    let dir = Path::new(DEST);
+    private_dir(dir)?;
+    require(
+        matches!(Path::new(SRC).symlink_metadata(), Err(e) if e.kind() == io::ErrorKind::NotFound),
+        "original delivery path must be vacant during private recovery",
+    )?;
+    let held = HeldInode {
+        device: 66305,
+        inode: INODE,
+        owner_mode: SOURCE_OWNER_MODE,
+        modified: UNIX_EPOCH + Duration::new(TIMES.0 as u64, TIMES.1 as u32),
+    };
+    held.refill(&dir.join("original-inode"), c, parts, SIZE, PART, SHA)?;
+    File::open(dir).and_then(|dir| dir.sync_all()).map_err(ioe)
+}
+
 fn approved_owner(code: u16, body: &[u8]) -> R<()> {
     require(
         code == 200 && body == OWNER,
@@ -491,7 +567,9 @@ fn approved_owner(code: u16, body: &[u8]) -> R<()> {
 fn run() -> R<()> {
     let args: Vec<_> = env::args().collect();
     require(
-        args.len() == 2 && matches!(args[1].as_str(), "park" | "verify" | "restore"),
+        args.len() == 2
+            && (matches!(args[1].as_str(), "park" | "verify" | "restore")
+                || (cfg!(epoch250) && args[1] == "refill-original")),
         "use park, verify or restore",
     )?;
     authority()?;
@@ -530,11 +608,18 @@ fn run() -> R<()> {
             private_dir(d)?;
             restore(&c, &parts, SIZE, PART, SHA, d)?;
         }
+        #[cfg(epoch250)]
+        "refill-original" => refill_original(&c, &parts)?,
         "verify" => recover(&c, &parts, SIZE, PART, SHA, &mut io::sink())?,
         _ => {}
     }
+    let kind = if cfg!(epoch250) {
+        "closed-archive"
+    } else {
+        "cid-to-offset-and-size"
+    };
     println!(
-        "{{\"epoch\":{EPOCH},\"kind\":\"cid-to-offset-and-size\",\"operation\":\"{}\",\"manifest_sha256\":\"{msha}\",\"sha256\":\"{SHA}\",\"bytes\":{SIZE},\"parts\":{},\"capacity_credit\":0,\"canonical_publication\":false}}",
+        "{{\"epoch\":{EPOCH},\"kind\":\"{kind}\",\"operation\":\"{}\",\"manifest_sha256\":\"{msha}\",\"sha256\":\"{SHA}\",\"bytes\":{SIZE},\"parts\":{},\"capacity_credit\":0,\"canonical_publication\":false}}",
         args[1],
         parts.len()
     );

@@ -253,3 +253,48 @@ fn owner_and_profile_do_not_accept_another_namespace() {
     )));
     assert!(!key(&"0".repeat(64)).ends_with(".jet"));
 }
+
+#[test]
+#[cfg(epoch250)]
+fn refills_only_the_quarantined_original_and_resumes_a_partial_part() {
+    use std::time::{Duration, UNIX_EPOCH};
+    let d = Dir::new();
+    let f = Fake::default();
+    let parts = parts(&f, &d.0).unwrap();
+    let path = d.0.join("held");
+    fs::write(&path, &SAMPLE[..5]).unwrap();
+    let m = path.metadata().unwrap();
+    let target = HeldInode {
+        device: m.dev(),
+        inode: m.ino(),
+        owner_mode: (m.uid(), m.gid(), m.mode() & 0o7777),
+        modified: UNIX_EPOCH + Duration::new(100, 512),
+    };
+    let refill = |path: &Path| target.refill(path, &f, &parts, 10, UNIT, &sha());
+    let pin = File::open(&path).unwrap();
+    pin.try_lock().unwrap();
+    assert!(refill(&path).is_err());
+    drop(pin);
+    let replacement = d.0.join("other");
+    fs::write(&replacement, &SAMPLE[..5]).unwrap();
+    assert!(refill(&replacement).is_err());
+    fs::hard_link(&path, d.0.join("link")).unwrap();
+    assert!(refill(&path).is_err());
+    fs::remove_file(d.0.join("link")).unwrap();
+    fs::write(&path, b"AAAAX").unwrap();
+    assert!(refill(&path).is_err());
+    assert_eq!(fs::read(&path).unwrap(), b"AAAAX");
+    fs::write(&path, &SAMPLE[..5]).unwrap();
+    let last = f.data.borrow_mut().remove(&key(&parts[2])).unwrap();
+    assert!(refill(&path).is_err());
+    assert_eq!(fs::read(&path).unwrap(), &SAMPLE[..8]);
+    f.data.borrow_mut().insert(key(&parts[2]), last);
+    for _ in 0..2 {
+        refill(&path).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), SAMPLE);
+        let m = path.metadata().unwrap();
+        assert_eq!(m.ino(), target.inode);
+        assert_eq!(m.modified().unwrap(), target.modified);
+    }
+    assert_eq!(fs::read(replacement).unwrap(), &SAMPLE[..5]);
+}
