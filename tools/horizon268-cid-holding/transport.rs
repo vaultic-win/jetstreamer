@@ -1,7 +1,7 @@
 //! Fixed-key Foundation holding transport. curl supplies TLS and SigV4; credentials go only to stdin.
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -198,13 +198,18 @@ fn retryable(exit: Option<i32>, status: Option<u16>) -> bool {
 }
 pub(super) trait Transport {
     fn request(&self, key: &str, put: Option<&Path>, max: u64) -> R<(u16, Vec<u8>)>;
-    fn small(&self, key: &str, p: &Path) -> R<()> {
-        let bytes = fs::read(p).map_err(|e| e.to_string())?;
+    fn small(&self, key: &str, p: &Path, length: u64) -> R<()> {
+        require((1..=1 << 20).contains(&length), "unbounded manifest")?;
+        let mut bytes = Vec::new();
+        fs::File::open(p)
+            .and_then(|f| f.take(length + 1).read_to_end(&mut bytes))
+            .map_err(|e| e.to_string())?;
         require(
-            !bytes.is_empty() && bytes.len() < 65536,
-            "unbounded manifest",
+            bytes.len() as u64 == length,
+            "different local manifest length",
         )?;
-        let (code, old) = self.request(key, None, 65536)?;
+        let response_limit = length.max(4096);
+        let (code, old) = self.request(key, None, response_limit)?;
         if code == 200 {
             return require(
                 old == bytes,
@@ -212,9 +217,9 @@ pub(super) trait Transport {
             );
         }
         require(code == 404, "unconfirmed absent marker")?;
-        let (status, _) = self.request(key, Some(p), 65536)?;
+        let (status, _) = self.request(key, Some(p), 4096)?;
         require(status == 200 || status == 412, "conditional marker failed")?;
-        let (code, remote) = self.request(key, None, 65536)?;
+        let (code, remote) = self.request(key, None, response_limit)?;
         require(code == 200 && remote == bytes, "manifest readback mismatch")
     }
 }

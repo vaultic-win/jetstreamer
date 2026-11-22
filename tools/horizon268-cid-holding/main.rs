@@ -201,17 +201,29 @@ fn header() -> String {
         "horizon{EPOCH}-cid-index-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} car_bytes={CAR_BYTES} entries={ENTRIES} buckets={BUCKETS} mapping={MAP_SHA} recovery={REC_SHA} structural={STR_SHA} canonical=false"
     )
 }
+fn manifest_length(profile: &str, size: u64, part: usize) -> R<u64> {
+    require(size > 0 && part > 0, "empty part geometry")?;
+    let parts = size.div_ceil(part as u64);
+    // One newline after the header, then one 64-character digest and newline per part.
+    let length = parts
+        .checked_mul(65)
+        .and_then(|n| n.checked_add(profile.len() as u64))
+        .and_then(|n| n.checked_add(1))
+        .ok_or("manifest size overflow")?;
+    require(length <= 1 << 20, "manifest exceeds holding metadata limit")?;
+    Ok(length)
+}
 fn parse(bytes: &[u8], profile: &str, size: u64, part: usize) -> R<Vec<String>> {
+    require(
+        bytes.len() as u64 == manifest_length(profile, size, part)?,
+        "different manifest length",
+    )?;
     let s = std::str::from_utf8(bytes).map_err(|_| "invalid manifest")?;
     let mut lines = s.lines();
-    require(
-        lines.next() == Some(profile) && bytes.len() < 65536,
-        "different manifest profile",
-    )?;
+    require(lines.next() == Some(profile), "different manifest profile")?;
     let parts: Vec<_> = lines.map(str::to_owned).collect();
     require(
-        part > 0
-            && parts.len() as u64 == size.div_ceil(part as u64)
+        parts.len() as u64 == size.div_ceil(part as u64)
             && parts.iter().all(|h| hex(h, 64))
             && manifest(profile, &parts) == bytes,
         "invalid chunk manifest",
@@ -286,12 +298,14 @@ fn remote_manifest<T: Transport>(
     size: u64,
     part: usize,
 ) -> R<(Vec<String>, String)> {
-    let (s, m) = c.request(&fixed(), None, 65536)?;
+    let length = manifest_length(profile, size, part)?;
+    let (s, m) = c.request(&fixed(), None, length)?;
     require(s == 200, "missing registered manifest")?;
+    let parts = parse(&m, profile, size, part)?;
     let sha = hash_bytes(&m)?;
-    let (s, b) = c.request(&format!("{PREFIX}/manifests/{sha}.manifest"), None, 65536)?;
+    let (s, b) = c.request(&format!("{PREFIX}/manifests/{sha}.manifest"), None, length)?;
     require(s == 200 && m == b, "immutable manifest differs")?;
-    Ok((parse(&m, profile, size, part)?, sha))
+    Ok((parts, sha))
 }
 fn recover<T: Transport>(
     c: &T,
@@ -464,11 +478,13 @@ fn run() -> R<()> {
         let m = manifest(&h, &parts);
         parse(&m, &h, SIZE, PART)?;
         let tmp = Scratch::new(work, "manifest", &m)?;
+        let length = manifest_length(&h, SIZE, PART)?;
         c.small(
             &format!("{PREFIX}/manifests/{}.manifest", hash_bytes(&m)?),
             &tmp.0,
+            length,
         )?;
-        c.small(&fixed(), &tmp.0)?;
+        c.small(&fixed(), &tmp.0, length)?;
     }
     let (parts, msha) = remote_manifest(&c, &h, SIZE, PART)?;
     match args[1].as_str() {
