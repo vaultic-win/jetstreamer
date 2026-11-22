@@ -206,8 +206,9 @@ def same_fork(before,after,observed):
         s.need(after["guard"]!=before["guard"] and after["guard_time"]>=before["guard_time"],
                "worker lacks a subsequent completed native guard")
 
-def native_actor(e,own,tree,run,stop,terminal=None):
-    d=R/DIRS[e];unit="horizon-qualify-"+UNITS[e]+".service";timer="horizon-guard-"+UNITS[e]+".timer"
+def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
+    directory, name = generation if generation is not None else (DIRS[e], UNITS[e])
+    d=R/directory;unit="horizon-qualify-"+name+".service";timer="horizon-guard-"+name+".timer"
     manager=s.show(unit);ps=fit.members(unit)
     if not ps:
         s.need(manager["ActiveState"] in ("failed","inactive") and not manager["Job"] and (terminal is not None or not (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists()),

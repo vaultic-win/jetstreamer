@@ -21,6 +21,7 @@ mod actor;
     epoch166_recovery,
     path = "../horizon_epoch166_guard_recovery_20261121_v1/source166.rs"
 )]
+#[cfg_attr(epoch167_cold_rebook, path = "cold167.rs")]
 mod source;
 use source::{ATTEMPT, BASE, CAP, EPOCH, LANE, OLD, PREVIOUS_GUARD_ARGV, TIMER, UNIT};
 const GUARD_SHA: &str = "07f6924ee1cf8d8311aa7bed6620dcf1af580a5546e948206af628c57aa3443b";
@@ -54,6 +55,9 @@ fn member(path: &Path, sealdigest: &str) -> Result<Value> {
     Ok(sr)
 }
 fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
+    #[cfg(epoch167_cold_rebook)]
+    let path = rt("incident-replay-fit-20261121-v1/tools-homefloor/post-stop-fit");
+    #[cfg(not(epoch167_cold_rebook))]
     let path = if fit_seal == "e8ba73178277950ed2bcc976534f49af21413745c8244026fcb1502bea9adc7e" {
         rt(PROVIDER)
     } else {
@@ -73,6 +77,16 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
             && n(&v, "available_memory_bytes")? >= n(&v, "required_available_memory_bytes")?
             && n(&v, "protected_raw_floor_bytes")? >= 8_297_502_499_408u64,
         "unfunded original replay booking"
+    );
+    #[cfg(epoch167_cold_rebook)]
+    ensure!(
+        v["epoch"] == EPOCH
+            && v["fleet"] == *fleet
+            && v["resource_credit_bytes"] == 0
+            && v["bookings"]["167"]["root"] == LANE
+            && v["bookings"]["167"]["cap_bytes"] == CAP
+            && v["replay_launch_authorized"] == false,
+        "foreign successor budget or candidate"
     );
     v["provider_seal"] = se;
     Ok(v)
@@ -415,7 +429,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(epoch166_recovery))]
+    #[cfg(not(any(epoch166_recovery, epoch167_cold_rebook)))]
     #[test]
     fn original_stop_and_permanent_witness_roots() {
         let v = source::files().unwrap();
