@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 from delivery248 import CLAIM, D, KEY, LENGTH, PRIVATE, ROOT, SHA, aws, bound, funds, live_binding, prefix, ref, registered
 
-START = ROOT/'start-status'
+FIRST = ROOT/'start-status'
+START = ROOT/'origin-clock-status'
 OLD = D/'horizon247-delivery-admission-20261119-v1/operation.log'
 
 def events(path):
@@ -64,7 +65,13 @@ def timing(now, items):
         meta = aws('head-object','--key','epoch-248.jet')
         assert meta['ContentLength'] == LENGTH and meta['ETag'] == items['epoch-248.jet']['ETag']
         assert SHA in meta['Metadata'].values()
-    return dict(phase=phase,seconds=math.ceil(remaining+1800),elapsed=round(elapsed*1000),owner=launch['unit']['InvocationID'],
+    origin = bound(book['handoff'])['producer']
+    event, = [e for e in origin['events'] if e['MESSAGE_ID'] == '39f53479d3a045ac8e11786248231fbf']
+    assert event['_PID'] == '1' and event['_UID'] == '0' and event['UNIT'] == origin['unit']['Id']
+    assert event['INVOCATION_ID'] == origin['unit']['InvocationID'] == '16f84e36b65645a7be7d28d08e3d40cc'
+    elapsed_ms = int(now*1000)-int(event['__REALTIME_TIMESTAMP'])//1000
+    assert elapsed_ms >= elapsed*1000
+    return dict(phase=phase,seconds=math.ceil(remaining+1800),elapsed=elapsed_ms,owner=launch['unit']['InvocationID'],
                 claim=claim_ref,benchmark=ref(benchmark),original_upload=history_ref,log=log,at=now)
 
 def start():
@@ -72,6 +79,9 @@ def start():
     fleet = Path(book['fit']['fleet']['path'])
     v = fleet.parent.name.split('-v')[1].split('-')[0]
     prev = ref(D/f'horizon-resumed-campaign-status-v{v}-a1/248/completion.json')
+    first = ref(FIRST/'completion.json')
+    assert bound(bound(first)['intent'])['previous'] == prev
+    prev = first
     previous = bound(prev)
     old = bound(previous['readback'])
     assert old['epoch'] == 248 and previous['authenticated_exact_byte_readback'] and previous['key'] == KEY

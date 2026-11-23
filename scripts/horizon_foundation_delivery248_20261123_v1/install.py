@@ -46,9 +46,10 @@ def status(s):
   assert key in items and set(items)<= {key,'epoch-248.jet'}
  else:
  '''+original)
-    s=replace(s,' marker_data=read(prior_marker);',""" if n==248 and (status248.START/'completion.json').exists():
-  event=status248.START/'completion.json'
-  if read(Path(read(event)['intent']['path']))['previous']==bind(prior_marker):prior_marker=event
+    s=replace(s,' marker_data=read(prior_marker);',""" if n==248:
+  for directory in (status248.FIRST,status248.START):
+   event=directory/'completion.json'
+   if event.exists() and read(Path(read(event)['intent']['path']))['previous']==bind(prior_marker):prior_marker=event
  marker_data=read(prior_marker);""")
     s=replace(s,'  else:\n   queue+=20*3600;',"""  elif n==248 and delivery.CLAIM.exists():
    t=status248.timing(sample.timestamp(),items)
