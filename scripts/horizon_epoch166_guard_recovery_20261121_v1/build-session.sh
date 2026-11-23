@@ -8,7 +8,7 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch168-cold-rebook ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -19,11 +19,17 @@ if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epo
         retry=retry11
         extra_cfg=(--cfg epoch166_after170)
     fi
-    if [[ $retry == cold-rebook ]]; then
+    date=20261122
+    if [[ $retry == cold-retry3 ]]; then
+        epoch=168
+        retry=retry3
+        date=20261123
+        extra_cfg=(--cfg epoch168_cold_retry3)
+    elif [[ $retry == cold-rebook ]]; then
         epoch=168
         retry=retry2
     fi
-    base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-$retry-rebook-20261122-v1"
+    base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-$retry-rebook-${date}-v1"
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
     test "$(findmnt -n -T "$scratch" -o SOURCE | sort -u)" = /dev/loop3
     cfg="epoch${epoch}_$retry"
@@ -73,7 +79,10 @@ if [[ ${1:-} == epoch166-after168 ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --cfg epoch166_after170 --test "$shared/main.rs" -o "$out/tests166-after170"
     "$out/tests166-after170" --test-threads=1
 fi
-if [[ ${#extra_cfg[@]} -gt 0 ]]; then
+if [[ ${1:-} == epoch168-cold-retry3 ]]; then
+    rustc "${args[@]}" --cfg epoch168_cold_rebook --test "$shared/main.rs" -o "$out/tests168-prior"
+    "$out/tests168-prior" --test-threads=1
+elif [[ ${#extra_cfg[@]} -gt 0 ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --test "$shared/main.rs" -o "$out/tests166-prior"
     "$out/tests166-prior" --test-threads=1
 fi

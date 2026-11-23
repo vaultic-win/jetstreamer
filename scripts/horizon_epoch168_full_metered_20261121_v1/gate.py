@@ -12,12 +12,14 @@ import time
 ALIAS = Path("/run/horizon-full168-metered")
 RUN = Path("/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1")
 UNIT = "horizon-qualify-168-full-metered-20261121-v1.service"
-COLD_ALIAS = Path("/run/horizon-full168-cold-v2")
+COLD_V3 = Path(__file__) == Path("/run/horizon-full168-cold-v3/gate.py")
+COLD_ALIAS = Path("/run/horizon-full168-cold-v3" if COLD_V3 else "/run/horizon-full168-cold-v2")
 COLD = Path(__file__) == COLD_ALIAS / "gate.py"
 if COLD:
     ALIAS = COLD_ALIAS
-    RUN = RUN / "cold-retry2-20261122"
-    UNIT = "horizon-qualify-168-full-metered-cold-v2-20261122.service"
+    RUN = RUN / ("cold-retry3-20261123" if COLD_V3 else "cold-retry2-20261122")
+    UNIT = ("horizon-qualify-168-full-metered-cold-v3-20261123.service" if COLD_V3 else
+            "horizon-qualify-168-full-metered-cold-v2-20261122.service")
 INPUTS = ALIAS if COLD else RUN / "runtime"
 NODE = "jetstreamer-node"
 WORKER = "jetstreamer-historical-worker-v1-5-6"

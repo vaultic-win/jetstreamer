@@ -35,7 +35,7 @@ pub fn sample() -> Result<Value> {
         ensure!(
             argv[held] == "/usr/bin/python3"
                 && argv[held + 1] == "-IB"
-                && argv[held + 2] == "/run/horizon-full168-cold-v2/gate.py"
+                && argv[held + 2] == format!("{}/gate.py", source::ALIAS)
                 && members(UNIT)? == vec![pid],
             "foreign held command"
         );

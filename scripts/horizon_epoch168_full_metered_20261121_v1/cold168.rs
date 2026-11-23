@@ -3,29 +3,72 @@ use super::*;
 
 pub const EPOCH: u64 = 168;
 pub const LANE: &str = "/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1";
-pub const ATTEMPT: &str = "full-metered-20261121-v1/cold-retry2-20261122";
-pub const BASE: &str = "epoch168-retry2-rebook-20261122-v1";
 pub const OLD: &str = "epoch168-full-metered-20261121-v1";
-pub const UNIT: &str = "horizon-qualify-168-full-metered-cold-v2-20261122.service";
-pub const TIMER: &str = "horizon-guard-168-full-metered-cold-v2-20261122.timer";
 pub const CAP: u64 = 288 << 30;
-pub const GUARD_SHA: &str = "22cc2f4f49ecd236d1b7c177bc4d2df0a96ebec5c6ef591905ff6ca6ab9e7770";
-pub const GSEAL: &str = "160ffc208db19b9fa23112c028cd9cb80853f10c8abc8f484cb0935adc51a1d2";
-pub const CONTRACT: &str = "f10342c06a7b501b503f6046c56a345880c785c2a5d17f03ab43c4b30526d088";
-pub const CSEAL: &str = "e68fec195ca0f5708ea98fc3013e7080c7a91b8e454f1c79bca51d0c29b14609";
-pub const WITNESS: &str = "7373df4366d2c4ea1fd14cfa063f56fb66ff1fb7997fc6e9245c345fbf3fb217";
 pub const PREVIOUS_GUARD_ARGV: &str =
     "1b81a271d53f52ea34ead452d578f68326ba9f51b61ddbaa154f7277cfa441bf";
 pub const OLD_UNIT: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
-pub const GUARD_BASE: &str = "epoch168-cold-guard-20261122-v2";
-pub const FIT: &str =
-    "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v2/post-stop-fit";
-const PREPARED: &str = "dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a";
 const ORIGINAL_ARGV: &str = "39d2e97f8f6962984f1ec9672a4701fe0772e3a63a72465b8d945d59eab7b4fa";
 const PAYLOAD: &str = "6c56c0cad87c9d22ca72ad8e2cf97cb0cc0c5e1b4d1d01e4f051dfc01875b240";
 const INPUT_SEAL: &str = "e00db5e753a2cc37af403933f54bcb3216594d1fac3d91cc8984623999295a93";
-const ROOT: &str = "ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc";
-const ALIAS: &str = "/run/horizon-full168-cold-v2";
+#[cfg(not(epoch168_cold_retry3))]
+mod route {
+    pub const ATTEMPT: &str = "full-metered-20261121-v1/cold-retry2-20261122";
+    pub const BASE: &str = "epoch168-retry2-rebook-20261122-v1";
+    pub const UNIT: &str = "horizon-qualify-168-full-metered-cold-v2-20261122.service";
+    pub const TIMER: &str = "horizon-guard-168-full-metered-cold-v2-20261122.timer";
+    pub const GUARD_SHA: &str = "22cc2f4f49ecd236d1b7c177bc4d2df0a96ebec5c6ef591905ff6ca6ab9e7770";
+    pub const GSEAL: &str = "160ffc208db19b9fa23112c028cd9cb80853f10c8abc8f484cb0935adc51a1d2";
+    pub const CONTRACT: &str = "f10342c06a7b501b503f6046c56a345880c785c2a5d17f03ab43c4b30526d088";
+    pub const CSEAL: &str = "e68fec195ca0f5708ea98fc3013e7080c7a91b8e454f1c79bca51d0c29b14609";
+    pub const WITNESS: &str = "7373df4366d2c4ea1fd14cfa063f56fb66ff1fb7997fc6e9245c345fbf3fb217";
+    pub const GUARD_BASE: &str = "epoch168-cold-guard-20261122-v2";
+    pub const FIT: &str =
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v2/post-stop-fit";
+    pub const ROOT: &str = "ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc";
+    pub const ALIAS: &str = "/run/horizon-full168-cold-v2";
+    pub const STATUS_QUALIFIED: &str = "COLD168_RETRY2_V1_STATUS_QUALIFIED.json";
+    pub const STATUS_ACTIVE: &str = "COLD168_RETRY2_V1_STATUS_ACTIVE.json";
+    pub const STATUS_SCHEMA: &str = "horizon-168-retry2-v1-status-qualified-v1";
+    pub const GUARD_QUALIFIED: &str =
+        "bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b";
+    pub const DESCRIPTION: &str = "--description=guarded-full168-cold-retry2";
+    pub const RUN_INO: u64 = 103481350;
+    pub const OUTPUT_INO: u64 = 103481354;
+    pub const PRIVATE_INO: u64 = 103481352;
+    pub const LOG_INO: u64 = 103481356;
+    pub const PREPARED: Option<&str> =
+        Some("dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a");
+}
+#[cfg(epoch168_cold_retry3)]
+mod route {
+    pub const ATTEMPT: &str = "full-metered-20261121-v1/cold-retry3-20261123";
+    pub const BASE: &str = "epoch168-retry3-rebook-20261123-v1";
+    pub const UNIT: &str = "horizon-qualify-168-full-metered-cold-v3-20261123.service";
+    pub const TIMER: &str = "horizon-guard-168-full-metered-cold-v3-20261123.timer";
+    pub const GUARD_SHA: &str = "426f78a04505ca11cdfd180db9195cbc8ec9e2300842013e4ee5829b34f4089f";
+    pub const GSEAL: &str = "830df6654ed3ddb53041f7fbfe699cd7d1a1c61de0f5d73c72d9eed8afac0359";
+    pub const CONTRACT: &str = "a5e03bcb30cb96182f1c091b55d1787ee8d3e5c7ce58d9f90c88773986fb231e";
+    pub const CSEAL: &str = "77136d519e99d81c90a8ba9e4bb045a4286d15f910a3368d5399fb406bb47683";
+    pub const WITNESS: &str = "f7e7fa120e7bb0b5acf736bd2da2c3e8dca2b400161137366ea583153dcc293c";
+    pub const GUARD_BASE: &str = "epoch168-cold-guard-20261123-v3";
+    pub const FIT: &str =
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry3-v1/post-stop-fit";
+    pub const ROOT: &str = "a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4";
+    pub const ALIAS: &str = "/run/horizon-full168-cold-v3";
+    pub const STATUS_QUALIFIED: &str = "COLD168_RETRY3_V1_STATUS_QUALIFIED.json";
+    pub const STATUS_ACTIVE: &str = "COLD168_RETRY3_V1_STATUS_ACTIVE.json";
+    pub const STATUS_SCHEMA: &str = "horizon-168-retry3-v1-status-qualified-v1";
+    pub const GUARD_QUALIFIED: &str =
+        "6fef2fa86ae3011b87d90a6d3c8168cac73ac07b9dd43b705ce664c421a04d62";
+    pub const DESCRIPTION: &str = "--description=guarded-full168-cold-retry3";
+    pub const RUN_INO: u64 = 103481378;
+    pub const OUTPUT_INO: u64 = 103481379;
+    pub const PRIVATE_INO: u64 = 103481380;
+    pub const LOG_INO: u64 = 103481382;
+    pub const PREPARED: Option<&str> = None;
+}
+pub use route::*;
 const OLD_ALIAS: &str = "/run/horizon-full168-metered";
 const NODE: &str = "jetstreamer-node";
 const WORKER: &str = "jetstreamer-historical-worker-v1-5-6";
@@ -139,7 +182,7 @@ fn translate_argv(old: &[String], p: &Value) -> Result<Vec<String>> {
         let replacement = if arg == &format!("--unit={OLD_UNIT}") {
             format!("--unit={UNIT}")
         } else if arg.starts_with("--description=") {
-            "--description=guarded-full168-cold-retry2".to_owned()
+            DESCRIPTION.to_owned()
         } else if arg.starts_with("--property=ExecPaths=") {
             format!(
                 "--property=ExecPaths={} {ALIAS}/{NODE}",
@@ -348,9 +391,9 @@ pub fn files() -> Result<Value> {
         "different original successor namespace"
     );
     for (key, path, ino) in [
-        ("root", run(), 103481350),
-        ("output", output(), 103481354),
-        ("private", run().join("private"), 103481352),
+        ("root", run(), RUN_INO),
+        ("output", output(), OUTPUT_INO),
+        ("private", run().join("private"), PRIVATE_INO),
     ] {
         let m = path.symlink_metadata()?;
         let row = if key == "root" { &root } else { &root[key] };
@@ -391,11 +434,87 @@ pub fn files() -> Result<Value> {
             "old 168 is active"
         );
     }
+    #[cfg(epoch168_cold_retry3)]
+    spent_retry2(&root)?;
     let profile = profile()?;
     retained_inputs(&profile["payload"], false)?;
     Ok(
-        json!({"root":{"path":run(),"device":64512,"inode":103481350},"stable_roots":rootref,"predecessor_stop":root["prior_stop"],"profile":profile}),
+        json!({"root":{"path":run(),"device":64512,"inode":RUN_INO},"stable_roots":rootref,"predecessor_stop":root["prior_stop"],"profile":profile}),
     )
+}
+#[cfg(epoch168_cold_retry3)]
+fn spent_retry2(root: &Value) -> Result<()> {
+    let prior = rt("epoch168-retry2-rebook-20261122-v1");
+    let previous_root = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json"))?;
+    let failure = bound(
+        &root["previous_start_failure"],
+        &prior.join("RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+    )?;
+    validate_previous(root, &previous_root, &failure)?;
+    let receipts = &failure["receipts"];
+    let authorization = bound(
+        &receipts["AUTHORIZED_GATED_PAYLOAD.json"],
+        &prior.join("AUTHORIZED_GATED_PAYLOAD.json"),
+    )?;
+    let held = bound(
+        &receipts["ACTUAL_PRODUCER_NATIVE.json"],
+        &prior.join("ACTUAL_PRODUCER_NATIVE.json"),
+    )?;
+    let old_unit = st(&failure["producer"], "Id")?;
+    let old_timer = st(&failure["timer"], "Id")?;
+    let actor = native(old_unit)?;
+    let timer = native(old_timer)?;
+    let iid = st(&held, "producer_invocation_id")?;
+    let allow = prior.join("barrier/allow");
+    ensure!(
+        authorization["producer_invocation_id"] == iid
+            && authorization["producer_pid"] == held["producer_pid"]
+            && authorization["start_ticks"] == held["start_ticks"]
+            && failure["producer"]["InvocationID"] == iid
+            && receipts["barrier/allow"]["path"] == json!(allow)
+            && receipts["barrier/allow"]["sha256"] == file_digest(&allow)?
+            && raw(&allow, 32)? == iid.as_bytes()
+            && !prior
+                .join("ACTUAL_ADMISSION_AND_PROTECTION.json")
+                .try_exists()?
+            && actor["ActiveState"] == "failed"
+            && actor["InvocationID"] == iid
+            && actor["Result"] == "exit-code"
+            && actor["MainPID"] == "0"
+            && actor["ControlPID"] == "0"
+            && actor["Job"] == ""
+            && actor["NRestarts"] == "0"
+            && members(old_unit)?.is_empty()
+            && timer["ActiveState"] == "inactive"
+            && timer["Job"] == ""
+            && members(&old_timer.replace(".timer", ".service"))?.is_empty(),
+        "previous epoch 168 permit or stopped owner changed"
+    );
+    Ok(())
+}
+#[cfg(epoch168_cold_retry3)]
+fn validate_previous(root: &Value, previous: &Value, failure: &Value) -> Result<()> {
+    ensure!(
+        root["previous_root"]["sha256"]
+            == "ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc"
+            && root["previous_start_failure"]["sha256"]
+                == "a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643"
+            && previous["prior_stop"] == root["prior_stop"]
+            && previous["initial_cleanup"] == root["initial_cleanup"]
+            && failure["epoch"] == EPOCH
+            && failure["permit_consumed"] == true
+            && failure["no_admission_record"] == true
+            && failure["worker_receipt_absent"] == true
+            && failure["private_directory_empty"] == true
+            && failure["producer"]["Id"]
+                == "horizon-qualify-168-full-metered-cold-v2-20261122.service"
+            && failure["timer"]["Id"] == "horizon-guard-168-full-metered-cold-v2-20261122.timer"
+            && failure["producer"]["InvocationID"] == "d929652cba0e459cafc75edd05356c83"
+            && failure["producer"]["ExecMainStatus"] == "1"
+            && failure["producer"]["NRestarts"] == "0",
+        "wrong predecessor for epoch 168 retry3"
+    );
+    Ok(())
 }
 fn record_once(name: &str, value: &Value) -> Result<Value> {
     let p = base().join(name);
@@ -418,7 +537,7 @@ fn logfile() -> Result<File> {
         p.canonicalize()? == p
             && m.is_file()
             && (m.dev(), m.ino(), m.nlink(), m.mode() & 0o7777, m.len())
-                == (64512, 103481356, 1, 0o600, 0)
+                == (64512, LOG_INO, 1, 0o600, 0)
             && matches!((m.uid(), m.gid()), (1001, 1003) | (0, 0))
             && same(
                 &p,
@@ -466,12 +585,13 @@ pub fn prepare() -> Result<Value> {
         "payload encoding differs"
     );
     stage_mounts(p)?;
-    record(
-        "PREPARED.json",
-        &json!({"schema":"horizon-168-replay-recovery-preparation-v1","epoch":EPOCH,
+    record("PREPARED.json", &preparation(&clean, &payload))
+}
+fn preparation(clean: &Value, payload: &Value) -> Value {
+    let profile = &clean["profile"];
+    json!({"schema":"horizon-168-replay-recovery-preparation-v1","epoch":EPOCH,
         "baseline":clean,"profile":profile,"payload":payload,"node_sha256":NODE_SHA,"worker_sha256":WORKER_SHA,
-        "original_run_retained":true,"replay_launch_authorized":false}),
-    )
+        "original_run_retained":true,"replay_launch_authorized":false})
 }
 pub fn prepare_log() -> Result<Value> {
     let m = logfile()?.metadata()?;
@@ -484,11 +604,20 @@ pub fn prepare_log() -> Result<Value> {
     )
 }
 pub fn ready() -> Result<Value> {
-    let (prep, r) = doc(&base().join("PREPARED.json"), Some(PREPARED))?;
+    let (prep, r) = doc(&base().join("PREPARED.json"), PREPARED)?;
+    let clean = files()?;
+    let (_, payload) = doc(
+        &base().join("COLD_PAYLOAD.json"),
+        Some(st(&clean["profile"], "payload_sha256")?),
+    )?;
+    ensure!(
+        prep == preparation(&clean, &payload),
+        "different epoch 168 preparation"
+    );
     let m = logfile()?.metadata()?;
     ensure!(
         (m.uid(), m.gid()) == (0, 0)
-            && prep["baseline"] == files()?
+            && prep["baseline"] == clean
             && prep["profile"] == prep["baseline"]["profile"]
             && bound(&prep["payload"], &base().join("COLD_PAYLOAD.json"))?
                 == prep["profile"]["payload"]
@@ -787,6 +916,33 @@ mod tests {
         short["fits"] = json!(false);
         assert!(checked_quote(&short, &provider, &actor, &plan, &first).is_err());
     }
+    #[cfg(epoch168_cold_retry3)]
+    #[test]
+    fn previous_permit_cannot_admit_a_successor() {
+        let root = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT))
+            .unwrap()
+            .0;
+        let prior = rt("epoch168-retry2-rebook-20261122-v1");
+        let prev = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json")).unwrap();
+        let f = bound(
+            &root["previous_start_failure"],
+            &prior.join("RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+        )
+        .unwrap();
+        for key in [
+            "permit_consumed",
+            "no_admission_record",
+            "worker_receipt_absent",
+            "private_directory_empty",
+        ] {
+            let mut bad = f.clone();
+            bad[key] = json!(false);
+            assert!(validate_previous(&root, &prev, &bad).is_err());
+        }
+        let mut wrong = f;
+        wrong["producer"]["InvocationID"] = json!("unrelated");
+        assert!(validate_previous(&root, &prev, &wrong).is_err());
+    }
     #[test]
     fn real_original_and_successor_paths_match() {
         let p = profile().unwrap();
@@ -808,7 +964,7 @@ mod tests {
             output().display(),
             run().join("private").display()
         ))));
-        assert_eq!(files().unwrap()["root"]["inode"], 103481350);
+        assert_eq!(files().unwrap()["root"]["inode"], RUN_INO);
         for (key, val) in [
             ("epoch", json!(167)),
             ("producer_unit", json!(UNIT)),
@@ -848,17 +1004,29 @@ mod tests {
 /// Require the sole writer qualified against this prepared lane.
 pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
     let d = rt("survivor172-cadence-20261122-v1");
-    let (q, qr) = doc(&d.join("COLD168_RETRY2_V1_STATUS_QUALIFIED.json"), None)?;
-    let (a, ar) = doc(&d.join("COLD168_RETRY2_V1_STATUS_ACTIVE.json"), None)?;
+    let (q, qr) = doc(&d.join(STATUS_QUALIFIED), None)?;
+    let (a, ar) = doc(&d.join(STATUS_ACTIVE), None)?;
     let (_, rr) = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT))?;
     let (_, gr) = doc(
         &rt(GUARD_BASE).join("GUARD_QUALIFIED.json"),
-        Some("bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b"),
+        Some(GUARD_QUALIFIED),
     )?;
+    #[cfg(epoch168_cold_retry3)]
+    {
+        let (_, failure_ref) = doc(
+            &rt("epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+            Some("a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643"),
+        )?;
+        ensure!(
+            q["failed_retry2"] == failure_ref
+                && a["schema"] == "horizon-168-retry3-v1-status-active-v1",
+            "different retry3 registration"
+        );
+    }
     let reg = &price["status_registration"];
     let actor = &a["new"];
     ensure!(
-        q["schema"] == "horizon-168-retry2-v1-status-qualified-v1"
+        q["schema"] == STATUS_SCHEMA
             && q["epoch"] == 168
             && q["prepared"] == *prepared
             && q["successor_root"] == rr
