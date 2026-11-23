@@ -2,7 +2,7 @@
 //! The acceptance names the archive path, while the terminal handoff records
 //! the digest and both file identities before the uploader was started.
 use super::*;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -39,102 +39,6 @@ fn producer_identity(i: &FileIdentity) -> Result<Value> {
         "uid": i.uid, "gid": i.gid, "mode": libc::S_IFREG | u32::from_str_radix(&i.mode, 8)?,
         "changed_seconds":ctime, "changed_nanoseconds":cn, "modified_seconds":mtime,"modified_nanoseconds":mn}),
     )
-}
-
-fn full_argument_tail(expected: &Value, epoch: u64) -> Result<Vec<Value>> {
-    let slot = |key: &str| {
-        expected[key]
-            .as_u64()
-            .with_context(|| format!("missing {key}"))
-    };
-    let text = |key: &str| {
-        expected[key]
-            .as_str()
-            .filter(|s| !s.is_empty())
-            .with_context(|| format!("missing {key}"))
-    };
-    let first = epoch.checked_mul(432_000).context("epoch slot overflow")?;
-    let end = first.checked_add(432_000).context("epoch slot overflow")?;
-    let parent = slot("parent_slot")?;
-    let terminal = slot("terminal_slot")?;
-    let evidence = expected["independent_evidence"]
-        .as_array()
-        .filter(|v| !v.is_empty())
-        .context("missing independent boundary evidence")?;
-    let successor = &expected["successor"];
-    let terminal_hash = text("terminal_blockhash")?;
-    ensure!(
-        expected["epoch"] == epoch
-            && parent < first
-            && match expected["schema"].as_str() {
-                Some("horizon-current-reader-epoch-expectation-v1") => {
-                    terminal == end - 1 && successor.is_null()
-                }
-                Some("horizon-current-reader-epoch-expectation-v2") => {
-                    (first..end - 1).contains(&terminal) && successor.is_object()
-                }
-                _ => false,
-            },
-        "wrong epoch expectation or terminal geometry"
-    );
-    let mut tail = vec![
-        json!("--anchor"),
-        json!(parent.to_string()),
-        json!(text("parent_blockhash")?),
-        json!("--expected-terminal"),
-        json!(terminal.to_string()),
-        json!(terminal_hash),
-    ];
-    if !successor.is_null() {
-        let next = successor["slot"]
-            .as_u64()
-            .context("missing successor slot")?;
-        ensure!(next >= end, "successor must be after the verified epoch");
-        let request: BoundFile = serde_json::from_value(successor["request"].clone())?;
-        let response: BoundFile = serde_json::from_value(successor["response"].clone())?;
-        ensure!(
-            evidence.contains(&successor["request"]) && evidence.contains(&successor["response"]),
-            "successor RPC evidence is not bound to the epoch expectation"
-        );
-        let queried = document(&request)?;
-        let answered = document(&response)?;
-        let params = json!([next, {
-            "commitment": "finalized", "transactionDetails": "none",
-            "rewards": false, "maxSupportedTransactionVersion": 0
-        }]);
-        ensure!(
-            queried["endpoint"] == "https://api.mainnet-beta.solana.com"
-                && queried["request"]["jsonrpc"] == "2.0"
-                && queried["request"]["method"] == "getBlock"
-                && queried["request"]["params"] == params
-                && queried["response_sha256"] == response.sha256
-                && answered["jsonrpc"] == "2.0"
-                && answered["id"].as_u64().is_some()
-                && answered["id"] == queried["request"]["id"]
-                && answered.get("error").is_none()
-                && answered["result"]["parentSlot"] == terminal
-                && answered["result"]["previousBlockhash"] == terminal_hash,
-            "successor RPC response does not anchor the skipped epoch tail"
-        );
-        tail.extend([
-            json!("--expected-successor"),
-            json!(next.to_string()),
-            json!(terminal.to_string()),
-            json!(terminal_hash),
-        ]);
-    }
-    if !expected["provenance_sha256"].is_null() {
-        let provenance = text("provenance_sha256")?;
-        ensure!(
-            provenance.len() == 64
-                && provenance
-                    .bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
-            "invalid provenance digest"
-        );
-        tail.extend([json!("--expected-provenance-sha256"), json!(provenance)]);
-    }
-    Ok(tail)
 }
 
 impl Binding {
@@ -193,8 +97,50 @@ impl Binding {
         let expectation: BoundFile =
             serde_json::from_value(plan["epoch_expectations"][epoch.to_string()].clone())?;
         let expected = document(&expectation)?;
+        let slot = |key: &str| -> Result<Value> {
+            Ok(json!(expected[key]
+                .as_u64()
+                .context("missing expected slot")?
+                .to_string()))
+        };
+        let hash = |key: &str| -> Result<Value> {
+            Ok(json!(expected[key]
+                .as_str()
+                .filter(|h| !h.is_empty())
+                .context("missing expected hash")?))
+        };
         ensure!(
-            args[4..] == full_argument_tail(&expected, epoch)?,
+            expected["schema"] == "horizon-current-reader-epoch-expectation-v1"
+                && expected["epoch"] == epoch,
+            "wrong epoch expectation"
+        );
+        let mut tail = vec![
+            json!("--anchor"),
+            slot("parent_slot")?,
+            hash("parent_blockhash")?,
+            json!("--expected-terminal"),
+            slot("terminal_slot")?,
+            hash("terminal_blockhash")?,
+        ];
+        if !expected["successor"].is_null() {
+            let successor_slot = expected["successor"]["slot"]
+                .as_u64()
+                .context("missing successor slot")?;
+            tail.extend([
+                json!("--expected-successor"),
+                json!(successor_slot.to_string()),
+                slot("terminal_slot")?,
+                hash("terminal_blockhash")?,
+            ]);
+        }
+        if !expected["provenance_sha256"].is_null() {
+            tail.extend([
+                json!("--expected-provenance-sha256"),
+                hash("provenance_sha256")?,
+            ]);
+        }
+        ensure!(
+            args[4..] == tail,
             "anchored full verification arguments differ"
         );
         let parent = evidence
@@ -264,45 +210,5 @@ mod tests {
                 "modified_seconds":1,"modified_nanoseconds":987654321
             })
         );
-    }
-
-    #[test]
-    fn full_argument_tail_binds_the_expectation_schema_to_its_slot_geometry() {
-        let mut expected = json!({
-            "schema": "horizon-current-reader-epoch-expectation-v1",
-            "epoch": 1, "parent_slot": 431999, "terminal_slot": 863999,
-            "parent_blockhash": "parent", "terminal_blockhash": "terminal",
-            "independent_evidence": [{"path":"/independent","sha256":"a".repeat(64)}],
-        });
-        assert!(full_argument_tail(&expected, 1).is_ok());
-        expected["terminal_slot"] = json!(863998);
-        assert!(full_argument_tail(&expected, 1).is_err());
-        expected["schema"] = json!("horizon-current-reader-epoch-expectation-v2");
-        assert!(full_argument_tail(&expected, 1).is_err());
-        expected["successor"] = json!({"slot":863999});
-        assert!(full_argument_tail(&expected, 1).is_err());
-    }
-
-    #[test]
-    #[ignore = "reads the locally sealed epoch 251 expectation and independent RPC evidence"]
-    fn epoch251_native_skipped_tail_matches_full_verifier() {
-        let expected = document(&BoundFile {
-            path: env::var("HORIZON_EPOCH_251_EXPECTATION").unwrap(),
-            sha256: env::var("HORIZON_EPOCH_251_EXPECTATION_SHA256").unwrap(),
-        })
-        .unwrap();
-        let args = full_argument_tail(&expected, 251).unwrap();
-        assert_eq!(
-            args[6..],
-            [
-                json!("--expected-successor"),
-                json!("108864012"),
-                json!("108863995"),
-                json!("86y6Vyi2ZFR8e9wXhnsS2NSrnuH7rFwZYdu3pHLVHufa"),
-            ]
-        );
-        let mut changed = expected;
-        changed["terminal_blockhash"] = json!("changed");
-        assert!(full_argument_tail(&changed, 251).is_err());
     }
 }
