@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+retry4_rejoin=false
+if [[ $flavor == retry4-rejoin ]]; then
+  retry4_rejoin=true
+  flavor=retry3-rejoin
+fi
 retry3_rejoin=false
 if [[ $flavor == retry3-rejoin ]]; then
   retry3_rejoin=true
@@ -96,6 +101,7 @@ if $five_lane_rejoin; then
   fixture+=(incident_fit::tests::both_exact_park_terminals_and_retirements_precede_handoff)
 fi
 if $retry3_rejoin; then extra+=(--cfg incident_retry3_145_only); fi
+if $retry4_rejoin; then extra+=(--cfg incident_retry4_145_only); fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi

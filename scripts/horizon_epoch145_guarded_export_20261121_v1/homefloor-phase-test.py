@@ -155,5 +155,12 @@ class Retry3Phase(HomefloorPhase):
         self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v3")
 
 
+class Retry4Phase(HomefloorPhase):
+    version = "tools-v5j"
+
+    def test_retry4_provider_is_required(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v4")
+
+
 if __name__ == "__main__":
     main()
