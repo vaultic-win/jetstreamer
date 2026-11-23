@@ -127,12 +127,14 @@ pub(super) fn validate(c: &Config) -> Result<()> {
     let mut pids = std::collections::HashSet::new();
     let mut invocations = std::collections::HashSet::new();
     let mut digests = std::collections::HashSet::new();
-    for (unit, claim) in [
-        (UNIT248, &c.delivery248_claim),
-        (UNIT249, &c.delivery249_claim),
-        (UNIT265, &c.delivery265_claim),
+    use OrdinaryEpoch::{Epoch248, Epoch249, Epoch265};
+    for (epoch, claim) in [
+        (Epoch248, &c.delivery248_claim),
+        (Epoch249, &c.delivery249_claim),
+        (Epoch265, &c.delivery265_claim),
     ] {
         let Some(claim) = claim else { continue };
+        let unit = epoch.select(claim)?.unit();
         ensure!(
             pids.insert(claim.pid)
                 && invocations.insert(&claim.invocation_id)
@@ -436,6 +438,7 @@ pub(super) fn sample(
     }
 }
 const UNIT265: &str = "horizon-upload-265-ordinary-v215.service";
+const RETRY265: &str = "horizon-upload-265-ordinary-retry-v216.service";
 const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
@@ -445,13 +448,14 @@ pub(super) enum OrdinaryEpoch {
     Epoch248,
     Epoch249,
     Epoch265,
+    Retry265,
 }
 impl OrdinaryEpoch {
     fn number(self) -> u64 {
         match self {
             Self::Epoch248 => 248,
             Self::Epoch249 => 249,
-            Self::Epoch265 => 265,
+            Self::Epoch265 | Self::Retry265 => 265,
         }
     }
     fn unit(self) -> &'static str {
@@ -459,13 +463,23 @@ impl OrdinaryEpoch {
             Self::Epoch248 => UNIT248,
             Self::Epoch249 => UNIT249,
             Self::Epoch265 => UNIT265,
+            Self::Retry265 => RETRY265,
         }
     }
     fn digest(self) -> &'static str {
         match self {
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
-            Self::Epoch265 => "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544",
+            Self::Epoch265 | Self::Retry265 => {
+                "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544"
+            }
             Self::Epoch249 => "03e16ae1dada49958ff00a7dda1c3ef31c2f37c7503b02b7e0a677bb40863e07",
+        }
+    }
+    pub(super) fn select(self, claim: &DeliveryClaim) -> Result<Self> {
+        match (self, claim.retry_unit.as_deref()) {
+            (_, None) => Ok(self),
+            (Self::Epoch265, Some(RETRY265)) => Ok(Self::Retry265),
+            _ => anyhow::bail!("unknown retry unit for ordinary epoch {}", self.number()),
         }
     }
     fn claim_path(self) -> PathBuf {
@@ -476,7 +490,7 @@ impl OrdinaryEpoch {
     fn argv(self) -> Vec<String> {
         let epoch = self.number();
         let (source, receipts, plan) = match self {
-            Self::Epoch265 => (
+            Self::Epoch265 | Self::Retry265 => (
                 "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3/output".to_owned(),
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-v215/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon265-ordinary-reader-v215/epoch-265-plan.json".to_owned(),
@@ -507,6 +521,8 @@ impl OrdinaryEpoch {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DeliveryClaim {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry_unit: Option<String>,
     invocation_id: String,
     pid: u32,
     claim_sha256: String,
@@ -639,8 +655,26 @@ mod tests {
         );
     }
     #[test]
+    fn retry_265_uses_its_own_receipt_and_the_original_archive_command() {
+        let original = OrdinaryEpoch::Epoch265;
+        let mut claim: DeliveryClaim = serde_json::from_value(json!({
+            "invocation_id":"a".repeat(32), "pid":1234, "claim_sha256":"b".repeat(64)
+        }))
+        .unwrap();
+        assert_eq!(original.select(&claim).unwrap().unit(), UNIT265);
+        claim.retry_unit = Some(RETRY265.into());
+        let retry = original.select(&claim).unwrap();
+        assert_eq!(retry.unit(), RETRY265);
+        assert_ne!(retry.claim_path(), original.claim_path());
+        assert_eq!(retry.argv(), original.argv());
+        assert!(OrdinaryEpoch::Epoch249.select(&claim).is_err());
+        claim.retry_unit = Some(UNIT248.into());
+        assert!(original.select(&claim).is_err());
+    }
+    #[test]
     fn ordinary_delivery_requires_a_bound_claim_and_pid() {
         let mut claim = DeliveryClaim {
+            retry_unit: None,
             invocation_id: "a".repeat(32),
             claim_sha256: "1".repeat(64),
             pid: 42,

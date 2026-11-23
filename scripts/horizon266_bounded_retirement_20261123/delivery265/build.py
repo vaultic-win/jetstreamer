@@ -11,7 +11,7 @@ def put(p,b):
  with p.open('xb') as f: f.write(b);os.fchmod(f.fileno(),0o444);f.flush();os.fsync(f.fileno())
 def dump(v):return (json.dumps(v,indent=2)+'\n').encode()
 with partition.take():
- q=price(6400*M,256*M,112*M,consumer_build=True);dest=D/name;dest.mkdir(mode=0o700)
+ q=price(6400*M,256*M,112*M,consumer_build=True,closed_disk=(V/'horizon266-closed-residual-delivery265-v215/assignment.json').exists());dest=D/name;dest.mkdir(mode=0o700)
  previous=bound(ref(D/'horizon266-capped-consumers-v201-a4/completion.json'));seal=bound(previous['seal'])
  original=bound(ref(old/'booking.json'))
  for leaf in ('commands.json','source.sha256','offline-qualification.json','tools.sha256','externs.sha256','build.py'):

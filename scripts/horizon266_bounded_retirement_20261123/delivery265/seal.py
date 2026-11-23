@@ -7,7 +7,7 @@ need(os.geteuid()==0 and os.environ.get('CODEX_THREAD_ID')==MAIN,'owner')
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 import funding as live_fit
 reservation_lock=live_fit.partition.take()
-price=live_fit.price(352*live_fit.M,2*live_fit.M,2*live_fit.M)
+price=live_fit.price(352*live_fit.M,2*live_fit.M,2*live_fit.M,closed_disk=(live_fit.V/'horizon266-closed-residual-delivery265-v215/assignment.json').exists())
 import funds
 ledger=D/("horizon-bounded265-residual-seal-consumers265-v215-"+sys.argv[1]);ledger.mkdir(mode=0o700);funds.put(ledger/"assignment.json",price)
 tag='horizon265-delivery-consumers-v215-'+sys.argv[1]

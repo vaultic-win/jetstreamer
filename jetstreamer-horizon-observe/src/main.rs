@@ -2006,7 +2006,7 @@ fn run(config: Config) -> Result<()> {
     ] {
         if let Some(claim) = claim {
             delivery_resources.push(delivery247_resource::sample_ordinary(
-                epoch,
+                epoch.select(claim)?,
                 claim,
                 started_unix,
             ));
