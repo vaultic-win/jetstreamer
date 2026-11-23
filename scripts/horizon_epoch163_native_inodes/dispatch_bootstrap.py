@@ -102,6 +102,51 @@ def quote(path,sha,iid):
          "priced 145 verifier changed")
 
 
+def capture(start, fleet_sha, iid):
+    """Use the verifier's complete accepted-fleet chain and original two-member external-price window."""
+    need(os.geteuid()==0 and sys.flags.isolated and __debug__, "root isolated price required")
+    runtime=fit["RUNTIME"]
+    tools=runtime/"incident-replay-fit-20261121-v1"
+    current=tools/"tools-homefloor-145-missed-rejoin-v1"
+    handoff=tools/"tools-homefloor-145-handoff-v4"
+    def authenticated(directory, sha, member):
+        seal=fit["checked"]({"path":str(directory/"deployment-seal-receipt.json"),"sha256":sha})
+        need(seal["destination"]==str(directory) and seal["sealer_sha256"]==base["SEALER"],"wrong sealed reader")
+        row,=[r for r in seal["members"] if r["name"]==member and r["mode"]=="0555"]
+        prog=directory/member
+        fit["pin"](prog,row["sha256"])
+        return prog
+    census=authenticated(current,"b2e28f51da8e428c106a23b3e5d73a6d92b1aca84043e82d1e662387d2c18b96","post-stop-fit")
+    dispatcher=authenticated(handoff,"2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea","run-recovery")
+    chain=runpy.run_path(str(dispatcher))["successors"]
+    first={"path":str(start),"sha256":fleet_sha}
+    cgroup=Path("/sys/fs/cgroup/system.slice/horizon-holding-export145-20261121-v1.service/cgroup.procs")
+    end=time.monotonic()+150
+    while time.monotonic()<end:
+        current_ref=chain(first)[-1]
+        if len(cgroup.read_text().split())!=2:
+            time.sleep(1)
+            continue
+        cmd=[census,"145",current_ref["path"],current_ref["sha256"]]
+        result=subprocess.run(cmd,capture_output=True,timeout=180)
+        if result.returncode:
+            error=result.stderr.decode()
+            if (error.startswith("Traceback (most recent call last):") and str(census) in error and
+                error.endswith("ValueError: foreign 145 descendants\n")):
+                time.sleep(1)
+                continue
+            raise ValueError(error[-2048:])
+        n=json.loads(result.stdout)
+        need(n["fleet"]==current_ref and chain(first)[-1]==current_ref,"accepted fleet changed during quote")
+        fleet=fit["checked"](current_ref)
+        charge=fit["inspect_price"](n,fleet["retry9_auxiliary_commitments"],iid,time.time())
+        _,commands=fit["recipe"]()
+        out=BASE/("bootstrap-native-quote-"+str(time.time_ns())+".json")
+        base["write"](out,encode(dict(native=n,bootstrap=charge,original_commands=commands)))
+        return {"path":str(out),"sha256":base["file_sha"](out)}
+    raise ValueError("could not complete the original external-price window")
+
+
 def dispatch(commit, path, sha, iid):
     import stat
     need(os.geteuid()==0 and sys.flags.isolated and __debug__,"root isolated dispatch required")
@@ -156,7 +201,9 @@ def dispatch(commit, path, sha, iid):
 if __name__=="__main__":
     if len(sys.argv)==3 and sys.argv[1]=="prepare":
         print(json.dumps(packages(sys.argv[2])))
+    elif len(sys.argv)==5 and sys.argv[1]=="quote":
+        print(json.dumps(capture(Path(sys.argv[2]),sys.argv[3],sys.argv[4])))
     elif len(sys.argv)==6 and sys.argv[1]=="dispatch":
         dispatch(sys.argv[2],Path(sys.argv[3]),sys.argv[4],sys.argv[5])
     else:
-        raise SystemExit("expected prepare COMMIT or dispatch COMMIT QUOTE SHA LIVE_145_IID")
+        raise SystemExit("expected prepare COMMIT, quote FLEET SHA LIVE_145_IID or dispatch COMMIT QUOTE SHA LIVE_145_IID")
