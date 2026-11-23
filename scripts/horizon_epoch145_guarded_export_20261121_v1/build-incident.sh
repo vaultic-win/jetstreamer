@@ -153,6 +153,7 @@ fi
 if $guard_walk; then
   test -s "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/guard_walk.rs"
   extra+=(--cfg incident_guard_walk145_only)
+  sources+=(v5n_feature_cover.py test_v5n_feature_cover.py)
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
@@ -251,6 +252,16 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   fleet_sha=$(sha256sum "$1" | cut -d' ' -f1)
   maximum_attempts=5
   if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
+  if $guard_walk; then
+    feature_cover="$src/scripts/horizon_epoch145_guarded_export_20261121_v1/v5n_feature_cover.py"
+    feature_snapshot() {
+      /usr/bin/python3 -IB -c '
+import json, runpy, sys
+print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv[2])), sort_keys=True))
+' "$feature_cover" "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"
+    }
+    feature_snapshot > "$q/feature159-before.json"
+  fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
     if $missed_rejoin || $v5m_post; then
       donor="$src/scripts/horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"
@@ -343,6 +354,8 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
         .fleet == {path:$fleet,sha256:$hash} and now-.recorded_unix_seconds >= 0
         and now-.recorded_unix_seconds <= 120' "$q/before.json" >/dev/null
     if $guard_walk; then
+      feature_snapshot > "$q/feature159-after.json"
+      cmp "$q/feature159-before.json" "$q/feature159-after.json"
       [[ $native_package == tools-homefloor-145-v5m-stopped-v1 && $seal_digest == b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7 ]]
       /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
       jq -e '.phase145.InvocationID == "dba04d40f1b046b4875d7e27e0ff224a"
@@ -448,6 +461,7 @@ for o in "$d"/build/*/out; do args+=(-L "native=$o"); done
 ulimit -c 0
 args+=(@"$base/epoch145-aligned-prefix-integration-20261120-g1/rustc.args")
 if $missed_rejoin; then /usr/bin/python3 -IB "$s/test_missed_clock.py"; fi
+if $guard_walk; then /usr/bin/python3 -IB "$s/test_v5n_feature_cover.py"; fi
 if $homefloor_rejoin; then
   /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
   # Both the real source inode and its read-only test mounts are inside this build's own image.
