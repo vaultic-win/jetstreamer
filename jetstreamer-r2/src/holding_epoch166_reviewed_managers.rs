@@ -6,10 +6,9 @@ use std::{ffi::OsStr, io::ErrorKind, process::Command};
 
 const RETRY10_PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
 const REGISTRY: &str = include_str!("holding_epoch166_reviewed_managers.json");
-const PROPERTIES: &str = "Id,Names,Job,NeedDaemonReload,Transient,LoadState,ActiveState,SubState,CanStart,UnitFileState,FragmentPath,DropInPaths,InvocationID,ExecStart,ExecMainPID,ExecMainExitTimestampMonotonic,ExecMainCode,ExecMainStatus,MainPID,ControlPID,ControlGroup,NRestarts,Result,Restart,RequiredBy,RequisiteOf,WantedBy,BoundBy,UpheldBy,ConsistsOf,OnSuccessOf,OnFailureOf,TriggeredBy,Triggers";
-const BACKLINKS: [&str; 10] = [
+const PROPERTIES: &str = "Id,Names,Job,NeedDaemonReload,Transient,LoadState,ActiveState,SubState,CanStart,UnitFileState,FragmentPath,DropInPaths,InvocationID,ExecStart,ExecMainPID,ExecMainExitTimestampMonotonic,ExecMainCode,ExecMainStatus,MainPID,ControlPID,ControlGroup,NRestarts,Result,Restart,RequiredBy,Requisite,RequisiteOf,WantedBy,BoundBy,UpheldBy,ConsistsOf,OnSuccessOf,OnFailureOf,TriggeredBy,Triggers";
+const BACKLINKS: [&str; 9] = [
     "RequiredBy",
-    "RequisiteOf",
     "WantedBy",
     "BoundBy",
     "UpheldBy",
@@ -32,6 +31,8 @@ struct Terminal {
     result: String,
     status: String,
     argv: String,
+    requisite: Vec<String>,
+    requisite_of: Vec<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -86,6 +87,18 @@ impl Registered {
             .collect()
     }
 
+    // Requisite= only accepts an already-active dependency, without starting
+    // it. Both census invocations required the retained terminal capture,
+    // and the capture required the authenticated park. Pin both directions.
+    fn relation(row: &Value, key: &str, expected: &[String]) -> bool {
+        let Some(value) = row[key].as_str() else {
+            return false;
+        };
+        let mut words: Vec<_> = value.split_whitespace().collect();
+        words.sort_unstable();
+        words == expected
+    }
+
     fn state(&self, unit: &str, row: &Value) -> Result<()> {
         ensure!(
             row["Id"] == unit
@@ -97,6 +110,11 @@ impl Registered {
             "reviewed manager acquires an alias, job, trigger, dependency or override: {unit}"
         );
         if let Some(t) = self.terminals.get(unit) {
+            ensure!(
+                Self::relation(row, "Requisite", &t.requisite)
+                    && Self::relation(row, "RequisiteOf", &t.requisite_of),
+                "original nonactivating dependencies changed: {unit}"
+            );
             let command = row["ExecStart"].as_str().context("terminal ExecStart")?;
             ensure!(
                 row["LoadState"] == "loaded"
@@ -122,7 +140,9 @@ impl Registered {
             );
         } else {
             ensure!(
-                row["LoadState"] == "not-found"
+                row["Requisite"] == ""
+                    && row["RequisiteOf"] == ""
+                    && row["LoadState"] == "not-found"
                     && row["CanStart"] == "no"
                     && row["ActiveState"] == "inactive"
                     && row["SubState"] == "dead"
@@ -355,7 +375,7 @@ mod tests {
 
     fn absent(unit: &str) -> Value {
         let mut row = json!({"Id":unit,"Names":unit,"Job":"","NeedDaemonReload":"no","DropInPaths":"","LoadState":"not-found","ActiveState":"inactive","SubState":"dead","Transient":"no","CanStart":"no","FragmentPath":"","UnitFileState":""});
-        for key in BACKLINKS {
+        for key in BACKLINKS.into_iter().chain(["Requisite", "RequisiteOf"]) {
             row[key] = json!("");
         }
         row
@@ -431,7 +451,7 @@ mod tests {
                     "accepted {unit} {key}"
                 );
             }
-            for key in BACKLINKS {
+            for key in BACKLINKS.into_iter().chain(["Requisite", "RequisiteOf"]) {
                 let mut changed = row.clone();
                 changed[key] = json!("activator.timer");
                 assert!(
@@ -470,7 +490,34 @@ mod tests {
             }
             row["ExecStart"] = json!(format!("{{ argv[]={0} ; }}", t.argv));
             row["FragmentPath"] = json!(t.fragment);
+            row["Requisite"] = json!(t.requisite.join(" "));
+            row["RequisiteOf"] = json!(
+                t.requisite_of
+                    .iter()
+                    .rev()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
             registry.state(name, &row).unwrap();
+            for key in ["Requisite", "RequisiteOf"] {
+                let expected = row[key].as_str().unwrap();
+                for changed in [
+                    format!("{expected} extra.service"),
+                    format!("{expected} {expected}"),
+                    String::new(),
+                ] {
+                    if changed.split_whitespace().count() == expected.split_whitespace().count() {
+                        continue;
+                    }
+                    let mut r = row.clone();
+                    r[key] = json!(changed);
+                    assert!(
+                        registry.state(name, &r).is_err(),
+                        "changed historical prerequisite: {name} {key}"
+                    );
+                }
+            }
             for key in [
                 "LoadState",
                 "Transient",
