@@ -15,7 +15,7 @@ ALLOWED = {RUNTIME / name / 'tools' for name in
            ('stage22-sealed-qa-retirement-20261123-v1', 'stage30-sealed-qa-retirement-20261123-v1',
             'stage41-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v1',
             'stage128-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v2',
-            'stage88-sealed-qa-retirement-20261123-v3')}
+            'stage88-sealed-qa-retirement-20261123-v3', 'stage88-sealed-qa-retirement-20261123-v4')}
 TOOLS = Path(__file__).absolute().parent
 CARGO = RUNTIME/'epoch166-exact-cargo-retirement-20261123-v1/tools'
 PROVIDER_HASH = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
@@ -48,7 +48,8 @@ def main():
     # Retain the terminal unit, so a concurrent physical reader can finish a
     # stable census. All source names and quarantine share one writable mount.
     args=['systemd-run','--no-block','--service-type=oneshot','--unit='+unit]
-    props=['CPUQuota=50%','MemoryMax=768M','MemorySwapMax=0','TasksMax=64',
+    cpu_quota=deployed['CPU_QUOTA_MICROS']
+    props=[f'CPUQuota={cpu_quota//10000}%','MemoryMax=768M','MemorySwapMax=0','TasksMax=64',
            'PrivateNetwork=yes','NoNewPrivileges=yes','ProtectSystem=full','RemainAfterExit=yes',
            'TimeoutStartSec=1500','UMask=0077','Nice=10','IOSchedulingClass=best-effort','IOSchedulingPriority=7']
     for item in props:
@@ -66,7 +67,7 @@ def main():
     fit=deployed['price'](host)
     cg=host['read'](Path(fit['fleet']['path']))['retry9_auxiliary_commitments']
     require(cg['build_and_native_qualification_serial'] and cg['holding_and_build_may_overlap']
-            and cg['build_cpu_quota_micros'] >= 500000
+            and cg['build_cpu_quota_micros'] >= cpu_quota
             and cg['build_memory_bytes'] >= (768 << 20), 'missing maintenance booking')
     for mutex in (deployed['SERIAL'],deployed['MUTEX']):
         with mutex.open('rb') as fd:

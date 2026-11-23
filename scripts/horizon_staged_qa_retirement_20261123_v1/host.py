@@ -17,7 +17,8 @@ EXECUTABLES_128 = RUNTIME / 'stage128-sealed-qa-retirement-20261123-v1' / 'tools
 SMALL_88 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v1' / 'tools'
 SMALL_88_LIVE145 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v2' / 'tools'
 SMALL_88_LIVE145_RETRY = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v3' / 'tools'
-SMALL_88_LIVE145_PACKAGES = (SMALL_88_LIVE145, SMALL_88_LIVE145_RETRY)
+SMALL_88_LIVE145_FULL_SLOT = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v4' / 'tools'
+SMALL_88_LIVE145_PACKAGES = (SMALL_88_LIVE145, SMALL_88_LIVE145_RETRY, SMALL_88_LIVE145_FULL_SLOT)
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
 LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -65,6 +66,7 @@ STATE = BASE / 'horizon-root-runtime-data' / (
 ) / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
 MUTEX = BASE / 'r2-receipts/local-mutation.lock'
+CPU_QUOTA_MICROS = 1_000_000 if PACK == SMALL_88_LIVE145_FULL_SLOT else 500_000
 
 def require(ok, why):
     if not ok:
@@ -98,7 +100,7 @@ def price(provider):
     head = provider['fleet']()
     fleet = {'path': str(head), 'sha256': provider['sha'](head)}
     command = [LIVE145_PROVIDER / 'post-stop-fit', '145', head, fleet['sha256']]
-    attempts = 3 if PACK == SMALL_88_LIVE145_RETRY else 1
+    attempts = 1 if PACK == SMALL_88_LIVE145 else 3
     for attempt in range(attempts):
         require(head == provider['fleet'](), 'fleet changed before live retirement pricing')
         child = subprocess.run(command, text=True, capture_output=True, timeout=220)
@@ -126,7 +128,7 @@ def check_runtime(action):
     cgroup = Path('/sys/fs/cgroup') / Path('/proc/self/cgroup').read_text().strip().split(':')[-1].lstrip('/')
     require(re.fullmatch('horizon-fit-'+PROFILE+'-'+action+r'-[0-9]+\.service',cgroup.name),'dedicated staged retirement service required')
     quota, period = map(int, (cgroup / 'cpu.max').read_text().split())
-    require(quota > 0 and quota * 2 <= period and int((cgroup/'memory.max').read_text()) <= 768<<20
+    require(0 < quota * 1_000_000 <= period * CPU_QUOTA_MICROS and int((cgroup/'memory.max').read_text()) <= 768<<20
             and int((cgroup/'memory.swap.max').read_text()) == 0, 'unfunded CPU, RAM or swap limit')
     require(os.stat('/proc/self/ns/net').st_ino != os.stat('/proc/1/ns/net').st_ino,'private network required')
     return cgroup.name
