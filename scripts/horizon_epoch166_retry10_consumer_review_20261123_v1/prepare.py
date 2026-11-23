@@ -246,6 +246,73 @@ def namespace_proof(q):
     return nq
 
 
+def check_service_command(body, mount, version, fleet):
+    # The finished original transfer is the funded networked holding profile.
+    # No credential contents are opened by this planner.
+    properties = [
+        "EnvironmentFiles",
+        "CPUQuotaPerSecUSec",
+        "MemoryMax",
+        "MemorySwapMax",
+        "TasksMax",
+    ]
+    result = subprocess.check_output(
+        ["systemctl", "show", "--all", "-p", ",".join(properties), PARK], text=True
+    )
+    profile = dict(line.split("=", 1) for line in result.splitlines())
+    credential = Path(
+        "/var/lib/jetstreamer/r2-chronological-plugin-audit-deployment-20261118-v1/credentials.env"
+    )
+    need(
+        profile["EnvironmentFiles"] == str(credential) + " (ignore_errors=no)",
+        "original holding credential provider changed",
+    )
+    reservation = fleet["retry9_auxiliary_commitments"]
+    need(
+        reservation["holding_serial"]
+        and reservation["holding_and_build_may_overlap"]
+        and reservation["holding_cpu_quota_micros"] == 2000000
+        and reservation["holding_memory_bytes"] == 2 << 30,
+        "holding reservation changed",
+    )
+    need(
+        profile["CPUQuotaPerSecUSec"] == "2s"
+        and profile["MemoryMax"] == str(2 << 30)
+        and profile["MemorySwapMax"] == "0"
+        and profile["TasksMax"] == "256",
+        "recorded holding resource limits changed",
+    )
+    state = BASE / "r2-holding-state-dev-samjohnson-v1"
+    capture = "horizon-closed166-retry10-park-terminal-20261122-v1.service"
+    options = [
+        "After=" + capture,
+        "ExecStartPre=/usr/bin/systemctl --quiet is-active " + capture,
+        "EnvironmentFile=" + str(credential),
+        "CPUQuota=200%",
+        "MemoryMax=" + profile["MemoryMax"],
+        "MemorySwapMax=0",
+        "TasksMax=256",
+        "TimeoutStartSec=30min",
+        "Restart=no",
+        "UMask=0077",
+        "NoNewPrivileges=yes",
+        "ProtectSystem=strict",
+        "ProtectHome=read-only",
+        "ReadWritePaths=" + str(state),
+        "RemainAfterExit=yes",
+        mount,
+    ]
+    unit = "horizon-closed166-retry10-check-" + version.rsplit("-", 1)[1]
+    return [
+        "systemd-run",
+        "--no-block",
+        "--unit=" + unit,
+        "--service-type=oneshot",
+        *(part for option in options for part in ("-p", option)),
+        *body,
+    ]
+
+
 def lock_version(path):
     path.mkdir(mode=0o700, parents=False, exist_ok=False)
     need(
@@ -731,6 +798,11 @@ def main():
             "native_source": nq["published_source_commit"],
             "namespace": q["production_bind_property"],
             "native_argv": body,
+            "check_service_argv": check_service_command(
+                body, q["production_bind_property"], v.name, fleet
+            )
+            if prior is None
+            else None,
             "r2_operations": 0,
             "physical_operations": 0,
         },

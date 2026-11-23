@@ -4,6 +4,8 @@ from pathlib import Path
 from datetime import datetime, timezone
 import hashlib, json, os, subprocess, time, sys
 
+if os.geteuid() != 0 or not sys.flags.isolated or not __debug__:
+    raise SystemExit("root python3 -IB required")
 work = Path("/home/sol/.jetstreamer-private/epoch166-retry10-consumer-review-20261123")
 build = work / "build"
 hold = Path(
