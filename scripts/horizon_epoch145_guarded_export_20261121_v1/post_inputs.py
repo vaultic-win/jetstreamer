@@ -19,12 +19,14 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
-RETRY = (Path(__file__).resolve().parent.name == "tools-v13e" or
+LEASE_POST = (Path(__file__).resolve().parent.name == "tools-v13f" or
+              (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--lease-ready"]))
+RETRY = LEASE_POST or (Path(__file__).resolve().parent.name == "tools-v13e" or
          (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--retry1"]))
-DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
+DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
 PAIR = R / "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"
 PAIR_SHA = "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4"
-DISPATCH_SEAL = "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
+DISPATCH_SEAL = "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if LEASE_POST else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
 ORIGINAL = "de6780b860b3467bae21fbd19176ca14"
 ARCHIVE = Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/epoch-145.jet")
 ANCHORS = Path("/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1")
@@ -201,7 +203,7 @@ def verify_build_price(d, price):
 
 
 def main():
-    args = sys.argv[2:] if RETRY and sys.argv[1:2] == ["--retry1"] else sys.argv[1:]
+    args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"]) else sys.argv[1:]
     if RETRY and len(args) == 2 and args[0] == "verify-build-price":
         need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
         d = load_dispatch()

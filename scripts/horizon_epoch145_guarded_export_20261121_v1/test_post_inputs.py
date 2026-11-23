@@ -99,12 +99,13 @@ class PublicationInputs(unittest.TestCase):
             p.validate_terminal(*f)
 
     def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
-        for version in ("tools-v13d", "tools-v13e"):
+        for version in ("tools-v13d", "tools-v13e", "tools-v13f"):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as td:
                 self.exercise_adapter(Path(td), version)
 
     def exercise_adapter(self, root, version):
-        retry = version == "tools-v13e"
+        lease = version == "tools-v13f"
+        retry = lease or version == "tools-v13e"
         pkg = root / "family" / version
         pkg.mkdir(parents=True)
         src = Path(__file__).with_name("incident-post-phase.py")
@@ -112,7 +113,7 @@ class PublicationInputs(unittest.TestCase):
         deployed.write_bytes(src.read_bytes())
         complete = runpy.run_path(str(deployed))["completion"]
         state = root / "state"
-        name = pkg.parent / ("v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
+        name = pkg.parent / ("v5k-name-handoff" if lease else "v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
         name.mkdir()
         original = state / IID
         original.mkdir(parents=True)
@@ -147,11 +148,11 @@ class PublicationInputs(unittest.TestCase):
         proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
         receipt = name / "semantic-completion.json"
         write(receipt, proof)
-        args = [str(pkg.parent / "tools-v5j/export145"), "recover-full-output", "/fleet", "1"*64, "f"*64]
+        args = [str(pkg.parent / ("tools-v5k/export145" if lease else "tools-v5j/export145")), "recover-full-output", "/fleet", "1"*64, "f"*64]
         write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
-        dispatch = {"path": "/sealed-dispatch", "sha256": "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
-        intent = dict(argv=args, original={"INVOCATION_ID": "48ad7b2234d74e74b0498e7110e0aee3"},
-                      review_sha256="38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
+        dispatch = {"path": "/sealed-dispatch", "sha256": "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if lease else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
+        intent = dict(argv=args, original={"INVOCATION_ID": "f2afc696a63a4e6aa6812451cf3559e5" if lease else "48ad7b2234d74e74b0498e7110e0aee3"},
+                      review_sha256="1a7f7bce208d97831963c66c462bbac28b7f9b84e990d09fa5da7e5efa56d150" if lease else "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
                       preflight={"quote_provider":dispatch})
         write(name / "submission-intent.json", intent)
         build = {"semantic_image": {"sha256": "f"*64}, "semantic_dispatch": dispatch}
@@ -161,7 +162,7 @@ class PublicationInputs(unittest.TestCase):
                 for change in (dict(review_sha256="0"*64), dict(original={"INVOCATION_ID": "afcf6cdd1ec0400ea2757f81472987b3"}),
                                dict(preflight={"quote_provider":dict(dispatch, sha256="0"*64)})):
                     write(name / "submission-intent.json", dict(intent, **change))
-                    with self.assertRaisesRegex(ValueError, "foreign retry handoff"):
+                    with self.assertRaisesRegex(ValueError, "foreign (retry|lease-ready) handoff"):
                         complete(Status(), build)
                 write(name / "submission-intent.json", intent)
             write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))

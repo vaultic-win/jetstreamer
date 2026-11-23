@@ -10,7 +10,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-V5J_RETRY = VERSION == "tools-v13e"
+LEASE_POST = VERSION == "tools-v13f"
+V5J_RETRY = LEASE_POST or VERSION == "tools-v13e"
 V5J_SUCCESSOR = V5J_RETRY or VERSION == "tools-v13d"
 SAME_IMAGE_RETRY = VERSION == "tools-v13c"
 FIXTURE_SUCCESSOR = SAME_IMAGE_RETRY or VERSION in ("tools-v13", "tools-v13b")
@@ -140,11 +141,17 @@ def fixture_semantic(s, build):
 
 def completion(s, build=None):
     if V5J_SUCCESSOR:
-        handoff = PKG.parent / ("v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
+        handoff = PKG.parent / ("v5k-name-handoff" if LEASE_POST else "v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
         selected, _ = s.read(handoff / "semantic-completion.json")
         result, _ = s.read(handoff / "submission-result.json")
         intent, _ = s.read(handoff / "submission-intent.json")
-        if V5J_RETRY:
+        if LEASE_POST:
+            s.need(intent["original"]["INVOCATION_ID"] == "f2afc696a63a4e6aa6812451cf3559e5"
+                   and intent["review_sha256"] == "1a7f7bce208d97831963c66c462bbac28b7f9b84e990d09fa5da7e5efa56d150"
+                   and intent["preflight"]["quote_provider"] == build["semantic_dispatch"]
+                   and build["semantic_dispatch"]["sha256"] == "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e"
+                   and result["invocation_id"] != intent["original"]["INVOCATION_ID"], "foreign lease-ready handoff")
+        elif V5J_RETRY:
             s.need(intent["original"]["INVOCATION_ID"] == "48ad7b2234d74e74b0498e7110e0aee3"
                    and intent["review_sha256"] == "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
                    and intent["preflight"]["quote_provider"] == build["semantic_dispatch"]
@@ -154,7 +161,7 @@ def completion(s, build=None):
         s.need(selected["schema"] == "horizon-145-v5j-semantic-completion-v1" and s.iid(bootstrap)
                and bootstrap == result["invocation_id"] and bootstrap != "afcf6cdd1ec0400ea2757f81472987b3"
                and intent["argv"] == result["argv"] and result["argv"][-1] == build["semantic_image"]["sha256"]
-               and result["argv"][-5:-3] == [str(PKG.parent / "tools-v5j/export145"), "recover-full-output"]
+               and result["argv"][-5:-3] == [str(PKG.parent / ("tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), "recover-full-output"]
                and selected["start"]["path"] == str(STATE / bootstrap / "recovery-started.json")
                and selected["completion"]["path"] == str(STATE / bootstrap / "complete.json"),
                "different bound v5j publication generation")

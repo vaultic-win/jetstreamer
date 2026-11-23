@@ -22,7 +22,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_fixture_post145_only)]
-const PROVIDER: &str = if cfg!(incident_v5j_retry1_post145_only) {
+const PROVIDER: &str = if cfg!(incident_v5k_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5k-v1/post-stop-fit"
+} else if cfg!(incident_v5j_retry1_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-v2/post-stop-fit"
 } else if cfg!(incident_v5j_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-v1/post-stop-fit"
@@ -1341,15 +1343,16 @@ mod tests {
             let (_, before) = original(&price, 32 << 20).unwrap();
             assert_eq!(before["fleet"], json!(binding));
             if cfg!(incident_v5j_retry1_post145_only) {
-                let handoff = Path::new(RUNTIME)
-                    .join("epoch145-semantic-continuity-20261121-v1/v5j-name-handoff-retry1");
+                let lease = cfg!(incident_v5k_post145_only);
+                let handoff = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1")
+                    .join(if lease { "v5k-name-handoff" } else { "v5j-name-handoff-retry1" });
                 let (_, started) =
                     original(&handoff.join("submission-result.json"), 1 << 20).unwrap();
                 let (_, intent) =
                     original(&handoff.join("submission-intent.json"), 16 << 20).unwrap();
                 assert_eq!(
                     intent["original"]["INVOCATION_ID"],
-                    "48ad7b2234d74e74b0498e7110e0aee3"
+                    if lease { "f2afc696a63a4e6aa6812451cf3559e5" } else { "48ad7b2234d74e74b0498e7110e0aee3" }
                 );
                 assert_eq!(intent["argv"], started["argv"]);
                 assert_eq!(before["phase145"]["stage"], "leased-worker");
