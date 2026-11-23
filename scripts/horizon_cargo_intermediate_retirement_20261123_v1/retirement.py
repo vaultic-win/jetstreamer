@@ -134,13 +134,14 @@ def secure_state(path):
 class Retirement:
     """A persisted intent binds all originals, parents and retained dependencies."""
 
-    def __init__(self, state, files, scope, closure, batch_size=128):
+    def __init__(self, state, files, scope, closure, batch_size=128, *, open_lease=lease):
         self.state = state
         self.quarantine = state / 'quarantine'
         self.files = sorted((Path(path), ids) for path, ids in files.items())
         self.scope = scope
         self.closure = closure
         self.batch_size = batch_size
+        self.open_lease = open_lease
         self.total = sum(x[7] * 512 for _, x in self.files)
         require(self.files and 0 < batch_size <= 128, 'empty or oversized batch')
         unique = {(s[0], s[1]) for _, s in self.files}
@@ -228,13 +229,13 @@ class Retirement:
             current, staged = state_of(src, original), state_of(dst, name)
             if staged is None:
                 require(current == expected, f'missing original before capture: {i}')
-                with lease(src, original, expected) as fd:
+                with self.open_lease(src, original, expected) as fd:
                     rename(src, original, dst, name)
                     require(state_of(src, original) is None and state_of(dst, name) == stamp(os.fstat(fd)), 'capture replaced')
                     event('after-rename')
             else:
                 require(current is None, f'original recreated during interrupted capture: {i}')
-            with lease(dst, name, expected, moved=True) as fd:
+            with self.open_lease(dst, name, expected, moved=True) as fd:
                 return stamp(os.fstat(fd))
 
         if not stage.exists():
@@ -260,7 +261,7 @@ class Retirement:
             # root-private directory; an absent captured name is an interrupted unlink.
             if state_of(dst, name) is None:
                 return
-            with lease(dst, name, captured) as fd:
+            with self.open_lease(dst, name, captured) as fd:
                 os.unlink(name, dir_fd=dst)
                 require(os.fstat(fd).st_nlink == 0 and state_of(dst, name) is None, 'inode still linked')
                 event('after-unlink')
