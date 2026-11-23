@@ -22,7 +22,7 @@ if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epo
     fi
     base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-$retry-rebook-20261122-v1"
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
-    test "$(findmnt -n -T "$scratch" -o SOURCE)" = /dev/loop3
+    test "$(findmnt -n -T "$scratch" -o SOURCE | sort -u)" = /dev/loop3
     cfg="epoch${epoch}_$retry"
     if [[ $epoch == 168 ]]; then cfg=epoch168_cold_rebook; fi
 else
@@ -36,7 +36,7 @@ memory_max=536870912
 if [[ $epoch == 168 ]]; then memory_max=1073741824; fi
 test "$(cat "$group/memory.max")" = "$memory_max"
 test "$(cat "$group/memory.swap.max")" = '0'
-test "$(findmnt -n -T "$work" -o SOURCE)" = /dev/loop4
+test "$(findmnt -n -T "$work" -o SOURCE | sort -u)" = /dev/loop4
 test "$(df -B1 --output=avail "$scratch" | tail -1)" -gt 50331648
 mkdir -m0700 "$stage" "$out" "$out/tmp"
 exec > "$stage/build.log" 2>&1
