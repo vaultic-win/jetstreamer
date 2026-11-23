@@ -19,17 +19,18 @@ def main(commit, iid, flavor="lease-rejoin"):
     if not (os.geteuid() == 0 and sys.flags.isolated and __debug__ and re.fullmatch("[0-9a-f]{40}", commit)
             and re.fullmatch("[0-9a-f]{32}", iid)):
         raise ValueError("expected exact merged COMMIT and successful BUILD_IID")
-    if flavor not in ("lease-rejoin", "missed-rejoin"):
+    if flavor not in ("lease-rejoin", "missed-rejoin", "guard-walk-rejoin"):
         raise ValueError("unknown recovery build")
-    missed = flavor == "missed-rejoin"
-    census = FIT / ("tools-homefloor-145-missed-rejoin-v1" if missed else "tools-homefloor-145-lease-rejoin-v1")
-    dispatch_dir = FIT / ("tools-homefloor-145-handoff-v4" if missed else "tools-homefloor-145-handoff-v3")
-    worker_dir = SEM / ("tools-v5m" if missed else "tools-v5k")
+    guard_walk = flavor == "guard-walk-rejoin"
+    missed = guard_walk or flavor == "missed-rejoin"
+    census = FIT / ("tools-homefloor-145-guard-walk-rejoin-v1" if guard_walk else "tools-homefloor-145-missed-rejoin-v1" if missed else "tools-homefloor-145-lease-rejoin-v1")
+    dispatch_dir = FIT / ("tools-homefloor-145-handoff-v5" if guard_walk else "tools-homefloor-145-handoff-v4" if missed else "tools-homefloor-145-handoff-v3")
+    worker_dir = SEM / ("tools-v5n" if guard_walk else "tools-v5m" if missed else "tools-v5k")
     build_unit = "horizon-145-" + flavor + "-build-v1.service"
-    build_price = FIT / ("tools-homefloor-145-v5k-stopped-v1" if missed else "tools-homefloor-145-lease-build-v1")
-    price_sha = ("ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6" if missed
+    build_price = FIT / ("tools-homefloor-145-v5m-stopped-v1" if guard_walk else "tools-homefloor-145-v5k-stopped-v1" if missed else "tools-homefloor-145-lease-build-v1")
+    price_sha = ("b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7" if guard_walk else "ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6" if missed
                  else "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5")
-    history_name = "v5k_stopped.py" if missed else "v5j_lease_failure.py"
+    history_name = "v5m_stopped.py" if guard_walk else "v5k_stopped.py" if missed else "v5j_lease_failure.py"
     local = Path(__file__).resolve().parent
     def git(*args):
         return subprocess.check_output(["runuser","-u","sol","--","git","-C","/home/sol/workspace/jetstreamer",*args])
@@ -81,7 +82,8 @@ def main(commit, iid, flavor="lease-rejoin"):
     existing = original_build["native_fixture_names"]
     readiness = [line.split(" ... ")[0].removeprefix("test ") for line in tests.splitlines()
                  if "lease_startup::tests::" in line and line.endswith(" ... ok")]
-    phase_tests = ("Ran 17 tests in " in tests or (not missed and "Ran 14 tests in " in tests))
+    phase_count = 20 if guard_walk else 17 if missed else 14
+    phase_tests = any(int(n) >= phase_count for n in re.findall(r"^Ran (\d+) tests in ", tests, re.M))
     need(len(set(readiness)) >= 2 and "test result: FAILED" not in tests and phase_tests and
          all(name+" ... ok" in tests for name in existing), "missing original or lease-readiness build tests")
     tool = product/"export145"
@@ -104,6 +106,14 @@ def main(commit, iid, flavor="lease-rejoin"):
         proof.update(schema="horizon-epoch145-missed-census-recovery-build-v1",
                      startup_failure=original_build["startup_failure"], missed_clock_failure=historical["receipts"]["failure"],
                      missed_clock_rejection=historical["receipts"]["cadence"], leased_sample=historical["receipts"]["worker_sample"])
+    if guard_walk:
+        need(str(FAMILY/"guard_walk.rs") in sources and "guard_walk::tests::" in tests, "missing registered-hold tests")
+        proof.update(schema="horizon-epoch145-registered-guard-walk-build-v1",
+                     missed_clock_failure=original_build["missed_clock_failure"],
+                     missed_clock_rejection=original_build["missed_clock_rejection"],
+                     previous_missed_recovery=original_build["previous_recovery"],
+                     guard_walk_failure=historical["receipts"]["failure"], rejected_guard=historical["receipts"]["rejected_guard"],
+                     registered_guard_clock=historical["receipts"]["registered"])
     need(proof["memory_peak"] <= 805306368 and proof["physical_scratch"] <= 73400320, "build exceeded its envelope")
     script = (source/"run-incident.sh").read_bytes()
     need(script.count(b"PINNED_INCIDENT_SHA") == 1, "unbound launcher")
@@ -126,6 +136,10 @@ def main(commit, iid, flavor="lease-rejoin"):
         name = "build_159_price.py"
         path = write(q/name,git("show",commit+":"+str(FAMILY/name)))
         members[name] = item(name,path,0o444)
+    if guard_walk:
+        name = "v5n_feature_cover.py"
+        path = write(q/name,git("show",commit+":"+str(FAMILY/name)))
+        members[name] = item(name,path,0o444)
     runtime = install(census,list(members.values()),q/"lease-runtime-plan.json")
     cmd = list(prior["sealed_service_argv"])
     need(cmd[-5] == prior["reader"]["path"] and cmd[-1] == prior["reader"]["sha256"], "original verifier argv changed")
@@ -138,7 +152,7 @@ def main(commit, iid, flavor="lease-rejoin"):
     staged = record(q/"lease-dispatch-review.json",review)
     digest = ref(staged)["sha256"]
     dispatcher = git("show",commit+":"+str(FAMILY/"recovery_dispatch.py"))
-    prefix = b"MISSED_CLOCK_" if missed else b"LEASE_START_"
+    prefix = b"GUARD_WALK_" if guard_walk else b"MISSED_CLOCK_" if missed else b"LEASE_START_"
     for needle,replacement in [(prefix+b"IMAGE_SHA",image),(prefix+b"REVIEW_SHA",digest)]:
         need(dispatcher.count(needle) == 1, "different dispatcher template")
         dispatcher = dispatcher.replace(needle,replacement.encode())
@@ -149,10 +163,15 @@ def main(commit, iid, flavor="lease-rejoin"):
         members["missed_clock.py"] = item("missed_clock.py",source/"missed_clock.py",0o444)
     dispatch = install(dispatch_dir,list(members.values()),q/"lease-dispatch-plan.json")
     new = runpy.run_path(str(dispatch_dir/"run-recovery"))
-    need(new["PACKAGE"] == dispatch_dir and new["LEASE_RETRY"] and new["MISSED_RETRY"] == missed and new["READER"] == worker_dir/"export145"
+    need(new["PACKAGE"] == dispatch_dir and new["LEASE_RETRY"] and new["MISSED_RETRY"] == missed and new["GUARD_RETRY"] == guard_walk and new["READER"] == worker_dir/"export145"
          and new["REVIEW_SHA"] == digest and new["IMAGE_SHA"] == image and new["OLD"] == fail["IID"]
          and new["original_command"](review,price["fleet"])[-5:] == [str(worker_dir/"export145"),"recover-full-output",
                   price["fleet"]["path"],price["fleet"]["sha256"],image], "different deployed repair")
+    if guard_walk:
+        record(SEM/"V5N_RUNTIME_BINDINGS.json",dict(schema="horizon-145-qualified-v5n-runtime-v1", source_commit=commit,
+                build=ref(worker_dir/"build-proof.json"), build_iid=iid, prior_dispatch=historical["predecessor_dispatch"],
+                prior_stopped=ref(build_price/"deployment-seal-receipt.json"), worker=worker, reader=review["reader"],
+                provider=runtime, dispatcher=dispatch, review=ref(dispatch_dir/"admission-review.json")))
     print(json.dumps(dict(worker=worker,provider=runtime,dispatcher=dispatch,review_sha256=digest,commit=commit,
                           verified_or_published=False,production_worker_started=False),sort_keys=True))
 

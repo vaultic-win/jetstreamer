@@ -21,7 +21,9 @@ FIT = RUNTIME / "incident-replay-fit-20261121-v1"
 RETRY_PACKAGE = FIT / "tools-homefloor-145-handoff-v2"
 LEASE_PACKAGE = FIT / "tools-homefloor-145-handoff-v3"
 MISSED_PACKAGE = FIT / "tools-homefloor-145-handoff-v4"
-MISSED_RETRY = Path(__file__).resolve().parent == MISSED_PACKAGE
+GUARD_PACKAGE = FIT / "tools-homefloor-145-handoff-v5"
+GUARD_RETRY = Path(__file__).resolve().parent == GUARD_PACKAGE
+MISSED_RETRY = GUARD_RETRY or Path(__file__).resolve().parent == MISSED_PACKAGE
 LEASE_RETRY = MISSED_RETRY or Path(__file__).resolve().parent == LEASE_PACKAGE
 RETRY = LEASE_RETRY or Path(__file__).resolve().parent == RETRY_PACKAGE
 PACKAGE = LEASE_PACKAGE if LEASE_RETRY else RETRY_PACKAGE if RETRY else FIT / "tools-homefloor-145-handoff-v1"
@@ -43,6 +45,13 @@ if MISSED_RETRY:
     OLD = "ff597d64ad37400ea5c6836336fb6706"
     IMAGE_SHA = "MISSED_CLOCK_IMAGE_SHA"
     REVIEW_SHA = "MISSED_CLOCK_REVIEW_SHA"
+if GUARD_RETRY:
+    PACKAGE = GUARD_PACKAGE
+    READER = SEMANTIC / "tools-v5n/export145"
+    HANDOFF = SEMANTIC / "v5n-name-handoff"
+    OLD = "dba04d40f1b046b4875d7e27e0ff224a"
+    IMAGE_SHA = "GUARD_WALK_IMAGE_SHA"
+    REVIEW_SHA = "GUARD_WALK_REVIEW_SHA"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -278,6 +287,12 @@ def exact_price(price, current, review, attached=False, at=None):
                 and cover["native_recorded_unix_seconds"] == price["recorded_unix_seconds"]
                 and cover["remaining_home_bytes"] >= 0 and cover["credited_retirement_bytes"] == 0
                 and not cover["replay_launch_authorized"], "missing current donor coverage")
+    if GUARD_RETRY:
+        require(price["corrected_159_donor"]["unit"] == "horizon-epoch159-vote-feature-reference-20261123-v1.service"
+                and price["corrected_159_donor"]["stage"] in ("unclaimed","drained")
+                and all(phase[k] == review["failed_phase"][k] for k in
+                        ("original_leased_sample","registered_missed_clock","rejected_guard","previous_guard")),
+                "different registered hold or corrected donor")
     require((phase["Id"], phase["InvocationID"], phase["ActiveState"], phase["SubState"], phase["MainPID"])
             == ((UNIT, OLD, "failed", "failed", "0") if attached else (UNIT, "", "inactive", "dead", "0"))
             and all(phase[k] == review["failed_phase"][k] for k in
@@ -292,8 +307,13 @@ def retry_phase():
     """Authenticate the same exhausted generation while attached or after reset."""
     review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
     if MISSED_RETRY:
-        archive = runpy.run_path(str(PACKAGE / "v5k_stopped.py"))
+        archive = runpy.run_path(str(PACKAGE / ("v5m_stopped.py" if GUARD_RETRY else "v5k_stopped.py")))
         _, proof = archive["historical"]()
+        if GUARD_RETRY:
+            require(proof["failed_phase"]["registered_missed_clock"] == proof["receipts"]["registered"]
+                    and proof["failed_phase"]["rejected_guard"] == proof["receipts"]["rejected_guard"]
+                    and proof["failed_phase"]["previous_guard"] == proof["receipts"]["previous_guard"],
+                    "changed native guard walk or registered clock")
         require(all(proof[k] == review[k] for k in ("failed_phase", "old_manager", "original_pid1_exit",
                 "original_fragment")) and proof["receipts"] == review["predecessor_receipts"]
                 and proof["predecessor_review"] == review["original_review"]

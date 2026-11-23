@@ -10,7 +10,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-MISSED_POST = VERSION == "tools-v13g"
+GUARD_POST = VERSION == "tools-v13h"
+MISSED_POST = GUARD_POST or VERSION == "tools-v13g"
 LEASE_POST = MISSED_POST or VERSION == "tools-v13f"
 V5J_RETRY = LEASE_POST or VERSION == "tools-v13e"
 V5J_SUCCESSOR = V5J_RETRY or VERSION == "tools-v13d"
@@ -142,12 +143,14 @@ def fixture_semantic(s, build):
 
 def completion(s, build=None):
     if V5J_SUCCESSOR:
-        handoff = PKG.parent / ("v5m-name-handoff" if MISSED_POST else "v5k-name-handoff" if LEASE_POST else "v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
+        handoff = PKG.parent / ("v5n-name-handoff" if GUARD_POST else "v5m-name-handoff" if MISSED_POST else "v5k-name-handoff" if LEASE_POST else "v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
         selected, _ = s.read(handoff / "semantic-completion.json")
         result, _ = s.read(handoff / "submission-result.json")
         intent, _ = s.read(handoff / "submission-intent.json")
         if LEASE_POST:
-            old, review, dispatcher = (("ff597d64ad37400ea5c6836336fb6706",
+            if GUARD_POST:
+                binding = s.bound(build["guard_walk_binding"], PKG.parent/"V5N_RUNTIME_BINDINGS.json")
+            old, review, dispatcher = (("dba04d40f1b046b4875d7e27e0ff224a",binding["review"]["sha256"],binding["dispatcher"]["sha256"]) if GUARD_POST else ("ff597d64ad37400ea5c6836336fb6706",
                                        "28540e178ace196165ea892f924001a72b59396708b8269fb3a057a2627b132f",
                                        "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea")
                                       if MISSED_POST else
@@ -168,7 +171,7 @@ def completion(s, build=None):
         s.need(selected["schema"] == "horizon-145-v5j-semantic-completion-v1" and s.iid(bootstrap)
                and bootstrap == result["invocation_id"] and bootstrap != "afcf6cdd1ec0400ea2757f81472987b3"
                and intent["argv"] == result["argv"] and result["argv"][-1] == build["semantic_image"]["sha256"]
-               and result["argv"][-5:-3] == [str(PKG.parent / ("tools-v5m/export145" if MISSED_POST else "tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), "recover-full-output"]
+               and result["argv"][-5:-3] == [str(PKG.parent / ("tools-v5n/export145" if GUARD_POST else "tools-v5m/export145" if MISSED_POST else "tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), "recover-full-output"]
                and selected["start"]["path"] == str(STATE / bootstrap / "recovery-started.json")
                and selected["completion"]["path"] == str(STATE / bootstrap / "complete.json"),
                "different bound v5j publication generation")
@@ -207,10 +210,15 @@ def completion(s, build=None):
     if MISSED_POST:
         native = start["fresh_fit"]
         window = native["phase145"]["window"]
-        s.need(start["image"] == build["semantic_image"]["sha256"] == "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21"
+        if GUARD_POST:
+            s.need(binding["reader"] == build["semantic_image"] and binding["worker"] == window["continuity_seal"]
+                   and window["guard_walk_failure"]["sha256"] == "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"
+                   and window["registered_guard_clock"]["sha256"] == "119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"
+                   and window["rejected_guard"]["sha256"] == "6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f", "unbound guard walk recovery")
+        s.need(start["image"] == build["semantic_image"]["sha256"] == (binding["reader"]["sha256"] if GUARD_POST else "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21")
                and native["phase145"]["invocation_id"] == bootstrap and native["phase145"]["stage"] == "controller"
                and native["fits"] and native["fleet"] == intent["fleet"]
-               and window["continuity_seal"]["sha256"] == "db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4"
+               and window["continuity_seal"]["sha256"] == (binding["worker"]["sha256"] if GUARD_POST else "db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4")
                and window["missed_clock_failure"]["sha256"] == "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"
                and native["epoch159_donor_cover"]["fleet"] == intent["fleet"]
                and native["epoch159_donor_cover"]["credited_retirement_bytes"] == 0, "unbound missed-clock recovery")

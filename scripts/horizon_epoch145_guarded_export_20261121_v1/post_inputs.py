@@ -19,13 +19,15 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
-MISSED_POST = (Path(__file__).resolve().parent.name == "tools-v13g" or
+GUARD_POST = (Path(__file__).resolve().parent.name == "tools-v13h" or
+              (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--guard-walk"]))
+MISSED_POST = GUARD_POST or (Path(__file__).resolve().parent.name == "tools-v13g" or
                (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--missed-clock"]))
 LEASE_POST = MISSED_POST or (Path(__file__).resolve().parent.name == "tools-v13f" or
               (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--lease-ready"]))
 RETRY = LEASE_POST or (Path(__file__).resolve().parent.name == "tools-v13e" or
          (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--retry1"]))
-DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v4" if MISSED_POST else "tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
+DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v5" if GUARD_POST else "tools-homefloor-145-handoff-v4" if MISSED_POST else "tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
 PAIR = R / "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"
 PAIR_SHA = "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4"
 DISPATCH_SEAL = "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea" if MISSED_POST else "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if LEASE_POST else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
@@ -49,9 +51,46 @@ def need(ok, msg):
         raise ValueError(msg)
 
 
+def guard_bindings():
+    # The qualified worker installer records the three sealer results in one
+    # root-owned, write-once receipt after validating and installing each.
+    previous = DISPATCH.parent / "tools-homefloor-145-handoff-v4"
+    oldseal = (previous / "deployment-seal-receipt.json").read_bytes()
+    need(hashlib.sha256(oldseal).hexdigest() == "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea", "different V5m anchor")
+    member, = [m for m in json.loads(oldseal)["members"] if m["name"] == "run-recovery" and m["mode"] == "0555"]
+    program = previous / "run-recovery"
+    raw = program.read_bytes()
+    need(hashlib.sha256(raw).hexdigest() == member["sha256"], "different V5m evidence reader")
+    api = {"__file__":str(program), "__name__":"prior_145_dispatcher"}
+    exec(compile(raw, str(program), "exec"),api)
+    raw, receipt = api["read"](BASE / "V5N_RUNTIME_BINDINGS.json")
+    b = json.loads(raw)
+    need(b["schema"] == "horizon-145-qualified-v5n-runtime-v1"
+         and b["prior_dispatch"] == {"path":str(previous/"deployment-seal-receipt.json"),"sha256":hashlib.sha256(oldseal).hexdigest()}
+         and b["prior_stopped"] == {"path":str(DISPATCH.parent/"tools-homefloor-145-v5m-stopped-v1/deployment-seal-receipt.json"),"sha256":"b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7"}, "foreign predecessor for V5n")
+    for key,path in (("worker",BASE/"tools-v5n"),("provider",DISPATCH.parent/"tools-homefloor-145-guard-walk-rejoin-v1"),("dispatcher",DISPATCH)):
+        seal = api["bound"](b[key])
+        need(b[key]["path"] == str(path/"deployment-seal-receipt.json") and seal["destination"] == str(path)
+             and seal["sealer_sha256"] == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
+             and seal["remote_mutations"] is False, "wrong V5n installation")
+        members={m["name"]:m["sha256"] for m in seal["members"]}
+        if key == "worker":
+            need(b["reader"] == {"path":str(path/"export145"),"sha256":members["export145"]}
+                 and b["build"] == {"path":str(path/"build-proof.json"),"sha256":members["build-proof.json"]}, "foreign V5n image")
+        if key == "dispatcher":
+            need(b["review"] == {"path":str(path/"admission-review.json"),"sha256":members["admission-review.json"]}, "foreign V5n review")
+    proof,review=api["bound"](b["build"]),api["bound"](b["review"])
+    need(proof["build_iid"] == b["build_iid"] and proof["source_commit"] == b["source_commit"]
+         and proof["capacity_provider"] == b["prior_stopped"] and proof["verifier_sha256"] == b["reader"]["sha256"]
+         and proof["guard_walk_failure"]["sha256"] == "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"
+         and review["old_manager"]["InvocationID"] == "dba04d40f1b046b4875d7e27e0ff224a"
+         and review["reader"] == b["reader"] and review["seal"] == b["worker"] and review["provider"] == b["provider"], "unqualified V5n family")
+    return b,receipt
+
+
 def load_dispatch():
     expected = (DISPATCH / "deployment-seal-receipt.json").read_bytes()
-    need(hashlib.sha256(expected).hexdigest() == DISPATCH_SEAL, "different semantic dispatcher seal")
+    need(hashlib.sha256(expected).hexdigest() == (guard_bindings()[0]["dispatcher"]["sha256"] if GUARD_POST else DISPATCH_SEAL), "different semantic dispatcher seal")
     row, = [r for r in json.loads(expected)["members"] if r["name"] == "run-recovery"]
     program = DISPATCH / row["name"]
     need(hashlib.sha256(program.read_bytes()).hexdigest() == row["sha256"], "different semantic dispatcher")
@@ -100,6 +139,17 @@ def original_pair(d, git):
 def validate_missed_start(started, intent):
     native = started["fresh_fit"]
     window = native["phase145"]["window"]
+    if GUARD_POST:
+        b,_=guard_bindings()
+        need(started["image"] == b["reader"]["sha256"] and intent["review_sha256"] == b["review"]["sha256"]
+             and intent["original"]["INVOCATION_ID"] == "dba04d40f1b046b4875d7e27e0ff224a"
+             and window["continuity_seal"] == b["worker"]
+             and window["guard_walk_failure"]["sha256"] == "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"
+             and window["rejected_guard"]["sha256"] == "6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"
+             and window["registered_guard_clock"]["sha256"] == "119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"
+             and native["fits"] and native["fleet"] == intent["fleet"] and native["epoch159_donor_cover"]["fleet"] == intent["fleet"]
+             and native["epoch159_donor_cover"]["credited_retirement_bytes"] == 0, "unbound guard walk recovery")
+        return
     need(started["image"] == "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21"
          and intent["original"]["INVOCATION_ID"] == "ff597d64ad37400ea5c6836336fb6706"
          and native["fits"] and native["fleet"] == intent["fleet"]
@@ -222,7 +272,7 @@ def verify_build_price(d, price):
 
 
 def main():
-    args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"], ["--missed-clock"]) else sys.argv[1:]
+    args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"], ["--missed-clock"], ["--guard-walk"]) else sys.argv[1:]
     if RETRY and len(args) == 2 and args[0] == "verify-build-price":
         need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
         d = load_dispatch()

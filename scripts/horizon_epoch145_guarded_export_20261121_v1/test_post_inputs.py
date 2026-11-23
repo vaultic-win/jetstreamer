@@ -99,12 +99,13 @@ class PublicationInputs(unittest.TestCase):
             p.validate_terminal(*f)
 
     def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
-        for version in ("tools-v13d", "tools-v13e", "tools-v13f", "tools-v13g"):
+        for version in ("tools-v13d", "tools-v13e", "tools-v13f", "tools-v13g", "tools-v13h"):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as td:
                 self.exercise_adapter(Path(td), version)
 
     def exercise_adapter(self, root, version):
-        missed = version == "tools-v13g"
+        guard = version == "tools-v13h"
+        missed = guard or version == "tools-v13g"
         lease = missed or version == "tools-v13f"
         retry = lease or version == "tools-v13e"
         pkg = root / "family" / version
@@ -114,7 +115,7 @@ class PublicationInputs(unittest.TestCase):
         deployed.write_bytes(src.read_bytes())
         complete = runpy.run_path(str(deployed))["completion"]
         state = root / "state"
-        name = pkg.parent / ("v5m-name-handoff" if missed else "v5k-name-handoff" if lease else "v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
+        name = pkg.parent / ("v5n-name-handoff" if guard else "v5m-name-handoff" if missed else "v5k-name-handoff" if lease else "v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
         name.mkdir()
         original = state / IID
         original.mkdir(parents=True)
@@ -151,6 +152,13 @@ class PublicationInputs(unittest.TestCase):
             native["phase145"]["window"].update(
                 continuity_seal={"sha256":"db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4"},
                 missed_clock_failure={"sha256":"04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"})
+        if guard:
+            image_sha = "a"*64
+            start["image"] = image_sha
+            native["phase145"]["window"].update(continuity_seal={"sha256":"7"*64},
+                guard_walk_failure={"sha256":"8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"},
+                registered_guard_clock={"sha256":"119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"},
+                rejected_guard={"sha256":"6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"})
         sr = write(original / "recovery-started.json", start)
         vr = write(original / "verified-frozen.json", verified)
         extract.update(verified_frozen=vr, recovery_evidence=sr)
@@ -159,14 +167,21 @@ class PublicationInputs(unittest.TestCase):
         proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
         receipt = name / "semantic-completion.json"
         write(receipt, proof)
-        args = [str(pkg.parent / ("tools-v5m/export145" if missed else "tools-v5k/export145" if lease else "tools-v5j/export145")), "recover-full-output", "/fleet", "1"*64, image_sha]
+        args = [str(pkg.parent / ("tools-v5n/export145" if guard else "tools-v5m/export145" if missed else "tools-v5k/export145" if lease else "tools-v5j/export145")), "recover-full-output", "/fleet", "1"*64, image_sha]
         write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
         dispatch = {"path": "/sealed-dispatch", "sha256": "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea" if missed else "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if lease else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
         intent = dict(fleet=fleet, argv=args, original={"INVOCATION_ID": "ff597d64ad37400ea5c6836336fb6706" if missed else "f2afc696a63a4e6aa6812451cf3559e5" if lease else "48ad7b2234d74e74b0498e7110e0aee3"},
                       review_sha256="28540e178ace196165ea892f924001a72b59396708b8269fb3a057a2627b132f" if missed else "1a7f7bce208d97831963c66c462bbac28b7f9b84e990d09fa5da7e5efa56d150" if lease else "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
                       preflight={"quote_provider":dispatch})
+        if guard:
+            dispatch["sha256"]="8"*64
+            intent.update(review_sha256="9"*64,original={"INVOCATION_ID":"dba04d40f1b046b4875d7e27e0ff224a"})
         write(name / "submission-intent.json", intent)
         build = {"semantic_image": {"sha256": image_sha}, "semantic_dispatch": dispatch}
+        if guard:
+            build["guard_walk_binding"] = write(pkg.parent/"V5N_RUNTIME_BINDINGS.json",
+                dict(review={"sha256":intent["review_sha256"]},dispatcher=dispatch,reader=build["semantic_image"],
+                     worker=native["phase145"]["window"]["continuity_seal"]))
         with patch.dict(complete.__globals__, STATE=state, OUTPUT=output, ARCHIVE=archive, PKG=pkg):
             self.assertEqual(complete(Status(), build), (dr, extract["extraction"]))
             if retry:
@@ -178,13 +193,13 @@ class PublicationInputs(unittest.TestCase):
                 write(name / "submission-intent.json", intent)
             if missed:
                 state_album = original / "recovery-started.json"
-                for key in ("continuity_seal", "missed_clock_failure"):
+                for key in (("guard_walk_failure","registered_guard_clock","rejected_guard","continuity_seal","missed_clock_failure") if guard else ("continuity_seal", "missed_clock_failure")):
                     window = start["fresh_fit"]["phase145"]["window"]
                     keep = window[key]
                     window[key] = {"sha256":"0"*64}
                     broken = write(state_album, start)
                     write(receipt, dict(proof, start=broken))
-                    with self.assertRaisesRegex(ValueError, "unbound missed-clock recovery"):
+                    with self.assertRaisesRegex(ValueError, "unbound (guard walk|missed-clock) recovery"):
                         complete(Status(), build)
                     window[key] = keep
                 self.assertEqual(write(state_album,start), sr)

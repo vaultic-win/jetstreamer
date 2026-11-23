@@ -74,6 +74,14 @@ class HomefloorPhase(TestCase):
                 (state / prior).symlink_to(g["STATE"] / prior, target_is_directory=True)
                 meta["missed_clock_failure"] = Status.read(state / prior / "failed.json")[1]
                 meta["previous_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
+                if g["GUARD_WALK"]:
+                    meta["previous_missed_recovery"] = meta["previous_recovery"]
+                    prior = "dba04d40f1b046b4875d7e27e0ff224a"
+                    (state / prior).symlink_to(g["STATE"] / prior, target_is_directory=True)
+                    meta["guard_walk_failure"] = Status.read(state / prior / "failed.json")[1]
+                    meta["previous_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
+                    meta["rejected_guard"] = {"sha256":"6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"}
+                    meta["registered_guard_clock"] = {"sha256":"119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"}
         build = record(pkg / "build-proof.json", meta)
         seal = record(pkg / "deployment-seal-receipt.json",
                       dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
@@ -205,6 +213,25 @@ class MissedClockPhase(HomefloorPhase):
             return data, ref
         with patch.object(Status, "read", side_effect=wrong_history):
             with self.assertRaisesRegex(ValueError,"unqualified retry of the missed fleet census"):
+                self.inspect((10,20))
+
+
+class GuardWalkPhase(HomefloorPhase):
+    version = "tools-v5n"
+
+    def test_guard_evidence_is_bound_to_original_failure_and_registered_clock(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-guard-walk-rejoin-v1")
+        self.write()
+        self.assertEqual(self.inspect((10,20))["window"]["guard_walk_failure"]["sha256"],
+                         "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010")
+        original = Status.read
+        for key in ("registered_guard_clock","rejected_guard","guard_walk_failure","previous_recovery"):
+            def wrong(path, expected=None):
+                data, ref = original(path, expected)
+                if path.name == "build-proof.json":
+                    data[key] = {"sha256":"0"*64}
+                return data, ref
+            with self.subTest(field=key), patch.object(Status,"read",side_effect=wrong), self.assertRaises(ValueError):
                 self.inspect((10,20))
 
 
