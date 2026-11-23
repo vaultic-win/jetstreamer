@@ -68,46 +68,96 @@ def inputs():
     return identities
 
 
+def mounted_inputs():
+    import _cbor2
+    import cbor2
+    from native import DEPLOY
+
+    require(os.geteuid() == 1001 and not os.getgroups(), "sandbox identity")
+    status = dict(
+        line.split(":", 1) for line in Path("/proc/self/status").read_text().splitlines() if ":" in line
+    )
+    require(
+        status["NoNewPrivs"].strip() == "1"
+        and int(status["CapEff"].strip(), 16) == 0
+        and int(status["CapBnd"].strip(), 16) == 0,
+        "sandbox privilege drop",
+    )
+    deps = json.loads(Path(__file__).with_name("dependencies.json").read_bytes())
+    seen = {}
+    for row in [*deps["cbor2"], deps["worker"]]:
+        p = Path(row["path"])
+        st = p.stat()
+        require(
+            not os.access(p, os.W_OK)
+            and st.st_size == row["length"]
+            and hashlib.sha256(p.read_bytes()).hexdigest() == row["sha256"],
+            "different service-visible native dependency",
+        )
+        seen[str(p)] = dict(dev=st.st_dev, ino=st.st_ino, sha256=row["sha256"])
+    require(
+        _cbor2.__file__ in seen
+        and cbor2.__file__ in seen
+        and cbor2.load is _cbor2.load
+        and str(DEPLOY / "jetstreamer-historical-worker-v1-5-6") in seen,
+        "native dependency resolution",
+    )
+    source = inputs()
+    require(
+        all(not os.access(v["path"], os.W_OK) for v in source.values()),
+        "writable service input",
+    )
+    return dict(
+        source=source,
+        dependencies=seen,
+        uid=os.geteuid(),
+        gid=os.getegid(),
+        caps=status["CapEff"].strip(),
+        no_new_privs=status["NoNewPrivs"].strip(),
+    )
+
+
 def allocation(scratch, receipts):
     require(
-        os.geteuid() != 0
-        and receipts.is_relative_to(HOME)
-        and os.stat(receipts).st_dev == HOME.stat().st_dev,
-        "private receipt storage",
+        os.geteuid() == 1001 and (scratch, receipts) == (Path("/work"), Path("/evidence")),
+        "wrong service user or mounts",
     )
-    for path in (scratch, receipts):
+    backing = {}
+    for path, size, name in (
+        (scratch, 24 << 30, "scratch.ext4"),
+        (receipts, 8 << 20, "evidence.ext4"),
+    ):
         st = path.lstat()
         require(
-            path.resolve(strict=True) == path
+            path.is_mount()
             and path.is_dir()
             and st.st_uid == os.getuid()
             and st.st_mode & 0o077 == 0
-            and all(path == scratch and x.name == "lost+found" for x in path.iterdir()),
-            "trace directories must be empty and private",
+            and all(f.name == "lost+found" for f in path.iterdir()),
+            "unclean service mount",
         )
-    device, typ = subprocess.check_output(
-        ["findmnt", "-n", "-o", "SOURCE,FSTYPE", "-T", scratch], text=True
-    ).split()
-    require(
-        scratch.is_mount()
-        and typ == "ext4"
-        and device.startswith("/dev/loop")
-        and device[9:].isdecimal(),
-        "bounded scratch mount",
-    )
-    backing = Path((Path("/sys/block") / Path(device).name / "loop/backing_file").read_text().strip())
-    sb = backing.stat()
+        devsys = Path("/sys/dev/block") / f"{os.major(st.st_dev)}:{os.minor(st.st_dev)}"
+        image = (devsys / "loop/backing_file").read_text().strip()
+        allowed = [
+            str(root / "epoch159-bounded-reference-20261123-v1/attempt-v1" / name)
+            for root in (
+                HOME / "horizon-root-runtime-data",
+                Path("/var/lib/jetstreamer/horizon_runtime_data"),
+            )
+        ]
+        mount = subprocess.check_output(
+            ["findmnt", "-n", "-o", "FSTYPE,OPTIONS", "-T", path], text=True
+        ).split()
+        require(
+            image in allowed
+            and int((devsys / "size").read_text()) * 512 == size
+            and mount[0] == "ext4"
+            and {"nodev", "nosuid", "noexec"} <= set(mount[1].split(",")),
+            "wrong paid loop mount",
+        )
+        backing[str(path)] = image
     v = os.statvfs(scratch)
-    require(
-        backing.is_relative_to(HOME)
-        and not os.access(backing, os.W_OK)
-        and sb.st_dev == HOME.stat().st_dev
-        and sb.st_size == 24 << 30
-        and sb.st_blocks * 512 >= sb.st_size
-        and v.f_bavail * v.f_frsize >= 22 << 30
-        and v.f_favail >= 500000,
-        "scratch booking or inode capacity",
-    )
+    require(v.f_bavail * v.f_frsize >= 22 << 30 and v.f_favail >= 500000, "scratch capacity")
     cg = Path("/sys/fs/cgroup") / Path("/proc/self/cgroup").read_text().strip().removeprefix(
         "0::"
     ).lstrip("/")
@@ -121,8 +171,8 @@ def allocation(scratch, receipts):
     return dict(
         cgroup=str(cg),
         scratch=str(scratch),
-        home_backing=str(backing),
-        home_bytes=sb.st_size,
+        home_backing=backing,
+        home_bytes=(24 << 30) + (8 << 20),
         memory_bytes=48 << 30,
         cpu_cores=2,
         swap=0,
@@ -131,7 +181,8 @@ def allocation(scratch, receipts):
 
 def trace(scratch, receipts):
     booking = allocation(scratch, receipts)
-    source = inputs()
+    mounted = mounted_inputs()
+    source = mounted["source"]
     incident = CONFIG["bootstrap"]["checkpoint"]
     started = time.monotonic()
     record(
@@ -140,6 +191,7 @@ def trace(scratch, receipts):
             started=utc(),
             booking=booking,
             source=source,
+            dependencies=mounted["dependencies"],
             intended_slots=[BOOT + 1, END],
             qualified_original_windows=CONFIG["car_windows"],
         ),
@@ -161,7 +213,10 @@ def trace(scratch, receipts):
     def capture_write(frame, version, pubkey, data):
         if pubkey != SLOT_HASHES or frame not in (*CHECKPOINTS, 68_687_998):
             return
-        require(len(data) == 20488 and int.from_bytes(data[:8], "little") == 512, "SlotHashes decode")
+        require(
+            len(data) == 20488 and int.from_bytes(data[:8], "little") == 512,
+            "SlotHashes decode",
+        )
         pairs = [
             (int.from_bytes(data[i : i + 8], "little"), base58(data[i + 8 : i + 40]))
             for i in range(8, len(data), 40)
@@ -171,7 +226,8 @@ def trace(scratch, receipts):
         actual = hashlib.sha256(data).hexdigest()
         filename = f"slot-hashes-{frame}-{version}.json"
         record(
-            receipts / filename, dict(slot=frame, write_version=version, sha256=actual, entries=pairs)
+            receipts / filename,
+            dict(slot=frame, write_version=version, sha256=actual, entries=pairs),
         )
         receipt["slot_hashes"][str(frame)] = dict(
             write_version=version,
@@ -194,6 +250,39 @@ def trace(scratch, receipts):
     signal.alarm(2 * 3600)
     try:
         with worker(6) as session:
+            native = Path("/proc") / str(session.proc.pid)
+
+            def identity(proc):
+                exe = (proc / "exe").stat()
+                ids = (proc / "stat").read_text().rsplit(") ", 1)[1].split()
+                return dict(
+                    pid=int(proc.resolve().name),
+                    parent=int(ids[1]),
+                    start_ticks=int(ids[19]),
+                    exe=os.readlink(proc / "exe"),
+                    dev=exe.st_dev,
+                    ino=exe.st_ino,
+                    comm=(proc / "comm").read_text().strip(),
+                    cgroup=(proc / "cgroup").read_text().strip(),
+                )
+
+            driver = identity(Path("/proc/self"))
+            child = identity(native)
+            require(
+                child["parent"] == driver["pid"]
+                and child["cgroup"] == driver["cgroup"]
+                and child["exe"].endswith("/jetstreamer-historical-worker-v1-5-6"),
+                "unexpected original worker or parent",
+            )
+            record(
+                receipts / "hello.json",
+                dict(
+                    invocation_id=os.environ["INVOCATION_ID"],
+                    driver=driver,
+                    worker=child,
+                    protocol=5,
+                ),
+            )
             session.initialize(
                 Path(source["bootstrap"]["path"]),
                 Path(source["genesis"]["path"]),
@@ -224,7 +313,7 @@ def trace(scratch, receipts):
             ):
                 target_ordinal = 0
 
-                def capture_outcome(tx, status, fee):
+                def capture_outcome(tx, status, fee, slot=slot):
                     nonlocal target_ordinal
                     if tx == VOTE_WIRE:
                         require(
@@ -246,7 +335,12 @@ def trace(scratch, receipts):
                         record(receipts / "vote.json", receipt["vote"])
                     target_ordinal += 1
 
-                session.process(slot, entries, capture_outcome if slot == END else None, capture_write)
+                session.process(
+                    slot,
+                    entries,
+                    capture_outcome if slot == END else None,
+                    capture_write,
+                )
                 receipt["blocks"] += 1
                 receipt["entries"] += len(entries)
                 receipt["transactions"] += sum(len(row[2]) for row in entries)
@@ -303,6 +397,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("check-source")
+    sub.add_parser("check-mounted-inputs")
     run = sub.add_parser("replay")
     run.add_argument("scratch", type=Path)
     run.add_argument("receipts", type=Path)
@@ -315,6 +410,8 @@ def main():
             counts["transactions"] += sum(len(row[2]) for row in entries)
         require(counts == CONFIG["source_counters"], "source totals disagree")
         print(json.dumps(counts))
+    elif args.action == "check-mounted-inputs":
+        print(json.dumps(mounted_inputs(), sort_keys=True))
     else:
         trace(args.scratch, args.receipts)
 
