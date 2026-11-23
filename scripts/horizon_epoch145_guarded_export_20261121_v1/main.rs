@@ -644,6 +644,16 @@ fn run() -> Result<()> {
 fn run() -> Result<()> {
     let a: Vec<_> = std::env::args().collect();
     match a.as_slice() {
+        #[cfg(incident_five_lane145_only)]
+        [_, mode, fleet, digest, sha] if mode == "check-serial-handback" => {
+            incident_fit::preflight(
+                Bound {
+                    path: fleet.into(),
+                    sha256: digest.clone(),
+                },
+                sha,
+            )
+        }
         #[cfg(all(partial145_only, not(joint145_only), not(continuity145_only)))]
         [_, mode, parent, sha] if mode == "recover-append" => partial::append(parent.parse()?, sha),
         #[cfg(all(materialized145_only, not(joint145_only), not(incident_post145_only)))]

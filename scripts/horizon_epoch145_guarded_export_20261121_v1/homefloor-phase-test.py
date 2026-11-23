@@ -39,11 +39,12 @@ class Status:
 
 
 class HomefloorPhase(TestCase):
+    version = "tools-v5g"
     def setUp(self):
         temp = tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR", "/home/sol/.jetstreamer-private"))
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
-        pkg = root / "tools-v5g"
+        pkg = root / self.version
         pkg.mkdir()
         (pkg / SCRIPT.name).write_bytes(SCRIPT.read_bytes())
         self.reader = runpy.run_path(str(pkg / SCRIPT.name))["inspect"]
@@ -53,7 +54,7 @@ class HomefloorPhase(TestCase):
         image = pkg / "export145"
         image.write_bytes(b"offline fixture")
         self.sha = hashlib.sha256(image.read_bytes()).hexdigest()
-        self.provider = g["BASE"] / "incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v1/post-stop-fit"
+        self.provider = g["BASE"] / "incident-replay-fit-20261121-v1" / g["HOMEFLOOR_PROVIDER"] / "post-stop-fit"
         self.fleet = g["BASE"] / "root214757-live166167170-20261122-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json"
 
         def record(p, value):
@@ -138,6 +139,13 @@ class HomefloorPhase(TestCase):
         self.write()
         with self.assertRaisesRegex(ValueError,"left its native frozen"):
             self.inspect((10,20))
+
+
+class FiveLanePhase(HomefloorPhase):
+    version = "tools-v5h"
+
+    def test_new_provider_is_required(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v2")
 
 
 if __name__ == "__main__":

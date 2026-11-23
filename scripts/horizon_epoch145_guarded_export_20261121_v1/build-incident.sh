@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+five_lane_rejoin=false
+if [[ $flavor == five-lane-rejoin ]]; then
+  five_lane_rejoin=true
+  flavor=homefloor-rejoin
+fi
 homefloor_rejoin=false
 if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
@@ -80,6 +85,10 @@ if $homefloor_rejoin; then
   extra+=(--cfg incident_homefloor145_only)
   sources+=(homefloor-phase-test.py)
   fixture+=(incident145::accepts_only_the_actual_stopped_retry1_and_retained_candidate)
+fi
+if $five_lane_rejoin; then
+  extra+=(--cfg incident_five_lane145_only)
+  fixture+=(incident_fit::tests::both_exact_park_terminals_and_retirements_precede_handoff)
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi

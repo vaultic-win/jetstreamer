@@ -18,6 +18,9 @@ mod support;
 use support::*;
 const COLD168_LAUNCHER: &str = "tools-v2/recover168";
 mod actor;
+#[cfg(epoch166_after168)]
+#[path = "../horizon_epoch166_guard_recovery_20261121_v1/after168.rs"]
+mod after168;
 #[cfg_attr(
     any(epoch166_recovery, epoch166_retry11),
     path = "../horizon_epoch166_guard_recovery_20261121_v1/source166.rs"
@@ -140,8 +143,16 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     };
     #[cfg(all(epoch166_retry11, not(epoch166_after170)))]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-166-v2/post-stop-fit");
-    #[cfg(epoch166_after170)]
+    #[cfg(all(epoch166_after170, not(epoch166_after168)))]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-166-after170-v1/post-stop-fit");
+    #[cfg(epoch166_after168)]
+    let path = {
+        ensure!(
+            fit_seal == after168::FIT_SEAL,
+            "different 166 capacity deployment"
+        );
+        rt(after168::FIT)
+    };
     #[cfg(epoch170_retry11)]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry11-170-v1/post-stop-fit");
     #[cfg(epoch170_retry12)]
@@ -150,6 +161,8 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry13-170-v1/post-stop-fit");
     #[cfg(epoch168_cold_rebook)]
     let path = rt(source::FIT);
+    #[cfg(epoch166_after168)]
+    doc(&base().join("PREPARED.json"), Some(after168::PREPARED))?;
     let se = member(&path, fit_seal)?;
     let b = command(
         path.to_str().unwrap(),
@@ -182,6 +195,13 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
             && v["replay_launch_authorized"] == false,
         "foreign successor budget or candidate"
     );
+    #[cfg(epoch166_after168)]
+    {
+        after168::peers_and_writer(&v)?;
+        if v["candidate"].is_null() {
+            after168::prestart(&v)?;
+        }
+    }
     v["provider_seal"] = se;
     Ok(v)
 }
@@ -551,7 +571,7 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
         epoch168_cold_rebook
     ))]
     verify_guard_route(&binding)?;
-    #[cfg(not(epoch168_cold_rebook))]
+    #[cfg(not(any(epoch168_cold_rebook, epoch166_after168)))]
     let inv = record("INVENTORY_PRESTART.json", &require_missing()?)?;
     #[cfg(epoch166_retry11)]
     source::holding_complete()?;
@@ -571,6 +591,10 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
         .checked_add(128 << 20)
         .context("guard slack")?
         .min(n(&before, "available_HOME_bytes")?);
+    #[cfg(epoch166_after168)]
+    let peers = after168::peers_and_writer(&before)?;
+    #[cfg(epoch166_after168)]
+    let inv = after168::inventory(&require_missing()?)?;
     #[cfg(epoch168_cold_rebook)]
     let peers = source::peer_identity(&before)?;
     #[cfg(epoch168_cold_rebook)]
@@ -609,6 +633,11 @@ fn start(fleet: &Value, fit_seal: &str) -> Result<Value> {
                 && after["candidate"]["producer_pid"] == actor["producer_pid"]
                 && after["candidate"]["start_ticks"] == actor["start_ticks"],
             "capacity was captured for another generation"
+        );
+        #[cfg(epoch166_after168)]
+        ensure!(
+            after168::peers_and_writer(&after)? == peers,
+            "166 peer or writer changed after guard"
         );
         #[cfg(epoch168_cold_rebook)]
         ensure!(
@@ -678,6 +707,8 @@ fn dispatch() -> Result<Value> {
                 "tools/recover170"
             } else if cfg!(epoch168_cold_rebook) {
                 COLD168_LAUNCHER
+            } else if cfg!(epoch166_after168) {
+                "tools-v5/recover166"
             } else if cfg!(epoch166_after170) {
                 "tools-v4/recover166"
             } else if cfg!(epoch166_retry11) {

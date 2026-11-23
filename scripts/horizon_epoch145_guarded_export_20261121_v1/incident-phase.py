@@ -8,7 +8,9 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-HOMEFLOOR_REJOIN = VERSION == "tools-v5g"
+FIVE_LANE_REJOIN = VERSION == "tools-v5h"
+HOMEFLOOR_REJOIN = VERSION == "tools-v5g" or FIVE_LANE_REJOIN
+HOMEFLOOR_PROVIDER = "tools-homefloor-145-rejoin-v2" if FIVE_LANE_REJOIN else "tools-homefloor-145-rejoin-v1"
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
 TIMER_REJOIN = VERSION in ("tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN
 FOCUSED_REJOIN = VERSION in ("tools-v5d", "tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN
@@ -146,7 +148,7 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and started_fit["phase145"]["window"]["native_parent"] == window["native_parent"]
                and started_fit["phase145"]["window"]["failed_predecessor"] == failed
                and started_fit["provider_seal"]["path"] == str(BASE / "incident-replay-fit-20261121-v1"
-                   / "tools-homefloor-145-rejoin-v1/deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
+                   / HOMEFLOOR_PROVIDER / "deployment-seal-receipt.json"), "foreign 145 pre-worker admission")
     predecessor = ("failed_manager_query" if TIMEOUT_REJOIN else
                    "failed_fresh_census" if REJOIN else "failed_preincident_verifier")
     if FOCUSED_REJOIN:
