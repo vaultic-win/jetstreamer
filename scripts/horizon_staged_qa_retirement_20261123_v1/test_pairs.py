@@ -19,6 +19,66 @@ Pair = runpy.run_path(str(base/'pairs.py'))['PairedFiles']
 signal.signal(signal.SIGIO, m['interrupted'])
 
 
+class TestFixedSelections(unittest.TestCase):
+    def setUp(self):
+        self.host = runpy.run_path(str(base/'host.py'))
+        self.package = self.host['CURRENT_22']
+        self.rows = {f'additional-{i}': {} for i in range(22)}
+        self.manifest = {
+            'proposed_files': self.rows, 'excluded_source_paths': [f'excluded-{i}' for i in range(59)],
+            'physical_allocated_bytes': 10064564224, 'logical_source_bytes': 10065734136,
+            'final_pair_read_bound': 20131468272, 'stage30_exclusion': {
+                'path': str(self.host['STAGE30_ORIGINAL']), 'sha256': self.host['STAGE30_ORIGINAL_SHA']}}
+        self.older = {f'prior-{i}': {} for i in range(35)}
+
+    def check(self):
+        def bound(path, digest):
+            self.assertEqual(path, self.host['STAGE30_ORIGINAL'])
+            self.assertEqual(digest, self.host['STAGE30_ORIGINAL_SHA'])
+            return {'files': self.older}
+        return self.host['checked_selection'](self.manifest, self.package, bound)
+
+    def test_exact_stage22(self):
+        self.assertIs(self.check(), self.rows)
+
+    def test_unknown_or_crossed_package(self):
+        for path in (self.host['LEGACY_30'], self.package/'alternate'):
+            self.package = path
+            with self.assertRaises(RuntimeError):
+                self.check()
+
+    def test_old_selection_preserved(self):
+        self.package = self.host['LEGACY_30']
+        self.manifest = dict(proposed_files={f'legacy-{i}': {} for i in range(30)},
+                             excluded_source_paths=[f'excluded-{i}' for i in range(5)],
+                             physical_allocated_bytes=12639535104, logical_source_bytes=12641076584,
+                             final_pair_read_bound=25282153168)
+        self.assertEqual(len(self.check()), 30)
+
+    def test_earlier_staged_inode_path_excluded(self):
+        self.older.pop('prior-0')
+        self.older['additional-0'] = {}
+        with self.assertRaisesRegex(RuntimeError, 'overlap'):
+            self.check()
+
+    def test_missing_earlier_candidate_and_foreign_manifest(self):
+        self.older.pop('prior-0')
+        with self.assertRaisesRegex(RuntimeError, 'overlap'):
+            self.check()
+        self.manifest['stage30_exclusion']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(RuntimeError, 'changed'):
+            self.check()
+
+    def test_altered_byte_or_pruned_exclusions(self):
+        self.manifest['physical_allocated_bytes'] += 1
+        with self.assertRaisesRegex(RuntimeError, 'exact selection'):
+            self.check()
+        self.manifest['physical_allocated_bytes'] -= 1
+        self.manifest['excluded_source_paths'][0] = 'additional-0'
+        with self.assertRaisesRegex(RuntimeError, 'exact selection'):
+            self.check()
+
+
 class TestPair(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(dir=os.environ['HORIZON_QA_FIXTURE_HOME'])
