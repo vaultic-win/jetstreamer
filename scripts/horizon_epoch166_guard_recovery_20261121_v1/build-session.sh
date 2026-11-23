@@ -8,11 +8,14 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch168-cold-rebook ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch168-cold-rebook ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-    if [[ $retry == after170 ]]; then
+    if [[ $retry == after168 ]]; then
+        extra_cfg=(--cfg epoch166_after170 --cfg epoch166_after168)
+        retry=retry11
+    elif [[ $retry == after170 ]]; then
         retry=retry11
         extra_cfg=(--cfg epoch166_after170)
     fi
@@ -47,6 +50,9 @@ cd "$src"
 shared=scripts/horizon_epoch167_source_index_recovery_20261121_v1
 own=scripts/horizon_epoch166_guard_recovery_20261121_v1
 cp --parents "$shared"/*.rs "$own/source166.rs" "$own/build-session.sh" "$out"
+if [[ ${1:-} == epoch166-after168 ]]; then
+    cp --parents "$own/after168.rs" "$out"
+fi
 if [[ $cfg == epoch166_retry11 || $epoch == 170 ]]; then
     cp --parents "$own/retry11.rs" "$out"
 fi
@@ -63,6 +69,10 @@ for lib in anyhow-fcfd55939853d71f serde-8c11d906d3ff8a0b serde_json-c069c0f2e8c
 ulimit -c 0
 rustc "${args[@]}" "${extra_cfg[@]}" --cfg "$cfg" --test "$shared/main.rs" -o "$out/tests$epoch"
 "$out/tests$epoch" --test-threads=1
+if [[ ${1:-} == epoch166-after168 ]]; then
+    rustc "${args[@]}" --cfg epoch166_retry11 --cfg epoch166_after170 --test "$shared/main.rs" -o "$out/tests166-after170"
+    "$out/tests166-after170" --test-threads=1
+fi
 if [[ ${#extra_cfg[@]} -gt 0 ]]; then
     rustc "${args[@]}" --cfg epoch166_retry11 --test "$shared/main.rs" -o "$out/tests166-prior"
     "$out/tests166-prior" --test-threads=1
