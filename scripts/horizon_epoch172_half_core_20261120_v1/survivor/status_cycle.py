@@ -48,6 +48,11 @@ ORIGINAL_CONFIG = {
     'sha256': '44fa45e339652456767ac1167c6a73c1ad39b3b151968398d1697c9541efe7bc',
 }
 
+if getattr(cold_workers, 'cold168', None):
+    SURVIVOR_CONFIGS += (('167','168','172'), ('166','167','168','172'),
+                         ('167','168','170','172'), ('166','167','168','170','172'))
+
+
 def now():
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
 
@@ -78,6 +83,9 @@ def project(original, due, predecessor):
     need(len(owners_by_epoch)==len(original['replays']) and (historical or keys in SURVIVOR_CONFIGS),
          'unrecognized prior producer population')
     need(owners_by_epoch['172']['producer_unit']==full172.UNIT,'changed survivor')
+    if '168' in owners_by_epoch and not historical:
+        route = getattr(cold_workers, 'cold168', None)
+        need(route and owners_by_epoch['168']['producer_unit'] == route.UNIT, 'unregistered 168 observer')
     rows=[owners_by_epoch['172']] if historical else list(owners_by_epoch.values())
     for row in rows:
         if row['range']!='172':
@@ -341,7 +349,10 @@ def make_context(head,fleet,sample_ref,cfg,out):
     need(c.full172['observer']==sample_ref and c.full172['fleet']==head and c.full172['identity']==ident,'foreign guard evidence')
     full172.reconcile_sample(c,cycle.observed_lane)
     cold_workers.reconcile(c,cycle.observed_lane)
-    owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,restored=c.recovered_owners)
+    if getattr(cold_workers, 'cold168', None):
+        cold_workers.cold168.census(owners, ident, c.recovered_owners)
+    else:
+        owners.replay_census([],None,full=ident,closed168_owner=True,metered_commit=True,restored=c.recovered_owners)
     return c
 
 def baselines(head,fleet,bridge):
@@ -380,6 +391,8 @@ def census(c,bridge):
         cap['current_cold167_protection']=c.recovered_ref
         if 166 in c.new_rows:
             cap['current_cold166_retry11_protection']=c.recovered_ref
+        if 168 in c.new_rows:
+            cap['current_cold168_retry2_protection']=c.recovered_ref
         if 170 in c.new_rows:
             cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref
     durable(path,witness)
@@ -573,6 +586,8 @@ def entry():
         package=f'tools-cold170-{cold_workers.ATTEMPT}-v2'
         if cold_workers.ATTEMPT == 'retry13' and CURRENT.with_name('cold170_commit.py').is_file():
             package='tools-cold170-retry13-terminal-v1'
+        if cold_workers.cold168:
+            package='tools-cold168-retry2-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)

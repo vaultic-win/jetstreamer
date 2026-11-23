@@ -65,6 +65,13 @@ def generation():
     return anchor, identity, proof
 
 
+# Earlier sealed packages continue to follow their original lane populations.
+cold168 = None
+if (LOCAL/'retry2-168-generation.json').is_file():
+    need(ATTEMPT == 'retry13' and (LOCAL/'cold170_commit.py').is_file(), 'wrong 170 generation for 168')
+    import cold168_status as cold168
+
+
 def reader():
     module = retry166.reader()
     _, identity, proof = generation()
@@ -80,6 +87,8 @@ def reader():
         return 384, proof['guard']['sha256'], proof
 
     module.guard_budget = guard_budget
+    if cold168:
+        cold168.register(module)
     return module
 
 
@@ -117,6 +126,8 @@ def check_generation(fleet_ref, fleet, state):
 
 
 def projection(row):
+    if cold168 and row['range'] == '168':
+        return cold168.projection(row)
     if row['range'] != '170':
         return retry166.projection(row)
     first = checked(bound(ROOT/'FIRST_PROTECTED_WORKER.json'))
@@ -135,6 +146,8 @@ def terminal_route(fleet):
 
 def roster(module, fleet_ref, fleet, terminal=None):
     checks = {166: retry166.check_generation, 167: cold167.check_generation, 170: check_generation}
+    if cold168:
+        checks[168] = lambda ref, data, state: cold168.check_generation(ref, data, state, cold167.EVENT)
     enrolled = set()
     for epoch, check in checks.items():
         state = module.native(epoch)
@@ -142,9 +155,16 @@ def roster(module, fleet_ref, fleet, terminal=None):
             need(state is None, 'committed cold170 producer still active')
             continue
         if state is None:
-            need(epoch == 166 and not (retry166.ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json').exists()
-                 and '166' not in fleet.get(FIELD, {}) and '166' not in fleet.get(retry166.FIELD, {}),
+            optional = {166: retry166}
+            if cold168:
+                optional[168] = cold168
+            need(epoch in optional and not (optional[epoch].ROOT/'ACTUAL_ADMISSION_AND_PROTECTION.json').exists()
+                 and all(str(epoch) not in fleet.get(field, {}) for field in (module.FIELD, FIELD, retry166.FIELD)),
                  'missing admitted cold worker '+str(epoch))
+            # Inactive 168 belongs to this retry. The generic reader has a
+            # historical 168 terminal path for a different unit.
+            if epoch == 168:
+                module.ROUTES.pop(168)
             continue
         check(fleet_ref, fleet, state)
         enrolled.add(epoch)
@@ -196,14 +216,22 @@ def reconcile(c, observed_lane):
     if terminal:
         for attr in ('recovered_ref','recovered_owners','new_rows'):
             setattr(c,attr,getattr(sample_context,attr))
-    need(set(c.new_rows) == enrolled and set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold roster changed during capture')
+    need(set(c.recovered_owners) == {str(e) for e in enrolled}, 'cold owner roster changed during capture')
+    admitted = {int(k) for k,v in c.recovered_owners.items() if v['admission']}
+    need(set(c.new_rows) == admitted and enrolled-admitted <= {168}, 'cold admissions changed during capture')
     for epoch in enrolled:
         key = str(epoch)
-        for field in (cold167.FIELD, retry166.FIELD, FIELD):
+        for field in (cold167.FIELD, retry166.FIELD, FIELD, module.FIELD):
             prior = c.fleet.get(field, {}).get(key)
             if prior:
                 need(prior['actor'] == c.recovered_owners[key]['actor'], 'cold owner changed')
+        if epoch == 168 and (epoch not in admitted or not c.recovered_owners[key]['first_worker']):
+            need(epoch not in admitted or c.new_rows[epoch]['observer_config'] is None, 'unregistered 168 worker')
+            continue
         projection(c.new_rows[epoch]['observer_config'])
+    if cold168:
+        # The shared archive observer selects this attribute for epoch 168.
+        c.metered168_row = c.new_rows.get(168)
 
 
 def install(c, fleet):
@@ -213,6 +241,9 @@ def install(c, fleet):
     live_context.commits={}
     reader().install(fleet, live_context)
     capture = fleet.pop('recovered_workers_observation')
+    if cold168:
+        fleet['current_homefloor_cold166_167_168_170_observation'] = capture
+        fleet[FIELD] = {k:v for k,v in c.recovered_owners.items() if k != '168'}
     fleet['current_homefloor_cold166_167_170_observation'] = capture
     fleet[cold167.FIELD] = {'167': c.recovered_owners['167']}
     fleet['current_homefloor_cold167_observation'] = capture
@@ -233,6 +264,8 @@ def install(c, fleet):
                    next_action='Verify and publish the retained epoch 170 archive.')
     fleet['useful_replay_count'] = cold167.counts(c)['current_replay_lanes']
     stops = {166: retry166.STOP, 167: cold167.STOP_SHA, 170: STOP}
+    if cold168:
+        stops[168] = cold168.STOP
     for epoch in c.new_rows:
         row = next(v for v in fleet['epochs'] if v['epoch'] == epoch)
         original = row.pop('current_home_floor_stop', row.get('original_home_floor_stop'))
