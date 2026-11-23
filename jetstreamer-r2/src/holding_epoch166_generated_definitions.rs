@@ -190,7 +190,7 @@ mod tests {
             stamp
         ));
         assert!(!qualified(
-            &Path::new("/run/systemd/transient/-.mount"),
+            Path::new("/run/systemd/transient/-.mount"),
             hash,
             stamp
         ));
