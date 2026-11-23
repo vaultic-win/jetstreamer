@@ -11,6 +11,7 @@ from pathlib import Path
 
 BASE = Path('/home/sol/.jetstreamer-private')
 RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
+EXECUTABLES_128 = RUNTIME / 'stage128-sealed-qa-retirement-20261123-v1' / 'tools'
 SMALL_88 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v1' / 'tools'
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -23,6 +24,10 @@ CARGO_HOST = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
 
 
 def selection(package):
+    if package == EXECUTABLES_128:
+        return ('stage128', BASE / 'fit-disjoint-064757-20261123-v1/MANIFEST_128.json',
+                'a971140658eb9d4bf329d9b663440002830fccc8d4c482487cb3a735f35cbfe8',
+                (128, 204, 13105426432, 13106666192, 26213332384))
     if package == SMALL_88:
         return ('stage88', BASE / 'fit-small-seal-siblings-20261123-v1/MANIFEST_88.json',
                 '2b0603cf98ce23fa152b418d01a1115846a75164e7bfbc14c4dd658bbc7f7857',
@@ -44,7 +49,7 @@ def selection(package):
 
 # Direct source/test imports retain the legacy defaults; main still verifies its exact executable path.
 PACK = Path(__file__).absolute().parent
-if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88):
+if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88, EXECUTABLES_128):
     PACK = LEGACY_30
 PROFILE, MANIFEST, SCOPE, _ = selection(PACK)
 STATE = BASE / 'horizon-root-runtime-data' / PACK.parent.name / 'state'
@@ -94,14 +99,14 @@ def checked_selection(manifest, package, bound):
     actual = (len(rows), len(excluded), manifest['physical_allocated_bytes'],
               manifest['logical_source_bytes'], manifest['final_pair_read_bound'])
     require(actual == expected and set(rows).isdisjoint(excluded), 'unrecognized exact selection')
-    if profile in ('stage22', 'stage41', 'stage88'):
+    if profile in ('stage22', 'stage41', 'stage88', 'stage128'):
         require(manifest['stage30_exclusion'] == dict(path=str(STAGE30_ORIGINAL), sha256=STAGE30_ORIGINAL_SHA),
                 'original stage30 candidates changed')
         older = bound(STAGE30_ORIGINAL, STAGE30_ORIGINAL_SHA)['files']
         require(len(older) == 35 and set(older).isdisjoint(rows), 'overlap with prior staged test inventory')
     if profile == 'stage41':
         checked_remainder(manifest, bound)
-    if profile == 'stage88':
+    if profile in ('stage88', 'stage128'):
         prior_path = BASE / 'late-qa-stage-duplicates-20261123-v1/PRIMARY.json'
         prior_sha = '0e18d96784f183a4c8fa3ecc3be15baed2919dc77597ecce0a24a9463a2a88a7'
         completion_path = REMAINDER_41.parent / 'state/complete.json'
@@ -110,7 +115,15 @@ def checked_selection(manifest, package, bound):
                 and manifest['stage41_completion'] == dict(path=str(completion_path), sha256=completion_sha),
                 'changed previous staged scope or completion')
         prior = bound(prior_path, prior_sha)['files']
-        require(len(prior) == 81 and excluded == set(prior) | set(older), 'incomplete exclusions from prior scopes')
+        prior_paths = set(prior) | set(older)
+        if profile == 'stage128':
+            _, scope_path, scope_sha, _ = selection(SMALL_88)
+            require(manifest['stage88_exclusion'] == dict(path=str(scope_path), sha256=scope_sha),
+                    'changed preceding 88-file staging scope')
+            stage88 = bound(scope_path, scope_sha)['proposed_files']
+            require(len(stage88) == 88 and set(stage88).isdisjoint(prior_paths), 'incorrect preceding staging scope')
+            prior_paths.update(stage88)
+        require(len(prior) == 81 and excluded == prior_paths, 'incomplete exclusions from prior scopes')
         completion = bound(completion_path, completion_sha)
         require(completion['files'] == 41 and completion['allocated_bytes_retired_once'] == 14806351872,
                 'previous stage incomplete')

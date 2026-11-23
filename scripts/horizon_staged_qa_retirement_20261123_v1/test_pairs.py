@@ -164,13 +164,41 @@ class TestSmallStaging(unittest.TestCase):
             self.check()
 
     def test_old_inventory_cannot_be_exchanged_for_new_path(self):
-        self.prior['small-0'] = self.prior.pop('prior81-0')
+        self.prior[next(iter(self.rows))] = self.prior.pop('prior81-0')
         with self.assertRaisesRegex(RuntimeError, 'incomplete exclusions'):
             self.check()
 
     def test_changed_previous_manifest_rejected(self):
         self.manifest['prior81_exclusion']['sha256'] = '0' * 64
         with self.assertRaisesRegex(RuntimeError, 'changed previous'):
+            self.check()
+
+
+class TestDisjointExecutables(TestSmallStaging):
+    def setUp(self):
+        super().setUp()
+        self.stage88 = self.rows
+        self.rows = {f'executable-{i}': {} for i in range(128)}
+        _, path, digest, _ = self.host['selection'](self.host['SMALL_88'])
+        self.inputs[path, digest] = {'proposed_files': self.stage88}
+        self.manifest.update(proposed_files=self.rows, physical_allocated_bytes=13105426432,
+                             logical_source_bytes=13106666192, final_pair_read_bound=26213332384,
+                             stage88_exclusion=dict(path=str(path), sha256=digest))
+        self.manifest['excluded_source_paths'].extend(self.stage88)
+
+    def check(self):
+        return self.host['checked_selection'](self.manifest, self.host['EXECUTABLES_128'],
+                                              lambda path, digest: self.inputs[path, digest])
+
+    def test_stage88_must_remain_excluded_before_or_after_its_cleanup(self):
+        self.assertIs(self.check(), self.rows)
+        self.manifest['excluded_source_paths'][-1] = 'foreign-path'
+        with self.assertRaisesRegex(RuntimeError, 'incomplete exclusions'):
+            self.check()
+
+    def test_prior88_exact_binding(self):
+        self.manifest['stage88_exclusion']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(RuntimeError, 'preceding 88-file'):
             self.check()
 
 
@@ -253,6 +281,19 @@ class TestPair(unittest.TestCase):
             self.assertTrue(all(Path(p).exists() for p in self.rows))
         self.run_op(opened=inspect)
         self.assertEqual(m['read'](self.state/'captured-0.json')['end'], 88)
+        self.assert_complete()
+
+    def test_128_pairs_leased_before_first_mutation(self):
+        for i in range(3, 128):
+            self.add_pair(i)
+        self.stamps = {p:r['source_stat'] for p,r in self.rows.items()}
+        self.inspection = m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=128).inspect()
+        def inspect(pair):
+            self.assertEqual(len(pair.sources), 128)
+            self.assertEqual(len(pair.keepers), 128)
+            self.assertTrue(all(Path(p).exists() for p in self.rows))
+        self.run_op(opened=inspect)
+        self.assertEqual(m['read'](self.state/'captured-0.json')['end'], 128)
         self.assert_complete()
 
     def test_all_leases_remain_held(self):
