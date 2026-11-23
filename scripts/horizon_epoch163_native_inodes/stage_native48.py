@@ -118,7 +118,7 @@ def rebind_phases(original):
         phase["actor_argv"][-n:] = changed
 
 
-def operator(stage, final, actor_plan):
+def operator(stage, final, actor_plan, current_fleet=False):
     seal = checked_actor(actor_plan)
     original = snapshot()
     original["consumer_source_plan"] = bound(actor_plan)
@@ -133,7 +133,13 @@ def operator(stage, final, actor_plan):
         require(text.count(before) == 1, "wrong number of operator source anchors")
         (stage / name).write_text(text.replace(before, after))
     dump(stage / "PROTOCOL.json", original)
-    members = {name: sha(stage / name) for name in [*OPERATOR_INPUTS, "PROTOCOL.json"]}
+    names = [*OPERATOR_INPUTS, "PROTOCOL.json"]
+    if current_fleet:
+        shutil.copyfile(PACKAGE / "consumer_capacity.rs", stage / "consumer_capacity.rs")
+        subprocess.run(["patch", "--batch", "--fuzz=0", "-p1", "-i", str(PACKAGE / "current-operator.patch")],
+                       cwd=stage, check=True)
+        names.append("consumer_capacity.rs")
+    members = {name: sha(stage / name) for name in names}
     dump(stage / "operator-source-plan.json", seal_plan(final, RUNTIME / "operator-source", members))
 
 
@@ -145,6 +151,7 @@ def main():
     o = sub.add_parser("operator")
     o.add_argument("actor_plan", type=Path)
     o.add_argument("output", type=Path)
+    o.add_argument("--current-fleet", action="store_true")
     args = parser.parse_args()
     output = args.output.absolute()
     parent = output.parent.resolve(strict=True)
@@ -157,7 +164,7 @@ def main():
         if args.mode == "actor":
             actor(stage, output)
         else:
-            operator(stage, output, args.actor_plan.resolve(strict=True))
+            operator(stage, output, args.actor_plan.resolve(strict=True), args.current_fleet)
         # Refuse even an empty directory created by a concurrent staging process.
         libc = ctypes.CDLL(None, use_errno=True)
         if libc.renameat2(-100, os.fsencode(stage), -100, os.fsencode(output), 1):
