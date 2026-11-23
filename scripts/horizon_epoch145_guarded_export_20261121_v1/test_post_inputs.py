@@ -99,12 +99,13 @@ class PublicationInputs(unittest.TestCase):
             p.validate_terminal(*f)
 
     def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
-        for version in ("tools-v13d", "tools-v13e", "tools-v13f"):
+        for version in ("tools-v13d", "tools-v13e", "tools-v13f", "tools-v13g"):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as td:
                 self.exercise_adapter(Path(td), version)
 
     def exercise_adapter(self, root, version):
-        lease = version == "tools-v13f"
+        missed = version == "tools-v13g"
+        lease = missed or version == "tools-v13f"
         retry = lease or version == "tools-v13e"
         pkg = root / "family" / version
         pkg.mkdir(parents=True)
@@ -113,7 +114,7 @@ class PublicationInputs(unittest.TestCase):
         deployed.write_bytes(src.read_bytes())
         complete = runpy.run_path(str(deployed))["completion"]
         state = root / "state"
-        name = pkg.parent / ("v5k-name-handoff" if lease else "v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
+        name = pkg.parent / ("v5m-name-handoff" if missed else "v5k-name-handoff" if lease else "v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
         name.mkdir()
         original = state / IID
         original.mkdir(parents=True)
@@ -140,6 +141,16 @@ class PublicationInputs(unittest.TestCase):
         start, verified, extract, done = [v[0] for v in f[-1]]
         archive = output / "epoch-145.jet"
         extract["extraction"]["archive"] = str(archive)
+        fleet = {"path":"/fleet", "sha256":"1"*64}
+        image_sha = "f"*64
+        if missed:
+            image_sha = "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21"
+            start["image"] = image_sha
+            native = start["fresh_fit"]
+            native.update(fits=True, fleet=fleet, epoch159_donor_cover=dict(fleet=fleet, credited_retirement_bytes=0))
+            native["phase145"]["window"].update(
+                continuity_seal={"sha256":"db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4"},
+                missed_clock_failure={"sha256":"04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"})
         sr = write(original / "recovery-started.json", start)
         vr = write(original / "verified-frozen.json", verified)
         extract.update(verified_frozen=vr, recovery_evidence=sr)
@@ -148,14 +159,14 @@ class PublicationInputs(unittest.TestCase):
         proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
         receipt = name / "semantic-completion.json"
         write(receipt, proof)
-        args = [str(pkg.parent / ("tools-v5k/export145" if lease else "tools-v5j/export145")), "recover-full-output", "/fleet", "1"*64, "f"*64]
+        args = [str(pkg.parent / ("tools-v5m/export145" if missed else "tools-v5k/export145" if lease else "tools-v5j/export145")), "recover-full-output", "/fleet", "1"*64, image_sha]
         write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
-        dispatch = {"path": "/sealed-dispatch", "sha256": "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if lease else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
-        intent = dict(argv=args, original={"INVOCATION_ID": "f2afc696a63a4e6aa6812451cf3559e5" if lease else "48ad7b2234d74e74b0498e7110e0aee3"},
-                      review_sha256="1a7f7bce208d97831963c66c462bbac28b7f9b84e990d09fa5da7e5efa56d150" if lease else "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
+        dispatch = {"path": "/sealed-dispatch", "sha256": "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea" if missed else "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if lease else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
+        intent = dict(fleet=fleet, argv=args, original={"INVOCATION_ID": "ff597d64ad37400ea5c6836336fb6706" if missed else "f2afc696a63a4e6aa6812451cf3559e5" if lease else "48ad7b2234d74e74b0498e7110e0aee3"},
+                      review_sha256="28540e178ace196165ea892f924001a72b59396708b8269fb3a057a2627b132f" if missed else "1a7f7bce208d97831963c66c462bbac28b7f9b84e990d09fa5da7e5efa56d150" if lease else "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
                       preflight={"quote_provider":dispatch})
         write(name / "submission-intent.json", intent)
-        build = {"semantic_image": {"sha256": "f"*64}, "semantic_dispatch": dispatch}
+        build = {"semantic_image": {"sha256": image_sha}, "semantic_dispatch": dispatch}
         with patch.dict(complete.__globals__, STATE=state, OUTPUT=output, ARCHIVE=archive, PKG=pkg):
             self.assertEqual(complete(Status(), build), (dr, extract["extraction"]))
             if retry:
@@ -165,6 +176,19 @@ class PublicationInputs(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "foreign (retry|lease-ready) handoff"):
                         complete(Status(), build)
                 write(name / "submission-intent.json", intent)
+            if missed:
+                state_album = original / "recovery-started.json"
+                for key in ("continuity_seal", "missed_clock_failure"):
+                    window = start["fresh_fit"]["phase145"]["window"]
+                    keep = window[key]
+                    window[key] = {"sha256":"0"*64}
+                    broken = write(state_album, start)
+                    write(receipt, dict(proof, start=broken))
+                    with self.assertRaisesRegex(ValueError, "unbound missed-clock recovery"):
+                        complete(Status(), build)
+                    window[key] = keep
+                self.assertEqual(write(state_album,start), sr)
+                write(receipt,proof)
             write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))
             with self.assertRaisesRegex(ValueError, "different bound v5j"):
                 complete(Status(), build)
