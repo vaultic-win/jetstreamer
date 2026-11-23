@@ -8,7 +8,7 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch168-cold-rebook ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
@@ -16,10 +16,15 @@ if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epo
         retry=retry11
         extra_cfg=(--cfg epoch166_after170)
     fi
+    if [[ $retry == cold-rebook ]]; then
+        epoch=168
+        retry=retry2
+    fi
     base="/var/lib/jetstreamer/horizon_runtime_data/epoch${epoch}-$retry-rebook-20261122-v1"
     scratch=/home/sol/.jetstreamer-private/epoch168-extractor-build-20261120-v1/work
     test "$(findmnt -n -T "$scratch" -o SOURCE)" = /dev/loop3
     cfg="epoch${epoch}_$retry"
+    if [[ $epoch == 168 ]]; then cfg=epoch168_cold_rebook; fi
 else
     test $# == 0
 fi
@@ -27,7 +32,9 @@ stage="$base/session-build-$INVOCATION_ID"
 out="$scratch/tmp/incident-${epoch}-session-$INVOCATION_ID"
 group="/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup)"
 test "$(cat "$group/cpu.max")" = '100000 100000'
-test "$(cat "$group/memory.max")" = '536870912'
+memory_max=536870912
+if [[ $epoch == 168 ]]; then memory_max=1073741824; fi
+test "$(cat "$group/memory.max")" = "$memory_max"
 test "$(cat "$group/memory.swap.max")" = '0'
 test "$(findmnt -n -T "$work" -o SOURCE)" = /dev/loop4
 test "$(df -B1 --output=avail "$scratch" | tail -1)" -gt 50331648
@@ -42,6 +49,9 @@ own=scripts/horizon_epoch166_guard_recovery_20261121_v1
 cp --parents "$shared"/*.rs "$own/source166.rs" "$own/build-session.sh" "$out"
 if [[ $cfg == epoch166_retry11 || $epoch == 170 ]]; then
     cp --parents "$own/retry11.rs" "$out"
+fi
+if [[ $epoch == 168 ]]; then
+    cp --parents scripts/horizon_epoch168_full_metered_20261121_v1/{cold168.rs,gate.py} "$out"
 fi
 if [[ $epoch == 170 ]]; then
     cp --parents scripts/horizon_epoch170_guard_recovery_20261121_v1/*.rs "$out"

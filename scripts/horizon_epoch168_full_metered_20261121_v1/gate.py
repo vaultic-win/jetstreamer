@@ -12,6 +12,13 @@ import time
 ALIAS = Path("/run/horizon-full168-metered")
 RUN = Path("/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1")
 UNIT = "horizon-qualify-168-full-metered-20261121-v1.service"
+COLD_ALIAS = Path("/run/horizon-full168-cold-v2")
+COLD = Path(__file__) == COLD_ALIAS / "gate.py"
+if COLD:
+    ALIAS = COLD_ALIAS
+    RUN = RUN / "cold-retry2-20261122"
+    UNIT = "horizon-qualify-168-full-metered-cold-v2-20261122.service"
+INPUTS = ALIAS if COLD else RUN / "runtime"
 NODE = "jetstreamer-node"
 WORKER = "jetstreamer-historical-worker-v1-5-6"
 
@@ -53,20 +60,27 @@ def main():
          and (group/"memory.max").read_text().strip() == str(68<<30)
          and (group/"memory.swap.max").read_text().strip() == "0" and quota == period*9,
          "producer cgroup, limits or generation differs")
-    payload=RUN/"runtime/payload.json"
+    payload=INPUTS/"payload.json"
     pinned(payload, os.environ["HORIZON_FULL168_PAYLOAD_SHA256"])
     j=json.loads(payload.read_bytes())
     need(j["epoch"] == 168 and args == j["regular_node_argv"]
          and all(os.environ.get(k)==v for k,v in j["environment"].items()),
          "normal producer argv or environment differs")
     for name,(_,digest) in j["members"].items():
-        pinned(RUN/"runtime"/name,digest)
+        pinned(INPUTS/name,digest)
     pinned(ALIAS/NODE, j["members"][NODE][1])
     for pair in j["indexes"]:
         p=Path(pair["target"]);m=p.stat()
         need(os.statvfs(p).f_flag & os.ST_RDONLY and
              [m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns]==pair["source"]["identity"],
              f"original compact-index projection differs: {p}")
+    if COLD:
+        for target, row in [(Path(j["bootstrap_file"]["path"]), j["bootstrap_file"]),
+                            (RUN/"output/genesis.tar.bz2", j["genesis"])]:
+            m = target.stat()
+            need(os.statvfs(target).f_flag & os.ST_RDONLY and
+                 [m.st_dev,m.st_ino,m.st_size,m.st_mtime_ns,m.st_ctime_ns] == row["identity"],
+                 f"original bank or genesis projection differs: {target}")
     deadline=time.monotonic()+180
     permit=ALIAS/"barrier/allow"
     while time.monotonic()<deadline:

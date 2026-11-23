@@ -29,6 +29,20 @@ pub fn sample() -> Result<Value> {
         .iter()
         .position(|x| x == &json!(source::node_arg()))
         .context("node command")?;
+    #[cfg(epoch168_cold_rebook)]
+    let (image, start, stage) = if same(&p.join("exe"), Path::new("/usr/bin/python3"))? {
+        let held = start.checked_sub(3).context("held invocation")?;
+        ensure!(
+            argv[held] == "/usr/bin/python3"
+                && argv[held + 1] == "-IB"
+                && argv[held + 2] == "/run/horizon-full168-cold-v2/gate.py"
+                && members(UNIT)? == vec![pid],
+            "foreign held command"
+        );
+        (Path::new("/usr/bin/python3").to_owned(), held, "held")
+    } else {
+        (image, start, "node")
+    };
     ensure!(
         group == format!("0::/system.slice/{UNIT}")
             && same(&p.join("exe"), &image)?
@@ -42,9 +56,14 @@ pub fn sample() -> Result<Value> {
         "different live node"
     );
     let meta = fs::metadata(image)?;
-    Ok(
-        json!({"producer_unit":UNIT,"producer_pid":pid,"producer_invocation_id":iid,"start_ticks":ticks,"MainPID":m["MainPID"],"InvocationID":iid,"MainStartTicks":ticks,"exe_device":meta.dev(),"exe_inode":meta.ino(),"cgroup":m["ControlGroup"]}),
-    )
+    let value = json!({"producer_unit":UNIT,"producer_pid":pid,"producer_invocation_id":iid,"start_ticks":ticks,"MainPID":m["MainPID"],"InvocationID":iid,"MainStartTicks":ticks,"exe_device":meta.dev(),"exe_inode":meta.ino(),"cgroup":m["ControlGroup"]});
+    #[cfg(epoch168_cold_rebook)]
+    let value = {
+        let mut v = value;
+        v["stage"] = json!(stage);
+        v
+    };
+    Ok(value)
 }
 pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
     let actual = bound(plan, &base().join("ACTUAL_GUARD_PLAN.json"))?;
@@ -63,7 +82,12 @@ pub fn guard(actor: &Value, plan: &Value) -> Result<(Value, Value)> {
             && timer["Triggers"] == unit
             && hex(st(&timer, "InvocationID")?, 32)
             && ctl["TriggeredBy"] == TIMER
-            && ctl["CPUQuotaPerSecUSec"] == "1s"
+            && ctl["CPUQuotaPerSecUSec"]
+                == (if cfg!(epoch168_cold_rebook) {
+                    "250ms"
+                } else {
+                    "1s"
+                })
             && ctl["MemoryMax"] == (1u64 << 30).to_string()
             && ctl["MemorySwapMax"] == "0",
         "different native guard/timer"
@@ -216,8 +240,12 @@ pub fn worker() -> Result<Value> {
     let mut h = Sha256::new();
     std::io::copy(&mut &f, &mut h)?;
     let ws = format!("{:x}", h.finalize());
+    #[cfg(epoch168_cold_rebook)]
+    let expected = source::WORKER_SHA;
+    #[cfg(not(epoch168_cold_rebook))]
+    let expected = "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819";
     ensure!(
-        ws == "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819"
+        ws == expected
             && file_digest(&image)? == ws
             && proc_row(pid)? == (parent, ticks, group)
             && sample()? == a,
