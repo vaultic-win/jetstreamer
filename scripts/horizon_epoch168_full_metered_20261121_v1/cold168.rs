@@ -40,7 +40,7 @@ mod route {
     pub const PREPARED: Option<&str> =
         Some("dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a");
 }
-#[cfg(epoch168_cold_retry3)]
+#[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry4)))]
 mod route {
     pub const ATTEMPT: &str = "full-metered-20261121-v1/cold-retry3-20261123";
     pub const BASE: &str = "epoch168-retry3-rebook-20261123-v1";
@@ -66,6 +66,34 @@ mod route {
     pub const OUTPUT_INO: u64 = 103481379;
     pub const PRIVATE_INO: u64 = 103481380;
     pub const LOG_INO: u64 = 103481382;
+    pub const PREPARED: Option<&str> = None;
+}
+#[cfg(epoch168_cold_retry4)]
+mod route {
+    pub const ATTEMPT: &str = "full-metered-20261121-v1/cold-retry4-20261123";
+    pub const BASE: &str = "epoch168-retry4-rebook-20261123-v1";
+    pub const UNIT: &str = "horizon-qualify-168-full-metered-cold-v4-20261123.service";
+    pub const TIMER: &str = "horizon-guard-168-full-metered-cold-v4-20261123.timer";
+    pub const GUARD_SHA: &str = "ab12bc9f6258a3382057518e5144b23fb673251b28cd09c0d32ad45baa9da68b";
+    pub const GSEAL: &str = "d11870d5dd698182f3fdc1030dcab186ba41e7615ca9c4f6cd8205ffc2c03810";
+    pub const CONTRACT: &str = "ddc173a15ae3a886d420083fd6d365a66368bc858f7cef5609d7cfbf672fc848";
+    pub const CSEAL: &str = "fca00c6fc6fa4d09e6f57cb899c6ef4fd49caf69b39815f15aa4d4a5a26808fa";
+    pub const WITNESS: &str = "c73a105f8566e5a9b93aa4f17e9724c6414b3b0429babd8a6904c7d6c3d366ab";
+    pub const GUARD_BASE: &str = "epoch168-cold-guard-20261123-v4";
+    pub const FIT: &str =
+        "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry4-v1/post-stop-fit";
+    pub const ROOT: &str = "713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4";
+    pub const ALIAS: &str = "/run/horizon-full168-cold-v4";
+    pub const STATUS_QUALIFIED: &str = "COLD168_RETRY4_V1_STATUS_QUALIFIED.json";
+    pub const STATUS_ACTIVE: &str = "COLD168_RETRY4_V1_STATUS_ACTIVE.json";
+    pub const STATUS_SCHEMA: &str = "horizon-168-retry4-v1-status-qualified-v1";
+    pub const GUARD_QUALIFIED: &str =
+        "685ccacf23985e9f4453a80b5dd71bcf793b94eb18a4d32009c748e8f06fe16d";
+    pub const DESCRIPTION: &str = "--description=guarded-full168-cold-retry4";
+    pub const RUN_INO: u64 = 103481722;
+    pub const OUTPUT_INO: u64 = 103481728;
+    pub const PRIVATE_INO: u64 = 103481729;
+    pub const LOG_INO: u64 = 103481750;
     pub const PREPARED: Option<&str> = None;
 }
 pub use route::*;
@@ -183,6 +211,23 @@ fn translate_argv(old: &[String], p: &Value) -> Result<Vec<String>> {
             format!("--unit={UNIT}")
         } else if arg.starts_with("--description=") {
             DESCRIPTION.to_owned()
+        } else if cfg!(epoch168_cold_retry4)
+            && [
+                "--property=ReadWritePaths=",
+                "--property=ExecPaths=",
+                "--property=NoExecPaths=",
+            ]
+            .iter()
+            .any(|prefix| arg.starts_with(prefix))
+        {
+            // Child mount IDs prevent atomic publication across private and output.
+            // The qualified unit drop-in binds the common attempt exactly once.
+            let (name, _) = arg
+                .strip_prefix("--property=")
+                .context("unit property")?
+                .split_once('=')
+                .context("path property")?;
+            format!("--property={name}=")
         } else if arg.starts_with("--property=ExecPaths=") {
             format!(
                 "--property=ExecPaths={} {ALIAS}/{NODE}",
@@ -434,8 +479,20 @@ pub fn files() -> Result<Value> {
             "old 168 is active"
         );
     }
-    #[cfg(epoch168_cold_retry3)]
+    #[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry4)))]
     spent_retry2(&root)?;
+    #[cfg(epoch168_cold_retry4)]
+    {
+        ensure!(
+            root["parent_immutable"] == true
+                && root["children_immutable"] == false
+                && directory_immutable(&run())?
+                && !directory_immutable(&output())?
+                && !directory_immutable(&run().join("private"))?,
+            "changed protection on the epoch 168 publication directory"
+        );
+        spent_retry3(&root)?;
+    }
     let profile = profile()?;
     retained_inputs(&profile["payload"], false)?;
     Ok(
@@ -513,6 +570,119 @@ fn validate_previous(root: &Value, previous: &Value, failure: &Value) -> Result<
             && failure["producer"]["ExecMainStatus"] == "1"
             && failure["producer"]["NRestarts"] == "0",
         "wrong predecessor for epoch 168 retry3"
+    );
+    Ok(())
+}
+#[cfg(epoch168_cold_retry4)]
+const RETRY3_FAILURE: &str = "cf8ef71b5b000cc4138f726d019c59a107b9b3d45f741b0b4802a6f4f31f1d21";
+#[cfg(epoch168_cold_retry4)]
+fn validate_exdev(failure: &Value, admitted: &Value) -> Result<()> {
+    ensure!(
+        failure["schema"] == "horizon-168-released-node-publication-probe-failure-v1"
+            && failure["epoch"] == EPOCH
+            && failure["permit_consumed"] == true
+            && failure["bootstrap_admission"] == true
+            && failure["no_admission_record"] == false
+            && failure["worker_receipt_absent"] == true
+            && failure["worker_in_observed_guard_samples"] == false
+            && failure["replay_claimed"] == false
+            && failure["r2_mutations"].as_u64() == Some(0)
+            && st(failure, "node_error")?.contains(
+                "RENAME_NOREPLACE is unavailable: Invalid cross-device link (os error 18)"
+            )
+            && failure["producer"]["ExecMainStatus"] == "1"
+            && failure["producer"]["NRestarts"] == "0"
+            && failure["producer"]["InvocationID"] == "032cb7da1929485994cf18b384c93459"
+            && admitted["producer_invocation_id"] == failure["producer"]["InvocationID"]
+            && admitted["stage"] == "node"
+            && admitted["bootstrap_only"] == true
+            && admitted["transaction_replay_claimed"] == false
+            && admitted["resource_credit_bytes"] == 0
+            && admitted["producer_unit"]
+                == "horizon-qualify-168-full-metered-cold-v3-20261123.service"
+            && admitted["timer_unit"] == "horizon-guard-168-full-metered-cold-v3-20261123.timer"
+            && admitted["producer_unit"] == failure["producer"]["Id"]
+            && admitted["timer_unit"] == failure["timer"]["Id"],
+        "different epoch 168 EXDEV predecessor"
+    );
+    Ok(())
+}
+#[cfg(epoch168_cold_retry4)]
+fn spent_retry3(root: &Value) -> Result<()> {
+    let prior = rt("epoch168-retry3-rebook-20261123-v1");
+    let prev = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json"))?;
+    ensure!(
+        root["previous_root"]["sha256"]
+            == "a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4"
+            && root["previous_start_failure"]["sha256"] == RETRY3_FAILURE
+            && root["initial_cleanup"] == prev["initial_cleanup"]
+            && root["prior_stop"] == prev["prior_stop"],
+        "different original epoch 168 retry lineage"
+    );
+    spent_retry2(&prev)?;
+    let failure = bound(
+        &root["previous_start_failure"],
+        &prior.join("RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+    )?;
+    let refs = &failure["receipts"];
+    let admission = bound(
+        &refs["ACTUAL_ADMISSION_AND_PROTECTION.json"],
+        &prior.join("ACTUAL_ADMISSION_AND_PROTECTION.json"),
+    )?;
+    validate_exdev(&failure, &admission)?;
+    let (fixture, _) = doc(
+        &prior.join("COMMON_MOUNT_REGRESSION/RESULT.json"),
+        Some("51b01c0110965a74db73e539dea68b0520f9e9b5ed02cb581f6a7f54be310704"),
+    )?;
+    ensure!(
+        fixture["native_failure"] == root["previous_start_failure"]
+            && fixture["visible_qa_worker"]["sha256"] == WORKER_SHA
+            && fixture["dropin"]["sha256"]
+                == "962785e09604bb61d88ab2eeeedbf2a7f6975e28cd46c4f7c82553125180268e"
+            && fixture["canonical_writes"] == 0
+            && fixture["physical_campaign_replay"] == false
+            && fixture["temporary_filesystems_retired"] == true,
+        "different single-mount historical worker qualification"
+    );
+
+    let auth = bound(
+        &refs["AUTHORIZED_GATED_PAYLOAD.json"],
+        &prior.join("AUTHORIZED_GATED_PAYLOAD.json"),
+    )?;
+    let node = bound(
+        &refs["NODE_AFTER_PERMIT.json"],
+        &prior.join("NODE_AFTER_PERMIT.json"),
+    )?;
+    let iid = st(&auth, "producer_invocation_id")?;
+    let allow = prior.join("barrier/allow");
+    let unit = st(&admission, "producer_unit")?;
+    let timer = st(&admission, "timer_unit")?;
+    let ctl = native(unit)?;
+    let retired_timer = native(timer)?;
+    ensure!(
+        auth["producer_invocation_id"] == admission["producer_invocation_id"]
+            && auth["producer_pid"] == admission["producer_pid"]
+            && auth["start_ticks"] == admission["start_ticks"]
+            && node["producer_invocation_id"] == iid
+            && node["authorization"] == refs["AUTHORIZED_GATED_PAYLOAD.json"]
+            && admission["source"] == refs["PREPARED.json"]
+            && admission["intent"] == refs["START_INTENT.json"]
+            && refs["barrier/allow"]["path"] == json!(allow)
+            && refs["barrier/allow"]["sha256"] == file_digest(&allow)?
+            && raw(&allow, 32)? == iid.as_bytes()
+            && !prior.join("FIRST_PROTECTED_WORKER.json").try_exists()?
+            && ctl["ActiveState"] == "failed"
+            && ctl["InvocationID"] == iid
+            && ctl["Result"] == "exit-code"
+            && ctl["MainPID"] == "0"
+            && ctl["ControlPID"] == "0"
+            && ctl["NRestarts"] == "0"
+            && ctl["Job"] == ""
+            && members(unit)?.is_empty()
+            && retired_timer["ActiveState"] == "inactive"
+            && retired_timer["Job"] == ""
+            && members(&timer.replace(".timer", ".service"))?.is_empty(),
+        "changed prior 168 guard, authorization or native stop"
     );
     Ok(())
 }
@@ -632,11 +802,69 @@ pub fn ready() -> Result<Value> {
     }
     Ok(r)
 }
+#[cfg(epoch168_cold_retry4)]
+fn directory_immutable(path: &Path) -> Result<bool> {
+    let f = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(path)?;
+    let mut flags: libc::c_long = 0;
+    // FS_IOC_GETFLAGS is read-only. FS_IMMUTABLE_FL is bit 4 in linux/fs.h.
+    if unsafe { libc::ioctl(f.as_raw_fd(), libc::FS_IOC_GETFLAGS, &mut flags) } < 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(flags & 0x10 != 0)
+}
+#[cfg(epoch168_cold_retry4)]
+fn mount_id(path: &Path) -> Result<u64> {
+    let fd = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(path)?;
+    let info = fs::read_to_string(format!("/proc/self/fdinfo/{}", fd.as_raw_fd()))?;
+    info.lines()
+        .find_map(|s| s.strip_prefix("mnt_id:"))
+        .context("directory mount ID")?
+        .trim()
+        .parse()
+        .context("invalid mount ID")
+}
+#[cfg(epoch168_cold_retry4)]
+fn publication_mounts(root: &Path) -> Result<()> {
+    let attempt = run();
+    let inside = |path: &Path| -> Result<PathBuf> { Ok(root.join(path.strip_prefix("/")?)) };
+    let parent = inside(&attempt)?;
+    let mount = mount_id(&parent)?;
+    ensure!(
+        directory_immutable(&parent)?,
+        "epoch 168 attempt parent lost its immutable flag"
+    );
+    for (leaf, ino) in [
+        (attempt, RUN_INO),
+        (output(), OUTPUT_INO),
+        (run().join("private"), PRIVATE_INO),
+    ] {
+        let path = inside(&leaf)?;
+        let m = path.symlink_metadata()?;
+        ensure!(
+            same(&path, &leaf)?
+                && (m.dev(), m.ino(), m.uid(), m.gid(), m.mode())
+                    == (64512, ino, 1001, 1003, 0o40700)
+                && mount_id(&path)? == mount,
+            "epoch 168 publication crosses mount at {}",
+            leaf.display()
+        );
+    }
+    Ok(())
+}
+
 pub fn index_selected() -> Result<()> {
     let m = native(UNIT)?;
     let pid = st(&m, "MainPID")?.parse::<u64>()?;
     ensure!(pid > 1, "no 168 native gate");
     let root = Path::new("/proc").join(pid.to_string());
+    #[cfg(epoch168_cold_retry4)]
+    publication_mounts(&root.join("root"))?;
     let mountinfo = fs::read_to_string(root.join("mountinfo"))?;
     for (src, dst) in projections(&translate_payload(original_payload()?)?)? {
         let path = root.join("root").join(dst.strip_prefix("/")?);
@@ -919,9 +1147,12 @@ mod tests {
     #[cfg(epoch168_cold_retry3)]
     #[test]
     fn previous_permit_cannot_admit_a_successor() {
-        let root = doc(&base().join("SUCCESSOR_ROOT.json"), Some(ROOT))
-            .unwrap()
-            .0;
+        let root = doc(
+            &rt("epoch168-retry3-rebook-20261123-v1/SUCCESSOR_ROOT.json"),
+            Some("a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4"),
+        )
+        .unwrap()
+        .0;
         let prior = rt("epoch168-retry2-rebook-20261122-v1");
         let prev = bound(&root["previous_root"], &prior.join("SUCCESSOR_ROOT.json")).unwrap();
         let f = bound(
@@ -943,6 +1174,70 @@ mod tests {
         wrong["producer"]["InvocationID"] = json!("unrelated");
         assert!(validate_previous(&root, &prev, &wrong).is_err());
     }
+    #[cfg(epoch168_cold_retry4)]
+    #[test]
+    fn require_the_bootstrap_admission_and_actual_rename_error() {
+        let d = rt("epoch168-retry3-rebook-20261123-v1");
+        let f = doc(
+            &d.join("RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+            Some(RETRY3_FAILURE),
+        )
+        .unwrap()
+        .0;
+        let a = bound(
+            &f["receipts"]["ACTUAL_ADMISSION_AND_PROTECTION.json"],
+            &d.join("ACTUAL_ADMISSION_AND_PROTECTION.json"),
+        )
+        .unwrap();
+        assert!(validate_exdev(&f, &a).is_ok());
+        for k in [
+            "permit_consumed",
+            "bootstrap_admission",
+            "worker_receipt_absent",
+        ] {
+            let mut bad = f.clone();
+            bad[k] = json!(false);
+            assert!(validate_exdev(&bad, &a).is_err());
+        }
+        for changed in [json!(false), json!(1)] {
+            let mut bad = f.clone();
+            bad["r2_mutations"] = changed;
+            assert!(validate_exdev(&bad, &a).is_err());
+        }
+        let mut bad = f.clone();
+        bad["node_error"] = json!("other");
+        assert!(validate_exdev(&bad, &a).is_err());
+        let mut wrong = a;
+        wrong["transaction_replay_claimed"] = json!(true);
+        assert!(validate_exdev(&f, &wrong).is_err());
+    }
+    #[cfg(epoch168_cold_retry4)]
+    #[test]
+    fn directory_id_distinguishes_bind_mounts_on_one_filesystem() {
+        let proc = Path::new("/proc");
+        let irq = Path::new("/proc/irq");
+        // Some systemd versions protect individual proc subtrees with read-only binds.
+        // /sys and /proc always provide independent real mounts with distinct IDs.
+        assert_ne!(
+            mount_id(proc).unwrap(),
+            mount_id(Path::new("/sys")).unwrap()
+        );
+        assert_eq!(
+            mount_id(proc).unwrap(),
+            mount_id(Path::new("/proc/.")).unwrap()
+        );
+        if fs::read_to_string("/proc/self/mountinfo")
+            .unwrap()
+            .lines()
+            .any(|l| l.split_whitespace().nth(4) == Some("/proc/irq"))
+        {
+            assert_eq!(
+                proc.metadata().unwrap().dev(),
+                irq.metadata().unwrap().dev()
+            );
+            assert_ne!(mount_id(proc).unwrap(), mount_id(irq).unwrap());
+        }
+    }
     #[test]
     fn real_original_and_successor_paths_match() {
         let p = profile().unwrap();
@@ -959,11 +1254,19 @@ mod tests {
             payload["root_checkpoint"]["accounts_hash"],
             "AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R"
         );
+        #[cfg(not(epoch168_cold_retry4))]
         assert!(argv.contains(&json!(format!(
             "--property=ReadWritePaths={} {}",
             output().display(),
             run().join("private").display()
         ))));
+        #[cfg(epoch168_cold_retry4)]
+        for key in ["ReadWritePaths", "ExecPaths", "NoExecPaths"] {
+            assert!(argv.contains(&json!(format!("--property={key}="))));
+            assert!(!argv.iter().any(|v| v.as_str().is_some_and(|x| {
+                x.starts_with(&format!("--property={key}=")) && !x.ends_with('=')
+            })));
+        }
         assert_eq!(files().unwrap()["root"]["inode"], RUN_INO);
         for (key, val) in [
             ("epoch", json!(167)),
@@ -1011,7 +1314,7 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
         &rt(GUARD_BASE).join("GUARD_QUALIFIED.json"),
         Some(GUARD_QUALIFIED),
     )?;
-    #[cfg(epoch168_cold_retry3)]
+    #[cfg(all(epoch168_cold_retry3, not(epoch168_cold_retry4)))]
     {
         let (_, failure_ref) = doc(
             &rt("epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
@@ -1021,6 +1324,18 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
             q["failed_retry2"] == failure_ref
                 && a["schema"] == "horizon-168-retry3-v1-status-active-v1",
             "different retry3 registration"
+        );
+    }
+    #[cfg(epoch168_cold_retry4)]
+    {
+        let (_, failure_ref) = doc(
+            &rt("epoch168-retry3-rebook-20261123-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json"),
+            Some(RETRY3_FAILURE),
+        )?;
+        ensure!(
+            q["failed_retry3"] == failure_ref
+                && a["schema"] == "horizon-168-retry4-v1-status-active-v1",
+            "different retry4 writer enrollment"
         );
     }
     let reg = &price["status_registration"];

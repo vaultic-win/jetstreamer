@@ -74,6 +74,19 @@ def exercise(scratch, retry4=False):
     s=SimpleNamespace(read=read,need=real.need,bound=bound,iid=real.iid,ref=real.ref,
                       show=lambda unit:{'InvocationID':rollback_actor['invocation_id']})
     denied=[]
+    bootstrap_controls=[]
+    if retry4:
+        failed_path=values['PRIOR']/'RELEASED_NODE_STARTUP_FAILURE_20261123.json'
+        failed,failed_ref=real.read(failed_path,values['FAILURE'])
+        admission_ref=failed['receipts']['ACTUAL_ADMISSION_AND_PROTECTION.json']
+        admitted_path=Path(admission_ref['path'])
+        admitted=real.bound(admission_ref,admitted_path)
+        records[failed_path]=(failed,failed_ref)
+        records[admitted_path]=(admitted,admission_ref)
+        bootstrap_controls=[(failed,'no_admission_record',True),(failed,'bootstrap_admission',False),
+                            (failed,'worker_in_observed_guard_samples',True),(failed,'worker_receipt_absent',False),
+                            (admitted,'producer_pid',0),(admitted,'producer_invocation_id','e'*32),
+                            (admitted,'bootstrap_only',False),(admitted,'transaction_replay_claimed',True)]
     with patch.dict(values,STATUS=temp):
         assert select(s,prior,prepared,guard)==prior
         paths['ACTIVE'].touch()
@@ -86,6 +99,11 @@ def exercise(scratch, retry4=False):
                 try:select(s,prior,prepared,guard)
                 except (ValueError,AssertionError):denied.append(key)
                 else:raise AssertionError('accepted changed '+key)
+        for rec,key,value in bootstrap_controls:
+            with patch.dict(rec,{key:value}):
+                try:select(s,prior,prepared,guard)
+                except (ValueError,AssertionError):pass
+                else:raise AssertionError('accepted changed bootstrap '+key)
         paths['ACTIVE'].unlink()
         paths['ROLLBACK'].touch()
         assert select(s,prior,prepared,guard)==(priorpkg,priorseal,rollback_actor['invocation_id'],rollback_actor)
@@ -99,7 +117,7 @@ def exercise(scratch, retry4=False):
             except ValueError:denied.append('original_rollback')
             else:raise AssertionError('accepted changed rollback')
     return dict(previous=pref,qualification=qr,actual_prepared=enrolled['prepared'],actual_guard=enrolled['guard_qualification'],
-                controls=denied,simulated_handoffs=['success','rollback','repeated rollback'],physical_service_changes=0,r2_writes=0)
+                controls=denied,bootstrap_controls=[key for _,key,_ in bootstrap_controls],simulated_handoffs=['success','rollback','repeated rollback'],physical_service_changes=0,r2_writes=0)
 
 
 if __name__=='__main__':

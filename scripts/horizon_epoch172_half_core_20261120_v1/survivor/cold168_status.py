@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import re
+import time
 
 from evidence import BASE, bound, checked, need
 from owners import show, ticks
@@ -51,6 +52,33 @@ if ATTEMPT in (3, 4):
     FAILURE = dict(path=str(BASE/prior/'RELEASED_NODE_STARTUP_FAILURE_20261123.json'), sha256=failure_sha)
     QUAL = checked(bound(BINDING))['guard_qualification']
     need(QUAL['path']==str(GUARD/'GUARD_QUALIFIED.json'), 'different 168 guard path')
+
+
+def await_recovery(unit, pid):
+    # A cold handoff after the clock fired must register the new lock owner
+    # before the normal reader can resume the pending sample or publish a row.
+    if ATTEMPT != 4:
+        return
+    receipts=BASE/'survivor172-cadence-20261122-v1'
+    name='COLD168_RETRY4_V1_STATUS_'
+    intent=receipts/(name+'INTENT.json')
+    if not intent.exists():
+        return
+    issued=checked(bound(intent))
+    if 'failed_incumbent' not in issued:
+        return
+    active=receipts/(name+'ACTIVE.json')
+    end=time.monotonic()+90
+    while not active.exists():
+        need(time.monotonic()<end,'cold receiver lease was not registered')
+        time.sleep(0.10)
+    registered=checked(bound(active))
+    actor=registered['new']
+    need(registered['intent']==bound(intent) and registered['failed_incumbent']==issued['failed_incumbent']
+         and actor['invocation_id']==unit['InvocationID'] and actor['pid']==pid and actor['start_ticks']==ticks(pid)
+         and actor['program']==str(Path(__file__).with_name('status_cycle.py'))
+         and actor['unit']==unit['Id'] and issued['schedule']==registered['schedule'],
+         'unregistered recovery writer invocation')
 
 
 def generation():

@@ -12,14 +12,18 @@ import time
 ALIAS = Path("/run/horizon-full168-metered")
 RUN = Path("/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1")
 UNIT = "horizon-qualify-168-full-metered-20261121-v1.service"
-COLD_V3 = Path(__file__) == Path("/run/horizon-full168-cold-v3/gate.py")
-COLD_ALIAS = Path("/run/horizon-full168-cold-v3" if COLD_V3 else "/run/horizon-full168-cold-v2")
-COLD = Path(__file__) == COLD_ALIAS / "gate.py"
+COLD_ROUTES = {
+    Path("/run/horizon-full168-cold-v2/gate.py"): ("cold-retry2-20261122", "cold-v2-20261122"),
+    Path("/run/horizon-full168-cold-v3/gate.py"): ("cold-retry3-20261123", "cold-v3-20261123"),
+    Path("/run/horizon-full168-cold-v4/gate.py"): ("cold-retry4-20261123", "cold-v4-20261123"),
+}
+gate = Path(__file__)
+COLD = gate in COLD_ROUTES
 if COLD:
-    ALIAS = COLD_ALIAS
-    RUN = RUN / ("cold-retry3-20261123" if COLD_V3 else "cold-retry2-20261122")
-    UNIT = ("horizon-qualify-168-full-metered-cold-v3-20261123.service" if COLD_V3 else
-            "horizon-qualify-168-full-metered-cold-v2-20261122.service")
+    directory, generation = COLD_ROUTES[gate]
+    ALIAS = gate.parent
+    RUN = RUN / directory
+    UNIT = f"horizon-qualify-168-full-metered-{generation}.service"
 INPUTS = ALIAS if COLD else RUN / "runtime"
 NODE = "jetstreamer-node"
 WORKER = "jetstreamer-historical-worker-v1-5-6"
