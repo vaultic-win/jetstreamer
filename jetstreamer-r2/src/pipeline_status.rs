@@ -374,6 +374,17 @@ fn validate_replay_origin(
             && receipt.producer_invocation_id == binding.origin_invocation_id,
         "elapsed-time origin is not the authenticated original replay"
     );
+    if epoch == 211
+        && binding.unit == "horizon-upload-211-ordinary-v221.service"
+        && binding.invocation_id == "b358151a70854e99918d76c4883e276e"
+        && let Some((unit, iid)) = fleet::full211_status_inactive_owner(receipt)?
+    {
+        ensure!(
+            binding.origin_unit == unit && binding.origin_invocation_id == iid,
+            "delivery does not match the authenticated full 211 replay origin"
+        );
+        return Ok(());
+    }
     let sample = validate_observer_binding(
         observer_bytes,
         &receipt.observer_receipt_sha256,
@@ -411,6 +422,8 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
     // Keep its phase clock separate from the original epoch247 replay clock.
     let exact247_uploader = unit == "horizon-upload-247-singleton-20261119-v1.service"
         && invocation == "69218e2e0924497ea595a1227a6c31db";
+    let full211_origin = unit == "horizon-singleton-211-capped-4aeca563-v1.service"
+        && invocation == "49ea83a3a5e94e99af51153d2fd79e92";
     let starts: Vec<_> = records
         .iter()
         .filter(|r| {
@@ -419,12 +432,14 @@ fn start_millis(records: &[Value], unit: &str, invocation: &str) -> Result<u64> 
                 && r["_PID"] == "1"
                 && r["_UID"] == "0" && r["MESSAGE"].as_str().is_some_and(|s| {
                 (s.starts_with("Starting ")
+                    && !full211_origin
                     && !exact247_uploader
                     && !(unit == super::singleton247_finalization::UNIT
                         && invocation == super::singleton247_finalization::IID)
                     && !super::original_singleton_finalization::original_owner(unit, invocation)
                     && unit != jetstreamer_horizon_observe::full265::UNIT)
-                    || (((exact247_uploader
+                    || (((full211_origin && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf")
+                        || (exact247_uploader
                         && r["MESSAGE_ID"] == "39f53479d3a045ac8e11786248231fbf"
                         && s.starts_with(
                             "Started horizon-upload-247-singleton-20261119-v1.service - ",
