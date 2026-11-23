@@ -48,6 +48,27 @@ def enrollment():
                 successor_root=pinned(RUN/"SUCCESSOR_ROOT.json","ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc"))
 
 
+def retry3_enrollment(prepared_sha, guard_sha):
+    old = RUNTIME/'epoch168-retry2-rebook-20261122-v1'
+    root = pinned(RUN/'SUCCESSOR_ROOT.json','a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4')
+    failure = pinned(old/'RELEASED_NODE_STARTUP_FAILURE_20261123.json','a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643')
+    need(json.loads(Path(root['path']).read_bytes())['previous_start_failure']==failure,'different retry2 predecessor')
+    return dict(successor_root=root,failed_retry2=failure,prepared=pinned(RUN/'PREPARED.json',prepared_sha),
+                guard_qualification=pinned(RUNTIME/'epoch168-cold-guard-20261123-v3/GUARD_QUALIFIED.json',guard_sha))
+
+
+def configure_retry3():
+    global RUN, OLD, TERMINAL, TARGET, OPERATOR, TAG, GENERATION, OLD_SEAL, TERMINAL_SEAL, QUAL
+    RUN=RUNTIME/'epoch168-retry3-rebook-20261123-v1'
+    OLD=TERMINAL=ROOT/'tools-cold168-retry2-v1'
+    OLD_SEAL=TERMINAL_SEAL='8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d'
+    TARGET=ROOT/'tools-cold168-retry3-v1'
+    OPERATOR=ROOT/'cold168-retry3-status-installer-v1'
+    TAG='COLD168_RETRY3_V1_STATUS_'
+    GENERATION='retry3-168-generation.json'
+    QUAL=ROOT/(TAG+'QUALIFIED.json')
+
+
 def git(shared, *args):
     return shared["output"]("/usr/sbin/runuser","-u","sol","--","/usr/bin/git","-C",shared["REPO"],*args)
 
@@ -70,13 +91,16 @@ def seal(c, shared, dest, stage, files):
     return result
 
 
-def prepare(c, shared, commit):
-    enrolled=enrollment()
+def prepare(c, shared, commit, enrolled):
+    retry3 = "failed_retry2" in enrolled
+    generation_name = "retry3" if retry3 else "retry2"
     prior_programs=c["checked"](pinned(TERMINAL/"deployment-seal-receipt.json",TERMINAL_SEAL))
     programs={r["name"]:r["sha256"] for r in prior_programs["members"]}
     files={}
     for name,sha in programs.items():
         pinned(TERMINAL/name,sha)
+        if retry3 and name=='retry2-168-generation.json':
+            continue
         if name.endswith(".json"):
             files[name]=(TERMINAL/name).read_bytes()
         else:
@@ -86,11 +110,11 @@ def prepare(c, shared, commit):
     for name in ("cold168_status.py","qualify_cold168.py"):
         files[name]=git(shared,"show",f"{commit}:{shared['SRC']}/{name}")
     files[GENERATION]=(json.dumps(enrolled,indent=2,sort_keys=True)+"\n").encode()
-    package=seal(c,shared,TARGET,ROOT/"cold168-retry2-status-source-v1",files)
+    package=seal(c,shared,TARGET,ROOT/f"cold168-{generation_name}-status-source-v1",files)
     generation=ref(TARGET/GENERATION)
     entry=ref(TARGET/"status_cycle.py")
     if not QUAL.exists():
-        qa=ROOT/"cold168-retry2-status-qa-v1"
+        qa=ROOT/f"cold168-{generation_name}-status-qa-v1"
         c["ensure_dir"](qa)
         suites={n:json.loads(shared["output"]("/usr/bin/python3","-IB",TARGET/n,qa,timeout=150)) for n in SUITES}
         recent=suites["qualify_cold168.py"]
@@ -108,7 +132,8 @@ def prepare(c, shared, commit):
              and suites["qualify_cold170.py"]["measured_lanes"]==4,"incomplete 168 receiver qualification")
         need(json.loads(shared["output"]("/usr/bin/python3","-IB",TARGET/"status_cycle.py","--check-entry"))==package,
              "unexpected receiver production entry")
-        c["durable"](QUAL,dict(schema="horizon-168-retry2-v1-status-qualified-v1",epoch=168,package=package,
+        c["durable"](QUAL,dict(schema=f"horizon-168-{generation_name}-v1-status-qualified-v1",epoch=168,package=package,
+            **({"failed_retry2":enrolled["failed_retry2"]} if retry3 else {}),
             entry=entry,source_commit=commit,generation=generation,guard=enrolled["guard_qualification"],
             successor_root=enrolled["successor_root"],prepared=enrolled["prepared"],suites=suites))
     q=c["read_ref"](QUAL)
@@ -119,13 +144,18 @@ def prepare(c, shared, commit):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode",choices=("seal-operator","prepare"))
+    parser.add_argument("mode",choices=("seal-operator","prepare","seal-handoff"))
     parser.add_argument("reference",help="published account-updates commit")
+    parser.add_argument("--retry3", action="store_true")
+    parser.add_argument("--prepared-sha")
+    parser.add_argument("--guard-sha")
     args=parser.parse_args()
+    if args.retry3:
+        configure_retry3()
     need(__debug__ and os.geteuid()==0 and sys.flags.isolated and sys.dont_write_bytecode,"use root python3 -IB")
     pinned(BASE_MODULE,"7f189ae92d13bca515099267852c1551fa43f159387eee7af5ec48839933260d")
     pinned(OLD/"deployment-seal-receipt.json",OLD_SEAL)
-    pinned(OLD/"status_cycle.py","c33a5af976a225d3fe5957e698ec70fc41df19d4932727122c44dc48a93162b1")
+    pinned(OLD/"status_cycle.py","dc0f98d1b468c2568abc63c723167e47529ec5f8f03b683421c77468184db690" if args.retry3 else "c33a5af976a225d3fe5957e698ec70fc41df19d4932727122c44dc48a93162b1")
     shared=runpy.run_path(str(BASE_MODULE))
     c=runpy.run_path(str(OLD/"status_cycle.py"))
     commit=args.reference
@@ -135,13 +165,24 @@ def main():
     blob=git(shared,"show",f"{commit}:{shared['SRC']}/{name}")
     need(blob==Path(__file__).read_bytes(),"operator differs from published source")
     if args.mode=="seal-operator":
-        return seal(c,shared,OPERATOR,ROOT/"cold168-status-installer-source-v1",{name:blob})
+        return seal(c,shared,OPERATOR,ROOT/("cold168-retry3-status-installer-source-v1" if args.retry3 else "cold168-status-installer-source-v1"),{name:blob})
     need(Path(__file__).resolve()==OPERATOR/"stage_cold168.py","use the sealed 168 handoff operator")
     sr=c["read_ref"](OPERATOR/"deployment-seal-receipt.json")
     row,=sr["members"]
     need(sr["sealer_sha256"]==SEALER_SHA and sr["destination"]==str(OPERATOR) and row["name"]==Path(__file__).name
          and row["sha256"]==ref(Path(__file__))["sha256"],"operator seal mismatch")
-    return prepare(c,shared,commit)
+    if args.mode=="seal-handoff":
+        need(args.retry3,"use the original retry2 handoff deployment")
+        files={n:git(shared,"show",f"{commit}:{shared['SRC']}/{n}") for n in
+               ("handoff_cold168.py","qualify_handoff_cold168.py")}
+        return seal(c,shared,ROOT/"cold168-retry3-status-switch-v1",ROOT/"cold168-retry3-status-switch-source-v1",files)
+    if args.retry3:
+        need(all(isinstance(h,str) and re.fullmatch("[a-f0-9]{64}",h) for h in (args.guard_sha,args.prepared_sha)),
+             "supply qualified retry3 prepared and guard digests")
+        enrolled=retry3_enrollment(args.prepared_sha,args.guard_sha)
+    else:
+        enrolled=enrollment()
+    return prepare(c,shared,commit,enrolled)
 
 
 if __name__=="__main__":

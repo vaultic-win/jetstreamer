@@ -30,14 +30,16 @@ def qualify(root, h):
     evidence=runpy.run_path(str(h['OLD']))
     final,head=h['finished_forecast'](evidence)
     original=evidence['checked'](h['PREVIOUS'])['new']
-    target=root/'tools-cold168-retry2-v1'
+    retry3=h['RETRY3']
+    number='retry3' if retry3 else 'retry2'
+    target=root/f'tools-cold168-{number}-v1'
     target.mkdir()
     session=root/'session'
     session.mkdir()
     new=target/'status_cycle.py'
     new.write_text('fixture reader')
-    generation=target/'retry2-168-generation.json'
-    evidence['durable'](generation,dict(prepared=h['PREPARED'],successor_root=h['ANCHOR'],guard_qualification=h['GUARD']))
+    generation=target/(number+'-168-generation.json')
+    evidence['durable'](generation,h['generation_record']())
     members=[]
     for member in [new,generation]:
         member.chmod(0o444)
@@ -49,9 +51,11 @@ def qualify(root, h):
     active=root/(h['TAG']+'ACTIVE.json')
     intent=root/(h['TAG']+'INTENT.json')
     rollback=root/(h['TAG']+'ROLLBACK.json')
-    reg=dict(schema='horizon-168-retry2-v1-status-qualified-v1',epoch=168,guard=h['GUARD'],successor_root=h['ANCHOR'],
+    reg=dict(schema=f'horizon-168-{number}-v1-status-qualified-v1',epoch=168,guard=h['GUARD'],successor_root=h['ANCHOR'],
              prepared=h['PREPARED'],generation=evidence['bound'](generation),source_commit='1'*40,
              suites={'fixture':True},entry=evidence['bound'](new),package=evidence['bound'](seal))
+    if retry3:
+        reg['failed_retry2']=h['FAILURE']
     future=root/'future'
     future.mkdir()
     def names(stamp):
@@ -106,9 +110,9 @@ def qualify(root, h):
             result=c['checked'](ref)
             if ref==final:
                 result=copy.deepcopy(result)
-                result['statuses'].pop('136')
+                result['receipts' if retry3 else 'statuses'].pop('136')
             return result
-        denied('wrong issuer, forecast handoff',lambda:h['switch'](dict(c,checked=incomplete),common_globals,head))
+        denied('incomplete first retry2 readback' if retry3 else 'wrong issuer, forecast handoff',lambda:h['switch'](dict(c,checked=incomplete),common_globals,head))
         denied('outside the completed 00:17 forecast chain',
                lambda:h['current_cycle'](c,c['checked'](h['FORECAST_PREP'])['head'],head))
         pending=future/'epoch-136.intent.json'
@@ -138,6 +142,10 @@ def qualify(root, h):
         for value in [record,c['read_ref'](intent)]:
             assert value['generation']==c['bound'](generation) and value['completed_forecast']==final
             assert value['admission']==value['prepared']==prepared
+            if retry3:
+                assert value['previous_active']==h['PREVIOUS'] and value['failed_retry2']==h['FAILURE']
+        if retry3:
+            assert record['schema']=='horizon-168-retry3-v1-status-active-v1'
         live['elapsed']=True
         started.touch()
         pending.touch()
@@ -152,9 +160,14 @@ def qualify(root, h):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('fixture_parent',type=Path)
+    parser.add_argument('--retry3',action='store_true')
     args=parser.parse_args()
     assert os.geteuid()==0 and sys.flags.isolated and sys.dont_write_bytecode and __debug__
     assert args.fixture_parent.resolve(strict=True).is_relative_to('/home/sol')
     with tempfile.TemporaryDirectory(dir=args.fixture_parent) as tmp:
-        report=qualify(Path(tmp),runpy.run_path(str(Path(__file__).with_name('handoff_cold168.py'))))
+        h=runpy.run_path(str(Path(__file__).with_name('handoff_cold168.py')))
+        if args.retry3:
+            h['configure_retry3']()
+            h=h['switch'].__globals__
+        report=qualify(Path(tmp),h)
         print(json.dumps(report,sort_keys=True))

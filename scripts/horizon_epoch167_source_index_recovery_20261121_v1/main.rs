@@ -710,6 +710,8 @@ fn dispatch() -> Result<Value> {
                 "tools/recover170"
             } else if cfg!(epoch168_cold_rebook) {
                 COLD168_LAUNCHER
+            } else if cfg!(epoch166_after168_retry3) {
+                "tools-v6/recover166"
             } else if cfg!(epoch166_after168) {
                 "tools-v5/recover166"
             } else if cfg!(epoch166_after170) {
