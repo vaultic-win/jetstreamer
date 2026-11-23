@@ -79,7 +79,11 @@ def resources(fit):
         assert manager["ActiveState"] == "active" and pid in map(int, (CG / name / "cgroup.procs").read_text().split())
         assert props(name, list(manager)) == manager and set(cpus).isdisjoint(mask)
         peers[name] = dict(manager, cpus=mask)
-    assert uploader["service"] in peers and cpus == list(range(8))
+    if uploader["service"] not in peers:
+        terminal = bound(ref(D / "horizon-upload-265-ordinary-v215/terminal.json"))
+        assert terminal["issuer"] == fit["closed265_delivery"] and not terminal["reservation_released"]
+        assert not (CG / uploader["service"]).exists()
+    assert cpus == list(range(8))
     return dict(bootstrap=bootstrap, release=uploader["donor"], delivery=fit["closed265_delivery"],
                 cpus=cpus, live_peers=peers, protected_floor=floor, required_ram=ram,
                 required_disk=disk, memory_margin=memory_margin, disk_margin=disk_margin)
