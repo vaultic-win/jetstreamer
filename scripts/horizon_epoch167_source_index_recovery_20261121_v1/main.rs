@@ -16,6 +16,7 @@ use std::{
 };
 mod support;
 use support::*;
+const COLD168_LAUNCHER: &str = "tools-v2/recover168";
 mod actor;
 #[cfg_attr(
     any(epoch166_recovery, epoch166_retry11),
@@ -148,8 +149,7 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
     #[cfg(epoch170_retry13)]
     let path = rt("incident-replay-fit-20261121-v1/tools-homefloor-retry13-170-v1/post-stop-fit");
     #[cfg(epoch168_cold_rebook)]
-    let path =
-        rt("incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v1/post-stop-fit");
+    let path = rt(source::FIT);
     let se = member(&path, fit_seal)?;
     let b = command(
         path.to_str().unwrap(),
@@ -677,7 +677,7 @@ fn dispatch() -> Result<Value> {
             } else if cfg!(any(epoch170_retry11, epoch170_retry12, epoch170_retry13)) {
                 "tools/recover170"
             } else if cfg!(epoch168_cold_rebook) {
-                "tools/recover168"
+                COLD168_LAUNCHER
             } else if cfg!(epoch166_after170) {
                 "tools-v4/recover166"
             } else if cfg!(epoch166_retry11) {

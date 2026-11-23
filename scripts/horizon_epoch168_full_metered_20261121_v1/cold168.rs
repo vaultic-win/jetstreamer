@@ -18,6 +18,9 @@ pub const PREVIOUS_GUARD_ARGV: &str =
     "1b81a271d53f52ea34ead452d578f68326ba9f51b61ddbaa154f7277cfa441bf";
 pub const OLD_UNIT: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
 pub const GUARD_BASE: &str = "epoch168-cold-guard-20261122-v2";
+pub const FIT: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v2/post-stop-fit";
+const PREPARED: &str = "dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a";
 const ORIGINAL_ARGV: &str = "39d2e97f8f6962984f1ec9672a4701fe0772e3a63a72465b8d945d59eab7b4fa";
 const PAYLOAD: &str = "6c56c0cad87c9d22ca72ad8e2cf97cb0cc0c5e1b4d1d01e4f051dfc01875b240";
 const INPUT_SEAL: &str = "e00db5e753a2cc37af403933f54bcb3216594d1fac3d91cc8984623999295a93";
@@ -427,7 +430,7 @@ fn logfile() -> Result<File> {
 }
 pub fn prepare() -> Result<Value> {
     ensure!(
-        std::env::current_exe()? == base().join("tools/recover168"),
+        std::env::current_exe()? == base().join(COLD168_LAUNCHER),
         "use sealed 168 launcher"
     );
     let clean = files()?;
@@ -481,7 +484,7 @@ pub fn prepare_log() -> Result<Value> {
     )
 }
 pub fn ready() -> Result<Value> {
-    let (prep, r) = doc(&base().join("PREPARED.json"), None)?;
+    let (prep, r) = doc(&base().join("PREPARED.json"), Some(PREPARED))?;
     let m = logfile()?.metadata()?;
     ensure!(
         (m.uid(), m.gid()) == (0, 0)
@@ -599,6 +602,8 @@ pub fn release_gate(held: &Value, plan: &Value, first: &Value, post: &Value) -> 
             && members(UNIT)? == vec![n(held, "producer_pid")?],
         "168 gate no longer held"
     );
+    let price = bound(post, &base().join("POST_GUARD_CAPACITY.json"))?;
+    verify_held_price(held, plan, first, &price)?;
     index_selected()?;
     actor::guard(held, plan)?;
     let ref_auth = record(
@@ -622,6 +627,36 @@ pub fn release_gate(held: &Value, plan: &Value, first: &Value, post: &Value) -> 
     observed["authorization"] = ref_auth;
     record_once("NODE_AFTER_PERMIT.json", &observed)?;
     Ok(next)
+}
+
+fn verify_held_price(held: &Value, plan: &Value, first: &Value, price: &Value) -> Result<()> {
+    let provider = member(&rt(FIT), st(&price["provider_seal"], "sha256")?)?;
+    let (record, actor) = doc(&base().join("ACTUAL_PRODUCER_NATIVE.json"), None)?;
+    ensure!(
+        record == *held && held["stage"] == "held",
+        "different held 168 receipt"
+    );
+    checked_quote(price, &provider, &actor, plan, first)
+}
+
+fn checked_quote(
+    price: &Value,
+    provider: &Value,
+    actor: &Value,
+    plan: &Value,
+    first: &Value,
+) -> Result<()> {
+    let candidate = &price["candidate"];
+    ensure!(
+        price["fits"] == true
+            && price["provider_seal"] == *provider
+            && candidate.get("admission") == Some(&Value::Null)
+            && candidate["plan"] == *plan
+            && candidate["first_guard"] == *first
+            && candidate["actor"] == *actor,
+        "missing namespace-checked capacity for the held epoch 168 process"
+    );
+    Ok(())
 }
 
 fn await_node(held: &Value) -> Result<Value> {
@@ -673,6 +708,7 @@ pub fn finish_released(fleet: &Value, fit_seal: &str) -> Result<Value> {
     let first = &auth["first_guard"];
     let post = &auth["post_guard_capacity"];
     let price = bound(post, &base().join("POST_GUARD_CAPACITY.json"))?;
+    verify_held_price(&held, plan, first, &price)?;
     let pre = &intent["prestart"];
     ensure!(
         intent["fleet"] == *fleet
@@ -726,6 +762,31 @@ pub fn finish_released(fleet: &Value, fit_seal: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn namespace_checked_quote_is_bound_to_this_held_actor_and_guard() {
+        let provider = json!({"path":rt(FIT).parent().unwrap().join("deployment-seal-receipt.json"),"sha256":"fixture"});
+        let (actor, plan, first) = (
+            json!({"path":"held"}),
+            json!({"path":"plan"}),
+            json!({"path":"first"}),
+        );
+        let row = json!({"admission": null, "actor":actor, "plan":plan, "first_guard":first});
+        let price = json!({"fits":true, "provider_seal":provider, "candidate":row});
+        assert!(checked_quote(&price, &provider, &actor, &plan, &first).is_ok());
+        for key in ["admission", "actor", "plan", "first_guard"] {
+            let mut other = price.clone();
+            other["candidate"][key] = json!("different");
+            assert!(checked_quote(&other, &provider, &actor, &plan, &first).is_err());
+        }
+        let mut old = price.clone();
+        old["provider_seal"]["path"] = json!(rt(
+            "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v1/deployment-seal-receipt.json"
+        ));
+        assert!(checked_quote(&old, &provider, &actor, &plan, &first).is_err());
+        let mut short = price;
+        short["fits"] = json!(false);
+        assert!(checked_quote(&short, &provider, &actor, &plan, &first).is_err());
+    }
     #[test]
     fn real_original_and_successor_paths_match() {
         let p = profile().unwrap();
