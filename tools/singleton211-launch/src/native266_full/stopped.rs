@@ -70,7 +70,7 @@ fn boundaries(raw: &[u8], unit: &str, iid: &str) -> Result<Vec<Value>> {
     ensure!(events.len() == 4, "incomplete bound producer shutdown");
     Ok(events)
 }
-fn checked_terminal(unit: &str, iid: &str) -> Result<Value> {
+pub(super) fn checked_terminal(unit: &str, iid: &str) -> Result<Value> {
     let before = gate::owner_fields(unit)?;
     terminal(&before, unit)?;
     let output = Command::new("/usr/bin/journalctl")

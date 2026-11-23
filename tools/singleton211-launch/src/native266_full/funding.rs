@@ -207,6 +207,7 @@ pub(super) fn candidates(
     let mut all = Vec::new();
     let mut chosen = Value::Null;
     let (roots, memories): (&[u64], &[u64]) = match lane {
+        Lane::Bounded266 => bail!("bounded replay requires its own issued booking"),
         Lane::Turnover266 => (&[320 << 30], &[176000000000]),
         Lane::Instructions266 => (&[320 << 30, 128 << 30], &[176000000000]),
         Lane::Epoch266 => (&ROOTS, &MEMORY),
@@ -242,6 +243,9 @@ pub(super) fn elect(
     r: &Value,
     held: Option<(&Profile, &Value, (u64, u64))>,
 ) -> Result<Value> {
+    if lane == Lane::Bounded266 {
+        return bounded::elect(n, r, held);
+    }
     if lane == Lane::Turnover266 {
         return turnover::elect(n, r, held);
     }
@@ -281,7 +285,7 @@ pub(super) fn elect(
             successor::MEMORY + GUARD_MEM + CONTROL_MEM,
             epoch228::proof251(n, &f, &ledger)?,
         ),
-        Lane::Turnover266 => bail!("turnover has an independent election"),
+        Lane::Bounded266 | Lane::Turnover266 => bail!("turnover has an independent election"),
         Lane::Epoch266 => (191932891136, json!(discharge()?)),
         Lane::Epoch228 => (epoch228::ASSIGNED, epoch228::funding(n, r, &f, &ledger)?),
     };
@@ -536,7 +540,7 @@ pub(super) fn elect(
             result["epoch251_assignment"] = basis;
             result["new_266_assignment"] = successor::allocation();
         }
-        Lane::Turnover266 => bail!("turnover has an independent election"),
+        Lane::Bounded266 | Lane::Turnover266 => bail!("turnover has an independent election"),
         Lane::Epoch266 => result["cold_discharge"] = basis,
         Lane::Epoch228 => result["epoch251_assignment"] = basis,
     }

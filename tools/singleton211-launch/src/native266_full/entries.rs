@@ -3,7 +3,7 @@ const NODE228: &str =
     "/var/lib/jetstreamer/horizon228-demotion-parent-natural-f797454e-v165-v1-qualified/parent";
 const NODE228_SHA: &str = "16a534aa24d81274dfa581fb282352b6538e85c065799514cf0458da42936895";
 const HANDOFF228: &str = "da3fdea0fa6f6682daa741e4c72d5f3a81d6bd420743d5df70c46d40b6319752";
-fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
+pub(super) fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
     let cg = Path::new("/sys/fs/cgroup/system.slice").join(&p.unit);
     let mut tree = BTreeMap::new();
     let members = fs::read_to_string(cg.join("cgroup.procs"))?;
@@ -17,6 +17,7 @@ fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
     );
     let mut workers = Vec::new();
     let (node, scratch, worker_sha) = match p.lane {
+        Lane::Bounded266 => (PathBuf::from(successor::NODE), "state", bounded::WORKER_SHA),
         Lane::Epoch228 => (PathBuf::from(NODE228), "scratch", epoch228::WORKER_SHA),
         Lane::Instructions266 | Lane::Turnover266 => (
             PathBuf::from(successor::NODE),
@@ -99,7 +100,7 @@ fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
     ensure!(seen.len() + 1 == tree.len(), "unaccounted replay processes");
     Ok(tree)
 }
-fn progress(row: &Value, target: u64) -> Result<Option<(u64, u64, u64, u64)>> {
+pub(super) fn progress(row: &Value, target: u64) -> Result<Option<(u64, u64, u64, u64)>> {
     let message = text(row, "MESSAGE")?;
     let Some((_, res)) = message.split_once("progress slot ") else {
         return Ok(None);
@@ -127,7 +128,9 @@ fn progress(row: &Value, target: u64) -> Result<Option<(u64, u64, u64, u64)>> {
 pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
     let p = Profile::new(lane, "pilot")?;
     let (bootstrap, target) = match lane {
-        Lane::Epoch266 | Lane::Instructions266 | Lane::Turnover266 => (114910768, 115343999),
+        Lane::Epoch266 | Lane::Instructions266 | Lane::Turnover266 | Lane::Bounded266 => {
+            (114910768, 115343999)
+        }
         Lane::Epoch228 => (98495291, 98928278),
     };
     let handoff = bound_at(&p.state.join("handoff.json"))?;
@@ -177,10 +180,15 @@ pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
                 && row["_UID"] == "1000",
             "foreign progress journal"
         );
-        if lane == Lane::Epoch228 {
+        if matches!(lane, Lane::Epoch228 | Lane::Bounded266) {
             ensure!(
                 row["_PID"].as_str().and_then(|v| v.parse::<u64>().ok()) == Some(pid)
-                    && row["_EXE"] == NODE228,
+                    && row["_EXE"]
+                        == if lane == Lane::Epoch228 {
+                            NODE228
+                        } else {
+                            successor::NODE
+                        },
                 "progress outside the original epoch 228 parent"
             );
         }

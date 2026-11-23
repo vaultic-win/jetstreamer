@@ -1,6 +1,7 @@
 //! First finite epoch 266 entry replay, using the original v165 delivery booking.
 use super::*;
 use std::os::unix::process::CommandExt;
+mod bounded;
 pub(crate) mod capped_cold;
 mod entries;
 mod epoch228;
@@ -38,12 +39,13 @@ enum Lane {
     Epoch266,
     Instructions266,
     Turnover266,
+    Bounded266,
     Epoch228,
 }
 impl Lane {
     fn epoch(self) -> u64 {
         match self {
-            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 => 266,
+            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 | Self::Bounded266 => 266,
             Self::Epoch228 => 228,
         }
     }
@@ -52,6 +54,7 @@ impl Lane {
             Self::Epoch266 => STATE,
             Self::Instructions266 => successor::STATE,
             Self::Turnover266 => turnover::STATE,
+            Self::Bounded266 => bounded::STATE,
             Self::Epoch228 => epoch228::STATE,
         }
     }
@@ -60,6 +63,7 @@ impl Lane {
             Self::Epoch266 => CTRL,
             Self::Instructions266 => successor::CONTROLLER,
             Self::Turnover266 => turnover::CONTROLLER,
+            Self::Bounded266 => bounded::CONTROLLER,
             Self::Epoch228 => epoch228::CTRL,
         }
     }
@@ -68,12 +72,15 @@ impl Lane {
             Self::Epoch266 => "epoch266-full",
             Self::Instructions266 => "epoch266-instructions",
             Self::Turnover266 => "epoch266-turnover",
+            Self::Bounded266 => "epoch266-bounded",
             Self::Epoch228 => "epoch228-full",
         }
     }
     fn guard(self) -> (&'static str, &'static str) {
         match self {
-            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 => (GUARD, GUARD_SHA),
+            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 | Self::Bounded266 => {
+                (GUARD, GUARD_SHA)
+            }
             Self::Epoch228 => (epoch228::GUARD, epoch228::GUARD_SHA),
         }
     }
@@ -96,13 +103,20 @@ impl Profile {
         } else {
             format!("-{mode}{}", if mode == "qa-disk" { "-a2" } else { "" })
         };
-        if matches!(lane, Lane::Instructions266 | Lane::Turnover266) {
+        if matches!(
+            lane,
+            Lane::Instructions266 | Lane::Turnover266 | Lane::Bounded266
+        ) {
             let generation = if lane == Lane::Turnover266 {
                 "v194"
             } else {
                 "v169"
             };
-            let tag = format!("266-instructions-2789f821{suffix}-{generation}");
+            let tag = if lane == Lane::Bounded266 {
+                format!("266-capped-bounded{suffix}-v207")
+            } else {
+                format!("266-instructions-2789f821{suffix}-{generation}")
+            };
             let guard = format!("horizon-{tag}-protective");
             return Ok(Self {
                 lane,
@@ -311,6 +325,9 @@ fn observed_turnover(
     Ok(json!(save_json(path, file, &report)?))
 }
 
+pub fn dispatch_bounded(args: &[String]) -> Result<Value> {
+    controller(Lane::Bounded266, args)
+}
 pub fn dispatch_turnover(args: &[String]) -> Result<Value> {
     controller(Lane::Turnover266, args)
 }

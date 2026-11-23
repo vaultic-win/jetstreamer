@@ -47,6 +47,13 @@ fn run() -> Result<()> {
         );
         return Ok(());
     }
+    if args.get(1).is_some_and(|op| op == "epoch266-bounded") {
+        println!(
+            "{}",
+            horizon_singleton211_launch::native266_full::dispatch_bounded(&args[2..])?
+        );
+        return Ok(());
+    }
     if args.get(1).is_some_and(|op| op == "epoch266-turnover") {
         println!(
             "{}",
