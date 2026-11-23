@@ -107,6 +107,26 @@ fn issuer_lock(r: &Value) -> Result<()> {
     );
     Ok(())
 }
+pub(super) fn runtime_image(r: &Value) -> Result<Bound> {
+    let original = Bound::new(
+        "/var/lib/jetstreamer/horizon266-capped-bounded-v208-a1-qualified/native-fit",
+        "79be3c4ba91dc629ca3efc0cfe07286873acd2667bd9c9925ba038d4cccf26e2",
+    );
+    original.artifact()?;
+    let seal = Bound::new(
+        original.path.with_file_name("deployment-seal-receipt.json"),
+        "03794517affb047ae6f24f2272cc92db4becaedafe0e0d7c14c3130fe9abdb50",
+    )
+    .sealed()?;
+    ensure!(
+        r["runtime_image"] == json!(original)
+            && rows(&seal, "members")?
+                .iter()
+                .any(|m| m["name"] == "native-fit" && m["sha256"] == original.sha256),
+        "different qualified runtime"
+    );
+    Ok(original)
+}
 pub(super) fn elect(
     n: &mut Native,
     r: &Value,
@@ -121,14 +141,25 @@ pub(super) fn elect(
     let b = booking.sealed()?;
     ensure!(
         b["issued"] == true
-            && b["issuer_pid"] == r["issuer_pid"]
-            && b["issuer_ticks"] == r["issuer_ticks"]
+            && booking.sha256 == "273f914d9cfaf6078076998ba1eb7a49b1b50a33a561db4eebe9ebf12ed45bc8"
+            && r["previous_review"]
+                == json!(Bound::new(
+                    Path::new(STATE).join("review.json"),
+                    "f3dfae7a9e0d7263c51c82043d03a69c40f70a310abdb5398554e8961f073e57"
+                ))
             && b["from_228"] == FROM_228
             && b["from_265"] == FROM_265
             && b["publication_authorized"] == false,
         "bounded reservation not issued for this controller"
     );
-    let price = binding(&b["assessment"])?.json()?;
+    let previous = binding(&r["previous_review"])?.sealed()?;
+    ensure!(
+        previous["reservation"] == json!(booking)
+            && previous["issuer_pid"] == b["issuer_pid"]
+            && !Path::new(&format!("/proc/{}", num(&b, "issuer_pid")?)).try_exists()?,
+        "original reservation issuer still exists"
+    );
+    let price = binding(&r["fresh_assessment"])?.json()?;
     let fit = &price["fit"];
     ensure!(
         price["fits"] == true
@@ -186,9 +217,20 @@ pub(super) fn elect(
             "41",
         ),
     ] {
-        let mut m = json!(gate::owner_fields(unit)?);
-        m["Job"] = json!(command_field(n, unit, "Job")?);
-        let current = live::finite_owner(&m, unit, iid, cap)?;
+        let until = Instant::now() + Duration::from_secs(4);
+        let (m, current) = loop {
+            let mut m = json!(gate::owner_fields(unit)?);
+            m["Job"] = json!(command_field(n, unit, "Job")?);
+            match live::finite_owner(&m, unit, iid, cap) {
+                Ok(current) => break (m, current),
+                Err(e)
+                    if e.to_string() == "kernel memory exceeds cap" && Instant::now() < until =>
+                {
+                    std::thread::sleep(Duration::from_millis(100))
+                }
+                Err(e) => return Err(e.context(format!("bounded peer {unit}"))),
+            }
+        };
         ensure!(
             text(&m, "MainPID")?.parse::<u64>()? == pid
                 && funding::cpus(&fs::read_to_string(format!(
