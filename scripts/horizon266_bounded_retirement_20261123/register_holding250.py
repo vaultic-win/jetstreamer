@@ -48,7 +48,7 @@ def status(text):
 
 
 def fleet(text):
-    end = "for ep in range(292,296):"
+    end = "for ep in range(292,296):\n for phase in ('plan','sections','capture'):"
     return once(text, end, IMPORT + """
 custody250,workers250=holding250.state()
 for item in custody250.values():
