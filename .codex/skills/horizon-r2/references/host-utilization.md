@@ -605,6 +605,13 @@ user permission request; existing user authorization persists. The main agent re
 owner and accounts for it before admitting more work. Preserve healthy jobs and every normal
 capability, resource, checkpoint, verification and publication gate.
 
+An offline test that executes the real node or historical worker also appears in a
+host-wide process census, even inside a private PID namespace. When an active verifier
+checks host processes, run such a fixture under a qualification identity its guard
+recognizes, or schedule it with the controller outside that verifier's lifetime.
+Record the host PID, start ticks and cgroup of the test process so a guard rejection
+can be traced to the exact invocation. Source review and fixture preparation can continue.
+
 When agent slots are full, retain a prioritized repair queue with a named next action and keep
 the fleet loop moving. Do not silently drop failed epochs or replace the campaign objective with
 the easiest repair. Close an incident only on the usual verified ready-pair evidence.
