@@ -21,7 +21,9 @@ GUARD = '685ccacf23985e9f4453a80b5dd71bcf793b94eb18a4d32009c748e8f06fe16d'
 LAUNCHER = '561eb14310bba8e97f2f6224021ea72e1d4d61c0741c18c7091dfa8a11542199'
 
 
-def quote():
+def quote(operation='prepare'):
+    if operation not in ('prepare','projection'):
+        raise ValueError('unknown offline operation')
     assert __debug__ and sys.flags.isolated and sys.dont_write_bytecode and os.geteuid()==0
     seal = PKG/'deployment-seal-receipt.json'
     assert hashlib.sha256(seal.read_bytes()).hexdigest()=='36a65a191047b3a76bf9903f97c6305619d1e745e861df3520bcaabd78133da1'
@@ -100,7 +102,16 @@ def quote():
         s.need(native['ActiveState']=='inactive' and native['MainPID']=='0' and not native['Job'] and not fit.members(unit)
                and not any((D/name).exists() for name in ('START_INTENT.json','barrier/allow','ACTUAL_ADMISSION_AND_PROTECTION.json')),
                '168 successor already started')
-        return dict(root=rr,guard=gr,launcher=lr,alias_repair=repaired)
+        inputs = dict(root=rr,guard=gr,launcher=lr,alias_repair=repaired)
+        if operation=='projection':
+            prepared, pr = s.read(D/'PREPARED.json')
+            log, logref = s.read(D/'OBSERVER_LOG_PREPARED.json')
+            s.need(prepared['epoch']==168 and prepared['baseline']['stable_roots']==rr and
+                   prepared['profile']['producer_unit']==unit and log['prepared']==pr and
+                   log['inode']==103481750 and log['size']==0 and log['uid']==log['gid']==0,
+                   'different live projection enrollment')
+            inputs.update(prepared=pr,observer_log=logref)
+        return inputs
     # The production provider keeps its mandatory live writer check. Only this local
     # calculation uses the observed dead controller and retains its entire reservation.
     inputs = preparation()
@@ -114,9 +125,12 @@ def quote():
            and reserved['build_cpu_quota_micros']>=1_000_000
            and result['complete_memory_plus_reserve_bytes']==810658050048 and result['complete_cpu_quota_micros']==64000000,
            'different funding obligations')
-    return dict(schema='horizon-offline-168-preparation-price-v1',fits=result['fits'],epoch=168,preparation=inputs,
-                authorized_action='idempotent standard prepare and observer-log preparation for epoch 168',
-                maximum_procs_cpu_quota_micros=1_000_000,maximum_memory_bytes=1<<30,maximum_swap_bytes=0,
+    projection = operation=='projection'
+    return dict(schema='horizon-offline-168-'+('projection' if projection else 'preparation')+'-price-v1',fits=result['fits'],epoch=168,preparation=inputs,
+                authorized_action=('inspect prepared 168 namespace through a private, nonlaunch projection'
+                                   if projection else 'idempotent standard prepare and observer-log preparation for epoch 168'),
+                maximum_procs_cpu_quota_micros=250_000 if projection else 1_000_000,
+                maximum_memory_bytes=(256<<20) if projection else (1<<30),maximum_swap_bytes=0,
                 required_serial_lock='/run/lock/horizon-native-serial-compiler.lock',
                 resource_credit_bytes=0,whole_host=res(result),
                 full_cost=result, recorded_unix_seconds=result['recorded_unix_seconds'],
@@ -130,6 +144,8 @@ def res(result):
 
 
 if __name__=='__main__':
-    value=quote()
+    if sys.argv[1:] not in ([],['--projection']):
+        raise SystemExit('usage: closed_writer_prepare168.py [--projection]')
+    value=quote('projection' if sys.argv[1:] else 'prepare')
     print(json.dumps(value,sort_keys=True))
     sys.exit(0 if value['fits'] else 1)
