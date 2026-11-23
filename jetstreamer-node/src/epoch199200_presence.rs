@@ -104,6 +104,17 @@ const EPOCH_257: Profile = Profile {
     ],
 };
 
+const EPOCH_261: Profile = Profile {
+    epoch: 261,
+    raw_sha: "adf684d1a7354b85ae477234877c23c7eaa046de7e8b6c73cc2015d3dca02f68",
+    compact_sha: "fd9a03717e4acab47e5122b241dff58686a230fa9894ee032c380d447c477673",
+    proven_skips: &[
+        112752259, 112754475, 112760466, 112770767, 112794584, 112795207,
+        112830589, 112846318, 112880356, 112895677, 112947842, 112960930,
+        112961016, 113075171, 113078372, 113094128,
+    ],
+};
+
 const EPOCH_267: Profile = Profile {
     epoch: 267,
     raw_sha: "b60ac1831d3f8850e426a6b47ee393e8260e67a9c7c473f1aea370fedd92c5e0",
@@ -271,6 +282,7 @@ impl RootedSlotPresence {
             199 => (&EPOCH_199, MANIFEST_SHA),
             200 => (&EPOCH_200, MANIFEST_SHA),
             257 => (&EPOCH_257, "8ee8ed720d8c7e96ebc9ada87817896b8be8ed1d7703d8ff112aec7f8d4087e7"),
+            261 => (&EPOCH_261, "3bd36d83a86989c8db03fcdb2c5c41950182ae99b4f16202f5bc115d4357e8f9"),
             267 => (
                 &EPOCH_267,
                 "e6f765e4fdca3f5e2c7c8bb1cda38b8ad9ff0e801dcb6df75799f74ce9e47f6f",
@@ -859,7 +871,7 @@ mod qualified_epoch268 {
 #[cfg(test)]
 mod qualified_epoch257 {
     use super::super::{LocalSlotIndex, SlotPresenceState, build_slot_presence_map};
-    use super::{EPOCH_257, RootedSlotPresence};
+    use super::{EPOCH_257, EPOCH_261, Profile, RootedSlotPresence};
     use jetstreamer_firehose::index::{SlotOffsetIndex, SlotOffsetIndexError, get_index_base_url};
     use sha2::{Digest, Sha256};
     use std::{
@@ -871,43 +883,80 @@ mod qualified_epoch257 {
     #[tokio::test]
     #[ignore = "requires original 256 warmup and sealed 257 compact and range inputs"]
     async fn singleton_warmup_and_epoch_use_qualified_membership() {
-        let ledger = PathBuf::from(env::var_os("HORIZON257_QUALIFIED_LEDGER").unwrap());
-        let map = build_slot_presence_map(
+        check_singleton(
+            &EPOCH_257,
             111022756,
-            111455999,
+            "bafyreienrbuyzpqtxdf2sywy67idahbpakcahmqeonwz276n62pupetgbu",
+            "/var/lib/jetstreamer/horizon257-source-ranges-20261120-v1/epoch-257-slot-ranges.candidate.raw",
+            "bafyreief4qucc6dk7mq62wl4jbglnii745jd6aipu52cjwbo4u6wgkwrye",
+            "7fd2e109d93533c85f597f843a39ff4a34d34d69b962911452bc41f42f0d8548",
+            "0138424f86f813d47e402175746e4d554dfd8d183acf2369e85b0a1f2fb4c065",
+        ).await;
+    }
+
+    #[tokio::test]
+    #[ignore = "requires original 260 warmup and sealed 261 compact and range inputs"]
+    async fn singleton_261_warmup_and_epoch_use_qualified_membership() {
+        check_singleton(
+            &EPOCH_261,
+            112751209,
+            "bafyreib6vznz6e6jrjjdh3clmdfpuxauj4okmjwgldevc2svggdksch4fq",
+            "/var/lib/jetstreamer/horizon261-source-ranges-v136-v1/epoch-261-slot-ranges.candidate.raw",
+            "bafyreiabyb2rm444cdvvhwykyuwsaliebbnnz5o2rabpzir425gdy6cw6q",
+            "38173a117b50c7a02ba5e3cf04df6a5dc38853d29463121bbf1df52214499a25",
+            "aa01106930493dc616429af673bd5a98683ae3bd840e5fe28b8616e646532bdb",
+        ).await;
+    }
+
+    async fn check_singleton(
+        profile: &Profile,
+        warmup_first: u64,
+        epoch_root: &str,
+        table_path: &str,
+        warmup_root: &str,
+        warmup_raw_sha: &str,
+        warmup_compact_sha: &str,
+    ) {
+        let epoch = profile.epoch;
+        let warmup = epoch - 1;
+        let ledger =
+            PathBuf::from(env::var_os(format!("HORIZON{epoch}_QUALIFIED_LEDGER")).unwrap());
+        let warmup_path =
+            PathBuf::from(env::var_os(format!("HORIZON{warmup}_WARMUP_RAW")).unwrap());
+        let first = epoch * 432000;
+        let last = first + 431999;
+        let map = build_slot_presence_map(
+            warmup_first,
+            last,
             Arc::new(AtomicBool::new(false)),
             &ledger,
-            257,
+            epoch,
         )
         .await
         .unwrap();
         let client = SlotOffsetIndex::new(get_index_base_url().unwrap()).unwrap();
         let mut next = None;
-        for (e, start, end, root, name, raw_sha, slot_sha) in [
+        for (e, start, end, root, path, raw_sha, slot_sha) in [
             (
-                257_u64,
-                111024000_u64,
-                111455999_u64,
-                "bafyreienrbuyzpqtxdf2sywy67idahbpakcahmqeonwz276n62pupetgbu",
-                "/var/lib/jetstreamer/horizon257-source-ranges-20261120-v1/epoch-257-slot-ranges.candidate.raw",
-                EPOCH_257.raw_sha,
-                EPOCH_257.compact_sha,
+                epoch,
+                first,
+                last,
+                epoch_root,
+                std::path::Path::new(table_path),
+                profile.raw_sha,
+                profile.compact_sha,
             ),
             (
-                256,
-                111022756,
-                111023999,
-                "bafyreief4qucc6dk7mq62wl4jbglnii745jd6aipu52cjwbo4u6wgkwrye",
-                "WARMUP_RAW",
-                "7fd2e109d93533c85f597f843a39ff4a34d34d69b962911452bc41f42f0d8548",
-                "0138424f86f813d47e402175746e4d554dfd8d183acf2369e85b0a1f2fb4c065",
+                warmup,
+                warmup_first,
+                first - 1,
+                warmup_root,
+                warmup_path.as_path(),
+                warmup_raw_sha,
+                warmup_compact_sha,
             ),
         ] {
-            let table = if e == 256 {
-                fs::read(env::var_os("HORIZON256_WARMUP_RAW").unwrap()).unwrap()
-            } else {
-                fs::read(name).unwrap()
-            };
+            let table = fs::read(path).unwrap();
             assert_eq!(format!("{:x}", Sha256::digest(&table)), raw_sha);
             let compact = fs::read(ledger.join(format!(
                 "compact-indexes/{e}/epoch-{e}-{root}-mainnet-slot-to-cid.index"
@@ -915,7 +964,7 @@ mod qualified_epoch257 {
             .unwrap();
             assert_eq!(format!("{:x}", Sha256::digest(&compact)), slot_sha);
             let rooted = RootedSlotPresence::configured(e).await.unwrap();
-            assert_eq!(rooted.is_some(), e == 257);
+            assert_eq!(rooted.is_some(), e == epoch);
             if let Some(r) = &rooted {
                 r.verify_compact(&compact).unwrap();
                 assert!(r.verify_compact(&compact[..compact.len() - 1]).is_err());
@@ -936,7 +985,7 @@ mod qualified_epoch257 {
                     Err(SlotOffsetIndexError::SlotNotFound(m, url)) => {
                         assert_eq!(m, slot);
                         assert_eq!((o, n), (0, 0));
-                        assert_eq!(url.scheme(), if e == 257 { "file" } else { "http" });
+                        assert_eq!(url.scheme(), if e == epoch { "file" } else { "http" });
                     }
                     Err(err) => panic!("unexpected range result at {slot}: {err}"),
                 }
@@ -962,8 +1011,8 @@ mod qualified_epoch257 {
                 }
             }
             exceptions.reverse();
-            if e == 257 {
-                assert_eq!(exceptions, EPOCH_257.proven_skips);
+            if e == epoch {
+                assert_eq!(exceptions, profile.proven_skips);
             } else {
                 assert!(exceptions.is_empty());
             }
