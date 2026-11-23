@@ -17,7 +17,7 @@ orig_alias = (
     / hold.name
     / "retirement-tools/jetstreamer-r2"
 )
-dest = hold / "retirement-tools-manager-v4"
+dest = hold / "retirement-tools-park-v5"
 elf = dest / "jetstreamer-r2"
 
 
@@ -69,10 +69,23 @@ actual = ref(Path(q["image"]["path"]))
 assert actual == q["image"]
 git = ["runuser", "-u", "sol", "--", "git", "-C", "/home/sol/workspace/jetstreamer"]
 for before, after in [
-    ("d41007215360e391c45ebecdfc0f0ee92dee7a02", q["published_source_commit"]),
+    ("e0214452e559a67632512a1d539a9b6fd8b00290", q["published_source_commit"]),
     (q["published_source_commit"], "origin/account-updates"),
 ]:
     subprocess.run(git + ["merge-base", "--is-ancestor", before, after], check=True)
+park_case = q["actual_park_test"]
+assert ref(Path(park_case["path"])) == park_case
+park_result = Path(park_case["path"]).read_text()
+assert (
+    "test holding::epoch166_retry10_retire::independent_tests::genuine_park_dispatch_after_reload ... ok"
+    in park_result
+    and "1 passed; 0 failed" in park_result
+)
+failure = ref(work / "PARK_DISPATCH_FAILURE_9dcefb54_20261123.json")
+assert (
+    failure["sha256"]
+    == "3be28439aca0a20fa90ec895661fc5542f6e33b47b299e9383f3428c6c5256d5"
+)
 case = q["actual_manager_test"]
 assert ref(Path(case["path"])) == case
 assert (
@@ -100,7 +113,7 @@ sealer = Path(
 seal_h = ref(sealer)["sha256"]
 assert seal_h == "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 plan = save(
-    work / "MANAGER_OPTIMIZED_SEAL_PLAN.json",
+    work / "PARK_DISPATCH_OPTIMIZED_SEAL_PLAN.json",
     {
         "schema": "jetstreamer-sealed-deployment-plan-v1",
         "destination": str(dest),
@@ -270,10 +283,12 @@ os.execv(sys.argv[9], sys.argv[9:])
         }
     )
 doc = save(
-    work / "QUALIFIED_MANAGER_SUCCESSOR_MOUNT.json",
+    work / "QUALIFIED_PARK_DISPATCH_SUCCESSOR_MOUNT.json",
     {
         "time": datetime.now(timezone.utc).isoformat(),
         "native_qualification": qual,
+        "park_dispatch_failure": failure,
+        "park_dispatch_test": park_case,
         "candidate": ref(elf),
         "seal": seal,
         "sealer": ref(sealer),

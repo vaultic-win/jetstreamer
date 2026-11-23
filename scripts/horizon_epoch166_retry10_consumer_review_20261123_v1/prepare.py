@@ -29,7 +29,7 @@ MATRIX = W / "SEMANTIC_BINDINGS_20261123T034106Z.json"
 EXPECTED = "1283a13c654c69b7a228d0665062514eaeed8cd0b986f6f8d86eafba76e110a5"
 FUTURE = "horizon-qualify-166-independent-retry11-20261122.service"
 PARK = "horizon-closed166-retry10-park-20261122-v1.service"
-MANAGER_COMMIT = "d41007215360e391c45ebecdfc0f0ee92dee7a02"
+MANAGER_COMMIT = "e0214452e559a67632512a1d539a9b6fd8b00290"
 REPO = Path("/home/sol/workspace/jetstreamer")
 
 
@@ -196,6 +196,27 @@ def namespace_proof(q):
         "original installed image must remain readable through its physical alias with the successor bound",
     )
     nq = doc(q["native_qualification"], True)
+    failure = {
+        "path": str(W / "PARK_DISPATCH_FAILURE_9dcefb54_20261123.json"),
+        "sha256": "3be28439aca0a20fa90ec895661fc5542f6e33b47b299e9383f3428c6c5256d5",
+    }
+    need(
+        q.get("park_dispatch_failure") == failure
+        and q.get("park_dispatch_test") is not None,
+        "the real rejected park dispatch and the corrected native test are required",
+    )
+    checked(failure, True)
+    need(
+        q["park_dispatch_test"] == nq.get("actual_park_test"),
+        "uncorrelated actual park qualification",
+    )
+    park_log = checked(q["park_dispatch_test"]).decode()
+    need(
+        "test holding::epoch166_retry10_retire::independent_tests::genuine_park_dispatch_after_reload ... ok"
+        in park_log
+        and "1 passed; 0 failed" in park_log,
+        "corrected binary did not verify the complete genuine park",
+    )
     need(
         q["candidate"]["sha256"] == nq["image"]["sha256"]
         and q["original"]["sha256"]
