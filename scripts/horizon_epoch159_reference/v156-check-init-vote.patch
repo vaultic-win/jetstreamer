@@ -1,0 +1,447 @@
+--- a/sdk/src/feature_set.rs
++++ b/sdk/src/feature_set.rs
+@@ -282,6 +282,10 @@
+     solana_sdk::declare_id!("GvDsGDkH5gyzwpDhxNixx8vtx1kwYHH13RiNAPw27zXb");
+ }
+ 
++pub mod check_init_vote_data {
++    solana_sdk::declare_id!("3ccR6QpxGYsAbWyfevEtBNGfWV4xBffxRj2tD6A9i39F");
++}
++
+ lazy_static! {
+     /// Map of feature identifiers to user-visible description
+     pub static ref FEATURE_NAMES: HashMap<Pubkey, &'static str> = [
+@@ -348,6 +352,7 @@
+         (full_inflation::w3m::vote::id(), "Community vote allowing w3m to enable full inflation"),
+         (full_inflation::w3m::enable::id(), "Full inflation enabled by w3m"),
+         (warp_timestamp_again::id(), "warp timestamp again, adjust bounding to 25% fast 80% slow #15204"),
++        (check_init_vote_data::id(), "check initialized Vote data"),
+         /*************** ADD NEW FEATURES HERE ***************/
+     ]
+     .iter()
+--- a/runtime/src/bank.rs
++++ b/runtime/src/bank.rs
+@@ -3876,10 +3876,12 @@
+             .store_slow_cached(self.slot(), pubkey, account);
+ 
+         if Stakes::is_stake(account) {
+-            self.stakes
+-                .write()
+-                .unwrap()
+-                .store(pubkey, account, self.stake_program_v2_enabled());
++            self.stakes.write().unwrap().store(
++                pubkey,
++                account,
++                self.stake_program_v2_enabled(),
++                self.check_init_vote_data_enabled(),
++            );
+         }
+     }
+ 
+@@ -4408,6 +4410,7 @@
+                         pubkey,
+                         account,
+                         self.stake_program_v2_enabled(),
++                        self.check_init_vote_data_enabled(),
+                     ) {
+                         overwritten_vote_accounts.push(OverwrittenVoteAccount {
+                             account: old_vote_account,
+@@ -4637,6 +4640,11 @@
+             .is_active(&feature_set::stake_program_v2::id())
+     }
+ 
++    pub fn check_init_vote_data_enabled(&self) -> bool {
++        self.feature_set
++            .is_active(&feature_set::check_init_vote_data::id())
++    }
++
+     pub fn simple_capitalization_enabled(&self) -> bool {
+         self.simple_capitalization_enabled_at_genesis()
+             || self
+--- a/runtime/src/stakes.rs
++++ b/runtime/src/stakes.rs
+@@ -5,6 +5,7 @@
+     account::Account, clock::Epoch, pubkey::Pubkey, sysvar::stake_history::StakeHistory,
+ };
+ use solana_stake_program::stake_state::{new_stake_history_entry, Delegation, StakeState};
++use solana_vote_program::vote_state::VoteState;
+ use std::{borrow::Borrow, collections::HashMap};
+ 
+ #[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize, AbiExample)]
+@@ -116,16 +117,18 @@
+         pubkey: &Pubkey,
+         account: &Account,
+         fix_stake_deactivate: bool,
++        check_vote_init: bool,
+     ) -> Option<ArcVoteAccount> {
+         if solana_vote_program::check_id(&account.owner) {
+             // unconditionally remove existing at first; there is no dependent calculated state for
+             // votes, not like stakes (stake codepath maintains calculated stake value grouped by
+             // delegated vote pubkey)
+             let old = self.vote_accounts.remove(pubkey);
+-            // when account is removed (lamports == 0), don't readd so that given
+-            // `pubkey` can be used for any owner in the future, while not
+-            // affecting Stakes.
+-            if account.lamports != 0 {
++            // when account is removed (lamports == 0 or data uninitialized), don't read so that
++            // given `pubkey` can be used for any owner in the future, while not affecting Stakes.
++            if account.lamports != 0
++                && !(check_vote_init && VoteState::is_uninitialized_no_deser(&account.data))
++            {
+                 let stake = old.as_ref().map_or_else(
+                     || {
+                         self.calculate_stake(
+@@ -226,7 +229,7 @@
+     use super::*;
+     use solana_sdk::{pubkey::Pubkey, rent::Rent};
+     use solana_stake_program::stake_state;
+-    use solana_vote_program::vote_state::{self, VoteState};
++    use solana_vote_program::vote_state::{self, VoteState, VoteStateVersions};
+ 
+     //  set up some dummies for a staked node     ((     vote      )  (     stake     ))
+     pub fn create_staked_node_accounts(stake: u64) -> ((Pubkey, Account), (Pubkey, Account)) {
+@@ -298,8 +301,8 @@
+             let ((vote_pubkey, vote_account), (stake_pubkey, mut stake_account)) =
+                 create_staked_node_accounts(10);
+ 
+-            stakes.store(&vote_pubkey, &vote_account, true);
+-            stakes.store(&stake_pubkey, &stake_account, true);
++            stakes.store(&vote_pubkey, &vote_account, true, true);
++            stakes.store(&stake_pubkey, &stake_account, true, true);
+             let stake = StakeState::stake_from(&stake_account).unwrap();
+             {
+                 let vote_accounts = stakes.vote_accounts();
+@@ -311,7 +314,7 @@
+             }
+ 
+             stake_account.lamports = 42;
+-            stakes.store(&stake_pubkey, &stake_account, true);
++            stakes.store(&stake_pubkey, &stake_account, true, true);
+             {
+                 let vote_accounts = stakes.vote_accounts();
+                 assert!(vote_accounts.get(&vote_pubkey).is_some());
+@@ -323,7 +326,7 @@
+ 
+             // activate more
+             let (_stake_pubkey, mut stake_account) = create_stake_account(42, &vote_pubkey);
+-            stakes.store(&stake_pubkey, &stake_account, true);
++            stakes.store(&stake_pubkey, &stake_account, true, true);
+             let stake = StakeState::stake_from(&stake_account).unwrap();
+             {
+                 let vote_accounts = stakes.vote_accounts();
+@@ -335,7 +338,7 @@
+             }
+ 
+             stake_account.lamports = 0;
+-            stakes.store(&stake_pubkey, &stake_account, true);
++            stakes.store(&stake_pubkey, &stake_account, true, true);
+             {
+                 let vote_accounts = stakes.vote_accounts();
+                 assert!(vote_accounts.get(&vote_pubkey).is_some());
+@@ -353,14 +356,14 @@
+         let ((vote_pubkey, vote_account), (stake_pubkey, stake_account)) =
+             create_staked_node_accounts(10);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+ 
+         let ((vote11_pubkey, vote11_account), (stake11_pubkey, stake11_account)) =
+             create_staked_node_accounts(20);
+ 
+-        stakes.store(&vote11_pubkey, &vote11_account, true);
+-        stakes.store(&stake11_pubkey, &stake11_account, true);
++        stakes.store(&vote11_pubkey, &vote11_account, true, true);
++        stakes.store(&stake11_pubkey, &stake11_account, true, true);
+ 
+         let vote11_node_pubkey = VoteState::from(&vote11_account).unwrap().node_pubkey;
+ 
+@@ -377,8 +380,8 @@
+         let ((vote_pubkey, mut vote_account), (stake_pubkey, stake_account)) =
+             create_staked_node_accounts(10);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -387,14 +390,45 @@
+         }
+ 
+         vote_account.lamports = 0;
+-        stakes.store(&vote_pubkey, &vote_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+             assert!(vote_accounts.get(&vote_pubkey).is_none());
+         }
++
+         vote_account.lamports = 1;
+-        stakes.store(&vote_pubkey, &vote_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++
++        {
++            let vote_accounts = stakes.vote_accounts();
++            assert!(vote_accounts.get(&vote_pubkey).is_some());
++            assert_eq!(vote_accounts.get(&vote_pubkey).unwrap().0, 10);
++        }
++
++        // Vote account too big
++        let cache_data = vote_account.data.clone();
++        vote_account.data.push(0);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++
++        {
++            let vote_accounts = stakes.vote_accounts();
++            assert!(vote_accounts.get(&vote_pubkey).is_none());
++        }
++
++        // Vote account uninitialized
++        let default_vote_state = VoteState::default();
++        let versioned = VoteStateVersions::new_current(default_vote_state);
++        VoteState::to(&versioned, &mut vote_account).unwrap();
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++
++        {
++            let vote_accounts = stakes.vote_accounts();
++            assert!(vote_accounts.get(&vote_pubkey).is_none());
++        }
++
++        vote_account.data = cache_data;
++        stakes.store(&vote_pubkey, &vote_account, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -416,11 +450,11 @@
+         let ((vote_pubkey2, vote_account2), (_stake_pubkey2, stake_account2)) =
+             create_staked_node_accounts(10);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&vote_pubkey2, &vote_account2, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&vote_pubkey2, &vote_account2, true, true);
+ 
+         // delegates to vote_pubkey
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+ 
+         let stake = StakeState::stake_from(&stake_account).unwrap();
+ 
+@@ -436,7 +470,7 @@
+         }
+ 
+         // delegates to vote_pubkey2
+-        stakes.store(&stake_pubkey, &stake_account2, true);
++        stakes.store(&stake_pubkey, &stake_account2, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -461,11 +495,11 @@
+ 
+         let (stake_pubkey2, stake_account2) = create_stake_account(10, &vote_pubkey);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
+ 
+         // delegates to vote_pubkey
+-        stakes.store(&stake_pubkey, &stake_account, true);
+-        stakes.store(&stake_pubkey2, &stake_account2, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
++        stakes.store(&stake_pubkey2, &stake_account2, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -480,8 +514,8 @@
+         let ((vote_pubkey, vote_account), (stake_pubkey, stake_account)) =
+             create_staked_node_accounts(10);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+         let stake = StakeState::stake_from(&stake_account).unwrap();
+ 
+         {
+@@ -511,8 +545,8 @@
+         let ((vote_pubkey, vote_account), (stake_pubkey, stake_account)) =
+             create_staked_node_accounts(10);
+ 
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+ 
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -525,6 +559,7 @@
+             &stake_pubkey,
+             &Account::new(1, 0, &solana_stake_program::id()),
+             true,
++            true,
+         );
+         {
+             let vote_accounts = stakes.vote_accounts();
+@@ -554,8 +589,8 @@
+         let genesis_epoch = 0;
+         let ((vote_pubkey, vote_account), (stake_pubkey, stake_account)) =
+             create_warming_staked_node_accounts(10, genesis_epoch);
+-        stakes.store(&vote_pubkey, &vote_account, true);
+-        stakes.store(&stake_pubkey, &stake_account, true);
++        stakes.store(&vote_pubkey, &vote_account, true, true);
++        stakes.store(&stake_pubkey, &stake_account, true, true);
+ 
+         assert_eq!(stakes.vote_balance_and_staked(), 11);
+         assert_eq!(stakes.vote_balance_and_warmed_staked(), 1);
+--- a/programs/vote/src/vote_instruction.rs
++++ b/programs/vote/src/vote_instruction.rs
+@@ -11,6 +11,7 @@
+ use solana_metrics::inc_new_counter_info;
+ use solana_sdk::{
+     decode_error::DecodeError,
++    feature_set,
+     hash::Hash,
+     instruction::{AccountMeta, Instruction, InstructionError},
+     keyed_account::{from_keyed_account, get_signers, next_keyed_account, KeyedAccount},
+@@ -278,7 +279,7 @@
+     _program_id: &Pubkey,
+     keyed_accounts: &[KeyedAccount],
+     data: &[u8],
+-    _invoke_context: &mut dyn InvokeContext,
++    invoke_context: &mut dyn InvokeContext,
+ ) -> Result<(), InstructionError> {
+     trace!("process_instruction: {:?}", data);
+     trace!("keyed_accounts: {:?}", keyed_accounts);
+@@ -296,6 +297,7 @@
+                 &vote_init,
+                 &signers,
+                 &from_keyed_account::<Clock>(next_keyed_account(keyed_accounts)?)?,
++                invoke_context.is_feature_active(&feature_set::check_init_vote_data::id()),
+             )
+         }
+         VoteInstruction::Authorize(voter_pubkey, vote_authorize) => vote_state::authorize(
+--- a/programs/vote/src/vote_state/mod.rs
++++ b/programs/vote/src/vote_state/mod.rs
+@@ -33,6 +33,9 @@
+ // Maximum number of credits history to keep around
+ const MAX_EPOCH_CREDITS_HISTORY: usize = 64;
+ 
++// Offset of VoteState::prior_voters, for determining initialization status without deserialization
++const DEFAULT_PRIOR_VOTERS_OFFSET: usize = 82;
++
+ #[frozen_abi(digest = "Ch2vVEwos2EjAVqSHCyJjnN2MNX1yrpapZTGhMSCjWUH")]
+ #[derive(Serialize, Default, Deserialize, Debug, PartialEq, Eq, Clone, AbiExample)]
+ pub struct Vote {
+@@ -568,6 +571,13 @@
+         self.last_timestamp = BlockTimestamp { slot, timestamp };
+         Ok(())
+     }
++
++    pub fn is_uninitialized_no_deser(data: &[u8]) -> bool {
++        const VERSION_OFFSET: usize = 4;
++        data.len() != VoteState::size_of()
++            || data[VERSION_OFFSET..VERSION_OFFSET + DEFAULT_PRIOR_VOTERS_OFFSET]
++                == [0; DEFAULT_PRIOR_VOTERS_OFFSET]
++    }
+ }
+ 
+ /// Authorize the given pubkey to withdraw or sign votes. This may be called multiple times,
+@@ -683,7 +693,11 @@
+     vote_init: &VoteInit,
+     signers: &HashSet<Pubkey, S>,
+     clock: &Clock,
++    check_data_size: bool,
+ ) -> Result<(), InstructionError> {
++    if check_data_size && vote_account.data_len()? != VoteState::size_of() {
++        return Err(InstructionError::InvalidAccountData);
++    }
+     let versioned = State::<VoteStateVersions>::state(vote_account)?;
+ 
+     if !versioned.is_uninitialized() {
+@@ -811,6 +825,7 @@
+             },
+             &signers,
+             &Clock::default(),
++            true,
+         );
+         assert_eq!(res, Err(InstructionError::MissingRequiredSignature));
+ 
+@@ -828,6 +843,7 @@
+             },
+             &signers,
+             &Clock::default(),
++            true,
+         );
+         assert_eq!(res, Ok(()));
+ 
+@@ -842,8 +858,27 @@
+             },
+             &signers,
+             &Clock::default(),
++            true,
+         );
+         assert_eq!(res, Err(InstructionError::AccountAlreadyInitialized));
++
++        //init should fail, account is too big
++        let large_vote_account = Account::new_ref(100, 2 * VoteState::size_of(), &id());
++        let large_vote_account =
++            KeyedAccount::new(&vote_account_pubkey, false, &large_vote_account);
++        let res = initialize_account(
++            &large_vote_account,
++            &VoteInit {
++                node_pubkey,
++                authorized_voter: vote_account_pubkey,
++                authorized_withdrawer: vote_account_pubkey,
++                commission: 0,
++            },
++            &signers,
++            &Clock::default(),
++            true,
++        );
++        assert_eq!(res, Err(InstructionError::InvalidAccountData));
+     }
+ 
+     fn create_test_account() -> (Pubkey, RefCell<Account>) {
+@@ -2018,4 +2053,39 @@
+         // when called on a `VoteStateVersions` that stores it
+         assert!(VoteStateVersions::new_current(VoteState::default()).is_uninitialized());
+     }
++
++    #[test]
++    fn test_is_uninitialized_no_deser() {
++        // Check all zeroes
++        let mut vote_account_data = vec![0; VoteState::size_of()];
++        assert!(VoteState::is_uninitialized_no_deser(&vote_account_data));
++
++        // Check default VoteState
++        let default_account_state = VoteStateVersions::new_current(VoteState::default());
++        VoteState::serialize(&default_account_state, &mut vote_account_data).unwrap();
++        assert!(VoteState::is_uninitialized_no_deser(&vote_account_data));
++
++        // Check non-zero data shorter than offset index used
++        let short_data = vec![1; DEFAULT_PRIOR_VOTERS_OFFSET];
++        assert!(VoteState::is_uninitialized_no_deser(&short_data));
++
++        // Check non-zero large account
++        let mut large_vote_data = vec![1; 2 * VoteState::size_of()];
++        let default_account_state = VoteStateVersions::new_current(VoteState::default());
++        VoteState::serialize(&default_account_state, &mut large_vote_data).unwrap();
++        assert!(VoteState::is_uninitialized_no_deser(&vote_account_data));
++
++        // Check populated VoteState
++        let account_state = VoteStateVersions::new_current(VoteState::new(
++            &VoteInit {
++                node_pubkey: Pubkey::new_unique(),
++                authorized_voter: Pubkey::new_unique(),
++                authorized_withdrawer: Pubkey::new_unique(),
++                commission: 0,
++            },
++            &Clock::default(),
++        ));
++        VoteState::serialize(&account_state, &mut vote_account_data).unwrap();
++        assert!(!VoteState::is_uninitialized_no_deser(&vote_account_data));
++    }
+ }

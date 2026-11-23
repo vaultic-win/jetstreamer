@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import feature19
+import feature156
 
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch159-bounded-reference-20261123-v1"
@@ -115,7 +116,7 @@ def verify_package():
 
 
 def check_feature_donor():
-    if UNIT != feature19.UNIT:
+    if UNIT not in (feature19.UNIT, feature156.UNIT):
         return
     # The deployed V5m provider validates the free donor lock before and after its native price.
     # Check before opening that lock, including the short dispatch-intent interval.
@@ -139,6 +140,8 @@ def check_feature_donor():
         and not state["Job"]
         and state["MainPID"] == state["ControlPID"] == "0"
     )
+    if UNIT == feature156.UNIT:
+        uses_current_provider = True
     need(not uses_current_provider or drained, "the epoch 145 verifier still requires a free donor lock")
 
 
@@ -177,11 +180,12 @@ def grant(digest):
         and any("136" in u for u in g["donor_idle_units"]),
         "missing checked donor units",
     )
-    if UNIT == feature19.UNIT:
+    if UNIT in (feature19.UNIT, feature156.UNIT):
+        profile = feature19 if UNIT == feature19.UNIT else feature156
         check_feature_donor()
-        settled = root_file(feature19.SETTLEMENT, feature19.SETTLEMENT_SHA)
-        need(settled["iid"] == feature19.PREVIOUS_INVOCATION, "previous trace has not settled")
-        enrolled = root_file(feature19.DONOR_UNITS, feature19.DONOR_UNITS_SHA)
+        settled = root_file(profile.SETTLEMENT, profile.SETTLEMENT_SHA)
+        need(settled["iid"] == profile.PREVIOUS_INVOCATION, "previous trace has not settled")
+        enrolled = root_file(profile.DONOR_UNITS, profile.DONOR_UNITS_SHA)
         need(
             set(enrolled["donor_idle_units"]).issubset(g["donor_idle_units"]),
             "feature differential omitted an existing donor unit",
@@ -324,9 +328,16 @@ def node_argv(check_inputs=False):
         "-IB",
         "/opt/epoch159/trace.py",
     ]
-    if UNIT == feature19.UNIT:
-        cmd.append("--feature19")
+    cmd.extend(profile_args())
     return cmd + (["check-mounted-inputs"] if check_inputs else ["replay", "/work", "/evidence"])
+
+
+def profile_args():
+    if UNIT == feature19.UNIT:
+        return ["--feature19"]
+    if UNIT == feature156.UNIT:
+        return ["--feature156"]
+    return []
 
 
 def system_argv(digest):
@@ -357,7 +368,7 @@ def system_argv(digest):
         PYTHON,
         "-IB",
         str(PACKAGE / "service.py"),
-        *(["--feature19"] if UNIT == feature19.UNIT else []),
+        *profile_args(),
         "run",
         digest,
     ]
@@ -558,18 +569,21 @@ def retire_scratch():
 def main():
     global ROOT, PACKAGE, ATTEMPT, UNIT
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--feature19", action="store_true")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--feature19", action="store_true")
+    mode.add_argument("--feature156", action="store_true")
     p.add_argument(
         "action",
         choices=["recipe", "check-mounted-inputs", "dispatch", "run", "retire-scratch"],
     )
     p.add_argument("sha", nargs="?")
     a = p.parse_args()
-    if a.feature19:
-        ROOT = RT / feature19.RUNTIME
+    if a.feature19 or a.feature156:
+        profile = feature19 if a.feature19 else feature156
+        ROOT = RT / profile.RUNTIME
         PACKAGE = ROOT / "package-v1"
         ATTEMPT = ROOT / "attempt-v1"
-        UNIT = feature19.UNIT
+        UNIT = profile.UNIT
     need(
         os.geteuid() == 0 and sys.flags.isolated and __debug__,
         "isolated root operator required",
