@@ -2,7 +2,11 @@
 // reader review. A direct empty source census does not satisfy this gate.
 use super::*;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
-use std::{borrow::Cow, collections::BTreeSet};
+use std::{
+    borrow::Cow,
+    collections::{BTreeSet, HashMap, HashSet},
+    ffi::OsStr,
+};
 
 mod generated {
     include!("holding_epoch166_generated_definitions.rs");
@@ -170,12 +174,67 @@ impl Artifact {
     }
 }
 
-fn literal_edges_raw(
-    bytes: &[u8],
-    corpus: &BTreeMap<PathBuf, Artifact>,
-    targets: &BTreeSet<PathBuf>,
-    aliases: &BTreeMap<PathBuf, PathBuf>,
-) -> BTreeSet<PathBuf> {
+#[derive(Default)]
+struct EdgeEntry<'a> {
+    id: Option<usize>,
+    alias: Option<&'a Path>,
+}
+
+// Keep Path's component-aware equality for every match. Most literal
+// ancestors have a directory name that never appears as an inventory member
+// or alias. Checking that one component avoids hashing the entire prefix.
+struct EdgeIndex<'a> {
+    entries: HashMap<&'a Path, EdgeEntry<'a>>,
+    endings: HashSet<Option<&'a OsStr>>,
+    member_count: usize,
+}
+
+impl<'a> EdgeIndex<'a> {
+    fn new(
+        corpus: &'a BTreeMap<PathBuf, Artifact>,
+        targets: &'a BTreeSet<PathBuf>,
+        aliases: &'a BTreeMap<PathBuf, PathBuf>,
+    ) -> Self {
+        let mut entries = HashMap::<&Path, EdgeEntry>::with_capacity(
+            corpus.len() + targets.len() + aliases.len(),
+        );
+        let mut member_count = 0;
+        for path in corpus.keys().chain(targets) {
+            let entry = entries.entry(path).or_default();
+            if entry.id.is_none() {
+                entry.id = Some(member_count);
+                member_count += 1;
+            }
+        }
+        for (alias, canonical) in aliases {
+            entries.entry(alias).or_default().alias = Some(canonical);
+        }
+        let endings = entries
+            .keys()
+            .copied()
+            .map(|p| p.components().next_back().map(|c| c.as_os_str()))
+            .collect();
+        Self {
+            entries,
+            endings,
+            member_count,
+        }
+    }
+
+    fn get(&self, path: &Path) -> Option<&EdgeEntry<'a>> {
+        let ending = path
+            .components()
+            .next_back()
+            .map(|component| component.as_os_str());
+        if self.endings.contains(&ending) {
+            self.entries.get(path)
+        } else {
+            None
+        }
+    }
+}
+
+fn indexed_edges_raw(bytes: &[u8], index: &EdgeIndex) -> BTreeSet<PathBuf> {
     use std::os::unix::ffi::OsStrExt;
     let mut edges = BTreeSet::new();
     let mut at = 0;
@@ -191,15 +250,18 @@ fn literal_edges_raw(
         if end - at <= 4096 {
             let path = Path::new(std::ffi::OsStr::from_bytes(&bytes[at..end]));
             for candidate in path.ancestors() {
-                if targets.contains(candidate) || corpus.contains_key(candidate) {
+                let Some(entry) = index.get(candidate) else {
+                    continue;
+                };
+                if entry.id.is_some() {
                     edges.insert(candidate.to_owned());
                 }
-                if let Some(canonical) = aliases.get(candidate)
+                if let Some(canonical) = entry.alias
                     && let Ok(suffix) = path.strip_prefix(candidate)
                 {
                     let resolved = canonical.join(suffix);
                     for target in resolved.ancestors() {
-                        if targets.contains(target) || corpus.contains_key(target) {
+                        if index.get(target).is_some_and(|entry| entry.id.is_some()) {
                             edges.insert(target.to_owned());
                         }
                     }
@@ -210,22 +272,13 @@ fn literal_edges_raw(
     }
     edges
 }
-fn literal_edges(
-    bytes: &[u8],
-    corpus: &BTreeMap<PathBuf, Artifact>,
-    targets: &BTreeSet<PathBuf>,
-    aliases: &BTreeMap<PathBuf, PathBuf>,
-) -> BTreeSet<PathBuf> {
-    let mut edges = literal_edges_raw(bytes, corpus, targets, aliases);
+fn indexed_edges(bytes: &[u8], index: &EdgeIndex) -> BTreeSet<PathBuf> {
+    let mut edges = indexed_edges_raw(bytes, index);
     // Unescaped JSON strings have already been scanned byte-for-byte above.
     // A valid JSON document without backslashes cannot contribute new paths.
     if bytes.contains(&b'\\') {
         let mut decoder = serde_json::Deserializer::from_slice(bytes);
-        let strings = JsonEdges {
-            corpus,
-            targets,
-            aliases,
-        };
+        let strings = JsonEdges { index };
         // Retain the previous all-or-nothing JSON rule: neither a valid prefix
         // nor strings visited before an invalid escape/trailing token count.
         if let Ok(decoded) = strings.deserialize(&mut decoder)
@@ -241,18 +294,16 @@ fn literal_edges(
 // serde_json still owns syntax, UTF-8, escape/surrogate and depth validation.
 // Only strings decoded into its scratch buffer need another raw-path scan.
 #[derive(Clone, Copy)]
-struct JsonEdges<'a> {
-    corpus: &'a BTreeMap<PathBuf, Artifact>,
-    targets: &'a BTreeSet<PathBuf>,
-    aliases: &'a BTreeMap<PathBuf, PathBuf>,
+struct JsonEdges<'a, 'paths> {
+    index: &'a EdgeIndex<'paths>,
 }
-impl<'de> DeserializeSeed<'de> for JsonEdges<'_> {
+impl<'de> DeserializeSeed<'de> for JsonEdges<'_, '_> {
     type Value = BTreeSet<PathBuf>;
     fn deserialize<D: serde::Deserializer<'de>>(self, decoder: D) -> Result<Self::Value, D::Error> {
         decoder.deserialize_any(self)
     }
 }
-impl<'de> Visitor<'de> for JsonEdges<'_> {
+impl<'de> Visitor<'de> for JsonEdges<'_, '_> {
     type Value = BTreeSet<PathBuf>;
     fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("a JSON value")
@@ -262,12 +313,7 @@ impl<'de> Visitor<'de> for JsonEdges<'_> {
         Ok(BTreeSet::new())
     }
     fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
-        Ok(literal_edges_raw(
-            text.as_bytes(),
-            self.corpus,
-            self.targets,
-            self.aliases,
-        ))
+        Ok(indexed_edges_raw(text.as_bytes(), self.index))
     }
     fn visit_string<E: serde::de::Error>(self, text: String) -> Result<Self::Value, E> {
         self.visit_str(&text)
@@ -302,12 +348,7 @@ impl<'de> Visitor<'de> for JsonEdges<'_> {
         let mut values: BTreeMap<Cow<'de, str>, BTreeSet<PathBuf>> = BTreeMap::new();
         while let Some(key) = object.next_key_seed(JsonKey)? {
             if let Cow::Owned(text) = &key {
-                edges.extend(literal_edges_raw(
-                    text.as_bytes(),
-                    self.corpus,
-                    self.targets,
-                    self.aliases,
-                ));
+                edges.extend(indexed_edges_raw(text.as_bytes(), self.index));
             }
             let value = object.next_value_seed(self)?;
             if value.is_empty() {
@@ -573,29 +614,31 @@ fn reverse_graph(
     // must not retain two million copies of potentially long absolute paths.
     // Targets get IDs even when their paths are absent from the metadata corpus.
     let paths: Vec<&Path> = corpus.keys().map(PathBuf::as_path).collect();
-    let mut ids = BTreeMap::<&Path, usize>::new();
-    for (id, path) in paths.iter().enumerate() {
-        ids.insert(*path, id);
-    }
+    let index = EdgeIndex::new(corpus, &targets, aliases);
     let mut target_ids = Vec::new();
     for target in &targets {
-        let next_id = ids.len();
-        target_ids.push(*ids.entry(target.as_path()).or_insert(next_id));
+        target_ids.push(
+            index.entries[target.as_path()]
+                .id
+                .context("target outside census index")?,
+        );
     }
-    let mut readers = vec![Vec::<usize>::new(); ids.len()];
+    let mut readers = vec![Vec::<usize>::new(); index.member_count];
     let mut count = 0usize;
     for (reader, (path, item)) in corpus.iter().enumerate() {
         let body = item
             .read(path)
             .with_context(|| format!("scan consumer metadata {}", path.display()))?;
-        let edges = literal_edges(&body, corpus, &targets, aliases);
+        let edges = indexed_edges(&body, &index);
         count = count
             .checked_add(edges.len())
             .context("reader edge overflow")?;
         ensure!(count <= 2_000_000, "literal reader graph exceeds bound");
         for edge in edges {
-            let target = *ids
+            let target = index
+                .entries
                 .get(edge.as_path())
+                .and_then(|entry| entry.id)
                 .context("edge outside census and targets")?;
             readers[target].push(reader);
         }
@@ -624,9 +667,13 @@ fn reverse_graph(
         let body = corpus[path]
             .read(path)
             .with_context(|| format!("emit consumer edges for {}", path.display()))?;
-        let mut edges = literal_edges(&body, corpus, &targets, aliases);
-        edges
-            .retain(|target| targets.contains(target) || selected.contains(&ids[target.as_path()]));
+        let mut edges = indexed_edges(&body, &index);
+        edges.retain(|target| {
+            targets.contains(target)
+                || index.entries[target.as_path()]
+                    .id
+                    .is_some_and(|id| selected.contains(&id))
+        });
         for target in &edges {
             emitted_path_bytes = emitted_path_bytes
                 .checked_add(target.as_os_str().len())
@@ -1066,6 +1113,55 @@ mod tests {
             definition,
         }
     }
+    fn literal_edges_raw(
+        bytes: &[u8],
+        corpus: &BTreeMap<PathBuf, Artifact>,
+        targets: &BTreeSet<PathBuf>,
+        aliases: &BTreeMap<PathBuf, PathBuf>,
+    ) -> BTreeSet<PathBuf> {
+        use std::os::unix::ffi::OsStrExt;
+        let mut edges = BTreeSet::new();
+        let mut at = 0;
+        while at < bytes.len() {
+            if bytes[at] != b'/' {
+                at += 1;
+                continue;
+            }
+            let mut end = at + 1;
+            while end < bytes.len() && !b"\0\n\r\t '\";|&()<>[]{},:\\".contains(&bytes[end]) {
+                end += 1;
+            }
+            if end - at <= 4096 {
+                let path = Path::new(std::ffi::OsStr::from_bytes(&bytes[at..end]));
+                for candidate in path.ancestors() {
+                    if targets.contains(candidate) || corpus.contains_key(candidate) {
+                        edges.insert(candidate.to_owned());
+                    }
+                    if let Some(canonical) = aliases.get(candidate)
+                        && let Ok(suffix) = path.strip_prefix(candidate)
+                    {
+                        let resolved = canonical.join(suffix);
+                        for target in resolved.ancestors() {
+                            if targets.contains(target) || corpus.contains_key(target) {
+                                edges.insert(target.to_owned());
+                            }
+                        }
+                    }
+                }
+            }
+            at = end;
+        }
+        edges
+    }
+    fn literal_edges(
+        bytes: &[u8],
+        corpus: &BTreeMap<PathBuf, Artifact>,
+        targets: &BTreeSet<PathBuf>,
+        aliases: &BTreeMap<PathBuf, PathBuf>,
+    ) -> BTreeSet<PathBuf> {
+        indexed_edges(bytes, &EdgeIndex::new(corpus, targets, aliases))
+    }
+
     // Independent decoder oracle: retain the former Value-tree implementation
     // in tests so string streaming must preserve its actual edge semantics.
     fn value_tree_edges(
@@ -1138,6 +1234,61 @@ mod tests {
             observed
         }
     }
+    #[test]
+    fn indexed_paths_preserve_raw_spelling_and_alias_ancestor_matches() {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let raw_path = |bytes: &[u8]| PathBuf::from(std::ffi::OsString::from_vec(bytes.to_vec()));
+        let mut fixture = EdgeFixture::new();
+        for name in [
+            b"/sealed//alternate/./plan".as_slice(),
+            b"/sealed/../literal",
+            b"/sealed/\xff",
+            b"/",
+        ] {
+            fixture.corpus.insert(raw_path(name), artifact("", false));
+        }
+        fixture
+            .aliases
+            .insert("/sealed/alternate/plan".into(), "/sealed".into());
+        fixture
+            .aliases
+            .insert("/sealed/alternate".into(), "/sealed/..".into());
+        let index = EdgeIndex::new(&fixture.corpus, &fixture.targets, &fixture.aliases);
+        let spellings = |edges: BTreeSet<PathBuf>| {
+            edges
+                .into_iter()
+                .map(|p| p.into_os_string().into_vec())
+                .collect::<Vec<_>>()
+        };
+        let token = b"/sealed/alternate//./plan";
+        let first = [token.as_slice(), b"/sealed/alternate/plan/"].concat();
+        for bytes in [
+            first.as_slice(),
+            b"/sealed/alternate//./plan/../literal",
+            b"/sealed/alternate/plan/plan.json",
+            b"///sealed/\xff//tail/./",
+            b"/sealed/../literal/",
+            b"//",
+            b"/unlisted/filename.json",
+            br#"{"a":"\u002fsealed\/alternate//plan/plan.json","b":"\/sealed\/..\/literal"}"#,
+        ] {
+            assert_eq!(
+                spellings(indexed_edges(bytes, &index)),
+                spellings(value_tree_edges(
+                    bytes,
+                    &fixture.corpus,
+                    &fixture.targets,
+                    &fixture.aliases
+                ))
+            );
+        }
+        assert!(
+            indexed_edges_raw(b"/sealed/alternate//./plan", &index)
+                .iter()
+                .any(|p| p.as_os_str().as_bytes() == token)
+        );
+    }
+
     #[test]
     fn streaming_json_preserves_keys_unicode_surrogates_aliases_and_nested_paths() {
         let fixture = EdgeFixture::new();
@@ -1357,7 +1508,7 @@ mod tests {
         let mut readers: BTreeMap<PathBuf, BTreeSet<PathBuf>> = BTreeMap::new();
         let mut edge_count = 0usize;
         for (path, item) in corpus {
-            let edges = literal_edges(&item.read(path)?, corpus, &targets, aliases);
+            let edges = value_tree_edges(&item.read(path)?, corpus, &targets, aliases);
             edge_count = edge_count
                 .checked_add(edges.len())
                 .context("reader edge overflow")?;

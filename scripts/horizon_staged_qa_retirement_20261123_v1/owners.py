@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 
-SYSTEM_ROOTS = ('/etc/systemd','/run/systemd/transient','/etc/cron.d','/etc/crontab',
+SYSTEM_ROOTS = ('/etc/systemd','/run/systemd/transient','/run/systemd/system','/etc/cron.d','/etc/crontab',
                 '/var/spool/cron','/home/sol/.config/systemd','/root/.config/systemd',
                 '/usr/local/lib/systemd','/run/user/1001/systemd')
 CONTROL_SUFFIXES = {'.service','.timer','.path','.sh','.py','.rs','.conf','.toml','.json','.jsonl'}

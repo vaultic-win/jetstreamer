@@ -21,6 +21,15 @@ struct Owner<'a> {
     sha: &'static str,
     cap: u64,
 }
+impl Owner<'_> {
+    fn range(&self) -> &'static str {
+        if self.unit == UNIT248 {
+            "248-248"
+        } else {
+            "247-247"
+        }
+    }
+}
 const ORIGINAL: Owner<'static> = Owner {
     unit: UNIT,
     iid: IID,
@@ -114,6 +123,18 @@ fn staged_inputs() -> Result<Value> {
     Ok(proof)
 }
 pub(super) fn validate(c: &Config) -> Result<()> {
+    if let Some(claim) = &c.delivery248_claim {
+        claim.validate()?;
+        for replay in c.replays.iter().chain(&c.diagnostic_replays) {
+            ensure!(
+                replay.producer_unit != UNIT248
+                    && replay.controller_unit != UNIT248
+                    && replay.expected_controller_invocation_id != claim.invocation_id
+                    && replay.expected_producer_invocation_id != claim.invocation_id,
+                "epoch 248 delivery aliases replay telemetry"
+            );
+        }
+    }
     ensure!(
         !(c.delivery247_resource_only && c.staged247_resource_only),
         "choose one 247 delivery observation"
@@ -334,7 +355,7 @@ fn observe(
             && image_before["mapped_device"] == image_after["mapped_device"],
         "delivery247 identity changed during same-cadence sample"
     );
-    let mut sample = json!({"range":"247-247","sampled_unix_seconds":clock,"resource_only":true,
+    let mut sample = json!({"range":owner.range(),"sampled_unix_seconds":clock,"resource_only":true,
         "delivery_resource_only":true,"phase":"upload-readback",
         "controller_before":before,"producer_before":before,"controller_after":after,"producer_after":after,
         "mapped_image_before":image_before,"mapped_image_after":image_after,
@@ -358,7 +379,7 @@ fn row(result: Result<Value>, owner: Owner<'_>) -> Value {
         Ok(v) => ("observed", Some(v), None),
         Err(e) => ("unavailable", None, Some(format!("{e:#}"))),
     };
-    json!({"range":"247-247","producer_unit":owner.unit,"expected_producer_invocation_id":owner.iid,
+    json!({"range":owner.range(),"producer_unit":owner.unit,"expected_producer_invocation_id":owner.iid,
         "delivery_resource_only":true,"status":status,"observation":observation,"error":error,
         "entry_replay":false,"ordinary_replay_claim":false,"terminal_completion_proven":false,
         "resource_release_authorized":false,"publication_authorized":false,"r2_mutations":false})
@@ -399,9 +420,143 @@ pub(super) fn sample(
         Vec::new()
     }
 }
+const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
+const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
+const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
+const CLAIM248: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon-upload-248-ordinary-v213/pipeline-claim.json";
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DeliveryClaim {
+    invocation_id: String,
+    pid: u32,
+    claim_sha256: String,
+}
+
+impl DeliveryClaim {
+    fn validate(&self) -> Result<()> {
+        let digest = |s: &str, n| {
+            s.len() == n
+                && s.bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        ensure!(
+            self.pid > 1 && digest(&self.invocation_id, 32) && digest(&self.claim_sha256, 64),
+            "invalid epoch 248 delivery binding"
+        );
+        Ok(())
+    }
+
+    fn checked_command(&self) -> Result<()> {
+        self.validate()?;
+        let path = Path::new(CLAIM248);
+        ensure!(path.canonicalize()? == path, "epoch 248 claim path");
+        let file = fs::File::open(path)?;
+        let m = file.metadata()?;
+        ensure!(
+            m.is_file()
+                && m.uid() == 0
+                && m.gid() == 0
+                && m.nlink() == 1
+                && m.mode() & 0o222 == 0
+                && m.len() <= 1 << 20,
+            "epoch 248 claim custody"
+        );
+        let mut bytes = Vec::new();
+        std::io::Read::take(file, (1 << 20) + 1).read_to_end(&mut bytes)?;
+        ensure!(
+            sha256(&bytes) == self.claim_sha256,
+            "epoch 248 claim changed"
+        );
+        let claim: Value = serde_json::from_slice(&bytes)?;
+        let args = [
+            IMAGE248,
+            "sync",
+            "/home/ubuntu/.jetstreamer-private/qualification-248-reboot-20261117-v1/output",
+            "--epochs",
+            "248-248",
+            "--receipt-directory",
+            "/home/ubuntu/.jetstreamer-private/current-reader-delivery-248-20261119-v2/receipts",
+            "--current-reader-plan",
+            "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-248-plan.json",
+            "--current-reader-plan-sha256",
+            "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
+            "--concurrency",
+            "2",
+        ];
+        ensure!(
+            claim["epoch"] == 248
+                && claim["phase"] == "upload-readback"
+                && claim["unit"] == UNIT248
+                && claim["invocation_id"] == self.invocation_id
+                && claim["evidence"].as_array().is_some_and(|v| !v.is_empty()),
+            "epoch 248 pipeline claim mismatch"
+        );
+        let command = claim["expected_exec_start"]
+            .as_str()
+            .context("epoch 248 expected command")?;
+        let prefix = format!(
+            "{{ path={IMAGE248} ; argv[]={} ; ignore_errors=no ; start_time=",
+            args.join(" ")
+        );
+        ensure!(
+            command.starts_with(&prefix),
+            "epoch 248 unexpected uploader command"
+        );
+        let actual = fs::read(format!("/proc/{}/cmdline", self.pid))?;
+        ensure!(
+            actual == (args.join("\0") + "\0").as_bytes(),
+            "epoch 248 process command mismatch"
+        );
+        let current = Command::new("/usr/bin/systemctl")
+            .args(["show", UNIT248, "--property=ExecStart", "--value"])
+            .output()?;
+        ensure!(
+            current.status.success()
+                && staged_exec_matches(command, std::str::from_utf8(&current.stdout)?.trim()),
+            "epoch 248 manager command changed"
+        );
+        Ok(())
+    }
+}
+
+pub(super) fn sample248(claim: &DeliveryClaim, clock: u64) -> Value {
+    let owner = Owner {
+        unit: UNIT248,
+        iid: &claim.invocation_id,
+        pid: claim.pid,
+        image: IMAGE248,
+        sha: SHA248,
+        cap: 10 << 30,
+    };
+    let result = (|| {
+        claim.checked_command()?;
+        let mut sample = observe(clock, owner, None)?;
+        claim.checked_command()?;
+        sample["delivery_claim"] = json!({"path":CLAIM248,"sha256":claim.claim_sha256});
+        Ok(sample)
+    })();
+    row(result, owner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ordinary_delivery_requires_a_bound_claim_and_pid() {
+        let mut claim = DeliveryClaim {
+            invocation_id: "a".repeat(32),
+            claim_sha256: "1".repeat(64),
+            pid: 42,
+        };
+        assert!(claim.validate().is_ok());
+        claim.pid = 0;
+        assert!(claim.validate().is_err());
+        claim.pid = 42;
+        claim.invocation_id.replace_range(0..1, "Z");
+        assert!(claim.validate().is_err());
+    }
     #[test]
     fn bounded_owner_requires_the_exact_new_plan_and_both_original_invocations() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!("fixtures/successor247-history.json"))?;

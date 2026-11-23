@@ -1,4 +1,4 @@
-"""Plan or submit one owner-selected stage30 inspection or execution."""
+"""Plan or submit one owner-selected staged-test inspection or execution."""
 import argparse
 import fcntl
 import hashlib
@@ -10,9 +10,11 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path('/var/lib/jetstreamer/horizon_runtime_data/stage30-sealed-qa-retirement-20261123-v1')
-TOOLS = ROOT/'tools'
-CARGO = ROOT.parent/'epoch166-exact-cargo-retirement-20261123-v1/tools'
+RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
+ALLOWED = {RUNTIME / name / 'tools' for name in
+           ('stage22-sealed-qa-retirement-20261123-v1', 'stage30-sealed-qa-retirement-20261123-v1')}
+TOOLS = Path(__file__).absolute().parent
+CARGO = RUNTIME/'epoch166-exact-cargo-retirement-20261123-v1/tools'
 PROVIDER_HASH = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
 
 def require(ok,msg):
@@ -27,18 +29,19 @@ def main():
     parser.add_argument('--inspection-sha256')
     cfg=parser.parse_args()
     require(os.geteuid()==0 and sys.flags.isolated and sys.dont_write_bytecode and __debug__,'root python3 -IB required')
-    require(Path(__file__).absolute()==TOOLS/'invoke.py','use sealed operator')
+    require(TOOLS in ALLOWED and Path(__file__).absolute()==TOOLS/'invoke.py','use sealed operator')
     require(hashlib.sha256((CARGO/'host.py').read_bytes()).hexdigest()==PROVIDER_HASH,'changed fit provider')
     host=runpy.run_path(str(CARGO/'host.py'))
     host['sealed'](TOOLS,cfg.seal)
     engine=runpy.run_path(str(TOOLS/'retirement.py'))
     deployed=runpy.run_path(str(TOOLS/'host.py'))
     manifest=host['bound'](deployed['MANIFEST'],deployed['SCOPE'])
+    deployed['checked_selection'](manifest, TOOLS, host['bound'])
     state=deployed['STATE']
     engine['secure_state'](state)
     require((cfg.action=='execute')==bool(cfg.inspection_sha256),'bind inspection only at execution')
     epoch=str(time.time_ns())
-    unit='horizon-fit-stage30-'+cfg.action+'-'+epoch
+    unit='horizon-fit-'+deployed['PROFILE']+'-'+cfg.action+'-'+epoch
     # Retain the terminal unit, so a concurrent physical reader can finish a
     # stable census. All source names and quarantine share one writable mount.
     args=['systemd-run','--no-block','--service-type=oneshot','--unit='+unit]
