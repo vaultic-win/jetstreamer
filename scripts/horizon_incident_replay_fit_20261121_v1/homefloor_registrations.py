@@ -227,15 +227,23 @@ def manager_exit(s, unit, iid, reported_at):
     return end
 
 
-def phase145(s, fit, epoch):
+def phase145(s, fit, epoch, detached=False):
     """Bind the failed same-image retry while its candidate and entire reservation are retained."""
     unit = fit.A145
     mgr = s.show(unit)
-    s.need(mgr["Id"] == unit and mgr["InvocationID"] == VERIFIER_IID
-           and mgr["ActiveState"] == mgr["SubState"] == "failed" and mgr["ExecMainStatus"] == "1"
-           and mgr["Result"] == "exit-code" and not mgr["ControlGroup"] and not mgr["Job"]
-           and mgr["MainPID"] == mgr["ControlPID"] == mgr["NRestarts"] == "0"
-           and not fit.members(unit), "different retry1 verifier or occupied group")
+    common = (mgr["Id"] == unit and not mgr["ControlGroup"] and not mgr["Job"]
+              and mgr["MainPID"] == mgr["ControlPID"] == mgr["NRestarts"] == "0"
+              and not fit.members(unit))
+    if detached:
+        s.need(common and epoch == 145 and mgr["LoadState"] == "not-found"
+               and mgr["ActiveState"] == "inactive" and mgr["SubState"] == "dead"
+               and not mgr["InvocationID"] and not mgr["TriggeredBy"],
+               "145 name has another owner")
+    else:
+        s.need(common and mgr["InvocationID"] == VERIFIER_IID
+               and mgr["ActiveState"] == mgr["SubState"] == "failed"
+               and mgr["ExecMainStatus"] == "1" and mgr["Result"] == "exit-code",
+               "different retry1 verifier or occupied group")
     state = R / "epoch145-guarded-export-20261121-v1/state" / VERIFIER_IID
     failed, failure = s.read(state / "failed.json", "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366")
     started, recovery = s.read(state / "recovery-started.json", "82532ce3f39356a26d78b2eb07ef32d6a90d604f7537d024ba5e696c42573ceb")

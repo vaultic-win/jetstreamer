@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-RETRY4_145 = HERE.name == "tools-homefloor-145-rejoin-v4"
+DETACHED_145 = HERE == D / "tools-homefloor-145-handoff-v1"
+RETRY4_145 = DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
@@ -504,6 +505,9 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
+    if DETACHED_145:
+        s.need(epoch == 145, "detached 145 census is for its transition only")
+        return registrations["phase145"](s, fit, epoch, detached=True)
     if HOMEFLOOR:
         # The existing terminal proof still prices an unstarted retry. A new
         # live generation must pass its own sealed verifier and native lease checks.
@@ -1216,6 +1220,9 @@ if __name__=="__main__":
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
     ref=s.ref(Path(args[1]),args[2])
+    if DETACHED_145:
+        s.need(not review and args[0] == "145", "detached census cannot book another actor")
+        runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     result=capture(int(args[0]),ref)
     if review:
         fleet,_=fleet_head(ref)
