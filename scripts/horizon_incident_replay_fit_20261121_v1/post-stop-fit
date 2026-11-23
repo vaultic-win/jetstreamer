@@ -47,7 +47,7 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-FIFTH168 = HERE.name == "tools-homefloor-cold168-retry2-v1"
+FIFTH168 = HERE.name in {"tools-homefloor-cold168-retry2-v1", "tools-homefloor-cold168-retry2-v2"}
 FOURTH166 = FIFTH168 or HERE.name == "tools-homefloor-166-after170-v1"
 PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
 RETRY13_170 = PUBLISH170 or FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",

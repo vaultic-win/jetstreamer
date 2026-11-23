@@ -148,6 +148,41 @@ def check_profile(s, d, profile, original, translated):
     return expected, pairs
 
 
+def home_namespace(s,proc,profile,pairs):
+    """Check the held process's effective mount table before its gate can release the node."""
+    home=Path('/home/sol')
+    config=Path(profile['payload']['environment']['XDG_CONFIG_HOME'])
+    s.need(config==LANE/'config','foreign 168 config directory')
+    writable={RUN/'output',RUN/'private'}
+    readonly={RUN/'producer.log',config}
+    expected={home,*readonly,*writable,*(p for p in pairs if p.is_relative_to(home))}
+    inaccessible,=(v.removeprefix('--property=InaccessiblePaths=').split() for v in profile['producer_argv']
+                   if v.startswith('--property=InaccessiblePaths='))
+    masks={Path(p.removeprefix('-')) for p in inaccessible}
+    mounted={}
+    for line in (proc/'mountinfo').read_text().splitlines():
+        fields=line.split()
+        target=Path(fields[4])
+        if not target.is_relative_to(home):
+            continue
+        opts=set(fields[5].split(','))
+        if target in masks:
+            # A systemd inaccessible path may be absent beneath the empty HOME tmpfs.
+            exposed=proc/'root'/target.relative_to('/')
+            s.need('ro' in opts and exposed.stat().st_mode & 0o777==0,'unmasked 168 private path '+str(target))
+            continue
+        s.need(target in expected and target not in mounted,'unexpected 168 HOME mount '+str(target))
+        mounted[target]=opts
+        if target==home:
+            s.need(fields[3]=='/' and fields[fields.index('-')+1]=='tmpfs' and
+                   {'ro','noexec','nosuid','nodev'} <= opts,'168 HOME must be a read-only noexec tmpfs')
+    s.need(mounted.keys()==expected,'incomplete 168 HOME namespace')
+    for target in writable|readonly:
+        s.need(('rw' if target in writable else 'ro') in mounted[target] and
+               s.same_file(proc/'root'/target.relative_to('/'),target),'foreign 168 HOME bind '+str(target))
+    s.need(not (proc/'root/home/sol/workspace/jetstreamer/Cargo.toml').exists(),'168 workspace exposed')
+
+
 def verify_start(s,d,proc,unit,timer,tree,run,intent,identity,held,readonly_mounts):
     prepared, ref = s.read(d/'PREPARED.json',PREPARED_SHA)
     profile = prepared['profile']
@@ -172,6 +207,7 @@ def verify_start(s,d,proc,unit,timer,tree,run,intent,identity,held,readonly_moun
     s.need(profile['producer_argv'][-len(full):]==full and hashlib.sha256(pairs[gate].read_bytes()).hexdigest()==GATE_SHA,
            'wrong cold 168 held gate or launch arguments')
     readonly_mounts(s,proc,pairs)
+    home_namespace(s,proc,profile,pairs)
     env=(proc/'environ').read_bytes().split(b'\0')
     enrolled={**translated['environment'],'HORIZON_FULL168_PAYLOAD_SHA256':payload_ref['sha256'],
               'INVOCATION_ID':identity['producer_invocation_id']}
