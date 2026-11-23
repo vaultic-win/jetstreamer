@@ -14,7 +14,8 @@ RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
 ALLOWED = {RUNTIME / name / 'tools' for name in
            ('stage22-sealed-qa-retirement-20261123-v1', 'stage30-sealed-qa-retirement-20261123-v1',
             'stage41-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v1',
-            'stage128-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v2')}
+            'stage128-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v2',
+            'stage88-sealed-qa-retirement-20261123-v3')}
 TOOLS = Path(__file__).absolute().parent
 CARGO = RUNTIME/'epoch166-exact-cargo-retirement-20261123-v1/tools'
 PROVIDER_HASH = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'

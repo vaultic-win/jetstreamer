@@ -16,6 +16,8 @@ RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
 EXECUTABLES_128 = RUNTIME / 'stage128-sealed-qa-retirement-20261123-v1' / 'tools'
 SMALL_88 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v1' / 'tools'
 SMALL_88_LIVE145 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v2' / 'tools'
+SMALL_88_LIVE145_RETRY = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v3' / 'tools'
+SMALL_88_LIVE145_PACKAGES = (SMALL_88_LIVE145, SMALL_88_LIVE145_RETRY)
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
 LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -34,7 +36,7 @@ def selection(package):
         return ('stage128', BASE / 'fit-disjoint-064757-20261123-v1/MANIFEST_128.json',
                 'a971140658eb9d4bf329d9b663440002830fccc8d4c482487cb3a735f35cbfe8',
                 (128, 204, 13105426432, 13106666192, 26213332384))
-    if package in (SMALL_88, SMALL_88_LIVE145):
+    if package in (SMALL_88, *SMALL_88_LIVE145_PACKAGES):
         return ('stage88', BASE / 'fit-small-seal-siblings-20261123-v1/MANIFEST_88.json',
                 '2b0603cf98ce23fa152b418d01a1115846a75164e7bfbc14c4dd658bbc7f7857',
                 (88, 116, 3494883328, 3496875656, 6993751312))
@@ -55,11 +57,11 @@ def selection(package):
 
 # Direct source/test imports retain the legacy defaults; main still verifies its exact executable path.
 PACK = Path(__file__).absolute().parent
-if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88, SMALL_88_LIVE145, EXECUTABLES_128):
+if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88, *SMALL_88_LIVE145_PACKAGES, EXECUTABLES_128):
     PACK = LEGACY_30
 PROFILE, MANIFEST, SCOPE, _ = selection(PACK)
 STATE = BASE / 'horizon-root-runtime-data' / (
-    SMALL_88.parent.name if PACK == SMALL_88_LIVE145 else PACK.parent.name
+    SMALL_88.parent.name if PACK in SMALL_88_LIVE145_PACKAGES else PACK.parent.name
 ) / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
 MUTEX = BASE / 'r2-receipts/local-mutation.lock'
@@ -90,13 +92,24 @@ def checked_live145_price(frame, guard, fleet, now):
 
 
 def price(provider):
-    if PACK != SMALL_88_LIVE145:
+    if PACK not in SMALL_88_LIVE145_PACKAGES:
         return provider['price']()
     provider['sealed'](LIVE145_PROVIDER, LIVE145_PROVIDER_SEAL)
     head = provider['fleet']()
     fleet = {'path': str(head), 'sha256': provider['sha'](head)}
-    child = subprocess.run([LIVE145_PROVIDER / 'post-stop-fit', '145', head, fleet['sha256']],
-                           text=True, capture_output=True, timeout=220)
+    command = [LIVE145_PROVIDER / 'post-stop-fit', '145', head, fleet['sha256']]
+    attempts = 3 if PACK == SMALL_88_LIVE145_RETRY else 1
+    for attempt in range(attempts):
+        require(head == provider['fleet'](), 'fleet changed before live retirement pricing')
+        child = subprocess.run(command, text=True, capture_output=True, timeout=220)
+        if child.returncode == 0:
+            break
+        # A guard helper may cross the native census. Retry the full proof on
+        # the same accepted fleet and let the provider authenticate both owners.
+        if attempt + 1 == attempts or not child.stderr.rstrip().endswith('ValueError: foreign 145 descendants'):
+            break
+        print('Epoch 145 guard activity crossed retirement pricing. Retrying the complete read-only quote.', flush=True)
+        time.sleep(3)
     require(child.returncode == 0, f'live five-peer price rejected: {child.stderr.strip()}')
     frame = json.loads(child.stdout)
     line = subprocess.check_output(['/usr/bin/tail', '-n', '1', LIVE145_GUARD_LOG], text=True)
