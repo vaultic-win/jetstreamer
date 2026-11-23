@@ -8,11 +8,16 @@ cache=${2:?supply the absolute path of the original offline Cargo cache}
 toolchain=${3:?supply the path of the exact Rust 1.49.0 toolchain}
 case "$output" in /home/sol/*);; *) echo 'expected charged HOME path' >&2; exit 1;; esac
 test ! -e "$output"
-# bwrap is run by the existing compiler service; it exposes only the admitted output as writable.
+test "$(id -u)" = 1001
+awk '/^NoNewPrivs:/ { good = $2 == 1 } END { exit !good }' /proc/self/status
+# Use the original native compiler's systemd mount namespace and unprivileged identity.
+# Git and Cargo may write their own private locks under the new output.
+for input in "$repo" "$cache/registry/index" "$cache/registry/cache" "$cache/git/db" "$toolchain"; do
+  options=$(findmnt -n -o VFS-OPTIONS -T "$input")
+  case ",$options," in *,ro,*);; *) echo "compiler input mount must be read-only: $input" >&2; exit 1;; esac
+done
 mkdir -m 0700 -- "$output"
-bwrap --die-with-parent --unshare-net --ro-bind / / --dev /dev --proc /proc \
-  --bind "$output" "$output" --clearenv --setenv LANG C --setenv PATH "$toolchain/bin:/usr/bin:/bin" \
-  --setenv HOME "$output" --setenv TMPDIR "$output" --setenv GIT_CONFIG_NOSYSTEM 1 \
+env -i LANG=C PATH="$toolchain/bin:/usr/bin:/bin" HOME="$output" TMPDIR="$output" GIT_CONFIG_NOSYSTEM=1 \
   /bin/bash -eu -o pipefail -c '
     src=$1 repo=$2 slot=$3 cache=$4 toolchain=$5
     dst=$slot/prepared
