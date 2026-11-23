@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import stat
 import sys
+import time
 from urllib.parse import urlsplit
 from cycle import Cycle,status_predecessor
 from evidence import EPOCHS, STATUS_ROOT, bound, checked, content, digest, durable, ensure_dir, lock, need, utc
@@ -50,9 +51,26 @@ class Storage:
         finally:r["Body"].close()
         need(len(raw)<=65536,"oversize status object");return r["ETag"],raw
     def put(self,e,etag,data):
+        from botocore.exceptions import ClientError
+
         self.pending=(key(e),etag)
-        try:return self.s3.put_object(Bucket=BUCKET,Key=key(e),ContentType="application/json",Body=data)["ETag"]
-        finally:self.pending=None
+        try:
+            for delay in (0.5, 1, 2, None):
+                try:
+                    return self.s3.put_object(Bucket=BUCKET,Key=key(e),ContentType="application/json",Body=data)["ETag"]
+                except ClientError as error:
+                    if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") != 503:
+                        raise
+                    if delay is not None:
+                        time.sleep(delay)
+                    current_etag, current_body = self.get(e)
+                    if current_etag != etag:
+                        need(current_body == data, "status changed during conditional R2 retry")
+                        return current_etag
+                    if delay is None:
+                        raise
+        finally:
+            self.pending=None
 def inventory(c,storage):
     statuses,ready,archives=storage.inventory()
     ref=c.prior["inventory"];v=checked(ref,root=False)

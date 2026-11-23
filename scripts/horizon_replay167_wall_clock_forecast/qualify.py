@@ -7,12 +7,66 @@ from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import replay167_event as event
 import replay167_rate as rate
 import status
 from evidence import BASE, EPOCHS, bound, checked, digest, utc
+
+class ConditionalStatusRetryTests(unittest.TestCase):
+    def make_storage(self, status_code=503):
+        from botocore.exceptions import ClientError
+
+        error = ClientError({"ResponseMetadata": {"HTTPStatusCode": status_code}}, "PutObject")
+        storage = status.Storage.__new__(status.Storage)
+        storage.pending = None
+        storage.s3 = SimpleNamespace(put_object=Mock(side_effect=error))
+        storage.get = Mock(return_value=('"before"', b'before'))
+        return storage, error
+
+    def test_unchanged_etag_retries_only_the_same_conditional_write(self):
+        storage, error = self.make_storage()
+        attempts = []
+
+        def put(**request):
+            attempts.append((storage.pending, request))
+            if len(attempts) == 1:
+                raise error
+            return {"ETag": '"after"'}
+
+        storage.s3.put_object.side_effect = put
+        with patch.object(status.time, "sleep") as backoff:
+            self.assertEqual(storage.put(172, '"before"', b'after'), '"after"')
+        backoff.assert_called_once_with(0.5)
+        storage.get.assert_called_once_with(172)
+        self.assertEqual(attempts, [attempts[0], attempts[0]])
+        self.assertEqual(attempts[0][0], ('epoch-172.epoch-status.json', '"before"'))
+        self.assertIsNone(storage.pending)
+
+    def test_changed_etag_requires_exact_intended_readback(self):
+        for body in (b'after', b'foreign'):
+            with self.subTest(body=body), patch.object(status.time, "sleep"):
+                storage, _ = self.make_storage()
+                storage.get.return_value = ('"after"', body)
+                if body == b'after':
+                    self.assertEqual(storage.put(172, '"before"', b'after'), '"after"')
+                else:
+                    with self.assertRaisesRegex(ValueError, "status changed"):
+                        storage.put(172, '"before"', b'after')
+                self.assertEqual(storage.s3.put_object.call_count, 1)
+                self.assertIsNone(storage.pending)
+
+    def test_retry_is_bounded_and_precondition_failure_still_propagates(self):
+        for status_code, attempts in ((503, 4), (412, 1)):
+            with self.subTest(status_code=status_code), patch.object(status.time, "sleep"):
+                storage, error = self.make_storage(status_code)
+                with self.assertRaises(type(error)):
+                    storage.put(172, '"before"', b'after')
+                self.assertEqual(storage.s3.put_object.call_count, attempts)
+                self.assertEqual(storage.get.call_count, attempts if status_code == 503 else 0)
+                self.assertIsNone(storage.pending)
+
 
 class ModelTests(unittest.TestCase):
     def setUp(self):
