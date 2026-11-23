@@ -246,6 +246,24 @@ class InventoryParsingTests(unittest.TestCase):
         self.assertEqual(items[0].object_name, canonical["metadata"]["name"])
         self.assertEqual(items[0].generation, 10)
 
+    def test_root_outside_subrange_can_prove_alias_without_becoming_a_candidate(self) -> None:
+        slot = 199
+        canonical = inventory_record(slot, size=1234, generation=10)
+        alias = inventory_record(slot, anchor=305, size=1234, generation=20)
+        exclusions = []
+        rows = preflight.parse_inventory_json(
+            json.dumps([alias, canonical]), "root", (200, 300), exclusions
+        )
+        self.assertEqual(rows, ())
+        self.assertEqual(exclusions[0]["retained_object_name"], canonical["metadata"]["name"])
+        for records in (
+            [alias],
+            [alias, inventory_record(slot, size=1235)],
+            [alias, canonical, inventory_record(slot, size=1234, generation=11)],
+        ):
+            with self.subTest(records=records), self.assertRaises(preflight.PreflightError):
+                preflight.parse_inventory_json(json.dumps(records), "root", (200, 300))
+
     def test_rejects_unproven_misplaced_root_alias(self) -> None:
         slot = preflight.FIRST_EPOCH * preflight.EPOCH_SLOTS - 1
         canonical = inventory_record(slot, size=1234)

@@ -470,11 +470,31 @@ def parse_inventory_json(
         )
 
     if source == "root":
+        # A misplaced alias can cross the requested range while its canonical
+        # object sits outside it. Use that exact object for comparison only.
+        comparison_slots = {
+            f"{item.slot}/{item.filename}": item.slot
+            for item in seen.values()
+            if item.anchor_slot != item.slot
+            and not relevant_slots[0] <= item.slot <= relevant_slots[1]
+        }
+        canonical_roots = seen.copy()
+        if comparison_slots:
+            for index, entry in enumerate(raw):
+                name = entry["metadata"]["name"]
+                slot = comparison_slots.get(name)
+                if slot is None:
+                    continue
+                canonical = _parse_snapshot_object(entry, source, index, (slot, slot))
+                if canonical is None:
+                    raise PreflightError(f"invalid comparison root {name!r}")
+                if canonical_roots.setdefault(name, canonical) != canonical:
+                    raise PreflightError(f"root inventory has conflicting metadata for object {name!r}")
         for item in tuple(seen.values()):
             if item.anchor_slot == item.slot:
                 continue
             canonical_name = f"{item.slot}/{item.filename}"
-            canonical = seen.get(canonical_name)
+            canonical = canonical_roots.get(canonical_name)
             if canonical is None:
                 raise PreflightError(
                     f"root inventory object {item.object_name!r} has a directory slot "
