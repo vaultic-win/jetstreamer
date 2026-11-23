@@ -71,6 +71,9 @@ def check(attempt):
         assert extent['first']['blocks'] == extent['second']['blocks'] == closed['retained_backing_bytes']
         assert Path('/sys/block/loop18/ro').read_text().strip() == '1'
         floor = fit['protected_floor'] - extent['remaining'] + fit['disk'] + closed['qa_bytes']
+        # A publication reservation carved out of this closed volume still needs its disk after the original growth is removed.
+        if fit.get('closed265_delivery'):
+            floor += bound(fit['closed265_delivery'])['disk']
         available = extent['free'] - floor
         option = bound(old_options)['candidate_options']['257']
         required_disk = option['disk']['bytes']
