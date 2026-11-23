@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import stat
 import string
@@ -16,17 +17,21 @@ import tempfile
 import time
 
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
-PACKAGE = RUNTIME / "incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v1"
+FIT = RUNTIME / "incident-replay-fit-20261121-v1"
+RETRY_PACKAGE = FIT / "tools-homefloor-145-handoff-v2"
+RETRY = Path(__file__).resolve().parent == RETRY_PACKAGE
+PACKAGE = RETRY_PACKAGE if RETRY else FIT / "tools-homefloor-145-handoff-v1"
 SEMANTIC = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
 READER = SEMANTIC / "tools-v5j/export145"
 STATE = RUNTIME / "epoch145-guarded-export-20261121-v1/state"
-HANDOFF = SEMANTIC / "v5j-name-handoff"
+HANDOFF = SEMANTIC / ("v5j-name-handoff-retry1" if RETRY else "v5j-name-handoff")
 HOME = Path("/home/sol/.jetstreamer-private")
 HOLD = HOME / "r2-holding-state-dev-samjohnson-v1"
 UNIT = "horizon-holding-export145-20261121-v1.service"
-OLD = "afcf6cdd1ec0400ea2757f81472987b3"
+OLD = "48ad7b2234d74e74b0498e7110e0aee3" if RETRY else "afcf6cdd1ec0400ea2757f81472987b3"
 IMAGE_SHA = "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"
-REVIEW_SHA = "4b8963f5490bd9dba3d9d6db521b9e9e864a28108c7b79bbe420417eefaf82e6"
+RETRY_REVIEW_SHA = "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
+REVIEW_SHA = RETRY_REVIEW_SHA if RETRY else "4b8963f5490bd9dba3d9d6db521b9e9e864a28108c7b79bbe420417eefaf82e6"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -220,12 +225,25 @@ def check_quote_parent(current):
         except FileNotFoundError:
             continue
     require(held == {0, 1}, "detached quote lacks both original locks")
+    intent_path = HANDOFF / "submission-intent.json"
+    if RETRY:
+        # Both fresh and interrupted dispatches can need another price while the
+        # original failed name is still attached. A detached name requires its intent.
+        selected_fleet = read(os.fsdecode(argv[3]))[1]
+        require(successors(selected_fleet)[-1] == current, "wrong dispatcher fleet")
+        if not intent_path.exists():
+            review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
+            host = Host(review, None)
+            manager, events = host.state()
+            require(not events, "another verifier before preflight")
+            host.original(manager)
+            return
     intent = json.loads(read(HANDOFF / "submission-intent.json")[0])
     require(intent["review_sha256"] == REVIEW_SHA and successors(intent["fleet"])[-1] == current,
             "detached quote outside authenticated handoff chain")
 
 
-def exact_price(price, current, review):
+def exact_price(price, current, review, attached=False, at=None):
     phase = price["phase145"]
     require(price["schema"] == "horizon-incident-replay-fit-v1" and price["epoch"] == 145
             and price["fleet"] == current and price["fits"] is True and price["candidate"] is None
@@ -234,15 +252,47 @@ def exact_price(price, current, review):
             and price["available_HOME_bytes"] >= price["complete_required_HOME_bytes"]
             and price["available_memory_bytes"] >= price["required_available_memory_bytes"]
             and price["resource_credit_bytes"] == 0 and price["replay_launch_authorized"] is False
-            and 0 <= time.time() - price["recorded_unix_seconds"] <= 180, "failed fresh detached 145 fit")
+            and 0 <= (time.time() if at is None else at) - price["recorded_unix_seconds"] <= 180, "failed fresh detached 145 fit")
     require((phase["Id"], phase["InvocationID"], phase["ActiveState"], phase["SubState"], phase["MainPID"])
-            == (UNIT, "", "inactive", "dead", "0")
+            == ((UNIT, OLD, "failed", "failed", "0") if attached else (UNIT, "", "inactive", "dead", "0"))
             and all(phase[k] == review["failed_phase"][k] for k in
                     ("candidate", "failure", "recovery", "retry_worker", "manager_exit", "source_checkpoint_exists", "resource_credit_bytes")),
             "different historical or live 145 price evidence")
     for k in ("registered_retry11_holding", "registered_cold168_holding"):
         require(price[k]["stage"] == "completed-copy" and price[k]["resource_credit_bytes"] == 0
                 and price[k]["additional_reservation_bytes"] == 0, "holding still owns a phase")
+
+
+def retry_phase():
+    """Authenticate the same exhausted generation while attached or after reset."""
+    review = json.loads(read(PACKAGE / "admission-review.json", RETRY_REVIEW_SHA)[0])
+    archive = runpy.run_path(str(PACKAGE / "v5j_retry.py"))
+    def evidence(path, expected):
+        data, ref = read(path, expected)
+        return json.loads(data), ref
+    require(archive["profile"](evidence, archive["journal"](out)) == review, "changed failed verifier evidence")
+    retained(review)
+    host = Host(review, None)
+    manager, events = host.state()
+    require(not events, "another 145 generation has appeared")
+    if manager["InvocationID"] == OLD:
+        host.original(manager)
+    else:
+        host.absent(manager)
+        require((HANDOFF / "submission-intent.json").exists(), "detached without a handoff")
+    return dict(review["failed_phase"], **{k: manager[k] for k in
+                ("Id", "InvocationID", "MainPID", "ActiveState", "SubState")})
+
+
+def retry_handback(review, quote):
+    prior = bound(review["predecessor_receipts"]["recovery"])["fresh_fit"]
+    refs = prior["serial_145_holding_handback"]
+    handbacks(review, refs)
+    for key in ("registered_retry11_holding", "registered_cold168_holding"):
+        require(all(quote[key][k] == prior[key][k] for k in
+                    ("stage", "unit", "start", "invocation_id", "restore_overlap_bytes",
+                     "additional_reservation_bytes", "resource_credit_bytes")), "changed holding terminal in quote")
+    return refs
 
 
 class Host:
@@ -269,7 +319,15 @@ class Host:
         require(successors(fleet)[-1] == fleet, "initial fleet superseded")
         retained(self.review)
         argv = original_command(self.review, fleet)
-        result = json.loads(out([str(READER), "check-serial-handback", fleet["path"], fleet["sha256"], IMAGE_SHA]))
+        if RETRY:
+            with holding():
+                quote = self.price(fleet, attached=True)
+                result = dict(fleet=fleet, provider=self.review["provider"],
+                              quote_provider=read(PACKAGE / "deployment-seal-receipt.json")[1],
+                              attached_price=quote, serial_handback=retry_handback(self.review, quote),
+                              recorded_unix_seconds=quote["recorded_unix_seconds"], worker_started=False)
+        else:
+            result = json.loads(out([str(READER), "check-serial-handback", fleet["path"], fleet["sha256"], IMAGE_SHA]))
         require(result["fleet"] == fleet and result["provider"] == self.review["provider"]
                 and result["worker_started"] is False and 0 <= time.time() - result["recorded_unix_seconds"] <= 180,
                 "unbound original handback")
@@ -283,6 +341,15 @@ class Host:
                 and intent["preflight"]["fleet"] == intent["fleet"]
                 and intent["preflight"]["provider"] == self.review["provider"]
                 and intent["preflight"]["worker_started"] is False, "changed submission identity")
+
+        if RETRY:
+            proof = intent["preflight"]
+            price = proof["attached_price"]
+            require(proof["quote_provider"] == read(PACKAGE / "deployment-seal-receipt.json")[1]
+                    and price["recorded_unix_seconds"] == proof["recorded_unix_seconds"]
+                    and bound(self.review["predecessor_receipts"]["recovery"])["fresh_fit"]["serial_145_holding_handback"]
+                    == proof["serial_handback"], "foreign attached price or handback")
+            exact_price(price, intent["fleet"], self.review, attached=True, at=proof["recorded_unix_seconds"])
 
     def validate(self, intent):
         self.check_intent(intent)
@@ -301,18 +368,22 @@ class Host:
             time.sleep(0.1)
         raise RuntimeError("145 name has not unloaded")
 
-    def quote(self, intent):
-        current = successors(intent["fleet"])[-1]
+    def price(self, current, attached=False):
         quote = json.loads(out([str(PACKAGE / "post-stop-fit"), "145", current["path"], current["sha256"]]))
-        exact_price(quote, current, self.review)
+        exact_price(quote, current, self.review, attached)
+        if RETRY and not attached:
+            retry_handback(self.review, quote)
         require(successors(current)[-1] == current, "fleet changed during detached price")
         return quote
+
+    def quote(self, intent):
+        return self.price(successors(intent["fleet"])[-1])
 
     def preflight_current(self, intent):
         # Only the same, freshly priced fleet can use the original quote. A recovered
         # orphan with a superseding fleet needs the complete detached native census.
         proof = intent["preflight"]
-        return (successors(intent["fleet"])[-1] == intent["fleet"]
+        return (not RETRY and successors(intent["fleet"])[-1] == intent["fleet"]
                 and 0 <= time.time() - proof["recorded_unix_seconds"] <= 180)
 
     def submit(self, argv):

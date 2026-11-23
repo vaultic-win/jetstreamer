@@ -2,6 +2,9 @@
 from contextlib import nullcontext
 import importlib.util
 import json
+import copy
+import os
+import runpy
 from pathlib import Path
 import tempfile
 import time
@@ -190,6 +193,60 @@ class RecoveryTest(unittest.TestCase):
                     dict(registered_cold168_holding=dict(holding, stage="copy-only")), dict(complete_cpu_quota_micros=1)):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 dispatch.exact_price(dict(price, **bad), FIRST, review)
+
+
+class RetryLineageTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # The signed failure is unique to this host. The inert manager tests above
+        # remain portable. These tests use only the original archived rows and bytes.
+        cls.origin = runpy.run_path(str(Path(__file__).with_name("v5j_retry.py")))
+        if os.geteuid() or not cls.origin["ORIGINAL_REVIEW"].exists():
+            raise unittest.SkipTest("original failed-generation evidence requires custodial read access")
+        cls.records = {}
+        for p, sha in [*cls.origin["MEMBERS"].values(),
+                       (cls.origin["ORIGINAL_REVIEW"], cls.origin["ORIGINAL_REVIEW_SHA"])]:
+            raw, ref = dispatch.read(p, sha)
+            cls.records[p] = json.loads(raw), ref
+        cls.rows = cls.origin["journal"](dispatch.out)
+
+    def qualify(self, mutated=None, rows=None):
+        def read(p, digest):
+            value, ref = copy.deepcopy(self.records[p])
+            self.assertEqual(ref["sha256"], digest)
+            if mutated:
+                mutated(p, value)
+            return value, ref
+        return self.origin["profile"](read, self.rows if rows is None else rows)
+
+    def test_reproduces_exact_archived_review(self):
+        body = (json.dumps(self.qualify(), sort_keys=True, separators=(",", ":")) + "\n").encode()
+        self.assertEqual(dispatch.hashlib.sha256(body).hexdigest(), dispatch.RETRY_REVIEW_SHA)
+
+    def test_rejects_wrong_native_child_and_predecessor(self):
+        worker = self.origin["MEMBERS"]["worker"][0]
+        def wrong_child(p, v):
+            if p == worker:
+                v["leased_worker_observation"]["native_child"]["pid"] += 1
+        def stale(p, v):
+            if p == self.origin["MEMBERS"]["submission"][0]:
+                v["invocation_id"] = self.origin["ORIGINAL"]
+        for mutate in (wrong_child, stale):
+            with self.subTest(mutate=mutate), self.assertRaises(ValueError):
+                self.qualify(mutate)
+
+    def test_rejects_wrong_exit_cursor_and_foreign_unit(self):
+        for key in ("__CURSOR", "UNIT", "EXIT_STATUS"):
+            rows = copy.deepcopy(self.rows)
+            next(r for r in rows if r.get("EXIT_STATUS") == "1")[key] = "other"
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.qualify(rows=rows)
+
+    def test_rejects_wrong_retained_inode(self):
+        review = self.qualify()
+        review["retained_inputs"][-1]["ino"] += 1
+        with self.assertRaisesRegex(ValueError, "retained 145 input"):
+            dispatch.retained(review)
 
 
 if __name__ == "__main__":

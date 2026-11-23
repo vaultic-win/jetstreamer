@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-DETACHED_145 = HERE == D / "tools-homefloor-145-handoff-v1"
+RETRY_HANDOFF_145 = HERE == D / "tools-homefloor-145-handoff-v2"
+DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5J_POST = HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
@@ -535,6 +536,11 @@ def phase145(epoch):
         return {"Id": fit.A145, "MainPID": "0", "stage": "v5j-semantic-complete", "completion": complete}
     if DETACHED_145:
         s.need(epoch == 145, "detached 145 census is for its transition only")
+        if RETRY_HANDOFF_145:
+            s.need(not fit.members(fit.A145), "failed 145 still has a claimant")
+            phase = runpy.run_path(str(HERE / "run-recovery"))["retry_phase"]()
+            s.need(not fit.members(fit.A145), "145 group changed during price")
+            return phase
         return registrations["phase145"](s, fit, epoch, detached=True)
     if HOMEFLOOR:
         # The existing terminal proof still prices an unstarted retry. A new
