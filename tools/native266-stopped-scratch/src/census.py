@@ -10,13 +10,15 @@ import time
 from pathlib import Path
 
 if globals().get('STOPPED_PROFILE', 'v173') == 'v173':
-    generation, minor, image_inode, mount_id, cap = 'v169', 9, 18335082, 1555, 128 << 30
+    tag, minor, image_inode, mount_id, cap = '266-instructions-2789f821-v169', 9, 18335082, 1555, 128 << 30
 elif STOPPED_PROFILE == 'v207':
-    generation, minor, image_inode, mount_id, cap = 'v194', 12, 18340079, 416, 320 << 30
+    tag, minor, image_inode, mount_id, cap = '266-instructions-2789f821-v194', 12, 18340079, 416, 320 << 30
+elif STOPPED_PROFILE == 'v210':
+    tag, minor, image_inode, mount_id, cap = '266-capped-bounded-v207', 15, 6025749, 611, 344997011456
 else:
     raise ValueError('unknown stopped guest')
-ROOT = Path(f'/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-{generation}')
-IMAGE = Path(f'/var/lib/jetstreamer/horizon266-instructions-2789f821-{generation}-control/pilot/private.ext4')
+ROOT = Path(f'/home/ubuntu/.jetstreamer-private/qualification-{tag}')
+IMAGE = Path(f'/var/lib/jetstreamer/horizon{tag}-control/pilot/private.ext4')
 LOOP = Path(f'/dev/loop{minor}')
 PATHS = [os.fsencode(p) for p in (ROOT, IMAGE, LOOP)]
 DEVICE = os.makedev(7, minor)
