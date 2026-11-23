@@ -65,12 +65,6 @@ const READER_COMMIT: &str = "58709604dfa4c97336c2e1f6fac53b862ed6f17f";
 const READER_COMMIT: &str = "eba5d1b596cd454811c466fde7a25a2ecb4b19ef";
 #[cfg(all(incident_post145_only, not(incident_timeout_post145_only)))]
 const READER_COMMIT: &str = "907c5b3c26837c75c5c62f76bb124ff4fd8fe642";
-// The build stays bound to its original source. The successor plan uses the
-// independently requalified source commit carried by its sealed reader pair.
-#[cfg(incident_v5n_post145_only)]
-const PLAN_READER_COMMIT: &str = "06607089e5762e61a82e0f6b2da0ae1adbf16634";
-#[cfg(not(incident_v5n_post145_only))]
-const PLAN_READER_COMMIT: &str = READER_COMMIT;
 const ANCHORS: &str =
     "/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1";
 const PARENT: &str = "Fnoa95TKZ1U419CubZrxYDtFnqadRmvM554FFi2xSizB";
@@ -472,13 +466,7 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     );
     #[cfg(incident_post145_only)]
     let qualified = {
-        let (directory, package, proof) = if cfg!(incident_v5n_post145_only) {
-            (
-                "archive-reader-epoch145-bridge-06607089-v1/current-reader",
-                "ed746ac663140a322a9a47f9e4bf9d45ad056a164d6e8ef1f3f123588e61c3cb",
-                "a8b9d56cb270ef0d93c52171ae24296ada23e3403f396103346f2076ec087f4a",
-            )
-        } else if cfg!(incident_timer_post145_only) {
+        let (directory, package, proof) = if cfg!(incident_timer_post145_only) {
             (
                 "fast-range-residency-20261121-v1/production-reader-v1",
                 "082893fdc45288721911818fd77f8b8db043122b27dd0b4fe596eb274213f42d",
@@ -510,7 +498,7 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
                         .iter()
                         .any(|m| m["name"] == "qualification.json" && m["sha256"] == item.sha256))
                 && accepted["schema"] == "horizon-current-reader-main-acceptance-v1"
-                && accepted["reader_commit"] == PLAN_READER_COMMIT
+                && accepted["reader_commit"] == READER_COMMIT
                 && accepted["pipeline"] == json!(pipe)
                 && accepted["full_verifier"] == json!(full)
                 && accepted["minimum_thread_stack_bytes"] == 67_108_864
@@ -520,18 +508,10 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
         );
         #[cfg(incident_timer_post145_only)]
         {
-            let (path, digest) = if cfg!(incident_v5n_post145_only) {
-                (
-                    "archive-reader-epoch145-bridge-06607089-v1/ordinary/QUALIFIED.json",
-                    "e91074b328d55941cdca41cca3eaf9b376be18414f6c3e016557b6655c62be50",
-                )
-            } else {
-                (
-                    "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json",
-                    "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4",
-                )
-            };
-            let pair = bound(&Path::new(capacity::RUNTIME).join(path), digest);
+            let pair = bound(
+                &Path::new(capacity::RUNTIME).join("fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"),
+                "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4",
+            );
             let paired = custody::json(&pair, true)?;
             ensure!(
                 paired["reader"] == json!(item)
@@ -761,7 +741,7 @@ pub fn full(fleet: Bound, sha: &str, joint: bool) -> Result<()> {
     let scratch = state.join("delivery");
     fs::DirBuilder::new().mode(0o700).create(&scratch)?;
     let plan = json!({"schema":"horizon-current-reader-plan-v1","repository":"/home/sol/workspace/jetstreamer",
-      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":PLAN_READER_COMMIT,
+      "origin_url":"git@github-matt-vaultic:vaultic-win/jetstreamer.git","reader_commit":READER_COMMIT,
       "pipeline":pipeline,"full_verifier":reader,"qualification":qualified,"scratch_directory":scratch,"threads":1,
       "maximum_archive_bytes":BYTES,"minimum_free_bytes":first["protected_bytes"],"epoch_expectations":{"145":eb}});
     let plan_binding = immutable_copy(

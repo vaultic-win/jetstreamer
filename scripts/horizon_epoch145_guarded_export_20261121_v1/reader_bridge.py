@@ -1,4 +1,4 @@
-"""Qualify the existing pipeline and full verifier at the reviewed boundary-tool change."""
+"""Resolve the original archive reader or qualify the reviewed boundary-tool transition."""
 import hashlib
 import json
 import os
@@ -79,10 +79,17 @@ def checked_transition():
         b":100644 100644 4335f85511ed25a205b1d71235e91dff282bb894 11d41120919f99f8b2e7d08d5845dde85a675c1c M\t" + BINARY.encode(),
     }
     check(set(changed.splitlines()) == expected and len(changed.splitlines()) == 2, "different reader scope transition")
-    tip = git("rev-parse", "origin/account-updates").decode().strip()
-    git("merge-base", "--is-ancestor", BRIDGE, tip)
-    check(not git("diff", "--name-only", BRIDGE, tip, "--", *SCOPES, POH), "current reader inputs changed again")
     return changed.decode().splitlines()
+
+
+def compatible_branch():
+    tip = git("rev-parse", "origin/account-updates").decode().strip()
+    git("merge-base", "--is-ancestor", BASE, tip)
+    for candidate in (BASE, BRIDGE):
+        if not git("diff", "--name-only", candidate, tip, "--", *SCOPES, POH):
+            git("merge-base", "--is-ancestor", candidate, tip)
+            return candidate, tip
+    raise ValueError("current reader inputs differ from both qualified source trees")
 
 
 def evidence():
@@ -152,8 +159,13 @@ def store(path, value):
 if __name__ == "__main__":
     check(os.geteuid() == 0 and sys.flags.isolated and len(sys.argv) == 1, "requires root isolated execution")
     old, source = evidence()
-    EVIDENCE.mkdir(mode=0o700,exist_ok=True)
-    source_ref = store(EVIDENCE / "compiled-equivalence.json", source)
-    qualified = dict(old, reader_commit=BRIDGE,
-                     source_build_evidence=[*old["source_build_evidence"], ref(ORIGINAL,ORIGINAL_SHA), source_ref])
-    print(json.dumps(store(EVIDENCE / "qualification.json", qualified)))
+    baseline, tip = compatible_branch()
+    if baseline == BASE:
+        qualification = ref(ORIGINAL, ORIGINAL_SHA)
+    else:
+        EVIDENCE.mkdir(mode=0o700, exist_ok=True)
+        source_ref = store(EVIDENCE / "compiled-equivalence.json", source)
+        qualified = dict(old, reader_commit=BRIDGE,
+                         source_build_evidence=[*old["source_build_evidence"], ref(ORIGINAL, ORIGINAL_SHA), source_ref])
+        qualification = store(EVIDENCE / "qualification.json", qualified)
+    print(json.dumps(dict(reader_commit=baseline, qualified_branch=tip, qualification=qualification)))
