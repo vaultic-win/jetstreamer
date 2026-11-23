@@ -19,6 +19,12 @@ W = Path("/home/sol/.jetstreamer-private/epoch166-retry10-consumer-review-202611
 D = Path("/var/lib/jetstreamer/horizon_runtime_data")
 H = D / "epoch166-retry10-holding-20261122-v1"
 BASE = Path("/home/sol/.jetstreamer-private")
+ORIGINAL = H / "retirement-tools/jetstreamer-r2"
+ORIGINAL_ALIAS = BASE / "horizon-root-runtime-data" / ORIGINAL.relative_to(D)
+ORIGINAL_SEAL = {
+    "path": str(ORIGINAL.with_name("deployment-seal-receipt.json")),
+    "sha256": "ac04d6adffe8326365a45adde19ac0638c608583e28c8665b515efb4280b8ea7",
+}
 MATRIX = W / "SEMANTIC_BINDINGS_20261123T034106Z.json"
 EXPECTED = "1283a13c654c69b7a228d0665062514eaeed8cd0b986f6f8d86eafba76e110a5"
 FUTURE = "horizon-qualify-166-independent-retry11-20261122.service"
@@ -165,6 +171,8 @@ def namespace_proof(q):
     for key in (
         "candidate",
         "original",
+        "original_alias",
+        "original_seal",
         "native_qualification",
         "seal",
         "sealer",
@@ -172,6 +180,21 @@ def namespace_proof(q):
         "plan",
     ):
         checked(q[key], True)
+    need(
+        q["original"]["path"] == str(ORIGINAL)
+        and q["original_alias"]
+        == {"path": str(ORIGINAL_ALIAS), "sha256": q["original"]["sha256"]}
+        and q["original_seal"] == ORIGINAL_SEAL
+        and ORIGINAL.samefile(ORIGINAL_ALIAS)
+        and q["original_inode"]
+        == [ORIGINAL_ALIAS.stat().st_dev, ORIGINAL_ALIAS.stat().st_ino]
+        and any(
+            case.get("mode") == "bound"
+            and "ORIGINAL_AND_BOUND_CANDIDATE_VERIFIED" in case["evidence"]
+            for case in q["cases"]
+        ),
+        "original installed image must remain readable through its physical alias with the successor bound",
+    )
     nq = doc(q["native_qualification"], True)
     need(
         q["candidate"]["sha256"] == nq["image"]["sha256"]
@@ -288,7 +311,7 @@ def check_service_command(body, mount, version, fleet):
         "After=" + capture,
         "ExecStartPre=/usr/bin/systemctl --quiet is-active " + capture,
         "EnvironmentFile=" + str(credential),
-        "CPUQuota=200%",
+        "CPUQuota=100%",
         "MemoryMax=" + profile["MemoryMax"],
         "MemorySwapMax=0",
         "TasksMax=256",
@@ -543,11 +566,25 @@ def main():
             ["horizon-closed166-retry10-consumer-census-successor-20261123-v1.service"],
         ),
     ]:
-        add_comp(
-            m["lifecycle_programs"][section],
-            owners,
-            [ins, m["lifecycle_programs"]["successor_origin_proof"]],
-        )
+        image = m["lifecycle_programs"][section]
+        proof = [ins, m["lifecycle_programs"]["successor_origin_proof"]]
+        if section == "base":
+            # The successor occupies the original service pathname in the checker namespace.
+            # Its HOME backing name still opens the original, sealed inode.
+            need(
+                image["path"] == str(ORIGINAL) and ORIGINAL.samefile(ORIGINAL_ALIAS),
+                "original deployment mount aliases differ",
+            )
+            seal = doc(ORIGINAL_SEAL, True)
+            member = next(x for x in seal["members"] if x["name"] == ORIGINAL.name)
+            need(
+                seal["destination"] == str(ORIGINAL.parent)
+                and member["sha256"] == image["sha256"],
+                "original deployment seal mismatch",
+            )
+            image = {"path": str(ORIGINAL_ALIAS), "sha256": image["sha256"]}
+            proof.append(ORIGINAL_SEAL)
+        add_comp(image, owners, proof)
     for path, im in m["observer_images_derived_from_start_wrappers"].items():
         owners = sorted(
             {

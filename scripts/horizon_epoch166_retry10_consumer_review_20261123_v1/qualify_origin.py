@@ -12,6 +12,11 @@ hold = Path(
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-retry10-holding-20261122-v1"
 )
 orig = hold / "retirement-tools/jetstreamer-r2"
+orig_alias = (
+    Path("/home/sol/.jetstreamer-private/horizon-root-runtime-data")
+    / hold.name
+    / "retirement-tools/jetstreamer-r2"
+)
 dest = hold / "retirement-tools-manager-v4"
 elf = dest / "jetstreamer-r2"
 
@@ -44,7 +49,15 @@ def run(*args):
 
 expected = "57b05bbcfa72fd4d6a6be68673c219299daeade65359236085e7a06be9b2515c"
 orig_id = (orig.stat().st_dev, orig.stat().st_ino)
-assert ref(orig)["sha256"] == expected
+orig_seal = ref(orig.with_name("deployment-seal-receipt.json"))
+assert (
+    orig_seal["sha256"]
+    == "ac04d6adffe8326365a45adde19ac0638c608583e28c8665b515efb4280b8ea7"
+)
+assert (
+    orig.samefile(orig_alias)
+    and ref(orig_alias)["sha256"] == ref(orig)["sha256"] == expected
+)
 qual = ref(Path(sys.argv[1]))
 assert (
     qual["sha256"] == sys.argv[2]
@@ -194,6 +207,33 @@ for mode, cmd_path, why in [
     commands = base + ["--unit=" + uid]
     if mode == "bound":
         commands += ["-p", f"BindReadOnlyPaths={elf}:{orig}"]
+        verify_alias = """
+import hashlib, os, pathlib, stat, sys
+historical, deployed = map(pathlib.Path, sys.argv[1:3])
+orig_dev, orig_ino, bound_dev, bound_ino = map(int, sys.argv[3:7])
+for path, dev, ino, digest in [(historical, orig_dev, orig_ino, sys.argv[7]), (deployed, bound_dev, bound_ino, sys.argv[8])]:
+    with path.open("rb") as handle:
+        st = os.fstat(handle.fileno())
+        assert path.resolve(strict=True) == path and (st.st_dev, st.st_ino) == (dev, ino)
+        assert st.st_uid == 0 and st.st_nlink == 1 and stat.S_ISREG(st.st_mode) and not st.st_mode & 0o222
+        assert hashlib.file_digest(handle, "sha256").hexdigest() == digest
+assert not historical.samefile(deployed)
+print("ORIGINAL_AND_BOUND_CANDIDATE_VERIFIED", flush=True)
+os.execv(sys.argv[9], sys.argv[9:])
+"""
+        commands += [
+            "/usr/bin/python3",
+            "-IB",
+            "-c",
+            verify_alias,
+            str(orig_alias),
+            str(orig),
+            *map(str, orig_id),
+            str(elf.stat().st_dev),
+            str(elf.stat().st_ino),
+            expected,
+            actual["sha256"],
+        ]
     commands += [
         str(cmd_path),
         "holding-census166-retry10-consumers",
@@ -210,13 +250,24 @@ for mode, cmd_path, why in [
         {"mode": mode, "cmd": commands, "returncode": result.returncode, "log": log},
     )
     assert result.returncode and why in log, (mode, log[-1600:])
+    if mode == "bound":
+        assert (
+            "ORIGINAL_AND_BOUND_CANDIDATE_VERIFIED" in result.stdout
+            and orig.samefile(orig_alias)
+        )
     assert (
         ref(elig) == real_elig
         and ref(orig)["sha256"] == expected
         and (orig.stat().st_dev, orig.stat().st_ino) == orig_id
     )
     results.append(
-        {"unit": uid, "argv": commands, "rc": result.returncode, "evidence": log}
+        {
+            "mode": mode,
+            "unit": uid,
+            "argv": commands,
+            "rc": result.returncode,
+            "evidence": log,
+        }
     )
 doc = save(
     work / "QUALIFIED_MANAGER_SUCCESSOR_MOUNT.json",
@@ -228,6 +279,8 @@ doc = save(
         "sealer": ref(sealer),
         "original": ref(orig),
         "original_inode": orig_id,
+        "original_alias": ref(orig_alias),
+        "original_seal": orig_seal,
         "plan": ref(origin_plan),
         "original_eligibility": real_elig,
         "cases": results,
