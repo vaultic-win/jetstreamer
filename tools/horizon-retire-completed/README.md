@@ -62,3 +62,10 @@ SHA-256 binding in the plan. The tool checks the terminal holding worker and
 authenticated scratch body and manifest, then checks canonical R2 readiness
 under the original controller, holding, and local mutation locks. Use the
 same check-only and execution commands shown above.
+
+Build with `--features anza-closed-154` for the exact closed epoch 154 canary
+output on Anza. The tool binds the original canary termination, refuses live
+or scheduled consumers, and verifies the established full, plugin, and two
+boundary receipts against authenticated R2 inventory for epochs 153–155. The
+plan selects only the canary output and binds the epoch 154 delivery receipt.
+The original canary receipt and both neighboring archives stay available.

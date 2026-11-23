@@ -20,10 +20,15 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(feature = "anza-closed-154")]
+mod anza_closed_154;
 #[cfg(feature = "anza-parked-183")]
 mod anza_parked_183;
 
-const HOME_ROOT: &str = if cfg!(feature = "anza-parked-183") {
+const HOME_ROOT: &str = if cfg!(any(
+    feature = "anza-parked-183",
+    feature = "anza-closed-154"
+)) {
     "/home/sol"
 } else {
     "/home/ubuntu"
@@ -98,7 +103,8 @@ struct Plan {
     inactive_units: Vec<String>,
     audit: PathBuf,
     #[cfg(feature = "anza-parked-183")]
-    holding_custody: Bound,
+    #[serde(default)]
+    holding_custody: Option<Bound>,
 }
 fn stamp(m: &fs::Metadata) -> Stamp {
     Stamp {
@@ -210,10 +216,13 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
     Ok(())
 }
 fn check_target(t: &Target) -> Result<()> {
-    #[cfg(feature = "anza-parked-183")]
-    let scope = anza_parked_183::is_target(t);
-    #[cfg(not(feature = "anza-parked-183"))]
-    let scope = (201..=300).contains(&t.epoch);
+    let scope = match t.epoch {
+        #[cfg(feature = "anza-closed-154")]
+        154 => anza_closed_154::is_target(t),
+        #[cfg(feature = "anza-parked-183")]
+        183 => anza_parked_183::is_target(t),
+        _ => HOME_ROOT == "/home/ubuntu" && (201..=300).contains(&t.epoch),
+    };
     ensure!(
         scope && !t.reason.trim().is_empty(),
         "invalid target authorization"
@@ -326,6 +335,24 @@ fn inactive(units: &[String]) -> Result<()> {
 fn contains(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
 }
+
+#[cfg(any(feature = "anza-parked-183", feature = "anza-closed-154"))]
+fn has_mapping(maps: &[u8], t: &Target) -> bool {
+    let dev = format!(
+        "{:02x}:{:02x}",
+        libc::major(t.identity.dev),
+        libc::minor(t.identity.dev)
+    );
+    let ino = t.identity.ino.to_string();
+    maps.split(|&b| b == b'\n').any(|line| {
+        let mut fields = line
+            .split(|b| b.is_ascii_whitespace())
+            .filter(|part| !part.is_empty())
+            .skip(3);
+        fields.next() == Some(dev.as_bytes()) && fields.next() == Some(ino.as_bytes())
+    })
+}
+
 fn scan_consumers(targets: &[Target]) -> Result<()> {
     let me = std::process::id().to_string();
     for entry in fs::read_dir("/proc")? {
@@ -345,9 +372,9 @@ fn scan_consumers(targets: &[Target]) -> Result<()> {
                         "PID {pid} references {} in {name}",
                         t.path.display()
                     );
-                    #[cfg(feature = "anza-parked-183")]
+                    #[cfg(any(feature = "anza-parked-183", feature = "anza-closed-154"))]
                     ensure!(
-                        name != "maps" || !anza_parked_183::has_mapping(&data, t),
+                        name != "maps" || !has_mapping(&data, t),
                         "PID {pid} maps the selected archive inode"
                     );
                 }
@@ -485,7 +512,10 @@ fn run() -> Result<()> {
     );
     let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
     #[cfg(feature = "anza-parked-183")]
-    let _holding_locks = anza_parked_183::lock_original_owners()?;
+    let _holding_locks = epochs
+        .contains(&183)
+        .then(anza_parked_183::lock_original_owners)
+        .transpose()?;
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -500,7 +530,15 @@ fn run() -> Result<()> {
         "mutation lock busy"
     );
     #[cfg(feature = "anza-parked-183")]
-    anza_parked_183::verify(&p, &lock)?;
+    if epochs.contains(&183) {
+        anza_parked_183::verify(&p, &lock)?;
+    } else {
+        ensure!(p.holding_custody.is_none(), "unexpected holding custody");
+    }
+    #[cfg(feature = "anza-closed-154")]
+    if epochs.contains(&154) {
+        anza_closed_154::verify_scope(&p, &lock)?;
+    }
     let bm = exact(&p.inventory_binary.path)?;
     ensure!(
         bm.uid() == 0
@@ -511,18 +549,21 @@ fn run() -> Result<()> {
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
     let horizon = Path::new(HOME_ROOT).join("horizon");
+    let range = (*epochs.first().unwrap(), *epochs.last().unwrap());
+    #[cfg(feature = "anza-closed-154")]
+    let range = if epochs.contains(&154) {
+        (153, 155)
+    } else {
+        range
+    };
     let output = Command::new(&p.inventory_binary.path)
         .env("TOKIO_WORKER_THREADS", "2")
         .arg("inventory")
         .arg(horizon)
         .arg("--epochs")
-        .arg(format!(
-            "{}-{}",
-            epochs.first().unwrap(),
-            epochs.last().unwrap()
-        ))
+        .arg(format!("{}-{}", range.0, range.1))
         .arg("--receipt-directory")
-        .arg(receipts)
+        .arg(&receipts)
         .output()?;
     ensure!(
         output.status.success(),
@@ -534,6 +575,10 @@ fn run() -> Result<()> {
     for proof in &p.proofs {
         let r: Value = serde_json::from_slice(&bound(&proof.receipt, LIMIT)?)?;
         ready(proof.epoch, &r, &inventory)?;
+    }
+    #[cfg(feature = "anza-closed-154")]
+    if epochs.contains(&154) {
+        anza_closed_154::verify_delivery(&receipts, &inventory)?;
     }
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
@@ -568,7 +613,13 @@ fn run() -> Result<()> {
     let mut bytes = 0;
     for t in &p.targets {
         #[cfg(feature = "anza-parked-183")]
-        anza_parked_183::check_owners()?;
+        if t.epoch == 183 {
+            anza_parked_183::check_owners()?;
+        }
+        #[cfg(feature = "anza-closed-154")]
+        if t.epoch == 154 {
+            anza_closed_154::check_owners()?;
+        }
         inactive(&p.inactive_units)?;
         scan_consumers(std::slice::from_ref(t))?;
         event(

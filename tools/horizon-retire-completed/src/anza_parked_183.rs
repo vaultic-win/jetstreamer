@@ -160,22 +160,6 @@ pub(super) fn check_owners() -> Result<()> {
     Ok(())
 }
 
-pub(super) fn has_mapping(maps: &[u8], t: &Target) -> bool {
-    let dev = format!(
-        "{:02x}:{:02x}",
-        libc::major(t.identity.dev),
-        libc::minor(t.identity.dev)
-    );
-    let ino = t.identity.ino.to_string();
-    maps.split(|&b| b == b'\n').any(|line| {
-        let mut fields = line
-            .split(|b| b.is_ascii_whitespace())
-            .filter(|part| !part.is_empty())
-            .skip(3);
-        fields.next() == Some(dev.as_bytes()) && fields.next() == Some(ino.as_bytes())
-    })
-}
-
 fn check_custody(c: &Value, length: u64) -> Result<()> {
     ensure!(
         c["schema"] == "jetstreamer-horizon-holding-custody-v2"
@@ -232,7 +216,11 @@ pub(super) fn verify(p: &Plan, lock: &File) -> Result<()> {
         "retirement audit must stay in the holding state"
     );
     check_owners()?;
-    let path = &p.holding_custody.path;
+    let custody = p
+        .holding_custody
+        .as_ref()
+        .context("missing holding custody")?;
+    let path = &custody.path;
     let meta = exact(path)?;
     ensure!(
         path.parent() == Some(Path::new(STATE).join("receipts").as_path())
@@ -240,7 +228,7 @@ pub(super) fn verify(p: &Plan, lock: &File) -> Result<()> {
             && meta.mode() & 0o222 == 0,
         "custody must be an immutable native receipt"
     );
-    let c: Value = serde_json::from_slice(&bound(&p.holding_custody, LIMIT)?)?;
+    let c: Value = serde_json::from_slice(&bound(custody, LIMIT)?)?;
     check_custody(&c, p.targets[0].identity.len)?;
     let name = format!(
         "custody-{}.json",
