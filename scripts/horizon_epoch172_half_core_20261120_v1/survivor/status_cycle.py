@@ -606,9 +606,11 @@ def main():
     os.umask(0o077)
     fd=lock(BASE/'stable-cadence-controller-20261120-v1/consumer.lock')
     try:
-        state=owners.show(CONTROLLER,('MainPID','ControlGroup','Job','ActiveState'))
+        state=owners.show(CONTROLLER,('Id','InvocationID','MainPID','ControlGroup','Job','ActiveState'))
         need(state['MainPID']==str(os.getpid()) and Path('/proc/self/cgroup').read_text().strip()=='0::'+state['ControlGroup'],
              'outside original status service')
+        if getattr(cold_workers, 'cold168', None):
+            cold_workers.cold168.await_recovery(state,os.getpid())
         validate_package()
         proof=handoff()
         durable(ROOT/'HANDOFF.json',proof)
