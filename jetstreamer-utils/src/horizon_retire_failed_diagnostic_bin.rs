@@ -3,7 +3,7 @@
 //! The legacy profile accepts only its two known disposable subtrees. An explicit
 //! restore-only epoch 213 profile accepts only its isolated scratch directory and
 //! requires a zero-entry stopped probe with retained inputs and no archive.
-//! A closed epoch 223 v3 profile retires only its failed restore scratch, retaining
+//! Closed epoch 223 warmup profiles retire only failed restore scratch, retaining
 //! and rehashing the immutable inputs and original failure evidence.
 //! All profiles prove terminal identity, revalidate sealed outcome evidence, and
 //! scan command/maps/cwd/root/exe/fd references before deletion.
@@ -18,10 +18,13 @@ use {
         env,
         ffi::OsStr,
         fs::{self, File, OpenOptions},
-        io::{Read, Write},
-        os::unix::{
-            ffi::OsStrExt as _,
-            fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _},
+        io::{BufRead, BufReader, Read, Write},
+        os::{
+            fd::AsRawFd as _,
+            unix::{
+                ffi::OsStrExt as _,
+                fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _},
+            },
         },
         path::{Path, PathBuf},
         process::Command,
@@ -43,6 +46,8 @@ struct Plan {
     restore_only_probe: bool,
     #[serde(default)]
     warmup223_v3: bool,
+    #[serde(default)]
+    warmup223_v2: bool,
     private_root: PathBuf,
     run_root: PathBuf,
     targets: Vec<PathBuf>,
@@ -242,6 +247,50 @@ const WARMUP223_ROOT: &str =
     "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v3";
 const WARMUP223_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v3.service";
 const WARMUP223_IID: &str = "1fffc79d92ad458a9a4d334a48b40dfc";
+const WARMUP223_V2_ROOT: &str =
+    "/home/ubuntu/.jetstreamer-private/qualification-223-v1625-prefix-warmup-a1f6239d-v2";
+const WARMUP223_V2_UNIT: &str = "horizon-qualify-223-warmup-resource-a1f6239d-v2.service";
+const WARMUP223_V2_IID: &str = "76e214a0a85145b79a50b78697e70e94";
+const WARMUP223_V2_STOP: &str = "f23a209f4bd096136c93d7f5a75ea4ae803527faca5bc9172556630cc1462090";
+const WARMUP223_V2_SOURCE: &str =
+    "/var/lib/jetstreamer/horizon-warmup223-resource-namespace-v2/actual-plan.json";
+const WARMUP223_V2_SOURCE_SHA: &str =
+    "773679ba1d76444a0f8783d61c40c4ed1844773211ddaa5d48d64a0eea2e6682";
+const WARMUP223_V2_CENSUS: &str =
+    "/home/ubuntu/.codex/diagnostics/horizon248-retirement-preflight-v233-a1/scheduled-readers.py";
+const WARMUP223_V2_CENSUS_SHA: &str =
+    "37658a5146f2e09bd50927cb5d07cb75cdbb129a237513d5fdec2901c524ef64";
+
+fn warmup223(plan: &Plan) -> bool {
+    plan.warmup223_v2 || plan.warmup223_v3
+}
+
+fn validate_warmup223_v2_profile(plan: &Plan) -> Result<()> {
+    ensure!(
+        !plan.restore_only_probe
+            && !plan.warmup223_v3
+            && plan.run_root == Path::new(WARMUP223_V2_ROOT)
+            && plan.producer.unit == WARMUP223_V2_UNIT
+            && plan.producer.invocation_id == WARMUP223_V2_IID
+            && plan.guard.unit == "horizon-warmup223-protective-v2.service"
+            && plan.inactive_units == ["horizon-warmup223-protective-v2.timer"]
+            && plan.outcome.path == plan.run_root.join("receipts/failure.json")
+            && plan.outcome.sha256
+                == "413b85f317c7114e27940ae2c2bdba42bc05cf93e82b212293fc5527b429d1d2"
+            && plan
+                .evidence
+                .iter()
+                .any(|e| e.path == plan.run_root.join("receipts/guard-stop.json")
+                    && e.sha256 == WARMUP223_V2_STOP)
+            && plan
+                .evidence
+                .iter()
+                .any(|e| e.path == Path::new(WARMUP223_V2_SOURCE)
+                    && e.sha256 == WARMUP223_V2_SOURCE_SHA),
+        "warmup cleanup must bind the exact failed v2 attempt and retained evidence"
+    );
+    Ok(())
+}
 
 fn validate_warmup223_profile(plan: &Plan) -> Result<()> {
     ensure!(
@@ -286,17 +335,36 @@ fn validate_warmup223_profile(plan: &Plan) -> Result<()> {
 }
 
 fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
-    validate_warmup223_profile(plan)?;
+    let (invocation, unit, error) = if plan.warmup223_v2 {
+        validate_warmup223_v2_profile(plan)?;
+        ensure!(
+            outcome["plan"]["path"] == WARMUP223_V2_SOURCE
+                && outcome["plan"]["sha256"] == WARMUP223_V2_SOURCE_SHA,
+            "warmup failure does not bind the original plan"
+        );
+        (
+            WARMUP223_V2_IID,
+            WARMUP223_V2_UNIT,
+            "No such file or directory (os error 2)",
+        )
+    } else {
+        validate_warmup223_profile(plan)?;
+        (
+            WARMUP223_IID,
+            WARMUP223_UNIT,
+            "physical scan time bound exceeded",
+        )
+    };
     ensure!(
-        outcome["invocation_id"] == WARMUP223_IID
-            && outcome["unit"] == WARMUP223_UNIT
+        outcome["invocation_id"] == invocation
+            && outcome["unit"] == unit
             && outcome["success"] == false
             && outcome["target_reached"] == false
             && outcome["observed_slot"].is_null()
             && outcome["first_progress"].is_null()
             && outcome["last_progress"].is_null()
             && outcome["capture"].is_null()
-            && outcome["error"] == "physical scan time bound exceeded"
+            && outcome["error"] == error
             && outcome["authority"]["r2_mutations"] == false
             && outcome["authority"]["publication_authorized"] == false,
         "warmup failure is not an unexecuted failed restore"
@@ -353,7 +421,10 @@ fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
 }
 
 fn disposable_targets(plan: &Plan) -> Result<BTreeSet<PathBuf>> {
-    if plan.warmup223_v3 {
+    if plan.warmup223_v2 {
+        validate_warmup223_v2_profile(plan)?;
+        Ok(BTreeSet::from([plan.run_root.join("scratch")]))
+    } else if plan.warmup223_v3 {
         validate_warmup223_profile(plan)?;
         Ok(BTreeSet::from([plan.run_root.join("scratch")]))
     } else if plan.restore_only_probe {
@@ -450,7 +521,7 @@ fn validate_plan(plan: &Plan) -> Result<()> {
         ensure!(
             item.path.is_absolute()
                 && (item.path.starts_with(&plan.private_root)
-                    || ((plan.restore_only_probe || plan.warmup223_v3)
+                    || ((plan.restore_only_probe || warmup223(plan))
                         && item.path.starts_with(Path::new("/var/lib/jetstreamer"))))
                 && valid_sha256(&item.sha256),
             "invalid evidence binding"
@@ -621,7 +692,7 @@ fn require_no_jobs(units: &BTreeSet<String>) -> Result<()> {
     Ok(())
 }
 
-fn tree_identity(path: &Path) -> Result<TreeIdentity> {
+fn tree_identity(path: &Path, require_single_links: bool) -> Result<TreeIdentity> {
     let metadata = fs::symlink_metadata(path)?;
     ensure!(
         metadata.is_dir() && !metadata.file_type().is_symlink(),
@@ -659,7 +730,8 @@ fn tree_identity(path: &Path) -> Result<TreeIdentity> {
                 pending.push(child);
             } else {
                 ensure!(
-                    child_metadata.is_file(),
+                    child_metadata.is_file()
+                        && (!require_single_links || child_metadata.nlink() == 1),
                     "unsupported member beneath target: {}",
                     child.display()
                 );
@@ -739,11 +811,26 @@ fn process_references(targets: &[PathBuf]) -> Result<Vec<String>> {
         let process = entry.path();
         for target in targets {
             let needle = target.as_os_str().as_bytes();
-            for (name, label) in [("cmdline", "command"), ("maps", "maps")] {
-                if read_proc_file(&process.join(name))?
-                    .is_some_and(|bytes| encoded_reference(&bytes, needle))
-                {
-                    references.push(format!("pid {pid} {label} {}", target.display()));
+            if read_proc_file(&process.join("cmdline"))?
+                .is_some_and(|bytes| encoded_reference(&bytes, needle))
+            {
+                references.push(format!("pid {pid} command {}", target.display()));
+            }
+            match File::open(process.join("maps")) {
+                Ok(maps) => {
+                    let mut maps = BufReader::new(maps);
+                    let mut line = Vec::new();
+                    while maps.read_until(b'\n', &mut line)? != 0 {
+                        if encoded_reference(&line, needle) {
+                            references.push(format!("pid {pid} maps {}", target.display()));
+                            break;
+                        }
+                        line.clear();
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(error).with_context(|| format!("cannot inspect pid {pid} maps"));
                 }
             }
             for name in ["cwd", "root", "exe"] {
@@ -777,6 +864,95 @@ fn process_references(targets: &[PathBuf]) -> Result<Vec<String>> {
         }
     }
     Ok(references)
+}
+
+fn warmup223_v2_lock() -> Result<File> {
+    let path = Path::new("/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock");
+    let lock = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)?;
+    let m = lock.metadata()?;
+    let named = path.symlink_metadata()?;
+    ensure!(
+        m.is_file()
+            && m.uid() == 1000
+            && m.nlink() == 1
+            && m.mode() & 0o777 == 0o600
+            && (m.dev(), m.ino()) == (named.dev(), named.ino())
+            && unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
+        "shared local mutation lock is busy or has changed"
+    );
+    Ok(lock)
+}
+
+fn warmup223_v2_staged_readers(target: &Path) -> Result<Value> {
+    ensure!(
+        format!(
+            "{:x}",
+            Sha256::digest(read_secure(
+                Path::new(WARMUP223_V2_CENSUS),
+                MAX_JSON_BYTES,
+                0
+            )?)
+        ) == WARMUP223_V2_CENSUS_SHA,
+        "scheduled-reader scanner changed"
+    );
+    let output = Command::new("/usr/bin/timeout")
+        .args(["--kill-after=1s", "45s", "/usr/bin/python3", "-IB", "-c",
+            "import json,runpy,sys; from pathlib import Path; scan=runpy.run_path(sys.argv[1])['scan']; scan.__globals__['TARGETS']=[str(Path(sys.argv[2]) / '.historical-runtime')]; print(json.dumps(scan()))",
+            WARMUP223_V2_CENSUS])
+        .arg(target)
+        .output()?;
+    ensure!(
+        output.status.success(),
+        "scheduled-reader scanner failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let census: Value = serde_json::from_slice(&output.stdout)?;
+    ensure!(
+        census["files"].as_u64().is_some_and(|count| count > 0)
+            && census["inspected_command_sources"]
+                .as_u64()
+                .is_some_and(|count| count > 0)
+            && census["remaining"] == json!([])
+            && census["unresolved"] == json!([]),
+        "staged or unresolved readers of the failed warmup: {census}"
+    );
+    Ok(census)
+}
+
+fn require_unmounted(target: &Path) -> Result<()> {
+    let mut namespaces = BTreeSet::new();
+    for pid in fs::read_dir("/proc")? {
+        let pid = pid?;
+        if !pid.file_name().as_bytes().iter().all(u8::is_ascii_digit) {
+            continue;
+        }
+        let process = pid.path();
+        let Some(namespace) = read_proc_link(&process.join("ns/mnt"))? else {
+            continue;
+        };
+        if namespaces.contains(&namespace) {
+            continue;
+        }
+        let Some(mounts) = read_proc_file(&process.join("mountinfo"))? else {
+            continue;
+        };
+        for line in std::str::from_utf8(&mounts)?.lines() {
+            let fields: Vec<_> = line.split_whitespace().take(5).collect();
+            ensure!(fields.len() == 5, "malformed mountinfo row");
+            let (root, mountpoint) = (Path::new(fields[3]), Path::new(fields[4]));
+            ensure!(
+                !root.starts_with(target) && !mountpoint.starts_with(target),
+                "failed warmup scratch is mounted in namespace {}: {line}",
+                namespace.display()
+            );
+        }
+        namespaces.insert(namespace);
+    }
+    ensure!(!namespaces.is_empty(), "no mount namespaces inspected");
+    Ok(())
 }
 
 fn fsync_directory(path: &Path) -> Result<()> {
@@ -905,7 +1081,11 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             && fs::canonicalize(&plan.run_root)? == plan.run_root,
         "unsafe run root"
     );
-    let outcome_bytes = read_secure(&plan.outcome.path, MAX_JSON_BYTES, 0)?;
+    let outcome_bytes = read_secure(
+        &plan.outcome.path,
+        MAX_JSON_BYTES,
+        if plan.warmup223_v2 { 1000 } else { 0 },
+    )?;
     ensure!(
         format!("{:x}", Sha256::digest(&outcome_bytes)) == plan.outcome.sha256,
         "outcome SHA-256 mismatch"
@@ -913,7 +1093,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let outcome: Value = serde_json::from_slice(&outcome_bytes)?;
     ensure!(
         outcome.pointer("/schema").and_then(Value::as_str)
-            == Some(if plan.warmup223_v3 {
+            == Some(if warmup223(plan) {
                 "jetstreamer-private-epoch223-warmup-resource-v1"
             } else if plan.restore_only_probe {
                 RESTORE_OUTCOME_SCHEMA
@@ -941,7 +1121,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             "failed restore probe has a checkpoint receipt; review its successful result separately"
         );
     }
-    if plan.warmup223_v3 {
+    if warmup223(plan) {
         validate_warmup223_outcome(plan, &outcome)?;
     } else {
         ensure!(
@@ -972,7 +1152,15 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let mut seen = BTreeSet::new();
     for item in bound_evidence(plan) {
         ensure!(seen.insert(item.path.clone()), "duplicate evidence path");
-        let bytes = read_secure(&item.path, MAX_JSON_BYTES, 0)?;
+        let uid = if plan.warmup223_v2
+            && (item.path == plan.outcome.path
+                || item.path == plan.run_root.join("receipts/guard-stop.json"))
+        {
+            1000
+        } else {
+            0
+        };
+        let bytes = read_secure(&item.path, MAX_JSON_BYTES, uid)?;
         let observed = format!("{:x}", Sha256::digest(&bytes));
         ensure!(
             observed == item.sha256,
@@ -981,8 +1169,14 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         );
         evidence.push(json!({"path": item.path, "sha256": observed}));
     }
-    let producer = sample_unit(&plan.producer, false)?;
-    let guard = sample_unit(&plan.guard, plan.restore_only_probe || plan.warmup223_v3)?;
+    let producer = sample_unit(&plan.producer, plan.warmup223_v2)?;
+    let guard = sample_unit(&plan.guard, plan.restore_only_probe || warmup223(plan))?;
+    if plan.warmup223_v2 {
+        ensure!(
+            collected_guard(&producer) && collected_guard(&guard),
+            "v2 units must remain collected"
+        );
+    }
     let mut inactive = Vec::new();
     for unit in &plan.inactive_units {
         inactive.push(require_inactive_unit(unit)?);
@@ -995,8 +1189,30 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let targets = plan
         .targets
         .iter()
-        .map(|path| tree_identity(path))
+        .map(|path| tree_identity(path, plan.warmup223_v2))
         .collect::<Result<Vec<_>>>()?;
+    if plan.warmup223_v2 {
+        let [target] = targets.as_slice() else {
+            return Err(anyhow!("expected one scratch tree"));
+        };
+        ensure!(
+            (
+                target.device,
+                target.inode,
+                target.uid,
+                target.regular_files,
+                target.directories,
+                target.physical_bytes
+            ) == (66305, 7778765, 1000, 407502, 15, 33_458_458_624)
+                && fs::read_dir(&target.path)?
+                    .map(|entry| entry.map(|e| e.file_name()))
+                    .collect::<std::io::Result<Vec<_>>>()?
+                    == [OsStr::new(".historical-runtime")],
+            "failed warmup scratch identity or content layout changed"
+        );
+        require_unmounted(&target.path)?;
+        warmup223_v2_staged_readers(&target.path)?;
+    }
     let references = process_references(&plan.targets)?;
     ensure!(
         references.is_empty(),
@@ -1012,6 +1228,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         "inactive_units": inactive,
         "evidence": evidence,
         "process_reference_scan": {"coverage": ["command", "maps", "cwd", "root", "exe", "file-descriptors"], "references": []},
+        "shared_lock_mount_and_staged_reader_checks_passed": plan.warmup223_v2,
         "pending_systemd_jobs": []
     }))
 }
@@ -1028,6 +1245,7 @@ fn main() -> Result<()> {
     );
     let plan: Plan = serde_json::from_slice(&plan_bytes)?;
     validate_plan(&plan)?;
+    let _mutation_lock = plan.warmup223_v2.then(warmup223_v2_lock).transpose()?;
     ensure!(
         !plan.intent_receipt.exists() && !plan.completion_receipt.exists(),
         "fresh receipt paths are required"
@@ -1172,6 +1390,42 @@ mod tests {
         assert!(validate_warmup223_outcome(&plan, &json!({"success":true})).is_err());
     }
 
+    #[test]
+    fn collected_warmup_is_bound_to_the_exact_v2_failure_and_scratch() {
+        let mut plan = warmup_plan();
+        plan.warmup223_v3 = false;
+        plan.warmup223_v2 = true;
+        plan.run_root = WARMUP223_V2_ROOT.into();
+        plan.targets = vec![plan.run_root.join("scratch")];
+        plan.producer.unit = WARMUP223_V2_UNIT.into();
+        plan.producer.invocation_id = WARMUP223_V2_IID.into();
+        plan.guard.unit = "horizon-warmup223-protective-v2.service".into();
+        plan.inactive_units = vec!["horizon-warmup223-protective-v2.timer".into()];
+        plan.outcome = Evidence {
+            path: plan.run_root.join("receipts/failure.json"),
+            sha256: "413b85f317c7114e27940ae2c2bdba42bc05cf93e82b212293fc5527b429d1d2".into(),
+        };
+        plan.evidence = vec![
+            Evidence {
+                path: plan.run_root.join("receipts/guard-stop.json"),
+                sha256: WARMUP223_V2_STOP.into(),
+            },
+            Evidence {
+                path: WARMUP223_V2_SOURCE.into(),
+                sha256: WARMUP223_V2_SOURCE_SHA.into(),
+            },
+        ];
+        validate_plan(&plan).unwrap();
+        plan.targets[0] = plan.run_root.join("ledger");
+        assert!(validate_plan(&plan).is_err());
+        plan.targets[0] = plan.run_root.join("scratch");
+        plan.warmup223_v3 = true;
+        assert!(validate_plan(&plan).is_err());
+        plan.warmup223_v3 = false;
+        plan.evidence[0].sha256 = "a".repeat(64);
+        assert!(validate_plan(&plan).is_err());
+    }
+
     fn restore_plan() -> Plan {
         let root = PathBuf::from(
             "/home/ubuntu/.jetstreamer-private/checkpoint-restore-probe-213-example-v1",
@@ -1180,6 +1434,7 @@ mod tests {
             schema: PLAN_SCHEMA.into(),
             restore_only_probe: true,
             warmup223_v3: false,
+            warmup223_v2: false,
             private_root: "/home/ubuntu/.jetstreamer-private".into(),
             targets: vec![root.join("scratch")],
             producer: UnitExpectation {
