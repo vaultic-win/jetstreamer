@@ -8,9 +8,10 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-FIVE_LANE_REJOIN = VERSION == "tools-v5h"
+FIVE_LANE_REJOIN = VERSION in ("tools-v5h", "tools-v5i")
 HOMEFLOOR_REJOIN = VERSION == "tools-v5g" or FIVE_LANE_REJOIN
-HOMEFLOOR_PROVIDER = "tools-homefloor-145-rejoin-v2" if FIVE_LANE_REJOIN else "tools-homefloor-145-rejoin-v1"
+HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
+                      "tools-v5i": "tools-homefloor-145-rejoin-v3"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
 TIMER_REJOIN = VERSION in ("tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN
 FOCUSED_REJOIN = VERSION in ("tools-v5d", "tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN

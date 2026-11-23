@@ -62,7 +62,10 @@ impl RealTree<'_> {
 impl Tree for RealTree<'_> {
     fn names(&self) -> io::Result<(Option<u64>, Option<u64>)> {
         let at = |n: &str| -> io::Result<Option<u64>> {
-            Ok(self.path(n).try_exists()?.then_some(5767184))
+            Ok(self
+                .path(n)
+                .try_exists()?
+                .then_some(crate::profile::CHILD_INODE))
         };
         Ok((at("original")?, at("quarantine")?))
     }

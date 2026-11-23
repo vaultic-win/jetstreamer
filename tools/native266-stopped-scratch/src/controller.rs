@@ -7,16 +7,8 @@ use std::{
     process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
-const STATE: &str = "/var/lib/jetstreamer/horizon266-stopped-scratch-v173-state";
-const GRANTS: &str = "/run/horizon266-stopped-scratch-v173-grants";
 const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
-const UNIT: &str = "horizon-qualify-266-instructions-2789f821-v169.service";
-const GUARD: &str = "horizon-266-instructions-2789f821-v169-protective.service";
-const TIMER: &str = "horizon-266-instructions-2789f821-v169-protective.timer";
-const FAILSAFE: &str = "horizon-266-instructions-2789f821-v169-protective-failsafe.service";
 const BOOT: &str = "3b17d005-5c3a-4a0e-8841-da097e0957b5";
-const CHECK: &str = "f068ddb1f4b01b77fd5befb7da0c6ca8dfbebeb99909daec5804d97dc99cbe30";
-const STOP: &str = "95c4635f0cce38ec8f936ff508289340f4151099fe4fdce12a2560394b9a1ed9";
 unsafe extern "C" {
     fn flock(fd: i32, operation: i32) -> i32;
     fn geteuid() -> u32;
@@ -63,13 +55,7 @@ fn manager() -> io::Result<()> {
             "stopped owner reactivated",
         )?;
         let fp = Path::new(prop("FragmentPath").unwrap_or("")).canonicalize()?;
-        need(
-            fp == Path::new(
-                "/var/lib/jetstreamer/horizon266-instructions-2789f821-v169-control/pilot",
-            )
-            .join(u),
-            "changed stopped unit",
-        )?;
+        need(fp == Path::new(CONTROL_DIR).join(u), "changed stopped unit")?;
         need(
             prop("Triggers") == Some(if is_timer { GUARD } else { "" })
                 && prop("TriggeredBy") == Some(if u == GUARD { TIMER } else { "" }),
@@ -137,7 +123,7 @@ fn pinned(p: &Path, s: &str) -> io::Result<()> {
     Ok(())
 }
 fn originals() -> io::Result<()> {
-    for l in include_str!("originals.tsv").lines() {
+    for l in profile::ORIGINALS.lines() {
         let (h, p) = l.split_once('\t').unwrap();
         pinned(Path::new(p), h)?
     }
@@ -154,28 +140,11 @@ fn originals() -> io::Result<()> {
             "--output-fields=MESSAGE_ID",
             "_PID=1",
             "_UID=0",
-            "UNIT=horizon-qualify-266-instructions-2789f821-v169.service",
-            "INVOCATION_ID=cad28704afe54672a6993db729227149",
+            &format!("UNIT={UNIT}"),
+            &format!("INVOCATION_ID={PRODUCER_IID}"),
         ],
     )?;
-    let events = [
-        (
-            "39f53479d3a045ac8e11786248231fbf",
-            "s=d048fb8ccd4e4326a91b8c5edb351816;i=9e2566;b=3b17d0055c3a4a0e8841da097e0957b5;m=69cb912eae;t=660d305e831d7;x=ec9c05d97960a311",
-        ),
-        (
-            "de5b426a63be47a7b6ac3eaac82e2f6f",
-            "s=d048fb8ccd4e4326a91b8c5edb351816;i=9e4013;b=3b17d0055c3a4a0e8841da097e0957b5;m=6a2cf68010;t=660d3674d8339;x=1f6f0dad5fdb637",
-        ),
-        (
-            "7ad2d189f7e94e70a38c781354912448",
-            "s=d048fb8ccd4e4326a91b8c5edb351816;i=9e4015;b=3b17d0055c3a4a0e8841da097e0957b5;m=6a2cff61bf;t=660d3675664e7;x=cdeb485a4247e9f5",
-        ),
-        (
-            "9d1aaa27d60140bd96365438aad20286",
-            "s=d048fb8ccd4e4326a91b8c5edb351816;i=9e4016;b=3b17d0055c3a4a0e8841da097e0957b5;m=6a2cff62ca;t=660d3675665f3;x=89b15a6f07bf9640",
-        ),
-    ];
+    let events = profile::EVENTS;
     let mut matched = vec![];
     for rec in j.split("\n\n") {
         let id = rec.lines().find_map(|s| s.strip_prefix("MESSAGE_ID="));
@@ -259,7 +228,9 @@ impl Grant {
             .to_string();
         let phase = if close { "close" } else { "retire" };
         let n = unit
-            .strip_prefix(&format!("horizon266-stopped-{phase}-v173-a"))
+            .strip_prefix(&format!(
+                "horizon266-stopped-{phase}-{SERVICE_GENERATION}-a"
+            ))
             .and_then(|s| s.strip_suffix(".service"))
             .unwrap_or("");
         need(
@@ -363,9 +334,16 @@ impl Grant {
 fn census(allowed: &[i32], ro: bool) -> io::Result<()> {
     // Execute the exact previously used, compiled-in source. Its Python argv contains
     // no target path, so the census can reject any such independent process command.
-    let script = "import os,sys; m={'__name__':'locked_census'}; exec(compile(sys.stdin.buffer.read(),'<sealed-census>','exec'),m); r=m['census'](); allowed={(str(os.getppid()),'fd/'+i) for i in sys.argv[2:]}; refs={tuple(x) for x in r['references']}; assert refs==allowed, refs; assert sys.argv[1]!='ro' or all('ro' in row.split(' - ')[1].split()[2].split(',') for rows in r['namespaces'].values() for row in rows); print('verified')";
+    let script = "import os,sys; m={'__name__':'locked_census','STOPPED_PROFILE':sys.argv[2]}; exec(compile(sys.stdin.buffer.read(),'<sealed-census>','exec'),m); r=m['census'](); allowed={(str(os.getppid()),'fd/'+i) for i in sys.argv[3:]}; refs={tuple(x) for x in r['references']}; assert refs==allowed, refs; assert sys.argv[1]!='ro' or all('ro' in row.split(' - ')[1].split()[2].split(',') for rows in r['namespaces'].values() for row in rows); print('verified')";
     let mut p = Command::new("/usr/bin/python3")
-        .args(["-I", "-B", "-c", script, if ro { "ro" } else { "normal" }])
+        .args([
+            "-I",
+            "-B",
+            "-c",
+            script,
+            if ro { "ro" } else { "normal" },
+            SERVICE_GENERATION,
+        ])
         .args(allowed.iter().map(ToString::to_string))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -381,6 +359,28 @@ fn census(allowed: &[i32], ro: bool) -> io::Result<()> {
         "fresh locked namespace/consumer census failed",
     )
 }
+/// Check the stopped producer and all preservation evidence on the actual host before issuing a grant.
+pub fn check_terminal() -> io::Result<()> {
+    need(
+        unsafe { geteuid() } == 0
+            && fs::read_link("/proc/1/ns/mnt")? == fs::read_link("/proc/self/ns/mnt")?
+            && fs::read_to_string("/proc/sys/kernel/random/boot_id")?.trim() == BOOT,
+        "original host/boot/root",
+    )?;
+    let held = lock()?;
+    manager()?;
+    originals()?;
+    retained::manifest()?;
+    census(&[], false)?;
+    let volume = closure::Original;
+    need(
+        volume.state()? == (false, false),
+        "unexpected stopped volume state",
+    )?;
+    volume.allocated()?;
+    lock_current(&held)
+}
+
 pub fn run(close: bool) -> io::Result<()> {
     need(
         unsafe { geteuid() } == 0
@@ -424,7 +424,7 @@ pub fn run(close: bool) -> io::Result<()> {
     under_root(&p)?;
     pinned(&p, v[6])?;
     let binding = format!(
-        "horizon266-stopped-retirement-v1\nstop={STOP}\ncheck={CHECK}\nfirst_invocation={}\nfirst_booking={}\nimage={}\nboot={BOOT}\noriginal=1801:5767184\narchive=0cbc940306fb1fce868729390ff4c38b0967fd18ff73eaf4b19a0ddbc71cff2d\nstate=2c9c246126a8878f8e11928858512f8ef881a6a794118c04d1a1572b18427c87\n",
+        "horizon266-stopped-retirement-v1\nstop={STOP}\ncheck={CHECK}\nfirst_invocation={}\nfirst_booking={}\nimage={}\nboot={BOOT}\noriginal={DEVICE}:{CHILD_INODE}\narchive={ARCHIVE_SHA}\nstate=2c9c246126a8878f8e11928858512f8ef881a6a794118c04d1a1572b18427c87\n",
         v[2], v[6], v[5]
     );
     let check = || -> io::Result<()> {

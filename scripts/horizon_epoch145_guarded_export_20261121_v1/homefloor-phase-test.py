@@ -148,5 +148,12 @@ class FiveLanePhase(HomefloorPhase):
         self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v2")
 
 
+class Retry3Phase(HomefloorPhase):
+    version = "tools-v5i"
+
+    def test_retry3_provider_is_required(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v3")
+
+
 if __name__ == "__main__":
     main()

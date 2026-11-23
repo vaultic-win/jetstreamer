@@ -205,6 +205,17 @@ fn fit(fleet: &Value, fit_seal: &str) -> Result<Value> {
             after168::prestart(&v)?;
         }
     }
+    #[cfg(epoch166_after168_closed)]
+    ensure!(
+        v["replacements"].get("168").is_none()
+            && v["closed_retry3_bootstrap"]["failure"]["sha256"]
+                == "cf8ef71b5b000cc4138f726d019c59a107b9b3d45f741b0b4802a6f4f31f1d21"
+            && v["closed_retry3_bootstrap"]["admission"]["sha256"]
+                == "8dd692fda6b1098a22a2162792e7165005692385795e6cae72b6df472c7e83c0"
+            && v["closed_retry3_bootstrap"]["resource_credit_bytes"] == 0
+            && v["bookings"]["168"]["cap_bytes"] == 288u64 << 30,
+        "missing retained 168 bootstrap booking"
+    );
     v["provider_seal"] = se;
     Ok(v)
 }
@@ -710,6 +721,8 @@ fn dispatch() -> Result<Value> {
                 "tools/recover170"
             } else if cfg!(epoch168_cold_rebook) {
                 COLD168_LAUNCHER
+            } else if cfg!(epoch166_after168_closed) {
+                "tools-v7/recover166"
             } else if cfg!(epoch166_after168_retry3) {
                 "tools-v6/recover166"
             } else if cfg!(epoch166_after168) {
