@@ -67,7 +67,7 @@ def assess():
         assert observed>0 and peak>=term['archive']['size']
         # Use the established full-epoch planning allowances. Only early recording was observed.
         assessment=lane.bound(lane.shared.pin(lane.D/'horizon296-300-live-workspace-v210-a1/assessment.json',
-            '25b1eff5500c335395a9721f77fb4b00cc5b5d18cc028a33ca1ef99cc4202844'))
+            '616fe04772d8d2f85dfb4a8c1d973fe07ce9e7ce7cf1b22e21c5555da8fdbd11'))
         source=assessment['prior_model']
         data=Path(source['path']).read_bytes()
         assert hashlib.sha256(data).hexdigest()==source['sha256']=='97d81ed3bb3616e32b01dd3332757385ec9a47e7cd8c392fc5c5de86cbe571ab'
