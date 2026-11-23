@@ -1419,18 +1419,23 @@ mod tests {
             let (_, before) = original(&price, 32 << 20).unwrap();
             assert_eq!(before["fleet"], json!(binding));
             if cfg!(incident_v5j_retry1_post145_only) {
-                let missed = cfg!(incident_v5m_post145_only);
-                let lease = cfg!(incident_v5k_post145_only);
-                let handoff = Path::new(RUNTIME).join("epoch145-semantic-continuity-20261121-v1")
-                    .join(if missed { "v5m-name-handoff" } else if lease { "v5k-name-handoff" } else { "v5j-name-handoff-retry1" });
+                let (directory, predecessor) = if cfg!(incident_v5n_post145_only) {
+                    ("v5n-name-handoff", "dba04d40f1b046b4875d7e27e0ff224a")
+                } else if cfg!(incident_v5m_post145_only) {
+                    ("v5m-name-handoff", "ff597d64ad37400ea5c6836336fb6706")
+                } else if cfg!(incident_v5k_post145_only) {
+                    ("v5k-name-handoff", "f2afc696a63a4e6aa6812451cf3559e5")
+                } else {
+                    ("v5j-name-handoff-retry1", "48ad7b2234d74e74b0498e7110e0aee3")
+                };
+                let handoff = Path::new(RUNTIME)
+                    .join("epoch145-semantic-continuity-20261121-v1")
+                    .join(directory);
                 let (_, started) =
                     original(&handoff.join("submission-result.json"), 1 << 20).unwrap();
                 let (_, intent) =
                     original(&handoff.join("submission-intent.json"), 16 << 20).unwrap();
-                assert_eq!(
-                    intent["original"]["INVOCATION_ID"],
-                    if missed { "ff597d64ad37400ea5c6836336fb6706" } else if lease { "f2afc696a63a4e6aa6812451cf3559e5" } else { "48ad7b2234d74e74b0498e7110e0aee3" }
-                );
+                assert_eq!(intent["original"]["INVOCATION_ID"], predecessor);
                 assert_eq!(intent["argv"], started["argv"]);
                 assert_eq!(before["phase145"]["stage"], "leased-worker");
                 assert_eq!(
@@ -1441,6 +1446,13 @@ mod tests {
                     started["invocation_id"],
                     intent["original"]["INVOCATION_ID"]
                 );
+            } else if cfg!(incident_guard_walk145_only) {
+                let phase = &before["phase145"];
+                assert_eq!(phase["InvocationID"], "dba04d40f1b046b4875d7e27e0ff224a");
+                assert_eq!(phase["failure"]["sha256"], "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010");
+                assert_eq!(phase["rejected_guard"]["sha256"], "6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f");
+                assert_eq!(phase["candidate"]["bytes"], 105_610_995_833u64);
+                assert!(phase["retry_worker"].is_null());
             } else if cfg!(incident_missed_clock145_only) {
                 assert_eq!(before["phase145"]["InvocationID"], "ff597d64ad37400ea5c6836336fb6706");
                 assert_eq!(before["phase145"]["failure"]["sha256"], "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6");
