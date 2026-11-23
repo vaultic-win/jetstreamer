@@ -45,6 +45,64 @@ fn target(rows: &[Value], unit: &str, iid: &str, pid: u64, after: u64) -> Result
     ))
 }
 
+fn progress_rows(unit: &str, iid: &str, pid: u64, count: &str) -> Result<Vec<Value>> {
+    let output = Command::new("/usr/bin/journalctl")
+        .args([
+            "--no-pager",
+            "-b",
+            "-n",
+            count,
+            "-o",
+            "json",
+            "--grep=progress slot ",
+            &format!("_SYSTEMD_UNIT={unit}"),
+            &format!("_SYSTEMD_INVOCATION_ID={iid}"),
+            &format!("_PID={pid}"),
+            "_UID=1000",
+            &format!("_EXE={}", successor::NODE),
+        ])
+        .output()?;
+    if output.status.code() == Some(1) && output.stdout.is_empty() && output.stderr.is_empty() {
+        return Ok(Vec::new());
+    }
+    ensure!(
+        output.status.success(),
+        "bounded progress journal unavailable"
+    );
+    Ok(std::str::from_utf8(&output.stdout)?
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<std::result::Result<Vec<_>, _>>()?)
+}
+
+// The node's first main-phase log prints counts sampled before reset_counts().
+// Authenticate that original record separately, even after it leaves the latest window.
+fn recording_target(
+    rows: &[Value],
+    transition: &Value,
+    unit: &str,
+    iid: &str,
+    pid: u64,
+    after: u64,
+) -> Result<Option<Value>> {
+    let initial = std::slice::from_ref(transition);
+    let (time, slot, _, _) =
+        entries::progress(transition, 115343999)?.context("expected recording transition")?;
+    ensure!(
+        slot < TARGET_SLOT && target(initial, unit, iid, pid, after)?.is_none(),
+        "missing pre-target recording transition"
+    );
+    let mut recording = Vec::with_capacity(rows.len());
+    for row in rows {
+        if row["__CURSOR"] == transition["__CURSOR"] {
+            ensure!(row == transition, "changed recording transition");
+        } else {
+            recording.push(row.clone());
+        }
+    }
+    target(&recording, unit, iid, pid, time)
+}
+
 pub(in super::super) fn stop_at_target(
     p: &Profile,
     s: &Value,
@@ -62,35 +120,23 @@ pub(in super::super) fn stop_at_target(
         "wrong guard release"
     );
     let first = binding(&token["guard_pid1"])?.sealed()?;
-    let output = Command::new("/usr/bin/journalctl")
-        .args([
-            "--no-pager",
-            "-b",
-            "-n",
-            "16",
-            "-o",
-            "json",
-            "--grep=progress slot ",
-            &format!("_SYSTEMD_UNIT={}", p.unit),
-            &format!("_SYSTEMD_INVOCATION_ID={iid}"),
-            &format!("_PID={pid}"),
-            "_UID=1000",
-            &format!("_EXE={}", successor::NODE),
-        ])
-        .output()?;
-    if output.status.code() == Some(1) && output.stdout.is_empty() && output.stderr.is_empty() {
+    let rows = progress_rows(&p.unit, iid, pid, "16")?;
+    if rows.is_empty() {
         return Ok(());
     }
-    ensure!(
-        output.status.success(),
-        "bounded progress journal unavailable"
-    );
-    let rows = std::str::from_utf8(&output.stdout)?
-        .lines()
-        .map(serde_json::from_str::<Value>)
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    let Some(progress) = target(&rows, &p.unit, iid, pid, num(&first, "last_monotonic_us")?)?
-    else {
+    let oldest = progress_rows(&p.unit, iid, pid, "+1")?;
+    let [transition] = oldest.as_slice() else {
+        bail!("bounded writer's first progress record is missing");
+    };
+    let progress = recording_target(
+        &rows,
+        transition,
+        &p.unit,
+        iid,
+        pid,
+        num(&first, "last_monotonic_us")?,
+    )?;
+    let Some(progress) = progress else {
         return Ok(());
     };
     let tree = entries::tree(p, pid)?;
@@ -152,6 +198,39 @@ mod tests {
     use super::*;
     #[test]
     #[ignore = "requires original trusted Foundation journal"]
+    fn warmup_transition_is_excluded_only_for_the_original_first_record() {
+        let saved = Bound::new(
+            "/home/ubuntu/.codex/diagnostics/horizon266-bounded-terminal-v210-a1/writer.json",
+            "f57b60e9fa32479670c08497a37065a689adea2c3ba06e1ad76a7e3f9f9973f8",
+        )
+        .json()
+        .unwrap();
+        let rows: Vec<_> = saved
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["MESSAGE"].as_str().unwrap().contains("progress slot "))
+            .cloned()
+            .collect();
+        let unit = "horizon-qualify-266-capped-bounded-v207.service";
+        let iid = "39999fd278dd40c18310a3d6c10c4e21";
+        let pid = 3451480;
+        // Exercise the exact same oldest/latest journal queries the deployed guard uses.
+        let oldest = progress_rows(unit, iid, pid, "+1").unwrap();
+        assert_eq!(oldest, rows[..1]);
+        let latest = progress_rows(unit, iid, pid, "16").unwrap();
+        assert!(target(&latest, unit, iid, pid, 0).is_err());
+        let check = |v: &[Value]| recording_target(v, &oldest[0], unit, iid, pid, 0);
+        assert!(check(&latest).unwrap().is_none());
+        let mut later = rows[1..].to_vec();
+        later[0]["MESSAGE"] = rows[0]["MESSAGE"].clone();
+        assert!(check(&later).is_err());
+        let mut changed = rows.clone();
+        changed[0]["_PID"] = json!("42");
+        assert!(check(&changed).is_err());
+    }
+    #[test]
+    #[ignore = "requires original trusted Foundation journal"]
     fn real_stopped_writer_requires_both_target_counters_and_its_own_identity() {
         let journal=Bound::new("/home/ubuntu/.codex/diagnostics/horizon266-bounded-input-contract-v207-a2/target-pid1-journal.json","80f0f09d2be263deff802cc021a5cfbe635734f05a4234b46b5f6bbbf6e7a27c").json().unwrap();
         let mut rows = journal.as_array().unwrap().clone();
@@ -167,6 +246,25 @@ mod tests {
         assert!(check(&rows[..6]).unwrap().is_none());
         rows.reverse();
         assert!(check(&rows).unwrap().is_some());
+        let first = progress_rows(
+            "horizon-qualify-266-instructions-2789f821-v194.service",
+            "41cf6e5a5cd54d57adc5eba3f0c0ecef",
+            3215067,
+            "+1",
+        )
+        .unwrap();
+        assert!(
+            recording_target(
+                &rows,
+                &first[0],
+                "horizon-qualify-266-instructions-2789f821-v194.service",
+                "41cf6e5a5cd54d57adc5eba3f0c0ecef",
+                3215067,
+                0
+            )
+            .unwrap()
+            .is_some()
+        );
         for (key, value) in [
             ("_PID", "42"),
             ("_UID", "0"),
