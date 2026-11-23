@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+missed_rejoin=false
+if [[ $flavor == missed-rejoin ]]; then
+  missed_rejoin=true
+  flavor=lease-rejoin
+fi
 lease_rejoin=false
 if [[ $flavor == lease-rejoin ]]; then
   lease_rejoin=true
@@ -125,6 +130,10 @@ if $retry4_rejoin; then extra+=(--cfg incident_retry4_145_only); fi
 if $lease_rejoin; then
   test -s "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/lease_startup.rs"
   extra+=(--cfg incident_lease_start145_only)
+  if $missed_rejoin; then
+    extra+=(--cfg incident_missed_clock145_only)
+    sources+=(missed_clock.py test_missed_clock.py build_159_price.py)
+  fi
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
@@ -217,6 +226,10 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   maximum_attempts=5
   if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
+    if $missed_rejoin; then
+      donor="$src/scripts/horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"
+      /usr/bin/python3 -IB "$donor" snapshot > "$q/donor-before.json"
+    fi
     if $fixture_post && ! $v5j_post; then
       # Capture the 136 mirrors and public reader commitments in the same native observation.
       quote=${6:?expected full mirror price executable}
@@ -286,6 +299,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     build_unit=horizon-145-homefloor-rejoin-build-v1.service
     if $v5j_post; then build_unit=horizon-145-v5j-post-build-v1.service; fi
     if $lease_rejoin; then build_unit=horizon-145-lease-rejoin-build-v1.service; fi
+    if $missed_rejoin; then build_unit=horizon-145-missed-rejoin-build-v1.service; fi
     if $v5j_retry_post; then build_unit=horizon-145-v5j-post-build-v2.service; fi
     if $v5k_post; then build_unit=horizon-145-v5k-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
@@ -296,7 +310,15 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     jq -e --arg fleet "$1" --arg hash "$fleet_sha" '
         .fleet == {path:$fleet,sha256:$hash} and now-.recorded_unix_seconds >= 0
         and now-.recorded_unix_seconds <= 120' "$q/before.json" >/dev/null
-    if $lease_rejoin; then
+    if $missed_rejoin; then
+      /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
+      [[ $native_package == tools-homefloor-145-v5k-stopped-v1 && $seal_digest == ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6 ]]
+      jq -e '.phase145.InvocationID == "ff597d64ad37400ea5c6836336fb6706"
+             and .phase145.failure.sha256 == "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"
+             and .phase145.recovery.sha256 == "706b0986b8a3979caa083d08ac007d93905919819b50126486e738cee6977e48"
+             and .phase145.candidate.inode == 103237059 and .phase145.retry_worker == null
+             and .phase145.source_checkpoint_exists == false' "$q/before.json" >/dev/null
+    elif $lease_rejoin; then
       [[ $native_package == tools-homefloor-145-lease-build-v1 && $seal_digest == ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5 ]]
       jq -e '.phase145.InvocationID == "f2afc696a63a4e6aa6812451cf3559e5"
              and .phase145.failure.sha256 == "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7"
@@ -365,6 +387,7 @@ args=("${extra[@]}" --cfg incident145_only --cfg continuity145_only --cfg materi
 for o in "$d"/build/*/out; do args+=(-L "native=$o"); done
 ulimit -c 0
 args+=(@"$base/epoch145-aligned-prefix-integration-20261120-g1/rustc.args")
+if $missed_rejoin; then /usr/bin/python3 -IB "$s/test_missed_clock.py"; fi
 if $homefloor_rejoin; then
   /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
   # Both the real source inode and its read-only test mounts are inside this build's own image.

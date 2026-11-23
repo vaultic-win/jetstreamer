@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_lease_start145_only)]
+#[cfg(incident_missed_clock145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-missed-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_lease_start145_only, not(incident_missed_clock145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-lease-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_retry4_145_only, not(incident_lease_start145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v4/post-stop-fit";
@@ -59,6 +61,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v6/post-stop-fit";
 #[cfg(not(any(incident_post145_only, incident_rejoin145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v3/post-stop-fit";
+#[cfg(incident_missed_clock145_only)]
+#[path = "missed_clock.rs"]
+pub(crate) mod missed_clock;
 const HOST_MEMORY: u64 = 810_658_050_048;
 const GROUPS: &str = "/sys/fs/cgroup/system.slice";
 type Process = (u32, u64, u64, u64);
@@ -150,6 +155,14 @@ fn head(start: &Bound) -> Result<Bound> {
             .join(d)
             .join("ROOT_COMPLETE_OPERATIONAL_FLEET.json");
         if !p.try_exists()? {
+            #[cfg(incident_missed_clock145_only)]
+            if let Some(next) = missed_clock::replacement(&b, &v)? {
+                let successor: Value = serde_json::from_slice(&custody::bytes(&next, 32 << 20, false)?)?;
+                ensure!(capacity::n(&successor, "recorded_unix_seconds")? > capacity::n(&v, "recorded_unix_seconds")?,
+                    "recovered fleet is not advancing");
+                b = next;
+                continue;
+            }
             return Ok(b);
         }
         let (n, successor) = original(&p, 32 << 20)?;
@@ -950,7 +963,14 @@ impl Fit {
     }
     pub fn topology(&self) -> Result<()> {
         let previous = self.capture.borrow().fleet.clone();
-        *self.capture.borrow_mut() = refresh(&previous)?;
+        let next = refresh(&previous);
+        #[cfg(incident_missed_clock145_only)]
+        if next.as_ref().is_err_and(|e| e.is::<missed_clock::Pending>()) {
+            // Read live guards, population, memory and physical HOME against the last paid
+            // topology. This check cannot yield a price or resume a stopped worker.
+            self.limits(0, false).map_err(|e| anyhow::anyhow!("live guard refused the registered hold: {e:#}"))?;
+        }
+        *self.capture.borrow_mut() = next?;
         Ok(())
     }
     pub fn await_topology(&self) -> Result<()> {
@@ -974,11 +994,14 @@ impl Fit {
         }
     }
     pub fn current(&self, needed: u64) -> Result<Value> {
+        self.limits(needed, true)
+    }
+    fn limits(&self, needed: u64, require_fresh: bool) -> Result<Value> {
         let last = self.capture.borrow();
         let s = &last.complete;
         ensure!(needed == 0, "frozen reader requested staging bytes");
         let age = last.captured.elapsed();
-        if age > Duration::from_secs(45) {
+        if require_fresh && age > Duration::from_secs(45) {
             return Err(capacity::Reprice(format!("full capture age {age:?}")).into());
         }
         let actual = active_population()?;
@@ -990,6 +1013,14 @@ impl Fit {
             .into());
         }
         let mut required = capacity::n(s, "complete_required_HOME_bytes")?;
+        #[cfg(incident_missed_clock145_only)]
+        {
+            let cover = &s["epoch159_donor_cover"];
+            ensure!(cover["fleet"] == s["fleet"] && cover["credited_retirement_bytes"] == 0
+                && cover["diagnostic"]["invocation_id"] == "fd406b11e15040cb9039dd9fdc48f63d",
+                "missing reserved donor resources");
+            required = required.max(capacity::n(cover, "native_home_required")?);
+        }
         let mut absolute = 0;
         for row in s["survivors"]
             .as_object()
@@ -1364,6 +1395,10 @@ mod tests {
                     started["invocation_id"],
                     intent["original"]["INVOCATION_ID"]
                 );
+            } else if cfg!(incident_missed_clock145_only) {
+                assert_eq!(before["phase145"]["InvocationID"], "ff597d64ad37400ea5c6836336fb6706");
+                assert_eq!(before["phase145"]["failure"]["sha256"], "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6");
+                assert!(before["phase145"]["retry_worker"].is_null());
             } else if cfg!(incident_lease_start145_only) {
                 assert_eq!(before["phase145"]["InvocationID"], "f2afc696a63a4e6aa6812451cf3559e5");
                 assert_eq!(before["phase145"]["failure"]["sha256"], "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7");

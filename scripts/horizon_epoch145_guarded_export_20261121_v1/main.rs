@@ -279,7 +279,13 @@ fn while_stopped(
     mut deadline: Instant,
     mut observe: impl FnMut() -> Result<Value>,
 ) -> Result<Value> {
+    #[cfg(incident_missed_clock145_only)]
+    let mut pending_until: Option<(incident_fit::missed_clock::Pending, Instant)> = None;
     loop {
+        #[cfg(incident_missed_clock145_only)]
+        if let Some((_, limit)) = &pending_until {
+            ensure!(Instant::now() < *limit, "missed RSS replacement hard deadline");
+        }
         // Leave room for the complete 10s census and timeout's 2s kill bound.
         ensure!(
             deadline.saturating_duration_since(Instant::now()) >= Duration::from_secs(12),
@@ -288,6 +294,12 @@ fn while_stopped(
         prove_stopped_child(pid, ticks)?;
         match observe() {
             Ok(sample) => {
+                #[cfg(incident_missed_clock145_only)]
+                if let Some((held, limit)) = &pending_until {
+                    held.confirm(&sample)?;
+                    ensure!(Instant::now() <= *limit && custody::now()? <= held.deadline, "late replacement price");
+                    incident_fit::missed_clock::stopped_leases(pid, ticks)?;
+                }
                 ensure!(
                     cfg!(any(incident_rejoin145_only, incident_post145_only))
                         || Instant::now() < deadline,
@@ -295,6 +307,18 @@ fn while_stopped(
                 );
                 prove_stopped_child(pid, ticks)?;
                 return Ok(sample);
+            }
+            #[cfg(incident_missed_clock145_only)]
+            Err(e) if e.is::<incident_fit::missed_clock::Pending>() => {
+                let hold = e.downcast_ref::<incident_fit::missed_clock::Pending>().unwrap();
+                let utc = hold.deadline;
+                let now = custody::now()?;
+                ensure!(utc > now && utc - now <= 2400, "invalid single replacement deadline");
+                let (original, limit) = pending_until.get_or_insert_with(|| (hold.clone(), Instant::now() + Duration::from_secs(utc - now)));
+                ensure!(hold == original && Instant::now() < *limit, "registered replacement changed");
+                incident_fit::missed_clock::stopped_leases(pid, ticks)?;
+                thread::sleep(Duration::from_secs(5));
+                deadline = *limit;
             }
             Err(e)
                 if (cfg!(continuity145_only) && e.is::<peer_terminal::Pending>())
