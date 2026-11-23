@@ -130,6 +130,50 @@ class TestRemainder(unittest.TestCase):
             self.check()
 
 
+class TestSmallStaging(unittest.TestCase):
+    def setUp(self):
+        self.host = runpy.run_path(str(base/'host.py'))
+        self.earlier = {f'prior35-{i}': {} for i in range(35)}
+        self.prior = {f'prior81-{i}': {} for i in range(81)}
+        self.rows = {f'small-{i}': {} for i in range(88)}
+        self.done = dict(files=41, allocated_bytes_retired_once=14806351872)
+        self.manifest = dict(proposed_files=self.rows, excluded_source_paths=[*self.earlier, *self.prior],
+                             physical_allocated_bytes=3494883328, logical_source_bytes=3496875656,
+                             final_pair_read_bound=6993751312)
+        bindings = [
+            ('stage30_exclusion', self.host['STAGE30_ORIGINAL'], self.host['STAGE30_ORIGINAL_SHA'],
+             {'files': self.earlier}),
+            ('prior81_exclusion', self.host['BASE']/'late-qa-stage-duplicates-20261123-v1/PRIMARY.json',
+             '0e18d96784f183a4c8fa3ecc3be15baed2919dc77597ecce0a24a9463a2a88a7', {'files': self.prior}),
+            ('stage41_completion', self.host['REMAINDER_41'].parent/'state/complete.json',
+             '4f803e54725562cdd28d69e5ef051f8da260a6c1de1ea1d7dcd7c184babc0257', self.done),
+        ]
+        self.inputs = {}
+        for key, path, digest, contents in bindings:
+            self.manifest[key] = dict(path=str(path), sha256=digest)
+            self.inputs[path, digest] = contents
+
+    def check(self):
+        return self.host['checked_selection'](self.manifest, self.host['SMALL_88'],
+                                              lambda path, digest: self.inputs[path, digest])
+
+    def test_exact_stage_and_previous_boundaries(self):
+        self.assertIs(self.check(), self.rows)
+        self.done['files'] -= 1
+        with self.assertRaisesRegex(RuntimeError, 'previous stage incomplete'):
+            self.check()
+
+    def test_old_inventory_cannot_be_exchanged_for_new_path(self):
+        self.prior['small-0'] = self.prior.pop('prior81-0')
+        with self.assertRaisesRegex(RuntimeError, 'incomplete exclusions'):
+            self.check()
+
+    def test_changed_previous_manifest_rejected(self):
+        self.manifest['prior81_exclusion']['sha256'] = '0' * 64
+        with self.assertRaisesRegex(RuntimeError, 'changed previous'):
+            self.check()
+
+
 class TestPair(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(dir=os.environ['HORIZON_QA_FIXTURE_HOME'])
@@ -197,6 +241,19 @@ class TestPair(unittest.TestCase):
         self.run_op(opened=inspect)
         self.assert_complete()
         self.assertEqual(m['read'](self.state/'captured-0.json')['end'], 41)
+
+    def test_88_pairs_leased_before_first_mutation(self):
+        for i in range(3, 88):
+            self.add_pair(i)
+        self.stamps = {p:r['source_stat'] for p,r in self.rows.items()}
+        self.inspection = m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=88).inspect()
+        def inspect(pair):
+            self.assertEqual(len(pair.sources), 88)
+            self.assertEqual(len(pair.keepers), 88)
+            self.assertTrue(all(Path(p).exists() for p in self.rows))
+        self.run_op(opened=inspect)
+        self.assertEqual(m['read'](self.state/'captured-0.json')['end'], 88)
+        self.assert_complete()
 
     def test_all_leases_remain_held(self):
         def inspect(pair):
