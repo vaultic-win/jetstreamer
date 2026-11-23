@@ -24,7 +24,7 @@ elif [[ ${1:-} == epoch168-cold-v3 && $# == 1 ]]; then
 elif [[ ${1:-} == epoch168-cold-v4 && $# == 1 ]]; then
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
     base=/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-guard-20261123-v4
-    group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v3-build.service
+    group=/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v4-build.service
     features+=(--cfg 'feature="epoch168-cold-v4"')
 elif [[ ${1:-} == epoch166-retry11 && $# == 1 ]]; then
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
