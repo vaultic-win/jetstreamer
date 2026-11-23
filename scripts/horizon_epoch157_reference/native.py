@@ -64,7 +64,7 @@ class Body(io.BytesIO):
         require(not self.read(1), "trailing wire bytes")
 
 
-def writes(body, slot, previous_slot, cursor):
+def writes(body, slot, previous_slot, cursor, observe=None):
     count = body.u64()
     require(count <= LIMIT // 145, "write count")
     for _ in range(count):
@@ -75,17 +75,19 @@ def writes(body, slot, previous_slot, cursor):
         cursor += 1
         if body.flag():
             body.vec(64)
-        body.vec(32)
+        pubkey = body.vec(32)
         body.u64()
         body.vec(32)
         body.flag()
         body.u64()
-        body.vec()
+        data = body.vec()
         body.vec(32)
+        if observe is not None:
+            observe(actual, cursor - 1, pubkey, data)
     return count, cursor, previous_slot
 
 
-def outcomes(body, expected):
+def outcomes(body, expected, observe=None):
     count = body.u64()
     require(0 < count <= len(expected), "outcome count")
     successful = 0
@@ -93,18 +95,23 @@ def outcomes(body, expected):
         # These are legacy packet transactions with a one-byte signature count.
         require(1 <= tx[0] < 128 and body.flag() and body.vec(64) == tx[1:65], "outcome signature")
         failed = body.flag()
+        status = None
         if failed:
             error = body.u32()
+            status = {"transaction_error": error}
             require(error <= 19, "unknown transaction error")
             if error == 8:
-                body.take(1)
+                status["instruction_index"] = body.take(1)[0]
                 instruction = body.u32()
+                status["instruction_error"] = instruction
                 require(instruction <= 53, "unknown instruction error")
                 if instruction == 25:  # InstructionError::Custom(u32)
-                    body.u32()
+                    status["custom"] = body.u32()
         else:
             successful += 1
-        body.u64()  # Fee
+        fee = body.u64()
+        if observe is not None:
+            observe(tx, status, fee)
     return count, successful
 
 
@@ -184,20 +191,20 @@ class Session:
         self.slot = slot
         body.eof()
 
-    def checkpoint(self, slot):
+    def checkpoint(self, slot, on_write=None):
         body = self.call(3, U64.pack(slot), 3)
         require(body.u64() == slot, "wrong checkpoint slot")
         state = dict(slot=slot, bank_hash=base58(body.vec(32)), accounts_hash=base58(body.vec(32)),
                      last_blockhash=base58(body.vec(32)), capitalization=body.u64(),
                      transaction_count=body.u64(), tick_height=body.u64())
         require(body.flag() and state["tick_height"] == (slot + 1) * 64, "incomplete checkpoint")
-        state["write_count"], self.cursor, _ = writes(body, slot, slot, self.cursor)
+        state["write_count"], self.cursor, _ = writes(body, slot, slot, self.cursor, on_write)
         state["next_write_version"] = body.u64()
         require(state["next_write_version"] == self.cursor, "checkpoint cursor")
         body.eof()
         return state
 
-    def process(self, slot, entries):
+    def process(self, slot, entries, on_outcome=None, on_write=None):
         for start in range(0, len(entries), 64):
             batch = entries[start:start + 64]
             request = bytearray(U64.pack(len(batch)))
@@ -216,11 +223,11 @@ class Session:
                     kind = body.u32()
                     sequence += 1
                     if kind == 0:
-                        n, successful = outcomes(body, txs[completed:])
+                        n, successful = outcomes(body, txs[completed:], on_outcome)
                         completed += n
                         self.successful += successful
                     elif kind == 1:
-                        _, self.cursor, previous_slot = writes(body, slot, previous_slot, self.cursor)
+                        _, self.cursor, previous_slot = writes(body, slot, previous_slot, self.cursor, on_write)
                     elif kind == 2:
                         ticks, complete = body.u64(), body.flag()
                         require(body.u64() == self.cursor, "entry cursor")
