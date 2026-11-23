@@ -206,7 +206,9 @@ class TestLive145Price(unittest.TestCase):
     def setUp(self):
         host = runpy.run_path(str(base/'host.py'))
         self.check = host['checked_live145_price']
+        self.check_stopped = host['checked_stopped145_price']
         self.assertEqual(host['selection'](host['SMALL_88']), host['selection'](host['SMALL_88_LIVE145']))
+        self.assertEqual(host['selection'](host['SMALL_88']), host['selection'](host['SMALL_88_STOPPED145']))
         self.fleet = {'path': '/fleet.json', 'sha256': '0' * 64}
         self.now = 1000
         self.frame = {
@@ -236,6 +238,21 @@ class TestLive145Price(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'do not fit'):
             self.check({**self.frame, 'required_available_memory_bytes': 3 << 30},
                        self.guard, self.fleet, self.now)
+
+    def test_stopped_price_retains_original_donor_charge(self):
+        phase = dict(InvocationID='f86e7e61f4b34dc7aedc4e08a128e713', ActiveState='failed',
+                     SubState='failed', MainPID='0', source_checkpoint_exists=False, resource_credit_bytes=0)
+        donor = dict(schema='horizon-145-drained-159-donor-cover-v1', fleet=self.fleet, credited_retirement_bytes=0,
+                     general_slot_cpu_micros=1_000_000, native_home_required=1536 << 20, remaining_home_bytes=256 << 20)
+        frame = dict(self.frame, phase145=phase, epoch159_donor_cover=donor, replay_launch_authorized=False)
+        self.check_stopped(frame, self.fleet, self.now, 2 << 30)
+        with self.assertRaisesRegex(RuntimeError, 'do not fit'):
+            self.check_stopped(frame, self.fleet, self.now, 1536 << 20)
+        with self.assertRaisesRegex(RuntimeError, 'unbound retained donor'):
+            self.check_stopped(dict(frame, epoch159_donor_cover=dict(donor, credited_retirement_bytes=1)),
+                               self.fleet, self.now, 2 << 30)
+        with self.assertRaisesRegex(RuntimeError, 'unrecognized stopped'):
+            self.check_stopped(dict(frame, phase145=dict(phase, MainPID='100')), self.fleet, self.now, 2 << 30)
 
 
 class TestPair(unittest.TestCase):
