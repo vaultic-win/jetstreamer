@@ -20,7 +20,9 @@ SMALL_88_LIVE145_RETRY = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v3' / 
 SMALL_88_LIVE145_FULL_SLOT = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v4' / 'tools'
 SMALL_88_LIVE145_PACKAGES = (SMALL_88_LIVE145, SMALL_88_LIVE145_RETRY, SMALL_88_LIVE145_FULL_SLOT)
 SMALL_88_STOPPED145 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v5' / 'tools'
-SMALL_88_SUCCESSORS = (*SMALL_88_LIVE145_PACKAGES, SMALL_88_STOPPED145)
+SMALL_88_STOPPED145_WAIT = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v6' / 'tools'
+SMALL_88_STOPPED145_PACKAGES = (SMALL_88_STOPPED145, SMALL_88_STOPPED145_WAIT)
+SMALL_88_SUCCESSORS = (*SMALL_88_LIVE145_PACKAGES, *SMALL_88_STOPPED145_PACKAGES)
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
 LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -70,11 +72,15 @@ STATE = BASE / 'horizon-root-runtime-data' / (
 ) / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
 MUTEX = BASE / 'r2-receipts/local-mutation.lock'
-CPU_QUOTA_MICROS = 1_000_000 if PACK in (SMALL_88_LIVE145_FULL_SLOT, SMALL_88_STOPPED145) else 500_000
+CPU_QUOTA_MICROS = 1_000_000 if PACK in (SMALL_88_LIVE145_FULL_SLOT, *SMALL_88_STOPPED145_PACKAGES) else 500_000
 
 def require(ok, why):
     if not ok:
         raise RuntimeError(str(why))
+
+
+class RetainedCapacityPressure(RuntimeError):
+    pass
 
 
 def checked_live145_price(frame, guard, fleet, now):
@@ -113,21 +119,64 @@ def checked_stopped145_price(frame, fleet, now, physical_home):
             'unbound retained donor reservation')
     home_margin = min(physical_home, frame['available_HOME_bytes']) - max(
         frame['complete_required_HOME_bytes'], donor['native_home_required'])
-    require(min(home_margin, donor['remaining_home_bytes']) >= (48 << 20)
-            and frame['available_memory_bytes'] - frame['required_available_memory_bytes'] >= (768 << 20),
-            'retained reservations and staged retirement do not fit together')
+    if (min(home_margin, donor['remaining_home_bytes']) < (48 << 20)
+            or frame['available_memory_bytes'] - frame['required_available_memory_bytes'] < (768 << 20)):
+        raise RetainedCapacityPressure('retained reservations and staged retirement do not fit together')
 
 
-def price(provider):
+def stopped145_pressure(child, command):
+    if child.returncode != 1 or child.stdout:
+        return False
+    frame = f'  File "{command}", line '
+    donor = f'  File "{command.with_name("build_159_price.py")}", line '
+    lines = child.stderr.rstrip().splitlines()
+    return (len(lines) >= 4 and lines[0] == 'Traceback (most recent call last):'
+            and lines[1].startswith(frame) and lines[1].endswith(', in <module>')
+            and lines[-1] == 'ValueError: insufficient HOME or general-slot memory'
+            and any(line.startswith(frame) and line.endswith(', in capture') for line in lines)
+            and any(line.startswith(donor) and line.endswith(', in cover') for line in lines))
+
+
+def stopped145_quote(provider, directory, fleet, head, wait):
+    executable = directory / 'post-stop-fit'
+    command = [executable, '145', head, fleet['sha256']]
+    deadline = time.monotonic() + 120 if wait else None
+    while True:
+        require(head == provider['fleet'](), 'fleet changed before stopped retirement pricing')
+        timeout = 220 if deadline is None else deadline - time.monotonic()
+        require(timeout > 0, 'retained capacity did not recover during paired retirement')
+        child = subprocess.run(command, text=True, capture_output=True, timeout=timeout)
+        try:
+            if stopped145_pressure(child, executable):
+                raise RetainedCapacityPressure(child.stderr.strip())
+            require(child.returncode == 0, f'five-peer price rejected: {child.stderr.strip()}')
+            frame = json.loads(child.stdout)
+            require(head == provider['fleet']() and fleet['sha256'] == provider['sha'](head),
+                    'fleet changed during stopped retirement pricing')
+            physical = os.statvfs(BASE)
+            checked_stopped145_price(frame, fleet, time.time(), physical.f_bavail * physical.f_frsize)
+            return frame
+        except RetainedCapacityPressure:
+            if deadline is None or time.monotonic() + 3 >= deadline:
+                raise
+            print('Retained capacity is below the floor. The paired files remain leased while the quote is renewed.',
+                  flush=True)
+            time.sleep(3)
+
+
+def price(provider, wait_for_paired=False):
     if PACK not in SMALL_88_SUCCESSORS:
         return provider['price']()
-    stopped = PACK == SMALL_88_STOPPED145
+    stopped = PACK in SMALL_88_STOPPED145_PACKAGES
     directory, seal = (STOPPED145_PROVIDER, STOPPED145_PROVIDER_SEAL) if stopped else (LIVE145_PROVIDER, LIVE145_PROVIDER_SEAL)
     provider['sealed'](directory, seal)
     head = provider['fleet']()
     fleet = {'path': str(head), 'sha256': provider['sha'](head)}
+    if stopped:
+        return stopped145_quote(provider, directory, fleet, head,
+                                 PACK == SMALL_88_STOPPED145_WAIT and wait_for_paired)
     command = [directory / 'post-stop-fit', '145', head, fleet['sha256']]
-    attempts = 1 if stopped or PACK == SMALL_88_LIVE145 else 3
+    attempts = 1 if PACK == SMALL_88_LIVE145 else 3
     for attempt in range(attempts):
         require(head == provider['fleet'](), 'fleet changed before live retirement pricing')
         child = subprocess.run(command, text=True, capture_output=True, timeout=220)
@@ -141,17 +190,12 @@ def price(provider):
         time.sleep(3)
     require(child.returncode == 0, f'five-peer price rejected: {child.stderr.strip()}')
     frame = json.loads(child.stdout)
-    if not stopped:
-        line = subprocess.check_output(['/usr/bin/tail', '-n', '1', LIVE145_GUARD_LOG], text=True)
-        stamp, separator, payload = line.partition(' epoch145 verification guard ')
-        require(stamp.isdecimal() and separator, 'missing live epoch 145 guard record')
-        guard = json.loads(payload)
+    line = subprocess.check_output(['/usr/bin/tail', '-n', '1', LIVE145_GUARD_LOG], text=True)
+    stamp, separator, payload = line.partition(' epoch145 verification guard ')
+    require(stamp.isdecimal() and separator, 'missing live epoch 145 guard record')
+    guard = json.loads(payload)
     require(head == provider['fleet']() and fleet['sha256'] == provider['sha'](head),
             'fleet changed during retirement pricing')
-    if stopped:
-        physical = os.statvfs(BASE)
-        checked_stopped145_price(frame, fleet, time.time(), physical.f_bavail * physical.f_frsize)
-        return frame
     checked_live145_price(frame, guard, fleet, time.time())
     return {**frame, 'staged_retirement_guard': guard}
 
@@ -280,7 +324,7 @@ def main():
         pair = pair_cls(STATE,rows,engine)
         proof = None
         def closure():
-            frame = price(provider)
+            frame = price(provider, wait_for_paired=proof is not None)
             roots = set(manifest['priced_roots']) | {x['root'] for x in frame['bookings'].values()}
             require(all(not any(Path(s).is_relative_to(root) for root in roots) for s in rows),'overlap with booking')
             keepers()

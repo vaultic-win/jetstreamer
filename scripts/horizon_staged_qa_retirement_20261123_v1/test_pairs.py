@@ -1,13 +1,16 @@
 """Exercise pair checking and physical operator crash boundaries on tiny fixtures."""
 import fcntl
 import hashlib
+import json
 import mmap
 import os
 import runpy
 import signal
+import subprocess
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 base = Path(__file__).resolve().parent
@@ -205,6 +208,7 @@ class TestDisjointExecutables(TestSmallStaging):
 class TestLive145Price(unittest.TestCase):
     def setUp(self):
         host = runpy.run_path(str(base/'host.py'))
+        self.host = host
         self.check = host['checked_live145_price']
         self.check_stopped = host['checked_stopped145_price']
         self.assertEqual(host['selection'](host['SMALL_88']), host['selection'](host['SMALL_88_LIVE145']))
@@ -253,6 +257,35 @@ class TestLive145Price(unittest.TestCase):
                                self.fleet, self.now, 2 << 30)
         with self.assertRaisesRegex(RuntimeError, 'unrecognized stopped'):
             self.check_stopped(dict(frame, phase145=dict(phase, MainPID='100')), self.fleet, self.now, 2 << 30)
+
+    def test_paired_quote_retries_only_authenticated_donor_pressure(self):
+        head = Path(self.fleet['path'])
+        directory = Path('/sealed/fit')
+        command = directory/'post-stop-fit'
+        trace = ('Traceback (most recent call last):\n'
+                 f'  File "{command}", line 1389, in <module>\n'
+                 f'  File "{command}", line 1301, in capture\n'
+                 f'  File "{directory}/build_159_price.py", line 150, in cover\n'
+                 'ValueError: insufficient HOME or general-slot memory\n')
+        insufficient = subprocess.CompletedProcess([], 1, '', trace)
+        accepted = subprocess.CompletedProcess([], 0, json.dumps(self.frame), '')
+        unbound = subprocess.CompletedProcess([], 1, '', trace.replace(', in cover', ', in snapshot'))
+        provider = {'fleet': lambda: head, 'sha': lambda _: self.fleet['sha256']}
+        quote = self.host['stopped145_quote']
+        capacity_check = mock.Mock()
+        with mock.patch.dict(quote.__globals__, {'checked_stopped145_price': capacity_check}):
+            with mock.patch.object(subprocess, 'run', side_effect=[insufficient, accepted]) as run, \
+                    mock.patch.object(time, 'sleep') as sleep:
+                self.assertEqual(quote(provider, directory, self.fleet, head, True), self.frame)
+                self.assertEqual(run.call_count, 2)
+                sleep.assert_called_once_with(3)
+                capacity_check.assert_called_once()
+            for result, wait in ((unbound, True), (insufficient, False)):
+                with mock.patch.object(subprocess, 'run', return_value=result) as run, \
+                        mock.patch.object(time, 'sleep') as sleep, self.assertRaises(RuntimeError):
+                    quote(provider, directory, self.fleet, head, wait)
+                run.assert_called_once()
+                sleep.assert_not_called()
 
 
 class TestPair(unittest.TestCase):
