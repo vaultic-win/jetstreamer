@@ -48,6 +48,16 @@ pub(in crate::fleet) fn predecessor(
         );
         num(event, "recorded_unix_seconds")?
     };
+    let old = prior(previous)?;
+    let replaced = if running && UNIT == native257::UNIT {
+        let predecessor = owner(&old)?;
+        if let Some(prior_owner) = predecessor {
+            native257::verify_replacement(prior_owner, o, event, &old)?;
+        }
+        predecessor
+    } else {
+        None
+    };
     ensure!(
         sealed(b)? == *event
             && start <= wall
@@ -66,17 +76,16 @@ pub(in crate::fleet) fn predecessor(
                 .is_some_and(|f| event["fleet"] == private157::binding(f)),
         "native bootstrap event substituted resource observer or prior fleet"
     );
-    let old = prior(previous)?;
     let direct = UNIT==native266::UNIT && !running && owner(&old)?.is_none() && sealed(&o.evidence[0])?["schema"] == native266_recovery::SCHEMA;
     if direct { ensure!(event["running_origin"]==private157::binding(&o.evidence[0]) && event["sampled_at_utc"]==sampled,"different directly recovered terminal"); }
     if running || direct {
         ensure!(
-            owner(&old)?.is_none()
-                && p.pipeline_claims.len() == old.pipeline_claims.len() + 1
+            owner(&old)? == replaced
+                && p.pipeline_claims.len() == old.pipeline_claims.len() + usize::from(replaced.is_none())
                 && old
                     .pipeline_claims
                     .iter()
-                    .all(|r| p.pipeline_claims.contains(r)),
+                    .all(|r| Some(r) == replaced || p.pipeline_claims.contains(r)),
             "native bootstrap changed existing pipeline ownership"
         );
         for r in previous["active"]

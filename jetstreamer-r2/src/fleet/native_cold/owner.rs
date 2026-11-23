@@ -59,10 +59,20 @@ pub(super) fn startup(b: &BoundFile) -> Result<(Value, Value)> {
     );
     let file = binding(&h["unit_file"])?;
     FsEvidence.bytes(&file, 65536)?;
-    ensure!(
-        Path::new(text(&h["producer"], "FragmentPath")?).canonicalize()? == file.path,
-        "native bootstrap producer file changed"
-    );
+    let fragment = Path::new(text(&h["producer"], "FragmentPath")?);
+    if EPOCH == 257 && fragment == Path::new("/etc/systemd/system").join(UNIT) {
+        // The original link can be retired and reused for a new invocation.
+        // Its sealed preparation retains the exact target and file hash.
+        let preparation = sealed(&binding(&r["preparation"])?)?;
+        ensure!(
+            preparation["units"][UNIT] == h["unit_file"]
+                && preparation["attempt"] == r["attempt"]
+                && preparation["operation"] == r["operation"],
+            "native bootstrap original producer preparation changed"
+        );
+    } else {
+        ensure!(fragment.canonicalize()? == file.path, "native bootstrap producer file changed");
+    }
     Ok((h, a))
 }
 pub(super) fn helper(a: &Value, sha: &str, actual: bool) -> Result<()> {
@@ -136,6 +146,10 @@ pub(super) fn properties() -> Result<Value> {
 }
 pub(super) fn live_owner(h: &Value) -> Result<Value> {
     let before = properties()?;
+    ensure!(
+        Path::new(text(&before, "FragmentPath")?).canonicalize()? == binding(&h["unit_file"])?.path,
+        "live native bootstrap producer file changed"
+    );
     let historical = &h["producer"];
     for k in [
         "Id",

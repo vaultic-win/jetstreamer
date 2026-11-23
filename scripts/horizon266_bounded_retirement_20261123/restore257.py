@@ -65,8 +65,26 @@ def running(h):
     return False
 
 
+def current_owner():
+    capture = ref(D / "horizon257-v21-owner-capture-a1/completion.json")
+    assert capture["sha256"] == "954cded618bc89041fe6f4c6831505d7f841c2655d901b6d5b406dbb424c0dc7"
+    record = bound(capture)
+    origin = bound(record["origin"])
+    assert origin["startup_handoff"] == record["handoff"]
+    h = bound(record["handoff"])
+    review = bound(bound(h["admission"])["review"])
+    closed = bound(review["previous_closure"])
+    _, previous, _ = evidence()
+    assert previous["startup_handoff"] == closed["startup"] and closed["original_processes_gone"]
+    assert closed["reservation"] == review["closed266_booking"] and not closed["resources_released"]
+    assert h["unit"] == UNIT and h["invocation_id"] == origin["invocation_id"]
+    assert h["main_pid"] == origin["main_pid"] and h["cpu_affinity"] == list(range(8))
+    assert bound(h["first_guard_token"])["invocation_id"] == origin["invocation_id"]
+    return origin, h
+
+
 def price_owner(assessment_only):
-    _, _, h = evidence()
+    _, h = current_owner()
     if not running(h):
         return {}
     assert assessment_only, "live 257 is funded by the closed 266 assessment"
@@ -76,9 +94,11 @@ def price_owner(assessment_only):
 def priced_services(enumerate_services):
     units = enumerate_services()
     if GUARD in units:
-        _, _, h = evidence()
+        _, h = current_owner()
         g = props(GUARD, ["FragmentPath", "DropInPaths", "TriggeredBy"])
-        assert Path(g["FragmentPath"]).resolve() == V / "horizon-native257-guard-units-cold-closed266-after-v218" / GUARD
+        review = bound(bound(h["admission"])["review"])
+        prepared_guard = bound(review["preparation"])["units"][GUARD]
+        assert ref(Path(g["FragmentPath"]).resolve()) == prepared_guard
         assert not g["DropInPaths"] and g["TriggeredBy"] == TIMER
         assert bound(h["guard_plan"])["invocation_id"] == h["invocation_id"]
         timer = props(TIMER, ["ActiveState", "Unit", "Job"])
@@ -89,7 +109,7 @@ def priced_services(enumerate_services):
 
 
 def schedule(config, wrapper):
-    _, origin, h = evidence()
+    origin, h = current_owner()
     row = dict(epoch=257, unit=UNIT, expected_invocation_id=h["invocation_id"], main_pid=h["main_pid"],
                scratch_path=origin["private_run_root"], executable=h["harness"]["path"],
                executable_sha256=h["harness"]["sha256"])
