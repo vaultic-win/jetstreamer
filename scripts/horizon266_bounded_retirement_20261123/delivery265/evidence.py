@@ -45,7 +45,7 @@ def repair():
         if completed.exists():
             return ref(completed)
         if not directory.exists():
-            allocation = price(256*M, 2*M, 2*M)
+            allocation = price(256*M, 2*M, 2*M, closed_disk=True)
             ledger = D / ("horizon-bounded265-residual-" + directory.name)
             ledger.mkdir(mode=0o700)
             assigned = funds.put(ledger / "assignment.json", allocation)

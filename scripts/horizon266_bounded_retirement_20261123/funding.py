@@ -6,7 +6,7 @@ sys.path.insert(0,'/run/horizon266-bounded-tools-v208')
 import retry_fit
 from retry_fit import M,D,V,CG,partition,ref,bound
 
-def price(serial,retained,disk,*,consumer_build=False,prepare257=False):
+def price(serial,retained,disk,*,consumer_build=False,prepare257=False,closed_disk=False):
     assert __debug__ and os.geteuid()==0 and partition.locked(partition.LOCK,os.getpid())
     if consumer_build:
         assert (serial, retained, disk) == (6400*M, 256*M, 112*M)
@@ -31,10 +31,21 @@ def price(serial,retained,disk,*,consumer_build=False,prepare257=False):
     # A launch cannot enter this phase: all issuers use the same exclusive lock, the original
     # retry is consumed, and its guard and worker have drained. Keep the complete hard ledger.
     assert bound(ref(V/'horizon266-capped-bounded-v210-control/pilot/handoff.json'))==original
-    assert fit['remaining_265']>=retained and fit['disk_margin']>=disk
+    disk_margin = fit['disk_margin']
+    if closed_disk:
+        booking = bound(fit['closed265_delivery'])
+        assert booking['donor']['sha256'] == 'c2112c2cf4d97797dbf9d1d2c347c2e00c954c14eedba5572b621aa22e7588af'
+        release = bound(booking['donor'])
+        extent = fit['extent']
+        assert release['original'] == fit['issued'] and release['terminal'] == fit['closed266']
+        assert extent['identity'] == release['current']['identity'] and Path('/sys/block/loop18/ro').read_text().strip() == '1'
+        assert extent['first']['blocks'] == extent['second']['blocks'] == release['retained_backing_bytes']
+        assert extent['remaining'] == release['replaced_future_growth_bytes']
+        disk_margin += extent['remaining'] - release['qa_bytes'] - booking['disk']
+    assert fit['remaining_265']>=retained and disk_margin>=disk
     margin=fit['growth_margin']+book['producer']-serial-retained
     assert margin>=0 and serial+retained<=book['producer']
     return dict(fit,planning=planning,serial=serial,retained=retained,disk=disk,
                 serialized_phase_margin=margin,donor=fit['issued'],serialized_in_place_of_drained_producer=True,
-                remaining_265=fit['remaining_265']-retained,disk_margin_after_phase=fit['disk_margin']-disk,
+                remaining_265=fit['remaining_265']-retained,disk_margin_after_phase=disk_margin-disk,
                 owner_lock=str(partition.LOCK),general_capacity_credit=0,replay_admitted=False)
