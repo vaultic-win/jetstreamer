@@ -49,7 +49,8 @@ ORIGINAL={166,167,170}
 HERE = Path(__file__).resolve().parent
 RETRY_HANDOFF_145 = HERE == D / "tools-homefloor-145-handoff-v2"
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
-V5J_POST = HERE == D / "tools-homefloor-145-post-v5j-v1"
+V5J_RETRY_POST = HERE == D / "tools-homefloor-145-post-v5j-v2"
+V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
@@ -469,7 +470,7 @@ def fixture_post_directory(here):
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
         post_directory = fixture_post_directory(here)
-        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13d"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
                     "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
@@ -529,7 +530,7 @@ def phase145(epoch):
                and m["SubState"] == "dead" and m["MainPID"] == m["ControlPID"] == "0"
                and not any(m[k] for k in ("Job", "ControlGroup", "InvocationID", "TriggeredBy")),
                "previous 145 unit or claimant still present")
-        package = R / "epoch145-semantic-continuity-20261121-v1/tools-v13d"
+        package = R / "epoch145-semantic-continuity-20261121-v1" / ("tools-v13e" if V5J_RETRY_POST else "tools-v13d")
         build, _ = s.read(package / "build-proof.json", profile["build_sha256"])
         complete, _ = reader["completion"](s, build)
         s.need(s.show(fit.A145) == m and not fit.members(fit.A145), "145 name changed during post handoff")

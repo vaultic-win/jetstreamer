@@ -2,15 +2,24 @@
 use super::*;
 
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
+    let retry = cfg!(incident_v5j_retry1_post145_only);
     let handoff = Path::new(INCIDENT_POST_IMAGE)
         .parent()
         .and_then(Path::parent)
         .context("145 semantic package")?
-        .join("v5j-name-handoff");
+        .join(if retry {
+            "v5j-name-handoff-retry1"
+        } else {
+            "v5j-name-handoff"
+        });
     let (selected, report) = publication::frozen_json(&handoff.join("semantic-completion.json"))?;
     let (_, submission) = publication::frozen_json(&handoff.join("submission-result.json"))?;
     let (_, intent) = publication::frozen_json(&handoff.join("submission-intent.json"))?;
-    let old = "afcf6cdd1ec0400ea2757f81472987b3";
+    let old = if retry {
+        "48ad7b2234d74e74b0498e7110e0aee3"
+    } else {
+        "afcf6cdd1ec0400ea2757f81472987b3"
+    };
     let image_sha = "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4";
     let image = handoff
         .parent()
@@ -31,6 +40,11 @@ pub(crate) fn semantic_owner(export: &str) -> Result<()> {
             && report["invocation_id"] == export
             && submission["invocation_id"] == export
             && intent["original"]["INVOCATION_ID"] == old
+            && (!retry
+                || (intent["review_sha256"]
+                    == "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
+                    && intent["preflight"]["quote_provider"]["sha256"]
+                        == "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"))
             && intent["argv"] == submission["argv"]
             && argv.len() >= 5
             && argv[argv.len() - 5..]

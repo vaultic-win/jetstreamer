@@ -8,6 +8,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v8") pkg="${pkg%/*}/tools-v8" ;;
     "${pkg%/*}/tools-v9") pkg="${pkg%/*}/tools-v9" ;;
     "${pkg%/*}/tools-v10") pkg="${pkg%/*}/tools-v10" ;;
+    "${pkg%/*}/tools-v13e") pkg="${pkg%/*}/tools-v13e" ;;
     "${pkg%/*}/tools-v13d") pkg="${pkg%/*}/tools-v13d" ;;
     "${pkg%/*}/tools-v13c") pkg="${pkg%/*}/tools-v13c" ;;
     "${pkg%/*}/tools-v13b") pkg="${pkg%/*}/tools-v13b" ;;
@@ -42,8 +43,10 @@ publish)
     ;;
 *) exit 2 ;;
 esac
-if [[ $pkg == */tools-v13d ]]; then
-    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-v1/post-stop-fit
+if [[ $pkg == */tools-v13d || $pkg == */tools-v13e ]]; then
+    version=v1
+    if [[ $pkg == */tools-v13e ]]; then version=v2; fi
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-$version/post-stop-fit
     "$provider" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '
        .epoch == 145 and .fits == true and .candidate == null and .resource_credit_bytes == 0
        and .fleet == {path:$f,sha256:$h} and .phase145.stage == "v5j-semantic-complete"

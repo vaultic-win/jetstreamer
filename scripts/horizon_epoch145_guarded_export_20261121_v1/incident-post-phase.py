@@ -10,7 +10,8 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-V5J_SUCCESSOR = VERSION == "tools-v13d"
+V5J_RETRY = VERSION == "tools-v13e"
+V5J_SUCCESSOR = V5J_RETRY or VERSION == "tools-v13d"
 SAME_IMAGE_RETRY = VERSION == "tools-v13c"
 FIXTURE_SUCCESSOR = SAME_IMAGE_RETRY or VERSION in ("tools-v13", "tools-v13b")
 TIMER_SUCCESSOR = V5J_SUCCESSOR or FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
@@ -139,10 +140,16 @@ def fixture_semantic(s, build):
 
 def completion(s, build=None):
     if V5J_SUCCESSOR:
-        handoff = PKG.parent / "v5j-name-handoff"
+        handoff = PKG.parent / ("v5j-name-handoff-retry1" if V5J_RETRY else "v5j-name-handoff")
         selected, _ = s.read(handoff / "semantic-completion.json")
         result, _ = s.read(handoff / "submission-result.json")
         intent, _ = s.read(handoff / "submission-intent.json")
+        if V5J_RETRY:
+            s.need(intent["original"]["INVOCATION_ID"] == "48ad7b2234d74e74b0498e7110e0aee3"
+                   and intent["review_sha256"] == "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
+                   and intent["preflight"]["quote_provider"] == build["semantic_dispatch"]
+                   and build["semantic_dispatch"]["sha256"] == "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"
+                   and result["invocation_id"] != intent["original"]["INVOCATION_ID"], "foreign retry handoff")
         bootstrap = selected["invocation_id"]
         s.need(selected["schema"] == "horizon-145-v5j-semantic-completion-v1" and s.iid(bootstrap)
                and bootstrap == result["invocation_id"] and bootstrap != "afcf6cdd1ec0400ea2757f81472987b3"

@@ -35,6 +35,11 @@ if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
   flavor=fixture-rejoin
 fi
+v5j_retry_post=false
+if [[ $flavor == v5j-retry1-post ]]; then
+  v5j_retry_post=true
+  flavor=v5j-post
+fi
 v5j_post=false
 if [[ $flavor == v5j-post ]]; then
   v5j_post=true
@@ -109,6 +114,7 @@ if $retry3_rejoin; then extra+=(--cfg incident_retry3_145_only); fi
 if $retry4_rejoin; then extra+=(--cfg incident_retry4_145_only); fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
+if $v5j_retry_post; then extra+=(--cfg incident_v5j_retry1_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
@@ -263,6 +269,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     slice=/sys/fs/cgroup/horizonaudit.slice
     build_unit=horizon-145-homefloor-rejoin-build-v1.service
     if $v5j_post; then build_unit=horizon-145-v5j-post-build-v1.service; fi
+    if $v5j_retry_post; then build_unit=horizon-145-v5j-post-build-v2.service; fi
     [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
     [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
@@ -271,11 +278,15 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     jq -e --arg fleet "$1" --arg hash "$fleet_sha" '
         .fleet == {path:$fleet,sha256:$hash} and now-.recorded_unix_seconds >= 0
         and now-.recorded_unix_seconds <= 120' "$q/before.json" >/dev/null
+    if $v5j_retry_post; then
+      /usr/bin/python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/post_inputs.py" --retry1 verify-build-price "$q/before.json"
+    else
+      jq -e '.phase145.InvocationID == "afcf6cdd1ec0400ea2757f81472987b3"
+             and .phase145.failure.sha256 == "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366"
+             and .phase145.candidate.inode == 103237059
+             and .phase145.source_checkpoint_exists == false' "$q/before.json" >/dev/null
+    fi
     jq -e '.epoch == 145 and .fits and .candidate == null and .replay_launch_authorized == false
-           and .phase145.InvocationID == "afcf6cdd1ec0400ea2757f81472987b3"
-           and .phase145.failure.sha256 == "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366"
-           and .phase145.candidate.inode == 103237059
-           and .phase145.source_checkpoint_exists == false
            and .recovery_obligations.public_storage.remaining_archive_growth_bytes == 0
            and .recovery_obligations.prefix.maximum_HOME_allocation_bytes == 16777216
            and .recovery_obligations.missing_mirror_bytes >= 0 and .candidate136.cap == 77309411328' "$q/before.json" >/dev/null
@@ -354,6 +365,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $registered_v7b; then phase_package=tools-v13b; fi
   if $registered_v7c; then phase_package=tools-v13c; fi
   if $v5j_post; then phase_package=tools-v13d; fi
+  if $v5j_retry_post; then phase_package=tools-v13e; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   if $v5j_post; then

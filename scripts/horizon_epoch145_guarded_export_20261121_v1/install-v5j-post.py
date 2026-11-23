@@ -13,16 +13,19 @@ R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 FIT = R / "incident-replay-fit-20261121-v1"
 DONOR = FIT / "tools-homefloor-145-rejoin-v4"
-TARGET = FIT / "tools-homefloor-145-post-v5j-v1"
-POST = BASE / "tools-v13d"
-DISPATCH = FIT / "tools-homefloor-145-handoff-v1"
+RETRY = sys.argv[1:2] == ["--retry1"]
+TARGET = FIT / ("tools-homefloor-145-post-v5j-v2" if RETRY else "tools-homefloor-145-post-v5j-v1")
+POST = BASE / ("tools-v13e" if RETRY else "tools-v13d")
+DISPATCH = FIT / ("tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
+DISPATCH_SHA = ("1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else
+                "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de")
 FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 SOURCE_PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
 REPO = Path("/home/sol/workspace/jetstreamer")
 SEALER = Path("/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment")
 SEAL_SHA = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 DONOR_SHA = "ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
-UNIT = "horizon-145-v5j-post-build-v1.service"
+UNIT = "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
 SEAL = "deployment-seal-receipt.json"
 
 
@@ -112,7 +115,7 @@ def main(commit, iid):
     rows = [json.loads(x) for x in journal.splitlines()]
     success, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
     start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
-    require(" v5j-post " in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
+    require((" v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
             and not (Path("/sys/fs/cgroup/horizonaudit.slice") / UNIT).exists(), "build has not completed")
     outputs = q / "products"
     inputs = {}
@@ -127,14 +130,14 @@ def main(commit, iid):
     log = (q / "build.log").read_text()
     require(all(n + " ... ok" in log for n in required_tests) and "test result: FAILED" not in log
             and log.count("test result: ok.") == 4 and log.count("\nOK\n") == 2
-            and re.search(r"Ran 6 tests in ", log) and re.search(r"Ran 2 tests in ", log), "native/adapter test incomplete")
+            and re.search(r"Ran 7 tests in ", log) and re.search(r"Ran 2 tests in ", log), "native/adapter test incomplete")
     image = outputs / "export145"
     image_sha = ref(image)["sha256"]
     artifacts = dict((Path(path).name, sha) for sha, path in (row.split("  ", 1) for row in (q / "artifacts").read_text().splitlines()))
     require(artifacts["export145"] == image_sha and str(POST / "export145").encode() in image.read_bytes()
             and str(TARGET / "post-stop-fit").encode() in image.read_bytes(), "unregistered native image")
     src = outputs / "source" / FAMILY
-    model = json.loads(subprocess.check_output([sys.executable, "-IB", src / "post_inputs.py", "inspect"]))
+    model = json.loads(subprocess.check_output([sys.executable, "-IB", src / "post_inputs.py", *(["--retry1"] if RETRY else []), "inspect"]))
     need_refs = model["artifacts"]
     price = json.loads((q / "before.json").read_bytes())
     require(price["fits"] and price["resource_credit_bytes"] == 0 and price["candidate"] is None and price["epoch"] == 145
@@ -142,7 +145,7 @@ def main(commit, iid):
             and price["available_HOME_bytes"] - price["complete_required_HOME_bytes"] >= 92274688 + 16777216
             and (q / "memory.peak").read_text().strip().isdigit(), "unfunded build")
     require(ref(SEALER)["sha256"] == SEAL_SHA and ref(DONOR / SEAL)["sha256"] == DONOR_SHA
-            and ref(DISPATCH / SEAL)["sha256"] == "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de",
+            and ref(DISPATCH / SEAL)["sha256"] == DISPATCH_SHA,
             "changed donor or sealer")
     proof = dict(schema="horizon-145-v5j-post-build-v1", source_commit=commit, source_hashes=inputs,
                  verifier_sha256=image_sha, semantic_image=ref(BASE / "tools-v5j/export145"), artifact_hashes=artifacts,
@@ -184,4 +187,4 @@ def main(commit, iid):
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(*sys.argv[1:]), sort_keys=True))
+    print(json.dumps(main(*(sys.argv[2:] if RETRY else sys.argv[1:])), sort_keys=True))

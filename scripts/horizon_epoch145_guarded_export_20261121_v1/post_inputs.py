@@ -19,10 +19,12 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
-DISPATCH = R / "incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v1"
+RETRY = (Path(__file__).resolve().parent.name == "tools-v13e" or
+         (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--retry1"]))
+DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
 PAIR = R / "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"
 PAIR_SHA = "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4"
-DISPATCH_SEAL = "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
+DISPATCH_SEAL = "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
 ORIGINAL = "de6780b860b3467bae21fbd19176ca14"
 ARCHIVE = Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/epoch-145.jet")
 ANCHORS = Path("/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1")
@@ -174,15 +176,45 @@ def semantic(d):
     return receipt
 
 
+def verify_build_price(d, price):
+    review = json.loads(d["read"](DISPATCH / "admission-review.json", d["REVIEW_SHA"])[0])
+    host = d["Host"](review, None)
+    def handoff(name):
+        return json.loads(d["read"](d["HANDOFF"] / name)[0])
+    intent = handoff("submission-intent.json")
+    result = handoff("submission-result.json")
+    manager, events = host.state()
+    host.check_intent(intent)
+    iid = result["invocation_id"]
+    phase = price["phase145"]
+    started = d["bound"](phase["window"]["recovery"])
+    need(result == host.accepted(manager, events, intent) and manager["InvocationID"] == iid
+         and intent["original"]["INVOCATION_ID"] == d["OLD"]
+         and phase["stage"] == "leased-worker" and phase["invocation_id"] == iid
+         and phase["window"]["recovery"]["path"] == str(d["STATE"] / iid / "recovery-started.json")
+         and started["iid"] == iid and started["image"] == d["IMAGE_SHA"] and started["r2_mutations"] is False
+         and started["fresh_fit"]["phase145"]["window"]["native_parent"] == phase["window"]["native_parent"]
+         and started["fresh_fit"]["serial_145_holding_handback"] == intent["preflight"]["serial_handback"],
+         "build price is outside the running paid verifier generation")
+    d["retained"](review)
+    d["retry_handback"](review, price)
+
+
 def main():
-    need(os.geteuid() == 0 and sys.flags.isolated and __debug__ and sys.argv[1:] in (["inspect"], ["capture"]),
+    args = sys.argv[2:] if RETRY and sys.argv[1:2] == ["--retry1"] else sys.argv[1:]
+    if RETRY and len(args) == 2 and args[0] == "verify-build-price":
+        need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
+        d = load_dispatch()
+        verify_build_price(d, json.loads(d["read"](Path(args[1]))[0]))
+        return
+    need(os.geteuid() == 0 and sys.flags.isolated and __debug__ and args in (["inspect"], ["capture"]),
          "expected inspect or capture, as root")
     d = load_dispatch()
     git = lambda *args: subprocess.check_output(["runuser", "-u", "sol", "--", "git", "-C",
                               "/home/sol/workspace/jetstreamer", *args], text=True, timeout=30)
     artifacts = original_pair(d, git)
     verified = semantic(d)
-    if sys.argv[1] == "capture":
+    if args == ["capture"]:
         need(verified is not None, "waiting for the v5j semantic invocation and PID1 success")
         path = d["HANDOFF"] / "semantic-completion.json"
         with (d["HANDOFF"] / "dispatch.lock").open("rb") as lock:

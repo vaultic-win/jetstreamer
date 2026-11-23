@@ -5,7 +5,7 @@ import json
 import runpy
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("post_inputs", Path(__file__).with_name("post_inputs.py"))
@@ -99,59 +99,100 @@ class PublicationInputs(unittest.TestCase):
             p.validate_terminal(*f)
 
     def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
-        with tempfile.TemporaryDirectory() as td:
-            root = Path(td)
-            pkg = root / "family/tools-v13d"
-            pkg.mkdir(parents=True)
-            src = Path(__file__).with_name("incident-post-phase.py")
-            deployed = pkg / src.name
-            deployed.write_bytes(src.read_bytes())
-            complete = runpy.run_path(str(deployed))["completion"]
-            state = root / "state"
-            name = pkg.parent / "v5j-name-handoff"
-            name.mkdir()
-            original = state / IID
-            original.mkdir(parents=True)
-            output = root / "output"
-            output.mkdir()
+        for version in ("tools-v13d", "tools-v13e"):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as td:
+                self.exercise_adapter(Path(td), version)
 
-            class Status:
-                need = staticmethod(p.need)
-                iid = staticmethod(lambda v: isinstance(v, str) and len(v) == 32 and all(c in "0123456789abcdef" for c in v))
-                @staticmethod
-                def read(path, sha=None):
-                    raw = path.read_bytes()
-                    actual = hashlib.sha256(raw).hexdigest()
-                    p.need(sha is None or sha == actual, "foreign receipt")
-                    return json.loads(raw), {"path": str(path), "sha256": actual}
-                @staticmethod
-                def bound(ref, path):
-                    p.need(ref["path"] == str(path), "different path")
-                    return Status.read(path, ref["sha256"])[0]
-            def write(path, val):
-                path.write_text(json.dumps(val))
-                return Status.read(path)[1]
-            f = fixture()
-            start, verified, extract, done = [v[0] for v in f[-1]]
-            archive = output / "epoch-145.jet"
-            extract["extraction"]["archive"] = str(archive)
-            sr = write(original / "recovery-started.json", start)
-            vr = write(original / "verified-frozen.json", verified)
-            extract.update(verified_frozen=vr, recovery_evidence=sr)
-            er = write(original / "extraction-complete.json", extract)
-            dr = write(original / "complete.json", dict(done, receipt=er))
-            proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
-            receipt = name / "semantic-completion.json"
-            write(receipt, proof)
-            args = [str(pkg.parent / "tools-v5j/export145"), "recover-full-output", "/fleet", "1"*64, "f"*64]
-            write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
-            write(name / "submission-intent.json", dict(argv=args))
-            build = {"semantic_image": {"sha256": "f"*64}}
-            with patch.dict(complete.__globals__, STATE=state, OUTPUT=output, ARCHIVE=archive, PKG=pkg):
-                self.assertEqual(complete(Status(), build), (dr, extract["extraction"]))
-                write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))
-                with self.assertRaisesRegex(ValueError, "different bound v5j"):
-                    complete(Status(), build)
+    def exercise_adapter(self, root, version):
+        retry = version == "tools-v13e"
+        pkg = root / "family" / version
+        pkg.mkdir(parents=True)
+        src = Path(__file__).with_name("incident-post-phase.py")
+        deployed = pkg / src.name
+        deployed.write_bytes(src.read_bytes())
+        complete = runpy.run_path(str(deployed))["completion"]
+        state = root / "state"
+        name = pkg.parent / ("v5j-name-handoff-retry1" if retry else "v5j-name-handoff")
+        name.mkdir()
+        original = state / IID
+        original.mkdir(parents=True)
+        output = root / "output"
+        output.mkdir()
+
+        class Status:
+            need = staticmethod(p.need)
+            iid = staticmethod(lambda v: isinstance(v, str) and len(v) == 32 and all(c in "0123456789abcdef" for c in v))
+            @staticmethod
+            def read(path, sha=None):
+                raw = path.read_bytes()
+                actual = hashlib.sha256(raw).hexdigest()
+                p.need(sha is None or sha == actual, "foreign receipt")
+                return json.loads(raw), {"path": str(path), "sha256": actual}
+            @staticmethod
+            def bound(ref, path):
+                p.need(ref["path"] == str(path), "different path")
+                return Status.read(path, ref["sha256"])[0]
+        def write(path, val):
+            path.write_text(json.dumps(val))
+            return Status.read(path)[1]
+        f = fixture()
+        start, verified, extract, done = [v[0] for v in f[-1]]
+        archive = output / "epoch-145.jet"
+        extract["extraction"]["archive"] = str(archive)
+        sr = write(original / "recovery-started.json", start)
+        vr = write(original / "verified-frozen.json", verified)
+        extract.update(verified_frozen=vr, recovery_evidence=sr)
+        er = write(original / "extraction-complete.json", extract)
+        dr = write(original / "complete.json", dict(done, receipt=er))
+        proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
+        receipt = name / "semantic-completion.json"
+        write(receipt, proof)
+        args = [str(pkg.parent / "tools-v5j/export145"), "recover-full-output", "/fleet", "1"*64, "f"*64]
+        write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
+        dispatch = {"path": "/sealed-dispatch", "sha256": "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee"}
+        intent = dict(argv=args, original={"INVOCATION_ID": "48ad7b2234d74e74b0498e7110e0aee3"},
+                      review_sha256="38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07",
+                      preflight={"quote_provider":dispatch})
+        write(name / "submission-intent.json", intent)
+        build = {"semantic_image": {"sha256": "f"*64}, "semantic_dispatch": dispatch}
+        with patch.dict(complete.__globals__, STATE=state, OUTPUT=output, ARCHIVE=archive, PKG=pkg):
+            self.assertEqual(complete(Status(), build), (dr, extract["extraction"]))
+            if retry:
+                for change in (dict(review_sha256="0"*64), dict(original={"INVOCATION_ID": "afcf6cdd1ec0400ea2757f81472987b3"}),
+                               dict(preflight={"quote_provider":dict(dispatch, sha256="0"*64)})):
+                    write(name / "submission-intent.json", dict(intent, **change))
+                    with self.assertRaisesRegex(ValueError, "foreign retry handoff"):
+                        complete(Status(), build)
+                write(name / "submission-intent.json", intent)
+            write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))
+            with self.assertRaisesRegex(ValueError, "different bound v5j"):
+                complete(Status(), build)
+
+    def test_post_build_price_selects_only_current_leased_retry(self):
+        parent = {"pid": 123, "start_ticks": 45}
+        old = "48ad7b2234d74e74b0498e7110e0aee3"
+        state, handoff = Path("/state"), Path("/handoff")
+        result = {"invocation_id": IID}
+        refs = [{"path":"166"}, {"path":"168"}]
+        intent = {"original":{"INVOCATION_ID":old}, "preflight":{"serial_handback":refs}}
+        host = Mock()
+        host.state.return_value = ({"InvocationID":IID}, [])
+        host.accepted.return_value = result
+        receipts = {p.DISPATCH / "admission-review.json":{}, handoff / "submission-intent.json":intent,
+                    handoff / "submission-result.json":result}
+        started = dict(iid=IID, image="f"*64, r2_mutations=False,
+                       fresh_fit={"phase145":{"window":{"native_parent":parent}}, "serial_145_holding_handback":refs})
+        d = {"Host":lambda *args:host, "HANDOFF":handoff, "STATE":state, "OLD":old, "IMAGE_SHA":"f"*64,
+             "read":lambda path,*args:(json.dumps(receipts[path]).encode(),{}), "REVIEW_SHA":"b"*64,
+             "bound":lambda ref:started, "retained":Mock(), "retry_handback":Mock()}
+        window = {"native_parent":parent, "recovery":{"path":str(state / IID / "recovery-started.json")}}
+        phase = {"stage":"leased-worker", "invocation_id":IID, "window":window}
+        p.verify_build_price(d, {"phase145":phase})
+        for change in (dict(invocation_id=old), dict(stage="controller"),
+                       dict(window=dict(window, native_parent=dict(parent, start_ticks=44))),
+                       dict(window=dict(window, recovery={"path":"/other"}))):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                p.verify_build_price(d, {"phase145":dict(phase, **change)})
 
 
 if __name__ == "__main__":
