@@ -34,7 +34,7 @@ def install():
         f.write(source);f.flush();os.fchmod(f.fileno(),0o400);os.fsync(f.fileno())
     os.replace(temp,target)
 
-def consume():
+def consume(version=214):
     import fcntl
     # Use the exact same continuation functions and one owner lock after the live-row consumer exited.
     path=EVENT/'continue_closed.py'
@@ -43,7 +43,7 @@ def consume():
     ns={'__file__':str(path)}
     exec(compile(source[:source.index("result=D/'horizon266-bounded-retry-terminal-status")],str(path),'exec'),ns)
     assert lane.bound(lane.ref(TERMINAL))['producer_drained']
-    version=214
+    assert version >= 214 and ns['fleet'](version - 1).is_file()
     with (ns['launch']/'closed-consumer.lock').open('rb') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:

@@ -51,6 +51,7 @@ def price(s):
 
 
 def status(s):
+    s=replace(s,"  if n==265:\n   elapsed=", "  if n==265 and not lane.CLAIM.exists():\n   elapsed=")
     s=replace(s,'from ordinary249 import delivery249 as lane249\n','from ordinary249 import delivery249 as lane249\n'+IMPORT)
     s=replace(s,'249:lane249}.get(n)','249:lane249,265:lane265}.get(n)')
     s=replace(s,' if n in range(247,252):',' if n in range(247,252) or (n==265 and lane.CLAIM.exists()):')
