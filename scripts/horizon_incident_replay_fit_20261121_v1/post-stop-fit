@@ -47,8 +47,9 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-FIVE_LANE_145 = HERE.name == "tools-homefloor-145-rejoin-v2"
-RETRY3_168 = HERE.name == "tools-homefloor-cold168-retry3-v1"
+RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
+FIVE_LANE_145 = RETRY3_145 or HERE.name == "tools-homefloor-145-rejoin-v2"
+RETRY3_168 = RETRY3_145 or HERE.name == "tools-homefloor-cold168-retry3-v1"
 FIFTH168 = RETRY3_168 or FIVE_LANE_145 or HERE.name in {"tools-homefloor-cold168-retry2-v1", "tools-homefloor-cold168-retry2-v2"}
 FOURTH166 = FIFTH168 or HERE.name == "tools-homefloor-166-after170-v1"
 PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
@@ -449,7 +450,8 @@ def fixture_post_directory(here):
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
         post_directory = fixture_post_directory(here)
-        profiles = {"five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
+        profiles = {"retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
+                    "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
                     "homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
                     "semantic": ("profile145-focused-semantic.json", "tools-v5d"),
                     "post": ("profile145-focused-post.json", "tools-v9"),
@@ -495,7 +497,8 @@ def phase145(epoch):
         # live generation must pass its own sealed verifier and native lease checks.
         here = Path(__file__).resolve()
         if ((here.parent / "profile145-homefloor-semantic.json").is_file() or FIVE_LANE_145) and fit.members(fit.A145):
-            focused = "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic"
+            focused = ("retry3-semantic" if RETRY3_145 else
+                       "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic")
             cfg, adapter, _ = profile145(here.parent, focused=focused)
             reader = runpy.run_path(str(adapter))
             phase = reader["inspect"](s, fit.overlap.leases, s.show(fit.A145), fit.members(fit.A145),
