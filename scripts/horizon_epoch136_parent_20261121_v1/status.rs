@@ -5,16 +5,21 @@ use std::os::fd::AsRawFd;
 use std::os::unix::fs::OpenOptionsExt;
 use std::process::{Command, Stdio};
 
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 const BRIDGE_PKG: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch168-terminal-status-20261121-v1/publisher-v1";
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 const BRIDGE_SEAL: &str = "76283826f8700557ffa359aa274ba991f7f644302476dde78e436c1011d4ed53";
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 const NEXT_PKG: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch166-post168-cadence-20261121-v1/publisher-v1";
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 const NEXT_SEAL: &str = "923519c0d6f031594b9b5b34195af8b37772c25553c5cb7d195f8ec66e7c276c";
 const PREFIX_PKG: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/prefix140-status-cadence-20261122-v1/cadence-tools";
 const PREFIX_SEAL: &str = "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e";
 static SELECTED: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 fn bridge_package(consumer: &Path) -> Result<(&'static str, &'static str)> {
     for (pkg, seal) in [
         (BRIDGE_PKG, BRIDGE_SEAL),
@@ -52,6 +57,43 @@ pub fn take_lock(path: &Path, create: bool) -> Result<File> {
     );
     Ok(file)
 }
+#[cfg(feature = "v5n-semantic")]
+fn verify_bridge() -> Result<()> {
+    let package = Path::new(PREFIX_PKG);
+    let seal = pinned(&package.join("deployment-seal-receipt.json"), PREFIX_SEAL)?;
+    ensure!(
+        seal["destination"] == json!(package),
+        "foreign original status transport"
+    );
+    for m in seal["members"]
+        .as_array()
+        .context("sealed transport members")?
+    {
+        let name = text(&m["name"])?;
+        ensure!(
+            Path::new(name).file_name().and_then(|n| n.to_str()) == Some(name)
+                && bound(&package.join(name))?["sha256"] == m["sha256"],
+            "changed status transport member"
+        );
+    }
+    ensure!(
+        SELECTED.get_or_init(|| PREFIX_PKG) == &PREFIX_PKG,
+        "changed 136 transport package"
+    );
+    let owner = bridge("v5n-owner", &Value::Null)?;
+    let ready = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch145-v5n-136-dispatch-20261123-v1/READY.json",
+    );
+    if ready.try_exists()? {
+        let registered = immutable(&bound(ready)?)?;
+        ensure!(
+            registered["status_consumer_seal"] == owner["consumer_seal"],
+            "status owner changed after V5n READY"
+        );
+    }
+    Ok(())
+}
+#[cfg(not(feature = "v5n-semantic"))]
 fn verify_bridge() -> Result<()> {
     let publisher = "horizon-archive-status-cadence-after172-20261120-v1.service";
     let unit = native(publisher)?;
@@ -87,6 +129,7 @@ fn verify_bridge() -> Result<()> {
     );
     Ok(())
 }
+#[cfg(any(not(feature = "v5n-semantic"), test))]
 fn verify_consumer(folder: &str, seal: &str, pid: i32, lock: &Path) -> Result<()> {
     let pkg = Path::new(folder);
     let s = pinned(&pkg.join("deployment-seal-receipt.json"), seal)?;
@@ -136,20 +179,23 @@ fn bridge(op: &str, body: &Value) -> Result<Value> {
     bridge_timeout(op, body, 14)
 }
 fn bridge_timeout(op: &str, body: &Value, seconds: u64) -> Result<Value> {
-    let mut c = Command::new("/usr/bin/timeout")
-        .args([
-            "--kill-after=1",
-            &seconds.to_string(),
-            "/usr/bin/python3",
-            "-I",
-            "-B",
-            "-c",
-            include_str!("transport.py"),
-            op,
-            SELECTED
-                .get()
-                .context("status publisher has not been verified")?,
-        ])
+    let mut c = Command::new("/usr/bin/timeout");
+    c.args([
+        "--kill-after=1",
+        &seconds.to_string(),
+        "/usr/bin/python3",
+        "-I",
+        "-B",
+        "-c",
+        include_str!("transport.py"),
+        op,
+        SELECTED
+            .get()
+            .context("status publisher has not been verified")?,
+    ]);
+    #[cfg(feature = "v5n-semantic")]
+    c.arg(env!("HORIZON_136_PROVIDER_SEAL_SHA256"));
+    let mut c = c
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

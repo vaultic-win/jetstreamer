@@ -5,6 +5,8 @@ import unittest
 
 
 HANDOFF = runpy.run_path(str(Path(__file__).with_name("v5n_boundary.py")))
+DONOR = runpy.run_path(str(Path(__file__).parent.parent /
+                          "horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"))
 
 
 class CompletionJoin(unittest.TestCase):
@@ -50,6 +52,32 @@ class CompletionJoin(unittest.TestCase):
         crossed["completion"]["sha256"] = "c" * 64
         with self.assertRaises(ValueError):
             HANDOFF["join"](self.inputs, crossed, self.phase)
+
+
+class SharedDonor(unittest.TestCase):
+    def setUp(self):
+        self.token = "00:1a:3453440"
+        self.lock = f"42: FLOCK ADVISORY WRITE 16 {self.token} 0 EOF"
+        self.candidate = dict(writer=dict(pid=16, start_ticks=100, invocation_id="a" * 32), occupied=False)
+
+    def test_endorsed_writer_and_exact_waiting_payload(self):
+        self.assertEqual(DONOR["donor_users"](self.candidate, self.token, [self.lock]),
+                         {DONOR["WRITER136"]: [16]})
+        waiting = dict(self.candidate, occupied=True, identity=dict(unit=DONOR["PAYLOAD136"], processes=[[17, 50]]))
+        self.assertEqual(DONOR["donor_users"](waiting, self.token, [self.lock]),
+                         {DONOR["WRITER136"]: [16], DONOR["PAYLOAD136"]: [17]})
+        waiting["identity"]["processes"].append([18, 60])
+        with self.assertRaises(ValueError):
+            DONOR["donor_users"](waiting, self.token, [self.lock])
+
+    def test_unchanged_idle_gate_and_foreign_or_changed_lock(self):
+        self.assertEqual(DONOR["donor_users"](None, self.token, []), {})
+        with self.assertRaises(ValueError):
+            DONOR["donor_users"](None, self.token, [self.lock])
+        for change in ([], [self.lock, self.lock], [self.lock.replace("WRITE 16", "WRITE 17")],
+                       [self.lock.replace("0 EOF", "4 EOF")], [self.lock.replace("WRITE", "READ")]):
+            with self.subTest(locks=change), self.assertRaises(ValueError):
+                DONOR["donor_users"](self.candidate, self.token, change)
 
 
 if __name__ == "__main__":

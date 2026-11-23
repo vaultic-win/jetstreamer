@@ -7,7 +7,11 @@ const V5N_REVIEW: &str = "73439c7bff8fbd6ab806ab70f7e8953dae890c8e3b783ab7b8d7c3
 const V5N_DISPATCH: &str = "080e95f9c7be162980589d1513c25ff2a4638d9e00d163a60e12c6d2475a5308";
 
 fn guard_walk_start(base: &Path, started: &Value, intent: &Value) -> Result<()> {
-    let post = base.join("tools-v13h");
+    let post = base.join(if cfg!(incident_v5n_136_post145_only) {
+        "tools-v13i"
+    } else {
+        "tools-v13h"
+    });
     let (_, seal) = publication::frozen_json(&post.join("deployment-seal-receipt.json"))?;
     let (proof, build) = publication::frozen_json(&post.join("build-proof.json"))?;
     let (binding, family) = publication::frozen_json(&base.join("V5N_RUNTIME_BINDINGS.json"))?;

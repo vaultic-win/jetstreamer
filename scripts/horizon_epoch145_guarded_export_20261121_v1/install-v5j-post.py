@@ -13,11 +13,14 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 FIT = R / "incident-replay-fit-20261121-v1"
-GUARD_POST = sys.argv[1:2] == ["--guard-walk"]
+V5N_136 = sys.argv[1:2] == ["--guard-walk-136"]
+GUARD_POST = V5N_136 or sys.argv[1:2] == ["--guard-walk"]
 MISSED_POST = GUARD_POST or sys.argv[1:2] == ["--missed-clock"]
 LEASE_POST = MISSED_POST or sys.argv[1:2] == ["--lease-ready"]
 RETRY = LEASE_POST or sys.argv[1:2] == ["--retry1"]
-if GUARD_POST:
+if V5N_136:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5n-136-v1", "tools-v13i", "tools-homefloor-145-handoff-v5", None)
+elif GUARD_POST:
     target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5n-v1", "tools-v13h", "tools-homefloor-145-handoff-v5", None)
 elif MISSED_POST:
     target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5m-v1", "tools-v13g", "tools-homefloor-145-handoff-v4",
@@ -39,7 +42,7 @@ REPO = Path("/home/sol/workspace/jetstreamer")
 SEALER = Path("/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment")
 SEAL_SHA = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 DONOR_SHA = "b2e28f51da8e428c106a23b3e5d73a6d92b1aca84043e82d1e662387d2c18b96" if MISSED_POST else "ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
-UNIT = "horizon-145-v5n-post-build-v1.service" if GUARD_POST else "horizon-145-v5m-post-build-v1.service" if MISSED_POST else "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
+UNIT = "horizon-145-v5n-136-post-build-v1.service" if V5N_136 else "horizon-145-v5n-post-build-v1.service" if GUARD_POST else "horizon-145-v5m-post-build-v1.service" if MISSED_POST else "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
 SEAL = "deployment-seal-receipt.json"
 
 
@@ -112,9 +115,11 @@ def install(dest, members, planpath):
     return ref(dest / SEAL)
 
 
-def main(commit, iid):
+def main(commit, iid, writer_sha=None):
     require(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
     require(re.fullmatch("[0-9a-f]{40}", commit) and re.fullmatch("[0-9a-f]{32}", iid), "use exact commit and invocation")
+    require((re.fullmatch("[0-9a-f]{64}", writer_sha or "") is not None) == V5N_136,
+            "the 136 route requires the exact new writer deployment seal")
     q = BASE / ("incident-build-" + iid)
     require(q.resolve(strict=True) == q and q.stat().st_uid == 0 and q.stat().st_mode & 0o077 == 0,
             "untrusted build root")
@@ -129,7 +134,7 @@ def main(commit, iid):
     rows = [json.loads(x) for x in journal.splitlines()]
     success, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
     start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
-    require((" v5n-post " if GUARD_POST else " v5m-post " if MISSED_POST else " v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
+    require((" v5n-136-post " if V5N_136 else " v5n-post " if GUARD_POST else " v5m-post " if MISSED_POST else " v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
             and not (Path("/sys/fs/cgroup/horizonaudit.slice") / UNIT).exists(), "build has not completed")
     outputs = q / "products"
     inputs = {}
@@ -207,6 +212,22 @@ def main(commit, iid):
     profile = {"image_sha256": image_sha, "build_sha256": ref(POST/"build-proof.json")["sha256"],
                "adapter_sha256": ref(POST/"incident-post-phase.py")["sha256"], "seal_sha256": post["sha256"]}
     members[profile_name] = item(profile_name, record(q/profile_name, profile), 0o444)
+    if V5N_136:
+        writer = R / "epoch136-joint-writer-20261123-v8/controller"
+        writer_seal = writer / SEAL
+        require(ref(writer_seal)["sha256"] == writer_sha, "different original V8 controller seal")
+        deployment = json.loads(writer_seal.read_bytes())
+        require(deployment["destination"] == str(writer) and deployment["sealer_sha256"] == SEAL_SHA
+                and deployment["remote_mutations"] is False, "foreign V8 deployment")
+        member, = [m for m in deployment["members"] if m["name"] == "admit136" and m["mode"] == "0555"]
+        require(ref(writer / "admit136")["sha256"] == member["sha256"], "V8 controller image changed")
+        name = "profile136-fixture-writer.json"
+        members[name] = item(name, record(q / name, dict(seal_sha256=writer_sha, image_sha256=member["sha256"])), 0o444)
+        provider_sources = {"retry4_status.py": "scripts/horizon_incident_replay_fit_20261121_v1/retry4_status.py",
+                            "build_159_price.py": str(FAMILY / "build_159_price.py")}
+        for name, source in provider_sources.items():
+            staged = write(q / ("provider-" + name), git("show", commit + ":" + source))
+            members[name] = item(name, staged, 0o444)
     fit = install(TARGET, list(members.values()), q/"post-provider-plan.json")
     return dict(post=post, provider=fit, compiler_outputs=ref(q/"artifacts"), build_proof=ref(POST/"build-proof.json"),
                 current_reader=need_refs["qualification"], original_pair=need_refs["pair"], public_origin=model["public_origin"],

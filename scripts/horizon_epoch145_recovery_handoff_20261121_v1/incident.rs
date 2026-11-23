@@ -143,7 +143,7 @@ pub(super) mod generation {
         pub(crate) const FAILURE: &str =
             "da29d82a4349444ccc15e0be020aa12918ae5bbb4634f9b62e13cc83a93c5f43";
     }
-    #[cfg(feature = "retry-post")]
+    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
     mod selected {
         pub(crate) const SOURCE: &str = "afcf6cdd1ec0400ea2757f81472987b3";
         pub(crate) const START: &str =
@@ -159,17 +159,45 @@ pub(super) mod generation {
         pub(crate) const FAILURE: &str =
             "38d828362fed1910cc60c605200380576c165168738dbf00520ce2b2522a0fcd";
     }
+    #[cfg(feature = "v5n-136-post")]
+    mod selected {
+        pub(crate) const SOURCE: &str = "f86e7e61f4b34dc7aedc4e08a128e713";
+        pub(crate) const START: &str =
+            "epoch145-semantic-continuity-20261121-v1/v5n-name-handoff/submission-result.json";
+        pub(crate) const ADVANCING: &str =
+            "57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e";
+        pub(crate) const PKG: &str = "epoch145-semantic-continuity-20261121-v1/tools-v13h";
+        pub(crate) const STATE_PATH: &str = "epoch145-v5n-136-dispatch-20261123-v1/state";
+        pub(crate) const FIT_PKG: &str =
+            "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1";
+    }
     pub(crate) use selected::*;
     pub(crate) const SEAL: &str = env!("HORIZON_145_POST_SEAL_SHA256");
     pub(crate) const FIT_SEAL: &str = env!("HORIZON_145_FIT_SEAL_SHA256");
+    #[cfg(not(feature = "v5n-136-post"))]
     pub(crate) const IMAGE: &str =
         "016f1beab41795dae2bbaa1cef5173773eeafae617a5f5db92ebd4aaa1887c21";
+    #[cfg(not(feature = "v5n-136-post"))]
     pub(crate) const SEMANTIC: &str =
         "epoch145-semantic-continuity-20261121-v1/tools-v5f/export145";
+    #[cfg(feature = "v5n-136-post")]
+    pub(crate) const IMAGE: &str =
+        "d6bc752180c265f6d680464ffec7ac2cc6bc4125440ef6ac1bb43534f3db2c34";
+    #[cfg(feature = "v5n-136-post")]
+    pub(crate) const SEMANTIC: &str =
+        "epoch145-semantic-continuity-20261121-v1/tools-v5n/export145";
     pub(crate) const PIPELINE: &str =
         "0f29fd116ef54668698089c01f8cd50ffcf729b430e311bb90b989f4d5ad8e94";
-    pub(crate) const INSPECT: &str = "inspect-v5f";
-    pub(crate) const FOLLOW: &str = "follow-v5f";
+    pub(crate) const INSPECT: &str = if cfg!(feature = "v5n-136-post") {
+        "inspect-v5n"
+    } else {
+        "inspect-v5f"
+    };
+    pub(crate) const FOLLOW: &str = if cfg!(feature = "v5n-136-post") {
+        "follow-v5n"
+    } else {
+        "follow-v5f"
+    };
 }
 
 pub fn handles(mode: &str) -> bool {
@@ -264,6 +292,7 @@ fn funded(boundary: impl Fn() -> Result<Option<fs::File>>) -> Result<(Value, Opt
         outcome::wait_file(&next)?;
     }
 }
+#[cfg(not(feature = "v5n-136-post"))]
 fn original() -> Result<Value> {
     let a = pinned(&rt(START), ADVANCING)?;
     let manager = from_ref(&a["manager"])?;
@@ -323,6 +352,46 @@ fn original() -> Result<Value> {
     }
     Ok(a)
 }
+
+#[cfg(feature = "v5n-136-post")]
+fn original() -> Result<Value> {
+    let result = pinned(&rt(START), ADVANCING)?;
+    let handoff = rt("epoch145-semantic-continuity-20261121-v1/v5n-name-handoff");
+    let init = handoff.join("submission-intent.json");
+    let intent = pinned(
+        &init,
+        "d15dfa6d3212f8a868bd00ac5df3ef26eee42466c0ac7afc7f0e9ab42aa2f23e",
+    )?;
+    let state = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
+    let start_ref = bound(&state.join("recovery-started.json"))?;
+    let start = from_ref(&start_ref)?;
+    let snapshot_path = Path::new("/home/sol/.jetstreamer-private/epoch145-lease-stop-20261123")
+        .join(format!("v5n-{SOURCE}-advancing.json"));
+    let sample = pinned(
+        &snapshot_path,
+        "7c9fe570d5317309d2891e559706d913760f145789c752882e19c1bf2f58118f",
+    )?;
+    let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
+        .trim()
+        .replace('-', "");
+    ensure!(
+        result["invocation_id"] == SOURCE
+            && intent["argv"] == result["argv"]
+            && intent["original"]["_BOOT_ID"] == boot
+            && intent["original"]["INVOCATION_ID"] == "dba04d40f1b046b4875d7e27e0ff224a"
+            && start["iid"] == SOURCE
+            && start["image"] == IMAGE
+            && start["r2_mutations"] == false
+            && sample["invocation_id"] == SOURCE
+            && sample["submission"] == bound(&rt(START))?
+            && sample["intent"] == bound(&init)?
+            && sample["image_sha256"] == IMAGE
+            && sample["window"]["recovery"] == start_ref,
+        "different original V5n invocation"
+    );
+    Ok(json!({"start":start_ref,"sample":sample,"result":result}))
+}
+
 pub(super) fn completed_semantics() -> Result<Value> {
     let s = rt("epoch145-guarded-export-20261121-v1/state").join(SOURCE);
     ensure!(
@@ -332,6 +401,21 @@ pub(super) fn completed_semantics() -> Result<Value> {
     let done = bound(&s.join("complete.json"))?;
     let d = from_ref(&done)?;
     let e = from_ref(&d["receipt"])?;
+    #[cfg(feature = "v5n-136-post")]
+    {
+        let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
+        let current: Value = serde_json::from_slice(&command(&inputs, &["inspect"])?)?;
+        let captured = rt(
+            "epoch145-semantic-continuity-20261121-v1/v5n-name-handoff/semantic-completion.json",
+        );
+        ensure!(
+            current["semantic_pending"] == false
+                && current["semantic"] == from_ref(&bound(&captured)?)?
+                && current["semantic"]["completion"] == done
+                && current["semantic"]["invocation_id"] == SOURCE,
+            "missing captured V13h completion"
+        );
+    }
     ensure!(
         d["iid"] == SOURCE
             && d["recovered_from"] == ORIGINAL
@@ -539,15 +623,23 @@ pub fn run(mode: &str) -> Result<()> {
     if mode == INSPECT {
         let current = native(E)?;
         let (pid, iid) = stable(&current, E)?;
+        #[cfg(not(feature = "v5n-136-post"))]
         let obs = &original["observations"][1];
+        #[cfg(feature = "v5n-136-post")]
+        let obs = &original["sample"]["window"]["native_parent"];
+        let (pid_key, ticks_key) = if cfg!(feature = "v5n-136-post") {
+            ("pid", "start_ticks")
+        } else {
+            ("parent_pid", "parent_ticks")
+        };
         ensure!(
             iid == SOURCE
-                && i64::from(pid) == obs["parent_pid"].as_i64().context("semantic parent")?
-                && platform::ticks(pid)? == obs["parent_ticks"]
+                && i64::from(pid) == obs[pid_key].as_i64().context("semantic parent")?
+                && platform::ticks(pid)? == obs[ticks_key]
                 && platform::proc_exe(pid)? == rt(SEMANTIC),
             "different original live verifier"
         );
-        #[cfg(feature = "fixture-post")]
+        #[cfg(all(feature = "fixture-post", not(feature = "v5n-136-post")))]
         {
             let child = i32::try_from(obs["child_pid"].as_i64().context("original V5f worker")?)?;
             let parent_command = fs::read(format!("/proc/{pid}/cmdline"))?;
@@ -590,6 +682,19 @@ pub fn run(mode: &str) -> Result<()> {
             ensure!(bound(&image)?["sha256"] == IMAGE, "V5f image changed");
             check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
         }
+        #[cfg(feature = "v5n-136-post")]
+        {
+            let child = &original["sample"]["window"]["native_child"];
+            let child_pid = i32::try_from(child["pid"].as_i64().context("V5n child")?)?;
+            ensure!(
+                platform::proc_exe(child_pid)? == rt(SEMANTIC)
+                    && platform::ticks(child_pid)? == child["start_ticks"]
+                    && fs::read_to_string(format!("/proc/{child_pid}/cgroup"))?.trim()
+                        == format!("0::/system.slice/{E}"),
+                "different advancing V5n child"
+            );
+            check_member(&rt(FIT_PKG), FIT_SEAL, "post-stop-fit")?;
+        }
         println!(
             "{}",
             json!({"original":iid,"manager":pid,"fleet":fleet()?,"post_seal":SEAL,"launch":false})
@@ -601,6 +706,17 @@ pub fn run(mode: &str) -> Result<()> {
     let _previous = boundary::guard_predecessor()?;
     let _lock = guard_instance(&rt(STATE_PATH))?;
     events::manager(E, SOURCE)?;
+    if cfg!(feature = "v5n-136-post") {
+        let inputs = check_member(&rt(PKG), SEAL, "post-inputs")?;
+        command(&inputs, &["capture"])?;
+        let retained = completed_semantics()?;
+        let _operation = boundary::before_post(&retained)?;
+        platform::save(
+            &rt(STATE_PATH).join("bounded-136-closed.json"),
+            &json!({"semantic_completion":retained,"boundary":boundary::selected_boundary()?,"post_started":false}),
+        )?;
+        return Ok(());
+    }
     let retained = completed_semantics()?;
     let id = stage("post-full", SOURCE, &retained)?;
     events::manager(E, &id)?;

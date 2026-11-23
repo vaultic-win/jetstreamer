@@ -21,6 +21,8 @@ CAP = 72 << 30
 V20 = ROOT / "incident-replay-fit-20261121-v1/tools-v20"
 V7 = ROOT / "epoch136-joint-writer-20261122-v7b"
 RETRY_WRITER = ROOT / "epoch136-joint-writer-20261122-v7c"
+V5N_WRITER = ROOT / "epoch136-joint-writer-20261123-v8"
+V5N_PROVIDER = ROOT / "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1"
 SEALER = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
 
 
@@ -82,7 +84,7 @@ def capture_fixture(native_path, path, digest):
         time.sleep(2)
 
 
-def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_total, waiter=None):
+def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_total, waiter=None, *, v5n=False):
     candidate = native["candidate136"]
     require(candidate["cap"] == CAP and candidate["remaining"] == CAP
             and candidate["occupied"] is (waiter is not None) and native["complete_cpu_quota_micros"] == 64_000_000
@@ -100,8 +102,15 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
     # The payload keeps every absolute incumbent stop floor *before* adding the 72 GiB.
     # V17 also books those 72 GiB, so recompute without it on the very same measured trees.
     protected = max(native_floor + prefix, candidate.get("guard_floor", 0))
-    require(protected + CAP >= native["complete_required_HOME_bytes"], "incomplete absolute home floor")
     available = min(disk_now, native["available_HOME_bytes"])
+    if v5n:
+        donor = native["epoch159_donor_cover"]
+        require(donor["fleet"] == native["fleet"] and donor["credited_retirement_bytes"] == 0
+                and donor["native_home_required"] >= native["complete_required_HOME_bytes"]
+                and donor["remaining_home_bytes"] >= 0, "unbound original 169/159 donor reservation")
+        protected = max(protected, donor["native_home_required"] - CAP)
+        available = min(available, donor["native_home_required"] + donor["remaining_home_bytes"])
+    require(protected + CAP >= native["complete_required_HOME_bytes"], "incomplete absolute home floor")
     require(memory_total >= native["complete_memory_plus_reserve_bytes"], "physical RAM changed")
     return dict(protected_raw_floor_bytes=protected, candidate_remaining_growth_bytes=CAP,
                 complete_required_HOME_bytes=protected + CAP, available_HOME_bytes=available,
@@ -112,13 +121,13 @@ def price(native, native_floor, prefix_before, prefix_after, disk_now, memory_to
                 unfenced_with_candidate_cpu_micros=68_250_000, new_resource_credit_bytes=0)
 
 
-def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, retry=False):
-    require(not retry or fixture, "invalid worker profile")
-    writer = RETRY_WRITER if retry else V7
+def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, retry=False, v5n=False):
+    require(not (retry or v5n) or (fixture and not (retry and v5n)), "invalid worker profile")
+    writer = V5N_WRITER if v5n else RETRY_WRITER if retry else V7
     require(mode in ("preflight", "session"), "unknown writer mode")
     expected = dict(image=dict(path=str(NATIVE / "post-stop-fit"), sha256=PRICE),
                     seal=dict(path=str(NATIVE / "deployment-seal-receipt.json"), sha256=NATIVE_SEAL))
-    directory = V20 if fixture else NATIVE
+    directory = V5N_PROVIDER if v5n else V20 if fixture else NATIVE
     if fixture:
         fixture_provider(provider, directory)
         expected = provider
@@ -174,6 +183,8 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
         require(not fixture or package == writer / "controller", "different V7 writer")
         session = runpy.run_path(str(package / "prestart_session.py"))
         context = {"fixture_provider": fixture_provider, "retry": retry} if fixture else {}
+        if v5n:
+            context.update(v5n=True, check_package=check_package, read_immutable=immutable_bytes)
         native = session["capture_context"](ref, fence, waiter, **context, pin=pin, checked=checked,
                                             runpy=runpy, json=json, observation=observation)
     require(native["fleet"] == ref and native["schema"] == "horizon-incident-replay-fit-v1"
@@ -186,10 +197,19 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
         binding = prospective["controller_deployment"]
         require(binding["path"] == str(controller / "deployment-seal-receipt.json"), "wrong fixture controller")
         deployment = check_package(controller, binding["sha256"])
-        member = [r for r in deployment["members"] if r["name"] == "fixture_boundary.py"]
+        member_name = "v5n_boundary.py" if v5n else "fixture_boundary.py"
+        member = [r for r in deployment["members"] if r["name"] == member_name]
         require(len(member) == 1 and member[0]["mode"] == "0444", "missing fixture semantic reader")
-        fixture_module = runpy.run_path(str(controller / "fixture_boundary.py"))
-        fixture_module["ordinary_phase"](prospective, native["phase145"], checked, pin, runpy, module["s"], retry=retry)
+        fixture_module = runpy.run_path(str(controller / member_name))
+        if v5n:
+            require(prospective["holding145_semantic_worker"] == fixture_module["SEMANTIC_RESULT"] and
+                    prospective["holding145_completion"] == fixture_module["COMPLETION_TOOLS"],
+                    "different prospective V5n completion generation")
+            joined = fixture_module["inspect"](pin, check_package, immutable_bytes,
+                       fixture_module["read_inputs"], lambda _: native["phase145"])
+            require(not joined["semantic_pending"], "V5n is still proving private semantic output")
+        else:
+            fixture_module["ordinary_phase"](prospective, native["phase145"], checked, pin, runpy, module["s"], retry=retry)
     floor, _, _ = module["disk_budget"](native["original_aggregate_HOME_bytes"], dict(remaining=0),
         native["bookings"], 145, native["survivors"], native["replacements"], native["active168_guard_floor"],
         native["closed_prestart_remaining"])
@@ -198,14 +218,15 @@ def inspect(path, digest, waiter, mode, provider, fence=None, fixture=False, ret
     require(first == last and workers == last_workers, "audit changed during native fit")
     disk = os.statvfs("/home/sol")
     total = int(Path("/proc/meminfo").read_text().splitlines()[0].split()[1]) * 1024
-    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total, waiter)
+    result = price(native, floor, before, after, disk.f_bavail * disk.f_frsize, total, waiter, v5n=v5n)
     return dict(result, schema="horizon-136-writer-joint-fit-v1", fleet=ref, provider_seal=expected["seal"],
                 authoritative_joint_fit=native, audit=first, ready_workers=workers,
                 ready_growth_before=before_ready, ready_growth_after=after_ready,
                 prefix_before=before, prefix_after=after, waiting_candidate=waiter,
                 activation_compatible=mode == "session" and result["disk_fits"] and result["memory_fits"],
                 replay_launch_authorized=False,
-                next_gate=("successful V5F completion and exclusive prestart before V13" if fixture else
+                next_gate=("exclusive prestart after original V5n success and before V13h" if v5n else
+                           "successful V5F completion and exclusive prestart before V13" if fixture else
                            "successful V5e completion and exclusive prestart before V11"))
 
 
@@ -213,5 +234,6 @@ if __name__ == "__main__":
     print(json.dumps(inspect(Path(sys.argv[1]), sys.argv[2], json.loads(sys.argv[3]),
                              sys.argv[4], json.loads(sys.argv[5]),
                              json.loads(sys.argv[6]) if len(sys.argv) >= 7 else None,
-                             fixture=sys.argv[7:] in (["fixture-semantic"], ["retry-semantic"]),
-                             retry=sys.argv[7:] == ["retry-semantic"]), sort_keys=True))
+                             fixture=sys.argv[7:] in (["fixture-semantic"], ["retry-semantic"], ["v5n-semantic"]),
+                             retry=sys.argv[7:] == ["retry-semantic"],
+                             v5n=sys.argv[7:] == ["v5n-semantic"]), sort_keys=True))

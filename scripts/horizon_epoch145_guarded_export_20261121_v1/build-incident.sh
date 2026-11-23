@@ -50,6 +50,11 @@ if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
   flavor=fixture-rejoin
 fi
+v5n_136_post=false
+if [[ $flavor == v5n-136-post ]]; then
+  v5n_136_post=true
+  flavor=v5n-post
+fi
 v5n_post=false
 if [[ $flavor == v5n-post ]]; then
   v5n_post=true
@@ -163,6 +168,7 @@ if $v5m_post; then
   sources+=(build_159_price.py)
 fi
 if $v5n_post; then extra+=(--cfg incident_v5n_post145_only); fi
+if $v5n_136_post; then extra+=(--cfg incident_v5n_136_post145_only); fi
 if $v5j_retry_post; then extra+=(--cfg incident_v5j_retry1_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
@@ -345,6 +351,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $v5m_post; then build_unit=horizon-145-v5m-post-build-v1.service; fi
     if $guard_walk; then build_unit=horizon-145-guard-walk-rejoin-build-v1.service; fi
     if $v5n_post; then build_unit=horizon-145-v5n-post-build-v1.service; fi
+    if $v5n_136_post; then build_unit=horizon-145-v5n-136-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
     [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
@@ -493,6 +500,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $v5k_post; then phase_package=tools-v13f; fi
   if $v5m_post; then phase_package=tools-v13g; fi
   if $v5n_post; then phase_package=tools-v13h; fi
+  if $v5n_136_post; then phase_package=tools-v13i; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   if $v5j_post; then

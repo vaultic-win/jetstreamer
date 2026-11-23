@@ -1,4 +1,4 @@
-//! The V7 binaries accept only the V5F semantic generation, including during
+//! Each writer and parent accepts one semantic generation, including during
 //! the registrar's inspection before its READY file becomes visible.
 use anyhow::{Result, ensure};
 use serde_json::Value;
@@ -6,16 +6,26 @@ use std::path::Path;
 
 const RUNTIME: &str = "/var/lib/jetstreamer/horizon_runtime_data";
 const FAMILY: &str = "epoch145-semantic-continuity-20261121-v1";
+#[cfg(not(feature = "v5n-semantic"))]
 const PRICE: &str = "incident-replay-fit-20261121-v1/tools-v20";
+#[cfg(feature = "v5n-semantic")]
+const PRICE: &str = "incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1";
 
-#[cfg(feature = "retry-semantic")]
+#[cfg(feature = "v5n-semantic")]
+mod profile {
+    pub const CONTROLLER: &str = "epoch136-joint-writer-20261123-v8/controller";
+    pub const DISPATCHER: &str = "epoch145-v5n-136-dispatch-20261123-v1";
+    pub const WORKER: &str = "v5n-name-handoff/submission-result.json";
+    pub const POST: &str = "tools-v13h";
+}
+#[cfg(all(feature = "retry-semantic", not(feature = "v5n-semantic")))]
 mod profile {
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7c/controller";
     pub const DISPATCHER: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
     pub const WORKER: &str = "V5F_RETRY1_ACTUAL_ADVANCING_WORKER.json";
     pub const POST: &str = "tools-v13c";
 }
-#[cfg(not(feature = "retry-semantic"))]
+#[cfg(not(any(feature = "retry-semantic", feature = "v5n-semantic")))]
 mod profile {
     pub const CONTROLLER: &str = "epoch136-joint-writer-20261122-v7b/controller";
     pub const DISPATCHER: &str = "epoch145-fixture-phase-dispatch-20261122-v1";
@@ -51,6 +61,12 @@ pub fn validate(plan: &Value) -> Result<()> {
         "deployment-seal-receipt.json",
     )?;
     reference(&plan["holding145_semantic_worker"], FAMILY, WORKER)?;
+    #[cfg(feature = "v5n-semantic")]
+    ensure!(
+        plan["holding145_semantic_worker"]["sha256"]
+            == "57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e",
+        "different original V5n submission"
+    );
     for (key, name) in [
         ("seal", "deployment-seal-receipt.json"),
         ("build", "build-proof.json"),
@@ -85,6 +101,14 @@ mod tests {
             "holding145_completion":{"seal":post("deployment-seal-receipt.json"),
                                      "build":post("build-proof.json"),"adapter":post("incident-post-phase.py")}
         });
+        #[cfg(feature = "v5n-semantic")]
+        {
+            plan["holding145_semantic_worker"]["sha256"] =
+                json!("57eb2aadef0bd6e5591800c439fa0f2e6d701c2f4baa3dc45b5074fdddebd02e");
+            let mut crossed = plan.clone();
+            crossed["holding145_semantic_worker"]["sha256"] = json!("f".repeat(64));
+            assert!(validate(&crossed).is_err());
+        }
         validate(&plan).unwrap();
         plan["holding145_prestart_ready"] = key(&format!("{DISPATCHER}/READY.json"));
         validate(&plan).unwrap();

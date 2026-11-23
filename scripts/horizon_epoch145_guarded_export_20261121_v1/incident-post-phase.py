@@ -10,7 +10,7 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
-GUARD_POST = VERSION == "tools-v13h"
+GUARD_POST = VERSION in ("tools-v13h", "tools-v13i")
 MISSED_POST = GUARD_POST or VERSION == "tools-v13g"
 LEASE_POST = MISSED_POST or VERSION == "tools-v13f"
 V5J_RETRY = LEASE_POST or VERSION == "tools-v13e"

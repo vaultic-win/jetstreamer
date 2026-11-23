@@ -19,6 +19,7 @@ CONTROLLER = 'horizon-archive-status-cadence-after172-20261120-v1.service'
 CLOSED = (166, 167, 168, 170)
 GUARD169 = BASE/'epoch169-focused-terminal-20261121-v1'
 CURRENT = Path(__file__).resolve()
+PRIVATE136 = CURRENT.parent == ROOT / 'tools-cold168-retry4-136-v1'
 assert hashlib.sha256((PACKAGE/'deployment-seal-receipt.json').read_bytes()).hexdigest() == PARENT_SEAL
 sys.path.insert(0,str(PACKAGE))
 from evidence import bound, checked, content, durable, ensure_dir, lock, names, need, sealed, utc
@@ -28,6 +29,7 @@ import focused169_completion
 import full172
 import owners
 import prefix140_storage
+import private136
 import race166
 import ready_audit_growth
 import resident_clock
@@ -261,6 +263,8 @@ def publish(c,store,refs,out,epoch,archive=None):
                        estimated_remaining_millis=prior['estimated_remaining_millis']-age)
             extra.update(producer_invocation_id=None,measured_canonical_progress=False,current_repair_owner='/root',
                          estimate_model='Retain the absolute publication forecast of the authenticated predecessor.')
+        if PRIVATE136:
+            extra.update(private136.status_fields(c,epoch))
         durable(intent,dict(epoch=epoch,key=status.key(epoch),previous_receipt=original,conditional_header='If-Match',
                 before_etag=old['after_etag'],before_sha256=old['after_sha256'],before_status=prior,
                 after_sha256=hashlib.sha256(status.body(after)).hexdigest(),after_status=after,
@@ -339,6 +343,10 @@ def make_context(head,fleet,sample_ref,cfg,out):
     c=SimpleNamespace(fleet_ref=head,fleet=fleet,stamp=when,now=utc(when),cfg=cfg,sample=sample,sample_ref=sample_ref,
            paths={'out':out,'sample':Path(sample_ref['path'])},lanes={},advancing={},next_cfg=copy.deepcopy(cfg),
            prior=checked(fleet['authenticated_status_audit']),new_rows={},rows={},metered168_row=None)
+    if PRIVATE136:
+        private136.previous(fleet)
+        c.private136 = private136.freeze(c)
+        private136.interpret(c,cycle.observed_lane)
     old=full172.owned(fleet);need(old is not None,'172 missing prior ownership')
     ident=full172.identity(fleet)
     oref=out/'FULL172_OBSERVATION.json'
@@ -380,6 +388,9 @@ def census(c,bridge):
         'active_live_diagnostics','current_normal_168','optional_existing_serial_build_136') if k in cap}
     # Retain each older obligation once by the immutable prior capacity reference.
     cap.pop('historical_prior_owner_observations',None)
+    if PRIVATE136 and c.private136:
+        cap.update(private136_observation=c.private136['receipt'], private136_capacity=c.private136.get('capacity'),
+                   active_live_diagnostics=private136.active(c.private136))
     if 'current_metered168_observation' in cap:
         cap['historical_pre_homefloor_metered168_observation']=cap.pop('current_metered168_observation')
     arc=status.observed_archive(c,172) if c.full172_row['scratch_path'] else None
@@ -411,9 +422,10 @@ def publish_all(c,bridge,store,vs):
     for e,r in refs.items(): authenticated(store,int(e),r)
     need(ready==status.inventory(c,store),'archive inventory changed during status refresh')
     counts=cold167_status.counts(c)
+    bounded136=private136.active(c.private136) if PRIVATE136 else 0
     original=dict(c.prior)
     original.update(receipts={k:v for k,v in refs.items() if k!='140'},observer=c.sample_ref,
-                    active_producer_count=counts['canonical_producer_count'],active_private_diagnostic_count=0,
+                    active_producer_count=counts['canonical_producer_count']+bounded136,active_private_diagnostic_count=bounded136,
                     canonical_producer_count=counts['canonical_producer_count'],replay_lanes=counts['current_replay_lanes'],
                     active_bootstraps=counts['active_bootstraps'],fleet_predecessor=c.fleet_ref,
                     effective_status_predecessor=c.fleet['authenticated_status_audit'],sampled_at_utc=c.stamp,
@@ -475,6 +487,8 @@ def fleet_successor(c,bridge,observed,statusref,allref,nref,timer):
     ready_audit_growth.reconcile(fleet,observed['audit'],cap,ar)
     prefix140_storage.reconcile(fleet,cap)
     cold_workers.install(c,fleet)
+    if PRIVATE136:
+        private136.install(c,fleet)
     if c.new_rows:
         active=', '.join(map(str,sorted([172,*c.new_rows])))
         pending=', '.join(map(str,sorted(set(CLOSED)-set(c.new_rows)-set(c.commits))))
@@ -589,6 +603,9 @@ def entry():
             package='tools-cold170-retry13-terminal-v1'
         if cold_workers.cold168:
             package=cold_workers.cold168.PACKAGE
+    if PRIVATE136:
+        need(package == 'tools-cold168-retry4-v1', '136 cadence requires the qualified retry4 parent')
+        package = 'tools-cold168-retry4-136-v1'
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)
@@ -596,6 +613,28 @@ def entry():
     need(seal['destination']==str(CURRENT.parent) and member['sha256']==bound(CURRENT)['sha256'],
          'unsealed cadence entry')
     return receipt
+
+
+def await_private136_owner(state, receipt):
+    intent_path=ROOT/'EPOCH136_V5N_STATUS_INTENT.json'
+    active_path=ROOT/'EPOCH136_V5N_STATUS_ACTIVE.json'
+    intent=read_ref(intent_path)
+    qualification=checked(intent['qualification'])
+    old=checked(intent['previous_active'])
+    need(intent['schema']=='horizon-136-v5n-status-intent-v1' and intent['old']==old['new']
+         and qualification['package']==receipt and qualification['entry']==bound(CURRENT),
+         'different qualified private 136 status transition')
+    due=time.monotonic()+90
+    while not active_path.exists():
+        need(time.monotonic()<due,'private 136 cadence owner was not registered')
+        time.sleep(0.1)
+    active=read_ref(active_path);new=active['new'];pid=os.getpid()
+    need(active['schema']=='horizon-136-v5n-status-active-v1' and active['intent']==bound(intent_path)
+         and active['schedule']==intent['schedule'] and active['old']==intent['old']
+         and new['program']==str(CURRENT) and new['unit']==state['Id'] and new['pid']==pid
+         and new['start_ticks']==owners.ticks(pid) and new['invocation_id']==state['InvocationID'],
+         'different live private 136 status owner')
+
 
 def main():
     receipt=entry()
@@ -609,7 +648,9 @@ def main():
         state=owners.show(CONTROLLER,('Id','InvocationID','MainPID','ControlGroup','Job','ActiveState'))
         need(state['MainPID']==str(os.getpid()) and Path('/proc/self/cgroup').read_text().strip()=='0::'+state['ControlGroup'],
              'outside original status service')
-        if getattr(cold_workers, 'cold168', None):
+        if PRIVATE136:
+            await_private136_owner(state,receipt)
+        elif getattr(cold_workers, 'cold168', None):
             cold_workers.cold168.await_recovery(state,os.getpid())
         validate_package()
         proof=handoff()

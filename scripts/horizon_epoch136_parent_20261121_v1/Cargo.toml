@@ -8,6 +8,7 @@ edition = "2024"
 [features]
 fixture-semantic = []
 retry-semantic = ["fixture-semantic"]
+v5n-semantic = ["fixture-semantic"]
 
 [dependencies]
 anyhow = "1"

@@ -34,7 +34,7 @@ pub(super) mod profile {
         pub(crate) const CLOSED: &str =
             "d267b6e774e26fc5c9d5b95f5845b547afbfde74f58e434b835acd63785a7f07";
     }
-    #[cfg(feature = "retry-post")]
+    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
     mod selected {
         pub(crate) const DIR: &str = "epoch145-fixture-retry1-dispatch-20261122-v1";
         pub(crate) const DISPATCH: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
@@ -42,6 +42,14 @@ pub(super) mod profile {
         pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261122-v7c";
         pub(crate) const CLOSED: &str =
             "e292ddb3e46ff8e5fb0d0dd39bacc6bb5376ac238c4868b622ccfdb42df47b5a";
+    }
+    #[cfg(feature = "v5n-136-post")]
+    mod selected {
+        pub(crate) const DIR: &str = "epoch145-v5n-136-dispatch-20261123-v1";
+        pub(crate) const DISPATCH: &str = "horizon-145-v5n-136-dispatch-20261123-v1.service";
+        pub(crate) const OLD: &str = "horizon-145-fixture-retry1-dispatch-20261122-v1.service";
+        pub(crate) const WRITER_DIR: &str = "epoch136-joint-writer-20261123-v8";
+        pub(crate) const CLOSED: &str = env!("HORIZON_145_PREDECESSOR_DRAINED_SHA256");
     }
     pub(crate) use selected::*;
     pub(crate) const DEPLOY: &str = "tools";
@@ -176,12 +184,24 @@ fn registration() -> Result<(Value, Value)> {
             "seal": bound(&provider.join("deployment-seal-receipt.json"))?}),
             "different registered V21 provider"
         );
-        let status =
-            rt("prefix140-status-cadence-20261122-v1/cadence-tools/deployment-seal-receipt.json");
+        let (status, status_sha) = if cfg!(feature = "v5n-136-post") {
+            (
+                rt(
+                    "survivor172-cadence-20261122-v1/tools-cold168-retry4-136-v1/deployment-seal-receipt.json",
+                ),
+                option_env!("HORIZON_136_STATUS_SEAL_SHA256").context("missing 136 status seal")?,
+            )
+        } else {
+            (
+                rt(
+                    "prefix140-status-cadence-20261122-v1/cadence-tools/deployment-seal-receipt.json",
+                ),
+                "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e",
+            )
+        };
         ensure!(
             ready["status_consumer_seal"] == bound(&status)?
-                && ready["status_consumer_seal"]["sha256"]
-                    == "7afadecf5d474dfb5b4dddf8dc61f816c8bcbe837fb2bd6bb2ed713d0262722e",
+                && ready["status_consumer_seal"]["sha256"] == status_sha,
             "different prefix status consumer"
         );
     }
@@ -228,7 +248,7 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
         vec![(original, "controller_lock")],
         vec![(OLD, "previous"), (earlier, "earlier")],
     );
-    #[cfg(feature = "retry-post")]
+    #[cfg(all(feature = "retry-post", not(feature = "v5n-136-post")))]
     let (locks, units) = (
         vec![
             (original, "controller_lock"),
@@ -239,6 +259,29 @@ fn previous_locks() -> Result<Vec<PathBuf>> {
         ],
         vec![
             (OLD, "previous"),
+            ("horizon-145-phase-dispatch-20261122-v1.service", "earlier"),
+            (earlier, "earliest"),
+        ],
+    );
+    #[cfg(feature = "v5n-136-post")]
+    let (locks, units) = (
+        vec![
+            (original, "controller_lock"),
+            (
+                rt("epoch145-fixture-phase-dispatch-20261122-v1/state/controller.lock"),
+                "recent_controller_lock",
+            ),
+            (
+                rt("epoch145-fixture-retry1-dispatch-20261122-v1/state/controller.lock"),
+                "retry_controller_lock",
+            ),
+        ],
+        vec![
+            (OLD, "retry"),
+            (
+                "horizon-145-fixture-phase-dispatch-20261122-v1.service",
+                "previous",
+            ),
             ("horizon-145-phase-dispatch-20261122-v1.service", "earlier"),
             (earlier, "earliest"),
         ],
@@ -319,6 +362,17 @@ fn before_submission() -> Result<()> {
             "145 already crossed its post boundary"
         );
     }
+    #[cfg(feature = "v5n-136-post")]
+    for entry in fs::read_dir(rt("epoch145-publication-20261121-v1"))? {
+        let name = entry?.file_name();
+        let name = name.to_str().context("non-UTF8 145 publication entry")?;
+        ensure!(
+            !["full-", "network-"]
+                .iter()
+                .any(|prefix| { name.strip_prefix(prefix).is_some_and(valid_iid) }),
+            "epoch 145 has already started an ordinary post phase"
+        );
+    }
     Ok(())
 }
 
@@ -345,9 +399,20 @@ fn fixture_plan(plan: &Value) -> Result<()> {
     };
     let worker = json!({"path":rt(START),"sha256":ADVANCING});
     let build = binding("build-proof.json")?;
+    #[cfg(not(feature = "v5n-136-post"))]
+    ensure!(
+        from_ref(&build)?["prior_phase"] == worker,
+        "different V5f retained worker"
+    );
+    #[cfg(feature = "v5n-136-post")]
+    ensure!(
+        from_ref(&worker)?["invocation_id"] == SEMANTIC
+            && build["sha256"]
+                == "acd58b6927de438b036275c50d2edbc08f2f33626dec64e6a43d2235b80e541c",
+        "different original V5n or V13h build"
+    );
     ensure!(
         seal["destination"] == json!(post)
-            && from_ref(&build)?["prior_phase"] == worker
             && plan["holding145_semantic_worker"] == worker
             && plan["holding145_completion"]
                 == json!({"build":build,"adapter":binding("incident-post-phase.py")?,"seal":{"path":seal_path,"sha256":SEAL}}),
@@ -784,7 +849,7 @@ pub(super) fn before_post(done: &Value) -> Result<File> {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "fixture-post")]
+    #[cfg(all(feature = "fixture-post", not(feature = "v5n-136-post")))]
     #[test]
     fn only_the_selected_v7b_and_v13b_can_follow_the_fixture_worker() {
         let actual =

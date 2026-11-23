@@ -99,12 +99,12 @@ class PublicationInputs(unittest.TestCase):
             p.validate_terminal(*f)
 
     def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
-        for version in ("tools-v13d", "tools-v13e", "tools-v13f", "tools-v13g", "tools-v13h"):
+        for version in ("tools-v13d", "tools-v13e", "tools-v13f", "tools-v13g", "tools-v13h", "tools-v13i"):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as td:
                 self.exercise_adapter(Path(td), version)
 
     def exercise_adapter(self, root, version):
-        guard = version == "tools-v13h"
+        guard = version in ("tools-v13h", "tools-v13i")
         missed = guard or version == "tools-v13g"
         lease = missed or version == "tools-v13f"
         retry = lease or version == "tools-v13e"

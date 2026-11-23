@@ -74,3 +74,28 @@ def registered_writer(s, prior, prepared_sha, guard_sha):
            and all(actor['lock'][k]==old['lock'][k] for k in ('path','inode','device')),
            'foreign retry4 service, generation or exclusive lock')
     return pkg,seal_ref,actor['invocation_id'],actor
+
+
+def registered_136_writer(s, prior):
+    oldpkg, old_seal, _, old = prior
+    s.need(oldpkg == STATUS / 'tools-cold168-retry4-v1' and old is not None, 'different 136 cadence predecessor')
+    root = STATUS / 'tools-cold168-retry4-136-v1'
+    intent, intent_ref = s.read(STATUS / 'EPOCH136_V5N_STATUS_INTENT.json')
+    qual = s.bound(intent['qualification'], STATUS / 'EPOCH136_V5N_STATUS_QUALIFIED.json')
+    end, _ = s.read(STATUS / 'EPOCH136_V5N_STATUS_ACTIVE.json')
+    old_active = s.bound(intent['previous_active'], STATUS / (PREFIX + 'ACTIVE.json'))
+    new = end['new']
+    seal = s.bound(qual['package'], root / 'deployment-seal-receipt.json')
+    entry, = [m for m in seal['members'] if m['name'] == 'status_cycle.py' and m['mode'] == '0444']
+    s.need(intent['schema'] == 'horizon-136-v5n-status-intent-v1'
+           and end['schema'] == 'horizon-136-v5n-status-active-v1' and end['intent'] == intent_ref
+           and end['schedule'] == intent['schedule'] and old_active['new'] == intent['old'] == end['old'] == old
+           and qual['schema'] == 'horizon-136-v5n-status-qualified-v1' and qual['prior_seal'] == old_seal
+           and qual['suites'] and re.fullmatch('[a-f0-9]{40}', qual['source_commit'])
+           and seal['schema'] == 'jetstreamer-sealed-deployment-receipt-v1' and seal['destination'] == str(root)
+           and seal['remote_mutations'] is False and qual['entry'] == s.ref(root / entry['name'], entry['sha256'])
+           and new['program'] == qual['entry']['path'] and new['unit'] == old['unit']
+           and s.iid(new['invocation_id']) and new['invocation_id'] != old['invocation_id']
+           and all(new['lock'][key] == old['lock'][key] for key in ('path','inode','device')),
+           'different qualified 136 cadence owner or lock')
+    return root, qual['package'], new['invocation_id'], new

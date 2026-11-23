@@ -9,6 +9,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v9") pkg="${pkg%/*}/tools-v9" ;;
     "${pkg%/*}/tools-v10") pkg="${pkg%/*}/tools-v10" ;;
     "${pkg%/*}/tools-v13h") pkg="${pkg%/*}/tools-v13h" ;;
+    "${pkg%/*}/tools-v13i") pkg="${pkg%/*}/tools-v13i" ;;
     "${pkg%/*}/tools-v13g") pkg="${pkg%/*}/tools-v13g" ;;
     "${pkg%/*}/tools-v13f") pkg="${pkg%/*}/tools-v13f" ;;
     "${pkg%/*}/tools-v13e") pkg="${pkg%/*}/tools-v13e" ;;
@@ -46,14 +47,19 @@ publish)
     ;;
 *) exit 2 ;;
 esac
-if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h ]]; then
+if [[ $pkg == */tools-v13d || $pkg == */tools-v13e || $pkg == */tools-v13f || $pkg == */tools-v13g || $pkg == */tools-v13h || $pkg == */tools-v13i ]]; then
     version=v1
     if [[ $pkg == */tools-v13e ]]; then version=v2; fi
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-$version/post-stop-fit
     if [[ $pkg == */tools-v13f ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5k-v1/post-stop-fit; fi
     if [[ $pkg == */tools-v13h ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-v1/post-stop-fit; fi
+    provider_args=()
+    if [[ $pkg == */tools-v13i ]]; then
+        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-136-v1/post-stop-fit
+        provider_args+=(--post-submission)
+    fi
     if [[ $pkg == */tools-v13g ]]; then provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5m-v1/post-stop-fit; fi
-    "$provider" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '
+    "$provider" "${provider_args[@]}" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '
        .epoch == 145 and .fits == true and .candidate == null and .resource_credit_bytes == 0
        and .fleet == {path:$f,sha256:$h} and .phase145.stage == "v5j-semantic-complete"
        and .registered_retry11_holding.stage == "completed-copy"

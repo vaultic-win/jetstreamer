@@ -10,6 +10,7 @@ timer-rejoin = ["cadence-rejoin"]
 registered-post = ["timer-rejoin"]
 fixture-post = ["registered-post"]
 retry-post = ["fixture-post"]
+v5n-136-post = ["retry-post"]
 
 [workspace]
 

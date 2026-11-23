@@ -19,7 +19,7 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
-GUARD_POST = (Path(__file__).resolve().parent.name == "tools-v13h" or
+GUARD_POST = (Path(__file__).resolve().parent.name in ("tools-v13h", "tools-v13i") or
               (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--guard-walk"]))
 MISSED_POST = GUARD_POST or (Path(__file__).resolve().parent.name == "tools-v13g" or
                (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--missed-clock"]))

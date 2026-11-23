@@ -20,6 +20,8 @@ EXIT = "31055f49783e564588f662448abde35e150035a0275ece6a80dab142cacd6909"
 FAIL = "3306fecc2732e2804d058e5b3c328870881ca79f8abe5e2351d097c06a90d093"
 CURSOR = "s=7f76387dd96140468b39dcf01e726fea;i=392ee68;b=763ea84ca81f4dddad364b1ea2ba36dd;m=371cee5228c;t=660f19bb87fc4;x=48734cd4d901dc22"
 CG = Path("/sys/fs/cgroup/system.slice") / UNIT
+WRITER136 = "horizon-admit-136-actual-20261120-g1.service"
+PAYLOAD136 = "horizon-qualify-136-actual-20261120-g1.service"
 MIB = 1 << 20
 GIB = 1 << 30
 
@@ -68,7 +70,27 @@ def image(name, size, ino, terminal):
     return {"original": key, "retained": True}
 
 
-def snapshot():
+def donor_users(exclusive136, token, rows):
+    locks = [row.split()[1:] for row in rows if token in row.split()]
+    if exclusive136 is None:
+        need(not locks, "another actor holds the donor; requires its own enrollment")
+        return {}
+    writer = exclusive136["writer"]
+    pid = writer["pid"]
+    need(pid > 1 and writer["start_ticks"] > 0 and re.fullmatch(r"[a-f0-9]{32}", writer["invocation_id"])
+         and locks == [["FLOCK", "ADVISORY", "WRITE", str(pid), token, "0", "EOF"]],
+         "136 writer does not own the original donor lock")
+    allowed = {WRITER136: [pid]}
+    if exclusive136["occupied"]:
+        actor = exclusive136["identity"]
+        processes = actor["processes"]
+        need(actor["unit"] == PAYLOAD136 and len(processes) == 1 and processes[0][0] > 1,
+             "unqualified 136 donor payload")
+        allowed[PAYLOAD136] = [processes[0][0]]
+    return allowed
+
+
+def snapshot(exclusive136=None):
     g, _ = bound(ROOT / "ADMISSION.json", GRANT)
     price, _ = bound(g["price"]["path"], PRICE)
     need(g["price"]["sha256"] == PRICE and price["fleet"] == g["fleet"] and g["actual_grant"] is True,
@@ -100,18 +122,22 @@ def snapshot():
     ls = Path(lock["path"]).lstat()
     need((ls.st_dev, ls.st_ino) == (lock["dev"], lock["ino"]) and stat.S_ISREG(ls.st_mode), "donor lock replaced")
     token = f"{os.major(ls.st_dev):02x}:{os.minor(ls.st_dev):02x}:{ls.st_ino}"
-    need(all(token not in ln.split() for ln in Path("/proc/locks").read_text().splitlines()),
-         "another actor holds the donor; requires its own enrollment")
+    permitted = donor_users(exclusive136, token, Path("/proc/locks").read_text().splitlines())
+    need(permitted.keys() <= set(g["donor_idle_units"]), "original donor does not name 136 users")
     for unit in g["donor_idle_units"]:
         grp = CG.parent / unit / "cgroup.procs"
-        need(not grp.exists() or not grp.read_text().strip(), "donor successor already enrolled")
-    return dict(invocation_id=IID, grant_sha256=GRANT, original_price_sha256=PRICE, driver_exit=EXIT,
+        members = sorted(map(int, grp.read_text().split())) if grp.exists() else []
+        need(members == permitted.get(unit, []), "donor successor already enrolled")
+    proof = dict(invocation_id=IID, grant_sha256=GRANT, original_price_sha256=PRICE, driver_exit=EXIT,
                 service_failure=FAIL, pid1_exit=CURSOR, retained=terminal["retained"],
                 scratch=image("scratch", 24 * GIB, 101263643, terminal),
                 evidence=image("evidence", 8 * MIB, 101263647, terminal), donor_lock=lock)
+    if exclusive136 is not None:
+        proof["exclusive136"] = exclusive136
+    return proof
 
 
-def cover(before, native, after, build_bytes=0, build_ram=0):
+def cover(before, native, after, build_bytes=0, build_ram=0, *, exclusive136=None):
     need(before == after and before["invocation_id"] == IID and before["grant_sha256"] == GRANT and
          before["driver_exit"] == EXIT and 0 <= build_bytes <= 104 * MIB and 0 <= build_ram <= 768 * MIB,
          "transition during pricing or unqualified build bound")
@@ -122,8 +148,14 @@ def cover(before, native, after, build_bytes=0, build_ram=0):
          "incomplete native system price")
     ref = native["fleet"]
     fleet, _ = bound(ref["path"], ref["sha256"])
+    candidate = native["candidate136"]
+    if exclusive136 is None:
+        need(not candidate["occupied"] and not candidate["loan_micros"], "changed 136 donor")
+    else:
+        need(exclusive136 == before["exclusive136"] == candidate and candidate["cap"] == candidate["remaining"] == 72 * GIB
+             and candidate["loan_micros"] in (0, 4_250_000) and not build_bytes and not build_ram,
+             "unqualified 136 donor or reduced reservation")
     need(fleet["canonical_producer_count"] == len(fleet["actual_executing_replays"]) == 5 and
-         not native["candidate136"]["occupied"] and not native["candidate136"]["loan_micros"] and
          set(native["replacements"]) == {"166", "167", "168", "170"} and set(native["survivors"]) == {"172"},
          "changed donor or producer topology")
     orig, _ = bound(ROOT / "HEAD131757-132005-donor.json", PRICE)
