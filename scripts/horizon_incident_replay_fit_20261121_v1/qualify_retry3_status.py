@@ -14,18 +14,21 @@ sys.path.insert(0,str(R/'epoch168-full-metered-20261121-v1/session-v4-registered
 import status168 as real
 
 
-def exercise(scratch):
-    library=runpy.run_path(str(HERE/'retry3_status.py'))
+def exercise(scratch, retry4=False):
+    attempt = 4 if retry4 else 3
+    previous_attempt = attempt - 1
+    failure_key = f'failed_retry{previous_attempt}'
+    library=runpy.run_path(str(HERE/f'retry{attempt}_status.py'))
     select=library['registered_writer']
     values=select.__globals__
     real_status=values['STATUS']
-    previous, pref=real.read(real_status/'COLD168_RETRY2_V1_STATUS_ACTIVE.json',values['PREDECESSOR'])
+    previous, pref=real.read(real_status/f'COLD168_RETRY{previous_attempt}_V1_STATUS_ACTIVE.json',values['PREDECESSOR'])
     original=previous['new']
     qual, qr=real.read(real_status/(values['PREFIX']+'QUALIFIED.json'))
     qref=qual['generation']
     enrolled=real.bound(qref,Path(qref['path']))
     prepared, guard=enrolled['prepared']['sha256'],enrolled['guard_qualification']['sha256']
-    oldpkg=real_status/'tools-cold168-retry2-v1'
+    oldpkg=real_status/f'tools-cold168-retry{previous_attempt}-v1'
     oldseal=real.ref(oldpkg/'deployment-seal-receipt.json',values['PRIOR_SEAL'])
     original_tuple=(oldpkg,oldseal,original['invocation_id'],original)
     if not (real_status/(values['PREFIX']+'ACTIVE.json')).exists() and not (real_status/(values['PREFIX']+'ROLLBACK.json')).exists():
@@ -36,7 +39,7 @@ def exercise(scratch):
     old=dict(original,program=str(priorpkg/'status_cycle.py'))
     previous=dict(previous,new=old)
     prior=(priorpkg,priorseal,old['invocation_id'],old)
-    pkg=temp/'tools-cold168-retry3-v1'
+    pkg=temp/f'tools-cold168-retry{attempt}-v1'
     translated=lambda ref: dict(ref,path=str(pkg/Path(ref['path']).name))
     q=copy.deepcopy(qual)
     for field in ('package','generation','entry'):
@@ -46,11 +49,11 @@ def exercise(scratch):
     actor=dict(old,program=str(pkg/'status_cycle.py'),pid=1234,start_ticks=12345,invocation_id='a'*32)
     schedule={'fleet':{'path':'fixture','sha256':'b'*64}}
     binding=dict(old=old,qualified=qr,admission=q['prepared'],prepared=q['prepared'],generation=q['generation'],
-                 previous_active=pref,failed_retry2=q['failed_retry2'])
+                 previous_active=pref,**{failure_key:q[failure_key]})
     intent=dict(**binding,schedule=schedule)
     intentref={'path':str(temp/(values['PREFIX']+'INTENT.json')),'sha256':'1'*64}
-    active=dict(**binding,new=actor,schedule=schedule,schema='horizon-168-retry3-v1-status-active-v1',intent=intentref)
-    previous_path=temp/'COLD168_RETRY2_V1_STATUS_ACTIVE.json'
+    active=dict(**binding,new=actor,schedule=schedule,schema=f'horizon-168-retry{attempt}-v1-status-active-v1',intent=intentref)
+    previous_path=temp/f'COLD168_RETRY{previous_attempt}_V1_STATUS_ACTIVE.json'
     paths={kind:temp/(values['PREFIX']+kind+'.json') for kind in ('QUALIFIED','INTENT','ACTIVE','ROLLBACK')}
     first_rollback={'path':str(paths['ROLLBACK']),'sha256':'e'*64}
     rollback_actor=dict(old,invocation_id='d'*32,pid=12346,start_ticks=12347)
@@ -75,7 +78,7 @@ def exercise(scratch):
         assert select(s,prior,prepared,guard)==prior
         paths['ACTIVE'].touch()
         assert select(s,prior,prepared,guard)==(pkg,q['package'],actor['invocation_id'],actor)
-        for record,key,value in [(previous,'new',{}),(q,'failed_retry2',{}),(q,'generation',dict(q['generation'],sha256='a'*64)),
+        for record,key,value in [(previous,'new',{}),(q,failure_key,{}),(q,'generation',dict(q['generation'],sha256='a'*64)),
                                  (q,'guard',{}),(q,'entry',{}),(intent,'previous_active',{}),(intent,'old',{}),
                                  (active,'schema','different'),(active,'schedule',{}),(active,'intent',{}),
                                  (actor,'program','foreign'),(actor,'lock',dict(actor['lock'],inode=1))]:
@@ -100,7 +103,8 @@ def exercise(scratch):
 
 
 if __name__=='__main__':
+    assert len(sys.argv) in (2,3) and sys.argv[2:] in ([],['--retry4'])
     parent=Path(sys.argv[1]).resolve(strict=True)
     assert parent.is_relative_to('/home/sol')
     with tempfile.TemporaryDirectory(dir=parent) as directory:
-        print(json.dumps(exercise(directory),sort_keys=True))
+        print(json.dumps(exercise(directory, sys.argv[2:]==['--retry4']),sort_keys=True))
