@@ -39,6 +39,13 @@ pub(in crate::fleet) fn record(path: &Path) -> Result<Value> {
         "native bootstrap guard record",
     )?)?)
 }
+pub(super) fn identity(handoff: &Value) -> Result<(&'static str, &'static str)> {
+    if EPOCH == 257 {
+        horizon_singleton211_launch::native257::saved_guard(handoff)
+    } else {
+        Ok((c::GUARD, c::GUARD_SHA))
+    }
+}
 pub(in crate::fleet) fn sample(
     h: &Value,
     gp: &Value,
@@ -54,7 +61,10 @@ pub(in crate::fleet) fn sample(
         num(h, "main_pid")?.try_into()?,
         wall,
         age,
-        &c::PROFILE,
+        &native265_guard::SampleProfile {
+            guard_sha: identity(h)?.1,
+            ..c::PROFILE
+        },
     )?;
     let page = u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })?;
     ensure!(page.is_power_of_two(), "native bootstrap kernel page size");
@@ -116,11 +126,12 @@ pub(in crate::fleet) fn live(h: &Value) -> Result<()> {
         },
         256,
     )?;
+    let (guard_path, guard_sha) = identity(h)?;
     let command = format!(
         "{{ path={} ; argv[]={0} {} --plan-sha256 ${{HORIZON{EPOCH}_GUARD_PLAN_SHA256}} --self-sha256 {}",
-        c::GUARD,
+        guard_path,
         gb.path.display(),
-        c::GUARD_SHA
+        guard_sha
     );
     ensure!(
         text(&manager, "ExecStart")?

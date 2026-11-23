@@ -52,7 +52,12 @@ fn verify(
     let iid = text(h, "invocation_id")?;
     let pid = num(h, "main_pid")?;
     let harness = json!(Bound::new(HARNESS, HARNESS_SHA));
-    let guard = json!(Bound::new(GUARD, GUARD_SHA));
+    let (path, sha) = if EPOCH == 257 {
+        crate::native257::saved_guard(h)?
+    } else {
+        (GUARD, GUARD_SHA)
+    };
+    let guard = json!(Bound::new(path, sha));
     let worker = json!(Bound::new(WORKER, WORKER_SHA));
     let packet = json!(Bound::new(PACKET, PACKET_SHA));
     ensure!(
@@ -214,6 +219,14 @@ mod tests {
             deny_authority(x);
         }
         sample_fixture(&mut a, &mut g);
+        if EPOCH == 257 {
+            h["guard"] = greg.clone();
+            let mut mixed = h.clone();
+            mixed.as_object_mut().unwrap().remove("guard");
+            assert!(verify(&mixed, &p, &a, &t, &gp, &g, &j).is_err());
+            mixed["guard"] = json!({"path": GUARD, "sha256": "f".repeat(64)});
+            assert!(verify(&mixed, &p, &a, &t, &gp, &g, &j).is_err());
+        }
         verify(&h, &p, &a, &t, &gp, &g, &j).unwrap();
         let mut promoted = t.clone();
         promoted["replay_launch_authorized"] = json!(true);

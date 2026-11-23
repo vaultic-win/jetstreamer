@@ -85,6 +85,7 @@ fn records(
     worker: Option<u64>,
     first: &Value,
 ) -> Result<(Vec<u64>, Option<String>)> {
+    let (_, guard_sha) = guard::identity(h)?;
     let files = history["records"]
         .as_object()
         .context("native bootstrap guard files")?;
@@ -260,7 +261,7 @@ fn records(
         if name == &format!("sample-{gid}.json") {
             ensure!(
                 start <= terminal
-                    && r["guard_sha256"] == c::GUARD_SHA
+                    && r["guard_sha256"] == guard_sha
                     && r["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
                     && r["plan"] == h["guard_plan"]["path"]
                     && r["producer"]["pid"] == main
@@ -315,7 +316,7 @@ fn records(
                 name == &format!("terminal-{gid}.json")
                     && good
                     && r["schema"] == epoch_name!("horizon", "-native-guard-terminal-v1")
-                    && r["guard_sha256"] == c::GUARD_SHA
+                    && r["guard_sha256"] == guard_sha
                     && r["terminal"]["invocation_id"] == h["invocation_id"]
                     && r["terminal"]["pid"] == 0
                     && r["terminal"]["control_pid"] == 0

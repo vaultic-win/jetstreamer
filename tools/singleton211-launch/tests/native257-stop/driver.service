@@ -10,7 +10,7 @@ Type=oneshot
 User=root
 UMask=0077
 TimeoutStartSec=90
-ExecStart=/fixture/sandbox-tests native257::retire::stop_sandbox::exact_guard_terminates_a_held_owner_without_a_release_token --exact --ignored --nocapture --test-threads=1
+ExecStart=/fixture/sandbox-tests native257::stop_sandbox::exact_guard_terminates_a_held_owner_without_a_release_token --exact --ignored --nocapture --test-threads=1
 Environment=RUST_BACKTRACE=1
 StandardOutput=append:/evidence/driver.stdout
 StandardError=append:/evidence/driver.stderr

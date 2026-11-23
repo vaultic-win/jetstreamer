@@ -97,7 +97,7 @@ supervisor)
     for u in "$stage"/src/units/*; do install -m 0444 "$u" "$guest/etc/systemd/system/"; done
     for spec in \
       horizon257-native-input-limited-20261120-v1/horizon257-native-input \
-      horizon257-native-guard-limited-20261120-v1/horizon257-native-guard; do
+      horizon257-native-guard-reap-v219/horizon257-native-guard; do
         install -D -m 0555 "$stage/src/${spec##*/}" "$guest/var/lib/jetstreamer/$spec"
     done
     install -d -m 0755 "$guest/var/lib/jetstreamer/horizon-native257-startup-tokens"

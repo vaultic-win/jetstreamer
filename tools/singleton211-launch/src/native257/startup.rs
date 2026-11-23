@@ -373,6 +373,9 @@ pub(super) fn run(
                 && num(&handoff, "recorded_monotonic_us")? < expires,
             "original admission expired before handoff"
         );
+        if EPOCH == 257 {
+            handoff["guard"] = p["guard"].clone();
+        }
         deny_authority(&mut handoff);
         handoff::reopen(&handoff)?;
         let h = save_json(&n.root, "guarded-startup-handoff.json", &handoff)?;

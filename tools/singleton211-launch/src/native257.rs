@@ -26,9 +26,22 @@ const TOKENS: &str = "/var/lib/jetstreamer/horizon-native257-startup-tokens";
 pub(super) const HARNESS: &str =
     "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input";
 const HARNESS_SHA: &str = "b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce";
-const GUARD: &str =
+const ORIGINAL_GUARD: &str =
     "/var/lib/jetstreamer/horizon257-native-guard-limited-20261120-v1/horizon257-native-guard";
-const GUARD_SHA: &str = "cd20c10244bb4a3a9818a6e459163be1f596165e859b2783f76a2507b8425369";
+const ORIGINAL_GUARD_SHA: &str = "cd20c10244bb4a3a9818a6e459163be1f596165e859b2783f76a2507b8425369";
+const GUARD: &str =
+    "/var/lib/jetstreamer/horizon257-native-guard-reap-v219/horizon257-native-guard";
+const GUARD_SHA: &str = "858ca59d690c42ddcce78f06c1d95cfa566f1cb240f5f378d55ec490eeea6543";
+
+/// Original handoffs bind the first guard in their startup plan. Later
+/// handoffs also carry its identity for historical sample and journal readers.
+pub fn saved_guard(handoff: &Value) -> Result<(&'static str, &'static str)> {
+    match handoff.get("guard") {
+        None => Ok((ORIGINAL_GUARD, ORIGINAL_GUARD_SHA)),
+        Some(value) if *value == json!(Bound::new(GUARD, GUARD_SHA)) => Ok((GUARD, GUARD_SHA)),
+        _ => bail!("unregistered epoch 257 guard"),
+    }
+}
 const WORKER: &str = "/var/lib/jetstreamer/horizon-supported235-shrink-debt-e3f15eb2-v1/jetstreamer-historical-worker-v1-7-15";
 const WORKER_SHA: &str = "c3b2c33420bcf6b6809d7f0b43309e7d57d2791a88e2d4074d21d4f636c521e4";
 const PACKET: &str =
@@ -41,7 +54,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-closed266-v16/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-closed266-v17/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
