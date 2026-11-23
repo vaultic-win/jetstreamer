@@ -586,7 +586,7 @@ fn validate_exdev(failure: &Value, admitted: &Value) -> Result<()> {
             && failure["worker_receipt_absent"] == true
             && failure["worker_in_observed_guard_samples"] == false
             && failure["replay_claimed"] == false
-            && failure["r2_mutations"] == false
+            && failure["r2_mutations"].as_u64() == Some(0)
             && st(failure, "node_error")?.contains(
                 "RENAME_NOREPLACE is unavailable: Invalid cross-device link (os error 18)"
             )
@@ -1197,6 +1197,11 @@ mod tests {
         ] {
             let mut bad = f.clone();
             bad[k] = json!(false);
+            assert!(validate_exdev(&bad, &a).is_err());
+        }
+        for changed in [json!(false), json!(1)] {
+            let mut bad = f.clone();
+            bad["r2_mutations"] = changed;
             assert!(validate_exdev(&bad, &a).is_err());
         }
         let mut bad = f.clone();
