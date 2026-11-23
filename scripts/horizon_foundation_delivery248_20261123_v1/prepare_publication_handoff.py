@@ -177,7 +177,7 @@ cycle=sub(cycle,"    sp.run([sys.executable,'-B',T/'native_binding.py',str(n)],c
     record(out/'status-audit.json', dict(state, fleet=f))
     print(record(out/'completion.json', dict(observer=ref(obs), fleet=f, statuses=state['statuses'],
                                              archive_publications=state['archive_publications'])), flush=True)
-    cmd = [sys.executable, '-B', T/'native_binding.py', str(n)]
+    cmd = [sys.executable, '-B', T/'native_binding_handoff.py', str(n)]
     while True:
         finished_before = set(closed)
         attempt = sp.run(cmd)
