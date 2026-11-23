@@ -1,9 +1,13 @@
 import hashlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 work=Path(__file__).resolve().parents[2]
-assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
+assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch168-cold-v3','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
 cold167=sys.argv[3:]==['epoch167-cold-v3']
-cold168=sys.argv[3:]==['epoch168-cold-v2']
+cold168v3=sys.argv[3:]==['epoch168-cold-v3']
+cold168=sys.argv[3:]==['epoch168-cold-v2'] or cold168v3
+guard168ver='v3' if cold168v3 else 'v2'
+guard168date='20261123' if cold168v3 else '20261122'
+attempt168=3 if cold168v3 else 2
 retry11=sys.argv[3:]==['epoch166-retry11']
 retry170=sys.argv[3:] in (['epoch170-retry11'],['epoch170-retry12'],['epoch170-retry13'])
 attempt=sys.argv[3].split('-')[-1] if retry170 else None
@@ -12,7 +16,7 @@ runtime=Path('/var/lib/jetstreamer/horizon_runtime_data')
 base=runtime/('epoch167-cold-guard-20261122-v3' if cold167 else 'epoch170-retry10-guard384-20261121-v1')
 if retry170:base=runtime/f'epoch170-{attempt}-guard-20261122-v1'
 if retry11:base=runtime/'epoch166-retry11-guard-20261122-v1'
-if cold168:base=runtime/'epoch168-cold-guard-20261122-v2'
+if cold168:base=runtime/f'epoch168-cold-guard-{guard168date}-{guard168ver}'
 build=sys.argv[2]
 assert re.fullmatch(r"[0-9a-f]{32}",build)
 proof=base/("build-"+build)
@@ -20,7 +24,7 @@ out=Path((proof/"build-dir").read_text().strip())
 group=Path('/sys/fs/cgroup/system.slice')/('horizon-167-cold-guard-v3-qualify.service' if cold167 else 'horizon-170-retry10-guard384-qualify.service')
 if retry170:group=Path(f'/sys/fs/cgroup/system.slice/horizon-170-{attempt}-guard-qualify.service')
 if retry11:group=Path('/sys/fs/cgroup/system.slice/horizon-166-retry11-guard-qualify.service')
-if cold168:group=Path('/sys/fs/cgroup/system.slice/horizon-168-cold-guard-v2-qualify.service')
+if cold168:group=Path(f'/sys/fs/cgroup/system.slice/horizon-168-cold-guard-{guard168ver}-qualify.service')
 sealer=Path('/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment')
 sha_sealer='e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3'
 code=sys.argv[1]
@@ -66,7 +70,7 @@ assert sha(build_source)==hashlib.sha256(git('show',code+':scripts/horizon_epoch
 j=dict(schema='horizon-cold167-v3-native-guard-build-v1' if cold167 else 'horizon-170-384-native-guard-build-v1',commit=code,source_hashes=sources,artifact=ref(out/'guard'),test=ref(out/'tests'),script=ref(build_source),build_iid=build,captured_source=ref(proof/'sources'),qualification_log=ref(proof/'build.log'),test_count=102)
 if retry170:j['schema']=f'horizon-170-{attempt}-native-guard-build-v1'
 if retry11:j['schema']='horizon-166-retry11-native-guard-build-v1'
-if cold168:j['schema']='horizon-168-cold-v2-native-guard-build-v1'
+if cold168:j['schema']=f'horizon-168-cold-{guard168ver}-native-guard-build-v1'
 bp=base/'BUILD.json';durable(bp,j)
 bseal=seal('tools',[member('guard',out/'guard',0o555),member('build.json',bp,0o444)])
 old=base.parent/'epoch166-independent-cold-20261120-v1/staging/p0355/sealed-contract/contract.json'
@@ -87,10 +91,10 @@ plan=dict(schema="jetstreamer-horizon-standalone-guard-plan-v1",unit=unit,invoca
           filesystem="/home/sol",minimum_free_bytes=8297502499408,worker_root="/home/sol/.jetstreamer-private/epoch170-standard-lane-20261109-v1",
           maximum_root_physical_bytes=384<<30,maximum_worker_vmas=3500000,receipt_directory=str(run/"guard-receipts"),data_fulfillment=binding)
 if cold168:
- plan.update(unit='horizon-qualify-168-full-metered-cold-v2-20261122.service',
+ plan.update(unit=f'horizon-qualify-168-full-metered-cold-{guard168ver}-{guard168date}.service',
              worker_root='/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1',
              maximum_root_physical_bytes=288<<30,
-             receipt_directory=str(runtime/'epoch168-retry2-rebook-20261122-v1/guard-receipts'))
+             receipt_directory=str(runtime/f'epoch168-retry{attempt168}-rebook-{guard168date}-v1/guard-receipts'))
 if cold167:
  plan.update(unit='horizon-qualify-167-source-index-v3-20261122.service',
              worker_root='/home/sol/.jetstreamer-private/epoch167-standard-lane-20261109-v1',
@@ -111,6 +115,10 @@ cases=[("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=(384
                 ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]
 if cold168:
  cases.append(('wrong-predecessor-168',dict(plan,unit='horizon-qualify-168-full-metered-20261121-v1.service')))
+if cold168v3:
+ cases.append(('spent-retry2-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v2-20261122.service')))
+ old=runtime/'epoch168-cold-guard-20261122-v2/contract'
+ cases.append(('spent-retry2-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),'deployment_seal':ref(old/'deployment-seal-receipt.json')})))
 if retry170:
  predecessor={'retry11':'retry10','retry12':'retry11','retry13':'retry12'}[attempt]
  old_170_contract=runtime/(f'epoch170-{predecessor}-guard-20261122-v1/contract' if predecessor!='retry10' else 'epoch170-retry10-guard384-20261121-v1/contract')
@@ -136,6 +144,6 @@ result=dict(schema="horizon-cold167-v3-native-guard-qualified-v1" if cold167 els
             contract=binding,static_controls=records,physical_launch=False,qualification_invocation=os.environ["INVOCATION_ID"])
 if retry170:result['schema']=f'horizon-170-{attempt}-native-guard-qualified-v1'
 if retry11:result['schema']='horizon-166-retry11-native-guard-qualified-v1'
-if cold168:result['schema']='horizon-168-cold-v2-native-guard-qualified-v1'
+if cold168:result['schema']=f'horizon-168-cold-{guard168ver}-native-guard-qualified-v1'
 durable(base/"GUARD_QUALIFIED.json",result)
 print(json.dumps(result))
