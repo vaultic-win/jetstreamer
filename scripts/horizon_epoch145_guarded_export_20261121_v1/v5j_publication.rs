@@ -1,8 +1,77 @@
 //! Birth and terminal evidence for the paid semantic successor, before local or public playback.
 use super::*;
 
+const V5N_PREDECESSOR: &str = "dba04d40f1b046b4875d7e27e0ff224a";
+const V5N_READER: &str = "d6bc752180c265f6d680464ffec7ac2cc6bc4125440ef6ac1bb43534f3db2c34";
+const V5N_REVIEW: &str = "73439c7bff8fbd6ab806ab70f7e8953dae890c8e3b783ab7b8d7c3e270de18ff";
+const V5N_DISPATCH: &str = "080e95f9c7be162980589d1513c25ff2a4638d9e00d163a60e12c6d2475a5308";
+
+fn guard_walk_start(base: &Path, started: &Value, intent: &Value) -> Result<()> {
+    let post = base.join("tools-v13h");
+    let (_, seal) = publication::frozen_json(&post.join("deployment-seal-receipt.json"))?;
+    let (proof, build) = publication::frozen_json(&post.join("build-proof.json"))?;
+    let (binding, family) = publication::frozen_json(&base.join("V5N_RUNTIME_BINDINGS.json"))?;
+    ensure!(
+        seal["destination"] == json!(post)
+            && seal["members"].as_array().is_some_and(|members| members
+                .iter()
+                .any(|m| m["name"] == "build-proof.json"
+                    && m["mode"] == "0444"
+                    && m["sha256"] == proof.sha256))
+            && build["schema"] == "horizon-145-v5j-post-build-v1"
+            && binding.sha256 == "e96a2cbf5ef5d8e5ddd70fc40acdb47b843c75970671d6fe381035480458f560"
+            && build["guard_walk_binding"] == json!(binding)
+            && family["schema"] == "horizon-145-qualified-v5n-runtime-v1"
+            && build["semantic_image"] == family["reader"]
+            && build["semantic_dispatch"] == family["dispatcher"],
+        "post build is outside the qualified V5n runtime family"
+    );
+    let worker_proof: Bound = serde_json::from_value(family["build"].clone())?;
+    let review_ref: Bound = serde_json::from_value(family["review"].clone())?;
+    let worker = custody::json(&worker_proof, true)?;
+    let review = custody::json(&review_ref, true)?;
+    let window = &started["fresh_fit"]["phase145"]["window"];
+    ensure!(
+        family["reader"] == json!({"path":base.join("tools-v5n/export145"),"sha256":V5N_READER})
+            && review_ref.sha256 == V5N_REVIEW
+            && family["dispatcher"]["sha256"] == V5N_DISPATCH
+            && worker["source_commit"] == family["source_commit"]
+            && worker["build_iid"] == family["build_iid"]
+            && worker["capacity_provider"] == family["prior_stopped"]
+            && worker["verifier_sha256"] == V5N_READER
+            && review["reader"] == family["reader"]
+            && review["seal"] == family["worker"]
+            && review["provider"] == family["provider"]
+            && review["old_manager"]["InvocationID"] == V5N_PREDECESSOR
+            && started["image"] == V5N_READER
+            && intent["review_sha256"] == V5N_REVIEW
+            && intent["preflight"]["quote_provider"] == family["dispatcher"]
+            && window["continuity_seal"] == family["worker"]
+            && window["guard_walk_failure"] == worker["guard_walk_failure"]
+            && window["guard_walk_failure"] == review["failed_phase"]["failure"]
+            && window["guard_walk_failure"]["sha256"]
+                == "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"
+            && window["rejected_guard"] == worker["rejected_guard"]
+            && window["rejected_guard"]["sha256"]
+                == "6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"
+            && window["registered_guard_clock"] == worker["registered_guard_clock"]
+            && window["registered_guard_clock"]["sha256"]
+                == "119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d",
+        "unbound V5n worker, dispatcher, or failed guard generation"
+    );
+    Ok(())
+}
+
 pub(crate) fn semantic_owner(export: &str) -> Result<()> {
-    let (handoff_name, old, image_name, image_sha, dispatch) = if cfg!(incident_v5m_post145_only) {
+    let (handoff_name, old, image_name, image_sha, dispatch) = if cfg!(incident_v5n_post145_only) {
+        (
+            "v5n-name-handoff",
+            V5N_PREDECESSOR,
+            "tools-v5n/export145",
+            V5N_READER,
+            Some((V5N_REVIEW, V5N_DISPATCH)),
+        )
+    } else if cfg!(incident_v5m_post145_only) {
         (
             "v5m-name-handoff",
             "ff597d64ad37400ea5c6836336fb6706",
@@ -61,7 +130,7 @@ pub(crate) fn semantic_owner(export: &str) -> Result<()> {
     let started = custody::evidence(&start)?;
     let done: Bound = serde_json::from_value(report["completion"].clone())?;
     let complete = custody::evidence(&done)?;
-    if cfg!(incident_v5m_post145_only) {
+    if cfg!(incident_v5n_post145_only) || cfg!(incident_v5m_post145_only) {
         let fit = &started["fresh_fit"];
         let window = &fit["phase145"]["window"];
         ensure!(
@@ -69,14 +138,21 @@ pub(crate) fn semantic_owner(export: &str) -> Result<()> {
                 && fit["phase145"]["stage"] == "controller"
                 && fit["fits"] == true
                 && fit["fleet"] == intent["fleet"]
-                && window["continuity_seal"]["sha256"]
-                    == "db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4"
                 && window["missed_clock_failure"]["sha256"]
                     == "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"
                 && fit["epoch159_donor_cover"]["fleet"] == intent["fleet"]
                 && fit["epoch159_donor_cover"]["credited_retirement_bytes"] == 0,
             "unbound missed-clock recovery or paid donor"
         );
+        if cfg!(incident_v5n_post145_only) {
+            guard_walk_start(base, &started, &intent)?;
+        } else {
+            ensure!(
+                window["continuity_seal"]["sha256"]
+                    == "db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4",
+                "unbound V5m worker seal"
+            );
+        }
     }
     ensure!(
         custody::hex(export, 32)
