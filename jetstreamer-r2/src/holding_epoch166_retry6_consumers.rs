@@ -114,7 +114,10 @@ impl FileStamp {
     }
     fn check(self, path: &Path) -> Result<()> {
         ensure!(
-            FileStamp::new(&fs::symlink_metadata(path)?) == self,
+            FileStamp::new(
+                &fs::symlink_metadata(path)
+                    .with_context(|| format!("read consumer inventory stamp {}", path.display()))?
+            ) == self,
             "transitive metadata changed since inventory: {}",
             path.display()
         );
@@ -480,15 +483,9 @@ fn census_walk(
     let md = fs::metadata(&canonical)?;
     if md.is_dir() {
         for entry in fs::read_dir(path)? {
-            census_walk(
-                &entry?.path(),
-                definition,
-                depth + 1,
-                seen,
-                out,
-                budget,
-                aliases,
-            )?;
+            let child = entry?.path();
+            census_walk(&child, definition, depth + 1, seen, out, budget, aliases)
+                .with_context(|| format!("inventory consumer metadata {}", child.display()))?;
         }
     } else if md.is_file() {
         if !definition && !metadata_candidate(path) {
@@ -543,7 +540,9 @@ fn revalidate_aliases(aliases: &BTreeMap<PathBuf, PathBuf>) -> Result<()> {
         // The sole permitted unresolved generated unit alias is validated by
         // canonical_metadata_path against the actual PID1 fragment and digest.
         ensure!(
-            canonical_metadata_path(path, true)? == *canonical,
+            canonical_metadata_path(path, true)
+                .with_context(|| format!("revalidate consumer alias {}", path.display()))?
+                == *canonical,
             "consumer alias changed: {}",
             path.display()
         );
@@ -582,7 +581,9 @@ fn reverse_graph(
     let mut readers = vec![Vec::<usize>::new(); ids.len()];
     let mut count = 0usize;
     for (reader, (path, item)) in corpus.iter().enumerate() {
-        let body = item.read(path)?;
+        let body = item
+            .read(path)
+            .with_context(|| format!("scan consumer metadata {}", path.display()))?;
         let edges = literal_edges(&body, corpus, &targets, aliases);
         count = count
             .checked_add(edges.len())
@@ -616,7 +617,9 @@ fn reverse_graph(
     let mut emitted_path_bytes = 0usize;
     for &reader in &selected {
         let path = paths[reader];
-        let body = corpus[path].read(path)?;
+        let body = corpus[path]
+            .read(path)
+            .with_context(|| format!("emit consumer edges for {}", path.display()))?;
         let mut edges = literal_edges(&body, corpus, &targets, aliases);
         edges
             .retain(|target| targets.contains(target) || selected.contains(&ids[target.as_path()]));
@@ -635,7 +638,8 @@ fn reverse_graph(
     }
     // Catch changes that occurred after a file's edge scan as well.
     for (path, item) in corpus {
-        item.check_entry(path)?;
+        item.check_entry(path)
+            .with_context(|| format!("revalidate consumer inventory entry {}", path.display()))?;
     }
     Ok(graph)
 }
@@ -773,7 +777,8 @@ fn runtime_packages(
     entries: &mut usize,
     packages: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
-    let md = fs::symlink_metadata(path)?;
+    let md = fs::symlink_metadata(path)
+        .with_context(|| format!("inspect runtime package directory {}", path.display()))?;
     if !md.is_dir() || md.uid() != 0 || path == Path::new(LIFECYCLE) {
         return Ok(());
     }
@@ -785,14 +790,23 @@ fn runtime_packages(
     if md.mode() & 0o222 == 0 && path.join("deployment-seal-receipt.json").try_exists()? {
         packages.insert(path.to_owned());
     } else {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
+        for entry in fs::read_dir(path)
+            .with_context(|| format!("list runtime package directory {}", path.display()))?
+        {
+            let entry = entry
+                .with_context(|| format!("read runtime package member in {}", path.display()))?;
             *entries += 1;
             ensure!(
                 *entries <= 500_000,
                 "runtime package inventory exceeded its entry bound"
             );
-            if entry.file_type()?.is_dir() {
+            if entry
+                .file_type()
+                .with_context(|| {
+                    format!("classify runtime package member {}", entry.path().display())
+                })?
+                .is_dir()
+            {
                 runtime_packages(&entry.path(), ancestors, entries, packages)?;
             }
         }
@@ -1468,6 +1482,21 @@ mod tests {
         let mut mismatched = disk_artifact(&p, false);
         mismatched.sha256 = "a".repeat(64);
         assert!(mismatched.read(&p).is_err());
+    }
+    #[test]
+    fn disappearing_consumer_metadata_names_the_file_and_graph_pass() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("scheduled-observer.service");
+        fs::write(&path, SOURCE).unwrap();
+        let corpus = BTreeMap::from([(path.clone(), disk_artifact(&path, true))]);
+        fs::remove_file(&path).unwrap();
+        let err = reverse_graph(&corpus, &BTreeMap::new()).unwrap_err();
+        let message = format!("{err:#}");
+        assert!(message.contains(&format!("scan consumer metadata {}", path.display())));
+        assert!(err.chain().any(|c| {
+            c.downcast_ref::<std::io::Error>()
+                .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+        }));
     }
     #[test]
     fn reverse_graph_follows_definition_wrapper_and_plan_instead_of_only_direct_source_hits() {
