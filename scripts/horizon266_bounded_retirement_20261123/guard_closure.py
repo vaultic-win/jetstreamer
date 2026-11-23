@@ -54,7 +54,7 @@ def observe(epoch):
     unit = base+'.service'
     timer = base+'.timer'
     system = props(unit,['ExecStart','FragmentPath','DropInPaths','TriggeredBy'])
-    assert plan['path'] in system['ExecStart'] and not system['DropInPaths'] and system['TriggeredBy']==timer
+    assert plan['path'] in system['ExecStart'] and not system['DropInPaths']
     fragment = pin(Path(system['FragmentPath']).resolve(),service_sha)
     env = Path(plan['path']).with_name('guard.env')
     assert env.read_text().split('=',1)[1].strip()==digest and env.stat().st_uid==0 and not env.stat().st_mode & 0o022
@@ -62,9 +62,9 @@ def observe(epoch):
     assert t['Id']==timer and t['Unit']==t['Triggers']==unit and not any(t[k] for k in ('PartOf','WantedBy','RequiredBy','DropInPaths','Job','TriggeredBy'))
     timer_file = pin(Path(t['FragmentPath']).resolve(),timer_sha)
     if t['ActiveState']=='active':
-        assert t['InvocationID']==timer_iid
+        assert t['InvocationID']==timer_iid and system['TriggeredBy']==timer
     else:
-        assert t['ActiveState']=='inactive' and t['InvocationID'] in ('',timer_iid)
+        assert t['ActiveState']=='inactive' and t['InvocationID'] in ('',timer_iid) and system['TriggeredBy'] in ('',timer)
     return dict(terminal=original,plan=plan,env=ref(env),producer=producer,producer_state=state,
                 producer_iid=iid,timer=t,timer_fragment=timer_file,guard_fragment=fragment)
 
