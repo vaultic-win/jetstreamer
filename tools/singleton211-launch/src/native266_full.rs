@@ -471,7 +471,12 @@ fn controller(lane: Lane, args: &[String]) -> Result<Value> {
                 && manager["MemorySwapMax"] == "0",
             "control must run in booked PID1 envelope"
         );
-        start::run(lane, &mut n, &r, &review, &image)
+        let runtime = if lane == Lane::Bounded266 {
+            bounded::runtime_image(&r)?
+        } else {
+            image
+        };
+        start::run(lane, &mut n, &r, &review, &runtime)
     }
 }
 fn rows<'a>(v: &'a Value, k: &str) -> Result<&'a Vec<Value>> {
