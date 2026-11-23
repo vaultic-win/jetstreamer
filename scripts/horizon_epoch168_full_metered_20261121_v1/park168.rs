@@ -36,9 +36,22 @@ use predecessor::evidence::*;
 
 const DIR: &str = "epoch168-full-metered-holding-20261122-v1";
 const PREP: &str = "2fa44417d9b239b8e35820c1bed5b6e47d184517e9850cbc7992c7f8b5663c58";
-const FIT_DIR: &str = "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v1";
-const FIT_SEAL: &str = "f2a9679f85940827829e0bc1cd3831e37f33805232e756b2b865df64df2781f7";
-const FIT_IMAGE: &str = "00b95053361f71f6523cab55acd876fd3bd7ac44276548ba016ebb54dc2fc788";
+// Each installed operator uses the provider qualified with its status-writer generation.
+#[cfg(not(park168_retry4))]
+mod deployment {
+    pub const TOOLS: &str = "operator-tools";
+    pub const FIT_DIR: &str = "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v1";
+    pub const FIT_SEAL: &str = "f2a9679f85940827829e0bc1cd3831e37f33805232e756b2b865df64df2781f7";
+    pub const FIT_IMAGE: &str = "00b95053361f71f6523cab55acd876fd3bd7ac44276548ba016ebb54dc2fc788";
+}
+#[cfg(park168_retry4)]
+mod deployment {
+    pub const TOOLS: &str = "operator-tools-retry4";
+    pub const FIT_DIR: &str = "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry4-v1";
+    pub const FIT_SEAL: &str = "7c7dc6f92cca7fc94388b22261e3b0b15fbfe27587fd56fb61e1951aaf4250e9";
+    pub const FIT_IMAGE: &str = "0d9610c5cdb3333f1325d311d17bbb2cd67e35169d72560d60b7d7964b1da7a5";
+}
+use deployment::{FIT_DIR, FIT_IMAGE, FIT_SEAL};
 const UNIT: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
 const BEFORE: &str = "horizon-closed166-retry10-park-20261122-v1.service";
 const PRIOR_IID: &str = "57146d4b5c9940449cd129433a5acd2b";
@@ -438,7 +451,7 @@ fn run() -> Result<Value> {
     );
     let head = json!({"path":args[2],"sha256":args[3]});
     if args[1] == "start" {
-        let tools = local("operator-tools");
+        let tools = local(deployment::TOOLS);
         let seal = doc(&tools.join("deployment-seal-receipt.json"), None)?.0;
         let image = tools.join("park168");
         let members = seal["members"]
@@ -520,6 +533,36 @@ fn main() {
 #[cfg(test)]
 mod holding_entry {
     use super::*;
+    #[cfg(park168_retry4)]
+    #[test]
+    fn current_price_joins_the_registered_writer() {
+        let quote = doc(
+            &local("operator-retry4-price-022839.json"),
+            Some("f304c68648a01456d6c6bc29e7c50c778ed552906f1ed29d6d34b94223a18ca0"),
+        )
+        .unwrap()
+        .0;
+        let head = &quote["fleet"];
+        let fleet = bound(head, Path::new(head["path"].as_str().unwrap())).unwrap();
+        funding(&quote, &fleet, head, false).unwrap();
+        let registration = &quote["status_registration"];
+        let active = doc(
+            &rt("survivor172-cadence-20261122-v1/COLD168_RETRY4_V1_STATUS_ACTIVE.json"),
+            Some("16cd7406abfd04bee0ae5ad8120e095507eeb7928f3ce670a8bb83328fc414ff"),
+        )
+        .unwrap()
+        .0;
+        for field in ["invocation_id", "pid", "start_ticks"] {
+            assert_eq!(registration[field], active["new"][field]);
+        }
+        assert_eq!(quote["candidate"], quote["replacements"]["168"]);
+        assert_eq!(quote["candidate"]["processes"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            file_digest(&rt(FIT_DIR).join("post-stop-fit")).unwrap(),
+            FIT_IMAGE
+        );
+        assert!(doc(&rt("incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v1/deployment-seal-receipt.json"), Some(FIT_SEAL)).is_err());
+    }
     #[test]
     fn original_args_and_source() {
         let p = doc(&local("PREPARED.json"), Some(PREP)).unwrap().0;
