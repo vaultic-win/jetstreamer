@@ -78,12 +78,12 @@ impl Original {
             (vm.dev(), vm.ino(), vm.uid(), vm.gid(), vm.mode()) == (DEVICE, 11, 0, 0, 0o40700)
                 && mi.lines().any(|l| {
                     l.strip_prefix("mnt_id:")
-                        .is_some_and(|s| s.trim() == "1555")
+                        .is_some_and(|s| s.trim().parse::<u64>().ok() == Some(MOUNT))
                 }),
             "original root-only quarantine parent",
         )?;
         need(
-            check_fd(&src, true)?.ino() == 5767183 && check_fd(&root, true)?.ino() == 2,
+            check_fd(&src, true)?.ino() == PARENT_INODE && check_fd(&root, true)?.ino() == 2,
             "original directory identity",
         )?;
         Ok(Self { src, vault })
@@ -94,13 +94,13 @@ impl Original {
         let info = fs::read_to_string(format!("/proc/self/fdinfo/{}", f.as_raw_fd()))?;
         need(
             m.is_dir()
-                && m.ino() == 5767184
+                && m.ino() == CHILD_INODE
                 && m.dev() == DEVICE
                 && [(0, 0), (1000, 1000)].contains(&(m.uid(), m.gid()))
                 && m.mode() & 0o7777 == 0o700
                 && info.lines().any(|s| {
                     s.strip_prefix("mnt_id:")
-                        .is_some_and(|id| id.trim() == "1555")
+                        .is_some_and(|id| id.trim().parse::<u64>().ok() == Some(MOUNT))
                 }),
             "quarantine identity",
         )?;
@@ -120,7 +120,7 @@ pub(super) fn erase(
         for row in fs::read_dir(format!("/proc/self/fd/{}", dir.as_raw_fd()))? {
             *used += 1;
             need(
-                *used <= 450000 && Instant::now() < until,
+                *used <= MAX_ENTRIES && Instant::now() < until,
                 "retirement entry/deadline limit",
             )?;
             let name = row?
@@ -174,7 +174,10 @@ impl Tree for Original {
     }
     fn full(&self) -> io::Result<()> {
         let f = open(&child(&self.src, CHILD), DIRECTORY)?;
-        need(check_fd(&f, true)?.ino() == 5767184, "wrong original child")?;
+        need(
+            check_fd(&f, true)?.ino() == CHILD_INODE,
+            "wrong original child",
+        )?;
         let mut c = Counts::default();
         inspect(
             &f,
@@ -189,7 +192,10 @@ impl Tree for Original {
     }
     fn move_tree(&self) -> io::Result<()> {
         let h = open(&child(&self.src, CHILD), DIRECTORY)?;
-        need(check_fd(&h, true)?.ino() == 5767184, "wrong rename source")?;
+        need(
+            check_fd(&h, true)?.ino() == CHILD_INODE,
+            "wrong rename source",
+        )?;
         rename_exclusive(&self.src, CHILD, &self.vault, Q)?;
         need(
             self.quarantined()?.metadata()?.ino() == h.metadata()?.ino(),
@@ -236,7 +242,7 @@ impl Tree for Original {
     fn remove_empty(&self) -> io::Result<()> {
         self.empty()?;
         need(
-            self.names()? == (None, Some(5767184)),
+            self.names()? == (None, Some(CHILD_INODE)),
             "final quarantine changed",
         )?;
         unlink(&self.vault, Q, true)?;
@@ -250,7 +256,7 @@ pub fn retire(
     original_alloc: u64,
     gate: &mut impl FnMut() -> io::Result<()>,
 ) -> io::Result<()> {
-    let named = Some(5767184);
+    let named = Some(CHILD_INODE);
     let intent = j.get("intent")?;
     let prior_intent = intent.is_some();
     let intent = if let Some(i) = intent {
@@ -313,7 +319,7 @@ pub fn validate_intent(i: &str, b: &str) -> io::Result<u64> {
         .and_then(|s| s.parse::<u64>().ok())
         .ok_or_else(|| io::Error::other("invalid intent binding"))?;
     need(
-        n > 100 << 30 && n <= 128 << 30,
+        n > 100 << 30 && n <= IMAGE_SIZE,
         "invalid original image allocation",
     )?;
     Ok(n)

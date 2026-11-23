@@ -47,9 +47,10 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
+CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
 FIVE_LANE_145 = RETRY3_145 or HERE.name == "tools-homefloor-145-rejoin-v2"
-RETRY3_168 = RETRY3_145 or HERE.name == "tools-homefloor-cold168-retry3-v1"
+RETRY3_168 = CLOSED_RETRY3 or RETRY3_145 or HERE.name == "tools-homefloor-cold168-retry3-v1"
 FIFTH168 = RETRY3_168 or FIVE_LANE_145 or HERE.name in {"tools-homefloor-cold168-retry2-v1", "tools-homefloor-cold168-retry2-v2"}
 FOURTH166 = FIFTH168 or HERE.name == "tools-homefloor-166-after170-v1"
 PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
@@ -63,6 +64,8 @@ HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-home
 )
 if FIFTH168:
     cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),init_globals={"RETRY3":RETRY3_168})
+if CLOSED_RETRY3:
+    closed_bootstrap = runpy.run_path(str(HERE / "closed_retry3.py"))
 if RETRY3_168:
     writer168 = runpy.run_path(str(HERE / "retry3_status.py"))
 if PUBLISH170:
@@ -245,6 +248,10 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     directory, name = generation if generation is not None else (DIRS[e], UNITS[e])
     d=R/directory;unit="horizon-qualify-"+name+".service";timer="horizon-guard-"+name+".timer"
     manager=s.show(unit);ps=fit.members(unit)
+    if CLOSED_RETRY3 and e==168:
+        # Keep original tree bookings. Only the exact dead bootstrap can be absent from the native census.
+        s.need(not ps and own!=168,"closed retry3 cannot grant a 168 slot")
+        terminal=closed_bootstrap["settled"](s,fit)
     if not ps:
         s.need(manager["ActiveState"] in ("failed","inactive") and not manager["Job"] and (terminal is not None or not (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists()),
                "replacement admission has no native producer")
@@ -909,6 +916,10 @@ def registered136(fleet, registration):
 
 def capture_once(epoch,ref,prestart136=None):
     s.need(epoch in {145,166,167,168,170} and os.geteuid()==0 and sys.flags.isolated and __debug__,"unrecognized caller")
+    closed_before=None
+    if CLOSED_RETRY3:
+        s.need(epoch==166 and prestart136 is None,"closed retry3 quote is for independent 166 only")
+        closed_before=closed_bootstrap["settled"](s,fit)
     stopped=proof_stops()
     f,rows=fleet_head(ref);ledger=bound(fit.BOOK);trace168()
     terminal170 = None
@@ -1106,6 +1117,9 @@ def capture_once(epoch,ref,prestart136=None):
         protected += required - need
         need = required
         recovered_price = dict(homefloor_stops=interrupted, recovery_obligations=after)
+    if CLOSED_RETRY3:
+        s.need(closed_bootstrap["settled"](s,fit)==closed_before and "168" not in rep, "closed 168 changed")
+        recovered_price["closed_retry3_bootstrap"]=closed_before
     if PUBLISH170:
         s.need(publication170["current"](f) == terminal170, "cold170 terminal changed during price")
         recovered_price["closed_cold170"] = terminal170

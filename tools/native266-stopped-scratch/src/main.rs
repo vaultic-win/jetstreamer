@@ -1,5 +1,9 @@
 //! Read-only check of the original guard-stopped cad28704 guest. The controller
 //! separately binds its completed stop, live fleet, process census and service grant.
+#[cfg_attr(feature = "stopped-v194", path = "profile_v194.rs")]
+#[cfg_attr(not(feature = "stopped-v194"), path = "profile_v169.rs")]
+mod profile;
+use profile::*;
 mod closure;
 mod controller;
 mod journal;
@@ -15,14 +19,10 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-const CHILD: &str = "jetstreamer-historical-parent-XJEdNU";
-const RUNTIME: &str = "jetstreamer-historical-v1.8.11-lQAA8n";
 const SNAPSHOT: &str = "snapshot-114910768-HnePfSpTtWaPDFx9RrPeuamDZREhoUXa7xpK6fbtPGyK.tar.zst";
 const DIRECTORY: i32 = 0o200000;
 const NOFOLLOW: i32 = 0o400000;
 const PATH_ONLY: i32 = 0o10000000;
-const DEVICE: u64 = 1801;
-const MOUNT: u64 = 1555;
 
 fn need(ok: bool, message: &str) -> io::Result<()> {
     if ok {
@@ -110,7 +110,7 @@ fn inspect(dir: &File, relative: &Path, counts: &mut Counts, until: Instant) -> 
         .ok_or_else(|| io::Error::other("directory name"))?;
     for entry in fs::read_dir(&parent)? {
         need(
-            Instant::now() < until && counts.files + counts.directories < 450_000,
+            Instant::now() < until && counts.files + counts.directories < MAX_ENTRIES,
             "phase bound",
         )?;
         let entry = entry?;
@@ -141,26 +141,23 @@ fn inspect(dir: &File, relative: &Path, counts: &mut Counts, until: Instant) -> 
     Ok(())
 }
 
-const EXPECTED: Counts = Counts {
-    files: 413571,
-    directories: 13,
-    logical: 134663299285,
-    allocated_files: 129322577920,
-};
 fn run() -> io::Result<()> {
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if args == [OsStr::new("--check-terminal")] {
+        controller::check_terminal()?;
+    }
     if args == [OsStr::new("--retire")] || args == [OsStr::new("--close")] {
         return controller::run(args[0] == "--close");
     }
     need(
-        std::env::args_os().skip(1).collect::<Vec<_>>() == [OsStr::new("--check-only")],
+        args == [OsStr::new("--check-only")] || args == [OsStr::new("--check-terminal")],
         "expected --check-only",
     )?;
     let parent = Path::new(preservation::RUN).join("scratch/.historical-runtime");
     need(parent.canonicalize()? == parent, "noncanonical parent")?;
     let base = open(&parent, DIRECTORY)?;
     need(
-        check_fd(&base, true)?.ino() == 5767183,
+        check_fd(&base, true)?.ino() == PARENT_INODE,
         "original producer directory",
     )?;
     let tree = open(
@@ -168,7 +165,7 @@ fn run() -> io::Result<()> {
         DIRECTORY,
     )?;
     need(
-        check_fd(&tree, true)?.ino() == 5767184,
+        check_fd(&tree, true)?.ino() == CHILD_INODE,
         "original derived root",
     )?;
     let retained = preservation::originals()?;

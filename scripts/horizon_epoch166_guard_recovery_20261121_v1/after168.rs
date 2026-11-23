@@ -12,9 +12,12 @@ const PREVIOUS_WRITER: &str = "f1b4781788205dbc065f5b116577c2e263e523f65e19cd658
 #[cfg(not(epoch166_after168_retry3))]
 const NEXT_WRITER: &str = "8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d";
 
-#[cfg(epoch166_after168_retry3)]
+#[cfg(all(epoch166_after168_retry3, not(epoch166_after168_closed)))]
 pub const FIT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry3-v1/post-stop-fit";
+#[cfg(epoch166_after168_closed)]
+pub const FIT: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-closed168-retry3-v1/post-stop-fit";
 #[cfg(epoch166_after168_retry3)]
 pub const FIT_SEAL: &str = env!("RETRY3_FIT_SEAL");
 #[cfg(epoch166_after168_retry3)]
