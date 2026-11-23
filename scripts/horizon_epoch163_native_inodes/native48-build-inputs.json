@@ -1,0 +1,44 @@
+{
+  "schema": "epoch163-native48-build-inputs-v1",
+  "protocol": {
+    "path": "/usr/local/lib/jetstreamer/horizon-native163-consumer15-operator-source-20261112-v3/PROTOCOL.json",
+    "sha256": "347119462d6bc35e60275dfb2a7811db0ed4c2d6077bbfd30be8df114af31cdb"
+  },
+  "source_files": {
+    "native.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/source/native.rs",
+      "base_sha256": "2f83da0c201d4bec625be30cd93ea0346c28c5345481026e827cddf22e34b02d",
+      "sha256": "52edb68c9a79f5111a71f78710d6154068e15d9580bc575b4959ceb60315212e"
+    },
+    "finalize.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/source/finalize.rs",
+      "base_sha256": "7dd6de6698653e9cc83c5f1e45088acafe1473cef787cfcffd135b603d47c7e3",
+      "sha256": "117e652eb7e54f34655b19231a9face1f47b418942d4c6d79972787183faf9f4"
+    },
+    "native_guards.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/source/native_guards.rs",
+      "base_sha256": "61e5bdd585c7495520b205c280d8d6f6ff0ac3af7f9d05f12020a699297604b6",
+      "sha256": "61e5bdd585c7495520b205c280d8d6f6ff0ac3af7f9d05f12020a699297604b6"
+    },
+    "historical.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/source/historical.rs",
+      "base_sha256": "bf1013e69e52ad4f50f9209993036508159b60aa4165ab012eddddc085af6455",
+      "sha256": "bf1013e69e52ad4f50f9209993036508159b60aa4165ab012eddddc085af6455"
+    },
+    "epoch141_ledger_common.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/source/epoch141_ledger_common.rs",
+      "base_sha256": "60390ea0a445863ceb63e79002a0cb47000b982ebdad9ec22612de12a68e2a35",
+      "sha256": "60390ea0a445863ceb63e79002a0cb47000b982ebdad9ec22612de12a68e2a35"
+    },
+    "namespace_control.rs": {
+      "source": "jetstreamer-node/src/bin/epoch163-native-input/namespace_control.rs",
+      "base_sha256": "16a82d08c7e5853f63dc75e87a936c8f7b915b9b56e70f8b62f7f032e07666e7",
+      "sha256": "0b2ac13f58ece47a2b355e0124a00f4bd0b6df4b7ed886d635ad4a73ba09ede8"
+    },
+    "native48_limits.rs": {
+      "source": "scripts/horizon_epoch163_native_inodes/native48_limits.rs",
+      "base_sha256": "c17a3119f4da67b3c94cd16bc7d948bcbe07b393852d7beb5c77855ac0b858b8",
+      "sha256": "c17a3119f4da67b3c94cd16bc7d948bcbe07b393852d7beb5c77855ac0b858b8"
+    }
+  }
+}
