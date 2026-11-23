@@ -48,7 +48,8 @@ ORIGINAL={166,167,170}
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
 LEASE_RUNTIME_145 = HERE == D / "tools-homefloor-145-lease-rejoin-v1"
-LEASE_BUILD_145 = HERE == D / "tools-homefloor-145-lease-build-v1"
+STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
+LEASE_BUILD_145 = STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5K_POST = HERE == D / "tools-homefloor-145-post-v5k-v1"
@@ -518,6 +519,9 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
+    if STOPPED_V5K:
+        s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
+        return runpy.run_path(str(HERE / "v5k_stopped.py"))["stopped_phase"](s, fit)
     if LEASE_BUILD_145:
         s.need(epoch == 145, "lease repair build provider only prices the failed 145 owner")
         return runpy.run_path(str(HERE / "v5j_lease_failure.py"))["build_phase"](s, fit)
