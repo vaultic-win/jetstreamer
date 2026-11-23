@@ -222,6 +222,10 @@ pub fn load(reference: &Value) -> Result<Owner> {
 }
 /// Bound the old PID 1 failures to the current boot before reporting the successor.
 pub fn verify_drains() -> Result<()> {
+    verify_registered_drains(None)
+}
+
+pub fn verify_registered_drains(additional: Option<(&str, &str)>) -> Result<()> {
     let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")?
         .trim()
         .replace('-', "");
@@ -229,7 +233,10 @@ pub fn verify_drains() -> Result<()> {
         boot == "3b17d0055c3a4a0e8841da097e0957b5",
         "247 boot changed"
     );
-    for (name, iid) in [(ORIGINAL, ORIGINAL_IID), (PRIOR_UNIT, PRIOR_IID)] {
+    for (name, iid) in [(ORIGINAL, ORIGINAL_IID), (PRIOR_UNIT, PRIOR_IID)]
+        .into_iter()
+        .chain(additional)
+    {
         let cgroup = Path::new("/sys/fs/cgroup/system.slice").join(name);
         match fs::symlink_metadata(cgroup) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),

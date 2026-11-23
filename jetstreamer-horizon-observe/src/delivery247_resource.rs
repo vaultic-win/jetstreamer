@@ -24,9 +24,12 @@ struct Owner<'a> {
 impl Owner<'_> {
     fn range(&self) -> &'static str {
         match self.unit {
+            UNIT211 => "211-211",
             UNIT248 => "248-248",
             UNIT249 => "249-249",
-            UNIT265 => "265-265",
+            UNIT250 => "250-250",
+            UNIT251 => "251-251",
+            UNIT265 | RETRY265 => "265-265",
             _ => "247-247",
         }
     }
@@ -127,10 +130,13 @@ pub(super) fn validate(c: &Config) -> Result<()> {
     let mut pids = std::collections::HashSet::new();
     let mut invocations = std::collections::HashSet::new();
     let mut digests = std::collections::HashSet::new();
-    use OrdinaryEpoch::{Epoch248, Epoch249, Epoch265};
+    use OrdinaryEpoch::*;
     for (epoch, claim) in [
+        (Epoch211, &c.delivery211_claim),
         (Epoch248, &c.delivery248_claim),
         (Epoch249, &c.delivery249_claim),
+        (Epoch250, &c.delivery250_claim),
+        (Epoch251, &c.delivery251_claim),
         (Epoch265, &c.delivery265_claim),
     ] {
         let Some(claim) = claim else { continue };
@@ -172,6 +178,10 @@ pub(super) fn validate(c: &Config) -> Result<()> {
     if !c.delivery247_resource_only && !c.staged247_resource_only {
         return Ok(());
     }
+    ensure!(
+        !pids.contains(&owner.pid) && !invocations.iter().any(|id| id.as_str() == owner.iid),
+        "247 aliases another delivery"
+    );
     for r in c.replays.iter().chain(&c.diagnostic_replays) {
         ensure!(
             r.producer_unit != owner.unit
@@ -265,7 +275,8 @@ fn successor_owner(info: &next::Owner) -> Owner<'_> {
     }
 }
 fn successor_input(reference: &Value, info: &next::Owner) -> Result<()> {
-    next::verify_drains()?;
+    let additional = (fourth::unit(info) == fourth::V221_UNIT).then_some((next::UNIT, fourth::OLD));
+    next::verify_registered_drains(additional)?;
     if fourth::is_fourth(info) {
         ensure!(
             fs::read_to_string("/proc/sys/kernel/random/boot_id")?
@@ -285,23 +296,23 @@ fn successor_input(reference: &Value, info: &next::Owner) -> Result<()> {
                 "show",
                 next::UNIT,
                 "-p",
-                "LoadState,ActiveState,MainPID,ControlPID,Job",
+                "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,Job,Result,ExecMainStatus,NRestarts,Restart",
             ])
             .output()?;
-        let state = std::str::from_utf8(&m.stdout)?
-            .lines()
-            .collect::<std::collections::BTreeSet<_>>();
+        let mut state = json!({});
+        for line in std::str::from_utf8(&m.stdout)?.lines() {
+            let (key, value) = line
+                .split_once('=')
+                .context("invalid e434 systemd property")?;
+            state[key] = json!(value);
+        }
         ensure!(
             matches!(m.status.code(), Some(0 | 4))
-                && [
-                    "LoadState=not-found",
-                    "ActiveState=inactive",
-                    "MainPID=0",
-                    "ControlPID=0",
-                    "Job="
-                ]
-                .into_iter()
-                .all(|s| state.contains(s)),
+                && state["Id"] == next::UNIT
+                && state["ControlPID"] == "0"
+                && state["Job"] == ""
+                && (state["LoadState"] != "loaded" || state["Restart"] == "no")
+                && fourth::predecessor_spent(&state, fourth::unit(info)),
             "e434 reactivated"
         );
     }
@@ -416,11 +427,7 @@ pub(super) fn sample(
             Err(e) => vec![row(
                 Err(e),
                 Owner {
-                    unit: if fourth::selected(r) {
-                        fourth::UNIT
-                    } else {
-                        next::UNIT
-                    },
+                    unit: fourth::selected_unit(r).unwrap_or(next::UNIT),
                     iid: "",
                     pid: 0,
                     image: next::IMAGE,
@@ -437,38 +444,53 @@ pub(super) fn sample(
         Vec::new()
     }
 }
+const UNIT250: &str = "horizon-upload-250-ordinary-v221.service";
+const UNIT251: &str = "horizon-upload-251-ordinary-v221.service";
 const UNIT265: &str = "horizon-upload-265-ordinary-v215.service";
 const RETRY265: &str = "horizon-upload-265-ordinary-retry-v216.service";
 const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
+const UNIT211: &str = "horizon-upload-211-ordinary-v221.service";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
 #[derive(Clone, Copy)]
 pub(super) enum OrdinaryEpoch {
+    Epoch211,
     Epoch248,
     Epoch249,
+    Epoch250,
+    Epoch251,
     Epoch265,
     Retry265,
 }
 impl OrdinaryEpoch {
     fn number(self) -> u64 {
         match self {
+            Self::Epoch211 => 211,
             Self::Epoch248 => 248,
             Self::Epoch249 => 249,
+            Self::Epoch250 => 250,
+            Self::Epoch251 => 251,
             Self::Epoch265 | Self::Retry265 => 265,
         }
     }
     fn unit(self) -> &'static str {
         match self {
+            Self::Epoch211 => UNIT211,
             Self::Epoch248 => UNIT248,
             Self::Epoch249 => UNIT249,
+            Self::Epoch250 => UNIT250,
+            Self::Epoch251 => UNIT251,
             Self::Epoch265 => UNIT265,
             Self::Retry265 => RETRY265,
         }
     }
     fn digest(self) -> &'static str {
         match self {
+            Self::Epoch211 => "ce03172902f1108c996e0ac9e9ac90df9180ef8ba49440a3c428d177a7945da2",
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
+            Self::Epoch250 => "12e68ddf9b6d2505b6090688b5a3cfa4e720242b264cf2a6e7993b9b02f910c2",
+            Self::Epoch251 => "1c815780661e8b502634caff4a2b0d783e831fccc27c612d6a94c3480d00e318",
             Self::Epoch265 | Self::Retry265 => {
                 "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544"
             }
@@ -495,7 +517,17 @@ impl OrdinaryEpoch {
                 "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-v215/receipts".to_owned(),
                 "/var/lib/jetstreamer/horizon265-ordinary-reader-v215/epoch-265-plan.json".to_owned(),
             ),
-            Self::Epoch248 | Self::Epoch249 => (
+            Self::Epoch211 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-211-singleton-capped-v1/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-211-v221/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon211-ordinary-reader-v221/epoch-211-plan.json".to_owned(),
+            ),
+            Self::Epoch251 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-251-20261119-v2/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-251-plan.json".to_owned(),
+            ),
+            Self::Epoch248 | Self::Epoch249 | Self::Epoch250 => (
                 format!("/home/ubuntu/.jetstreamer-private/qualification-{epoch}-reboot-20261117-v1/output"),
                 format!("/home/ubuntu/.jetstreamer-private/current-reader-delivery-{epoch}-20261119-v2/receipts"),
                 format!("/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{epoch}-plan.json"),
@@ -623,6 +655,52 @@ pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "reads only the registered manager, PID and historical drains on the original host"]
+    fn v221_registered_commands_match_all_native_identities() -> Result<()> {
+        let path = std::path::PathBuf::from(std::env::var("HORIZON_V221_STATIC_CONFIG")?);
+        let (config, _) = load_config(&path)?;
+        let reference = config
+            .successor247_claim
+            .as_ref()
+            .context("v221 staged claim")?;
+        let staged = fourth::load(reference)?;
+        ensure!(
+            fourth::unit(&staged) == fourth::V221_UNIT,
+            "different staged owner"
+        );
+        successor_input(reference, &staged)?;
+        use OrdinaryEpoch::*;
+        for (epoch, claim) in [
+            (Epoch211, config.delivery211_claim),
+            (Epoch248, config.delivery248_claim),
+            (Epoch249, config.delivery249_claim),
+            (Epoch250, config.delivery250_claim),
+            (Epoch251, config.delivery251_claim),
+            (Epoch265, config.delivery265_claim),
+        ] {
+            let claim = claim.context("missing ordinary delivery")?;
+            claim.checked_command(epoch.select(&claim)?)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn each_v221_delivery_uses_its_own_epoch_and_claim_directory() {
+        use OrdinaryEpoch::*;
+        for epoch in [Epoch211, Epoch248, Epoch249, Epoch250, Epoch251, Retry265] {
+            let unit = epoch.unit();
+            let owner = Owner { unit, ..ORIGINAL };
+            let args = epoch.argv();
+            assert_eq!(owner.range(), format!("{0}-{0}", epoch.number()));
+            assert_eq!(args[4], owner.range());
+            assert_eq!(args[10], epoch.digest());
+            assert!(epoch.claim_path().ends_with(format!(
+                "{}/pipeline-claim.json",
+                unit.trim_end_matches(".service")
+            )));
+        }
+    }
     #[test]
     fn ordinary_delivery_binds_each_epoch_to_its_distinct_plan_and_process() {
         for epoch in [OrdinaryEpoch::Epoch248, OrdinaryEpoch::Epoch249] {

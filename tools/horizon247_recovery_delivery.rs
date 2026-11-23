@@ -6,6 +6,8 @@ use sha2::{Digest, Sha256};
 use std::{fs, io::Read, os::unix::fs::MetadataExt, path::Path};
 
 pub const UNIT: &str = "horizon-upload-247-staged-58709604-v1.service";
+pub const V221_UNIT: &str = "horizon-upload-247-staged-58709604-v221.service";
+const V221_ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-58709604-v221";
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 pub const IMAGE_SHA: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
 const ROOT: &str = "/home/ubuntu/.codex/diagnostics/horizon-upload-247-staged-58709604-v1";
@@ -140,7 +142,7 @@ fn post228_receipts(term: &Value, status: &Value, fleet: &Value, cold: &Value) -
     Ok(())
 }
 
-fn read(reference: &Value, path: &Path) -> Result<Value> {
+pub(super) fn read(reference: &Value, path: &Path) -> Result<Value> {
     ensure!(
         reference["path"].as_str() == path.to_str()
             && path.is_absolute()
@@ -171,14 +173,22 @@ fn read(reference: &Value, path: &Path) -> Result<Value> {
 fn claim_path() -> std::path::PathBuf {
     Path::new(ROOT).join("pipeline-claim.json")
 }
-pub fn selected(reference: &Value) -> bool {
-    reference["path"].as_str() == claim_path().to_str()
+pub fn selected_unit(reference: &Value) -> Option<&'static str> {
+    let path = Path::new(reference["path"].as_str()?);
+    // Compare the literal paths. Path component normalization must not select an alias.
+    if path.as_os_str() == claim_path().as_os_str() {
+        Some(UNIT)
+    } else if path.as_os_str() == Path::new(V221_ROOT).join("pipeline-claim.json").as_os_str() {
+        Some(V221_UNIT)
+    } else {
+        None
+    }
 }
 pub fn is_fourth(owner: &old::Owner) -> bool {
-    selected(&owner.proof["claim"])
+    selected_unit(&owner.proof["claim"]).is_some()
 }
 pub fn unit(owner: &old::Owner) -> &'static str {
-    if is_fourth(owner) { UNIT } else { old::UNIT }
+    selected_unit(&owner.proof["claim"]).unwrap_or(old::UNIT)
 }
 
 fn identity(
@@ -343,9 +353,234 @@ fn allocation(cap: &Value, ledger: &Value, reg: &Value, closure: &Value) -> Resu
     Ok(())
 }
 
+const V221_CLAIM_SHA: &str = "2bbaea3660fbac6ed235bb64baf2ba50064cf6dd8db5568286384ea42b79d951";
+
+fn load_v221(reference: &Value) -> Result<old::Owner> {
+    // The original claim authenticates the ordered booking and launch, which in turn
+    // authenticate the admission, predecessor receipts and recorded reader comparison.
+    ensure!(
+        reference["sha256"] == V221_CLAIM_SHA,
+        "different v221 claim"
+    );
+    let root = Path::new(V221_ROOT);
+    let claim = read(reference, &root.join("pipeline-claim.json"))?;
+    let evidence = claim["evidence"]
+        .as_array()
+        .context("v221 claim evidence")?;
+    let [book_ref, launch_ref] = evidence.as_slice() else {
+        anyhow::bail!("v221 booking and launch required")
+    };
+    let book = read(book_ref, &root.join("booking.json"))?;
+    let launch = read(launch_ref, &root.join("launch.json"))?;
+    let admission = read(&book["admission"], &root.join("admission.json"))?;
+    let source = &book["source"];
+    let history = &source["terminal_evidence"];
+    let binding_doc = |r: &Value| {
+        read(
+            r,
+            Path::new(r["path"].as_str().context("missing bound path")?),
+        )
+    };
+    let recipe_ref = old::binding(RECOVERY, RECOVERY_SHA);
+    let recipe = binding_doc(&recipe_ref)?;
+    let plan_ref = old::binding(PLAN, PLAN_SHA);
+    let plan = binding_doc(&plan_ref)?;
+    let scope = binding_doc(&admission["source_scope"]["comparison"])?;
+    let registration = binding_doc(&history["registration"])?;
+    let ledger = binding_doc(&history["ledger"])?;
+    ensure!(
+        launch["booking"] == *book_ref
+            && claim["epoch"] == 247
+            && claim["phase"] == "upload-readback"
+            && book["unit"] == V221_UNIT
+            && source["plan"] == plan_ref
+            && book["plan"] == plan_ref
+            && recipe["current_reader_plan"] == plan_ref
+            && recipe["uploader"] == old::binding(IMAGE, IMAGE_SHA)
+            && recipe["uploader"] == source["uploader"]
+            && book["argv"] == recipe["recovery_argv"]
+            && source["argv"] == book["argv"]
+            && plan["threads"] == 2
+            && scope["staged_epoch"] == 247
+            && scope["sidecar_authorized"] == false
+            && ["reader", "compiled reader"].iter().all(|name| {
+                let row = &scope["compared"][*name];
+                row["base"] == plan["reader_commit"] && row["changed_paths"] == json!([])
+            })
+            && history["registration"] == old::binding(OLD_EVENT, OLD_EVENT_SHA)
+            && history["ledger"] == old::binding(LEDGER, LEDGER_SHA)
+            && registration["booking"] == history["booking"]
+            && registration["launch"] == history["launch"]
+            && registration["claim"] == history["claim"]
+            && registration["retained_ledger"] == history["ledger"]
+            && history["outcome"] == "failed"
+            && history["original_process"]["boot_id"] == BOOT
+            && recipe["required_predecessor_invocations"]
+                == json!([old::ORIGINAL_IID, old::PRIOR_IID, OLD]),
+        "v221 staged delivery lineage"
+    );
+    let reservations = ledger["reservations"]
+        .as_array()
+        .context("247 reservations")?;
+    for (index, (name, iid)) in [
+        (old::ORIGINAL, old::ORIGINAL_IID),
+        (old::PRIOR_UNIT, old::PRIOR_IID),
+        (old::UNIT, OLD),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let row = &history["predecessors"][index];
+        let saved = &history["terminals"][index];
+        let e = &saved["event"];
+        let drain = &saved["drain"];
+        ensure!(
+            row["invocation_id"] == *iid
+                && row.get("release") == Some(&Value::Null)
+                && reservations.iter().filter(|r| *r == row).count() == 1
+                && e["UNIT"] == *name
+                && e["INVOCATION_ID"] == *iid
+                && e["_BOOT_ID"] == BOOT
+                && e["_UID"] == "0"
+                && e["_PID"] == "1"
+                && e["UNIT_RESULT"] == "exit-code"
+                && e["MESSAGE_ID"] == "d9b373ed55a64feb8242e02dbe79a49c"
+                && drain["Id"] == *name
+                && drain["InvocationID"] == *iid
+                && drain["MainPID"] == "0"
+                && drain["ControlPID"] == "0"
+                && drain["Job"] == ""
+                && drain["ActiveState"] == "failed"
+                && drain["Restart"] == "no",
+            "v221 predecessor reservation or terminal evidence"
+        );
+    }
+    let staged = &history["initial_object"];
+    let remote = &book["remote"];
+    ensure!(
+        source["original_replay_iid"] == "d091bb68ff2648159c76f690b3b7fee3"
+            && staged["key"] == "epoch-247.jet"
+            && remote["key"] == staged["key"]
+            && staged["length"] == source["bytes"]
+            && remote["length"] == staged["length"]
+            && source["source_sidecar_digest"] == staged["sha256"]
+            && remote["sha256"] == staged["sha256"]
+            && remote["etag"] == format!("\"{}\"", staged["etag"].as_str().context("staged ETag")?)
+            && staged["sidecar_absent"] == true,
+        "v221 original staged body"
+    );
+    let fit = binding_doc(&admission["fit"])?;
+    let number = |v: &Value| v.as_u64().context("v221 original capacity value");
+    let credit = number(&admission["resident_anon_credit"])?;
+    let memory = number(&fit["required_available_memory_bytes"])?
+        .checked_add(old::BOOKED)
+        .and_then(|v| v.checked_sub(credit))
+        .context("v221 memory threshold")?;
+    let disk = number(&fit["required_initial_free_bytes"])?
+        .checked_add(old::DISK)
+        .context("v221 disk threshold")?;
+    for when in ["before", "after"] {
+        let snapshot = &admission[when];
+        let anon = snapshot["anon"].as_object().context("v221 peer memory")?;
+        let total = anon.values().try_fold(0u64, |n, v| {
+            n.checked_add(number(v)?).context("v221 peer memory total")
+        })?;
+        ensure!(
+            anon.len() == 3
+                && total == credit
+                && number(&snapshot["available"])? >= memory
+                && number(&snapshot["free"])? >= disk,
+            "v221 admission snapshot"
+        );
+    }
+    ensure!(
+        fit["fits"] == true
+            && admission["required_available"] == memory
+            && admission["required_free"] == disk,
+        "v221 original fit"
+    );
+    for (i, epoch) in [250, 251].into_iter().enumerate() {
+        let holding = binding_doc(&admission["holding_readbacks"][i])?;
+        ensure!(
+            holding["source_retained"] == true
+                && holding["resource_credit"] == 0
+                && holding["result"]["operation"] == "verify"
+                && holding["result"]["epoch"] == epoch,
+            "v221 retained holding evidence"
+        );
+    }
+    let donor = binding_doc(&admission["donor"])?;
+    let reservation = binding_doc(&admission["reservation257"])?;
+    let terminal = binding_doc(&admission["terminal257"])?;
+    ensure!(
+        admission["gross"] == old::BOOKED
+            && admission["additional_disk"] == old::DISK
+            && admission["prior_reservations_released"] == false
+            && donor["other_reservations_retained"] == true
+            && donor["same_reservation_only"] == true
+            && reservation["donor"] == admission["donor"]
+            && reservation["automatic_release"] == false
+            && terminal["qualified"] == true
+            && terminal["full_replay"] == false,
+        "v221 original funding"
+    );
+    let u = &launch["unit"];
+    let iid = claim["invocation_id"].as_str().context("v221 invocation")?;
+    let command = claim["expected_exec_start"]
+        .as_str()
+        .context("v221 command")?;
+    let pid = u["MainPID"].as_str().context("v221 PID")?.parse::<u32>()?;
+    // The immutable launch captured systemd monotonic microseconds on this 100 Hz host.
+    let micros = u["ExecMainStartTimestampMonotonic"]
+        .as_str()
+        .context("v221 launch time")?
+        .parse::<u64>()?;
+    let ticks = micros / 10_000;
+    ensure!(
+        claim["unit"] == V221_UNIT
+            && u["Id"] == V221_UNIT
+            && u["InvocationID"] == iid
+            && u["ExecStart"] == command
+            && pid > 1
+            && ticks > 0
+            && u["ActiveState"] == "active"
+            && u["SubState"] == "running"
+            && u["Job"] == ""
+            && u["NRestarts"] == "0"
+            && u["Restart"] == "no"
+            && u["MemorySwapMax"] == "0"
+            && u["MemoryMax"] == "10737418240",
+        "v221 launch identity"
+    );
+    let proof = json!({"claim":reference,"booking":book_ref,"launch":launch_ref,"admission":book["admission"],
+        "plan":plan_ref,"recovery":recipe_ref,"start_ticks":ticks,"prior":history["registration"],
+        "old_claim_evidence":[history["booking"],history["launch"]],"retained_ledger":history["ledger"],
+        "source_scope":admission["source_scope"],"donor":admission["donor"],"reservation257":admission["reservation257"],"terminal257":admission["terminal257"]});
+    Ok(old::Owner {
+        iid: iid.to_owned(),
+        pid,
+        argv: book["argv"].clone(),
+        command: command.to_owned(),
+        proof,
+    })
+}
+
+pub fn predecessor_spent(u: &Value, current: &str) -> bool {
+    (u["LoadState"] == "not-found"
+        && u["ActiveState"] == "inactive"
+        && u["MainPID"] == "0"
+        && (current != V221_UNIT
+            || (u["SubState"] == "dead" && u["InvocationID"].as_str().unwrap_or("").is_empty())))
+        || (current == V221_UNIT
+            && u["LoadState"] == "loaded"
+            && old::terminal(u, old::UNIT, OLD).is_ok())
+}
+
 pub fn load(reference: &Value) -> Result<old::Owner> {
-    if !selected(reference) {
-        return old::load(reference);
+    match selected_unit(reference) {
+        Some(V221_UNIT) => return load_v221(reference),
+        Some(UNIT) => (),
+        _ => return old::load(reference),
     }
     let root = Path::new(ROOT);
     let c = read(reference, &claim_path())?;
@@ -440,7 +675,7 @@ pub fn validate_sample(row: &Value, owner: &old::Owner) -> Result<()> {
     staged247_rss::validate_endpoints(
         row,
         &staged247_rss::Endpoint {
-            unit: UNIT,
+            unit: unit(owner),
             iid: &owner.iid,
             pid: owner.pid,
             ticks: owner.proof["start_ticks"]
@@ -457,6 +692,24 @@ pub fn validate_sample(row: &Value, owner: &old::Owner) -> Result<()> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn actual_v221_and_planned_fourth_have_distinct_history() {
+        let mut u = json!({"Id":old::UNIT,"InvocationID":OLD,"LoadState":"loaded","ActiveState":"failed",
+            "SubState":"failed","MainPID":"0","NRestarts":"0","Result":"exit-code","ExecMainStatus":"1"});
+        assert!(predecessor_spent(&u, V221_UNIT));
+        assert!(!predecessor_spent(&u, UNIT));
+        u["InvocationID"] = json!(old::PRIOR_IID);
+        assert!(!predecessor_spent(&u, V221_UNIT));
+        assert_eq!(
+            selected_unit(&json!({"path":Path::new(V221_ROOT).join("pipeline-claim.json")})),
+            Some(V221_UNIT)
+        );
+        assert_eq!(selected_unit(&json!({"path":claim_path()})), Some(UNIT));
+        assert_eq!(
+            selected_unit(&json!({"path":format!("{V221_ROOT}//pipeline-claim.json")})),
+            None
+        );
+    }
     #[test]
     fn fourth_claim_never_accepts_an_old_iid_or_another_image() {
         let argv = json!([IMAGE, "sync", "/private/fixed", "--recover-staged-247"]);

@@ -56,7 +56,7 @@ fn recovery_history(fleet: &Value, owner: &successor::Owner) -> Result<()> {
             .context("fourth 247 fleet history")?;
         let original = entries.len();
         entries.retain(|r| {
-            r["unit"]["Id"] != fourth::UNIT || r["expected_invocation_id"] != owner.iid
+            r["unit"]["Id"] != fourth::unit(owner) || r["expected_invocation_id"] != owner.iid
         });
         ensure!(
             original == entries.len() + 1,
@@ -84,9 +84,7 @@ fn recovery_history(fleet: &Value, owner: &successor::Owner) -> Result<()> {
             && r["evidence"] == *reg
             && u == &older["unit_census"][successor::UNIT]
             && u["Id"] == successor::UNIT
-            && u["LoadState"] == "not-found"
-            && u["ActiveState"] == "inactive"
-            && u["MainPID"] == "0"
+            && fourth::predecessor_spent(u, fourth::unit(owner))
             && !older["active"]
                 .as_array()
                 .context("active owners")?
@@ -96,6 +94,107 @@ fn recovery_history(fleet: &Value, owner: &successor::Owner) -> Result<()> {
         "e434 history changed"
     );
     Ok(())
+}
+
+// The v221 cohort has several simultaneous deliveries using the same uploader image.
+fn ordinary_delivery_join(row: &Value, fleet: &Value, o: &Value, name: &str) -> Result<()> {
+    use jetstreamer_horizon_observe::staged247_rss::{Endpoint, validate_delivery_endpoints};
+    use std::path::Path;
+    let mut entries = fleet["pipelines"]
+        .as_array()
+        .context("delivery pipelines")?
+        .iter()
+        .filter(|entry| entry["unit"]["Id"] == name);
+    let entry = entries
+        .next()
+        .context("missing ordinary delivery pipeline")?;
+    let epoch = entry["epoch"].as_u64().context("delivery epoch")?;
+    let stem = name
+        .strip_suffix(".service")
+        .context("delivery unit name")?;
+    ensure!(
+        name.starts_with(&format!("horizon-upload-{epoch}-ordinary-"))
+            && stem.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'),
+        "ordinary delivery epoch or unit changed"
+    );
+    let root = Path::new("/home/ubuntu/.codex/diagnostics").join(stem);
+    let claim = fourth::read(&row["delivery_claim"], &root.join("pipeline-claim.json"))?;
+    let records = claim["evidence"].as_array().context("delivery evidence")?;
+    let launch_ref = records
+        .iter()
+        .find(|r| r["path"].as_str() == root.join("launch.json").to_str())
+        .context("ordinary delivery launch binding")?;
+    let launch = fourth::read(launch_ref, &root.join("launch.json"))?;
+    let unit = &entry["unit"];
+    let iid = unit["InvocationID"]
+        .as_str()
+        .context("ordinary invocation")?;
+    let pid = unit["MainPID"]
+        .as_str()
+        .context("ordinary PID")?
+        .parse::<u32>()?;
+    let micros = launch["unit"]["ExecMainStartTimestampMonotonic"]
+        .as_str()
+        .context("ordinary launch time")?
+        .parse::<u64>()?;
+    let range = format!("{epoch}-{epoch}");
+    ensure!(
+        entries.next().is_none()
+            && pid > 1
+            && micros >= 10_000
+            && entry["live"] == true
+            && entry["phase"] == "upload-readback"
+            && entry["sampled_at_utc"] == fleet["sampled_at_utc"]
+            && fleet["active"]
+                .as_array()
+                .context("active owners")?
+                .iter()
+                .filter(|e| e["unit"]["Id"] == name)
+                .eq(std::iter::once(entry))
+            && unit == &fleet["unit_census"][name]
+            && entry["expected_invocation_id"] == iid
+            && claim["unit"] == name
+            && claim["invocation_id"] == iid
+            && claim["epoch"] == epoch
+            && claim["phase"] == "upload-readback"
+            && claim["evidence"] == entry["evidence"]
+            && launch["unit"]["Id"] == name
+            && launch["unit"]["InvocationID"] == iid
+            && launch["unit"]["MainPID"] == unit["MainPID"]
+            && launch["unit"]["ExecStart"] == claim["expected_exec_start"]
+            && row["sampled_unix_seconds"]
+                == super::fleet::utc_seconds(
+                    o["recorded_at_utc"].as_str().context("sample clock")?
+                )?
+            && row["publication_authorized"] == false
+            && row["resource_release_authorized"] == false
+            && o["delivery_resources"]
+                .as_array()
+                .context("delivery RSS census")?
+                .iter()
+                .filter(|e| e["producer_unit"] == name
+                    && e["expected_producer_invocation_id"] == iid
+                    && e["status"] == "observed"
+                    && e["delivery_resource_only"] == true
+                    && e["range"] == range
+                    && &e["observation"] == row)
+                .count()
+                == 1,
+        "ordinary delivery claim, endpoints or sample clock changed"
+    );
+    validate_delivery_endpoints(
+        row,
+        &Endpoint {
+            unit: name,
+            iid,
+            pid,
+            ticks: micros / 10_000,
+            image: fourth::IMAGE,
+            image_sha: fourth::IMAGE_SHA,
+            cap: successor::HARD,
+        },
+        &range,
+    )
 }
 
 fn checked(o: &Value, ledger: &Value) -> Result<Value> {
@@ -132,7 +231,11 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             ensure!(
                 matches!(
                     name,
-                    successor::ORIGINAL | successor::PRIOR_UNIT | successor::UNIT | fourth::UNIT
+                    successor::ORIGINAL
+                        | successor::PRIOR_UNIT
+                        | successor::UNIT
+                        | fourth::UNIT
+                        | fourth::V221_UNIT
                 ),
                 "unregistered epoch 247 uploader"
             );
@@ -175,6 +278,12 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
         let name = row["producer_after"]["unit"]
             .as_str()
             .context("observed memory owner")?;
+        if owners.contains_key(fourth::V221_UNIT)
+            && name.starts_with("horizon-upload-")
+            && name.contains("-ordinary-")
+        {
+            ordinary_delivery_join(row, ledger, o, name)?;
+        }
         if name == jetstreamer_horizon_observe::staged247_rss::UNIT {
             let timestamp = super::fleet::utc_seconds(
                 o["recorded_at_utc"]
@@ -204,7 +313,7 @@ fn checked(o: &Value, ledger: &Value) -> Result<Value> {
             );
             jetstreamer_horizon_observe::staged247_rss::validate(row)?;
         }
-        if matches!(name, successor::UNIT | fourth::UNIT) {
+        if matches!(name, successor::UNIT | fourth::UNIT | fourth::V221_UNIT) {
             ensure!(
                 row["sampled_unix_seconds"]
                     == super::fleet::utc_seconds(
@@ -345,6 +454,67 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires the sealed v221 receipts and offline seven-delivery fixture"]
+    fn v221_seven_deliveries_are_charged_once_without_replay_credit() -> Result<()> {
+        let fixture: Value =
+            serde_json::from_slice(&std::fs::read(std::env::var("HORIZON_V221_FIXTURE")?)?)?;
+        assert_eq!(fixture["offline_synthetic_rss"], true);
+        let mut observation = fixture["observer"].clone();
+        let fleet = &fixture["fleet"];
+        let owner = fourth::load(&fixture["config_fields"]["successor247_claim"])?;
+        assert_eq!(fourth::unit(&owner), fourth::V221_UNIT);
+        assert_eq!(owner.proof["start_ticks"], 56_984_232u64);
+        let rows = observation["delivery_resources"].as_array_mut().unwrap();
+        let idx = rows
+            .iter()
+            .position(|row| row["producer_unit"] == fourth::V221_UNIT)
+            .unwrap();
+        rows[idx]["observation"]["successor_owner"] = owner.proof.clone();
+        let result = report(&observation, fleet);
+        assert_eq!(result["valid"], true, "{result}");
+        assert_eq!(result["non_replay_owner_count"], 7);
+        assert_eq!(result["non_replay_resident_bytes"], 28 * 4096);
+        assert_eq!(result["executing_lanes"], 0);
+        assert_eq!(result["admission_authorized"], false);
+        for i in 0..7 {
+            let mut missing = observation.clone();
+            missing["delivery_resources"]
+                .as_array_mut()
+                .unwrap()
+                .remove(i);
+            assert_eq!(report(&missing, fleet)["valid"], false);
+            let mut stale = observation.clone();
+            stale["delivery_resources"][i]["observation"]["sampled_unix_seconds"] = json!(42);
+            assert_eq!(report(&stale, fleet)["valid"], false);
+            let mut alias = observation.clone();
+            alias["delivery_resources"][i]["observation"]["producer_after"]["invocation_id"] =
+                json!(owner.iid);
+            if i == idx {
+                alias["delivery_resources"][i]["observation"]["producer_after"]["main_pid"] =
+                    json!(42);
+            }
+            assert_eq!(report(&alias, fleet)["valid"], false);
+        }
+        let old = fleet["pipelines"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .position(|row| row["unit"]["Id"] == successor::UNIT)
+            .unwrap();
+        let mut duplicate = fleet.clone();
+        duplicate["pipelines"]
+            .as_array_mut()
+            .unwrap()
+            .push(fleet["pipelines"][old].clone());
+        assert_eq!(report(&observation, &duplicate)["valid"], false);
+        let mut reactivated = fleet.clone();
+        reactivated["pipelines"][old]["unit"]["MainPID"] = json!("42");
+        reactivated["unit_census"][successor::UNIT] = reactivated["pipelines"][old]["unit"].clone();
+        assert_eq!(report(&observation, &reactivated)["valid"], false);
+        Ok(())
+    }
+
     #[test]
     #[ignore = "requires the Foundation host's original v215 and v216 fleet receipts"]
     fn delivery_only_target_from_recorded_fleet() -> Result<()> {

@@ -61,8 +61,12 @@ pub fn validate(row: &Value) -> Result<()> {
     )
 }
 pub fn validate_endpoints(row: &Value, owner: &Endpoint<'_>) -> Result<()> {
+    validate_delivery_endpoints(row, owner, "247-247")
+}
+
+pub fn validate_delivery_endpoints(row: &Value, owner: &Endpoint<'_>, range: &str) -> Result<()> {
     ensure!(
-        row["range"] == "247-247"
+        row["range"] == range
             && row["phase"] == "upload-readback"
             && row["resource_only"] == true
             && row["delivery_resource_only"] == true
