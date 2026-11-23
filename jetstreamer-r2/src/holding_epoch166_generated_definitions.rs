@@ -97,7 +97,10 @@ fn directory_tree(
             Err(error) if path == root && error.kind() == std::io::ErrorKind::NotFound => {
                 return Ok(());
             }
-            Err(error) => return Err(error.into()),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("stat generator namespace entry {}", path.display()));
+            }
         };
         ensure!(
             path != root || md.is_dir(),
@@ -127,8 +130,13 @@ fn directory_tree(
             Contents::File(observed)
         };
         if md.is_dir() {
-            for item in fs::read_dir(&path)? {
-                pending.push(item?.path());
+            for item in fs::read_dir(&path)
+                .with_context(|| format!("list generator directory {}", path.display()))?
+            {
+                pending.push(
+                    item.with_context(|| format!("read generator member in {}", path.display()))?
+                        .path(),
+                );
                 ensure!(
                     pending.len() + entries.len() < 4096,
                     "generator namespace exceeds bound"
