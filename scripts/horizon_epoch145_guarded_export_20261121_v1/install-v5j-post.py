@@ -156,7 +156,9 @@ def main(commit, iid, writer_sha=None):
     require(artifacts["export145"] == image_sha and str(POST / "export145").encode() in image.read_bytes()
             and str(TARGET / "post-stop-fit").encode() in image.read_bytes(), "unregistered native image")
     src = outputs / "source" / FAMILY
-    model = json.loads(subprocess.check_output([sys.executable, "-IB", src / "post_inputs.py", *(["--guard-walk" if GUARD_POST else "--missed-clock" if MISSED_POST else "--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []), "inspect"]))
+    adapter = src / "post_inputs.py"
+    adapter_args = ["--guard-walk" if GUARD_POST else "--missed-clock" if MISSED_POST else "--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []
+    model = json.loads(subprocess.check_output([sys.executable, "-IB", adapter, *adapter_args, "inspect"]))
     need_refs = model["artifacts"]
     price = json.loads((q / "before.json").read_bytes())
     require(price["fits"] and price["resource_credit_bytes"] == 0 and price["candidate"] is None and price["epoch"] == 145
@@ -164,8 +166,13 @@ def main(commit, iid, writer_sha=None):
             and price["available_HOME_bytes"] - price["complete_required_HOME_bytes"] >= 92274688 + 16777216
             and (q / "memory.peak").read_text().strip().isdigit(), "unfunded build")
     if GUARD_POST:
-        module = runpy.run_path(str(src/"post_inputs.py"))
-        bindings,binding_ref = module["guard_bindings"]()
+        installer_args = sys.argv
+        try:
+            sys.argv = [str(adapter), *adapter_args]
+            module = runpy.run_path(str(adapter))
+            bindings, binding_ref = module["guard_bindings"]()
+        finally:
+            sys.argv = installer_args
     require(ref(SEALER)["sha256"] == SEAL_SHA and ref(DONOR / SEAL)["sha256"] == (bindings["provider"]["sha256"] if GUARD_POST else DONOR_SHA)
             and ref(DISPATCH / SEAL)["sha256"] == (bindings["dispatcher"]["sha256"] if GUARD_POST else DISPATCH_SHA),
             "changed donor or sealer")
