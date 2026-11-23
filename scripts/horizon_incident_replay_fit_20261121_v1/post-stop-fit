@@ -49,7 +49,10 @@ ORIGINAL={166,167,170}
 HERE = Path(__file__).resolve().parent
 DETACHED_145 = HERE == D / "tools-homefloor-145-handoff-v1"
 V5J_POST = HERE == D / "tools-homefloor-145-post-v5j-v1"
-RETRY4_145 = V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
+HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
+if HOURLY169:
+    hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
+RETRY4_145 = HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
@@ -110,6 +113,8 @@ def fleet_head(ref):
     mo=re.fullmatch(r"horizon-observer-(root[0-9]{6}[-a-zA-Z0-9]+)\.timer",name)
     s.need(mo and not (R/mo.group(1)/p.name).exists(),"superseded fleet")
     rows=[v for k in ("actual_executing_replays","actual_active_bootstraps","actual_active_private_diagnostics") for v in f[k]]
+    if HOURLY169:
+        rows, _ = hourly169["archival_roster"](f)
     roster={v["epoch"]:v for v in rows}
     s.need(((169 in roster)==(f.get("focused169_terminal") is None)) and ((172 in roster) == (f.get("full172_local_commit") is None)) and roster.keys()<=ORIGINAL|{136,168,169,172} and len(rows)==len(roster),"unexpected root fleet membership")
     return f,roster
@@ -701,7 +706,7 @@ def closed168_tree():
     s.need(first==second and os.path.samestat(m,run.stat()),"retained metered 168 allocation changed during walk")
     return dict(physical_bytes=first,root=str(s.TREE),cap=fit.CAP)
 
-def census(peers,replacements,extra,c136,own,stops):
+def census(peers,replacements,extra,c136,own,stops,hourly=None):
     expect={v["unit"]:v["processes"] for v in peers.values()}
     expect.update({v["producer_unit"]:v["processes"] for v in replacements.values()})
     if extra and extra["actor"]:
@@ -709,6 +714,10 @@ def census(peers,replacements,extra,c136,own,stops):
         if extra.get("first_worker"):
             w=bound(extra["first_worker"]);expect[s.U].append((w["worker_pid"],w["worker_start_ticks"]))
     if c136["occupied"]:expect[fit.N136]=c136["identity"]["processes"]
+    if hourly is not None:
+        s.need(HOURLY169 and own == 145 and hourly["unit"] not in expect and not c136["occupied"],
+               "different focused 169 actor or donor")
+        expect[hourly["unit"]] = hourly["processes"]
     s.need(fit.units()==set(expect),"foreign qualifier unit")
     for u,prs in expect.items():
         members=fit.members(u);expected=tuple(sorted(p[0] for p in prs))
@@ -1093,7 +1102,8 @@ def capture_once(epoch,ref,prestart136=None):
         books["168"]["run"] = str(cold168["RUN"])
         books["168"]["stable_root"] = cold168["stable"](s)
         census_stops = {**stopped, "168": interrupted[168]}
-    population,qualification=census(peers,rep,extra,c136,epoch,census_stops)
+    hourly = hourly169["archival_roster"](f)[1] if HOURLY169 else None
+    population,qualification=census(peers,rep,extra,c136,epoch,census_stops,hourly)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -1104,7 +1114,7 @@ def capture_once(epoch,ref,prestart136=None):
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,census_stops)==(population,qualification),
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,census_stops,hourly)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
@@ -1202,6 +1212,17 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
+    if HOURLY169:
+        s.need(epoch == 145 and prestart136 is None, "hourly actor registration requires its dedicated complete quote")
+        fleet, _ = fleet_head(ref)
+        _, before = hourly169["archival_roster"](fleet)
+        native = capture_native(epoch, ref)
+        sample, receipt = hourly169["newest_guard"](before)
+        result = hourly169["price"](native, fleet, before, sample)
+        _, after = hourly169["archival_roster"](fleet)
+        s.need(before == after, "hourly process generation changed during native capacity capture")
+        result["guard_receipt"] = receipt
+        return result
     if FIFTH168 and epoch in (166,168):
         route = retry11 if epoch == 166 else cold168
         if not fit.members(route["UNIT"]):
@@ -1239,6 +1260,7 @@ if __name__=="__main__":
     args=sys.argv[1:]
     review=args[:1]==["--next-admission"]
     if review:
+        s.need(not HOURLY169, "use the dedicated hourly actor complete quote directly")
         args=args[1:]
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
