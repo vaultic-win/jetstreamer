@@ -24,10 +24,15 @@ pub(crate) fn latest(f: &Bound) -> Result<Value> {
     let mut parents = BTreeSet::new();
     for entry in fs::read_dir(D)? {
         let entry = entry?;
-        if !entry
-            .file_name()
-            .to_string_lossy()
-            .starts_with("horizon-fleet-takeover-v")
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        // The 257 owner and terminal events sit between routine samples 218
+        // and 219. They participate in the same hash-linked fleet history.
+        if !name.starts_with("horizon-fleet-takeover-v")
+            && !matches!(
+                name.as_ref(),
+                "horizon257-v16-owner-fleet-a1" | "horizon257-v16-terminal-fleet-a1"
+            )
         {
             continue;
         }
