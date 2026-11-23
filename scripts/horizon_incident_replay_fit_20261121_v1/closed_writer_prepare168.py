@@ -73,7 +73,9 @@ def quote():
                current['sole_next_timer']=='horizon-observer-'+GAP.name+'.timer' and
                current['recorded_unix_seconds']<datetime.fromisoformat(sample['recorded_at_utc']).timestamp()<=timestamp and
                0<=time.time()-timestamp<=2400 and not current['actual_active_bootstraps'] and
-               not current['actual_active_private_diagnostics'] and not sample['diagnostic_replays'] and
+               not current['actual_active_private_diagnostics'] and
+               all(v['status']=='unavailable' and not v['ordinary_replay_claim'] and not v['publication_authorized']
+                   for v in sample['diagnostic_replays']) and
                not (GAP/'ROOT_COMPLETE_OPERATIONAL_FLEET.json').exists(),'different or expired preparation observations')
         actors={v['epoch']:v for v in current['actual_executing_replays']}
         s.need(set(actors)=={167,170,172} and len(sample['replays'])==3 and
