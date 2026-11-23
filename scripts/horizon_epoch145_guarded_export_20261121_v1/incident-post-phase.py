@@ -10,9 +10,10 @@ PKG = ROOT / "epoch145-semantic-continuity-20261121-v1/tools-v7"
 VERSION = Path(__file__).resolve().parent.name
 FOCUSED_SUCCESSOR = VERSION == "tools-v9"
 RETRIED_SEMANTIC = VERSION == "tools-v10"
+V5J_SUCCESSOR = VERSION == "tools-v13d"
 SAME_IMAGE_RETRY = VERSION == "tools-v13c"
 FIXTURE_SUCCESSOR = SAME_IMAGE_RETRY or VERSION in ("tools-v13", "tools-v13b")
-TIMER_SUCCESSOR = FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
+TIMER_SUCCESSOR = V5J_SUCCESSOR or FIXTURE_SUCCESSOR or VERSION in ("tools-v11", "tools-v12")
 TIMEOUT_SUCCESSOR = TIMER_SUCCESSOR or VERSION in ("tools-v8", "tools-v9", "tools-v10")
 if TIMEOUT_SUCCESSOR:
     PKG = PKG.parent / VERSION
@@ -137,7 +138,22 @@ def fixture_semantic(s, build):
 
 
 def completion(s, build=None):
-    if FIXTURE_SUCCESSOR:
+    if V5J_SUCCESSOR:
+        handoff = PKG.parent / "v5j-name-handoff"
+        selected, _ = s.read(handoff / "semantic-completion.json")
+        result, _ = s.read(handoff / "submission-result.json")
+        intent, _ = s.read(handoff / "submission-intent.json")
+        bootstrap = selected["invocation_id"]
+        s.need(selected["schema"] == "horizon-145-v5j-semantic-completion-v1" and s.iid(bootstrap)
+               and bootstrap == result["invocation_id"] and bootstrap != "afcf6cdd1ec0400ea2757f81472987b3"
+               and intent["argv"] == result["argv"] and result["argv"][-1] == build["semantic_image"]["sha256"]
+               and result["argv"][-5:-3] == [str(PKG.parent / "tools-v5j/export145"), "recover-full-output"]
+               and selected["start"]["path"] == str(STATE / bootstrap / "recovery-started.json")
+               and selected["completion"]["path"] == str(STATE / bootstrap / "complete.json"),
+               "different bound v5j publication generation")
+        s.bound(selected["completion"], STATE / bootstrap / "complete.json")
+        advancing = {"invocation_id": bootstrap, "start": selected["start"]}
+    elif FIXTURE_SUCCESSOR:
         bootstrap, advancing = fixture_semantic(s, build)
     elif TIMER_SUCCESSOR:
         # The price observer authenticates the build receipt against the sealed

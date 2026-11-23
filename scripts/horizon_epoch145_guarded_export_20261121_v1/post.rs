@@ -7,7 +7,9 @@ use std::os::unix::fs::PermissionsExt;
 #[cfg(not(incident_timeout_post145_only))]
 pub(super) const INCIDENT_POST_IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v7/export145";
 #[cfg(incident_fixture_post145_only)]
-pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v7c_post145_only) {
+pub(super) const INCIDENT_POST_IMAGE: &str = if cfg!(incident_v5j_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13d/export145"
+} else if cfg!(incident_v7c_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13c/export145"
 } else if cfg!(incident_v7b_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v13b/export145"
@@ -528,7 +530,10 @@ fn native_tools(root: &Path, state: &Path) -> Result<(Bound, Bound, Bound)> {
     Ok((full, pipe, qualified))
 }
 
-#[cfg(incident_fixture_post145_only)]
+#[cfg(incident_v5j_post145_only)]
+pub(super) use v5j_publication::semantic_owner as fixture_semantic_owner;
+
+#[cfg(all(incident_fixture_post145_only, not(incident_v5j_post145_only)))]
 pub(super) fn fixture_semantic_owner(export: &str) -> Result<()> {
     let package = Path::new(INCIDENT_POST_IMAGE).parent().unwrap();
     let (_, seal) = publication::frozen_json(&package.join("deployment-seal-receipt.json"))?;
@@ -866,3 +871,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(incident_v5j_post145_only)]
+#[path = "v5j_publication.rs"]
+mod v5j_publication;

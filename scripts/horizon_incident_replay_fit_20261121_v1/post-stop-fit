@@ -48,7 +48,8 @@ ORIGINAL={166,167,170}
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
 DETACHED_145 = HERE == D / "tools-homefloor-145-handoff-v1"
-RETRY4_145 = DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
+V5J_POST = HERE == D / "tools-homefloor-145-post-v5j-v1"
+RETRY4_145 = V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
@@ -462,7 +463,8 @@ def fixture_post_directory(here):
 def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_post=False, focused=None):
     if focused is not None:
         post_directory = fixture_post_directory(here)
-        profiles = {"retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
+        profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13d"),
+                    "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
                     "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
                     "homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
@@ -491,7 +493,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         profile,directory="profile145-post.json","tools-v6"
     else:
         profile,directory="profile145.json","tools-v5"
-    name="incident-post-phase.py" if post or recovery_post or focused in ("post","retry-post","timer-post","registered-post","fixture-post") else "incident-phase.py"
+    name="incident-post-phase.py" if post or recovery_post or focused in ("v5j-post","post","retry-post","timer-post","registered-post","fixture-post") else "incident-phase.py"
     cfg,ref=s.read(here/profile)
     package=R/"epoch145-semantic-continuity-20261121-v1"/directory
     seal,sr=s.read(package/"deployment-seal-receipt.json",cfg["seal_sha256"])
@@ -505,6 +507,27 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
+    if V5J_POST:
+        s.need(epoch == 145, "v5j completion census is for epoch 145 only")
+        profile, adapter, _ = profile145(HERE, focused="v5j-post")
+        reader = runpy.run_path(str(adapter))
+        m = s.show(fit.A145)
+        members = fit.members(fit.A145)
+        if members:
+            activity = reader["inspect"](s, fit.overlap.leases, m, members, epoch, Path(__file__).resolve(), profile)
+            s.need(activity is not None, "foreign worker in current 145 publication unit")
+            return activity
+        # This is only an unoccupied preflight. Every actual worker must identify
+        # itself above and repeat the entire native census after taking its leases.
+        s.need(m["Id"] == fit.A145 and m["LoadState"] == "not-found" and m["ActiveState"] == "inactive"
+               and m["SubState"] == "dead" and m["MainPID"] == m["ControlPID"] == "0"
+               and not any(m[k] for k in ("Job", "ControlGroup", "InvocationID", "TriggeredBy")),
+               "previous 145 unit or claimant still present")
+        package = R / "epoch145-semantic-continuity-20261121-v1/tools-v13d"
+        build, _ = s.read(package / "build-proof.json", profile["build_sha256"])
+        complete, _ = reader["completion"](s, build)
+        s.need(s.show(fit.A145) == m and not fit.members(fit.A145), "145 name changed during post handoff")
+        return {"Id": fit.A145, "MainPID": "0", "stage": "v5j-semantic-complete", "completion": complete}
     if DETACHED_145:
         s.need(epoch == 145, "detached 145 census is for its transition only")
         return registrations["phase145"](s, fit, epoch, detached=True)

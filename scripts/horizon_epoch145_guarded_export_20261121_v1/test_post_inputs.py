@@ -1,0 +1,158 @@
+"""Tagged v5j semantic and ordinary local/public qualification fixtures."""
+import importlib.util
+import hashlib
+import json
+import runpy
+import tempfile
+import unittest
+from unittest.mock import patch
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("post_inputs", Path(__file__).with_name("post_inputs.py"))
+p = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(p)
+IID = "f" * 32
+UNIT = "horizon-holding-export145-20261121-v1.service"
+
+
+def fixture():
+    leaf = p.ARCHIVE.with_name(".tmp36MvkN")
+    view = leaf.parent.parent / "epoch145-prefix-extract-materialized-view-20261121-v1/epoch-145.jet"
+    candidate = dict(bytes=105610995833, inode=103237059)
+    review = dict(old_manager=dict(Id=UNIT, InvocationID="afcf6cdd1ec0400ea2757f81472987b3"),
+                  failed_phase=dict(candidate=candidate), reader=dict(sha256="f" * 64),
+                  retained_inputs=[{"path": "/original"}, {}, {"path": str(leaf)}],
+                  retained_manifest={"sha256": "a" * 64})
+    argv = ["systemd-run", "--", "/v5j", "recover-full-output", "/fleet", "1" * 64, "f" * 64]
+    links = [{"path": "166", "sha256": "a" * 64}, {"path": "168", "sha256": "b" * 64}]
+    intent = {"original": {"_BOOT_ID": "boot"}, "preflight": {"serial_handback": links}, "argv": argv}
+    result = {"invocation_id": IID, "argv": argv, "manager_start_cursor": "original-start"}
+    event = dict(UNIT=UNIT, INVOCATION_ID=IID, _PID="1", _BOOT_ID="boot")
+    rows = [dict(event, MESSAGE_ID="39f53479d3a045ac8e11786248231fbf", __CURSOR="original-start",
+                 __MONOTONIC_TIMESTAMP="1", MESSAGE="Started " + UNIT + " - " + " ".join(argv[2:]) + "."),
+            dict(event, MESSAGE_ID=p.SUCCESS, __CURSOR="original-success", __MONOTONIC_TIMESTAMP="2")]
+    extraction = dict(schema="jetstreamer-private-epoch145-canonical-prefix-extraction-v1", archive=str(p.ARCHIVE),
+                      epoch=145, archive_bytes=105610995833, output_slot_start=62640000, output_slot_count=432000,
+                      source_archive="/original", source_archive_sha256="cb8ac0bc47919c22dc7898e068fb43ffac80aceadcacac3ff8f24ef32d3b3353",
+                      source_manifest_sha256="a" * 64, worker_sha256="2cca500106d274ebfbbc8c5bfa0e6e8343cd5e41003f9e82c93282800732d8c8",
+                      source_canonical_checkpoint_slot=63072070, source_canonical_accounts_hash="DsoBNgzFVZ7j5bF2CpKnt7HAC7fRrMMwdWW9FUafRe1p",
+                      retained_verification_tail_slots=71, source_must_be_retained=True, independent_output_reread_passed=True,
+                      current_plugin_verification_passed=False, canonical_sidecar_authorized=False, publication_authorized=False,
+                      retirement_authorized=False, r2_mutations=False, archive_sha256="3" * 64, output_semantic_sha256="4" * 64,
+                      expected_output_provenance_sha256="5" * 64)
+    refs = [{"path": tag, "sha256": str(i) * 64} for i, tag in enumerate(["start", "verified", "extract", "complete"], 1)]
+    phase = {"invocation_id": IID, "stage": "controller", "window": {"native_parent": {"pid": 123}}}
+    start = dict(iid=IID, file=str(leaf), image=review["reader"]["sha256"], r2_mutations=False,
+                 fresh_fit=dict(phase145=phase, serial_145_holding_handback=links))
+    verified = dict(iid=IID, parent=123, before=candidate, private_projection=str(view), paid_source=str(leaf),
+                    original_export=p.ORIGINAL, extraction=dict(extraction, archive=str(view)), r2_mutations=False)
+    extract = dict(schema="horizon-epoch145-guarded-private-prefix-completion-v1", actor_iid=IID,
+                   verified_frozen=refs[1], recovery_evidence=refs[0], archive_publication_authorized=False,
+                   original_export=p.ORIGINAL, extraction=extraction, r2_mutations=False)
+    done = dict(iid=IID, receipt=refs[2], recovered_from=p.ORIGINAL, r2_mutations=False)
+    return [IID, intent, result, review, rows, list(zip((start, verified, extract, done), refs))]
+
+
+class PublicationInputs(unittest.TestCase):
+    def test_tagged_v5j_semantic_success(self):
+        f = fixture()
+        accepted = p.validate_terminal(*f)
+        self.assertEqual(accepted["invocation_id"], IID)
+        self.assertEqual(accepted["completion"], f[-1][-1][1])
+        self.assertEqual(accepted["pid1_success"], "original-success")
+
+    def test_reject_v5f_failure_stale_generation(self):
+        f = fixture()
+        f[0] = f[3]["old_manager"]["InvocationID"]
+        with self.assertRaisesRegex(ValueError, "foreign semantic generation"):
+            p.validate_terminal(*f)
+
+    def test_reject_interchanged_terminal_boot_cursor_or_failed_pid1(self):
+        for index, key, value in ((0, "__CURSOR", "other"), (1, "_BOOT_ID", "other"),
+                                  (1, "MESSAGE_ID", "failed"), (1, "_PID", "123")):
+            f = fixture()
+            f[4][index][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                p.validate_terminal(*f)
+
+    def test_promoted_archive_requires_exact_links_and_all_slots(self):
+        for key, value in (("epoch", 144), ("output_slot_count", 431999), ("source_must_be_retained", False),
+                           ("publication_authorized", True), ("source_canonical_checkpoint_slot", 63071999)):
+            f = fixture()
+            f[5][2][0]["extraction"][key] = value
+            f[5][1][0]["extraction"][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                p.validate_terminal(*f)
+        f = fixture()
+        f[5][3][0]["receipt"] = {"path": "different"}
+        with self.assertRaises(ValueError):
+            p.validate_terminal(*f)
+
+    def test_reject_replaced_frozen_candidate_or_different_serial_handback(self):
+        f = fixture()
+        f[5][1][0]["before"] = dict(f[3]["failed_phase"]["candidate"], inode=1)
+        with self.assertRaises(ValueError):
+            p.validate_terminal(*f)
+        f = fixture()
+        f[5][0][0]["fresh_fit"]["serial_145_holding_handback"] = []
+        with self.assertRaises(ValueError):
+            p.validate_terminal(*f)
+
+    def test_deployed_post_adapter_accepts_only_the_selected_v5j(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pkg = root / "family/tools-v13d"
+            pkg.mkdir(parents=True)
+            src = Path(__file__).with_name("incident-post-phase.py")
+            deployed = pkg / src.name
+            deployed.write_bytes(src.read_bytes())
+            complete = runpy.run_path(str(deployed))["completion"]
+            state = root / "state"
+            name = pkg.parent / "v5j-name-handoff"
+            name.mkdir()
+            original = state / IID
+            original.mkdir(parents=True)
+            output = root / "output"
+            output.mkdir()
+
+            class Status:
+                need = staticmethod(p.need)
+                iid = staticmethod(lambda v: isinstance(v, str) and len(v) == 32 and all(c in "0123456789abcdef" for c in v))
+                @staticmethod
+                def read(path, sha=None):
+                    raw = path.read_bytes()
+                    actual = hashlib.sha256(raw).hexdigest()
+                    p.need(sha is None or sha == actual, "foreign receipt")
+                    return json.loads(raw), {"path": str(path), "sha256": actual}
+                @staticmethod
+                def bound(ref, path):
+                    p.need(ref["path"] == str(path), "different path")
+                    return Status.read(path, ref["sha256"])[0]
+            def write(path, val):
+                path.write_text(json.dumps(val))
+                return Status.read(path)[1]
+            f = fixture()
+            start, verified, extract, done = [v[0] for v in f[-1]]
+            archive = output / "epoch-145.jet"
+            extract["extraction"]["archive"] = str(archive)
+            sr = write(original / "recovery-started.json", start)
+            vr = write(original / "verified-frozen.json", verified)
+            extract.update(verified_frozen=vr, recovery_evidence=sr)
+            er = write(original / "extraction-complete.json", extract)
+            dr = write(original / "complete.json", dict(done, receipt=er))
+            proof = {"schema": "horizon-145-v5j-semantic-completion-v1", "start": sr, "completion": dr, "invocation_id": IID}
+            receipt = name / "semantic-completion.json"
+            write(receipt, proof)
+            args = [str(pkg.parent / "tools-v5j/export145"), "recover-full-output", "/fleet", "1"*64, "f"*64]
+            write(name / "submission-result.json", dict(invocation_id=IID, argv=args))
+            write(name / "submission-intent.json", dict(argv=args))
+            build = {"semantic_image": {"sha256": "f"*64}}
+            with patch.dict(complete.__globals__, STATE=state, OUTPUT=output, ARCHIVE=archive, PKG=pkg):
+                self.assertEqual(complete(Status(), build), (dr, extract["extraction"]))
+                write(receipt, dict(proof, invocation_id="afcf6cdd1ec0400ea2757f81472987b3"))
+                with self.assertRaisesRegex(ValueError, "different bound v5j"):
+                    complete(Status(), build)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -35,6 +35,11 @@ if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
   flavor=fixture-rejoin
 fi
+v5j_post=false
+if [[ $flavor == v5j-post ]]; then
+  v5j_post=true
+  flavor=fixture-post
+fi
 registered_v7b=false
 registered_v7c=false
 if [[ $flavor == fixture-post-v7c ]]; then
@@ -103,6 +108,7 @@ fi
 if $retry3_rejoin; then extra+=(--cfg incident_retry3_145_only); fi
 if $retry4_rejoin; then extra+=(--cfg incident_retry4_145_only); fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
+if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
 if $registered; then extra+=(--cfg incident_registered136_post145_only); sources+=(registered-build-fit.py); fi
@@ -162,7 +168,10 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   fi
   if $fixture_post || $fixture_recovery; then
     native_package=tools-v20-prestart
-    if $fixture_post; then
+    if $v5j_post; then
+      native_package=tools-homefloor-145-rejoin-v4
+      [[ ${5:?expected original build price generation} == "$native_package" ]]
+    elif $fixture_post; then
       native_package=${5:?expected build price generation}
       [[ $native_package == tools-v20-prestart || $native_package == tools-v20 ]]
     elif $homefloor_rejoin; then
@@ -186,7 +195,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   maximum_attempts=5
   if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
-    if $fixture_post; then
+    if $fixture_post && ! $v5j_post; then
       # Capture the 136 mirrors and public reader commitments in the same native observation.
       quote=${6:?expected full mirror price executable}
       quote_digest=${7:?expected qualification hash for mirror price}
@@ -248,11 +257,13 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     sleep "$((2+probe))"
   done
   disk=117440512
-  if $homefloor_rejoin; then disk=$((92274688 + 16777216)); fi
+  if $homefloor_rejoin || $v5j_post; then disk=$((92274688 + 16777216)); fi
   python3 -IB -c 'import json,sys; v=json.load(open(sys.argv[1])); assert v["fits"] and v["resource_credit_bytes"]==0 and v["available_HOME_bytes"]-v["complete_required_HOME_bytes"]>=int(sys.argv[3]) and v["available_memory_bytes"]-v["required_available_memory_bytes"]>=int(sys.argv[2])' "$q/before.json" "$memory" "$disk"
-  if $homefloor_rejoin; then
+  if $homefloor_rejoin || $v5j_post; then
     slice=/sys/fs/cgroup/horizonaudit.slice
-    [[ $cg == "$slice/horizon-145-homefloor-rejoin-build-v1.service" ]]
+    build_unit=horizon-145-homefloor-rejoin-build-v1.service
+    if $v5j_post; then build_unit=horizon-145-v5j-post-build-v1.service; fi
+    [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
     [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
     (( $(cat "$slice/memory.current") + memory <= $(cat "$slice/memory.high") ))
@@ -311,7 +322,7 @@ find . -type f -print0 | sort -z | xargs -0 sha256sum > "$q/sources"
 export TMPDIR="$out/tmp"
 export PATH=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin
 export INCIDENT_FLEET="$1"
-if $homefloor_rejoin; then export INCIDENT_HOMEFLOOR_PRICE="$q/before.json"; fi
+if $homefloor_rejoin || $v5j_post; then export INCIDENT_HOMEFLOOR_PRICE="$q/before.json"; fi
 args=("${extra[@]}" --cfg incident145_only --cfg continuity145_only --cfg materialized145_only --cfg partial145_only -Adead_code -L "dependency=$d/deps" -Copt-level=2 -Cstrip=symbols -Ccodegen-units=1 -Clink-arg=-Wl,--threads=1 -Clink-arg=-lstdc++)
 for o in "$d"/build/*/out; do args+=(-L "native=$o"); done
 ulimit -c 0
@@ -342,9 +353,16 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $fixture_post; then phase_package=tools-v13; fi
   if $registered_v7b; then phase_package=tools-v13b; fi
   if $registered_v7c; then phase_package=tools-v13c; fi
+  if $v5j_post; then phase_package=tools-v13d; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
-  POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
+  if $v5j_post; then
+    /usr/bin/python3 -IB "$s/test_post_inputs.py"
+    POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py" \
+      PostPhaseTest.test_full_native_read_and_foreign_command PostPhaseTest.test_unregistered_controller_and_phase_members
+  else
+    POST_PHASE_UNDER_TEST="$out/tmp/$phase_package/incident-post-phase.py" /usr/bin/python3 -IB "$s/post-phase-test.py"
+  fi
 elif [[ $flavor == post || $flavor == current-post ]]; then
   /usr/bin/python3 -IB "$s/post-phase-test.py"
 fi
@@ -355,7 +373,7 @@ du -s -B1 "$out" > "$q/scratch-bytes"
 test "$(cut -f1 "$q/scratch-bytes")" -le 73400320
 if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin || $flavor == timeout-post ]] || $focused; then
   mkdir -m0700 "$q/products"
-  if $homefloor_rejoin; then
+  if $homefloor_rejoin || $v5j_post; then
     # Keep the test binary inside the paid image. The 16 MiB outside allocation covers the retained source, binary and deployment image.
     cp -R "$out/source" "$out/export145" "$q/products/"
     test "$(du -s -B1 "$q/products" | cut -f1)" -le 7340032

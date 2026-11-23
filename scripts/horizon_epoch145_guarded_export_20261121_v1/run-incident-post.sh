@@ -8,6 +8,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "${pkg%/*}/tools-v8") pkg="${pkg%/*}/tools-v8" ;;
     "${pkg%/*}/tools-v9") pkg="${pkg%/*}/tools-v9" ;;
     "${pkg%/*}/tools-v10") pkg="${pkg%/*}/tools-v10" ;;
+    "${pkg%/*}/tools-v13d") pkg="${pkg%/*}/tools-v13d" ;;
     "${pkg%/*}/tools-v13c") pkg="${pkg%/*}/tools-v13c" ;;
     "${pkg%/*}/tools-v13b") pkg="${pkg%/*}/tools-v13b" ;;
     "${pkg%/*}/tools-v13") pkg="${pkg%/*}/tools-v13" ;;
@@ -41,4 +42,15 @@ publish)
     ;;
 *) exit 2 ;;
 esac
+if [[ $pkg == */tools-v13d ]]; then
+    provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-v1/post-stop-fit
+    "$provider" 145 "$fleet" "$fleet_sha" | /usr/bin/jq -e --arg f "$fleet" --arg h "$fleet_sha" '
+       .epoch == 145 and .fits == true and .candidate == null and .resource_credit_bytes == 0
+       and .fleet == {path:$f,sha256:$h} and .phase145.stage == "v5j-semantic-complete"
+       and .registered_retry11_holding.stage == "completed-copy"
+       and .registered_cold168_holding.stage == "completed-copy"' > /dev/null
+    if [[ $mode == publish ]]; then
+        opts+=(--setenv=HORIZON_PUBLIC_BASE_URL=https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev)
+    fi
+fi
 exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 "${opts[@]}" -p "StandardOutput=append:$pub/incident-$mode.stdout" -p "StandardError=append:$pub/incident-$mode.stderr" -- "$pkg/export145" "${args[@]}" "$image_sha"

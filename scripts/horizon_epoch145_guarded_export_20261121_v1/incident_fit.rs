@@ -20,7 +20,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_fixture_post145_only)]
-const PROVIDER: &str = if cfg!(incident_v7c_post145_only) {
+const PROVIDER: &str = if cfg!(incident_v5j_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5j-v1/post-stop-fit"
+} else if cfg!(incident_v7c_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v23/post-stop-fit"
 } else if cfg!(incident_v7b_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v21b/post-stop-fit"
@@ -309,13 +311,13 @@ fn pending_join(error: &str) -> Result<Option<u64>> {
         return held_170();
     }
     for (epoch, unit, directory) in [
-        #[cfg(incident_homefloor145_only)]
+        #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
         (
             166,
             "horizon-qualify-166-independent-retry11-20261122.service",
             "epoch166-retry11-rebook-20261122-v1",
         ),
-        #[cfg(incident_homefloor145_only)]
+        #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
         (
             170,
             "horizon-qualify-170-replacement-local3retry11-20261122.service",
@@ -479,7 +481,7 @@ pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
 }
 
 fn reserved_memory(_complete: &Value) -> Result<u64> {
-    #[cfg(incident_homefloor145_only)]
+    #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
     let qualification_memory = match &_complete["bounded_qualification"] {
         Value::Null => 0,
         q => {
@@ -495,7 +497,7 @@ fn reserved_memory(_complete: &Value) -> Result<u64> {
             capacity::n(q, "memory_bytes")?
         }
     };
-    #[cfg(not(incident_homefloor145_only))]
+    #[cfg(not(any(incident_homefloor145_only, incident_v5j_post145_only)))]
     let qualification_memory = 0;
     HOST_MEMORY
         .checked_add(qualification_memory)
@@ -504,7 +506,7 @@ fn reserved_memory(_complete: &Value) -> Result<u64> {
 
 /// Reopen the holding tool's two completed retirements while this verifier holds
 /// the same serial transition lock. Free space is measured by the provider.
-#[cfg(incident_five_lane145_only)]
+#[cfg(any(incident_five_lane145_only, incident_v5j_post145_only))]
 fn serial_handback(complete: &Value) -> Result<Vec<Bound>> {
     let state = Path::new(HOLDING_LOCK).parent().context("holding state")?;
     read_handback(complete, state, |path| match fs::symlink_metadata(path) {
@@ -514,7 +516,7 @@ fn serial_handback(complete: &Value) -> Result<Vec<Bound>> {
     })
 }
 
-#[cfg(incident_five_lane145_only)]
+#[cfg(any(incident_five_lane145_only, incident_v5j_post145_only))]
 fn read_handback(
     complete: &Value,
     state: &Path,
@@ -724,7 +726,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             && complete["replay_launch_authorized"] == false,
         "foreign incident capacity or 145 phase"
     );
-    #[cfg(incident_homefloor145_only)]
+    #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
     {
         let holding = &complete["registered_retry11_holding"];
         let obligations = &complete["recovery_obligations"];
@@ -746,7 +748,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
             "145 requires the current paid HOME, holding and sole writer census"
         );
     }
-    #[cfg(incident_five_lane145_only)]
+    #[cfg(any(incident_five_lane145_only, incident_v5j_post145_only))]
     {
         let handback = serial_handback(&complete)?;
         complete["serial_145_holding_handback"] = json!(handback);
@@ -1280,7 +1282,7 @@ mod tests {
         assert!(read_handback(&price, state, |_| Ok(())).is_err());
     }
 
-    #[cfg(incident_homefloor145_only)]
+    #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
     #[test]
     fn complete_and_live_prices_keep_the_bounded_qualification() {
         let mut observed = json!({"bounded_qualification":null});
@@ -1318,7 +1320,7 @@ mod tests {
             serde_json::from_slice(&custody::bytes(&current, 32 << 20, false).unwrap()).unwrap();
         assert_eq!(v["owner"], "/root");
         let a = active_population().unwrap();
-        #[cfg(not(incident_homefloor145_only))]
+        #[cfg(not(any(incident_homefloor145_only, incident_v5j_post145_only)))]
         for unit in [
             "horizon-qualify-172-full-half-core-20261120-v1.service",
             "horizon-qualify-166-independent-recovery-20261121-v1.service",
@@ -1327,7 +1329,7 @@ mod tests {
             assert_eq!(ps.len(), 2);
             assert!(ps[0].0 != ps[1].0 && ps.iter().all(|p| p.1 > 0 && p.3 > 0));
         }
-        #[cfg(incident_homefloor145_only)]
+        #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
         {
             // The last cadence can predate a just-admitted producer. The sealed
             // provider prices those replacements and fingerprints every native PID.
