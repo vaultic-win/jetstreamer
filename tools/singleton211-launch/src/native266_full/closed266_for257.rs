@@ -448,7 +448,30 @@ pub(crate) fn booking(review: &Value) -> Result<Value> {
             && binding(&charge["readback"])?.json()?["reservation257"] == json!(award),
         "issuer has not charged the booking"
     );
-    binding(&charge["source_control"])?.artifact()?;
+    // The reservation predates the two holding readbacks and the retained
+    // terminal clock. Check the original pricing bytes at their archived path
+    // and the live issuer at the version that carries this same reservation.
+    let original = binding(&charge["source_control"])?;
+    Bound::new(
+        "/home/ubuntu/.codex/diagnostics/horizon257-v16-operator-registration/horizon266-bounded-tools-v208-retry_fit.py",
+        original.sha256,
+    )
+    .bytes(true)?;
+    let deployment = Bound::new(
+        "/home/ubuntu/.codex/diagnostics/horizon257-original-terminal-manager-v220/completion.json",
+        "ea519b5bfe1a626303bce5b1b161da7b1a206c706e7a5ba1dc9dcfb8e8eba20c",
+    )
+    .json()?;
+    let changes: Vec<Bound> = serde_json::from_value(deployment["changes"].clone())?;
+    let current = changes
+        .iter()
+        .find(|change| change.path == original.path)
+        .context("deployment lacks the epoch 257 pricing script")?;
+    ensure!(
+        binding(&deployment["debit"])?.json()?["reservation257"] == json!(award),
+        "pricing deployment charged a different epoch 257 reservation"
+    );
+    current.artifact()?;
     bounded::issuer_lock(review)?;
     Ok(book)
 }
