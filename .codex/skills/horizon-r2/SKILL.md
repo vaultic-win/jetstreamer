@@ -18,11 +18,11 @@ small system service/mount definitions on root. Migrate existing storage at a
 safe owner boundary, preserving receipts, hashes, locks and recovery state;
 do not restart healthy replay just to change a path. Charge copied bytes and
 remaining growth to the home filesystem's existing complete fleet commitments.
-For verification of archives already in R2, stream the canonical public URL through the
-[Jetstreamer verification plugin](#public-playback-for-archive-publication-and-historical-audits).
-Book zero bytes for archive staging. Budget bounded decoder memory and HOME space for the
-pinned inventory, logs and verification receipts. Price a local restore separately when a
-downstream operation actually needs a file.
+To verify an existing R2 epoch, stream it directly from the public origin with the
+multithreaded Jetstreamer verification plugin. This needs **zero bytes of local archive
+storage**. The verifier keeps active decoders in RAM and writes only the small inventory,
+logs and result. A full successful run is sufficient for plugin verification. See
+[the single-epoch command and acceptance checks](#public-playback-for-archive-publication-and-historical-audits).
 
 Keep one controlling conversation per host and assigned campaign. Before booking resources or
 starting shared builds, admissions, launches or status writers, check the recorded owner and any
@@ -124,6 +124,31 @@ commit and binary hash, invocation, first and last slot, slot and record counts 
 semantic stream digest. Require all expected slot notifications, including legitimate
 leader skips, and successful plugin finalization. A prefix read qualifies only connectivity.
 
+**For an epoch already in R2, run the verification plugin directly with many threads.**
+Use the public bucket base URL and an absolute path to an authenticated inventory that pins
+the target `.jet` by key, strong ETag and length. Give the plugin the target epoch as a
+one-epoch slot range, an existing private report directory, and the qualified reader executable.
+
+```sh
+public_origin=https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev
+horizon_pipeline "$epoch:$epoch" "$public_origin" --verify-only --slot-ranges \
+  --threads 256 --archive-inventory "$inventory" --verification-report-dir "$reports"
+```
+
+The 256 slot partitions share the work across the epoch. Set `--max-active-partitions N`
+when the available RAM or CPU calls for fewer concurrent decoders. This preserves all 256
+partition boundaries. For consecutive epochs, substitute `"$first:$last"` and run one process
+per contiguous range. Keep the archive in R2 throughout. A standalone verification needs
+no local `.jet`, restore, replay ledger, scratch copy, upload or separate whole-file download.
+Runs can finish in as little as eight minutes. Forecast each epoch from its actual record
+count, observed plugin throughput and available resources.
+
+Accept plugin verification after exit zero, plugin finalization, complete expected slot
+coverage and an authenticated recheck of the pinned archive identity. For a verified-only
+ready inventory, also confirm the canonical readiness sidecar. A staged `.jet` can be
+plugin-verified by this command before its sidecar exists. Record its verified object
+identity and keep publication pending until the uploader commits the sidecar.
+
 **After an archive upload**, the Rust uploader streams and hashes the entire authenticated
 object, then plays the public object with a single-epoch result.
 
@@ -138,25 +163,6 @@ source, branch and remote identity before committing the canonical readiness sid
 An unpublished sidecar stays pending if the public reader fails. Keep local source and
 failure evidence for a retry. No archive-sized playback scratch is needed on the ordinary
 upload path.
-
-**To verify an epoch already in R2**, run the public Jetstreamer verification plugin directly.
-For one ready epoch set `first` and `last` to that epoch. For a range audit, list the
-authenticated inventory and select canonical archives with matching readiness sidecars.
-Group consecutive ready epochs and run one process per contiguous range. Record staged
-objects and sidecar anomalies separately. Use the public bucket base URL, an absolute
-path to the authenticated inventory and an existing private report directory.
-
-```sh
-horizon_pipeline "$first:$last" "$public_origin" --verify-only --slot-ranges \
-  --threads "$threads" --archive-inventory "$inventory" --verification-report-dir "$reports"
-```
-
-This uses the standard Horizon consumer's slot partitioner. The thread count applies
-across the range. Use `--max-active-partitions` when admission limits the number of
-concurrent decoders. Accept the range after a successful exit, a finalized report for
-every epoch with complete slot coverage, and an authenticated recheck of archive and
-sidecar identities. Store these small reports and keep the archive in R2. A progress
-pulse is insufficient for acceptance.
 
 When progressive per-epoch receipts are required, omit `--slot-ranges` and keep
 the same pinned origin, inventory and report directory. Record the first incomplete
