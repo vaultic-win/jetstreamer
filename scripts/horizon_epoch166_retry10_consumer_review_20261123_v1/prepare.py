@@ -522,14 +522,16 @@ def main():
         ),
         "old generation in current active or scheduled consumers, or scheduler/fleet differ",
     )
-    # These two attempts belonged to the same retirement lifecycle. The second
-    # actually read the partial. Bind their image and terminal commands explicitly.
+    # Recheck previous lifecycle commands, including the completed 05:02 V5
+    # read of this partial and its authentic native receipt.
     lifecycle_ref = {
-        "path": str(W / "PRIOR_LIFECYCLE_CHECKS_20261123T043101Z.json"),
-        "sha256": "78820090c365d65858ad4e0d73946598f83d6006a654a3176ccd4b4ff94eb655",
+        "path": str(W / "PRIOR_LIFECYCLE_CHECKS_THROUGH_050210_20261123.json"),
+        "sha256": "1d587dca2b685a024938da76ec7df7e6b331e2cdbcca8d1545b37f838089805f",
     }
     lifecycle = doc(lifecycle_ref, True)
-    checked(lifecycle["image"], True)
+    checked(lifecycle["previous_review"], True)
+    for image in [lifecycle["image"], *lifecycle["additional_images"]]:
+        checked(image, True)
     prior_attempts = {attempt["unit"]: attempt for attempt in lifecycle["attempts"]}
     units = set([service, timer, FUTURE, *live, *prior_attempts])
     classified = {}
@@ -658,6 +660,17 @@ def main():
         if u in prior_attempts:
             attempt = prior_attempts[u]
             checked(attempt["submit"], True)
+            if attempt.get("successful_check"):
+                receipt = doc(attempt["native_receipt"], True)
+                measured = doc(attempt["terminal_timing"], True)
+                need(
+                    receipt["checked"]
+                    and not receipt["data_removed"]
+                    and receipt["local_proof"]["sha256"] == g["sha256"]
+                    and receipt["local_proof"]["identity"]["inode"] == 93782070
+                    and measured["iid"] == attempt["manager"]["InvocationID"],
+                    "wrong prior completed native check",
+                )
             if r["LoadState"] == "not-found" and dead(r):
                 continue
             before = attempt["manager"]
