@@ -54,7 +54,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-closed266-v17/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-closed266-v18/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
@@ -234,7 +234,7 @@ fn admit(
     }
     let (fit, cap) = current(n, r, false)?;
     let fit = save_json(&n.root, "original-fit.json", &fit)?;
-    let window = if select {
+    let window = if select && r.get("closed266_booking").is_none() {
         let scope = json!({"epoch":257, "boot_id":r["boot_id"], "actual_current_memory":cap["actual_current_memory"], "review":rf});
         Some(peer_window::select(n, r, &scope)?)
     } else {

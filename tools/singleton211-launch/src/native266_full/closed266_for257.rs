@@ -87,6 +87,101 @@ fn closed_loop(release: &Value, scratch_dev: u64) -> Result<()> {
     Ok(())
 }
 
+// Both original private transfers finished. Their reservations remain in the
+// frozen budget while the same two slots perform independent readback.
+fn holding_readers(peers: &mut BTreeMap<String, Value>) -> Result<()> {
+    for (base, cpu, park_sha, start_sha) in [
+        (
+            "horizon250-private-holding-v203-a1",
+            56,
+            "1404721cf236c2849a607d6c175789c713c26503c128ff9d4b7ea0bc51400342",
+            "0b93872b69e2e5aa40cc42d4fb6bda6340b2ad8bafbf6ec0422276ede446b3f4",
+        ),
+        (
+            "horizon251-private-holding-v205-a1",
+            41,
+            "a88b2bf3322ae5b442168c52927b15dd4d3bd85192e0f75afea45d07b859a31b",
+            "e732fb3f9aa67692ae21339d8447a9e619a1451f21b259f1b4c312b92d3ca4f8",
+        ),
+    ] {
+        let diag = Path::new("/home/ubuntu/.codex/diagnostics");
+        let park_name = format!("{base}-park.service");
+        let verify_name = format!("{base}-verify.service");
+        let park_ref = Bound::new(diag.join(format!("{base}-park/completion.json")), park_sha);
+        let park = park_ref.json()?;
+        let previous = peers
+            .remove(&park_name)
+            .context("missing original holding owner")?;
+        ensure!(
+            park["invocation_id"] == previous["InvocationID"]
+                && park["source_retained"] == true
+                && park["resource_credit"] == 0
+                && !Path::new("/sys/fs/cgroup/system.slice")
+                    .join(park_name)
+                    .try_exists()?,
+            "original holding transfer has not drained"
+        );
+        let dir = diag.join(format!("{base}-verify"));
+        let start = Bound::new(dir.join("running.json"), start_sha).json()?;
+        let book = binding(&start["booking"])?.json()?;
+        ensure!(
+            book["original"] == park["original"]
+                && book["prior"] == json!(park_ref)
+                && book["operation"] == "verify"
+                && book["unit"] == verify_name
+                && book["service_bytes"] == (512u64 << 20)
+                && book["retirement"] == false,
+            "independent holding readback booking changed"
+        );
+        let mut owner = start["owner"].clone();
+        let finished = dir.join("completion.json");
+        if finished.try_exists()? {
+            let result = bound_at(&finished)?.json()?;
+            let mut expected = park["result"].clone();
+            expected["operation"] = json!("verify");
+            let manager = binding(&result["manager"])?.json()?;
+            ensure!(
+                result["booking"] == start["booking"]
+                    && result["invocation_id"] == owner["InvocationID"]
+                    && result["source_retained"] == true
+                    && result["resource_credit"] == 0
+                    && result["original"] == book["original"]
+                    && result["result"] == expected
+                    && binding(&result["process"])?.json()?["exit"] == 0
+                    && manager
+                        .as_array()
+                        .is_some_and(|events| events.iter().any(|r| r["_PID"] == "1"
+                            && r["_UID"] == "0"
+                            && r["UNIT"] == verify_name
+                            && r["INVOCATION_ID"] == owner["InvocationID"]
+                            && r["MESSAGE_ID"] == "7ad2d189f7e94e70a38c781354912448"
+                            && r.get("UNIT_RESULT").is_none_or(|v| v == "success")))
+                    && !Path::new("/sys/fs/cgroup/system.slice")
+                        .join(&verify_name)
+                        .try_exists()?,
+                "incomplete private holding readback"
+            );
+        } else {
+            let pid = text(&owner, "MainPID")?.parse::<u32>()?;
+            ensure!(
+                fs::read_link(format!("/proc/{pid}/exe"))? == binding(&book["image"])?.path
+                    && owner["AllowedCPUs"] == cpu.to_string(),
+                "private readback owner changed"
+            );
+            owner["cpus"] = json!([cpu]);
+            peers.insert(verify_name, owner);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn confirmed_census(values: &Value) -> Result<bool> {
+    let expected = owners()?;
+    Ok(values
+        .as_object()
+        .is_some_and(|m| m.len() == expected.len() && expected.keys().all(|k| m.contains_key(k))))
+}
+
 fn owners() -> Result<BTreeMap<String, Value>> {
     let preparation = Bound::new(
         PREPARATION,
@@ -108,6 +203,7 @@ fn owners() -> Result<BTreeMap<String, Value>> {
     );
     owner["cpus"] = json!([10, 11]);
     peers.insert(unit, owner);
+    holding_readers(&mut peers)?;
     Ok(peers)
 }
 
@@ -293,35 +389,47 @@ pub(crate) fn booking(review: &Value) -> Result<Value> {
     ensure!(
         review["closed266_booking"] == json!(award)
             && review["epoch"] == 257
-            && review["operation"] == "native-cold",
+            && matches!(
+                review["operation"].as_str(),
+                Some("native-cold" | "qualify-guard")
+            ),
         "different closed 266 booking or restore"
     );
     let book = award.sealed()?;
     let closure = Bound::new(
-        "/home/ubuntu/.codex/diagnostics/horizon257-post-first-close-v218-a1/completion.json",
-        "17c4d4dee84e2b9306dfd56f0c8cbf5bf2f6ddd85207c1c93453e2379749ce7e",
+        "/home/ubuntu/.codex/diagnostics/horizon257-v16-retention-closure-v220/completion.json",
+        "2858c894467c83a7e0f81efac6f6ea9c2782aa47247a72feedbb18ebccd7ad7c",
     );
     let closed = closure.json()?;
-    let terminal = binding(&closed["terminal"])?.json()?;
-    let previous = binding(&book["prepared"])?.sealed()?;
+    let terminal = binding(&closed["terminal"])?.sealed()?;
+    let handoff = binding(&closed["startup"])?.sealed()?;
+    let intent = binding(&closed["intent"])?.json()?;
     let next = binding(&review["preparation"])?.sealed()?;
     let prepare_review = binding(&next["review"])?.sealed()?;
+    let requested = (review["operation"].as_str(), review["attempt"].as_str());
     ensure!(
-        review["attempt"] == "cold-closed266-after-v218"
-            && next["attempt"] == review["attempt"]
-            && next["cpu_affinity"] == previous["cpu_affinity"]
-            && next["guard"] == previous["guard"]
-            && prepare_review["previous_preparation"] == book["prepared"]
+        matches!(
+            requested,
+            (Some("qualify-guard"), Some("guard-reap-closed266-v220"))
+                | (Some("native-cold"), Some("cold-reap-closed266-v220"))
+        ) && next["attempt"] == review["attempt"]
+            && next["operation"] == review["operation"]
+            && next["cpu_affinity"] == book["cpu"]
+            && next["guard"] == review["guard"]
+            && prepare_review["previous_preparation"] == intent["preparation"]
             && prepare_review["closed266_booking"] == json!(award)
             && prepare_review["previous_closure"] == json!(closure)
             && review["previous_closure"] == json!(closure)
             && closed["reservation"] == json!(award)
-            && closed["released"] == false
-            && terminal["kernel_drained"] == true
-            && terminal["candidate_token_absent"] == true
-            && terminal["guarded_startup_accepted"] == false
-            && terminal["paired_257_reservations_released"] == false,
-        "fresh preparation must inherit the original booking after closure"
+            && closed["resources_released"] == false
+            && closed["all_four_links_removed"] == true
+            && closed["original_token_preserved"] == true
+            && closed["original_processes_gone"] == true
+            && closed["token"] == handoff["first_guard_token"]
+            && terminal["invocation_id"] == handoff["invocation_id"]
+            && terminal["native_input_qualified"] == false
+            && terminal["resource_release_authorized"] == false,
+        "fresh preparation must inherit the original reservation from the closed cold restore"
     );
     ensure!(
         review["cpu_affinity"] == book["cpu"]

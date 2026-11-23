@@ -245,7 +245,7 @@ pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Windo
     if review.get("closed266_booking").is_some() {
         native266_full::closed266_for257::booking(review)?;
         ensure!(a["epoch"]==257 && a["capacity"]["closed266_booking"]==review["closed266_booking"]
-            && a["actual_current_memory"].as_object().is_some_and(|m|m.len()==6),
+            && native266_full::closed266_for257::confirmed_census(&a["actual_current_memory"])?,
             "missing 257 funding census");
         // The enrolled cohort consists solely of uploaders and private transfers. Its
         // exact manager/cgroup roster is rechecked before activation and token release.
