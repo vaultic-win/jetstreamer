@@ -34,7 +34,7 @@ fn original_plan(p: &Profile, cap: u64, review: &Value) -> Result<Value> {
                 == "9f7763ff57c27bcfa112814701314c1b36366a35c7e171a7d6f3ee97ee7330ae",
         "native 1.8.11 binding"
     );
-    let (node, worker) = if p.lane == Lane::Bounded266 {
+    let (node, worker) = if p.lane.is_bounded() {
         bounded::inputs()?;
         (successor::NODE, bounded::WORKER)
     } else if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
@@ -205,7 +205,7 @@ fn static_units(n: &mut Native, p: &Profile, r: &Bound, spec: &Bound, fit: &Valu
             .replace("@EPOCH@", &p.lane.epoch().to_string())
             .replace("@IMAGE@", image)
             .replace("@GUARD@", &p.guard)
-            .replace("@WORKER@", if p.lane == Lane::Bounded266 { bounded::WORKER } else { "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-historical-worker-v1-8-11" })
+            .replace("@WORKER@", if p.lane.is_bounded() { bounded::WORKER } else { "/var/lib/jetstreamer/horizon-contiguous-266-266-current-46b4b4a-v1/jetstreamer-historical-worker-v1-8-11" })
     };
     let template = if p.lane == Lane::Epoch228 {
         include_str!("epoch228.service.in")

@@ -100,7 +100,7 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         epoch228::verify_payload(p, &s)?;
     } else {
         inputs()?;
-        if p.lane == Lane::Bounded266 {
+        if p.lane.is_bounded() {
             bounded::payload(p, &s)?;
         } else if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
             successor::payload(p, &s)?;
@@ -132,7 +132,7 @@ pub(super) fn wait(p: &Profile, b: &Bound) -> Result<Value> {
         .collect::<Result<Vec<_>>>()?;
     if p.lane == Lane::Epoch228 {
         epoch228::verify_payload(p, &s)?;
-    } else if p.lane == Lane::Bounded266 {
+    } else if p.lane.is_bounded() {
         bounded::payload(p, &s)?;
     } else if matches!(p.lane, Lane::Instructions266 | Lane::Turnover266) {
         successor::payload(p, &s)?;
@@ -194,7 +194,7 @@ fn stop(p: &Profile, s: &Value, reason: &str, rec: &Value) -> Result<()> {
 }
 fn guard_once(p: &Profile, s: &Value) -> Result<Value> {
     let m = owner_fields(&p.unit)?;
-    if p.lane == Lane::Bounded266 && p.mode == "pilot" && m["ActiveState"] == "inactive" {
+    if p.lane.is_bounded() && p.mode == "pilot" && m["ActiveState"] == "inactive" {
         let intent = p.state.join("receipts/target-stop-intent.json");
         if intent.try_exists()? {
             return Ok(
@@ -277,7 +277,7 @@ fn guard_once(p: &Profile, s: &Value) -> Result<Value> {
         let proof = stopped::closed(p, s, &m, &plan)?;
         return Ok(json!({"qualified_native_guard":guard,"closed_manager_owner":proof}));
     }
-    if p.lane == Lane::Bounded266 && p.mode == "pilot" && m["ActiveState"] == "active" {
+    if p.lane.is_bounded() && p.mode == "pilot" && m["ActiveState"] == "active" {
         bounded::stop_at_target(p, s, &m)?;
     }
     Ok(json!({"qualified_native_guard":guard}))

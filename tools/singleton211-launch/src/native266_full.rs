@@ -40,12 +40,20 @@ enum Lane {
     Instructions266,
     Turnover266,
     Bounded266,
+    BoundedRetry266,
     Epoch228,
 }
 impl Lane {
+    fn is_bounded(self) -> bool {
+        matches!(self, Self::Bounded266 | Self::BoundedRetry266)
+    }
     fn epoch(self) -> u64 {
         match self {
-            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 | Self::Bounded266 => 266,
+            Self::Epoch266
+            | Self::Instructions266
+            | Self::Turnover266
+            | Self::Bounded266
+            | Self::BoundedRetry266 => 266,
             Self::Epoch228 => 228,
         }
     }
@@ -55,6 +63,7 @@ impl Lane {
             Self::Instructions266 => successor::STATE,
             Self::Turnover266 => turnover::STATE,
             Self::Bounded266 => bounded::STATE,
+            Self::BoundedRetry266 => bounded::RETRY_STATE,
             Self::Epoch228 => epoch228::STATE,
         }
     }
@@ -64,6 +73,7 @@ impl Lane {
             Self::Instructions266 => successor::CONTROLLER,
             Self::Turnover266 => turnover::CONTROLLER,
             Self::Bounded266 => bounded::CONTROLLER,
+            Self::BoundedRetry266 => bounded::RETRY_CONTROLLER,
             Self::Epoch228 => epoch228::CTRL,
         }
     }
@@ -73,14 +83,17 @@ impl Lane {
             Self::Instructions266 => "epoch266-instructions",
             Self::Turnover266 => "epoch266-turnover",
             Self::Bounded266 => "epoch266-bounded",
+            Self::BoundedRetry266 => "epoch266-bounded-retry",
             Self::Epoch228 => "epoch228-full",
         }
     }
     fn guard(self) -> (&'static str, &'static str) {
         match self {
-            Self::Epoch266 | Self::Instructions266 | Self::Turnover266 | Self::Bounded266 => {
-                (GUARD, GUARD_SHA)
-            }
+            Self::Epoch266
+            | Self::Instructions266
+            | Self::Turnover266
+            | Self::Bounded266
+            | Self::BoundedRetry266 => (GUARD, GUARD_SHA),
             Self::Epoch228 => (epoch228::GUARD, epoch228::GUARD_SHA),
         }
     }
@@ -105,14 +118,16 @@ impl Profile {
         };
         if matches!(
             lane,
-            Lane::Instructions266 | Lane::Turnover266 | Lane::Bounded266
+            Lane::Instructions266 | Lane::Turnover266 | Lane::Bounded266 | Lane::BoundedRetry266
         ) {
             let generation = if lane == Lane::Turnover266 {
                 "v194"
             } else {
                 "v169"
             };
-            let tag = if lane == Lane::Bounded266 {
+            let tag = if lane == Lane::BoundedRetry266 {
+                format!("266-capped-bounded{suffix}-v210")
+            } else if lane == Lane::Bounded266 {
                 format!("266-capped-bounded{suffix}-v207")
             } else {
                 format!("266-instructions-2789f821{suffix}-{generation}")
@@ -325,6 +340,9 @@ fn observed_turnover(
     Ok(json!(save_json(path, file, &report)?))
 }
 
+pub fn dispatch_bounded_retry(args: &[String]) -> Result<Value> {
+    controller(Lane::BoundedRetry266, args)
+}
 pub fn dispatch_bounded(args: &[String]) -> Result<Value> {
     controller(Lane::Bounded266, args)
 }

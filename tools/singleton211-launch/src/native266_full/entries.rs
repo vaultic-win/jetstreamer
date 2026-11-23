@@ -17,7 +17,9 @@ pub(super) fn tree(p: &Profile, parent: u64) -> Result<BTreeMap<u64, Value>> {
     );
     let mut workers = Vec::new();
     let (node, scratch, worker_sha) = match p.lane {
-        Lane::Bounded266 => (PathBuf::from(successor::NODE), "state", bounded::WORKER_SHA),
+        Lane::Bounded266 | Lane::BoundedRetry266 => {
+            (PathBuf::from(successor::NODE), "state", bounded::WORKER_SHA)
+        }
         Lane::Epoch228 => (PathBuf::from(NODE228), "scratch", epoch228::WORKER_SHA),
         Lane::Instructions266 | Lane::Turnover266 => (
             PathBuf::from(successor::NODE),
@@ -128,9 +130,11 @@ pub(super) fn progress(row: &Value, target: u64) -> Result<Option<(u64, u64, u64
 pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
     let p = Profile::new(lane, "pilot")?;
     let (bootstrap, target) = match lane {
-        Lane::Epoch266 | Lane::Instructions266 | Lane::Turnover266 | Lane::Bounded266 => {
-            (114910768, 115343999)
-        }
+        Lane::Epoch266
+        | Lane::Instructions266
+        | Lane::Turnover266
+        | Lane::Bounded266
+        | Lane::BoundedRetry266 => (114910768, 115343999),
         Lane::Epoch228 => (98495291, 98928278),
     };
     let handoff = bound_at(&p.state.join("handoff.json"))?;
@@ -180,7 +184,10 @@ pub(super) fn witness(n: &mut Native, lane: Lane) -> Result<Value> {
                 && row["_UID"] == "1000",
             "foreign progress journal"
         );
-        if matches!(lane, Lane::Epoch228 | Lane::Bounded266) {
+        if matches!(
+            lane,
+            Lane::Epoch228 | Lane::Bounded266 | Lane::BoundedRetry266
+        ) {
             ensure!(
                 row["_PID"].as_str().and_then(|v| v.parse::<u64>().ok()) == Some(pid)
                     && row["_EXE"]

@@ -4,6 +4,8 @@ mod progress;
 pub(super) use progress::{finish, stop_at_target};
 pub(super) const STATE: &str = "/var/lib/jetstreamer/horizon266-capped-bounded-v207-control";
 pub(super) const CONTROLLER: &str = "horizon266-capped-bounded-v207-control.service";
+pub(super) const RETRY_STATE: &str = "/var/lib/jetstreamer/horizon266-capped-bounded-v210-control";
+pub(super) const RETRY_CONTROLLER: &str = "horizon266-capped-bounded-v210-control.service";
 pub(super) const MEMORY: u64 = 192_000_000_000;
 const ROOT_BYTES: u64 = 344_997_011_456;
 const FLOOR: u64 = 4_290_366_117_888;
@@ -127,7 +129,56 @@ pub(super) fn runtime_image(r: &Value) -> Result<Bound> {
     );
     Ok(original)
 }
+// The previous loop stays sealed. Only the existing reservation transfers to this attempt.
+fn retry_limits(booking: &Bound, assessment: &Value, fleet: &Bound) -> Result<(u64, u64)> {
+    let closure = Bound::new(
+        "/var/lib/jetstreamer/horizon266-v207-closed-growth-v210/release.json",
+        "a4c097ded324c48c3c591c46c90f7baf6cb816405c1f6200ad0d1bcd3813600c",
+    );
+    let released = closure.sealed()?;
+    let observed = binding(&assessment["successor_fit"])?.sealed()?;
+    let old = Profile::new(Lane::Bounded266, "pilot")?;
+    let mount = bound_at(&old.state.join("mount.json"))?.sealed()?;
+    let image = fs::symlink_metadata(old.state.join("private.ext4"))?;
+    ensure!(
+        assessment["closed_predecessor"] == json!(closure)
+            && released["original"] == json!(booking)
+            && released["remaining_original_growth"] == 0
+            && observed["issued"] == json!(booking)
+            && observed["fleet"] == json!(fleet)
+            && observed["terminal"] == released["terminal"]
+            && observed["other_reservations_retained"] == true
+            && mount["loop"] == "/dev/loop15"
+            && fs::read_to_string("/sys/block/loop15/ro")?.trim() == "1"
+            && image.dev() == 66305
+            && image.ino() == 6025749
+            && image.len() == ROOT_BYTES
+            && image.blocks() * 512 == num(&released, "retained_backing_bytes")?,
+        "bounded predecessor closure or reservation changed"
+    );
+    live::verify_drained_group(&old.unit)?;
+    let disk = num(assessment, "successor_floor")?;
+    let extent = &observed["extent"];
+    let expected = num(&observed, "protected_floor")?
+        .checked_sub(num(extent, "remaining")?)
+        .and_then(|n| n.checked_add(num(&observed, "disk").ok()?))
+        .context("successor disk floor")?;
+    ensure!(
+        disk == expected
+            && disk >= num(&released, "floor")?
+            && extent["identity"] == released["current"]["identity"]
+            && extent["first"]["map_sha256"] == released["current"]["first"]["map_sha256"]
+            && extent["second"]["map_sha256"] == released["current"]["second"]["map_sha256"],
+        "unfunded bounded successor"
+    );
+    Ok((
+        disk.checked_add(num(&released, "qa_bytes")?)
+            .context("QA floor")?,
+        num(&observed, "growth")?,
+    ))
+}
 pub(super) fn elect(
+    lane: Lane,
     n: &mut Native,
     r: &Value,
     held: Option<(&Profile, &Value, (u64, u64))>,
@@ -192,7 +243,7 @@ pub(super) fn elect(
             == [247],
         "booked fleet changed"
     );
-    let mut allowed = BTreeSet::from([CONTROLLER.to_owned()]);
+    let mut allowed = BTreeSet::from([lane.controller().to_owned()]);
     let mut uploader_current = 0;
     for (unit, iid, pid, cap, mask) in [
         (
@@ -301,12 +352,36 @@ pub(super) fn elect(
             num(w, "retained_211")? + num(w, "retained_265")? - FROM_265 + uploader_current,
         )
         .context("growth accounting")?;
+    let (floor, growth) = if lane == Lane::BoundedRetry266 {
+        let (disk, retained_growth) = retry_limits(&booking, &price, &fleet)?;
+        (disk, growth.max(retained_growth))
+    } else {
+        (FLOOR, growth)
+    };
     ensure!(
-        HARD <= total && growth <= available && FLOOR + ROOT_BYTES <= free,
+        HARD <= total && growth <= available && floor + ROOT_BYTES <= free,
         "capped replay no longer fits"
     );
     issuer_lock(r)?;
     Ok(
-        json!({"reservation":booking,"fleet":fleet,"cpus":price["cpu"],"protected_floor":FLOOR,"services":services,"winner":{"fits":true,"root":ROOT_BYTES,"memory":MEMORY,"hard":HARD,"growth":growth,"required_free":FLOOR+ROOT_BYTES},"free":free,"available":available}),
+        json!({"reservation":booking,"fleet":fleet,"cpus":price["cpu"],"protected_floor":floor,"services":services,"winner":{"fits":true,"root":ROOT_BYTES,"memory":MEMORY,"hard":HARD,"growth":growth,"required_free":floor+ROOT_BYTES},"free":free,"available":available}),
     )
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    #[test]
+    fn retry_has_its_own_workers_guards_and_receipts() {
+        for mode in MODES {
+            let old = Profile::new(Lane::Bounded266, mode).unwrap();
+            let retry = Profile::new(Lane::BoundedRetry266, mode).unwrap();
+            assert_ne!(old.unit, retry.unit);
+            assert_ne!(old.root, retry.root);
+            assert_ne!(old.state, retry.state);
+            assert_ne!(old.timer, retry.timer);
+            assert_ne!(old.guard, retry.guard);
+            assert!(retry.lane.is_bounded());
+        }
+    }
 }
