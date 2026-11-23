@@ -249,8 +249,9 @@ pub(super) fn observe(p: &Plan, plan_sha: &str, has_token: bool) -> Result<Value
             workers.push((pid, wv));
             pins.push(worker);
         } else if let Some(old) = known(p, plan_sha, "worker")? {
-            // A reaped worker may disappear while the harness persists its result.
-            gone(&old)?;
+            // cgroup.procs can drop an exiting child before the harness reaps it.
+            // A live process outside the cgroup still trips the guard immediately.
+            exited_worker_reaped(old.pid, old.parent_pid, old.start_ticks)?;
         }
         if ids == pids_at(&cgroup())? {
             ensure!(boot()? == p.boot_id, "boot changed during sample");
@@ -261,23 +262,73 @@ pub(super) fn observe(p: &Plan, plan_sha: &str, has_token: bool) -> Result<Value
     }
     bail!("cgroup membership did not stabilize within bounded observation")
 }
-fn gone(pin: &Pin) -> Result<()> {
-    match stat(Path::new(PROCS), pin.pid) {
+fn process_identity(pid: u32) -> Result<Option<(u32, u64)>> {
+    match stat(Path::new(PROCS), pid) {
+        Ok(identity) => Ok(Some(identity)),
         Err(e)
             if e.downcast_ref::<std::io::Error>()
                 .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound) =>
         {
-            Ok(())
+            Ok(None)
         }
         Err(e) => Err(e),
-        Ok((_, ticks)) => {
-            ensure!(
-                ticks != pin.start_ticks,
-                "original process still exists, possibly escaped cgroup"
-            );
-            Ok(())
-        }
     }
+}
+
+fn exited_worker_reaped(pid: u32, parent: u32, start: u64) -> Result<()> {
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+    use std::time::{Duration, Instant};
+
+    // Bind the pidfd before reading /proc so a recycled PID cannot supply the
+    // exit event for a still-live original worker.
+    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) } as i32;
+    if fd < 0 {
+        let err = std::io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::ESRCH) {
+            return Ok(());
+        }
+        return Err(err.into());
+    }
+    let fd = unsafe { OwnedFd::from_raw_fd(fd) };
+    let deadline = Instant::now() + Duration::from_millis(500);
+    loop {
+        let Some((actual_parent, ticks)) = process_identity(pid)? else {
+            return Ok(());
+        };
+        if ticks != start {
+            return Ok(());
+        }
+        ensure!(
+            actual_parent == parent,
+            "missing worker {pid} changed parent to {actual_parent}"
+        );
+        let mut poll = libc::pollfd {
+            fd: fd.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let ready = unsafe { libc::poll(&mut poll, 1, 0) };
+        if ready < 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+        ensure!(
+            ready == 1 && poll.revents & libc::POLLIN != 0,
+            "pinned live worker {pid} absent from cgroup (start ticks {start})"
+        );
+        ensure!(
+            Instant::now() < deadline,
+            "exited worker {pid} still unreaped after 500 ms"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn gone(pin: &Pin) -> Result<()> {
+    ensure!(
+        process_identity(pin.pid)?.is_none_or(|(_, ticks)| ticks != pin.start_ticks),
+        "original process still exists, possibly escaped cgroup"
+    );
+    Ok(())
 }
 pub(super) fn drain(p: &Plan, plan_sha: &str) -> Result<Value> {
     let kernel = match fs::symlink_metadata(cgroup()) {
@@ -330,6 +381,41 @@ mod tests {
             assert!(membership(&pids, 42, true).is_err());
         }
     }
+    #[test]
+    fn missing_child_must_exit_and_be_reaped() {
+        use std::process::Command;
+        use std::time::Duration;
+        let mut child = Command::new("/usr/bin/sleep").arg("30").spawn().unwrap();
+        let pid = child.id();
+        let (parent, start) = stat(Path::new(PROCS), pid).unwrap();
+        assert!(exited_worker_reaped(pid, parent, start).is_err());
+        let unit = fs::read_to_string(format!("/proc/{pid}/cgroup")).unwrap();
+        let group = Path::new("/sys/fs/cgroup").join(unit.trim().strip_prefix("0::/").unwrap());
+        assert!(
+            fs::read_to_string(group.join("cgroup.procs"))
+                .unwrap()
+                .lines()
+                .any(|line| line == pid.to_string())
+        );
+        child.kill().unwrap();
+        // waitid(WNOWAIT) guarantees the pinned child is a zombie while its
+        // parent still owns the wait status.
+        let mut info = unsafe { std::mem::zeroed() };
+        assert_eq!(
+            unsafe { libc::waitid(libc::P_PID, pid, &mut info, libc::WEXITED | libc::WNOWAIT) },
+            0
+        );
+        let members = fs::read_to_string(group.join("cgroup.procs")).unwrap();
+        assert!(!members.lines().any(|line| line == pid.to_string()));
+        assert!(exited_worker_reaped(pid, parent, start).is_err());
+        let reaper = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            child.wait().unwrap();
+        });
+        exited_worker_reaped(pid, parent, start).unwrap();
+        reaper.join().unwrap();
+    }
+
     #[test]
     fn proc_stat_handles_spaces_and_parentheses_in_comm_and_binds_pid() {
         let d = tempfile::tempdir().unwrap();
