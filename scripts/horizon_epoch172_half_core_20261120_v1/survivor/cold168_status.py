@@ -23,24 +23,34 @@ NODE = '/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-2026
 NODE_SHA = 'a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65'
 
 
-RETRY3 = Path(__file__).with_name('retry3-168-generation.json').is_file()
-PACKAGE = 'tools-cold168-retry3-v1' if RETRY3 else 'tools-cold168-retry2-v1'
+GENERATIONS = [n for n in (2, 3, 4) if Path(__file__).with_name(f'retry{n}-168-generation.json').is_file()]
+need(len(GENERATIONS)==1, 'missing or ambiguous 168 generation')
+ATTEMPT, = GENERATIONS
+PACKAGE = f'tools-cold168-retry{ATTEMPT}-v1'
 ROOT_INODE, LOG_INODE = 103481350, 103481356
-if RETRY3:
-    ROOT = BASE/'epoch168-retry3-rebook-20261123-v1'
-    GUARD = BASE/'epoch168-cold-guard-20261123-v3'
-    RUN = RUN.with_name('cold-retry3-20261123')
-    ALIAS = Path('/run/horizon-full168-cold-v3')
-    NAME = '168-full-metered-cold-v3-20261123'
+if ATTEMPT in (3, 4):
+    ROOT = BASE/f'epoch168-retry{ATTEMPT}-rebook-20261123-v1'
+    GUARD = BASE/f'epoch168-cold-guard-20261123-v{ATTEMPT}'
+    RUN = RUN.with_name(f'cold-retry{ATTEMPT}-20261123')
+    ALIAS = Path(f'/run/horizon-full168-cold-v{ATTEMPT}')
+    NAME = f'168-full-metered-cold-v{ATTEMPT}-20261123'
     UNIT = 'horizon-qualify-'+NAME+'.service'
     TIMER = 'horizon-guard-'+NAME+'.timer'
-    ROOT_INODE, LOG_INODE = 103481378, 103481382
-    BINDING = Path(__file__).with_name('retry3-168-generation.json')
-    ANCHOR = dict(path=str(ROOT/'SUCCESSOR_ROOT.json'),sha256='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4')
-    FAILURE = dict(path=str(BASE/'epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json'),
-                   sha256='a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643')
+    BINDING = Path(__file__).with_name(f'retry{ATTEMPT}-168-generation.json')
+    if ATTEMPT == 3:
+        ROOT_INODE, LOG_INODE = 103481378, 103481382
+        anchor_sha='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4'
+        prior='epoch168-retry2-rebook-20261122-v1'
+        failure_sha='a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643'
+    else:
+        ROOT_INODE, LOG_INODE = 103481722, 103481750
+        anchor_sha='713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4'
+        prior='epoch168-retry3-rebook-20261123-v1'
+        failure_sha='cf8ef71b5b000cc4138f726d019c59a107b9b3d45f741b0b4802a6f4f31f1d21'
+    ANCHOR = dict(path=str(ROOT/'SUCCESSOR_ROOT.json'),sha256=anchor_sha)
+    FAILURE = dict(path=str(BASE/prior/'RELEASED_NODE_STARTUP_FAILURE_20261123.json'), sha256=failure_sha)
     QUAL = checked(bound(BINDING))['guard_qualification']
-    need(QUAL['path']==str(GUARD/'GUARD_QUALIFIED.json'), 'different retry3 guard path')
+    need(QUAL['path']==str(GUARD/'GUARD_QUALIFIED.json'), 'different 168 guard path')
 
 
 def generation():
@@ -48,12 +58,21 @@ def generation():
     prepared = bound(ROOT/'PREPARED.json')
     expected = dict(prepared=prepared, successor_root=ANCHOR, guard_qualification=QUAL)
     anchor, proof, reg = checked(ANCHOR), checked(QUAL), checked(prepared)
-    if RETRY3:
-        expected['failed_retry2'] = FAILURE
+    if ATTEMPT in (3, 4):
+        expected[f'failed_retry{ATTEMPT-1}'] = FAILURE
         failed = checked(FAILURE)
         need(anchor['previous_start_failure']==FAILURE and failed['permit_consumed']
-             and failed['no_admission_record'] and failed['worker_receipt_absent'] and not failed['replay_claimed'],
-             'different consumed retry2 generation')
+             and failed['no_admission_record'] is (ATTEMPT==3) and failed['worker_receipt_absent'] and not failed['replay_claimed'],
+             'different consumed 168 generation')
+        if ATTEMPT == 4:
+            admission=failed['receipts']['ACTUAL_ADMISSION_AND_PROTECTION.json']
+            data=checked(admission)
+            need(anchor['parent_immutable'] and not anchor['children_immutable']
+                 and anchor['common_mount_fixture']['sha256']=='51b01c0110965a74db73e539dea68b0520f9e9b5ed02cb581f6a7f54be310704'
+                 and failed['bootstrap_admission'] and not failed['worker_in_observed_guard_samples']
+                 and admission['sha256']=='8dd692fda6b1098a22a2162792e7165005692385795e6cae72b6df472c7e83c0'
+                 and data['producer_invocation_id']=='032cb7da1929485994cf18b384c93459' and data['producer_pid']==889002
+                 and data['bootstrap_only'] and not data['transaction_replay_claimed'], 'different admitted 168 predecessor')
     else:
         need(prepared['sha256']=='dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a',
              'different retry2 preparation')
@@ -77,7 +96,7 @@ def generation():
     need(baseline['profile'] == profile and profile['producer_unit'] == UNIT and profile['guard_timer'] == TIMER
          and reg['payload'] == bound(ROOT/'COLD_PAYLOAD.json') and checked(reg['payload']) == profile['payload']
          and profile['payload']['members']['jetstreamer-node'] == [NODE, NODE_SHA]
-         and proof['schema'] == ('horizon-168-cold-v3-native-guard-qualified-v1' if RETRY3 else 'horizon-168-cold-v2-native-guard-qualified-v1')
+         and proof['schema'] == f'horizon-168-cold-v{ATTEMPT}-native-guard-qualified-v1'
          and proof['guard'] == bound(GUARD/'tools/guard') and proof['guard']['sha256'] == profile['guard_binary_sha256']
          and proof['seal'] == bound(GUARD/'tools/deployment-seal-receipt.json'), 'different 168 inputs or guard')
     return prepared, baseline, proof

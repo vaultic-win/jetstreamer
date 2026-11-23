@@ -35,36 +35,50 @@ def need(condition, why):
         raise ValueError(why)
 
 
-RETRY3 = False
+ATTEMPT = 2
 FAILURE = dict(path=str(BASE/'epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json'),
                sha256='a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643')
 FIRST_RETRY2_CYCLE = dict(path=str(BASE/'root004757-live166167170-20261123-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json'),
                           sha256='39db14ce7cbc96d1ca300e1120db6e67e4b5048582f8968f9886fd4317a107cc')
 
 
-def configure_retry3():
-    global RETRY3,SESSION,OLD,TARGET,TAG,QUALIFIED,ACTIVE,PREPARED,ANCHOR,GUARD,PREVIOUS,OLD_SHA
-    RETRY3=True
-    SESSION=BASE/'epoch168-retry3-rebook-20261123-v1'
-    OLD=ROOT/'tools-cold168-retry2-v1/status_cycle.py'
-    OLD_SHA='dc0f98d1b468c2568abc63c723167e47529ec5f8f03b683421c77468184db690'
-    TARGET=ROOT/'tools-cold168-retry3-v1'
-    TAG='COLD168_RETRY3_V1_STATUS_'
+def configure_successor(attempt):
+    global ATTEMPT,SESSION,OLD,TARGET,TAG,QUALIFIED,ACTIVE,PREPARED,ANCHOR,GUARD,PREVIOUS,OLD_SHA,FAILURE
+    global FORECAST,FORECAST_PREP,DUE
+    need(attempt in (3,4), 'unknown successor')
+    ATTEMPT=attempt
+    SESSION=BASE/f'epoch168-retry{attempt}-rebook-20261123-v1'
+    OLD=ROOT/f'tools-cold168-retry{attempt-1}-v1/status_cycle.py'
+    if attempt==3:
+        OLD_SHA='dc0f98d1b468c2568abc63c723167e47529ec5f8f03b683421c77468184db690'
+        anchor_sha='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4'
+        previous_sha='c144e7d6badc06ea10f4aef853ce84dd33a2e906a045d1f094bce04b8693a8e5'
+    else:
+        OLD_SHA='d8823404a5dcf35965fb5b519569dd8fc5ede733cea215a582aa5669d8b9eb98'
+        anchor_sha='713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4'
+        previous_sha='b63b2e1b0f681e458a141a857db6b4b66137596f5387f9efb4edac31ab8d1bb7'
+        FAILURE=dict(path=str(BASE/'epoch168-retry3-rebook-20261123-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json'),
+                     sha256='cf8ef71b5b000cc4138f726d019c59a107b9b3d45f741b0b4802a6f4f31f1d21')
+        FORECAST=ROOT/'three-004757-dependency-forecasts'
+        FORECAST_PREP=dict(path=str(FORECAST/'PREPARED.json'),sha256='88627ed83dc9d40ab4179ab4ed286f0c3a7c82c9f21bcf5d40af902b727ca6eb')
+        DUE='2026-11-23T01:17:57Z'
+    TARGET=ROOT/f'tools-cold168-retry{attempt}-v1'
+    TAG=f'COLD168_RETRY{attempt}_V1_STATUS_'
     QUALIFIED=ROOT/(TAG+'QUALIFIED.json')
     ACTIVE=ROOT/(TAG+'ACTIVE.json')
     q=json.loads(QUALIFIED.read_bytes())
     PREPARED=q['prepared']
     GUARD=q['guard']
     need(PREPARED['path']==str(SESSION/'PREPARED.json') and
-         GUARD['path']==str(BASE/'epoch168-cold-guard-20261123-v3/GUARD_QUALIFIED.json'), 'foreign retry3 enrollment paths')
-    ANCHOR=dict(path=str(SESSION/'SUCCESSOR_ROOT.json'),sha256='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4')
-    PREVIOUS=dict(path=str(ROOT/'COLD168_RETRY2_V1_STATUS_ACTIVE.json'),sha256='c144e7d6badc06ea10f4aef853ce84dd33a2e906a045d1f094bce04b8693a8e5')
+         GUARD['path']==str(BASE/f'epoch168-cold-guard-20261123-v{attempt}/GUARD_QUALIFIED.json'), 'foreign 168 enrollment paths')
+    ANCHOR=dict(path=str(SESSION/'SUCCESSOR_ROOT.json'),sha256=anchor_sha)
+    PREVIOUS=dict(path=str(ROOT/f'COLD168_RETRY{attempt-1}_V1_STATUS_ACTIVE.json'),sha256=previous_sha)
 
 
 def generation_record():
     data=dict(prepared=PREPARED,successor_root=ANCHOR,guard_qualification=GUARD)
-    if RETRY3:
-        data['failed_retry2']=FAILURE
+    if ATTEMPT>2:
+        data[f'failed_retry{ATTEMPT-1}']=FAILURE
     return data
 
 
@@ -83,7 +97,7 @@ def checked_member(c, path):
 def enrollment(c):
     ref=c['bound'](QUALIFIED)
     q=c['checked'](ref)
-    need(q['schema']==('horizon-168-retry3-v1-status-qualified-v1' if RETRY3 else 'horizon-168-retry2-v1-status-qualified-v1') and q['epoch']==168 and
+    need(q['schema']==f'horizon-168-retry{ATTEMPT}-v1-status-qualified-v1' and q['epoch']==168 and
          q['guard']==GUARD and q['successor_root']==ANCHOR and q['prepared']==PREPARED and
          q['generation'] is not None and re.fullmatch('[0-9a-f]{40}',q['source_commit']) and
          isinstance(q['suites'],dict) and q['suites'], 'different status qualification')
@@ -92,10 +106,10 @@ def enrollment(c):
     program=TARGET/'status_cycle.py'
     need(checked_member(c,program)==q['package'] and c['bound'](program)==q['entry'],
          'different qualified epoch 168 program or package')
-    if RETRY3:
-        need(q['failed_retry2']==c['checked'](ANCHOR)['previous_start_failure']==FAILURE
-             and c['checked'](FAILURE)['no_admission_record'], 'foreign previous 168 admission')
-    generation=TARGET/('retry3-168-generation.json' if RETRY3 else 'retry2-168-generation.json')
+    if ATTEMPT>2:
+        need(q[f'failed_retry{ATTEMPT-1}']==c['checked'](ANCHOR)['previous_start_failure']==FAILURE
+             and c['checked'](FAILURE)['no_admission_record'] is (ATTEMPT==3), 'foreign previous 168 admission')
+    generation=TARGET/f'retry{ATTEMPT}-168-generation.json'
     need(checked_member(c,generation)==q['package'] and c['bound'](generation)==q['generation'] and
          c['checked'](q['generation'])==generation_record(),
          'different qualified epoch 168 generation')
@@ -104,7 +118,7 @@ def enrollment(c):
 
 def finished_forecast(c):
     """Bind the original issuer and fourteen conditional intents to all twenty authenticated readbacks."""
-    if RETRY3:
+    if ATTEMPT==3:
         accepted=c['checked'](PREVIOUS)
         fleet=c['checked'](FIRST_RETRY2_CYCLE)
         final=fleet['complete_active_status_audit']
@@ -119,7 +133,15 @@ def finished_forecast(c):
             need(row['authenticated_readback'] and row['epoch']==int(epoch) and
                  re.fullmatch('[0-9a-f]{64}',row['after_sha256']) and row['after_etag'], 'foreign first retry2 status')
         return final,FIRST_RETRY2_CYCLE
-    prior=c['checked'](PREVIOUS)
+    subscriber=c['checked'](PREVIOUS)
+    issuer=PREVIOUS
+    if ATTEMPT==4:
+        issuer=subscriber['previous_active']
+        need(issuer['sha256']=='c144e7d6badc06ea10f4aef853ce84dd33a2e906a045d1f094bce04b8693a8e5'
+             and c['checked'](issuer)['new']==subscriber['old'] and subscriber['new']['program']==str(OLD)
+             and subscriber['new']['invocation_id']=='c66cbea9e6d847b6aadd08b320fe6602',
+             'wrong retry3 forecast successor')
+    prior=c['checked'](issuer)
     prep=c['checked'](FORECAST_PREP)
     final_ref=c['bound'](FORECAST/'FINAL_READBACK.json')
     final=c['checked'](final_ref)
@@ -129,7 +151,7 @@ def finished_forecast(c):
     whole=c['checked'](fleet['complete_active_status_audit'])
     actual=fleet['complete_active_status_receipts']
     need(final['handoff']==c['bound'](FORECAST/'SENT_TO_SOLE_WRITER.json') and sorted(CHANGED)==final['corrections']
-         and prep['controller']==PREVIOUS and hand['owner']==prior['new'] and
+         and prep['controller']==issuer and hand['owner']==prior['new'] and
          hand['remote_writes']==final['remote_writes_by_handoff']==0 and set(map(int,hand['inputs']))==CHANGED and
          final['fleet']==c['bound'](expected['out']/'ROOT_COMPLETE_OPERATIONAL_FLEET.json') and
          fleet['previous_Root_operational_review']==prep['head'] and fleet['observer']==hand['sample']==whole['observer']
@@ -144,7 +166,7 @@ def finished_forecast(c):
         if int(key) in CHANGED:
             intent=c['checked'](hand['inputs'][key])
             need(row['before_etag']!=row['after_etag'] and intent['conditional_header']=='If-Match' and
-                 intent['previous_receipt']==prep['statuses'][key]['receipt'] and intent['active_status_writer']==PREVIOUS and
+                 intent['previous_receipt']==prep['statuses'][key]['receipt'] and intent['active_status_writer']==issuer and
                  all(row[k]==v for k,v in intent.items()),'different original forecast intent '+key)
     return final_ref,final['fleet']
 
@@ -197,8 +219,8 @@ def registration(c):
     qualification,q=enrollment(c)
     final,first=finished_forecast(c)
     binding=dict(prepared=PREPARED,generation=q['generation'],completed_forecast=final)
-    if RETRY3:
-        binding.update(previous_active=PREVIOUS,failed_retry2=FAILURE)
+    if ATTEMPT>2:
+        binding.update(previous_active=PREVIOUS,**{f'failed_retry{ATTEMPT-1}':FAILURE})
     intent_path=ROOT/(TAG+'INTENT.json')
     if intent_path.exists():
         intent=c['read_ref'](intent_path)
@@ -232,20 +254,20 @@ def switch(c,common,head):
         if path in (ACTIVE,intent_path):
             record=dict(record,**binding)
         if path==ACTIVE:
-            if RETRY3:
-                record=dict(record,schema='horizon-168-retry3-v1-status-active-v1')
+            if ATTEMPT>2:
+                record=dict(record,schema=f'horizon-168-retry{ATTEMPT}-v1-status-active-v1')
             check_owner(record['new'],incumbent,TARGET/'status_cycle.py')
         if 'restored' in record:
             check_owner(record['restored'],incumbent,OLD)
         c['durable'](path,record)
-    drop=common['DROP'].with_name('zzzzzzzzzzzzzzzzzz-cold168-retry3-v1.conf' if RETRY3 else 'zzzzzzzzzzzzzzzzz-cold168-retry2-v1.conf')
+    drop=common['DROP'].with_name('z'*(15+ATTEMPT)+f'-cold168-retry{ATTEMPT}-v1.conf')
     return common['switch'](dict(c,durable=write),head,target=TARGET,incumbent=OLD,
              incumbent_iid=incumbent['invocation_id'],tag=TAG,drop=drop,admission=enrollment_proof)
 
 
 def main(args):
-    if args.retry3:
-        configure_retry3()
+    if args.attempt>2:
+        configure_successor(args.attempt)
     need(os.geteuid()==0 and sys.flags.isolated and sys.dont_write_bytecode and __debug__,
          'run with isolated root Python and disabled bytecode')
     need(hashlib.sha256(COMMON.read_bytes()).hexdigest()==COMMON_SHA and
@@ -284,5 +306,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('mode',choices=('observe','activate'))
     parser.add_argument('fleet')
-    parser.add_argument('--retry3',action='store_true')
+    flags=parser.add_mutually_exclusive_group()
+    flags.add_argument('--retry3',dest='attempt',action='store_const',const=3)
+    flags.add_argument('--retry4',dest='attempt',action='store_const',const=4)
+    parser.set_defaults(attempt=2)
     print(json.dumps(main(parser.parse_args()),sort_keys=True))

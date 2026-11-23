@@ -12,24 +12,33 @@ const PREVIOUS_WRITER: &str = "f1b4781788205dbc065f5b116577c2e263e523f65e19cd658
 #[cfg(not(epoch166_after168_retry3))]
 const NEXT_WRITER: &str = "8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d";
 
-#[cfg(all(epoch166_after168_retry3, not(epoch166_after168_closed)))]
+#[cfg(all(epoch166_after168_retry3, not(any(epoch166_after168_closed, epoch166_after168_retry4))))]
 pub const FIT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry3-v1/post-stop-fit";
+#[cfg(epoch166_after168_retry4)]
+pub const FIT: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry4-v1/post-stop-fit";
 #[cfg(epoch166_after168_closed)]
 pub const FIT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-closed168-retry3-v1/post-stop-fit";
 #[cfg(epoch166_after168_retry3)]
 pub const FIT_SEAL: &str = env!("RETRY3_FIT_SEAL");
-#[cfg(epoch166_after168_retry3)]
+#[cfg(epoch166_after168_retry4)]
+const PREVIOUS_WRITER: &str = "2b36ded26d4e244c166c1f3623d8f125f558b94fb1a17555b96c361d5cb3cfd2";
+#[cfg(all(epoch166_after168_retry3, not(epoch166_after168_retry4)))]
 const PREVIOUS_WRITER: &str = "8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d";
 #[cfg(epoch166_after168_retry3)]
 const NEXT_WRITER: &str = env!("RETRY3_WRITER_SEAL");
-const PREVIOUS_PACKAGE: &str = if cfg!(epoch166_after168_retry3) {
+const PREVIOUS_PACKAGE: &str = if cfg!(epoch166_after168_retry4) {
+    "tools-cold168-retry3-v1"
+} else if cfg!(epoch166_after168_retry3) {
     "tools-cold168-retry2-v1"
 } else {
     "tools-cold170-retry13-v2"
 };
-const NEXT_PACKAGE: &str = if cfg!(epoch166_after168_retry3) {
+const NEXT_PACKAGE: &str = if cfg!(epoch166_after168_retry4) {
+    "tools-cold168-retry4-v1"
+} else if cfg!(epoch166_after168_retry3) {
     "tools-cold168-retry3-v1"
 } else {
     "tools-cold168-retry2-v1"
@@ -154,7 +163,13 @@ mod tests {
     use super::*;
 
     fn original() -> Value {
-        #[cfg(epoch166_after168_retry3)]
+        #[cfg(epoch166_after168_retry4)]
+        let (mut price, _) = doc(
+            &base().join("V7_PREFLIGHT_WITHOUT_168_20261123T013518026117Z.json"),
+            Some("3a78fa27e1fbe889ba46d57a682e6e694a34cd1019365276e557f4c1f967056d"),
+        )
+        .unwrap();
+        #[cfg(all(epoch166_after168_retry3, not(epoch166_after168_retry4)))]
         let (mut price, _) = doc(
             &base().join("INSTALLED_V5_AFTER_168_NODE_EXIT_20261123T005319083542Z.json"),
             Some("829680397007018b8ecbc0a200860e9ba4cddca27fc84c32d8a6bc505c329806"),
@@ -203,7 +218,9 @@ mod tests {
     fn reverse_order_requires_admitted_168_and_qualified_writer() {
         let mut price = original();
         let (prepared, _) = doc(
-            &rt(if cfg!(epoch166_after168_retry3) {
+            &rt(if cfg!(epoch166_after168_retry4) {
+                "epoch168-retry4-rebook-20261123-v1/PREPARED.json"
+            } else if cfg!(epoch166_after168_retry3) {
                 "epoch168-retry3-rebook-20261123-v1/PREPARED.json"
             } else {
                 "epoch168-retry2-rebook-20261122-v1/PREPARED.json"
@@ -221,7 +238,9 @@ mod tests {
         price["replacements"]["168"] = peer.clone();
         assert!(peers_and_writer(&price).is_err());
         let (q, _) = doc(
-            &rt(if cfg!(epoch166_after168_retry3) {
+            &rt(if cfg!(epoch166_after168_retry4) {
+                "survivor172-cadence-20261122-v1/COLD168_RETRY4_V1_STATUS_QUALIFIED.json"
+            } else if cfg!(epoch166_after168_retry3) {
                 "survivor172-cadence-20261122-v1/COLD168_RETRY3_V1_STATUS_QUALIFIED.json"
             } else {
                 "survivor172-cadence-20261122-v1/COLD168_RETRY2_V1_STATUS_QUALIFIED.json"

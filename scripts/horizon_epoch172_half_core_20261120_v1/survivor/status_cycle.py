@@ -392,7 +392,7 @@ def census(c,bridge):
         if 166 in c.new_rows:
             cap['current_cold166_retry11_protection']=c.recovered_ref
         if 168 in c.new_rows:
-            name = 'current_cold168_retry3_protection' if cold_workers.cold168.RETRY3 else 'current_cold168_retry2_protection'
+            name = f'current_cold168_retry{cold_workers.cold168.ATTEMPT}_protection'
             cap[name]=c.recovered_ref
         if 170 in c.new_rows:
             cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref

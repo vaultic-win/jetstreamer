@@ -4,11 +4,13 @@ import hashlib
 import json
 import os
 import re
+import runpy
 import stat
 from pathlib import Path
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
-RETRY3 = globals().get('RETRY3',False)
+RETRY4 = globals().get('RETRY4',False)
+RETRY3 = globals().get('RETRY3',False) or RETRY4
 RETRY2_DIRECTORY = 'epoch168-retry2-rebook-20261122-v1'
 DIRECTORY = RETRY2_DIRECTORY
 NAME = '168-full-metered-cold-v2-20261122'
@@ -47,6 +49,28 @@ if RETRY3:
            not re.fullmatch('[0-9a-f]{64}',generation[k]['sha256']) for k,p in expected.items()):
         raise ValueError('foreign qualified epoch 168 retry3 generation')
     PREPARED_SHA,LOG_SHA,GUARD_QUAL_SHA,GATE_SHA = (generation[k]['sha256'] for k in ('prepared','log','guard','gate'))
+
+
+if RETRY4:
+    PREVIOUS_PREPARED_SHA,PREVIOUS_GUARD_SHA=PREPARED_SHA,GUARD_QUAL_SHA
+    DIRECTORY='epoch168-retry4-rebook-20261123-v1'
+    NAME='168-full-metered-cold-v4-20261123'
+    UNIT='horizon-qualify-'+NAME+'.service'
+    GUARD=R/'epoch168-cold-guard-20261123-v4'
+    RUN=LANE/'full-metered-20261121-v1/cold-retry4-20261123'
+    ALIAS=Path('/run/horizon-full168-cold-v4')
+    generation=json.loads(Path(__file__).with_name('retry4-168-fit-generation.json').read_bytes())
+    expected=dict(prepared=R/DIRECTORY/'PREPARED.json',log=R/DIRECTORY/'OBSERVER_LOG_PREPARED.json',
+                  guard=GUARD/'GUARD_QUALIFIED.json',gate=R/DIRECTORY/'tools/gate.py',root=R/DIRECTORY/'SUCCESSOR_ROOT.json')
+    if set(generation)!=set(expected) or any(set(generation[k])!={'path','sha256'} or generation[k]['path']!=str(path)
+            or not re.fullmatch('[0-9a-f]{64}',generation[k]['sha256']) for k,path in expected.items()):
+        raise ValueError('foreign epoch 168 retry4 generation')
+    PREPARED_SHA,LOG_SHA,GUARD_QUAL_SHA,GATE_SHA,ROOT_SHA=(generation[k]['sha256'] for k in ('prepared','log','guard','gate','root'))
+    common_mount=runpy.run_path(str(Path(__file__).with_name('cold168_common_mount.py')))
+    spent=runpy.run_path(str(Path(__file__).with_name('closed_retry3.py')))
+    if ROOT_SHA != '713e94750dd3d430c2f54c1ccb2af7ed708dec802af5cbf210ee4963a992d0f4':
+        raise ValueError('unbound new epoch168 root')
+    ROOT_INODE, LOG_INODE = 103481722, 103481750
 
 
 def failed_retry2(s,root):
@@ -104,7 +128,23 @@ def stable(s):
                observed.st_size==0, 'cold 168 append log changed before observer registration')
     s.need(candidate['inode']==ROOT_INODE and root['log']['inode']==LOG_INODE and root['worker_launched'] is False,
            'wrong cold 168 generation')
-    if RETRY3:
+    if RETRY4:
+        previous=R/'epoch168-retry3-rebook-20261123-v1'
+        fixture = previous/'COMMON_MOUNT_REGRESSION/RESULT.json'
+        fixture_sha = '51b01c0110965a74db73e539dea68b0520f9e9b5ed02cb581f6a7f54be310704'
+        _, fixture_ref = s.read(fixture, fixture_sha)
+        s.need(root['common_mount_fixture'] == fixture_ref and root['parent_immutable'] is True and
+               root['children_immutable'] is False and root['private']['inode'] == 103481729 and
+               root['output']['inode'] == 103481728 and
+               all(not common_mount['immutable'](RUN / k) for k in ('private', 'output')),
+               'different common mount witness or sealed replay children')
+        before=s.bound(root['previous_root'],previous/'SUCCESSOR_ROOT.json')
+        s.need(root['previous_root']['sha256']=='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4' and
+               root['previous_start_failure']==s.ref(previous/'RELEASED_NODE_STARTUP_FAILURE_20261123.json',spent['FAILURE']) and
+               all(root[k]==before[k] for k in ('initial_cleanup','prior_stop')) and common_mount['immutable'](RUN),
+               'different retry4 predecessor or unprotected fresh attempt')
+        failed_retry2(s,before)
+    elif RETRY3:
         failed_retry2(s,root)
     closed = s.bound(root['prior_stop'],OLD/'guard-receipts/stop-completion.json')
     cleanup = s.bound(root['initial_cleanup'],R/'epoch168-closed-accounts-20261122-v1/state/full-metered/COMPLETE.json')
@@ -124,6 +164,10 @@ def observe(s,fit,native_actor,own):
         stopped -= {UNIT,'horizon-guard-'+NAME+'.timer','horizon-guard-'+NAME+'.service'}
         stopped.update(('horizon-qualify-168-full-metered-20261121-v1.service',
                         'horizon-guard-168-full-metered-20261121-v1.timer','horizon-guard-168-full-metered-20261121-v1.service'))
+    if RETRY4:
+        settled=spent['settled'](s,fit)
+        s.need(settled['failure']==root['previous_start_failure'] and not settled['executing'],'different spent retry3 owner')
+        stopped.discard(spent['UNIT'])
     for unit in stopped:
         m=s.show(unit)
         old_failed=RETRY3 and unit=='horizon-qualify-168-full-metered-cold-v2-20261122.service' and (
@@ -132,7 +176,7 @@ def observe(s,fit,native_actor,own):
     predecessor = dict(original=dict(producer_invocation_id=PRIOR_IID), stop_completion=root['prior_stop'])
     actor=native_actor(168,own,LANE,RUN,predecessor,generation=(DIRECTORY,NAME))
     if RETRY3 and actor is not None:
-        s.need(actor['producer_invocation_id']!=FAILED_IID,'spent retry2 invocation cannot admit retry3')
+        s.need(actor['producer_invocation_id'] not in ((FAILED_IID,spent['IID']) if RETRY4 else (FAILED_IID,)),'spent retry2 invocation cannot admit retry3')
     return actor
 
 
@@ -216,7 +260,9 @@ def home_namespace(s,proc,profile,pairs):
     s.need(config==LANE/'config','foreign 168 config directory')
     writable={RUN/'output',RUN/'private'}
     readonly={RUN/'producer.log',config}
-    if RETRY3:
+    if RETRY4:
+        writable={RUN}
+    elif RETRY3:
         readonly.add(RUN)
     expected={home,*readonly,*writable,*(p for p in pairs if p.is_relative_to(home))}
     inaccessible,=(v.removeprefix('--property=InaccessiblePaths=').split() for v in profile['producer_argv']
@@ -243,7 +289,9 @@ def home_namespace(s,proc,profile,pairs):
     for target in writable|readonly:
         s.need(('rw' if target in writable else 'ro') in mounted[target] and
                s.same_file(proc/'root'/target.relative_to('/'),target),'foreign 168 HOME bind '+str(target))
-    if RETRY3:
+    if RETRY4:
+        common_mount['verify'](s,proc,RUN,mounted)
+    elif RETRY3:
         for target in [RUN,*writable]:
             node_view=(proc/'root'/target.relative_to('/')).stat()
             s.need((node_view.st_uid,node_view.st_gid,node_view.st_mode)==(1001,1003,0o40700),
@@ -318,6 +366,7 @@ def guard(s,profile):
     s.bound(contract['deployment_seal'],GUARD/'contract/deployment-seal-receipt.json')
     witness=s.bound(terms['qualified_native_witness'],GUARD/'NATIVE_WITNESS.json')
     schema='horizon-168-cold-v3-native-guard-qualified-v1' if RETRY3 else 'horizon-168-cold-v2-native-guard-qualified-v1'
+    if RETRY4: schema='horizon-168-cold-v4-native-guard-qualified-v1'
     s.need(qualified['schema']==schema and qualified['guard']==dict(path=str(image),sha256=digest) and
            seal['destination']==str(image.parent) and any(x['name']=='guard' and x['sha256']==digest for x in seal['members']) and
            witness['native_identity']['executable']==str(image) and witness['native_identity']['executable_sha256']==digest and
