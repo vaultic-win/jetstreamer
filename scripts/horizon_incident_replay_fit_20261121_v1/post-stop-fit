@@ -49,8 +49,9 @@ ORIGINAL={166,167,170}
 HERE = Path(__file__).resolve().parent
 MISSED_RUNTIME_145 = HERE == D / "tools-homefloor-145-missed-rejoin-v1"
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
+STOPPED_V5M = HERE == D / "tools-homefloor-145-v5m-stopped-v1"
 STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
-LEASE_BUILD_145 = STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
+LEASE_BUILD_145 = STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3", D / "tools-homefloor-145-handoff-v4")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5M_POST = HERE == D / "tools-homefloor-145-post-v5m-v1"
@@ -521,9 +522,10 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
-    if STOPPED_V5K:
+    if STOPPED_V5M or STOPPED_V5K:
         s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
-        return runpy.run_path(str(HERE / "v5k_stopped.py"))["stopped_phase"](s, fit)
+        name = "v5m_stopped.py" if STOPPED_V5M else "v5k_stopped.py"
+        return runpy.run_path(str(HERE / name))["stopped_phase"](s, fit)
     if LEASE_BUILD_145:
         s.need(epoch == 145, "lease repair build provider only prices the failed 145 owner")
         return runpy.run_path(str(HERE / "v5j_lease_failure.py"))["build_phase"](s, fit)
@@ -1233,7 +1235,7 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
-    if V5M_POST or MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-handoff-v4":
+    if STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-handoff-v4":
         s.need(epoch == 145 and prestart136 is None, "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
         module = HERE / "build_159_price.py"
