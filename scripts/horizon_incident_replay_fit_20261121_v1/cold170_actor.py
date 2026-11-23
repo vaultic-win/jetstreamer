@@ -170,13 +170,19 @@ def observe(s, fit, native_actor, own):
     return row
 
 
-def fund_prestart(s, price, retained, budget, registered_floor):
+def fund_prestart(s, price, retained, budget, registered_floor, *, cold168_profile=False, raw_with_retained168=None):
     """Price an unstarted epoch against the occupied bytes guaranteed by inactive peer siblings."""
     epoch = price['epoch']
     peers = price['survivors']
     charged = price['bookings']
     expected = {167, 170} if epoch == 166 else {167}
-    s.need(epoch in (166, 170) and price['candidate'] is None and set(retained) == expected
+    if cold168_profile:
+        s.need(epoch in (166, 168), 'wrong fifth-lane candidate')
+        expected = {167, 170}
+        other = 166 if epoch == 168 else 168
+        if str(other) in price['replacements']:
+            expected.add(other)
+    s.need(epoch in (166, 168, 170) and price['candidate'] is None and set(retained) == expected
            and all(str(peer) in price['replacements'] for peer in expected)
            and '172' in peers, 'unexpected candidate or peers for nonexact startup price')
     guard172 = peers['172']['guard']
@@ -186,7 +192,7 @@ def fund_prestart(s, price, retained, budget, registered_floor):
     for peer in sorted(retained):
         key = str(peer)
         book = charged[key]
-        cap = {167: 512 << 30, 170: 384 << 30}[peer]
+        cap = {166: 288 << 30, 167: 512 << 30, 168: 288 << 30, 170: 384 << 30}[peer]
         s.need(0 < retained[peer] <= book['physical_bytes'] <= book['cap_bytes'] == cap,
                f'invalid current occupancy for {peer}')
         books[key] = dict(book, physical_bytes=retained[peer], remaining_bytes=cap - retained[peer])
@@ -194,7 +200,12 @@ def fund_prestart(s, price, retained, budget, registered_floor):
     # The original 172 host equation adds its remaining allowance once, after
     # the maximum of incumbent guard floors. Replacing occupancy with zero
     # adds exactly paid172 to that aggregate. disk_budget computes the rest.
-    raw = price['original_aggregate_HOME_bytes'] + paid172
+    original_raw = price['original_aggregate_HOME_bytes']
+    if 168 in retained:
+        s.need(cold168_profile and raw_with_retained168 is not None and raw_with_retained168 >= original_raw,
+               'missing full host reprice for retained 168')
+        original_raw = raw_with_retained168
+    raw = original_raw + paid172
     candidate136 = price['candidate136']
     actors = price['replacements']
     def evaluate(candidate, epoch):
@@ -221,6 +232,9 @@ def fund_prestart(s, price, retained, budget, registered_floor):
                    funded=exposure <= headroom, retained167_bytes=retained[167],
                    occupied172_credit_bytes=0, full172_cap_bytes=guard172['cap'],
                    candidate_remaining_bytes=candidate['remaining_bytes'], guard172=guard172['guard'])
+    if cold168_profile:
+        details.update(retained_peer_bytes={str(k):v for k,v in retained.items()},
+                       peer_guards={str(k):actors[str(k)]['guard'] for k in retained})
     if epoch == 166:
         details.update(retained170_bytes=retained[170], candidate_cap_bytes=candidate['cap_bytes'],
                        peer_167_guard=actors['167']['guard'], peer_170_guard=actors['170']['guard'])

@@ -47,7 +47,8 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-FOURTH166 = HERE.name == "tools-homefloor-166-after170-v1"
+FIFTH168 = HERE.name == "tools-homefloor-cold168-retry2-v1"
+FOURTH166 = FIFTH168 or HERE.name == "tools-homefloor-166-after170-v1"
 PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
 RETRY13_170 = PUBLISH170 or FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
                             "tools-homefloor-145-rejoin-v1"}
@@ -57,6 +58,8 @@ RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-home
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
+if FIFTH168:
+    cold168 = runpy.run_path(str(HERE / "cold168_actor.py"))
 if PUBLISH170:
     publication170 = runpy.run_path(str(HERE / "cold170_commit.py"))
 if COLD170:
@@ -178,6 +181,9 @@ def host_floor(fleet,ledger,tree,surviving,closed_booking,focused_booking=None):
     return value,{**registration,**retained}
 
 def stable_root(e):
+    if FIFTH168 and e == 168:
+        cold168["stable"](s)
+        return cold168["RUN"]
     v=bound(STABLE[e])
     if e==167:
         row=v["normal167"][0];path=Path(row["path"]);dev,ino=row["device"],row["inode"]
@@ -251,13 +257,23 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     identity=dict(producer_unit=unit,producer_invocation_id=iid,producer_pid=pid,start_ticks=ticks)
     s.identity(actor,identity)
     pkg=R/"epoch167-local-index-successor-20261121-v1/deployment" if e==167 else Path(f"/usr/local/lib/jetstreamer/horizon-independent{e}-singleton-package-20261109-v1")
-    if gated:
+    cold168_owner = FIFTH168 and e == 168
+    if cold168_owner:
+        python = Path("/usr/bin/python3").stat()
+        s.identity(actor, dict(stage="held", exe_device=python.st_dev, exe_inode=python.st_ino))
+        held = not (d / "ACTUAL_ADMISSION_AND_PROTECTION.json").exists()
+        s.need(not held or (e == own and ps == (pid,)), "foreign held 168 generation")
+    elif gated:
         s.need(e==own and len(ps)==1,"foreign pending 170")
         extensions["held"](s,unit,run,pid,pr,intent)
     else:s.need(s.same_file(pr/"exe",pkg/"jetstreamer-node"),"different normal node")
     s.need(pg=="0::"+group and s.same_file(pr/"fd/1",run/"producer.log")
            and s.same_file(pr/"fd/2",run/"producer.log"),"foreign replacement executable or output")
     cap,guard_image,contract=CAPS[e],IMAGE,CONTRACT
+    if cold168_owner:
+        guard_image, contract = cold168["verify_start"](
+            s, d, pr, unit, timer, tree, run, intent, identity, held, retry11["readonly_mounts"]
+        )
     if e==167 and generation is not None:
         member = bound({"path":str(cold167["GUARD_DIR"]/"deployment-seal-receipt.json"),"sha256":cold167["GUARD_SEAL"]})
         image = cold167["GUARD_DIR"]/"guard"
@@ -307,7 +323,7 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     timerrow=s.show(timer);guard=s.show(timer.removesuffix(".timer")+".service")
     s.need(timerrow["ActiveState"]=="active" and s.iid(timerrow["InvocationID"]) and not timerrow["Job"]
            and timerrow["Triggers"]==guard["Id"] and guard["TriggeredBy"]==timer and guard["MemoryMax"]==str(G)
-           and guard["CPUQuotaPerSecUSec"]=="1s" and guard["MemorySwapMax"]=="0","foreign replacement guard")
+           and guard["CPUQuotaPerSecUSec"]==("250ms" if FIFTH168 and e==168 else "1s") and guard["MemorySwapMax"]=="0","foreign replacement guard")
     historical=s.bound(first["receipt"],d/"guard-receipts"/("sample-"+first["guard_invocation"]+".json"))
     s.need(s.iid(first["guard_invocation"]) and historical["guard_sha256"]==guard_image and historical["plan_sha256"]==pref["sha256"]
            and historical["producer_invocation_id"]==iid and historical["producer"]["pid"]==pid and
@@ -319,6 +335,10 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     s.need(pre["schema"]=="horizon-incident-replay-fit-v1" and pre["epoch"]==e and pre["fits"] is True and pre["candidate"] is None
            and pre["bookings"][str(e)]["cap_bytes"]==cap and pre["bookings"][str(e)]["root"]==str(tree)
            and 0<=pre["bookings"][str(e)]["remaining_bytes"]<=cap,"unbound prepaid allocation")
+    if cold168_owner:
+        s.need(plan["minimum_free_bytes"] == intent["armed_floor"] >= pre["protected_raw_floor_bytes"] and
+               intent["armed_floor"] + pre["bookings"]["168"]["remaining_bytes"] <= pre["available_HOME_bytes"] and
+               pre["bookings"]["168"]["run"] == str(run), "changed or unfunded cold 168 floor or tree")
     admission=None
     if (d/"ACTUAL_ADMISSION_AND_PROTECTION.json").exists():
         ad,adref=s.read(d/"ACTUAL_ADMISSION_AND_PROTECTION.json");s.identity(ad,identity)
@@ -344,6 +364,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     ps=fit.members(unit)
     s.need(pid in ps and len(ps) in (1,2),"unexpected native actor members")
     actual=[p for p in ps if p!=pid];guarded=[w[0] for w in sample["workers"]]
+    if cold168_owner and held:
+        s.need(not actual and not guarded, "worker present before cold 168 permit")
     s.need(all(0 < w[1] < 3500000 for w in sample["workers"]),"worker VMA cap exceeded")
 
     processes=[]
@@ -353,7 +375,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
             s.need(parent==pid and cg=="0::"+group and exe.readlink().is_relative_to(run/"private")
                    and "scratch" in exe.readlink().relative_to(run/"private").parts and exe.readlink().name=="historical-worker"
                    and s.same_file(exe,exe.readlink()),"foreign guarded worker")
-            with exe.open("rb") as f:s.need(hashlib.file_digest(f,"sha256").hexdigest()=="cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819","different worker image")
+            expected_worker = cold168["WORKER_SHA"] if FIFTH168 and e == 168 else "cf5fa883df75b23de82af52dc0e90c013f8e83397b445027e510a1137decc819"
+            with exe.open("rb") as f:s.need(hashlib.file_digest(f,"sha256").hexdigest()==expected_worker,"different worker image")
         processes.append([p,start,st.st_dev,st.st_ino])
     obs=sample["root_physical_observation"]
     s.need(obs["maximum_physical_bytes"]==cap and obs["exceeds_budget"] is False and
@@ -388,6 +411,8 @@ def native_actor(e,own,tree,run,stop,terminal=None,*,generation=None):
     return row
 
 def observe_actor(e, own, tree, run, stop, terminal=None):
+    if FIFTH168 and e == 168:
+        return cold168["observe"](s, fit, native_actor, own)
     if COLD170 and e == 170:
         return cold170["observe"](s, fit, native_actor, own)
     if RETRY11 and e == 166:
@@ -702,6 +727,8 @@ def joined_resident(active):
     return charged
 
 def registered_status():
+    if FIFTH168:
+        return registrations["registered_status"](s,fit,13,cold168["registered_writer"])
     if PUBLISH170:
         return registrations["registered_status"](s,fit,13,publication170["registered_writer"])
     if HOMEFLOOR:
@@ -726,7 +753,8 @@ def disk_budget(raw,c136,booking,epoch,peers,replacements,guard168_floor=0,close
     deficit=sum(max(0,x["historical_realized_bytes"]-x["physical_bytes"]) for x in booking.values())
     # Native incumbent floors retain the stopped-era basis. Growth already realized by
     # a newly admitted generation consumes only its own stop-era, prepaid allowance.
-    spent=sum(v["prestart_remaining"]-booking[k]["remaining_bytes"] for k,v in replacements.items())
+    # host_floor already rebases the entire 168 obligation on its measured tree.
+    spent=sum(v["prestart_remaining"]-booking[k]["remaining_bytes"] for k,v in replacements.items() if k != "168")
     # A re-admitted generation owns the same booked tree. Its closed predecessor
     # spent only the allowance between its own and the successor's prestart.
     spent+=sum(prior - (replacements[k]["prestart_remaining"] if k in replacements else booking[k]["remaining_bytes"])
@@ -881,6 +909,7 @@ def capture_once(epoch,ref,prestart136=None):
     peers=survivors(rows,ledger);status=registered_status()
     phase=phase145(epoch)
     parked166=retry11["holding"](s,fit,f) if RETRY11 else None
+    parked168=cold168["holding"](s,fit,f,parked166) if FIFTH168 else None
     if prestart136 is None:
         c136=registered136(f,status["registration"])
         s.need((136 in rows)==c136["occupied"],"136 registration drift")
@@ -946,7 +975,26 @@ def capture_once(epoch,ref,prestart136=None):
     extra=None if closed168 or 168 in interrupted else s.inspect()
     floor168=0;resident168=0;guard168=None
     tree_measurement="two complete stopped-tree walks"
-    if extra:
+    if FIFTH168:
+        s.need(closed168 is None and 168 in interrupted and extra is None, "unexpected original 168 settlement")
+        a = observe_actor(168,epoch,s.TREE,cold168["RUN"],interrupted[168])
+        if a:
+            rep["168"] = a
+            if a["physical"] is not None:
+                tree_measurement = "two complete native whole-tree walks"
+                tree = dict(physical_bytes=a["physical"], root=str(s.TREE), cap=fit.CAP)
+            else:
+                tree_measurement = "two retained-tree walks excluding active run"
+                size = tree_size(s.TREE,fit.CAP,cold168["RUN"])
+                s.need(size == tree_size(s.TREE,fit.CAP,cold168["RUN"]), "retained 168 siblings changed")
+                tree = dict(physical_bytes=size, root=str(s.TREE), cap=fit.CAP)
+            floor168 = a["floor"]
+        else:
+            tree = closed168_tree()
+        if 168 in rows:
+            s.need(a and a["admission"] and (rows[168]["unit"]["Id"],rows[168]["unit"]["InvocationID"]) ==
+                   (a["producer_unit"],a["producer_invocation_id"]), "foreign cold 168 fleet row")
+    elif extra:
         s.need(extra["ordinary_canonical"] or epoch==168,"foreign pending normal 168")
         a=extra.get("actor")
         if a and extra["stage"]=="gated":
@@ -975,11 +1023,16 @@ def capture_once(epoch,ref,prestart136=None):
             tree=dict(physical_bytes=physical,root=str(s.TREE),cap=fit.CAP)
         else:tree=fit.measure_tree()
     else:tree=closed168_tree() if closed168 or 168 in interrupted else fit.measure_tree()
-    if 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
+    if not FIFTH168 and 168 in rows:s.need(extra and extra["ordinary_canonical"] and extra["actor"]["producer_invocation_id"]==rows[168]["unit"]["InvocationID"],"foreign 168 fleet row")
     books["168"]=dict(root=str(s.TREE),cap_bytes=fit.CAP,physical_bytes=tree["physical_bytes"],measurement=tree_measurement,
                        remaining_bytes=fit.CAP-tree["physical_bytes"],historical_realized_bytes=0)
     if guard168:books["168"]["measured_guard"]=guard168["receipt"]
-    population,qualification=census(peers,rep,extra,c136,epoch,stopped)
+    census_stops = stopped
+    if FIFTH168:
+        books["168"]["run"] = str(cold168["RUN"])
+        books["168"]["stable_root"] = cold168["stable"](s)
+        census_stops = {**stopped, "168": interrupted[168]}
+    population,qualification=census(peers,rep,extra,c136,epoch,census_stops)
     if closed169:books["169"]=focused169_booking(closed169)
     if closed172:books["172"]=full172_booking(closed172)
     raw,ledger_proof=host_floor(f,ledger,tree,peers,books.get("172"),books.get("169"))
@@ -990,7 +1043,7 @@ def capture_once(epoch,ref,prestart136=None):
     needmem=fit.MEM-sum(v["resident"] for v in peers.values())-sum(resident.values())
     mem={l.split()[0]:int(l.split()[1])*1024 for l in Path("/proc/meminfo").read_text().splitlines() if l.startswith(("MemTotal:","MemAvailable:"))}
     s.need(mem["MemTotal:"]>=fit.MEM and int(fit.command("/usr/bin/getconf","_NPROCESSORS_ONLN"))==64,"physical host changed")
-    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,stopped)==(population,qualification),
+    s.need(fleet_head(ref)[1]==rows and phase145(epoch)==phase and registered_status()==status and census(peers,rep,extra,c136,epoch,census_stops)==(population,qualification),
            "capacity generation changed during collection")
     if prestart136 is None and not c136["occupied"]:
         s.need(registered136(f,status["registration"])==c136,"136 idle or release generation changed during collection")
@@ -1047,12 +1100,15 @@ def capture_once(epoch,ref,prestart136=None):
     if RETRY11:
         s.need(retry11["holding"](s,fit,f)==parked166, "166 holding stage changed during complete fit")
         recovered_price.update(registered_retry11_holding=parked166, retry11_root=retry11["stable"](s))
+    if FIFTH168:
+        s.need(cold168["holding"](s,fit,f,parked166)==parked168, "168 holding stage changed during complete fit")
+        recovered_price["registered_cold168_holding"]=parked168
     if qualification:
         need += qualification["scratch_bytes"]
         protected += qualification["scratch_bytes"]
         needmem += qualification["memory_bytes"]
     vfs=os.statvfs(HOME);avail=vfs.f_bavail*vfs.f_frsize
-    own=rep.get(str(epoch)) if epoch!=168 else (extra or {}).get("actor")
+    own=rep.get(str(epoch)) if FIFTH168 or epoch!=168 else (extra or {}).get("actor")
     return dict(schema="horizon-incident-replay-fit-v1",epoch=epoch,fleet=ref,recorded_unix_seconds=int(time.time()),
         fits=avail>=need and mem["MemAvailable:"]>=needmem,closed_recovered166=closed.get(166),closed_indexed167=closed.get(167),closed_recovered170=closed.get(170),closed_prestart_remaining=closed_prepaid,closed_metered168=closed168,closed_full172=closed172,closed_focused169=closed169,epoch170_extension=extension,actual_original_stops=stopped,survivors=peers,
         replacements={e:v for e,v in rep.items() if v["admission"]},candidate=own,normal168=extra,bookings=books,
@@ -1067,7 +1123,7 @@ def capture_native(epoch,ref,prestart136=None):
         return capture_once(epoch,ref,prestart136)
     except WorkerFork as fork:
         e,before=fork.epoch,fork.anchor
-        after=confirm_fork(e,epoch,before,proof_stops()[str(e)])
+        after=confirm_fork(e,epoch,before,{} if FIFTH168 and e==168 else proof_stops()[str(e)])
     except Reprice as confirmed:
         e,before,after=confirmed.epoch,confirmed.before,confirmed.after
     # Discard every earlier resource measurement. A second fork or a change of child
@@ -1082,6 +1138,12 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
+    if FIFTH168 and epoch in (166,168):
+        route = retry11 if epoch == 166 else cold168
+        if not fit.members(route["UNIT"]):
+            return cold168["prestart"](s,fit,epoch,ref,prestart136,capture_native,tree_size,host_floor,
+                                       disk_budget,post145_floor,cold170["fund_prestart"],
+                                       {166:retry11,167:cold167,168:cold168,170:cold170})
     prestart166 = FOURTH166 and epoch == 166 and not fit.members(retry11['UNIT'])
     prestart170 = RETRY13_170 and epoch == 170 and not fit.members('horizon-qualify-' + cold170['NAME'] + '.service')
     if not (prestart166 or prestart170):
