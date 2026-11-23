@@ -23,10 +23,10 @@ struct Owner<'a> {
 }
 impl Owner<'_> {
     fn range(&self) -> &'static str {
-        if self.unit == UNIT248 {
-            "248-248"
-        } else {
-            "247-247"
+        match self.unit {
+            UNIT248 => "248-248",
+            UNIT249 => "249-249",
+            _ => "247-247",
         }
     }
 }
@@ -123,15 +123,27 @@ fn staged_inputs() -> Result<Value> {
     Ok(proof)
 }
 pub(super) fn validate(c: &Config) -> Result<()> {
-    if let Some(claim) = &c.delivery248_claim {
+    if let (Some(left), Some(right)) = (&c.delivery248_claim, &c.delivery249_claim) {
+        ensure!(
+            left.pid != right.pid
+                && left.invocation_id != right.invocation_id
+                && left.claim_sha256 != right.claim_sha256,
+            "ordinary delivery claims alias each other"
+        );
+    }
+    for (unit, claim) in [
+        (UNIT248, &c.delivery248_claim),
+        (UNIT249, &c.delivery249_claim),
+    ] {
+        let Some(claim) = claim else { continue };
         claim.validate()?;
         for replay in c.replays.iter().chain(&c.diagnostic_replays) {
             ensure!(
-                replay.producer_unit != UNIT248
-                    && replay.controller_unit != UNIT248
+                replay.producer_unit != unit
+                    && replay.controller_unit != unit
                     && replay.expected_controller_invocation_id != claim.invocation_id
                     && replay.expected_producer_invocation_id != claim.invocation_id,
-                "epoch 248 delivery aliases replay telemetry"
+                "ordinary delivery aliases replay telemetry"
             );
         }
     }
@@ -420,12 +432,64 @@ pub(super) fn sample(
         Vec::new()
     }
 }
+const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
 const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae0a660e";
-const CLAIM248: &str =
-    "/home/ubuntu/.codex/diagnostics/horizon-upload-248-ordinary-v213/pipeline-claim.json";
-
+#[derive(Clone, Copy)]
+pub(super) enum OrdinaryEpoch {
+    Epoch248,
+    Epoch249,
+}
+impl OrdinaryEpoch {
+    fn number(self) -> u64 {
+        match self {
+            Self::Epoch248 => 248,
+            Self::Epoch249 => 249,
+        }
+    }
+    fn unit(self) -> &'static str {
+        match self {
+            Self::Epoch248 => UNIT248,
+            Self::Epoch249 => UNIT249,
+        }
+    }
+    fn digest(self) -> &'static str {
+        match self {
+            Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
+            Self::Epoch249 => "03e16ae1dada49958ff00a7dda1c3ef31c2f37c7503b02b7e0a677bb40863e07",
+        }
+    }
+    fn claim_path(self) -> PathBuf {
+        Path::new("/home/ubuntu/.codex/diagnostics")
+            .join(self.unit().trim_end_matches(".service"))
+            .join("pipeline-claim.json")
+    }
+    fn argv(self) -> Vec<String> {
+        let epoch = self.number();
+        vec![
+            IMAGE248.into(),
+            "sync".into(),
+            format!(
+                "/home/ubuntu/.jetstreamer-private/qualification-{epoch}-reboot-20261117-v1/output"
+            ),
+            "--epochs".into(),
+            format!("{epoch}-{epoch}"),
+            "--receipt-directory".into(),
+            format!(
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-{epoch}-20261119-v2/receipts"
+            ),
+            "--current-reader-plan".into(),
+            format!(
+                "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{epoch}-plan.json"
+            ),
+            "--current-reader-plan-sha256".into(),
+            self.digest().into(),
+            "--concurrency".into(),
+            "2".into(),
+        ]
+    }
+}
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DeliveryClaim {
@@ -448,11 +512,11 @@ impl DeliveryClaim {
         Ok(())
     }
 
-    fn checked_command(&self) -> Result<()> {
+    fn checked_command(&self, epoch: OrdinaryEpoch) -> Result<()> {
         self.validate()?;
-        let path = Path::new(CLAIM248);
-        ensure!(path.canonicalize()? == path, "epoch 248 claim path");
-        let file = fs::File::open(path)?;
+        let path = epoch.claim_path();
+        ensure!(path.canonicalize()? == path, "ordinary delivery claim path");
+        let file = fs::File::open(&path)?;
         let m = file.metadata()?;
         ensure!(
             m.is_file()
@@ -461,69 +525,55 @@ impl DeliveryClaim {
                 && m.nlink() == 1
                 && m.mode() & 0o222 == 0
                 && m.len() <= 1 << 20,
-            "epoch 248 claim custody"
+            "ordinary delivery claim custody"
         );
         let mut bytes = Vec::new();
         std::io::Read::take(file, (1 << 20) + 1).read_to_end(&mut bytes)?;
         ensure!(
             sha256(&bytes) == self.claim_sha256,
-            "epoch 248 claim changed"
+            "ordinary delivery claim changed"
         );
         let claim: Value = serde_json::from_slice(&bytes)?;
-        let args = [
-            IMAGE248,
-            "sync",
-            "/home/ubuntu/.jetstreamer-private/qualification-248-reboot-20261117-v1/output",
-            "--epochs",
-            "248-248",
-            "--receipt-directory",
-            "/home/ubuntu/.jetstreamer-private/current-reader-delivery-248-20261119-v2/receipts",
-            "--current-reader-plan",
-            "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-248-plan.json",
-            "--current-reader-plan-sha256",
-            "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
-            "--concurrency",
-            "2",
-        ];
+        let args = epoch.argv();
         ensure!(
-            claim["epoch"] == 248
+            claim["epoch"] == epoch.number()
                 && claim["phase"] == "upload-readback"
-                && claim["unit"] == UNIT248
+                && claim["unit"] == epoch.unit()
                 && claim["invocation_id"] == self.invocation_id
                 && claim["evidence"].as_array().is_some_and(|v| !v.is_empty()),
-            "epoch 248 pipeline claim mismatch"
+            "ordinary delivery pipeline claim mismatch"
         );
         let command = claim["expected_exec_start"]
             .as_str()
-            .context("epoch 248 expected command")?;
+            .context("ordinary delivery expected command")?;
         let prefix = format!(
             "{{ path={IMAGE248} ; argv[]={} ; ignore_errors=no ; start_time=",
             args.join(" ")
         );
         ensure!(
             command.starts_with(&prefix),
-            "epoch 248 unexpected uploader command"
+            "ordinary delivery unexpected uploader command"
         );
         let actual = fs::read(format!("/proc/{}/cmdline", self.pid))?;
         ensure!(
             actual == (args.join("\0") + "\0").as_bytes(),
-            "epoch 248 process command mismatch"
+            "ordinary delivery process command mismatch"
         );
         let current = Command::new("/usr/bin/systemctl")
-            .args(["show", UNIT248, "--property=ExecStart", "--value"])
+            .args(["show", epoch.unit(), "--property=ExecStart", "--value"])
             .output()?;
         ensure!(
             current.status.success()
                 && staged_exec_matches(command, std::str::from_utf8(&current.stdout)?.trim()),
-            "epoch 248 manager command changed"
+            "ordinary delivery manager command changed"
         );
         Ok(())
     }
 }
 
-pub(super) fn sample248(claim: &DeliveryClaim, clock: u64) -> Value {
+pub(super) fn sample_ordinary(epoch: OrdinaryEpoch, claim: &DeliveryClaim, clock: u64) -> Value {
     let owner = Owner {
-        unit: UNIT248,
+        unit: epoch.unit(),
         iid: &claim.invocation_id,
         pid: claim.pid,
         image: IMAGE248,
@@ -531,10 +581,10 @@ pub(super) fn sample248(claim: &DeliveryClaim, clock: u64) -> Value {
         cap: 10 << 30,
     };
     let result = (|| {
-        claim.checked_command()?;
+        claim.checked_command(epoch)?;
         let mut sample = observe(clock, owner, None)?;
-        claim.checked_command()?;
-        sample["delivery_claim"] = json!({"path":CLAIM248,"sha256":claim.claim_sha256});
+        claim.checked_command(epoch)?;
+        sample["delivery_claim"] = json!({"path":epoch.claim_path(),"sha256":claim.claim_sha256});
         Ok(sample)
     })();
     row(result, owner)
@@ -543,6 +593,29 @@ pub(super) fn sample248(claim: &DeliveryClaim, clock: u64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ordinary_delivery_binds_each_epoch_to_its_distinct_plan_and_process() {
+        for epoch in [OrdinaryEpoch::Epoch248, OrdinaryEpoch::Epoch249] {
+            let n = epoch.number();
+            let args = epoch.argv();
+            assert_eq!(args[4], format!("{n}-{n}"));
+            assert_eq!(
+                args[8],
+                format!(
+                    "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{n}-plan.json"
+                )
+            );
+            assert_eq!(args[10], epoch.digest());
+            assert!(epoch.claim_path().ends_with(format!(
+                "{}/pipeline-claim.json",
+                epoch.unit().trim_end_matches(".service")
+            )));
+        }
+        assert_ne!(
+            OrdinaryEpoch::Epoch248.digest(),
+            OrdinaryEpoch::Epoch249.digest()
+        );
+    }
     #[test]
     fn ordinary_delivery_requires_a_bound_claim_and_pid() {
         let mut claim = DeliveryClaim {
