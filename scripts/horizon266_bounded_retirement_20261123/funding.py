@@ -6,13 +6,17 @@ sys.path.insert(0,'/run/horizon266-bounded-tools-v208')
 import retry_fit
 from retry_fit import M,D,V,CG,partition,ref,bound
 
-def price(serial,retained,disk,*,consumer_build=False):
+def price(serial,retained,disk,*,consumer_build=False,prepare257=False):
     assert __debug__ and os.geteuid()==0 and partition.locked(partition.LOCK,os.getpid())
     if consumer_build:
         assert (serial, retained, disk) == (6400*M, 256*M, 112*M)
         previous = bound(ref(D/'horizon249-delivery-consumers-v214-a1/booking.json'))
         allowance = bound(previous['assignment'])
         assert tuple(allowance[k] for k in ('serial','retained','disk')) == (serial,retained,disk)
+    elif prepare257:
+        previous = bound(ref(D/'horizon257-inert-prepare-cold-v156-v1/booking.json'))
+        assert (serial, retained, disk) == (512*M, 256*M, 256*M)
+        assert (previous['memory'], previous['disk_reserve']) == (serial, disk)
     else:
         assert 0<serial<=2<<30 and 0<disk<=retained<=64*M
     fit=retry_fit.price(0,0,0,assessment_only=True)
