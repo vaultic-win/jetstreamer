@@ -15,7 +15,7 @@ use std::{
 };
 
 const SLOTS: u64 = 432_000;
-const REVIEWED_EPOCHS: std::ops::RangeInclusive<u64> = 268..=300;
+const REVIEWED_EPOCHS: std::ops::RangeInclusive<u64> = 268..=301;
 const HEADER: u64 = 59;
 const PROFILE: &str = include_str!("plan.json");
 
@@ -127,6 +127,7 @@ fn known_root(e: u64) -> Result<&'static str> {
         298 => Ok("bafyreihsmeo6tbb5vbwrk7md4k4mbbmjdhkkpvqnnpcpnxmmgjxkdeyu6a"),
         299 => Ok("bafyreiaom6ox5xoiql6sng2v6z53eemxqiwfaxvhkzcmysc5me4lo6xcoi"),
         300 => Ok("bafyreih45lcghluasjbqciqkixfjfjufbltuu3vhhkrx6ktdkotahpklva"),
+        301 => Ok("bafyreierz53jcmi577gn5dv5rtubzbr3szebafo6lpffv3lmura2ywmw4e"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -512,6 +513,10 @@ fn reviewed(epoch: u64, plan_path: &Path, expected: &str) -> Result<(String, u64
             508_337_873_180,
             "ccd566b2535cf6e07f2aedb48fb22db221e5b79cb516ee2ec63e5b75fe456d87",
         ),
+        301 => (
+            459_390_679_072,
+            "3365c64ba2d3b1244768a455d5dab105737627f6348945e73d6c51d1cce95569",
+        ),
         _ => return Err("unregistered dynamic epoch".into()),
     };
     let first = epoch * SLOTS;
@@ -587,7 +592,7 @@ fn main() -> Result<()> {
         .filter(|epoch| REVIEWED_EPOCHS.contains(epoch));
     let (profile, body_bytes, range_count) = if let Some(epoch) = dynamic_epoch {
         command.next();
-        let path = command.next().ok_or("usage: repair --epoch{268..300} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let path = command.next().ok_or("usage: repair --epoch{268..301} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
         let digest = command.next().ok_or("missing reviewed plan SHA-256")?;
         let (plan, bytes, count) =
             reviewed(epoch, Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
@@ -605,7 +610,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267 | --epoch{268..300} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch{268..301} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
