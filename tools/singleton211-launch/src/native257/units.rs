@@ -558,8 +558,15 @@ mod tests {
         assert!(g.contains("ReadWritePaths=/tmp/receipt-mount\n"));
         // Preserve the four epoch 257 definitions already sealed by the v3 launcher.
         if EPOCH == 257 {
+            let (old_path, old_sha) = crate::native257::saved_guard(&json!({})).unwrap();
+            let original = guard_template(
+                &Bound::new(old_path, old_sha),
+                Path::new("/tmp/guard/guard-plan.json"),
+                Path::new("/tmp/receipt-mount"),
+            );
+            assert_eq!(g, original.replace(old_path, GUARD).replace(old_sha, GUARD_SHA));
             assert_eq!(
-                [u, g, timer_template(), retention_template()].map(|text| digest(text.as_bytes())),
+                [u, original, timer_template(), retention_template()].map(|text| digest(text.as_bytes())),
                 [
                     "1fa3f168082793e306b98b91e95cad23cdedae3fb707dbe1d2eec05bb3f64130",
                     "c8e3dd87247b9c9151a86a9f9d0dac094a60c55013bcbe2bee70cadcccf5b034",
