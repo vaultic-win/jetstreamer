@@ -45,6 +45,11 @@ if [[ $flavor == homefloor-rejoin ]]; then
   homefloor_rejoin=true
   flavor=fixture-rejoin
 fi
+v5m_post=false
+if [[ $flavor == v5m-post ]]; then
+  v5m_post=true
+  flavor=v5k-post
+fi
 v5k_post=false
 if [[ $flavor == v5k-post ]]; then
   v5k_post=true
@@ -138,6 +143,10 @@ fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
 if $v5k_post; then extra+=(--cfg incident_v5k_post145_only); fi
+if $v5m_post; then
+  extra+=(--cfg incident_v5m_post145_only)
+  sources+=(build_159_price.py)
+fi
 if $v5j_retry_post; then extra+=(--cfg incident_v5j_retry1_post145_only); fi
 if $registered_v7c; then extra+=(--cfg incident_v7c_post145_only); fi
 if $registered_v7b; then extra+=(--cfg incident_v7b_post145_only); fi
@@ -201,6 +210,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     if $v5j_post; then
       native_package=tools-homefloor-145-rejoin-v4
       if $v5k_post; then native_package=tools-homefloor-145-lease-rejoin-v1; fi
+      if $v5m_post; then native_package=tools-homefloor-145-missed-rejoin-v1; fi
       [[ ${5:?expected original build price generation} == "$native_package" ]]
     elif $fixture_post; then
       native_package=${5:?expected build price generation}
@@ -226,8 +236,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
   maximum_attempts=5
   if [[ $flavor == retry-post || $flavor == timer-post ]]; then maximum_attempts=10; fi
   for ((probe=1;probe<=maximum_attempts;probe++)); do
-    if $missed_rejoin; then
+    if $missed_rejoin || $v5m_post; then
       donor="$src/scripts/horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"
+      if $v5m_post; then
+        [[ $(sha256sum "$donor" | cut -d' ' -f1) == 0f25f955fc5978ee29057a5e687955326f4b6a2f1a7c788482ae8454a42746fb ]]
+      fi
       /usr/bin/python3 -IB "$donor" snapshot > "$q/donor-before.json"
     fi
     if $fixture_post && ! $v5j_post; then
@@ -302,6 +315,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     if $missed_rejoin; then build_unit=horizon-145-missed-rejoin-build-v1.service; fi
     if $v5j_retry_post; then build_unit=horizon-145-v5j-post-build-v2.service; fi
     if $v5k_post; then build_unit=horizon-145-v5k-post-build-v1.service; fi
+    if $v5m_post; then build_unit=horizon-145-v5m-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
     [[ $(cat "$slice/memory.high") == 21474836480 && $(cat "$slice/memory.max") == 25769803776 ]]
@@ -328,6 +342,11 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     elif $v5j_retry_post; then
       selector=--retry1
       if $v5k_post; then selector=--lease-ready; fi
+      if $v5m_post; then
+        selector=--missed-clock
+        [[ $seal_digest == b2e28f51da8e428c106a23b3e5d73a6d92b1aca84043e82d1e662387d2c18b96 ]]
+        /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
+      fi
       /usr/bin/python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/post_inputs.py" "$selector" verify-build-price "$q/before.json"
     else
       jq -e '.phase145.InvocationID == "afcf6cdd1ec0400ea2757f81472987b3"
@@ -417,6 +436,7 @@ if [[ $flavor == timeout-post || $flavor == focused-post || $flavor == retry-pos
   if $v5j_post; then phase_package=tools-v13d; fi
   if $v5j_retry_post; then phase_package=tools-v13e; fi
   if $v5k_post; then phase_package=tools-v13f; fi
+  if $v5m_post; then phase_package=tools-v13g; fi
   mkdir "$out/tmp/$phase_package"
   cp "$s/incident-post-phase.py" "$out/tmp/$phase_package/"
   if $v5j_post; then

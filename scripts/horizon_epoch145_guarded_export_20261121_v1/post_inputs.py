@@ -19,14 +19,16 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 POST = R / "epoch145-publication-20261121-v1"
-LEASE_POST = (Path(__file__).resolve().parent.name == "tools-v13f" or
+MISSED_POST = (Path(__file__).resolve().parent.name == "tools-v13g" or
+               (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--missed-clock"]))
+LEASE_POST = MISSED_POST or (Path(__file__).resolve().parent.name == "tools-v13f" or
               (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--lease-ready"]))
 RETRY = LEASE_POST or (Path(__file__).resolve().parent.name == "tools-v13e" or
          (Path(__file__).name == "post_inputs.py" and sys.argv[1:2] == ["--retry1"]))
-DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
+DISPATCH = R / "incident-replay-fit-20261121-v1" / ("tools-homefloor-145-handoff-v4" if MISSED_POST else "tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
 PAIR = R / "fast-range-residency-20261121-v1/archive-publication-58709604/ordinary/QUALIFIED.json"
 PAIR_SHA = "cd357ec5b130887d41961aa7803acb50e833bdbc2dd1f8ebba23252a87b5d3a4"
-DISPATCH_SEAL = "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if LEASE_POST else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
+DISPATCH_SEAL = "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea" if MISSED_POST else "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if LEASE_POST else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de"
 ORIGINAL = "de6780b860b3467bae21fbd19176ca14"
 ARCHIVE = Path("/home/sol/.jetstreamer-private/epoch145-prefix-extract-funded-20261121-v1/epoch-145.jet")
 ANCHORS = Path("/usr/local/lib/jetstreamer/horizon-epoch145-independent-boundary-metadata-20261106-v1")
@@ -95,6 +97,19 @@ def original_pair(d, git):
                 additional_compiled_input=POH_SOURCE, reader_commit=READER, fetched_tip=tip, anchors=anchors)
 
 
+def validate_missed_start(started, intent):
+    native = started["fresh_fit"]
+    window = native["phase145"]["window"]
+    need(started["image"] == "9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21"
+         and intent["original"]["INVOCATION_ID"] == "ff597d64ad37400ea5c6836336fb6706"
+         and native["fits"] and native["fleet"] == intent["fleet"]
+         and window["continuity_seal"]["sha256"] == "db422be5b246aa3aef2457fd9325f6b8cca739e3e4c63d2e4794ae30c527f6c4"
+         and window["missed_clock_failure"]["sha256"] == "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6"
+         and native["epoch159_donor_cover"]["fleet"] == intent["fleet"]
+         and native["epoch159_donor_cover"]["credited_retirement_bytes"] == 0,
+         "unbound missed-clock worker or donor")
+
+
 def validate_terminal(iid, intent, result, review, rows, receipts):
     need(re.fullmatch("[0-9a-f]{32}", iid) and iid != review["old_manager"]["InvocationID"]
          and result["invocation_id"] == iid and result["argv"] == intent["argv"], "foreign semantic generation")
@@ -107,6 +122,8 @@ def validate_terminal(iid, intent, result, review, rows, receipts):
          and start[0]["MESSAGE"] == "Started " + review["old_manager"]["Id"] + " - "
              + " ".join(result["argv"][result["argv"].index("--") + 1:]) + ".", "missing unique successful PID1 exit")
     (started, sr), (verified, vr), (extracted, er), (done, dr) = receipts
+    if MISSED_POST:
+        validate_missed_start(started, intent)
     candidate = review["failed_phase"]["candidate"]
     source, _, leaf = review["retained_inputs"]
     view = Path(leaf["path"]).parent.parent / "epoch145-prefix-extract-materialized-view-20261121-v1/epoch-145.jet"
@@ -190,6 +207,8 @@ def verify_build_price(d, price):
     iid = result["invocation_id"]
     phase = price["phase145"]
     started = d["bound"](phase["window"]["recovery"])
+    if MISSED_POST:
+        validate_missed_start(started, intent)
     need(result == host.accepted(manager, events, intent) and manager["InvocationID"] == iid
          and intent["original"]["INVOCATION_ID"] == d["OLD"]
          and phase["stage"] == "leased-worker" and phase["invocation_id"] == iid
@@ -203,7 +222,7 @@ def verify_build_price(d, price):
 
 
 def main():
-    args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"]) else sys.argv[1:]
+    args = sys.argv[2:] if RETRY and sys.argv[1:2] in (["--retry1"], ["--lease-ready"], ["--missed-clock"]) else sys.argv[1:]
     if RETRY and len(args) == 2 and args[0] == "verify-build-price":
         need(os.geteuid() == 0 and sys.flags.isolated and __debug__, "root isolated interpreter required")
         d = load_dispatch()

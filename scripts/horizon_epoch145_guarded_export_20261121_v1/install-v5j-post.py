@@ -12,21 +12,30 @@ import sys
 R = Path("/var/lib/jetstreamer/horizon_runtime_data")
 BASE = R / "epoch145-semantic-continuity-20261121-v1"
 FIT = R / "incident-replay-fit-20261121-v1"
-DONOR = FIT / "tools-homefloor-145-rejoin-v4"
-LEASE_POST = sys.argv[1:2] == ["--lease-ready"]
+MISSED_POST = sys.argv[1:2] == ["--missed-clock"]
+LEASE_POST = MISSED_POST or sys.argv[1:2] == ["--lease-ready"]
 RETRY = LEASE_POST or sys.argv[1:2] == ["--retry1"]
-TARGET = FIT / ("tools-homefloor-145-post-v5k-v1" if LEASE_POST else "tools-homefloor-145-post-v5j-v2" if RETRY else "tools-homefloor-145-post-v5j-v1")
-POST = BASE / ("tools-v13f" if LEASE_POST else "tools-v13e" if RETRY else "tools-v13d")
-DISPATCH = FIT / ("tools-homefloor-145-handoff-v3" if LEASE_POST else "tools-homefloor-145-handoff-v2" if RETRY else "tools-homefloor-145-handoff-v1")
-DISPATCH_SHA = ("f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e" if LEASE_POST else "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee" if RETRY else
-                "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de")
+if MISSED_POST:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5m-v1", "tools-v13g", "tools-homefloor-145-handoff-v4",
+                                               "2c582f4c5a0d400cadd35e37710aa126b8b2ae8c09bab7bdfcc08f1ecfc5aaea")
+elif LEASE_POST:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5k-v1", "tools-v13f", "tools-homefloor-145-handoff-v3",
+                                               "f69f462cecb76fc586799d36f358e61b1880f99d0c024b0c76dd27d3a2f9637e")
+elif RETRY:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5j-v2", "tools-v13e", "tools-homefloor-145-handoff-v2",
+                                               "1b98fea46cef7beefe2c3f250da7fe524e0e07f78b6ffb61a575a552b2a1b1ee")
+else:
+    target, package, dispatch, dispatch_sha = ("tools-homefloor-145-post-v5j-v1", "tools-v13d", "tools-homefloor-145-handoff-v1",
+                                               "19c0fe27899e6742d095b075377b2adb9aebdb47b2ad2655688b214cd8b632de")
+TARGET, POST, DISPATCH, DISPATCH_SHA = FIT / target, BASE / package, FIT / dispatch, dispatch_sha
+DONOR = FIT / ("tools-homefloor-145-missed-rejoin-v1" if MISSED_POST else "tools-homefloor-145-rejoin-v4")
 FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
 SOURCE_PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
 REPO = Path("/home/sol/workspace/jetstreamer")
 SEALER = Path("/usr/local/lib/jetstreamer/horizon-deployment-sealer-umask-20261021-v1/jetstreamer-seal-deployment")
 SEAL_SHA = "e0d565f4450b25b527ffd4455a52e1861568548b826e86a6894a1ae127e811f3"
-DONOR_SHA = "ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
-UNIT = "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
+DONOR_SHA = "b2e28f51da8e428c106a23b3e5d73a6d92b1aca84043e82d1e662387d2c18b96" if MISSED_POST else "ed0e272c1cf6df09bb19ff6049154cad9e55f21e96089f66e6f9e3d0f89da9cb"
+UNIT = "horizon-145-v5m-post-build-v1.service" if MISSED_POST else "horizon-145-v5k-post-build-v1.service" if LEASE_POST else "horizon-145-v5j-post-build-v2.service" if RETRY else "horizon-145-v5j-post-build-v1.service"
 SEAL = "deployment-seal-receipt.json"
 
 
@@ -116,7 +125,7 @@ def main(commit, iid):
     rows = [json.loads(x) for x in journal.splitlines()]
     success, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
     start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
-    require((" v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
+    require((" v5m-post " if MISSED_POST else " v5k-post " if LEASE_POST else " v5j-retry1-post " if RETRY else " v5j-post ") in start["MESSAGE"] and int(start["__MONOTONIC_TIMESTAMP"]) < int(success["__MONOTONIC_TIMESTAMP"])
             and not (Path("/sys/fs/cgroup/horizonaudit.slice") / UNIT).exists(), "build has not completed")
     outputs = q / "products"
     inputs = {}
@@ -138,7 +147,7 @@ def main(commit, iid):
     require(artifacts["export145"] == image_sha and str(POST / "export145").encode() in image.read_bytes()
             and str(TARGET / "post-stop-fit").encode() in image.read_bytes(), "unregistered native image")
     src = outputs / "source" / FAMILY
-    model = json.loads(subprocess.check_output([sys.executable, "-IB", src / "post_inputs.py", *(["--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []), "inspect"]))
+    model = json.loads(subprocess.check_output([sys.executable, "-IB", src / "post_inputs.py", *(["--missed-clock" if MISSED_POST else "--lease-ready" if LEASE_POST else "--retry1"] if RETRY else []), "inspect"]))
     need_refs = model["artifacts"]
     price = json.loads((q / "before.json").read_bytes())
     require(price["fits"] and price["resource_credit_bytes"] == 0 and price["candidate"] is None and price["epoch"] == 145
@@ -149,7 +158,7 @@ def main(commit, iid):
             and ref(DISPATCH / SEAL)["sha256"] == DISPATCH_SHA,
             "changed donor or sealer")
     proof = dict(schema="horizon-145-v5j-post-build-v1", source_commit=commit, source_hashes=inputs,
-                 verifier_sha256=image_sha, semantic_image=ref(BASE / ("tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), artifact_hashes=artifacts,
+                 verifier_sha256=image_sha, semantic_image=ref(BASE / ("tools-v5m/export145" if MISSED_POST else "tools-v5k/export145" if LEASE_POST else "tools-v5j/export145")), artifact_hashes=artifacts,
                  build_iid=iid, native_success_cursor=success["__CURSOR"], tests=ref(q/"build.log"),
                  native_fixture_names=required_tests, memory_peak=int((q/"memory.peak").read_text()),
                  physical_scratch=int((q/"scratch-bytes").read_text().split()[0]), build_fleet=price["fleet"],
@@ -157,8 +166,16 @@ def main(commit, iid):
                  qualified_reader_scopes=need_refs["ordinary_reader_scopes"], reader_commit=need_refs["reader_commit"],
                  semantic_dispatch=ref(DISPATCH/SEAL), donor=ref(DONOR/SEAL), source_snapshot=ref(q/"sources"),
                  compiler_outputs=ref(q/"artifacts"), archive_body_verified_by_this_build=False, resource_credit_bytes=0)
-    require(proof["semantic_image"]["sha256"] == ("02c9a1ad332fbea43e4b552561fc01e503f1dedcec6347e541db4cf9de56f571" if LEASE_POST else "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"),
+    require(proof["semantic_image"]["sha256"] == ("9068d5ac9ccd4d35481cbf2882faf67a97b0926133663a2e4885917e714bdc21" if MISSED_POST else "02c9a1ad332fbea43e4b552561fc01e503f1dedcec6347e541db4cf9de56f571" if LEASE_POST else "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"),
             "different semantic image")
+    if MISSED_POST:
+        combined = json.loads((q / "donor-combined-price.json").read_bytes())
+        require(combined["fleet"] == price["fleet"] and combined["diagnostic"] == price["epoch159_donor_cover"]["diagnostic"]
+                and combined["native_recorded_unix_seconds"] == price["recorded_unix_seconds"]
+                and combined["build_HOME_bytes"] == (104 << 20) and combined["build_RAM_bytes"] == (768 << 20)
+                and combined["remaining_home_bytes"] >= 0 and combined["credited_retirement_bytes"] == 0,
+                "unfunded post build after donor handback")
+        proof["build_donor_cover"] = ref(q / "donor-combined-price.json")
     launcher = (src/"run-incident-post.sh").read_bytes()
     require(launcher.count(b"PINNED_POST_SHA") == 1, "malformed launcher")
     launch = write(q/"run-post", launcher.replace(b"PINNED_POST_SHA", image_sha.encode()))

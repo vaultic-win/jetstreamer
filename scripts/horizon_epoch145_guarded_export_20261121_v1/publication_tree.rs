@@ -12,7 +12,9 @@ impl Tree {
         let own = fs::read_to_string("/proc/self/cgroup")?;
         let base = "/system.slice/";
         #[cfg(all(test, incident_registered136_post145_only))]
-        let expected = if cfg!(incident_v5k_post145_only) {
+        let expected = if cfg!(incident_v5m_post145_only) {
+            "0::/horizonaudit.slice/horizon-145-v5m-post-build-v1.service"
+        } else if cfg!(incident_v5k_post145_only) {
             "0::/horizonaudit.slice/horizon-145-v5k-post-build-v1.service"
         } else if cfg!(incident_v5j_retry1_post145_only) {
             "0::/horizonaudit.slice/horizon-145-v5j-post-build-v2.service"
