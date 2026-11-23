@@ -43,7 +43,7 @@ pub(in crate::fleet) fn matches(unit: &Value, proof: &Value) -> Result<()> {
     );
     Ok(())
 }
-fn decision(
+pub(super) fn decision(
     rows: &[Value],
     manager: &Value,
     h: &Value,
@@ -360,7 +360,7 @@ pub(in crate::fleet) fn validate(v: &Value, b: &BoundFile) -> Result<()> {
     validate_parts(v, &b.path)?;
     Ok(())
 }
-fn actual_journal(h: &Value) -> Result<Vec<Value>> {
+pub(super) fn actual_journal(h: &Value) -> Result<Vec<Value>> {
     let iid = text(h, "invocation_id")?;
     guard::journal(&[
         "_PID=1".into(),

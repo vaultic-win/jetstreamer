@@ -3922,6 +3922,10 @@ async fn main() -> Result<()> {
     if env::args().nth(1).as_deref() == Some("capture-native261-input") {
         return fleet::capture_native261_input();
     }
+    if env::args().nth(1).as_deref() == Some("verify-native261-bootstrap-history") {
+        ensure!(env::args().count() == 2, "verify-native261-bootstrap-history takes no arguments");
+        return fleet::verify_native261_bootstrap_history();
+    }
     if env::args().nth(1).as_deref() == Some("capture-native261-terminal") {
         return fleet::capture_native261_terminal();
     }

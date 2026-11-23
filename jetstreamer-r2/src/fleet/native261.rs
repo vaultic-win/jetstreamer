@@ -59,3 +59,8 @@ include!("native_cold/owner.rs");
 
 const TMPFS_BYTES: u64 = 128 << 30;
 include!("native_cold/tmpfs.rs");
+
+mod retained {
+    include!("native261_retained.rs");
+}
+pub(super) use retained::verify_history;

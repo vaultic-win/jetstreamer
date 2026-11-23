@@ -133,6 +133,9 @@ pub(super) fn capture_native261_input() -> Result<()> {
 pub(super) fn capture_native261_terminal() -> Result<()> {
     native261::terminal::capture()
 }
+pub(super) fn verify_native261_bootstrap_history() -> Result<()> {
+    native261::verify_history()
+}
 pub(super) fn validate_native261_inactive(
     f: &Value,
     current: &BTreeMap<String, Value>,
