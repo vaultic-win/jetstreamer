@@ -11,6 +11,7 @@ import tomllib
 HERE = Path(__file__).resolve().parent
 SPEC = json.loads((HERE / "v156-backport.json").read_bytes())
 WORKTREE = "historical-runtime/v1_5_6"
+PROTOCOL_SCHEMA = "historical-runtime/protocol-schema"
 ARCHIVED_GIT_DB = "solana-7a5d8113b7344779"
 CARGO_149_GIT_DB = "solana-58d818797bb1766e"
 REGISTRY = "github.com-1ecc6299db9ec823"
@@ -61,6 +62,8 @@ def originals(repo, cache):
     rev = SPEC["original_jetstreamer"]
     check(git(repo, "rev-parse", rev + ":" + WORKTREE).decode().strip()
           == SPEC["original_worker_tree"], "different v1.5.6 source tree")
+    check(git(repo, "rev-parse", rev + ":" + PROTOCOL_SCHEMA).decode().strip()
+          == SPEC["original_protocol_schema_tree"], "different shared protocol schema tree")
     checkout = cache / "git/checkouts" / ARCHIVED_GIT_DB / SPEC["solana"][:7]
     check(git(checkout, "rev-parse", "HEAD").decode().strip() == SPEC["solana"], "different Solana checkout")
     bare = cache / "git/db" / CARGO_149_GIT_DB
@@ -87,12 +90,14 @@ def prepare(repo, cache, dest):
     result, checkout, sources = originals(repo, cache)
     dest.mkdir(mode=0o700, exist_ok=False)
     ws = dest / "workspace"
-    ws.mkdir()
-    archive = git(repo, "archive", SPEC["original_worker_tree"])
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        for member in tar.getmembers():
-            check(member.isfile() or member.isdir(), "unexpected historical source link")
-        tar.extractall(ws, filter="data")
+    for target, tree in ((ws, SPEC["original_worker_tree"]),
+                         (dest / "protocol-schema", SPEC["original_protocol_schema_tree"])):
+        target.mkdir()
+        archive = git(repo, "archive", tree)
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            for member in tar.getmembers():
+                check(member.isfile() or member.isdir(), "unexpected historical source link")
+            tar.extractall(target, filter="data")
     chome = dest / "cargo"
     (chome / "registry").mkdir(parents=True)
     for name in ("index", "cache"):
