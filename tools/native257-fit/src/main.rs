@@ -5,16 +5,16 @@ fn run() -> Result<()> {
     if args.len() == 5
         && matches!(
             args[1].as_str(),
-            "measure-261-turnover-fit" | "measure-capped-266-fit"
+            "measure-261-turnover-fit" | "measure-capped-266-fit" | "measure-257-closed266-fit"
         )
     {
         use horizon_singleton211_launch::native266_full::{
-            measure_261_turnover, measure_capped_266,
+            measure_261_turnover, measure_capped_266, measure_closed266_for257,
         };
-        let measure = if args[1] == "measure-capped-266-fit" {
-            measure_capped_266
-        } else {
-            measure_261_turnover
+        let measure = match args[1].as_str() {
+            "measure-capped-266-fit" => measure_capped_266,
+            "measure-257-closed266-fit" => measure_closed266_for257,
+            _ => measure_261_turnover,
         };
         println!(
             "{}",

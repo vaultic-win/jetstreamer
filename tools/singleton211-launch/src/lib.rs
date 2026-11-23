@@ -381,9 +381,12 @@ impl Native {
         } else {
             live::PROPS.to_owned()
         };
+        self.show_fields(unit, &properties)
+    }
+    fn show_fields(&mut self, unit: &str, properties: &str) -> Result<Value> {
         let bytes = self.run(
             "/usr/bin/systemctl",
-            &["show", unit, "--no-pager", "--property", &properties],
+            &["show", unit, "--no-pager", "--property", properties],
         )?;
         let mut v = serde_json::Map::new();
         for line in std::str::from_utf8(&bytes)?.lines() {

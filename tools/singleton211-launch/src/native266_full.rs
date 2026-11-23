@@ -3,6 +3,7 @@ use super::*;
 use std::os::unix::process::CommandExt;
 mod bounded;
 pub(crate) mod capped_cold;
+pub(crate) mod closed266_for257;
 mod entries;
 mod epoch228;
 mod epoch228_peer;
@@ -263,19 +264,46 @@ pub fn measure_turnover_allocation(path: &Path) -> Result<Value> {
 
 /// Read-only candidate census under the finite qualification booking.
 pub fn measure_261_turnover(path: &Path, fleet: &Path, sha: &str) -> Result<Value> {
-    measure_cold_fit(path, fleet, sha, false)
+    measure_cold_fit(
+        path,
+        fleet,
+        sha,
+        "horizon261-turnover-fit-check-",
+        "fit-261-",
+        peer261::assess,
+    )
 }
 
 pub fn measure_capped_266(path: &Path, fleet: &Path, sha: &str) -> Result<Value> {
-    measure_cold_fit(path, fleet, sha, true)
+    measure_cold_fit(
+        path,
+        fleet,
+        sha,
+        "horizon266-capped-fit-check-",
+        "fit-capped-266-",
+        capped_cold::assess,
+    )
 }
 
-fn measure_cold_fit(path: &Path, fleet: &Path, sha: &str, capped: bool) -> Result<Value> {
-    let (controller_prefix, directory_prefix) = if capped {
-        ("horizon266-capped-fit-check-", "fit-capped-266-")
-    } else {
-        ("horizon261-turnover-fit-check-", "fit-261-")
-    };
+pub fn measure_closed266_for257(path: &Path, fleet: &Path, sha: &str) -> Result<Value> {
+    measure_cold_fit(
+        path,
+        fleet,
+        sha,
+        "horizon257-closed266-fit-",
+        "fit-closed266-for257-",
+        closed266_for257::assess,
+    )
+}
+
+fn measure_cold_fit(
+    path: &Path,
+    fleet: &Path,
+    sha: &str,
+    controller_prefix: &str,
+    directory_prefix: &str,
+    assess: impl FnOnce(&mut Native, &Bound, &str, bool) -> Result<Value>,
+) -> Result<Value> {
     let controller = fs::read_to_string("/proc/self/cgroup")?;
     let unit = controller
         .trim()
@@ -294,11 +322,7 @@ fn measure_cold_fit(path: &Path, fleet: &Path, sha: &str, capped: bool) -> Resul
         );
         live::finite_owner(&owner, unit, &iid, 256 << 20)?;
         let f = Bound::new(fleet, sha);
-        let result = if capped {
-            capped_cold::assess(n, &f, unit, false)?
-        } else {
-            peer261::assess(n, &f, unit, false)?
-        };
+        let result = assess(n, &f, unit, false)?;
         live::same_owner(&owner, &n.show(unit)?)?;
         Ok(json!({"assessment":result,"admission_authorized":false,"producer_started":false}))
     })
