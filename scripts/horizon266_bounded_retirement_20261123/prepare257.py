@@ -38,7 +38,8 @@ def staged_units(preparation, cpus, directory):
                     "--property=AllowedCPUs=8", "--property=CPUQuota=100%",
                     "--property=RuntimeMaxSec=45", "--property=TasksMax=32",
                     "--property=ProtectSystem=strict", "--property=ProtectHome=read-only",
-                    "--property=PrivateNetwork=yes", "--property=NoNewPrivileges=yes",
+                    "--property=PrivateTmp=yes", "--property=PrivateNetwork=yes",
+                    "--property=NoNewPrivileges=yes",
                     "/usr/bin/systemd-analyze", "verify", "--man=no",
                     *[row["path"] for row in result.values()]], check=True, timeout=55)
     return result
