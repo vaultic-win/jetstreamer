@@ -12,6 +12,10 @@ mod generated {
     include!("holding_epoch166_generated_definitions.rs");
 }
 
+mod reviewed_managers {
+    include!("holding_epoch166_reviewed_managers.rs");
+}
+
 const SEALED: &str = "/usr/local/lib/jetstreamer";
 // The native host inventory contains 104,491 metadata files / 15,425,505,635
 // bytes, including a 66,027,261-byte historical frame. This is a total I/O
@@ -742,7 +746,7 @@ fn review_shape(r: &Review, p: &Retire, now: u64) -> Result<()> {
     );
     Ok(())
 }
-fn owner_units(units: &[String], p: &Retire) -> Result<()> {
+fn owner_units(units: &[String], p: &Retire, registered: &reviewed_managers::Registered) -> Result<()> {
     ensure!(
         !units.is_empty() && units.len() <= 32,
         "consumer has no terminal owner binding"
@@ -759,7 +763,7 @@ fn owner_units(units: &[String], p: &Retire) -> Result<()> {
         );
         if unit == PARK {
             park(p)?;
-        } else {
+        } else if !registered.terminal(unit) {
             closed(&native(unit)?, unit)?;
         }
     }
@@ -794,6 +798,10 @@ fn graph_matches(
             "closed-consumer" => {
                 ensure!(!node.owner_units.is_empty(), "closed consumer has no owner")
             }
+            "retired-observer-drop-in" => ensure!(
+                artifact.definition && reviewed_managers::Registered::profile(PARK)?.dropin(node),
+                "unrecognized retired observer definition or owner"
+            ),
             "retained-nonexecuting-evidence" => ensure!(
                 !artifact.definition && node.owner_units.is_empty(),
                 "executable definition cannot be waived as inert evidence"
@@ -1016,12 +1024,13 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
     );
     let graph = c.graph;
     graph_matches(&r, &c.all, &graph)?;
+    let registered = reviewed_managers::Registered::profile(PARK)?;
     for node in &r.nodes {
         for proof in &node.semantic_evidence {
             read_artifact(proof, 128 << 20, true)?;
         }
         if node.disposition == "closed-consumer" {
-            owner_units(&node.owner_units, p)?;
+            owner_units(&node.owner_units, p, &registered)?;
             if c.all[&node.file.path].definition {
                 let mut actual_owner = false;
                 for unit in &node.owner_units {
@@ -1058,7 +1067,7 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
         for proof in &item.reviewed_source {
             read_artifact(proof, 128 << 20, true)?;
         }
-        owner_units(&item.owner_units, p)?;
+        owner_units(&item.owner_units, p, &registered)?;
         for &(path, sha, unit) in ADDITIONAL_COMPILED {
             if item.image.path == Path::new(path) && item.image.sha256 == sha && item.owner_units.iter().any(|owner| owner == unit) {
                 additional.insert(path);
@@ -1080,6 +1089,7 @@ pub(super) fn verify(p: &Retire) -> Result<Value> {
             read_artifact(&proof, 128 << 20, true)?;
         }
     }
+    registered.verify()?;
     Ok(
         json!({"schema":profile!("horizon-", "-transitive-consumer-gate-v1"),"review":p.consumer_closure,
         "sealed_metadata_census_sha256":sealed_sha,"definition_census_sha256":definitions_sha,
