@@ -60,7 +60,16 @@ def consume():
             if not timer.is_file():ns['run'](EVENT/'cadence.py',version+1,'closed','roll')
             n=lane.bound(lane.ref(timer));assert n['previous']==lane.ref(lane.D/f'horizon-resume-observer-20261120-v{version}.json')
             assert lane.shared.props(n['timer']['Id'],['InvocationID','ActiveState'])==dict(InvocationID=n['timer']['InvocationID'],ActiveState='active')
-            ns['run'](dest/'status.py');ns['run'](dest/'status261.py',version);ns['run'](dest/'fleet.py')
+            ns['run'](dest/'status.py')
+            status261=lane.D/f'horizon261-replay-preparation-status-v{version}-a1/completion.json'
+            if status261.exists():
+                done=lane.bound(lane.ref(status261))
+                intent=lane.bound(done['intent'])
+                assert done['authenticated_exact_byte_readback'] and intent['payload']==lane.bound(done['readback'])
+                assert done['key']=='epoch-261.epoch-status.json' and n['previous'] in intent['evidence']
+            else:
+                ns['run'](dest/'status261.py',version)
+            ns['run'](dest/'fleet.py')
             version+=1;ns['prepare'](version)
 
 if __name__=='__main__':
