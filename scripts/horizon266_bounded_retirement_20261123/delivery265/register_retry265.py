@@ -33,6 +33,25 @@ def pricing(source):
                    "  fixed.update(lane265.finite_owner())\n  fixed.update(retry265.finite_owner())")
 
 
+def fleet(source):
+    source = replace(source, IMPORT, SELECT)
+    census = "added265=lane265.CLAIM.exists() and lane265.census(p,o,done)"
+    return replace(source, census, census + """
+if added265:
+ _,claim,booking,_=lane265.registered()
+ hand=b.checked(booking['handoff'])
+ drain=b.checked(booking['drain'])
+ assert hand['schema']=='horizon-singleton-delivery-handoff-v1' and hand['epoch']==265
+ assert hand['producer']['unit']['Result']=='success' and hand['producer']['unit']['ExecMainStatus']=='0'
+ assert drain['schema']=='horizon-singleton-terminal-drain-v1' and drain['epoch']==265
+ assert drain['producer_cgroup_drained'] and drain['terminal_handoff']==booking['handoff']
+ assert claim['phase']=='upload-readback' and claim in p['pipeline_claims']
+ gate=p['gates']['265']
+ assert gate['state'] in ('staged-admissible','post-replay-pipeline')
+ b.include(gate,Path(booking['handoff']['path']),Path(booking['drain']['path']))
+ gate['state']='post-replay-pipeline'""")
+
+
 def status(source):
     source = replace(source, IMPORT, SELECT)
     return replace(source, " if lane:\n  for directory in", """ if lane is retry265 and not prior_marker.exists():
@@ -49,7 +68,7 @@ def install():
     routine = Path("/tmp/horizon-main-v217")
     consumers = [
         (routine/"status.py", "dd3cad7248d42607b223099ca0b6e35e7bce4f78563ad9e60ef7abd8954f7ce7", status),
-        (routine/"fleet.py", "225403ed716d7281d050bc01bd018c1b4a03d7543859bb170c83c859dc1e1fdb", lambda s:replace(s, IMPORT, SELECT)),
+        (routine/"fleet.py", "225403ed716d7281d050bc01bd018c1b4a03d7543859bb170c83c859dc1e1fdb", fleet),
         (tools/"retry_fit.py", "c1acd9ebea996c8e540450c912569a0987948b3e652509a908074c6c21c0b28b", pricing),
         (tools/"retry_entry_cadence.py", "821d3504f3909c89f916214aac45ab82595a7775295fc297381d5b5a07b4f7b3", cadence),
         (Path("/run/horizon266-terminal-event-v211-a1/cadence.py"), "4b697d968c07026aeb2991bb284e1a976b9553a9eb503f45de9d3496b026aa66", cadence)]
