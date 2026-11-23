@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_homefloor145_only)]
+#[cfg(incident_five_lane145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v2/post-stop-fit";
+#[cfg(all(incident_homefloor145_only, not(incident_five_lane145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_fixture145_only, not(incident_homefloor145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v20/post-stop-fit";
@@ -496,6 +498,148 @@ fn reserved_memory(_complete: &Value) -> Result<u64> {
         .context("qualified memory budget")
 }
 
+/// Reopen the holding tool's two completed retirements while this verifier holds
+/// the same serial transition lock. Free space is measured by the provider.
+#[cfg(incident_five_lane145_only)]
+fn serial_handback(complete: &Value) -> Result<Vec<Bound>> {
+    let state = Path::new(HOLDING_LOCK).parent().context("holding state")?;
+    read_handback(complete, state, |path| match fs::symlink_metadata(path) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err.into()),
+        Ok(_) => anyhow::bail!("retired holding path reappeared: {}", path.display()),
+    })
+}
+
+#[cfg(incident_five_lane145_only)]
+fn read_handback(
+    complete: &Value,
+    state: &Path,
+    absent: impl Fn(&Path) -> Result<()>,
+) -> Result<Vec<Bound>> {
+    let mut evidence = Vec::new();
+    for (label, field, plan_sha) in [
+        (
+            "166-retry10",
+            "registered_retry11_holding",
+            "cee159c094d1d77778a24d7b563a6a6bdd295786652ff73745258bb086f33b04",
+        ),
+        (
+            "168-full-metered",
+            "registered_cold168_holding",
+            "a8c1611f228a216d68b56f249e6b8c34c346b963f4675e6d7015ae22ae8c06c6",
+        ),
+    ] {
+        let holding = &complete[field];
+        ensure!(
+            holding["stage"] == "completed-copy"
+                && holding["additional_reservation_bytes"] == 0
+                && holding["resource_credit_bytes"] == 0,
+            "serial holding {label} has not drained"
+        );
+        let iid = holding["invocation_id"]
+            .as_str()
+            .context("holding invocation")?;
+        ensure!(custody::hex(iid, 32), "invalid holding invocation");
+        let terminal = state
+            .join("receipts")
+            .join(format!("epoch{label}-park-terminal-{iid}.json"));
+        let (terminal_ref, proof) = original(&terminal, 1 << 20)?;
+        let plan_path = Path::new(RUNTIME).join(format!(
+            "epoch{label}-holding-20261122-v1/package/plan.json"
+        ));
+        let (plan_ref, plan) = original(&plan_path, 1 << 20)?;
+        let path = state
+            .join("retirements")
+            .join(format!("epoch{label}-completion.json"));
+        let (receipt, completed) = original(&path, 1 << 20)?;
+        let intent = &completed["intent"];
+        let quarantine = state.join("retirements").join(format!(
+            "epoch{label}-{}.jet",
+            plan["sha256"].as_str().context("holding SHA")?
+        ));
+        ensure!(
+            plan_ref.sha256 == plan_sha
+                && proof["park_plan"] == json!(plan_ref)
+                && proof["invocation_id"] == iid
+                && proof["unit"] == holding["unit"]
+                && proof["start"] == holding["start"]
+                && proof["schema"] == format!("horizon-closed{label}-park-terminal-v1")
+                && completed["schema"]
+                    == format!("jetstreamer-holding-retire{label}-completion-v1")
+                && completed["authenticated_custody_revalidated"] == true
+                && completed["resource_credit_bytes"] == 0
+                && completed["actual_free_delta_claimed"] == false
+                && completed["source_absent"] == true
+                && completed["quarantine_absent"] == true
+                && intent["park_terminal"] == json!(terminal_ref)
+                && intent["custody"] == proof["custody"]
+                && intent["sha256"] == plan["sha256"]
+                && intent["length"] == plan["length"]
+                && intent["source"] == plan["source"]
+                && intent["quarantine"] == json!(quarantine)
+                && intent["eligibility"] == plan["eligibility"]
+                && plan["length"] == holding["restore_overlap_bytes"],
+            "foreign {label} holding handback"
+        );
+        let source = Path::new(plan["source"].as_str().context("holding source")?);
+        absent(source)?;
+        absent(&quarantine)?;
+        evidence.push(receipt);
+    }
+    Ok(evidence)
+}
+
+/// Check the actual handback before replacing the original failed unit identity.
+#[cfg(incident_five_lane145_only)]
+pub fn preflight(fleet: Bound, sha: &str) -> Result<()> {
+    check_image(sha, Path::new(incident145::IMAGE))?;
+    let _lock = lock()?;
+    ensure!(head(&fleet)? == fleet, "a newer complete fleet exists");
+    let seal = provider_identity()?;
+    let response = Command::new(PROVIDER)
+        .args([
+            "145",
+            fleet.path.to_str().context("fleet path")?,
+            &fleet.sha256,
+        ])
+        .output()?;
+    ensure!(
+        response.status.success(),
+        "145 preflight failed: {}",
+        String::from_utf8_lossy(&response.stderr)
+    );
+    let v: Value = serde_json::from_slice(&response.stdout)?;
+    ensure!(
+        v["schema"] == "horizon-incident-replay-fit-v1"
+            && v["epoch"] == 145
+            && v["fits"] == true
+            && v["fleet"] == json!(fleet)
+            && v["candidate"].is_null()
+            && v["resource_credit_bytes"] == 0
+            && v["phase145"]["InvocationID"] == "afcf6cdd1ec0400ea2757f81472987b3"
+            && v["phase145"]["failure"]["sha256"]
+                == "5e001f59750a67f2cdce6aa43fb11b7d55e648a40d52e3fbee26ed3ead66a366"
+            && v["phase145"]["source_checkpoint_exists"] == false
+            && v["phase145"]["candidate"]["inode"] == 103237059
+            && v["replay_launch_authorized"] == false
+            && v["complete_cpu_quota_micros"] == 64_000_000
+            && v["complete_memory_plus_reserve_bytes"] == HOST_MEMORY
+            && capacity::n(&v, "available_HOME_bytes")?
+                >= capacity::n(&v, "complete_required_HOME_bytes")?
+            && capacity::n(&v, "available_memory_bytes")?
+                >= capacity::n(&v, "required_available_memory_bytes")?,
+        "unfunded or foreign 145 preflight"
+    );
+    let receipts = serial_handback(&v)?;
+    ensure!(head(&fleet)? == fleet, "fleet changed during preflight");
+    println!(
+        "{}",
+        json!({"fleet": fleet, "provider": seal, "serial_handback": receipts,
+        "recorded_unix_seconds": v["recorded_unix_seconds"], "worker_started": false})
+    );
+    Ok(())
+}
+
 fn refresh(previous: &Bound) -> Result<Capture> {
     let fleet = head(previous)?;
     let seal = provider_identity()?;
@@ -597,6 +741,11 @@ fn refresh(previous: &Bound) -> Result<Capture> {
                 && complete["candidate136"]["cap"] == 72u64 << 30,
             "145 requires the current paid HOME, holding and sole writer census"
         );
+    }
+    #[cfg(incident_five_lane145_only)]
+    {
+        let handback = serial_handback(&complete)?;
+        complete["serial_145_holding_handback"] = json!(handback);
     }
     let actors = active_population()?;
     let expected: BTreeMap<_, _> = actors
@@ -1036,6 +1185,97 @@ fn remaining136(sample: &Value) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(incident_five_lane145_only)]
+    #[test]
+    #[ignore = "requires both root-owned production park plans"]
+    fn both_exact_park_terminals_and_retirements_precede_handoff() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = tmp.path();
+        fs::create_dir(state.join("retirements")).unwrap();
+        fs::create_dir(state.join("receipts")).unwrap();
+        let mut price = json!({});
+        let mut finals = Vec::new();
+        let iid = "1".repeat(32);
+        let mut expected = Vec::new();
+        for (label, field) in [
+            ("166-retry10", "registered_retry11_holding"),
+            ("168-full-metered", "registered_cold168_holding"),
+        ] {
+            let path = Path::new(RUNTIME).join(format!(
+                "epoch{label}-holding-20261122-v1/package/plan.json"
+            ));
+            let (pr, plan) = original(&path, 1 << 20).unwrap();
+            let unit = format!("horizon-closed{label}-park-20261122-v1.service");
+            let start = json!({"path":"fixture-start","sha256":"3".repeat(64)});
+            let custody = json!({"path":"fixture-custody","sha256":"4".repeat(64)});
+            price[field] = json!({"stage":"completed-copy","unit":unit,"invocation_id":iid,"start":start,
+                "restore_overlap_bytes":plan["length"],"additional_reservation_bytes":0,"resource_credit_bytes":0});
+            let terminal = state
+                .join("receipts")
+                .join(format!("epoch{label}-park-terminal-{iid}.json"));
+            let proof = json!({"schema":format!("horizon-closed{label}-park-terminal-v1"),"unit":unit,"start":start,"invocation_id":iid,"custody":custody,"park_plan":pr});
+            let write = |file: &Path, v: &Value| {
+                use std::os::unix::fs::PermissionsExt;
+                fs::write(file, serde_json::to_vec(v).unwrap()).unwrap();
+                fs::set_permissions(file, fs::Permissions::from_mode(0o600)).unwrap();
+            };
+            write(&terminal, &proof);
+            let (terminal_ref, _) = original(&terminal, 1 << 20).unwrap();
+            let quarantine = state.join("retirements").join(format!(
+                "epoch{label}-{}.jet",
+                plan["sha256"].as_str().unwrap()
+            ));
+            expected.extend([
+                PathBuf::from(plan["source"].as_str().unwrap()),
+                quarantine.clone(),
+            ]);
+            let receipt = state
+                .join("retirements")
+                .join(format!("epoch{label}-completion.json"));
+            let completed = json!({"schema":format!("jetstreamer-holding-retire{label}-completion-v1"),
+                "authenticated_custody_revalidated":true,"actual_free_delta_claimed":false,"resource_credit_bytes":0,
+                "source_absent":true,"quarantine_absent":true,
+                "intent":{"source":plan["source"],"length":plan["length"],"sha256":plan["sha256"],"quarantine":quarantine,
+                    "park_terminal":terminal_ref,"eligibility":plan["eligibility"],"custody":custody}});
+            write(&receipt, &completed);
+            finals.push((receipt, completed));
+        }
+        let visited = RefCell::new(Vec::new());
+        assert_eq!(
+            read_handback(&price, state, |p| {
+                visited.borrow_mut().push(p.to_owned());
+                Ok(())
+            })
+            .unwrap()
+            .len(),
+            2
+        );
+        assert_eq!(visited.into_inner(), expected);
+        assert!(read_handback(&price, state, |_| anyhow::bail!("reappeared")).is_err());
+        for (key, bad) in [
+            ("stage", json!("copy-only")),
+            ("resource_credit_bytes", json!(1)),
+            ("invocation_id", json!("2".repeat(32))),
+        ] {
+            let mut changed = price.clone();
+            changed["registered_cold168_holding"][key] = bad;
+            assert!(read_handback(&changed, state, |_| Ok(())).is_err());
+        }
+        let (path, good) = &finals[1];
+        for key in [
+            "source_absent",
+            "quarantine_absent",
+            "authenticated_custody_revalidated",
+        ] {
+            let mut bad = good.clone();
+            bad[key] = false.into();
+            fs::write(path, serde_json::to_vec(&bad).unwrap()).unwrap();
+            assert!(read_handback(&price, state, |_| Ok(())).is_err());
+        }
+        fs::remove_file(path).unwrap();
+        assert!(read_handback(&price, state, |_| Ok(())).is_err());
+    }
+
     #[cfg(incident_homefloor145_only)]
     #[test]
     fn complete_and_live_prices_keep_the_bounded_qualification() {

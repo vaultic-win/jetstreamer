@@ -18,9 +18,13 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "$pkg/tools-v5e") image="$pkg/tools-v5e/export145" ;;
     "$pkg/tools-v5f") image="$pkg/tools-v5f/export145" ;;
     "$pkg/tools-v5g") image="$pkg/tools-v5g/export145" ;;
+    "$pkg/tools-v5h") image="$pkg/tools-v5h/export145" ;;
     *) exit 1 ;;
 esac
 read -r image_sha _ < <(sha256sum -- "$image")
 test "$image_sha" = PINNED_INCIDENT_SHA
 read -r fleet_sha _ < <(sha256sum -- "$fleet")
+if [[ $image == "$pkg/tools-v5h/export145" ]]; then
+    "$image" check-serial-handback "$fleet" "$fleet_sha" "$image_sha"
+fi
 exec systemd-run --quiet --unit=horizon-holding-export145-20261121-v1 -p Type=exec -p CPUQuota=100% -p CPUWeight=10 -p Nice=15 -p MemoryMax=2147483648 -p MemorySwapMax=0 -p TasksMax=128 -p KillMode=control-group -p Restart=no -p RuntimeMaxSec=259500 -p UMask=0077 -p NoNewPrivileges=yes -p PrivateNetwork=yes -p ProtectSystem=strict -p ProtectHome=read-only -p "BindReadOnlyPaths=/var/lib/jetstreamer/horizon_runtime_data/epoch145-materialized-recovery-20261121-v1/view-template:$view" -p "BindReadOnlyPaths=$leaf:$view/epoch-145.jet" -p "ReadWritePaths=$rt/state $output $holding" -p "StandardOutput=append:$pkg/incident-full-output.stdout" -p "StandardError=append:$pkg/incident-full-output.stderr" -- "$image" recover-full-output "$fleet" "$fleet_sha" "$image_sha"
