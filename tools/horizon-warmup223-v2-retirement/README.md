@@ -1,9 +1,10 @@
 # Epoch 223 v2 warmup scratch retirement
 
-This standalone crate retains the exact source used to retire the failed epoch
-223 v2 warmup scratch. The deployed executable and completion receipt still
-bind the original plan and executable digests. The standalone copy preserves
-the source of that sealed executable, including its legacy profile checks.
+This standalone crate handles disposable epoch 223 warmup scratch. Commit
+`f896d8b2` preserves the exact source for the first v2 retirement. The
+native 20 profile also binds the failed run's capture and stop receipts to the
+successful repeat of the same target. It retains the original proofs and
+deletes only the failed run's scratch.
 
 Run the source checks with `cargo test --locked --manifest-path
 tools/horizon-warmup223-v2-retirement/Cargo.toml`. Operational use requires the

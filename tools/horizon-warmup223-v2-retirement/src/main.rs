@@ -32,6 +32,8 @@ use {
     },
 };
 
+mod native20;
+
 const PLAN_SCHEMA: &str = "jetstreamer-horizon-failed-diagnostic-retirement-plan-v1";
 const RECEIPT_SCHEMA: &str = "jetstreamer-horizon-failed-diagnostic-retirement-receipt-v1";
 const OUTCOME_SCHEMA: &str = "jetstreamer-horizon-epoch224-singleton-diagnostic-outcome-v1";
@@ -48,6 +50,8 @@ struct Plan {
     warmup223_v3: bool,
     #[serde(default)]
     warmup223_v2: bool,
+    #[serde(default)]
+    warmup223_native20: bool,
     private_root: PathBuf,
     run_root: PathBuf,
     targets: Vec<PathBuf>,
@@ -262,7 +266,11 @@ const WARMUP223_V2_CENSUS_SHA: &str =
     "37658a5146f2e09bd50927cb5d07cb75cdbb129a237513d5fdec2901c524ef64";
 
 fn warmup223(plan: &Plan) -> bool {
-    plan.warmup223_v2 || plan.warmup223_v3
+    plan.warmup223_v2 || plan.warmup223_v3 || plan.warmup223_native20
+}
+
+fn locked_scratch_profile(plan: &Plan) -> bool {
+    plan.warmup223_v2 || plan.warmup223_native20
 }
 
 fn validate_warmup223_v2_profile(plan: &Plan) -> Result<()> {
@@ -421,7 +429,10 @@ fn validate_warmup223_outcome(plan: &Plan, outcome: &Value) -> Result<()> {
 }
 
 fn disposable_targets(plan: &Plan) -> Result<BTreeSet<PathBuf>> {
-    if plan.warmup223_v2 {
+    if plan.warmup223_native20 {
+        native20::validate_profile(plan)?;
+        Ok(BTreeSet::from([plan.run_root.join("scratch")]))
+    } else if plan.warmup223_v2 {
         validate_warmup223_v2_profile(plan)?;
         Ok(BTreeSet::from([plan.run_root.join("scratch")]))
     } else if plan.warmup223_v3 {
@@ -576,8 +587,11 @@ fn parse_systemctl(stdout: &[u8]) -> Result<BTreeMap<String, String>> {
 }
 
 fn collected_guard(state: &UnitState) -> bool {
-    state.load_state == "not-found"
-        && state.invocation_id.is_empty()
+    state.load_state == "not-found" && inactive_without_invocation(state)
+}
+
+fn inactive_without_invocation(state: &UnitState) -> bool {
+    state.invocation_id.is_empty()
         && state.active_state == "inactive"
         && state.sub_state == "dead"
         && state.main_pid == 0
@@ -587,7 +601,11 @@ fn collected_guard(state: &UnitState) -> bool {
         && state.exec_main_status == 0
 }
 
-fn sample_unit(expectation: &UnitExpectation, allow_collected_guard: bool) -> Result<UnitState> {
+fn sample_unit(
+    expectation: &UnitExpectation,
+    allow_collected_guard: bool,
+    require_masked: bool,
+) -> Result<UnitState> {
     let output = Command::new("systemctl")
         .args(["show", &expectation.unit, "--property=LoadState,ActiveState,SubState,Result,MainPID,InvocationID,NRestarts,ExecMainCode,ExecMainStatus"])
         .output()?;
@@ -621,6 +639,16 @@ fn sample_unit(expectation: &UnitExpectation, allow_collected_guard: bool) -> Re
         exec_main_code: signed("ExecMainCode")?,
         exec_main_status: signed("ExecMainStatus")?,
     };
+    if require_masked {
+        ensure!(
+            state.load_state == "masked"
+                && inactive_without_invocation(&state)
+                && fs::read_link(Path::new("/etc/systemd/system").join(&state.unit))?
+                    == Path::new("/dev/null"),
+            "native 20 producer is no longer masked and inactive"
+        );
+        return Ok(state);
+    }
     // A qualified restore-only/warmup guard may be collected. Never synthesize
     // its old invocation as live state; independently require its timer inactive.
     if allow_collected_guard && collected_guard(&state) {
@@ -866,7 +894,7 @@ fn process_references(targets: &[PathBuf]) -> Result<Vec<String>> {
     Ok(references)
 }
 
-fn warmup223_v2_lock() -> Result<File> {
+fn shared_scratch_retirement_lock() -> Result<File> {
     let path = Path::new("/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock");
     let lock = OpenOptions::new()
         .read(true)
@@ -886,7 +914,7 @@ fn warmup223_v2_lock() -> Result<File> {
     Ok(lock)
 }
 
-fn warmup223_v2_staged_readers(target: &Path) -> Result<Value> {
+fn scheduled_scratch_readers(target: &Path) -> Result<Value> {
     ensure!(
         format!(
             "{:x}",
@@ -1093,7 +1121,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let outcome: Value = serde_json::from_slice(&outcome_bytes)?;
     ensure!(
         outcome.pointer("/schema").and_then(Value::as_str)
-            == Some(if warmup223(plan) {
+            == Some(if plan.warmup223_native20 {
+                native20::OUTCOME_SCHEMA
+            } else if warmup223(plan) {
                 "jetstreamer-private-epoch223-warmup-resource-v1"
             } else if plan.restore_only_probe {
                 RESTORE_OUTCOME_SCHEMA
@@ -1121,7 +1151,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             "failed restore probe has a checkpoint receipt; review its successful result separately"
         );
     }
-    if warmup223(plan) {
+    if plan.warmup223_native20 {
+        native20::validate_retained_evidence(plan, &outcome)?;
+    } else if warmup223(plan) {
         validate_warmup223_outcome(plan, &outcome)?;
     } else {
         ensure!(
@@ -1152,7 +1184,9 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let mut seen = BTreeSet::new();
     for item in bound_evidence(plan) {
         ensure!(seen.insert(item.path.clone()), "duplicate evidence path");
-        let uid = if plan.warmup223_v2
+        let uid = if plan.warmup223_native20 {
+            native20::evidence_uid(&item.path)
+        } else if plan.warmup223_v2
             && (item.path == plan.outcome.path
                 || item.path == plan.run_root.join("receipts/guard-stop.json"))
         {
@@ -1169,12 +1203,22 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         );
         evidence.push(json!({"path": item.path, "sha256": observed}));
     }
-    let producer = sample_unit(&plan.producer, plan.warmup223_v2)?;
-    let guard = sample_unit(&plan.guard, plan.restore_only_probe || warmup223(plan))?;
+    let producer = sample_unit(&plan.producer, plan.warmup223_v2, plan.warmup223_native20)?;
+    let guard = sample_unit(
+        &plan.guard,
+        plan.restore_only_probe || warmup223(plan),
+        false,
+    )?;
+    if locked_scratch_profile(plan) {
+        ensure!(
+            collected_guard(&guard),
+            "warmup guard must remain collected"
+        );
+    }
     if plan.warmup223_v2 {
         ensure!(
-            collected_guard(&producer) && collected_guard(&guard),
-            "v2 units must remain collected"
+            collected_guard(&producer),
+            "v2 producer must remain collected"
         );
     }
     let mut inactive = Vec::new();
@@ -1189,11 +1233,16 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
     let targets = plan
         .targets
         .iter()
-        .map(|path| tree_identity(path, plan.warmup223_v2))
+        .map(|path| tree_identity(path, locked_scratch_profile(plan)))
         .collect::<Result<Vec<_>>>()?;
-    if plan.warmup223_v2 {
+    if locked_scratch_profile(plan) {
         let [target] = targets.as_slice() else {
             return Err(anyhow!("expected one scratch tree"));
+        };
+        let expected = if plan.warmup223_native20 {
+            (66305, 2759713, 1000, 407897, 15, 32_866_521_088)
+        } else {
+            (66305, 7778765, 1000, 407502, 15, 33_458_458_624)
         };
         ensure!(
             (
@@ -1203,7 +1252,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
                 target.regular_files,
                 target.directories,
                 target.physical_bytes
-            ) == (66305, 7778765, 1000, 407502, 15, 33_458_458_624)
+            ) == expected
                 && fs::read_dir(&target.path)?
                     .map(|entry| entry.map(|e| e.file_name()))
                     .collect::<std::io::Result<Vec<_>>>()?
@@ -1211,7 +1260,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
             "failed warmup scratch identity or content layout changed"
         );
         require_unmounted(&target.path)?;
-        warmup223_v2_staged_readers(&target.path)?;
+        scheduled_scratch_readers(&target.path)?;
     }
     let references = process_references(&plan.targets)?;
     ensure!(
@@ -1228,7 +1277,7 @@ fn stable_evidence(plan: &Plan) -> Result<Value> {
         "inactive_units": inactive,
         "evidence": evidence,
         "process_reference_scan": {"coverage": ["command", "maps", "cwd", "root", "exe", "file-descriptors"], "references": []},
-        "shared_lock_mount_and_staged_reader_checks_passed": plan.warmup223_v2,
+        "shared_lock_mount_and_staged_reader_checks_passed": locked_scratch_profile(plan),
         "pending_systemd_jobs": []
     }))
 }
@@ -1245,7 +1294,9 @@ fn main() -> Result<()> {
     );
     let plan: Plan = serde_json::from_slice(&plan_bytes)?;
     validate_plan(&plan)?;
-    let _mutation_lock = plan.warmup223_v2.then(warmup223_v2_lock).transpose()?;
+    let _mutation_lock = locked_scratch_profile(&plan)
+        .then(shared_scratch_retirement_lock)
+        .transpose()?;
     ensure!(
         !plan.intent_receipt.exists() && !plan.completion_receipt.exists(),
         "fresh receipt paths are required"
@@ -1435,6 +1486,7 @@ mod tests {
             restore_only_probe: true,
             warmup223_v3: false,
             warmup223_v2: false,
+            warmup223_native20: false,
             private_root: "/home/ubuntu/.jetstreamer-private".into(),
             targets: vec![root.join("scratch")],
             producer: UnitExpectation {
