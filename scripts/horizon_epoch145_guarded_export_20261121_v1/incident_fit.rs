@@ -70,6 +70,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(incident_missed_clock145_only)]
 #[path = "missed_clock.rs"]
 pub(crate) mod missed_clock;
+#[cfg(incident_guard_walk145_only)]
+#[path = "guard_walk.rs"]
+mod guard_walk;
 const HOST_MEMORY: u64 = 810_658_050_048;
 const GROUPS: &str = "/sys/fs/cgroup/system.slice";
 type Process = (u32, u64, u64, u64);
@@ -861,19 +864,7 @@ fn refresh(previous: &Bound) -> Result<Capture> {
     })
 }
 
-fn current_guard(
-    plan: &Value,
-    original_sample: Option<&Value>,
-    expected_remaining: u64,
-    unit: &str,
-) -> Result<(u64, u64)> {
-    let b: Bound = serde_json::from_value(plan.clone())?;
-    let p = custody::evidence(&b)?;
-    let d = Path::new(
-        p["receipt_directory"]
-            .as_str()
-            .context("guard receipt directory")?,
-    );
+fn live_guard_sample(d: &Path, p: &Value, b: &Bound, unit: &str) -> Result<(Bound, Value)> {
     let mut file = File::open(d.parent().context("guard root")?.join("guard.stdout"))?;
     let len = file.metadata()?.len();
     file.seek(SeekFrom::Start(len.saturating_sub(2 << 20)))?;
@@ -890,7 +881,7 @@ fn current_guard(
     ensure!(custody::hex(id, 32), "invalid guard IID");
     let (sample_ref, observed) = original(&d.join(format!("sample-{id}.json")), 2 << 20)?;
     let scan = &observed["root_physical_observation"];
-    let cap = capacity::n(&p, "maximum_root_physical_bytes")?;
+    let cap = capacity::n(p, "maximum_root_physical_bytes")?;
     ensure!(
         observed == latest
             && observed["schema"] == "jetstreamer-horizon-standalone-guard-sample-v1"
@@ -903,6 +894,7 @@ fn current_guard(
             && observed["DATA_fulfillment_observation_error"].is_null()
             && observed["producer_stop_enabled"] == true
             && observed["producer"]["active"] == "active"
+            && observed["producer"]["invocation_id"] == p["invocation_id"]
             && observed["producer"]["restarts"] == 0
             && scan["exceeds_budget"] == false
             && scan["maximum_physical_bytes"] == cap,
@@ -915,6 +907,30 @@ fn current_guard(
     if age > 90 {
         return Err(capacity::Reprice(format!("guard {unit} {sample_ref:?} is {age}s old")).into());
     }
+    for pass in ["first", "second"] {
+        capacity::n(&scan[pass], "vanished_entries")?;
+        ensure!(capacity::n(&scan[pass], "physical_bytes")? <= cap, "native guard cap exceeded");
+    }
+    Ok((sample_ref, observed))
+}
+
+fn current_guard(
+    plan: &Value,
+    original_sample: Option<&Value>,
+    expected_remaining: u64,
+    unit: &str,
+    _stopped_for_clock: bool,
+) -> Result<(u64, u64)> {
+    let b: Bound = serde_json::from_value(plan.clone())?;
+    let p = custody::evidence(&b)?;
+    let d = Path::new(
+        p["receipt_directory"]
+            .as_str()
+            .context("guard receipt directory")?,
+    );
+    let (sample_ref, observed) = live_guard_sample(d, &p, &b, unit)?;
+    let scan = &observed["root_physical_observation"];
+    let cap = capacity::n(&p, "maximum_root_physical_bytes")?;
     let floor = capacity::n(&p, "minimum_free_bytes")?;
     let remaining = if scan["first"]["vanished_entries"] == 0
         && scan["second"]["vanished_entries"] == 0
@@ -927,6 +943,26 @@ fn current_guard(
     } else if original_sample == Some(&json!(sample_ref)) {
         expected_remaining
     } else {
+        #[cfg(incident_guard_walk145_only)]
+        if _stopped_for_clock {
+            let path = Path::new(p["worker_root"].as_str().context("guard root path")?);
+            ensure!(path.parent() == Some(Path::new("/home/sol/.jetstreamer-private"))
+                && path.metadata()?.dev() == Path::new("/home/sol").metadata()?.dev(),
+                "guard root differs from its HOME booking");
+            let measured = guard_walk::lower_bound(path, cap)?;
+            // Reopen the current native receipt after the two walks. A producer
+            // trip, expired receipt or changed plan during measurement is fatal.
+            let (_, current) = live_guard_sample(d, &p, &b, unit)?;
+            let latest_scan = &current["root_physical_observation"];
+            let mut paid = measured;
+            for observation in [scan, latest_scan] {
+                for pass in ["first", "second"] {
+                    paid = paid.min(capacity::n(&observation[pass], "physical_bytes")?);
+                }
+            }
+            let remaining = cap.checked_sub(paid).context("guard cap exceeded")?;
+            return Ok((floor, remaining.saturating_sub(expected_remaining)));
+        }
         // Keep exactly the earlier independently funded stable-subtree basis only through its original sample;
         // a changed unstable sample needs the provider's current measured lower-bound path.
         return Err(capacity::Reprice(format!(
@@ -1039,6 +1075,7 @@ impl Fit {
                 Some(&g["guard"]),
                 capacity::n(g, "remaining")?,
                 row["unit"].as_str().context("incumbent unit")?,
+                !require_fresh,
             )?;
             required = required.checked_add(growth).context("incumbent growth")?;
             absolute = absolute.max(floor);
@@ -1053,6 +1090,7 @@ impl Fit {
                 Some(&row["guard"]),
                 capacity::n(b, "remaining_bytes")?,
                 row["producer_unit"].as_str().context("replacement unit")?,
+                !require_fresh,
             )?;
             // A new deficit can affect the original physical baseline and the independent new-generation spending calculation.
             required = required
@@ -1079,6 +1117,7 @@ impl Fit {
                 sample,
                 capacity::n(booking, "remaining_bytes")?,
                 admitted["producer_unit"].as_str().context("168 unit")?,
+                !require_fresh,
             )?;
             required = required.checked_add(growth).context("168 growth")?;
             absolute = absolute.max(floor);
@@ -1432,7 +1471,7 @@ mod tests {
             assert_eq!(before["population"], json!(observed));
         }
         assert!(
-            current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus").is_err()
+            current_guard(&json!({"path":p,"sha256":"f".repeat(64)}), None, 0, "bogus", false).is_err()
         );
     }
 }
