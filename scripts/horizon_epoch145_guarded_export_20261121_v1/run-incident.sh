@@ -20,12 +20,16 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "$pkg/tools-v5g") image="$pkg/tools-v5g/export145" ;;
     "$pkg/tools-v5h") image="$pkg/tools-v5h/export145" ;;
     "$pkg/tools-v5i") image="$pkg/tools-v5i/export145" ;;
+    "$pkg/tools-v5k") image="$pkg/tools-v5k/export145" ;;
     "$pkg/tools-v5j") image="$pkg/tools-v5j/export145" ;;
     *) exit 1 ;;
 esac
 read -r image_sha _ < <(sha256sum -- "$image")
 test "$image_sha" = PINNED_INCIDENT_SHA
 read -r fleet_sha _ < <(sha256sum -- "$fleet")
+if [[ $image == "$pkg/tools-v5k/export145" ]]; then
+    exec /var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v3/run-recovery "$fleet"
+fi
 if [[ $image == "$pkg/tools-v5h/export145" || $image == "$pkg/tools-v5i/export145" || $image == "$pkg/tools-v5j/export145" ]]; then
     "$image" check-serial-handback "$fleet" "$fleet_sha" "$image_sha"
 fi

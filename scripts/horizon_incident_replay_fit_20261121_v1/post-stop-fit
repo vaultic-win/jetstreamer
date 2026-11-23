@@ -47,15 +47,16 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
+LEASE_RUNTIME_145 = HERE == D / "tools-homefloor-145-lease-rejoin-v1"
 LEASE_BUILD_145 = HERE == D / "tools-homefloor-145-lease-build-v1"
-RETRY_HANDOFF_145 = HERE == D / "tools-homefloor-145-handoff-v2"
+RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5J_RETRY_POST = HERE == D / "tools-homefloor-145-post-v5j-v2"
 V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-RETRY4_145 = LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
+RETRY4_145 = LEASE_RUNTIME_145 or LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
@@ -473,6 +474,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         post_directory = fixture_post_directory(here)
         profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
+                    "lease-semantic": ("profile145-lease-semantic.json", "tools-v5k"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
                     "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
                     "homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
@@ -552,7 +554,8 @@ def phase145(epoch):
         # live generation must pass its own sealed verifier and native lease checks.
         here = Path(__file__).resolve()
         if ((here.parent / "profile145-homefloor-semantic.json").is_file() or FIVE_LANE_145) and fit.members(fit.A145):
-            focused = ("retry4-semantic" if RETRY4_145 else
+            focused = ("lease-semantic" if LEASE_RUNTIME_145 else
+                       "retry4-semantic" if RETRY4_145 else
                        "retry3-semantic" if RETRY3_145 else
                        "five-lane-semantic" if FIVE_LANE_145 else "homefloor-semantic")
             cfg, adapter, _ = profile145(here.parent, focused=focused)

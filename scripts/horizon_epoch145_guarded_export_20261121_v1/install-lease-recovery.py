@@ -1,0 +1,141 @@
+#!/usr/bin/python3 -IB
+"""Install the qualified active-lease verifier, its census and its one-shot dispatcher."""
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import subprocess
+import sys
+
+FAMILY = Path("scripts/horizon_epoch145_guarded_export_20261121_v1")
+PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
+FIT = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
+SEM = FIT.parent / "epoch145-semantic-continuity-20261121-v1"
+DONOR = FIT / "tools-homefloor-145-rejoin-v4"
+CENSUS = FIT / "tools-homefloor-145-lease-rejoin-v1"
+DISPATCH = FIT / "tools-homefloor-145-handoff-v3"
+WORKER = SEM / "tools-v5k"
+BUILD_UNIT = "horizon-145-lease-rejoin-build-v1.service"
+BUILD_PRICE = FIT / "tools-homefloor-145-lease-build-v1"
+BUILD_PRICE_SHA = "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5"
+
+
+def main(commit, iid):
+    if not (os.geteuid() == 0 and sys.flags.isolated and __debug__ and re.fullmatch("[0-9a-f]{40}", commit)
+            and re.fullmatch("[0-9a-f]{32}", iid)):
+        raise ValueError("expected exact merged COMMIT and successful BUILD_IID")
+    local = Path(__file__).resolve().parent
+    def git(*args):
+        return subprocess.check_output(["runuser","-u","sol","--","git","-C","/home/sol/workspace/jetstreamer",*args])
+    git("merge-base","--is-ancestor",commit,"origin/account-updates")
+    for src in (Path(__file__).name, "install-v5j-post.py", "v5j_lease_failure.py"):
+        if git("show",commit+":"+str(FAMILY/src)) != (local/src).read_bytes():
+            raise ValueError("changed installation source " + src)
+    util = runpy.run_path(str(local/"install-v5j-post.py"))
+    fail = runpy.run_path(str(local/"v5j_lease_failure.py"))
+    need, ref, item, install, write, record = (util[k] for k in ("require","ref","item","install","write","record"))
+    previous, historical = fail["historical"]()
+    prior = previous["bound"](historical["predecessor_review"])
+    need(not git("diff","--name-only",commit,"origin/account-updates","--",str(FAMILY),PROVIDER,
+                 "scripts/horizon_epoch145_private_prefix_v8","scripts/horizon_epoch166_delivery_20261121_v1"),
+         "superseding build inputs on account-updates")
+    q = SEM / ("incident-build-" + iid)
+    need(q.resolve(strict=True) == q and q.lstat().st_uid == 0 and q.lstat().st_mode & 0o077 == 0, "untrusted build directory")
+    rows = [json.loads(row) for row in previous["out"](["/usr/bin/journalctl","--no-pager","-ojson",
+            "_PID=1","UNIT="+BUILD_UNIT,"INVOCATION_ID="+iid]).splitlines()]
+    start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
+    end, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
+    need(" lease-rejoin " in start["MESSAGE"] and start["MESSAGE"].endswith(" tools-homefloor-145-lease-build-v1.")
+         and int(start["__MONOTONIC_TIMESTAMP"]) < int(end["__MONOTONIC_TIMESTAMP"])
+         and all(r.get("_BOOT_ID") == historical["original_pid1_exit"]["_BOOT_ID"] for r in rows)
+         and not (Path("/sys/fs/cgroup/horizonaudit.slice")/BUILD_UNIT).exists(), "build not successfully drained")
+    product = q/"products"
+    sources = {}
+    for line in (q/"sources").read_text().splitlines():
+        sha, rel = line.split("  ./",1)
+        need(rel not in sources and util["digest"](git("show",commit+":"+rel)) == sha
+             == ref(product/"source"/rel)["sha256"], "unmerged or changed build input " + rel)
+        sources[rel] = sha
+    for name in ("lease_startup.rs","materialized.rs","post.rs","incident-phase.py","build-incident.sh","run-incident.sh"):
+        need(str(FAMILY/name) in sources, "missing worker source " + name)
+    price = json.loads((q/"before.json").read_bytes())
+    need(price["fits"] and price["epoch"] == 145 and price["phase145"] == historical["failed_phase"] and
+         price["candidate"] is None and price["resource_credit_bytes"] == 0 and
+         price["complete_cpu_quota_micros"] == 64000000 and price["complete_memory_plus_reserve_bytes"] == 810658050048 and
+         price["available_HOME_bytes"]-price["complete_required_HOME_bytes"] >= 92274688+16777216 and
+         price["available_memory_bytes"]-price["required_available_memory_bytes"] >= 805306368, "foreign or underfunded build")
+    need(ref(BUILD_PRICE/"deployment-seal-receipt.json")["sha256"] == BUILD_PRICE_SHA
+         and ref(DONOR/"deployment-seal-receipt.json")["sha256"] == util["DONOR_SHA"]
+         and ref(util["SEALER"])["sha256"] == util["SEAL_SHA"], "different donor or capacity provider")
+    original_build = json.loads((SEM/"tools-v5j/build-proof.json").read_bytes())
+    prior_seal = previous["bound"](prior["seal"])
+    original_build_sha, = [r["sha256"] for r in prior_seal["members"] if r["name"] == "build-proof.json"]
+    need(ref(SEM/"tools-v5j/build-proof.json")["sha256"] == original_build_sha, "different original tests")
+    tests = (q/"build.log").read_text()
+    existing = original_build["native_fixture_names"]
+    readiness = [line.split(" ... ")[0].removeprefix("test ") for line in tests.splitlines()
+                 if "lease_startup::tests::" in line and line.endswith(" ... ok")]
+    need(len(set(readiness)) >= 2 and "test result: FAILED" not in tests and "Ran 14 tests in " in tests and
+         all(name+" ... ok" in tests for name in existing), "missing original or lease-readiness build tests")
+    tool = product/"export145"
+    image = ref(tool)["sha256"]
+    artifacts = {Path(path).name:sha for sha,path in (line.split("  ",1) for line in (q/"artifacts").read_text().splitlines())}
+    need(artifacts["export145"] == image != fail["IMAGE"] and str(WORKER/"export145").encode() in tool.read_bytes()
+         and str(CENSUS/"post-stop-fit").encode() in tool.read_bytes(), "wrong successor binary")
+    source = product/"source"/FAMILY
+    proof = dict(schema="horizon-epoch145-child-lease-startup-build-v1", source_commit=commit,source_hashes=sources,
+                 build_iid=iid,native_success_cursor=end["__CURSOR"],verifier_sha256=image,
+                 startup_failure=historical["receipts"]["failure"], previous_recovery=historical["receipts"]["recovery"],
+                 predecessor_dispatch=historical["predecessor_dispatch"], capacity=ref(q/"before.json"),capacity_provider=ref(BUILD_PRICE/"deployment-seal-receipt.json"),
+                 native_fixture_names=existing+readiness, child_lease_readiness_protocol="self-stop-after-three-leases",
+                 tests=ref(q/"build.log"),compiler_outputs=ref(q/"artifacts"),source_snapshot=ref(q/"sources"),
+                 memory_peak=int((q/"memory.peak").read_text()),physical_scratch=int((q/"scratch-bytes").read_text().split()[0]),
+                 resource_credit_bytes=0, replay_launch_authorized=False,r2_mutations=False)
+    need(proof["memory_peak"] <= 805306368 and proof["physical_scratch"] <= 73400320, "build exceeded its envelope")
+    script = (source/"run-incident.sh").read_bytes()
+    need(script.count(b"PINNED_INCIDENT_SHA") == 1, "unbound launcher")
+    launcher = write(q/"lease-ready-launcher",script.replace(b"PINNED_INCIDENT_SHA",image.encode()))
+    worker = install(WORKER, [item("export145",tool,0o555),item("incident-phase.py",source/"incident-phase.py",0o444),
+        item("run-recovery",launcher,0o555),item("build-proof.json",record(q/"lease-build-proof.json",proof),0o444)], q/"lease-semantic-plan.json")
+    donor = json.loads((DONOR/"deployment-seal-receipt.json").read_bytes())
+    members = {}
+    for row in donor["members"]:
+        name = row["name"]
+        need(name == Path(name).name and name not in members, "duplicate or indirect donor")
+        members[name] = item(name,DONOR/name,int(row["mode"],8))
+        need(members[name]["sha256"] == row["sha256"], "changed donor member " + name)
+    provider = write(q/"lease-provider",git("show",commit+":"+PROVIDER))
+    members["post-stop-fit"] = item("post-stop-fit",provider,0o555)
+    profile = dict(build_sha256=ref(WORKER/"build-proof.json")["sha256"],image_sha256=image,
+                   adapter_sha256=ref(WORKER/"incident-phase.py")["sha256"],seal_sha256=worker["sha256"])
+    members["profile145-lease-semantic.json"] = item("profile145-lease-semantic.json",record(q/"lease-runtime-profile.json",profile),0o444)
+    runtime = install(CENSUS,list(members.values()),q/"lease-runtime-plan.json")
+    cmd = list(prior["sealed_service_argv"])
+    need(cmd[-5] == prior["reader"]["path"] and cmd[-1] == fail["IMAGE"], "original verifier argv changed")
+    cmd[-5], cmd[-1] = str(WORKER/"export145"), image
+    review = dict(prior, schema="horizon-145-lease-startup-dispatch-review-v1",old_manager=historical["old_manager"],
+                  original_pid1_exit=historical["original_pid1_exit"],original_fragment=historical["original_fragment"],
+                  failed_phase=historical["failed_phase"],predecessor_receipts=historical["receipts"],original_review=historical["predecessor_review"],
+                  reader=ref(WORKER/"export145"),stock_launcher=ref(WORKER/"run-recovery"),seal=worker,provider=runtime,sealed_service_argv=cmd)
+    staged = record(q/"lease-dispatch-review.json",review)
+    digest = ref(staged)["sha256"]
+    dispatcher = git("show",commit+":"+str(FAMILY/"recovery_dispatch.py"))
+    for needle,replacement in [(b"LEASE_START_IMAGE_SHA",image),(b"LEASE_START_REVIEW_SHA",digest)]:
+        need(dispatcher.count(needle) == 1, "different dispatcher template")
+        dispatcher = dispatcher.replace(needle,replacement.encode())
+    members["run-recovery"] = item("run-recovery",write(q/"lease-dispatch",dispatcher),0o555)
+    members["admission-review.json"] = item("admission-review.json",staged,0o444)
+    members["v5j_lease_failure.py"] = item("v5j_lease_failure.py",write(q/"lease-failure-evidence.py",git("show",commit+":"+str(FAMILY/"v5j_lease_failure.py"))),0o444)
+    dispatch = install(DISPATCH,list(members.values()),q/"lease-dispatch-plan.json")
+    new = runpy.run_path(str(DISPATCH/"run-recovery"))
+    need(new["PACKAGE"] == DISPATCH and new["LEASE_RETRY"] and new["READER"] == WORKER/"export145"
+         and new["REVIEW_SHA"] == digest and new["IMAGE_SHA"] == image and new["OLD"] == fail["IID"]
+         and new["original_command"](review,price["fleet"])[-5:] == [str(WORKER/"export145"),"recover-full-output",
+                  price["fleet"]["path"],price["fleet"]["sha256"],image], "different deployed repair")
+    print(json.dumps(dict(worker=worker,provider=runtime,dispatcher=dispatch,review_sha256=digest,commit=commit,
+                          verified_or_published=False,production_worker_started=False),sort_keys=True))
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

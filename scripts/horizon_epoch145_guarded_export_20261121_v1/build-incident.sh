@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+lease_rejoin=false
+if [[ $flavor == lease-rejoin ]]; then
+  lease_rejoin=true
+  flavor=retry4-rejoin
+fi
 retry4_rejoin=false
 if [[ $flavor == retry4-rejoin ]]; then
   retry4_rejoin=true
@@ -112,6 +117,10 @@ if $five_lane_rejoin; then
 fi
 if $retry3_rejoin; then extra+=(--cfg incident_retry3_145_only); fi
 if $retry4_rejoin; then extra+=(--cfg incident_retry4_145_only); fi
+if $lease_rejoin; then
+  test -s "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/lease_startup.rs"
+  extra+=(--cfg incident_lease_start145_only)
+fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
 if $v5j_retry_post; then extra+=(--cfg incident_v5j_retry1_post145_only); fi
@@ -269,6 +278,7 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     slice=/sys/fs/cgroup/horizonaudit.slice
     build_unit=horizon-145-homefloor-rejoin-build-v1.service
     if $v5j_post; then build_unit=horizon-145-v5j-post-build-v1.service; fi
+    if $lease_rejoin; then build_unit=horizon-145-lease-rejoin-build-v1.service; fi
     if $v5j_retry_post; then build_unit=horizon-145-v5j-post-build-v2.service; fi
     [[ $cg == "$slice/$build_unit" ]]
     [[ $(cat "$slice/cpu.max") == '1200000 100000' && $(cat "$slice/cpu.idle") == 1 ]]
@@ -278,7 +288,14 @@ if [[ $flavor == rejoin || $flavor == current-post || $flavor == timeout-rejoin 
     jq -e --arg fleet "$1" --arg hash "$fleet_sha" '
         .fleet == {path:$fleet,sha256:$hash} and now-.recorded_unix_seconds >= 0
         and now-.recorded_unix_seconds <= 120' "$q/before.json" >/dev/null
-    if $v5j_retry_post; then
+    if $lease_rejoin; then
+      [[ $native_package == tools-homefloor-145-lease-build-v1 && $seal_digest == ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5 ]]
+      jq -e '.phase145.InvocationID == "f2afc696a63a4e6aa6812451cf3559e5"
+             and .phase145.failure.sha256 == "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7"
+             and .phase145.recovery.sha256 == "adb40073fd977545227b6eaf1cd0999f8769a5a992999561eab7ca382d3c139e"
+             and .phase145.candidate.inode == 103237059 and .phase145.retry_worker == null
+             and .phase145.source_checkpoint_exists == false' "$q/before.json" >/dev/null
+    elif $v5j_retry_post; then
       /usr/bin/python3 -IB "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/post_inputs.py" --retry1 verify-build-price "$q/before.json"
     else
       jq -e '.phase145.InvocationID == "afcf6cdd1ec0400ea2757f81472987b3"

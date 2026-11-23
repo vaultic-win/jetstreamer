@@ -61,7 +61,15 @@ class HomefloorPhase(TestCase):
             p.write_text(json.dumps(value))
             return Status.read(p)[1]
 
-        build = record(pkg / "build-proof.json", dict(verifier_sha256=self.sha))
+        meta = dict(verifier_sha256=self.sha)
+        if self.version == "tools-v5k":
+            iid = "f2afc696a63a4e6aa6812451cf3559e5"
+            state = root / "state"
+            state.mkdir()
+            (state / iid).symlink_to(g["STATE"] / iid, target_is_directory=True)
+            meta["startup_failure"] = Status.read(state / iid / "failed.json")[1]
+            meta["child_lease_readiness_protocol"] = "self-stop-after-three-leases"
+        build = record(pkg / "build-proof.json", meta)
         seal = record(pkg / "deployment-seal-receipt.json",
                       dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
                            dict(name="build-proof.json", sha256=build["sha256"])]))
@@ -160,6 +168,17 @@ class Retry4Phase(HomefloorPhase):
 
     def test_retry4_provider_is_required(self):
         self.assertEqual(self.provider.parent.name, "tools-homefloor-145-rejoin-v4")
+
+
+class LeaseReadyPhase(HomefloorPhase):
+    version = "tools-v5k"
+
+    def test_current_lease_failure_is_required(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-lease-rejoin-v1")
+        self.write()
+        v = self.inspect((10,20))
+        self.assertEqual(v["window"]["startup_failure"]["sha256"],
+                         "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7")
 
 
 if __name__ == "__main__":

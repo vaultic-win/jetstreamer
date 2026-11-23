@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_retry4_145_only)]
+#[cfg(incident_lease_start145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-lease-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_retry4_145_only, not(incident_lease_start145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v4/post-stop-fit";
 #[cfg(all(incident_retry3_145_only, not(incident_retry4_145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v3/post-stop-fit";
@@ -1359,6 +1361,10 @@ mod tests {
                     started["invocation_id"],
                     intent["original"]["INVOCATION_ID"]
                 );
+            } else if cfg!(incident_lease_start145_only) {
+                assert_eq!(before["phase145"]["InvocationID"], "f2afc696a63a4e6aa6812451cf3559e5");
+                assert_eq!(before["phase145"]["failure"]["sha256"], "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7");
+                assert!(before["phase145"]["retry_worker"].is_null());
             } else {
                 assert_eq!(
                     before["phase145"]["InvocationID"],

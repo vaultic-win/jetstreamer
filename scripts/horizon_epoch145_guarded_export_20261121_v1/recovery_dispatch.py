@@ -19,19 +19,21 @@ import time
 RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FIT = RUNTIME / "incident-replay-fit-20261121-v1"
 RETRY_PACKAGE = FIT / "tools-homefloor-145-handoff-v2"
-RETRY = Path(__file__).resolve().parent == RETRY_PACKAGE
-PACKAGE = RETRY_PACKAGE if RETRY else FIT / "tools-homefloor-145-handoff-v1"
+LEASE_PACKAGE = FIT / "tools-homefloor-145-handoff-v3"
+LEASE_RETRY = Path(__file__).resolve().parent == LEASE_PACKAGE
+RETRY = LEASE_RETRY or Path(__file__).resolve().parent == RETRY_PACKAGE
+PACKAGE = LEASE_PACKAGE if LEASE_RETRY else RETRY_PACKAGE if RETRY else FIT / "tools-homefloor-145-handoff-v1"
 SEMANTIC = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
-READER = SEMANTIC / "tools-v5j/export145"
+READER = SEMANTIC / ("tools-v5k/export145" if LEASE_RETRY else "tools-v5j/export145")
 STATE = RUNTIME / "epoch145-guarded-export-20261121-v1/state"
-HANDOFF = SEMANTIC / ("v5j-name-handoff-retry1" if RETRY else "v5j-name-handoff")
+HANDOFF = SEMANTIC / ("v5k-name-handoff" if LEASE_RETRY else "v5j-name-handoff-retry1" if RETRY else "v5j-name-handoff")
 HOME = Path("/home/sol/.jetstreamer-private")
 HOLD = HOME / "r2-holding-state-dev-samjohnson-v1"
 UNIT = "horizon-holding-export145-20261121-v1.service"
-OLD = "48ad7b2234d74e74b0498e7110e0aee3" if RETRY else "afcf6cdd1ec0400ea2757f81472987b3"
-IMAGE_SHA = "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"
+OLD = "f2afc696a63a4e6aa6812451cf3559e5" if LEASE_RETRY else "48ad7b2234d74e74b0498e7110e0aee3" if RETRY else "afcf6cdd1ec0400ea2757f81472987b3"
+IMAGE_SHA = "LEASE_START_IMAGE_SHA" if LEASE_RETRY else "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"
 RETRY_REVIEW_SHA = "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
-REVIEW_SHA = RETRY_REVIEW_SHA if RETRY else "4b8963f5490bd9dba3d9d6db521b9e9e864a28108c7b79bbe420417eefaf82e6"
+REVIEW_SHA = "LEASE_START_REVIEW_SHA" if LEASE_RETRY else RETRY_REVIEW_SHA if RETRY else "4b8963f5490bd9dba3d9d6db521b9e9e864a28108c7b79bbe420417eefaf82e6"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -265,12 +267,21 @@ def exact_price(price, current, review, attached=False, at=None):
 
 def retry_phase():
     """Authenticate the same exhausted generation while attached or after reset."""
-    review = json.loads(read(PACKAGE / "admission-review.json", RETRY_REVIEW_SHA)[0])
-    archive = runpy.run_path(str(PACKAGE / "v5j_retry.py"))
-    def evidence(path, expected):
-        data, ref = read(path, expected)
-        return json.loads(data), ref
-    require(archive["profile"](evidence, archive["journal"](out)) == review, "changed failed verifier evidence")
+    review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
+    if LEASE_RETRY:
+        archive = runpy.run_path(str(PACKAGE / "v5j_lease_failure.py"))
+        _, proof = archive["historical"]()
+        require(all(proof[k] == review[k] for k in ("failed_phase", "old_manager", "original_pid1_exit",
+                "original_fragment")) and proof["receipts"] == review["predecessor_receipts"]
+                and proof["acquired_child_leases_proved"] is False
+                and review["reader"] == {"path":str(READER), "sha256":IMAGE_SHA}
+                and IMAGE_SHA != archive["IMAGE"], "different failed child or unchanged verifier")
+    else:
+        archive = runpy.run_path(str(PACKAGE / "v5j_retry.py"))
+        def evidence(path, expected):
+            data, ref = read(path, expected)
+            return json.loads(data), ref
+        require(archive["profile"](evidence, archive["journal"](out)) == review, "changed failed verifier evidence")
     retained(review)
     host = Host(review, None)
     manager, events = host.state()
