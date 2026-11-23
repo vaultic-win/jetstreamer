@@ -40,11 +40,16 @@ const MAX_AGE_CORRECTION_EPOCH: u64 = 14;
 // parent may route or publish this candidate. Snapshot creator metadata alone
 // is not treated as evidence that v1.5.8 execution semantics apply out of era.
 // The separately compiled epoch-169 diagnostic replaces this ordinary
-// envelope with one exact root bootstrap and a checkpoint-bounded span.
+// envelope with the original root or its registered hourly Bank, both ending
+// at the same trusted terminal checkpoint.
 #[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
 const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 66_527_778;
 #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
 const MIN_SUPPORTED_SNAPSHOT_SLOT: u64 = 73_007_829;
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_HOURLY_BOOTSTRAP: u64 = 73_238_440;
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_HOURLY_ACCOUNTS_HASH: &str = "GDXFwepRMYKGWDv947uUN9cfoMpunPFDLJHn4cgJx5A5";
 const MIN_SUPPORTED_ENTRY_SLOT: u64 = MIN_SUPPORTED_SNAPSHOT_SLOT + 1;
 #[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
 const MAX_SUPPORTED_SLOT_EXCLUSIVE: u64 = 68_256_000;
@@ -104,10 +109,12 @@ impl RuntimeState {
         let (bank, source) = match initial_state {
             jetstreamer_historical_protocol::InitialState::SnapshotArchive { archive_path } => {
                 let archive_path_ref = Path::new(archive_path);
-                let (archive_slot, _, _) = snapshot::parse_archive_identity(archive_path_ref)?;
-                // Reject out-of-era archives from their committed filename
-                // before spending resources extracting or decoding them.
-                validate_candidate_snapshot_slot(archive_slot)?;
+                let identity = snapshot::parse_archive_identity(archive_path_ref)?;
+                // Reject out-of-era archives before extraction. load_archive
+                // also verifies the recovered Bank against the archive identity.
+                validate_candidate_snapshot_slot(identity.0)?;
+                #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+                validate_epoch169_hourly_snapshot_hash(identity.0, &identity.1)?;
                 let loaded = snapshot::load_archive(
                     archive_path_ref,
                     &state_dir,
@@ -701,12 +708,20 @@ impl RuntimeState {
     }
 }
 
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+fn validate_epoch169_hourly_snapshot_hash(slot: u64, hash: &Hash) -> Result<(), String> {
+    if slot == EPOCH169_HOURLY_BOOTSTRAP && hash.to_string() != EPOCH169_HOURLY_ACCOUNTS_HASH {
+        return Err("epoch 169 hourly diagnostic requires its registered accounts hash".into());
+    }
+    Ok(())
+}
+
 fn validate_candidate_snapshot_slot(slot: u64) -> Result<(), String> {
     #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
-    if slot != MIN_SUPPORTED_SNAPSHOT_SLOT {
+    if slot != MIN_SUPPORTED_SNAPSHOT_SLOT && slot != EPOCH169_HOURLY_BOOTSTRAP {
         return Err(format!(
-            "epoch 169 diagnostic requires snapshot slot {}, got {}",
-            MIN_SUPPORTED_SNAPSHOT_SLOT, slot
+            "epoch 169 diagnostic requires snapshot slot {} or {}, got {}",
+            MIN_SUPPORTED_SNAPSHOT_SLOT, EPOCH169_HOURLY_BOOTSTRAP, slot
         ));
     }
     #[cfg(not(feature = "epoch169-v1-5-8-diagnostic"))]
@@ -1241,7 +1256,13 @@ mod tests {
     #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
     fn epoch169_diagnostic_accepts_only_exact_bootstrap_and_entries() {
         assert!(validate_candidate_snapshot_slot(73_007_829).is_ok());
-        for &slot in &[66_527_778, 68_255_999, 73_007_828, 73_007_830, 73_245_218] {
+        assert!(validate_candidate_snapshot_slot(73_238_440).is_ok());
+        let hourly_hash: Hash = EPOCH169_HOURLY_ACCOUNTS_HASH.parse().unwrap();
+        assert!(validate_epoch169_hourly_snapshot_hash(73_238_440, &hourly_hash).is_ok());
+        assert!(validate_epoch169_hourly_snapshot_hash(73_238_440, &Hash::default()).is_err());
+        for &slot in &[
+            66_527_778, 68_255_999, 73_007_828, 73_007_830, 73_238_439, 73_238_441, 73_245_218,
+        ] {
             assert!(validate_candidate_snapshot_slot(slot).is_err(), "{}", slot);
         }
         assert!(validate_candidate_entry_slot(73_007_830).is_ok());

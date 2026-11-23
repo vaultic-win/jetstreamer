@@ -5692,9 +5692,21 @@ fn qualification_plan(
     }))
 }
 
-/// This feature build is a single private experiment, never an ordinary
-/// epoch-169 producer or an archive publication route. The trusted file
-/// contents and snapshot generation are validated by the normal input gates.
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_HOURLY_BOOTSTRAP: Slot = 73_238_440;
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_HOURLY_SNAPSHOT: &str =
+    "snapshot-73238440-GDXFwepRMYKGWDv947uUN9cfoMpunPFDLJHn4cgJx5A5.tar.zst";
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_HOURLY_ROOT: &str =
+    "/home/sol/.jetstreamer-private/epoch169-hourly-source-20261123-v1";
+#[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+const EPOCH169_TERMINAL_SNAPSHOT: &str =
+    "snapshot-73245218-5aXCD1ZXBe3fPYtrxvFkDvSvz8x68XiRmWfoEnLVLPif.tar.zst";
+
+/// The original and hourly Bank experiments have separate private output and
+/// scratch paths. Both must traverse the signed discrepancy and end at the
+/// independently registered terminal Bank.
 #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
 fn validate_epoch169_diagnostic_launch(
     qualification: Option<QualificationPlan>,
@@ -5707,28 +5719,46 @@ fn validate_epoch169_diagnostic_launch(
     replay_scratch: Option<&Path>,
 ) -> Result<(), String> {
     let plan = qualification.ok_or("epoch 169 diagnostic requires focused qualification")?;
+    let snapshot = snapshot_archive.ok_or("epoch 169 diagnostic snapshot is missing")?;
+    let dest = match plan.bootstrap_slot {
+        73_007_829 => {
+            const ORIGINAL: &str =
+                "snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst";
+            if !snapshot.is_absolute()
+                || snapshot.file_name() != Some(std::ffi::OsStr::new(ORIGINAL))
+            {
+                return Err(
+                    "epoch 169 diagnostic requires the named canonical bootstrap snapshot".into(),
+                );
+            }
+            PathBuf::from(
+                "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/v158",
+            )
+        }
+        EPOCH169_HOURLY_BOOTSTRAP => {
+            let root = Path::new(EPOCH169_HOURLY_ROOT);
+            if snapshot != root.join("inputs").join(EPOCH169_HOURLY_SNAPSHOT) {
+                return Err(
+                    "epoch 169 hourly diagnostic requires the pinned hourly snapshot path".into(),
+                );
+            }
+            root.join("v158")
+        }
+        _ => return Err("epoch 169 diagnostic requires a registered bootstrap".into()),
+    };
     if plan.epoch != 169
-        || plan.bootstrap_slot != 73_007_829
-        || plan.replay_start != 73_007_830
+        || plan.replay_start != plan.bootstrap_slot + 1
+        || plan.output_slot_start != plan.replay_start.max(epoch_to_slot_range(169).0)
         || plan.end_inclusive != 73_245_218
         || !allow_candidate_runtime
         || incompatible_mode
     {
         return Err("epoch 169 diagnostic requires exact focused interval, candidate opt-in, and no other replay mode".into());
     }
-    const SNAPSHOT_NAME: &str =
-        "snapshot-73007829-AgJkU9ZTLnhbCHK54yWFCG4N9sxbtLPRgkCZqwpdWF9R.tar.zst";
-    let snapshot = snapshot_archive.ok_or("epoch 169 diagnostic snapshot is missing")?;
-    if !snapshot.is_absolute() || snapshot.file_name() != Some(std::ffi::OsStr::new(SNAPSHOT_NAME))
-    {
-        return Err("epoch 169 diagnostic requires the named canonical bootstrap snapshot".into());
-    }
-    let private_root =
-        Path::new("/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1");
-    if dest_dir != private_root.join("v158")
-        || epoch_hashes != Some(dest_dir.join("epoch-hashes-169-focused.txt").as_path())
-        || horizon_output != Some(dest_dir.join("epoch-169-through-73245218.jet").as_path())
-        || replay_scratch != Some(dest_dir.join("scratch").as_path())
+    if dest_dir != dest
+        || epoch_hashes != Some(dest.join("epoch-hashes-169-focused.txt").as_path())
+        || horizon_output != Some(dest.join("epoch-169-through-73245218.jet").as_path())
+        || replay_scratch != Some(dest.join("scratch").as_path())
     {
         return Err(
             "epoch 169 diagnostic requires exact private input, output, and scratch paths".into(),
@@ -15221,6 +15251,16 @@ fn qualification_expectations(
             "qualification snapshot changed after CLI validation: expected slot {}, got {snapshot_slot}",
             plan.bootstrap_slot
         ));
+    }
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    if plan.epoch == 169 && plan.bootstrap_slot == EPOCH169_HOURLY_BOOTSTRAP {
+        let (terminal, hash) =
+            snapshot_path_expectation(Path::new(EPOCH169_TERMINAL_SNAPSHOT), bootstrap)?;
+        if plan.end_inclusive != terminal || expected.get(&terminal) != Some(&hash) {
+            return Err(
+                "epoch 169 hourly diagnostic requires the pinned terminal accounts hash".into(),
+            );
+        }
     }
     if let Some(resume) = resume {
         resume.validate_bootstrap_expectation(plan, snapshot_archive, snapshot_expectation)?;
@@ -25872,6 +25912,94 @@ mod early_snapshot_tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
+    fn epoch169_hourly_diagnostic_binds_input_output_and_terminal_bank() {
+        let root = Path::new(EPOCH169_HOURLY_ROOT);
+        let dest = root.join("v158");
+        let snapshot = root.join("inputs").join(EPOCH169_HOURLY_SNAPSHOT);
+        let hashes = dest.join("epoch-hashes-169-focused.txt");
+        let output = dest.join("epoch-169-through-73245218.jet");
+        let scratch = dest.join("scratch");
+        let plan = qualification_plan(
+            169,
+            169,
+            Some(73_245_218),
+            Some(true),
+            Some(&snapshot),
+            Some(&hashes),
+            Some(&output),
+        )
+        .unwrap()
+        .unwrap();
+        let check = |plan, path: &Path, target: &Path, candidate, other_mode| {
+            validate_epoch169_diagnostic_launch(
+                Some(plan),
+                candidate,
+                other_mode,
+                target,
+                Some(path),
+                Some(&hashes),
+                Some(&output),
+                Some(&scratch),
+            )
+        };
+        assert!(check(plan, &snapshot, &dest, true, false).is_ok());
+        assert!(check(plan, &snapshot, &dest, false, false).is_err());
+        assert!(check(plan, &snapshot, &dest, true, true).is_err());
+        assert!(check(plan, &snapshot, Path::new("/home/sol/horizon"), true, false).is_err());
+        assert!(
+            check(
+                plan,
+                &dest.join(EPOCH169_HOURLY_SNAPSHOT),
+                &dest,
+                true,
+                false
+            )
+            .is_err()
+        );
+        for wrong_plan in [
+            QualificationPlan {
+                bootstrap_slot: 73_238_439,
+                ..plan
+            },
+            QualificationPlan {
+                replay_start: 73_238_442,
+                ..plan
+            },
+            QualificationPlan {
+                output_slot_start: 73_239_086,
+                ..plan
+            },
+            QualificationPlan {
+                end_inclusive: 73_239_086,
+                ..plan
+            },
+            QualificationPlan {
+                bootstrap_slot: 73_007_829,
+                ..plan
+            },
+        ] {
+            assert!(check(wrong_plan, &snapshot, &dest, true, false).is_err());
+        }
+        let bootstrap = compatibility::SOLANA_V1_5_8_RUNTIME.bootstrap;
+        let (first, bank) = snapshot_path_expectation(&snapshot, bootstrap).unwrap();
+        let (end, terminal) =
+            snapshot_path_expectation(Path::new(EPOCH169_TERMINAL_SNAPSHOT), bootstrap).unwrap();
+        let trusted = BTreeMap::from([(first, bank), (end, terminal)]);
+        assert_eq!(
+            qualification_expectations(trusted.clone(), plan, &snapshot, bootstrap, None).unwrap(),
+            trusted
+        );
+        for bad in [
+            BTreeMap::from([(first, bank)]),
+            BTreeMap::from([(first, bank), (end, bank)]),
+            BTreeMap::from([(first, terminal), (end, terminal)]),
+        ] {
+            assert!(qualification_expectations(bad, plan, &snapshot, bootstrap, None).is_err());
+        }
     }
 
     #[test]

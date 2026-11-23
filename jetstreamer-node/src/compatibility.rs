@@ -4242,18 +4242,19 @@ mod tests {
     #[test]
     #[cfg(feature = "epoch169-v1-5-8-diagnostic")]
     fn epoch169_focused_route_is_not_a_production_era() {
-        let range = 73_007_830..73_245_219;
-        assert_eq!(
-            select_runtime(range.clone(), true).unwrap().backend,
-            RuntimeBackend::SolanaV1_5_6
-        );
-        assert!(select_focused_qualification_runtime(range.clone(), false).is_err());
-        assert_eq!(
-            select_focused_qualification_runtime(range, true)
-                .unwrap()
-                .backend,
-            RuntimeBackend::SolanaV1_5_8
-        );
+        for range in [73_007_830..73_245_219, 73_238_441..73_245_219] {
+            assert_eq!(
+                select_runtime(range.clone(), true).unwrap().backend,
+                RuntimeBackend::SolanaV1_5_6
+            );
+            assert!(select_focused_qualification_runtime(range.clone(), false).is_err());
+            assert_eq!(
+                select_focused_qualification_runtime(range, true)
+                    .unwrap()
+                    .backend,
+                RuntimeBackend::SolanaV1_5_8
+            );
+        }
         assert_eq!(
             select_focused_qualification_runtime(73_007_829..73_007_830, true)
                 .unwrap()
