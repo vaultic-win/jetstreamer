@@ -1,13 +1,14 @@
 import hashlib,json,os,re,stat,subprocess,sys
 from pathlib import Path
 work=Path(__file__).resolve().parents[2]
-assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch168-cold-v3','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
+assert len(sys.argv)==3 or (len(sys.argv)==4 and sys.argv[3] in ('epoch167-cold-v3','epoch168-cold-v2','epoch168-cold-v3','epoch168-cold-v4','epoch166-retry11','epoch170-retry11','epoch170-retry12','epoch170-retry13'))
 cold167=sys.argv[3:]==['epoch167-cold-v3']
 cold168v3=sys.argv[3:]==['epoch168-cold-v3']
-cold168=sys.argv[3:]==['epoch168-cold-v2'] or cold168v3
-guard168ver='v3' if cold168v3 else 'v2'
-guard168date='20261123' if cold168v3 else '20261122'
-attempt168=3 if cold168v3 else 2
+cold168v4=sys.argv[3:]==['epoch168-cold-v4']
+cold168=sys.argv[3:]==['epoch168-cold-v2'] or cold168v3 or cold168v4
+guard168ver='v4' if cold168v4 else ('v3' if cold168v3 else 'v2')
+guard168date='20261123' if cold168v3 or cold168v4 else '20261122'
+attempt168=int(guard168ver[1:])
 retry11=sys.argv[3:]==['epoch166-retry11']
 retry170=sys.argv[3:] in (['epoch170-retry11'],['epoch170-retry12'],['epoch170-retry13'])
 attempt=sys.argv[3].split('-')[-1] if retry170 else None
@@ -115,10 +116,14 @@ cases=[("positive",plan),("wrong-cap",dict(plan,maximum_root_physical_bytes=(384
                 ("missing-witness",{k:v for k,v in plan.items() if k!="data_fulfillment"})]
 if cold168:
  cases.append(('wrong-predecessor-168',dict(plan,unit='horizon-qualify-168-full-metered-20261121-v1.service')))
-if cold168v3:
+if cold168v3 or cold168v4:
  cases.append(('spent-retry2-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v2-20261122.service')))
  old=runtime/'epoch168-cold-guard-20261122-v2/contract'
  cases.append(('spent-retry2-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),'deployment_seal':ref(old/'deployment-seal-receipt.json')})))
+if cold168v4:
+ cases.append(('spent-retry3-168',dict(plan,unit='horizon-qualify-168-full-metered-cold-v3-20261123.service')))
+ old=runtime/'epoch168-cold-guard-20261123-v3/contract'
+ cases.append(('spent-retry3-contract',dict(plan,data_fulfillment={'contract':ref(old/'contract.json'),'deployment_seal':ref(old/'deployment-seal-receipt.json')})))
 if retry170:
  predecessor={'retry11':'retry10','retry12':'retry11','retry13':'retry12'}[attempt]
  old_170_contract=runtime/(f'epoch170-{predecessor}-guard-20261122-v1/contract' if predecessor!='retry10' else 'epoch170-retry10-guard384-20261121-v1/contract')

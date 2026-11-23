@@ -716,6 +716,7 @@ fn run() -> Result<()> {
         feature = "epoch166-retry11",
         feature = "epoch168-cold-v2",
         feature = "epoch168-cold-v3",
+        feature = "epoch168-cold-v4",
         feature = "epoch170-retry11",
         feature = "epoch170-retry12",
         feature = "epoch170-retry13"
