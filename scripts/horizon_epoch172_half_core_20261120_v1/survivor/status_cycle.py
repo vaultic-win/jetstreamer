@@ -29,7 +29,6 @@ import focused169_completion
 import full172
 import owners
 import prefix140_storage
-import private136
 import race166
 import ready_audit_growth
 import resident_clock
@@ -38,6 +37,10 @@ import status
 sys.path.insert(0,str(CURRENT.parent))
 import cold167_status
 import cold166_status
+
+if PRIVATE136:
+    private136 = cycle.private136
+    need(Path(private136.__file__) == PACKAGE / 'private136.py', 'different inherited epoch 136 observer')
 
 cold_workers = cold166_status
 if any(CURRENT.with_name(f'{name}-170-generation.json').is_file() for name in ('retry11','retry12','retry13')):
