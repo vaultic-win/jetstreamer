@@ -21,13 +21,8 @@ use {
     },
 };
 
-#[path = "horizon_boundary_bridge/native_full.rs"]
-mod native_full;
-
 const PLAN_SCHEMA: &str = "jetstreamer-horizon-boundary-bridge-plan-v1";
 const PLAN_SCHEMA_MIXED_UID: &str = "jetstreamer-horizon-boundary-bridge-plan-v2";
-const PLAN_SCHEMA_NATIVE: &str = "jetstreamer-horizon-boundary-bridge-plan-v3";
-const RECEIPT_SCHEMA_NATIVE: &str = "jetstreamer-horizon-boundary-bridge-receipt-v2";
 const RECEIPT_SCHEMA: &str = "jetstreamer-horizon-boundary-bridge-receipt-v1";
 const MAX_PLAN_BYTES: u64 = 1024 * 1024;
 const MAX_EVIDENCE_BYTES: u64 = 1024 * 1024;
@@ -73,7 +68,6 @@ struct ArchiveEvidence {
     archive: PathBuf,
     sidecar: PathBuf,
     full_receipt: PathBuf,
-    native_full: Option<native_full::Binding>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,8 +124,7 @@ struct ValidatedArchive {
     sidecar_identity: FileIdentity,
     full_receipt_identity: FileIdentity,
     full_verifier_sha256: String,
-    full_script_sha256: Option<String>,
-    native_full: Option<native_full::Binding>,
+    full_script_sha256: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -148,7 +141,7 @@ struct Receipt {
     authority: ReceiptAuthority,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct BoundFile {
     path: String,
@@ -176,10 +169,7 @@ struct ArchiveReceipt {
     sidecar_identity: FileIdentity,
     full_receipt_identity: FileIdentity,
     full_verifier_sha256: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    full_script_sha256: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    native_full: Option<native_full::Binding>,
+    full_script_sha256: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -376,11 +366,6 @@ fn full_receipt_owner_matches(receipt_uid: u32, artifact_uid: u32) -> bool {
 }
 
 fn artifact_uids(plan: &Plan) -> Result<(u32, u32)> {
-    let native = plan.left.native_full.is_some() || plan.right.native_full.is_some();
-    ensure!(
-        native == (plan.schema == PLAN_SCHEMA_NATIVE),
-        "native full receipt requires a v3 plan"
-    );
     match plan.schema.as_str() {
         PLAN_SCHEMA => {
             ensure!(
@@ -390,7 +375,7 @@ fn artifact_uids(plan: &Plan) -> Result<(u32, u32)> {
             );
             Ok((plan.expected_artifact_uid, plan.expected_artifact_uid))
         }
-        PLAN_SCHEMA_MIXED_UID | PLAN_SCHEMA_NATIVE => {
+        PLAN_SCHEMA_MIXED_UID => {
             let left = plan
                 .left_expected_artifact_uid
                 .context("missing left owner")?;
@@ -430,17 +415,12 @@ fn validate_archive(
         evidence.sidecar == Path::new(&expected_sidecar),
         "sidecar path mismatch"
     );
-    let full_name = if evidence.native_full.is_some() {
-        "local-acceptance.json".to_owned()
-    } else {
-        format!("epoch-{epoch}.full.ok")
-    };
     ensure!(
         evidence
             .full_receipt
             .file_name()
             .and_then(|value| value.to_str())
-            == Some(full_name.as_str()),
+            == Some(&format!("epoch-{epoch}.full.ok")),
         "full receipt name does not match epoch"
     );
     let archive_identity = inspect_archive(&evidence.archive, expected_uid)?;
@@ -469,25 +449,8 @@ fn validate_archive(
         u32::from_str_radix(&full_receipt_identity.mode, 8)? & 0o022 == 0,
         "full receipt is group/other writable"
     );
-    let (full_verifier_sha256, full_script_sha256) = if let Some(binding) = &evidence.native_full {
-        ensure!(
-            full_receipt_identity.uid == 0 && full_receipt_identity.mode == "0400",
-            "native acceptance must be root-private and read-only"
-        );
-        let verifier = binding.verify(
-            evidence,
-            epoch,
-            &digest,
-            &archive_identity,
-            &sidecar_identity,
-            &receipt_bytes,
-            allowlist,
-        )?;
-        (verifier, None)
-    } else {
-        let (verifier, script) = parse_full_receipt(&receipt_bytes, &digest, allowlist)?;
-        (verifier, Some(script))
-    };
+    let (full_verifier_sha256, full_script_sha256) =
+        parse_full_receipt(&receipt_bytes, &digest, allowlist)?;
     Ok(ValidatedArchive {
         epoch,
         digest,
@@ -499,7 +462,6 @@ fn validate_archive(
         full_receipt_identity,
         full_verifier_sha256,
         full_script_sha256,
-        native_full: evidence.native_full.clone(),
     })
 }
 
@@ -647,15 +609,6 @@ fn archive_receipt(value: &ValidatedArchive) -> ArchiveReceipt {
         full_receipt_identity: value.full_receipt_identity.clone(),
         full_verifier_sha256: value.full_verifier_sha256.clone(),
         full_script_sha256: value.full_script_sha256.clone(),
-        native_full: value.native_full.clone(),
-    }
-}
-
-fn receipt_schema(left: &ArchiveReceipt, right: &ArchiveReceipt) -> &'static str {
-    if left.native_full.is_some() || right.native_full.is_some() {
-        RECEIPT_SCHEMA_NATIVE
-    } else {
-        RECEIPT_SCHEMA
     }
 }
 
@@ -678,7 +631,7 @@ fn validate_existing_private_receipt(
     let value: Receipt =
         serde_json::from_slice(bytes).context("invalid existing private receipt")?;
     ensure!(
-        value.schema == receipt_schema(expected.left, expected.right),
+        value.schema == RECEIPT_SCHEMA,
         "private receipt schema mismatch"
     );
     ensure!(
@@ -769,8 +722,7 @@ fn main() -> Result<()> {
     ensure!(is_digest(&plan.verifier.sha256), "invalid verifier digest");
     ensure!(
         !plan.full_receipt_allowlist.verifier_sha256.is_empty()
-            && (!plan.full_receipt_allowlist.script_sha256.is_empty()
-                || (plan.left.native_full.is_some() && plan.right.native_full.is_some())),
+            && !plan.full_receipt_allowlist.script_sha256.is_empty(),
         "full receipt allowlist is empty"
     );
     ensure!(
@@ -946,7 +898,7 @@ fn main() -> Result<()> {
         Err(error) => return Err(error),
     }
     let receipt = Receipt {
-        schema: receipt_schema(&left_receipt, &right_receipt).to_owned(),
+        schema: RECEIPT_SCHEMA.to_owned(),
         recorded_unix_seconds: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
         plan: BoundFile {
             path: arguments.plan.display().to_string(),
@@ -1075,8 +1027,7 @@ mod tests {
             sidecar_identity: test_identity(),
             full_receipt_identity: test_identity(),
             full_verifier_sha256: "d".repeat(64),
-            full_script_sha256: Some("e".repeat(64)),
-            native_full: None,
+            full_script_sha256: "e".repeat(64),
         }
     }
 
