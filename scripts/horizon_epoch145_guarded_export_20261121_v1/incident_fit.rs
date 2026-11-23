@@ -510,6 +510,28 @@ pub fn timer_inspection_timeout(stderr: &str, provider: &str) -> bool {
         && lines.next_back() == Some(expected.as_str())
 }
 
+#[cfg(incident_guard_walk145_only)]
+fn retained_donor_pressure(stderr: &str, provider: &str) -> bool {
+    let Some(directory) = Path::new(provider).parent() else {
+        return false;
+    };
+    let frame = format!("  File \"{provider}\", line ");
+    let donor_frame = format!(
+        "  File \"{}\", line ",
+        directory.join("build_159_price.py").display()
+    );
+    let mut lines = stderr.trim_end().lines();
+    lines.next() == Some("Traceback (most recent call last):")
+        && lines
+            .next()
+            .is_some_and(|line| line.starts_with(&frame) && line.ends_with(", in <module>"))
+        && lines.next_back() == Some("ValueError: insufficient HOME or general-slot memory")
+        && lines
+            .clone()
+            .any(|line| line.starts_with(&frame) && line.ends_with(", in capture"))
+        && lines.any(|line| line.starts_with(&donor_frame) && line.ends_with(", in cover"))
+}
+
 fn reserved_memory(_complete: &Value) -> Result<u64> {
     #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
     let qualification_memory = match &_complete["bounded_qualification"] {
@@ -688,6 +710,16 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         .output()?;
     let err = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
+        #[cfg(incident_guard_walk145_only)]
+        if out.status.code() == Some(1)
+            && out.stdout.is_empty()
+            && retained_donor_pressure(&err, PROVIDER)
+        {
+            // The original guarded stop window still applies. Only a new
+            // complete fit can resume the worker, and no new worker is admitted.
+            return Err(anyhow::Error::new(capacity::GuardInFlight)
+                .context("retained donor HOME or general-slot memory is temporarily insufficient"));
+        }
         if cfg!(any(incident_rejoin145_only, incident_post145_only))
             && out.status.signal() == Some(libc::SIGALRM)
             && out.stdout.is_empty()
@@ -1275,6 +1307,28 @@ fn remaining136(sample: &Value) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(incident_guard_walk145_only)]
+    #[test]
+    fn capacity_pressure_requires_the_exact_sealed_provider_and_donor_frames() {
+        let provider = "/sealed/fit/post-stop-fit";
+        let trace = format!(
+            "Traceback (most recent call last):\n  File \"{provider}\", line 1320, in <module>\n  File \"{provider}\", line 1260, in capture\n  File \"/sealed/fit/build_159_price.py\", line 150, in cover\nValueError: insufficient HOME or general-slot memory\n"
+        );
+        assert!(retained_donor_pressure(&trace, provider));
+        assert!(!retained_donor_pressure(
+            &trace.replace("/sealed/fit/build_159_price.py", "/unsealed/build_159_price.py"),
+            provider
+        ));
+        assert!(!retained_donor_pressure(
+            &trace.replace(", in cover", ", in snapshot"),
+            provider
+        ));
+        assert!(!retained_donor_pressure(
+            &trace.replace("insufficient HOME or general-slot memory", "different donor or producer topology"),
+            provider
+        ));
+    }
     #[cfg(incident_five_lane145_only)]
     #[test]
     #[ignore = "requires both root-owned production park plans"]
