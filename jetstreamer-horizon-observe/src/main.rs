@@ -127,6 +127,8 @@ struct Config {
     #[serde(default)]
     successor247_claim: Option<serde_json::Value>,
     #[serde(default)]
+    delivery248_claim: Option<delivery247_resource::DeliveryClaim>,
+    #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
 }
 
@@ -343,6 +345,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
             || !config.diagnostic_replays.is_empty()
             || !config.native_input_diagnostics.is_empty()
             || config.staged247_resource_only
+            || config.delivery248_claim.is_some()
             || config.delivery247_resource_only
             || config.singleton247_finalization
             || !config.singleton_finalization_epochs.is_empty(),
@@ -390,6 +393,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "delivery247_resource_only":config.delivery247_resource_only,
             "staged247_resource_only":config.staged247_resource_only,
             "successor247_claim":config.successor247_claim,
+            "delivery248_claim":config.delivery248_claim,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
@@ -1980,12 +1984,15 @@ fn run(config: Config) -> Result<()> {
     for epoch in singleton247_finalization::epochs(&config)? {
         diagnostic_observations.push(singleton247_finalization::sample(epoch, started_unix)?);
     }
-    let delivery_resources = delivery247_resource::sample(
+    let mut delivery_resources = delivery247_resource::sample(
         config.delivery247_resource_only,
         config.staged247_resource_only,
         config.successor247_claim.as_ref(),
         started_unix,
     );
+    if let Some(claim) = &config.delivery248_claim {
+        delivery_resources.push(delivery247_resource::sample248(claim, started_unix));
+    }
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
             std::slice::from_ref(&auxiliary.replay),
@@ -2508,6 +2515,7 @@ mod tests {
             delivery247_resource_only: false,
             staged247_resource_only: false,
             successor247_claim: None,
+            delivery248_claim: None,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
