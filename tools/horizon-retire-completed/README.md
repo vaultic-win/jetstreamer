@@ -55,3 +55,10 @@ mutation lock, and removed **13,110,140,928 allocated bytes**. The audit is
 The selected snapshot is absent; all four sibling metadata files remain.
 No R2 object was modified. The completed plan cannot be reused as another file's
 authority, and the remaining immutable metadata is retained as audit evidence.
+
+Build with `--features anza-parked-183` for the exact closed Anza lane-a epoch 183
+copy. Supply the native `holding_custody` receipt as an additional path and
+SHA-256 binding in the plan. The tool checks the terminal holding worker and
+authenticated scratch body and manifest, then checks canonical R2 readiness
+under the original controller, holding, and local mutation locks. Use the
+same check-only and execution commands shown above.

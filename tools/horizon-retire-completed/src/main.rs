@@ -20,8 +20,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const PRIVATE: &str = "/home/ubuntu/.jetstreamer-private";
-const LOCK: &str = "/home/ubuntu/.jetstreamer-private/r2-receipts/local-mutation.lock";
+#[cfg(feature = "anza-parked-183")]
+mod anza_parked_183;
+
+const HOME_ROOT: &str = if cfg!(feature = "anza-parked-183") {
+    "/home/sol"
+} else {
+    "/home/ubuntu"
+};
 const LIMIT: u64 = 16 << 20;
 const EPOCH246_BOOTSTRAP: &str = "/var/lib/jetstreamer/horizon246-bootstrap-copy1636-work-v2/projection/bootstrap/snapshot-106271618-6LSJUywaryX8vRn53cbWqLJiTwBCCb3wnNTPevWfqtQD.tar.zst";
 const EPOCH246_BOOTSTRAP_SHA: &str =
@@ -91,6 +97,8 @@ struct Plan {
     targets: Vec<Target>,
     inactive_units: Vec<String>,
     audit: PathBuf,
+    #[cfg(feature = "anza-parked-183")]
+    holding_custody: Bound,
 }
 fn stamp(m: &fs::Metadata) -> Stamp {
     Stamp {
@@ -202,8 +210,12 @@ fn ready(epoch: u64, receipt: &Value, inventory: &Value) -> Result<()> {
     Ok(())
 }
 fn check_target(t: &Target) -> Result<()> {
+    #[cfg(feature = "anza-parked-183")]
+    let scope = anza_parked_183::is_target(t);
+    #[cfg(not(feature = "anza-parked-183"))]
+    let scope = (201..=300).contains(&t.epoch);
     ensure!(
-        t.epoch >= 201 && t.epoch <= 300 && !t.reason.trim().is_empty(),
+        scope && !t.reason.trim().is_empty(),
         "invalid target authorization"
     );
     ensure!(
@@ -252,7 +264,8 @@ fn check_target(t: &Target) -> Result<()> {
 }
 
 fn ordinary_private_path(path: &Path) -> bool {
-    path.starts_with(PRIVATE) && !path.starts_with(Path::new(PRIVATE).join("r2-receipts"))
+    let private = Path::new(HOME_ROOT).join(".jetstreamer-private");
+    path.starts_with(&private) && !path.starts_with(private.join("r2-receipts"))
 }
 fn external_bootstrap_path(epoch: u64, path: &Path) -> bool {
     epoch == 246 && path == Path::new(EPOCH246_BOOTSTRAP)
@@ -331,6 +344,11 @@ fn scan_consumers(targets: &[Target]) -> Result<()> {
                         !contains(&data, t.path.as_os_str().as_bytes()),
                         "PID {pid} references {} in {name}",
                         t.path.display()
+                    );
+                    #[cfg(feature = "anza-parked-183")]
+                    ensure!(
+                        name != "maps" || !anza_parked_183::has_mapping(&data, t),
+                        "PID {pid} maps the selected archive inode"
                     );
                 }
             }
@@ -465,11 +483,14 @@ fn run() -> Result<()> {
         proof_epochs == epochs && p.proofs.len() == epochs.len(),
         "proof/target epoch mismatch"
     );
+    let receipts = Path::new(HOME_ROOT).join(".jetstreamer-private/r2-receipts");
+    #[cfg(feature = "anza-parked-183")]
+    let _holding_locks = anza_parked_183::lock_original_owners()?;
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
         .custom_flags(libc::O_NOFOLLOW)
-        .open(LOCK)?;
+        .open(receipts.join("local-mutation.lock"))?;
     ensure!(
         lock.metadata()?.is_file() && lock.metadata()?.nlink() == 1,
         "unsafe lock"
@@ -478,6 +499,8 @@ fn run() -> Result<()> {
         unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
         "mutation lock busy"
     );
+    #[cfg(feature = "anza-parked-183")]
+    anza_parked_183::verify(&p, &lock)?;
     let bm = exact(&p.inventory_binary.path)?;
     ensure!(
         bm.uid() == 0
@@ -487,16 +510,19 @@ fn run() -> Result<()> {
     );
     inactive(&p.inactive_units)?;
     scan_consumers(&p.targets)?;
+    let horizon = Path::new(HOME_ROOT).join("horizon");
     let output = Command::new(&p.inventory_binary.path)
         .env("TOKIO_WORKER_THREADS", "2")
-        .args([
-            "inventory",
-            "/home/ubuntu/horizon",
-            "--epochs",
-            &format!("{}-{}", epochs.first().unwrap(), epochs.last().unwrap()),
-            "--receipt-directory",
-            "/home/ubuntu/.jetstreamer-private/r2-receipts",
-        ])
+        .arg("inventory")
+        .arg(horizon)
+        .arg("--epochs")
+        .arg(format!(
+            "{}-{}",
+            epochs.first().unwrap(),
+            epochs.last().unwrap()
+        ))
+        .arg("--receipt-directory")
+        .arg(receipts)
         .output()?;
     ensure!(
         output.status.success(),
@@ -541,6 +567,8 @@ fn run() -> Result<()> {
     File::open(p.audit.parent().unwrap())?.sync_all()?;
     let mut bytes = 0;
     for t in &p.targets {
+        #[cfg(feature = "anza-parked-183")]
+        anza_parked_183::check_owners()?;
         inactive(&p.inactive_units)?;
         scan_consumers(std::slice::from_ref(t))?;
         event(
@@ -587,12 +615,13 @@ mod tests {
             assert!(!external_bootstrap_path(246, Path::new(path)));
         }
         assert!(!external_bootstrap_path(247, Path::new(EPOCH246_BOOTSTRAP)));
-        assert!(ordinary_private_path(Path::new(
-            "/home/ubuntu/.jetstreamer-private/old/archive"
-        )));
-        assert!(!ordinary_private_path(Path::new(
-            "/home/ubuntu/.jetstreamer-private/r2-receipts/epoch-246.r2.json"
-        )));
+        let home = Path::new(HOME_ROOT);
+        assert!(ordinary_private_path(
+            &home.join(".jetstreamer-private/old/archive")
+        ));
+        assert!(!ordinary_private_path(
+            &home.join(".jetstreamer-private/r2-receipts/epoch-246.r2.json")
+        ));
     }
 
     #[test]
