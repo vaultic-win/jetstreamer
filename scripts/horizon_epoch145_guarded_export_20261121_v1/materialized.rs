@@ -237,6 +237,13 @@ pub fn verify(parent: u32, sha: &str) -> Result<()> {
     let src = lease(Path::new(SOURCE))?;
     let manifest = lease(Path::new(MANIFEST))?;
     let candidate = lease(&file)?;
+    #[cfg(incident_lease_start145_only)]
+    {
+        post::lease_startup::stop_after_leases()?;
+        src.check()?;
+        manifest.check()?;
+        candidate.check()?;
+    }
     source_identity()?;
     let before = custody::frozen_identity(&file)?;
     let mut source = epoch145_extract::PinnedSource::open(
@@ -354,10 +361,11 @@ pub fn run(fleet: Bound, sha: &str) -> Result<()> {
         if let Some(verified) = prior_verified {
             custody::write_new(&root.join("verified-frozen.json"), &verified)?;
         } else {
-            post::run_child(
+            post::run_child_with_startup(
                 Command::new(IMAGE).args(["recover-worker", &std::process::id().to_string(), sha]),
                 &fit,
                 &original,
+                cfg!(incident_lease_start145_only),
             )?;
         }
         let verification = custody::binding(&root.join("verified-frozen.json"))?;

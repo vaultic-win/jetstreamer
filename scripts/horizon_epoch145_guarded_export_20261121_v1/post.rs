@@ -181,10 +181,22 @@ macro_rules! implement_guard {
 implement_guard!(capacity::Fit);
 #[cfg(incident145_only)]
 implement_guard!(crate::incident_fit::Fit);
+#[path = "lease_startup.rs"]
+pub(super) mod lease_startup;
+
 pub(super) fn run_child(
     command: &mut Command,
     fit: &impl VerificationGuard,
     lease: &source_lease::ReadLease,
+) -> Result<()> {
+    run_child_with_startup(command, fit, lease, false)
+}
+
+pub(super) fn run_child_with_startup(
+    command: &mut Command,
+    fit: &impl VerificationGuard,
+    lease: &source_lease::ReadLease,
+    waits_for_lease_census: bool,
 ) -> Result<()> {
     fit.await_topology()?;
     fit.await_current(0)?;
@@ -205,6 +217,24 @@ pub(super) fn run_child(
     let result = (|| -> Result<()> {
         let pid = child.id();
         let ticks = native::ticks(pid)?;
+        let sample_and_resume = |deadline| -> Result<()> {
+            let sample = while_stopped(pid, ticks, deadline, || {
+                lease.check()?;
+                fit.topology()?;
+                fit.current(0)
+            })?;
+            ensure!(
+                unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
+                "resume guarded verifier"
+            );
+            println!("{} epoch145 verification guard {}", custody::now()?, sample);
+            Ok(())
+        };
+        if waits_for_lease_census {
+            let deadline = Instant::now() + Duration::from_secs(90);
+            lease_startup::wait_for_lease_stop(&child, deadline)?;
+            sample_and_resume(deadline)?;
+        }
         let mut last = Instant::now();
         loop {
             if let Some(status) = child.try_wait()? {
@@ -233,17 +263,7 @@ pub(super) fn run_child(
                     }
                     return Err(e);
                 }
-                let sample =
-                    while_stopped(pid, ticks, Instant::now() + Duration::from_secs(90), || {
-                        lease.check()?;
-                        fit.topology()?;
-                        fit.current(0)
-                    })?;
-                ensure!(
-                    unsafe { libc::kill(pid.try_into()?, libc::SIGCONT) } == 0,
-                    "resume guarded verifier"
-                );
-                println!("{} epoch145 verification guard {}", custody::now()?, sample);
+                sample_and_resume(Instant::now() + Duration::from_secs(90))?;
                 last = Instant::now();
             }
             thread::sleep(Duration::from_secs(3));
