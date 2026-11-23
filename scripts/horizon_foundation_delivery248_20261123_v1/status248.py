@@ -80,12 +80,12 @@ def timing(now, items, owner=delivery248):
     return dict(phase=phase,seconds=math.ceil(remaining+1800),elapsed=elapsed_ms,owner=launch['unit']['InvocationID'],
                 claim=claim_ref,benchmark=ref(benchmark),original_upload=history_ref,log=log,at=now)
 
-def start(owner=delivery248):
+def start(owner=delivery248, previous_receipt=None):
     directory = owner.ROOT/'origin-clock-status'
     claim_ref,claim,book,launch = owner.registered()
     fleet = Path(book['fit']['fleet']['path'])
     v = fleet.parent.name.split('-v')[1].split('-')[0]
-    prev = ref(D/f'horizon-resumed-campaign-status-v{v}-a1/{owner.EPOCH}/completion.json')
+    prev = previous_receipt or ref(D/f'horizon-resumed-campaign-status-v{v}-a1/{owner.EPOCH}/completion.json')
     if owner.EPOCH == 248:
         first = ref(FIRST/'completion.json')
         assert bound(bound(first)['intent'])['previous'] == prev
