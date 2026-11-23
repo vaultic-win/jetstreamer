@@ -242,6 +242,15 @@ fn roster(review: &Value, a: &Value) -> Result<Vec<(periodic::Control, Value)>> 
     Ok(entries)
 }
 pub(super) fn capture(n: &mut Native, review: &Value, a: &Value) -> Result<Window> {
+    if review.get("closed266_booking").is_some() {
+        native266_full::closed266_for257::booking(review)?;
+        ensure!(a["epoch"]==257 && a["capacity"]["closed266_booking"]==review["closed266_booking"]
+            && a["actual_current_memory"].as_object().is_some_and(|m|m.len()==6),
+            "missing 257 funding census");
+        // The enrolled cohort consists solely of uploaders and private transfers. Its
+        // exact manager/cgroup roster is rechecked before activation and token release.
+        return capture_roster(n,review,a,vec![]);
+    }
     if review.get("capped_cold_fit").is_some() {
         native266_capped::checked_review(review)?;
         let fleet = native266_full::peer261::latest(&binding(&review["fleet"])?)?;

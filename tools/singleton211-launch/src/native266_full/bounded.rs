@@ -83,7 +83,7 @@ const PARK251: &str = "horizon251-private-holding-v205-a1-park.service";
 const HARD: u64 = 1_212_131_577_856;
 const FROM_228: u64 = 76_000_000_000;
 const FROM_265: u64 = MEMORY + GUARD_MEM + CONTROL_MEM - FROM_228;
-fn issuer_lock(r: &Value) -> Result<()> {
+pub(super) fn issuer_lock(r: &Value) -> Result<()> {
     let pid = num(r, "issuer_pid")?;
     let stat = fs::read_to_string(format!("/proc/{pid}/stat"))?;
     ensure!(

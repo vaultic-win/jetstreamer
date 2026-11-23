@@ -116,12 +116,53 @@ fn census(
     fleet: &Value,
     controller: &str,
     owners: &BTreeMap<String, Value>,
-) -> Result<()> {
+    held: bool,
+) -> Result<BTreeMap<String, u64>> {
     let mut expected: BTreeSet<_> = owners.keys().cloned().collect();
+    if held {
+        let actor = n.show(native257::UNIT)?;
+        let iid = text(&actor, "InvocationID")?;
+        live::finite_owner(
+            &actor,
+            native257::UNIT,
+            iid,
+            native257_fit::NATIVE257_MEMORY,
+        )?;
+        crate::gate::held_image(
+            text(&actor, "MainPID")?.parse()?,
+            iid,
+            native257::UNIT,
+            native257::HARNESS,
+        )?;
+        expected.insert(native257::UNIT.to_owned());
+    }
     ensure!(
-        expected.insert(controller.to_owned()) && funding::manager_units(n)? == expected,
-        "live service roster changed"
+        expected.insert(controller.to_owned()),
+        "controller overlaps a booked owner"
     );
+    let mut active_units = funding::manager_units(n)?;
+    // The original 266 guard periodically wakes even after its producer drained.
+    // Only accept a complete census after that actual firing has finished.
+    let guard = "horizon-266-general-protective-v1.service";
+    if active_units.contains(guard)
+        && active_units
+            .difference(&expected)
+            .eq(std::iter::once(&guard.to_owned()))
+    {
+        let timer = n.show_fields(
+            "horizon-266-general-protective-v1.timer",
+            "InvocationID,ActiveState,Triggers",
+        )?;
+        ensure!(
+            timer["InvocationID"] == "eeb81e1dee8544a88b44feb1d38ec9d7"
+                && timer["ActiveState"] == "active"
+                && timer["Triggers"] == guard,
+            "unknown periodic guard"
+        );
+        std::thread::sleep(Duration::from_millis(250));
+        active_units = funding::manager_units(n)?;
+    }
+    ensure!(active_units == expected, "live service roster changed");
     let active = rows(fleet, "active")?;
     ensure!(active.len() == 4, "unexpected fleet width");
     let mut deliveries = BTreeSet::new();
@@ -145,6 +186,7 @@ fn census(
         deliveries == BTreeSet::from([247, 248, 249, 265]),
         "delivery epochs changed"
     );
+    let mut memory = BTreeMap::new();
     for (name, owner) in owners {
         let cap = if name.starts_with("horizon-upload-") {
             10 << 30
@@ -152,7 +194,10 @@ fn census(
             512 << 20
         };
         let now=n.show_fields(name,"Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MainPID,MemoryMax,MemorySwapMax")?;
-        live::finite_owner(&now, name, text(owner, "InvocationID")?, cap)?;
+        memory.insert(
+            name.clone(),
+            live::finite_owner(&now, name, text(owner, "InvocationID")?, cap)?,
+        );
         ensure!(now["MainPID"] == owner["MainPID"], "replaced peer process");
         let pid = text(owner, "MainPID")?.parse::<u32>()?;
         let status = fs::read_to_string(format!("/proc/{pid}/status"))?;
@@ -169,11 +214,10 @@ fn census(
             "peer CPU booking changed"
         );
     }
-    Ok(())
+    Ok(memory)
 }
 
 pub(crate) fn assess(n: &mut Native, f: &Bound, controller: &str, held: bool) -> Result<Value> {
-    ensure!(!held, "assessment requires an unstarted candidate");
     original_boot()?;
     let fleet = peer261::latest(f)?;
     let a = Bound::new(ACCOUNTING, ACCOUNTING_SHA).json()?;
@@ -201,15 +245,15 @@ pub(crate) fn assess(n: &mut Native, f: &Bound, controller: &str, held: bool) ->
         "257 scratch is occupied"
     );
     let peers = owners()?;
-    let sample = |n: &mut Native| -> Result<(u64, u64, u64)> {
-        census(n, &fleet, controller, &peers)?;
+    let sample = |n: &mut Native| -> Result<_> {
+        let current = census(n, &fleet, controller, &peers, held)?;
         closed_loop(&release, device)?;
         closed_loop(&predecessor, device)?;
-        live::resources_at(scratch)
+        Ok((live::resources_at(scratch)?, current))
     };
-    let first = sample(n)?;
+    let (first, _) = sample(n)?;
     let (growth, floor) = budget(&a, &release, &delivery)?;
-    let last = sample(n)?;
+    let (last, current) = sample(n)?;
     let available = first.1.min(last.1);
     let free = first.2.min(last.2);
     let required = capacity::add(floor, native257_fit::NATIVE257_DISK)?;
@@ -219,12 +263,88 @@ pub(crate) fn assess(n: &mut Native, f: &Bound, controller: &str, held: bool) ->
     );
     Ok(
         json!({"fleet":f,"accounting":Bound::new(ACCOUNTING,ACCOUNTING_SHA),"release":release_ref,
-        "owners":peers.keys().collect::<Vec<_>>(),"candidate_memory_bytes":native257_fit::NATIVE257_MEMORY,
+        "actual_current_memory":current,"owners":peers.keys().collect::<Vec<_>>(),"candidate_memory_bytes":native257_fit::NATIVE257_MEMORY,
         "candidate_control_memory_bytes":CONTROL+GUARD,"candidate_disk_bytes":native257_fit::NATIVE257_DISK,
         "required_available_memory_bytes":growth,"observed_available_memory_bytes":available,
         "protected_existing_floor_bytes":floor,"required_initial_free_bytes":required,"observed_available_bytes":free,
         "fits":available>=growth && free>=required,"admission_authorized":false,"producer_started":false}),
     )
+}
+
+const BOOK: &str = "/var/lib/jetstreamer/horizon257-closed266-reservation-v217/assignment.json";
+const BOOK_SHA: &str = "c28b7b8e77ad679827338f883e5496c42f2d2de6a3a25cc44c7d3f38cf2862cb";
+
+pub(crate) fn booking(review: &Value) -> Result<Value> {
+    let award = Bound::new(BOOK, BOOK_SHA);
+    ensure!(
+        review["closed266_booking"] == json!(award)
+            && review["epoch"] == 257
+            && review["operation"] == "native-cold"
+            && review["attempt"] == "cold-closed266-with265-v1",
+        "different closed 266 booking or restore"
+    );
+    let book = award.sealed()?;
+    ensure!(
+        review["preparation"] == book["prepared"]
+            && review["cpu_affinity"] == book["cpu"]
+            && book["memory"] == native257_fit::NATIVE257_MEMORY + CONTROL + GUARD
+            && book["disk"] == native257_fit::NATIVE257_DISK
+            && book["automatic_release"] == false,
+        "257 booking differs from prepared envelope"
+    );
+    let charge = Bound::new(
+        "/home/ubuntu/.codex/diagnostics/horizon257-closed266-reservation-v217/completion.json",
+        "555b31358b0c0c16948e67409fbdba1228e5d088be94ebfcbb9491ea2433c38b",
+    )
+    .json()?;
+    ensure!(
+        charge["reservation"] == json!(award)
+            && binding(&charge["readback"])?.json()?["reservation257"] == json!(award),
+        "issuer has not charged the booking"
+    );
+    binding(&charge["source_control"])?.artifact()?;
+    bounded::issuer_lock(review)?;
+    Ok(book)
+}
+
+pub(crate) fn current(n: &mut Native, review: &Value, held: bool) -> Result<(Value, Value)> {
+    let book = booking(review)?;
+    let controller = text(review, "controller_unit")?;
+    let iid = std::env::var("INVOCATION_ID")?;
+    let owner = n.show(controller)?;
+    ensure!(
+        fs::read_to_string("/proc/self/cgroup")?.trim() == format!("0::/system.slice/{controller}")
+            && text(&owner, "MainPID")?.parse::<u32>()? == std::process::id(),
+        "different 257 launch controller"
+    );
+    live::finite_owner(&owner, controller, &iid, CONTROL)?;
+    let f = binding(&review["fleet"])?;
+    let current = f.json()?;
+    let money = &current["memory_target"];
+    ensure!(
+        review["observer"]
+            == json!(Bound::new(
+                text(&current, "observer_receipt")?,
+                text(&current, "observer_sha256")?
+            ))
+            && money["valid"] == true
+            && money["executing_lanes"] == 0
+            && num(money, "desired_lanes")? > 0
+            && money["sampled_at_utc"] == current["sampled_at_utc"],
+        "current fleet RSS target or observer differs"
+    );
+    let fit = assess(n, &f, controller, held)?;
+    ensure!(
+        fit["fits"] == true && fit["release"] == book["donor"],
+        "reserved 257 no longer fits"
+    );
+    let after = n.show(controller)?;
+    live::same_owner(&owner, &after)?;
+    bounded::issuer_lock(review)?;
+    let cap = json!({"protected_existing_floor_bytes":fit["protected_existing_floor_bytes"],
+       "actual_current_memory":fit["actual_current_memory"],"closed266_booking":review["closed266_booking"],
+       "capacity":fit});
+    Ok((fit, cap))
 }
 
 #[cfg(test)]

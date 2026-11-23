@@ -23,7 +23,7 @@ pub(super) const TIMER: &str = "horizon-native257-protective-v1.timer";
 const RETENTION: &str = "horizon-native257-terminal-retention.target";
 const ROOT: &str = "/home/ubuntu/.jetstreamer-private/native-input257-selected-20261120-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon-native257-startup-tokens";
-const HARNESS: &str =
+pub(super) const HARNESS: &str =
     "/var/lib/jetstreamer/horizon257-native-input-limited-20261120-v1/horizon257-native-input";
 const HARNESS_SHA: &str = "b8f52e2de7bf4f6232ea66137bb148bb6fb5b3342ce354379f4c237c70c39fce";
 const GUARD: &str =
@@ -41,7 +41,7 @@ const SCRATCH: u64 = 160_000_000_000;
 const RESERVATION: u64 = 256_000_000_000;
 const SLOT: u64 = 111_022_755;
 const LAUNCHER: &str =
-    "/var/lib/jetstreamer/horizon257-native-launch-20261121-v14/horizon-native257-launch";
+    "/var/lib/jetstreamer/horizon257-native-launch-closed266-v15/horizon-native257-launch";
 fn package(attempt: &str, kind: &str) -> PathBuf {
     PathBuf::from(format!(
         "/var/lib/jetstreamer/horizon-native257-{kind}-{attempt}"
@@ -141,6 +141,9 @@ fn startup_floor(c: &Value, scenario: &str) -> Result<u64> {
 }
 
 fn current(n: &mut Native, r: &Value, held: bool) -> Result<(Value, Value)> {
+    if r.get("closed266_booking").is_some() {
+        return native266_full::closed266_for257::current(n, r, held);
+    }
     let rf = binding(&r["resource_review"])?;
     let rr = rf.sealed()?;
     for key in [
