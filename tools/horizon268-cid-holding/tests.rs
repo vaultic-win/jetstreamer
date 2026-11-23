@@ -300,3 +300,51 @@ fn refills_only_the_quarantined_original_and_resumes_a_partial_part() {
     }
     assert_eq!(fs::read(replacement).unwrap(), &SAMPLE[..5]);
 }
+
+#[test]
+#[cfg(any(epoch249, epoch250, epoch251))]
+fn returns_the_verified_original_without_overwriting_a_delivery_candidate() {
+    let d = Dir::new();
+    let holding = d.0.join("holding");
+    fs::create_dir(&holding).unwrap();
+    fs::set_permissions(&holding, fs::Permissions::from_mode(0o700)).unwrap();
+    let src = holding.join("original-inode");
+    let dest = d.0.join("epoch.jet");
+    fs::write(&src, SAMPLE).unwrap();
+    let m = src.metadata().unwrap();
+    let held = HeldInode {
+        device: m.dev(),
+        inode: m.ino(),
+        owner_mode: (m.uid(), m.gid(), m.mode() & 0o7777),
+        modified: m.modified().unwrap(),
+    };
+    let restore = |digest: &str| {
+        held.return_to_delivery(
+            &holding,
+            &dest,
+            SAMPLE.len() as u64,
+            digest,
+            &d.0.metadata().unwrap(),
+        )
+    };
+    assert!(restore(&"0".repeat(64)).is_err());
+    let lock = File::open(&src).unwrap();
+    lock.try_lock().unwrap();
+    assert!(restore(&sha()).is_err());
+    drop(lock);
+    std::os::unix::fs::symlink("absent", &dest).unwrap();
+    assert!(restore(&sha()).is_err());
+    assert!(dest.is_symlink());
+    fs::remove_file(&dest).unwrap();
+    fs::write(&dest, SAMPLE).unwrap();
+    assert!(restore(&sha()).is_err());
+    assert!(src.exists());
+    fs::remove_file(&dest).unwrap();
+    restore(&sha()).unwrap();
+    restore(&sha()).unwrap();
+    assert!(!src.exists());
+    assert_eq!(dest.metadata().unwrap().ino(), m.ino());
+    fs::rename(&dest, d.0.join("keep")).unwrap();
+    fs::write(&dest, SAMPLE).unwrap();
+    assert!(restore(&sha()).is_err());
+}
