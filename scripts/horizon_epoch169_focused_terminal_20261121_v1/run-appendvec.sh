@@ -1,18 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 umask 077
-pkg=/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools
+pkg=/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v2
 test "$(id -u)" = 0
 test "$(realpath -e "$0")" = "$pkg/run"
 test "$#" = 2
 mode=$1
-case "$mode" in check|execute) ;; *) exit 2 ;; esac
+case "$mode" in qualify|check|execute) ;; *) exit 2 ;; esac
 fleet=$(realpath -e "$2")
 test "$fleet" = "$2"
 test "$(basename "$fleet")" = ROOT_COMPLETE_OPERATIONAL_FLEET.json
 test "$(dirname "$(dirname "$fleet")")" = /var/lib/jetstreamer/horizon_runtime_data
 test "$(sha256sum "$pkg/retire169" | cut -d' ' -f1)" = PINNED_NATIVE_SHA
-for action in check execute; do
+for action in qualify check execute; do
     test "$(systemctl show -p LoadState --value horizon-169-g4-appendvec-$action.service)" = not-found
 done
 # One shared mount makes the atomic sibling rename possible. Before reading any

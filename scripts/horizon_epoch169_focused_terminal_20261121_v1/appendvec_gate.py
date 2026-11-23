@@ -1,5 +1,8 @@
 #!/usr/bin/python3 -IB
 """Price and authenticate one G4 scratch transition against the actual focused closure."""
+import ctypes
+import errno
+import fcntl
 import hashlib
 import json
 import os
@@ -16,7 +19,7 @@ H = Path("/home/sol/.jetstreamer-private")
 BOOK = H / "epoch169-focused-diagnostic-20261117-v1"
 OLD = BOOK / "v158/scratch/.historical-runtime/jetstreamer-historical-parent-6hfz7E/jetstreamer-historical-v1.5.8-eHT65K/accounts-state"
 CUSTODY = H / "epoch169-g4-appendvec-custody-20261123-v1"
-PKG = R / "epoch169-g4-appendvec-20261123-v1/tools"
+PKG = R / "epoch169-g4-appendvec-20261123-v1/tools-v2"
 HELD = CUSTODY / "accounts-state"
 P = R / "incident-replay-fit-20261121-v1/tools-homefloor-145-rejoin-v4"
 HOST = R / "epoch166-exact-cargo-retirement-20261123-v1/tools/host.py"
@@ -63,7 +66,7 @@ def price(fleet):
     v = json.loads(p.stdout)
     need(v["fleet"] == selected and Path(selected["path"]) == h["fleet"]() and 0 <= time.time()-v["recorded_unix_seconds"] <= 120
          and v["schema"] == "horizon-incident-replay-fit-v1" and v["epoch"] == 145 and v["fits"] and v["resource_credit_bytes"] == 0
-         and set(v["survivors"]) == {"172"} and set(v["replacements"]) == {"166", "167", "168", "170"}
+         and v["complete_cpu_quota_micros"] == 64000000
          and v["closed_focused169"]["producer_invocation_id"] == "0dfa0d36fbc246c28443a1c90a82c9cb"
          and v["closed_focused169"]["terminal"]["sha256"] == TERMINAL and v["closed_focused169"]["guard_retirement"]["sha256"] == DRAIN,
          "different five-owner price or original terminal")
@@ -133,7 +136,7 @@ def readers_between_samples():
 
 
 def kernel_gate(mode, fleet, step):
-    need(os.geteuid() == 0 and sys.flags.isolated and __debug__ and mode in {"check","execute"}
+    need(os.geteuid() == 0 and sys.flags.isolated and __debug__ and mode in {"qualify","check","execute"}
          and step in {"initial","before-rename","quarantined","settled"}, "unexpected caller")
     need(Path(__file__).resolve() == PKG/"gate.py" and Path(f"/proc/{os.getppid()}/exe").resolve() == PKG/"retire169",
          "only the sealed native owner can enter this gate")
@@ -189,5 +192,86 @@ def kernel_gate(mode, fleet, step):
                 live_mount_namespaces=ns,transient_home_bytes=transient,resource_credit_bytes=0)
 
 
+
+def read_only():
+    # Kernel file-open and mutation barriers apply to the observer and every
+    # descendant. They keep its original ptrace domain for the mandatory host
+    # /proc census. The only inherited writable objects are the two output pipes.
+    need(stat.S_ISFIFO(os.fstat(0).st_mode) and stat.S_ISFIFO(os.fstat(1).st_mode), "private observer pipes required")
+    for candidate in Path("/proc/self/fd").iterdir():
+        fd = int(candidate.name)
+        if fd <= 2:
+            continue
+        try:
+            flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        except OSError as e:
+            if e.errno == errno.EBADF:
+                continue
+            raise
+        need(flags & os.O_ACCMODE == os.O_RDONLY, "unregistered writable observer descriptor")
+    sec=ctypes.CDLL("libseccomp.so.2")
+    sec.seccomp_init.restype=ctypes.c_void_p
+    sec.seccomp_rule_add_array.argtypes=[ctypes.c_void_p,ctypes.c_uint32,ctypes.c_int,ctypes.c_uint,ctypes.c_void_p]
+    sec.seccomp_syscall_resolve_name.argtypes=[ctypes.c_char_p]
+    sec.seccomp_load.argtypes=[ctypes.c_void_p]
+    sec.seccomp_release.argtypes=[ctypes.c_void_p]
+    ctx=sec.seccomp_init(0x7fff0000)
+    need(ctx,"seccomp init failed")
+    class Compare(ctypes.Structure):
+        _fields_=[("arg",ctypes.c_uint),("op",ctypes.c_uint),("mask",ctypes.c_uint64),("match",ctypes.c_uint64)]
+    def deny(name, comparison=None, error=errno.EPERM):
+        nr=sec.seccomp_syscall_resolve_name(name.encode())
+        if nr < 0:
+            return
+        ok=sec.seccomp_rule_add_array(ctx,0x50000|error,nr,int(comparison is not None),
+                    None if comparison is None else ctypes.byref(comparison))
+        need(ok==0,"seccomp rule failed for "+name+" "+str(ok))
+    for name in ("creat truncate ftruncate fallocate unlink unlinkat rename renameat renameat2 mkdir mkdirat rmdir "
+                 "link linkat symlink symlinkat chmod fchmod fchmodat fchmodat2 chown fchown lchown fchownat "
+                 "mknod mknodat setxattr lsetxattr fsetxattr removexattr lremovexattr fremovexattr "
+                 "utime utimes futimesat utimensat ptrace process_vm_writev pidfd_getfd io_uring_setup "
+                 "mount umount2 mount_setattr move_mount open_tree fsopen fsmount fspick fsconfig "
+                 "pivot_root setns unshare init_module finit_module delete_module reboot syslog kexec_load "
+                 "swapon swapoff open_by_handle_at bpf io_setup io_submit userfaultfd").split():
+        deny(name)
+    # openat2's flags are behind a userspace pointer. Libraries can fall back
+    # to conventional opens, whose flags the kernel filter examines directly.
+    deny("openat2",error=errno.ENOSYS)
+    for name,arg in (("open",1),("openat",2)):
+        for bit in [os.O_WRONLY,os.O_RDWR,os.O_CREAT,os.O_TRUNC,os.O_APPEND,os.O_TMPFILE & ~os.O_DIRECTORY]:
+            deny(name,Compare(arg,7,bit,bit))
+    need(sec.seccomp_load(ctx)==0, "seccomp load failed")
+    sec.seccomp_release(ctx)
+    try:
+        fd=os.open("/dev/null",os.O_WRONLY)
+    except PermissionError as e:
+        need(e.errno==errno.EPERM,"unexpected observer denial")
+    else:
+        os.close(fd)
+        raise ValueError("observer can open a writable file")
+    need(Path("/proc/1/ns/mnt").stat().st_ino>0 and Path("/proc/1/maps").open("rb").read(1), "host proc inaccessible")
+
+
+def observe(mode,fleet):
+    need(mode in {"check","execute","qualify"} and os.geteuid()==0 and Path(__file__).resolve()==PKG/"gate.py"
+         and Path(f"/proc/{os.getppid()}/exe").resolve()==PKG/"retire169","foreign observer owner")
+    read_only()
+    for line in sys.stdin:
+        action=line.rstrip("\n")
+        if action=="exit":
+            return
+        try:
+            if action in {"source-readers","held-readers"}:
+                run=subprocess.run([PKG/"retire169","scan",action],capture_output=True,timeout=240)
+                need(run.returncode==0,run.stderr.decode()[-2000:])
+                result=json.loads(run.stdout)
+            else:
+                result=kernel_gate(mode,fleet,action)
+            print(json.dumps(dict(action=action,ok=True,result=result)),flush=True)
+        except Exception as e:
+            print(json.dumps(dict(action=action,ok=False,error=str(e))),flush=True)
+            return
+
 if __name__=="__main__":
-    print(json.dumps(kernel_gate(sys.argv[1],Path(sys.argv[2]),sys.argv[3]),sort_keys=True))
+    need(len(sys.argv)==4 and sys.argv[1]=="observe","expected observe MODE FLEET")
+    observe(sys.argv[2],Path(sys.argv[3]))

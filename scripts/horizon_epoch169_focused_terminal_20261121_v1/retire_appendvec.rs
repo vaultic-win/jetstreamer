@@ -7,14 +7,14 @@ use std::{
     collections::BTreeMap,
     ffi::CString,
     fs::{self, File, OpenOptions},
-    io::{self, Read, Write},
+    io::{self, BufRead, BufReader, Read, Write},
     os::unix::{
         ffi::OsStrExt,
         fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
         io::AsRawFd,
     },
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 use tempfile::NamedTempFile;
 
@@ -26,7 +26,7 @@ mod stopped_tree;
 const PRIVATE: &str = "/home/sol/.jetstreamer-private";
 const SOURCE: &str = "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/v158/scratch/.historical-runtime/jetstreamer-historical-parent-6hfz7E/jetstreamer-historical-v1.5.8-eHT65K/accounts-state";
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v2";
 const DEVICE: u64 = 64512;
 const ROOT_INODE: u64 = 114770421;
 const BYTES: u64 = 50285883392;
@@ -267,35 +267,85 @@ fn restrict_writes(first: &Path, second: &Path) -> Result<()> {
     Ok(())
 }
 
-fn gate(mode: &str, fleet: &Path, at: &str) -> Result<Value> {
-    let r = Command::new("/usr/bin/python3")
-        .args(["-IB"])
-        .arg(Path::new(PACKAGE).join("gate.py"))
-        .arg(mode)
-        .arg(fleet)
-        .arg(at)
-        .output()?;
-    ensure!(
-        r.status.success(),
-        "registered owner gate: {}",
-        String::from_utf8_lossy(&r.stderr)
-    );
-    Ok(serde_json::from_slice(&r.stdout)?)
+struct Observer {
+    child: Child,
+    commands: ChildStdin,
+    results: BufReader<ChildStdout>,
 }
-fn clear_readers(path: &Path) -> Result<()> {
-    let r = process_references::scan(Path::new("/proc"), path)?;
+impl Observer {
+    fn start(mode: &str, fleet: &Path) -> Result<Self> {
+        let mut child = Command::new("/usr/bin/python3")
+            .arg("-IB")
+            .arg(Path::new(PACKAGE).join("gate.py"))
+            .arg("observe")
+            .arg(mode)
+            .arg(fleet)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+        let commands = child.stdin.take().context("observer command pipe")?;
+        let results = BufReader::new(child.stdout.take().context("observer result pipe")?);
+        Ok(Self {
+            child,
+            commands,
+            results,
+        })
+    }
+    fn check(&mut self, action: &str) -> Result<Value> {
+        writeln!(&mut self.commands, "{action}")?;
+        self.commands.flush()?;
+        let mut out = String::new();
+        ensure!(
+            (&mut self.results).take(1 << 20).read_line(&mut out)? > 0,
+            "read-only observer exited before {action}"
+        );
+        let row: Value = serde_json::from_str(&out)?;
+        ensure!(
+            row["action"] == action && row["ok"] == true,
+            "observer {action} failed: {}",
+            row["error"]
+        );
+        Ok(row["result"].clone())
+    }
+}
+impl Drop for Observer {
+    fn drop(&mut self) {
+        let _ = writeln!(&mut self.commands, "exit");
+        let _ = self.commands.flush();
+        let _ = self.child.wait();
+    }
+}
+fn scanner(which: &str) -> Result<()> {
     ensure!(
-        r.inspected_processes > 0 && r.references.is_empty(),
-        "active G4 scratch readers: {:?}",
-        r.references
+        std::env::current_exe()? == Path::new(PACKAGE).join("retire169")
+            && unsafe { libc::geteuid() } == 0
+            && unsafe { libc::prctl(libc::PR_GET_SECCOMP, 0, 0, 0, 0) } == 2,
+        "native read-only observer image required"
     );
+    let target = match which {
+        "source-readers" => PathBuf::from(SOURCE),
+        "held-readers" => {
+            Path::new(PRIVATE).join("epoch169-g4-appendvec-custody-20261123-v1/accounts-state")
+        }
+        _ => anyhow::bail!("unknown read-only reference scope"),
+    };
+    let result = process_references::scan(Path::new("/proc"), &target)?;
+    ensure!(
+        result.inspected_processes > 0 && result.references.is_empty(),
+        "active G4 scratch readers: {:?}",
+        result.references
+    );
+    println!("{}", serde_json::to_string(&result)?);
     Ok(())
 }
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().collect();
+    if args.len() == 3 && args[1] == "scan" {
+        return scanner(&args[2]);
+    }
     ensure!(
         args.len() == 3
-            && matches!(args[1].as_str(), "check" | "execute")
+            && matches!(args[1].as_str(), "check" | "execute" | "qualify")
             && unsafe { libc::geteuid() } == 0,
         "use guarded check or execute FLEET"
     );
@@ -318,7 +368,21 @@ fn run() -> Result<()> {
     );
     let src = Path::new(SOURCE);
     let held = dir.join("accounts-state");
+    // The read-only monitor starts outside the writer's Landlock domain. An
+    // inherited Landlock domain cannot inspect arbitrary host proc entries.
+    let mut observer = Observer::start(mode, fleet)?;
     restrict_writes(src.parent().context("source parent")?, &dir)?;
+    if mode == "qualify" {
+        let price = observer.check("initial")?;
+        let source = observer.check("source-readers")?;
+        let held = observer.check("held-readers")?;
+        println!(
+            "{}",
+            json!({"scope":"normal installed read-only qualification","price":price,"original_scope":source,
+                  "quarantine_scope":held,"production_cleanup_started":false,"source_bytes_read":0,"r2_mutations":false})
+        );
+        return Ok(());
+    }
     let _mutation = lock(
         &Path::new(PRIVATE).join("r2-receipts/local-mutation.lock"),
         101135013,
@@ -332,12 +396,13 @@ fn run() -> Result<()> {
     let intent = dir.join("intent.json");
     let cleared = dir.join("contents-cleared.json");
     let completion = dir.join("completion.json");
-    let first = gate(mode, fleet, "initial")?;
+    let first = observer.check("initial")?;
     if mode == "check" {
         ensure!(
             !held.try_exists()? && !intent.try_exists()? && !completion.try_exists()?,
             "retirement already started"
         );
+        observer.check("source-readers")?;
         let fd = stopped_tree::open_root(src, DEVICE, ROOT_INODE)?;
         let tree = stopped_tree::capture(&fd, DEVICE, 1001, 1003)?;
         let (bytes, rows) = allocated(src, &tree)?;
@@ -345,7 +410,6 @@ fn run() -> Result<()> {
             bytes == BYTES && rows == SHARDS,
             "actual scope or allocation changed"
         );
-        clear_readers(src)?;
         stopped_tree::validate_remaining(
             &tree,
             &stopped_tree::capture(&fd, DEVICE, 1001, 1003)?,
@@ -388,7 +452,7 @@ fn run() -> Result<()> {
                 && done["releases_no_booking"] == true,
             "changed completion"
         );
-        gate(mode, fleet, "settled")?;
+        observer.check("settled")?;
         println!("{}", done);
         return Ok(());
     }
@@ -401,14 +465,14 @@ fn run() -> Result<()> {
             !held.try_exists()? && !cleared.try_exists()?,
             "two owners or inconsistent cleanup"
         );
+        observer.check("source-readers")?;
         let fd = stopped_tree::open_root(src, DEVICE, ROOT_INODE)?;
         stopped_tree::validate_remaining(
             &original,
             &stopped_tree::capture(&fd, DEVICE, 1001, 1003)?,
             false,
         )?;
-        clear_readers(src)?;
-        let _ = gate(mode, fleet, "before-rename")?;
+        let _ = observer.check("before-rename")?;
         save(&intent, &binding)?;
         norename(src, &held)?;
         ensure!(
@@ -422,10 +486,10 @@ fn run() -> Result<()> {
         "different retirement intent"
     );
     if held.try_exists()? {
+        observer.check("held-readers")?;
+        observer.check("source-readers")?;
         let fd = stopped_tree::open_root(&held, DEVICE, ROOT_INODE)?;
-        clear_readers(&held)?;
-        clear_readers(src)?;
-        gate(mode, fleet, "quarantined")?;
+        observer.check("quarantined")?;
         stopped_tree::remove_contents(&fd, &original, DEVICE, 1001, 1003)?;
         save(&cleared, &binding)?;
         ensure!(
@@ -441,7 +505,7 @@ fn run() -> Result<()> {
             && !src.try_exists()?,
         "missing cleared handback"
     );
-    let final_state = gate(mode, fleet, "settled")?;
+    let final_state = observer.check("settled")?;
     let done = json!({"binding":binding,"source_absent":true,"quarantine_absent":true,"physically_retired_bytes":BYTES,
         "semantic_owner":final_state["terminal"],"preserved_log":final_state["log"],"preserved_partial":final_state["partial"],
         "repriced_booking":final_state["booking"],"releases_no_booking":true,"resource_credit_bytes":0,"r2_mutations":false});
