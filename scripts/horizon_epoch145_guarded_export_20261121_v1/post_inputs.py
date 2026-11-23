@@ -98,7 +98,13 @@ def load_dispatch():
 
 
 def original_pair(d, git):
-    raw, pair_ref = d["read"](PAIR, PAIR_SHA)
+    if GUARD_POST:
+        pair_path = R / "archive-reader-epoch145-bridge-06607089-v1/ordinary/QUALIFIED.json"
+        pair_sha = "e91074b328d55941cdca41cca3eaf9b376be18414f6c3e016557b6655c62be50"
+        baseline = "06607089e5762e61a82e0f6b2da0ae1adbf16634"
+    else:
+        pair_path, pair_sha, baseline = PAIR, PAIR_SHA, READER
+    raw, pair_ref = d["read"](pair_path, pair_sha)
     pair = json.loads(raw)
     reader = d["bound"](pair["reader"])
     local = d["bound"](pair["local_acceptance"])
@@ -106,7 +112,7 @@ def original_pair(d, git):
     transfer = d["bound"](pair["archive_identity"])
     result = local["local_playback"]
     public = remote["remote_playback"]["playback"]
-    need(reader["reader_commit"] == remote["reader_commit"] == READER and pair["threads"] == 1
+    need(reader["reader_commit"] == remote["reader_commit"] == baseline and pair["threads"] == 1
          and reader["full_and_plugin_capabilities_accepted"] and reader["source_artifact_correspondence_accepted"]
          and reader["minimum_thread_stack_bytes"] == 67108864
          and local["full_exit_code"] == result["process_exit_code"] == public["process_exit_code"] == 0
@@ -127,13 +133,13 @@ def original_pair(d, git):
          "different ordinary uploader reader scope")
     tip = git("rev-parse", "origin/account-updates").strip()
     need(re.fullmatch("[0-9a-f]{40}", tip), "missing fetched branch")
-    git("merge-base", "--is-ancestor", READER, tip)
-    need(not git("diff", "--name-only", READER, tip, "--", *scopes, POH_SOURCE), "current reader inputs changed")
+    git("merge-base", "--is-ancestor", baseline, tip)
+    need(not git("diff", "--name-only", baseline, tip, "--", *scopes, POH_SOURCE), "current reader inputs changed")
     anchors = [d["read"](ANCHORS / name, sha)[1] for name, sha in ANCHOR_SHA.items()]
     return dict(pair=pair_ref, qualification=pair["reader"], full_verifier=reader["full_verifier"],
                 pipeline=reader["pipeline"], uploader=pair["uploader"], uploader_seal=pair["uploader_seal"],
                 negative=pair["negative_stderr"], ordinary_reader_scopes=scopes,
-                additional_compiled_input=POH_SOURCE, reader_commit=READER, fetched_tip=tip, anchors=anchors)
+                additional_compiled_input=POH_SOURCE, reader_commit=baseline, fetched_tip=tip, anchors=anchors)
 
 
 def validate_missed_start(started, intent):
