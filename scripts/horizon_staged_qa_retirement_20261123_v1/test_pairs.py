@@ -287,6 +287,26 @@ class TestLive145Price(unittest.TestCase):
                 run.assert_called_once()
                 sleep.assert_not_called()
 
+    def test_maintenance_checks_live_floors_and_its_own_booking(self):
+        phase = dict(InvocationID='f86e7e61f4b34dc7aedc4e08a128e713', ActiveState='failed',
+                     SubState='failed', MainPID='0', source_checkpoint_exists=False, resource_credit_bytes=0)
+        growth = {'remaining_DATA_growth_bytes': 160 << 20}
+        frame = dict(self.frame, phase145=phase, replay_launch_authorized=False,
+                     recovery_obligations={'public_storage': growth})
+        booking = dict(build_and_native_qualification_serial=True, holding_and_build_may_overlap=True,
+                       build_cpu_quota_micros=1_000_000, build_memory_bytes=2 << 30)
+        registered = dict(retry9_auxiliary_commitments=booking, all_existing_memory_DATA_OS_native_transport_promises_retained=True,
+                          all_reservation_ending_bytes=0, complete_cycle_conservative_available_DATA_bytes=2 << 30,
+                          active_ready_range_audit_obligation={'current_storage': growth})
+        check = self.host['checked_maintenance_price']
+        result = check(frame, self.fleet, registered, self.now, 2 << 30)
+        self.assertEqual(result['complete_required_HOME_bytes'], (1024 + 160 + 48) << 20)
+        with self.assertRaisesRegex(RuntimeError, 'do not fit'):
+            check(frame, self.fleet, registered, self.now, (1232 << 20) - 1)
+        with self.assertRaisesRegex(RuntimeError, 'maintenance booking'):
+            check(frame, self.fleet, dict(registered, retry9_auxiliary_commitments=dict(booking, build_cpu_quota_micros=500_000)),
+                  self.now, 2 << 30)
+
 
 class TestPair(unittest.TestCase):
     def setUp(self):

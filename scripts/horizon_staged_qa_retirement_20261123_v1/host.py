@@ -21,7 +21,8 @@ SMALL_88_LIVE145_FULL_SLOT = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v4
 SMALL_88_LIVE145_PACKAGES = (SMALL_88_LIVE145, SMALL_88_LIVE145_RETRY, SMALL_88_LIVE145_FULL_SLOT)
 SMALL_88_STOPPED145 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v5' / 'tools'
 SMALL_88_STOPPED145_WAIT = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v6' / 'tools'
-SMALL_88_STOPPED145_PACKAGES = (SMALL_88_STOPPED145, SMALL_88_STOPPED145_WAIT)
+SMALL_88_MAINTENANCE = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v7' / 'tools'
+SMALL_88_STOPPED145_PACKAGES = (SMALL_88_STOPPED145, SMALL_88_STOPPED145_WAIT, SMALL_88_MAINTENANCE)
 SMALL_88_SUCCESSORS = (*SMALL_88_LIVE145_PACKAGES, *SMALL_88_STOPPED145_PACKAGES)
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -103,9 +104,8 @@ def checked_live145_price(frame, guard, fleet, now):
             'epoch 145 and staged retirement do not fit together')
 
 
-def checked_stopped145_price(frame, fleet, now, physical_home):
+def checked_stopped145_frame(frame, fleet, now):
     phase = frame['phase145']
-    donor = frame['epoch159_donor_cover']
     require(frame['schema'] == 'horizon-incident-replay-fit-v1' and frame['epoch'] == 145
             and frame['fits'] is True and frame['fleet'] == fleet and frame['resource_credit_bytes'] == 0
             and frame['replay_launch_authorized'] is False and 0 <= now - frame['recorded_unix_seconds'] <= 120
@@ -114,6 +114,11 @@ def checked_stopped145_price(frame, fleet, now, physical_home):
             and phase['ActiveState'] == phase['SubState'] == 'failed' and phase['MainPID'] == '0'
             and phase['resource_credit_bytes'] == 0 and phase['source_checkpoint_exists'] is False,
             'unrecognized stopped five-peer 145 frame')
+
+
+def checked_stopped145_price(frame, fleet, now, physical_home):
+    checked_stopped145_frame(frame, fleet, now)
+    donor = frame['epoch159_donor_cover']
     require(donor['schema'] == 'horizon-145-drained-159-donor-cover-v1' and donor['fleet'] == fleet
             and donor['credited_retirement_bytes'] == 0 and donor['general_slot_cpu_micros'] >= 1_000_000,
             'unbound retained donor reservation')
@@ -122,6 +127,38 @@ def checked_stopped145_price(frame, fleet, now, physical_home):
     if (min(home_margin, donor['remaining_home_bytes']) < (48 << 20)
             or frame['available_memory_bytes'] - frame['required_available_memory_bytes'] < (768 << 20)):
         raise RetainedCapacityPressure('retained reservations and staged retirement do not fit together')
+
+
+def checked_maintenance_price(frame, fleet, registered, now, physical_home):
+    checked_stopped145_frame(frame, fleet, now)
+    booking = registered['retry9_auxiliary_commitments']
+    require(registered['all_existing_memory_DATA_OS_native_transport_promises_retained'] is True
+            and registered['all_reservation_ending_bytes'] == 0
+            and booking['build_and_native_qualification_serial'] is True
+            and booking['holding_and_build_may_overlap'] is True
+            and booking['build_cpu_quota_micros'] >= 1_000_000
+            and booking['build_memory_bytes'] >= 768 << 20,
+            'staged retirement requires the existing maintenance booking')
+    # The cleanup uses the booked maintenance slot. Prices for admitting a
+    # future 159/169 workload must still be evaluated when that workload starts.
+    free = min(physical_home, frame['available_HOME_bytes'], registered['complete_cycle_conservative_available_DATA_bytes'])
+    audit = max(frame['recovery_obligations']['public_storage']['remaining_DATA_growth_bytes'],
+                registered['active_ready_range_audit_obligation']['current_storage']['remaining_DATA_growth_bytes'])
+    required = frame['complete_required_HOME_bytes'] + audit + (48 << 20)
+    require(free >= required and frame['available_memory_bytes'] - frame['required_available_memory_bytes'] >= 768 << 20,
+            'current host floors and staged retirement do not fit together')
+    return dict(available_HOME_bytes=free, complete_required_HOME_bytes=required)
+
+
+def maintenance_quote(provider, directory, fleet, head):
+    registered = provider['bound'](head, fleet['sha256'])
+    require(head == provider['fleet'](), 'fleet changed before maintenance pricing')
+    capture = runpy.run_path(str(directory/'post-stop-fit'))['capture_native']
+    frame = capture(145, fleet)
+    require(head == provider['fleet']() and fleet['sha256'] == provider['sha'](head), 'fleet changed during maintenance pricing')
+    physical = os.statvfs(BASE)
+    measured = checked_maintenance_price(frame, fleet, registered, time.time(), physical.f_bavail * physical.f_frsize)
+    return {**frame, **measured}
 
 
 def stopped145_pressure(child, command):
@@ -172,6 +209,8 @@ def price(provider, wait_for_paired=False):
     provider['sealed'](directory, seal)
     head = provider['fleet']()
     fleet = {'path': str(head), 'sha256': provider['sha'](head)}
+    if PACK == SMALL_88_MAINTENANCE:
+        return maintenance_quote(provider, directory, fleet, head)
     if stopped:
         return stopped145_quote(provider, directory, fleet, head,
                                  PACK == SMALL_88_STOPPED145_WAIT and wait_for_paired)
