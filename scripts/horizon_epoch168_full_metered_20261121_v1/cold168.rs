@@ -797,12 +797,13 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
     let reg = &price["status_registration"];
     let actor = &a["new"];
     ensure!(
-        q["prepared"] == *prepared
+        q["schema"] == "horizon-168-retry2-v1-status-qualified-v1"
+            && q["epoch"] == 168
+            && q["prepared"] == *prepared
             && q["successor_root"] == rr
             && q["guard"] == gr
             && !q["generation"].is_null()
             && q["generation"] == a["generation"]
-            && q["package"] == q["entry"]
             && q["package"] == reg["consumer_seal"]
             && a["qualified"] == qr
             && hex(st(&q, "source_commit")?, 40)
@@ -821,7 +822,12 @@ pub fn status_receiver(price: &Value, prepared: &Value) -> Result<Value> {
             && actor["program"] == json!(pkg.join("status_cycle.py")),
         "foreign 168 status package"
     );
-    member(&pkg.join("status_cycle.py"), st(&q["package"], "sha256")?)?;
+    let entry = pkg.join("status_cycle.py");
+    ensure!(
+        q["entry"]["path"] == json!(entry) && st(&q["entry"], "sha256")? == file_digest(&entry)?,
+        "different qualified status program"
+    );
+    member(&entry, st(&q["package"], "sha256")?)?;
     let ctl = native(st(actor, "unit")?)?;
     let pid = n(actor, "pid")?;
     let (_, ticks, group) = proc_row(pid)?;
