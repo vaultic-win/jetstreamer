@@ -4,6 +4,10 @@ use super::*;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use std::{borrow::Cow, collections::BTreeSet};
 
+mod generated {
+    include!("holding_epoch166_generated_definitions.rs");
+}
+
 const SEALED: &str = "/usr/local/lib/jetstreamer";
 // The native host inventory contains 104,491 metadata files / 15,425,505,635
 // bytes, including a 66,027,261-byte historical frame. This is a total I/O
@@ -120,6 +124,7 @@ impl FileStamp {
 #[derive(Clone)]
 enum Body {
     File(FileStamp),
+    Generated(FileStamp),
     Mask(FileStamp),
     #[cfg(test)]
     Fixture(Vec<u8>),
@@ -128,6 +133,7 @@ impl Artifact {
     fn check_entry(&self, path: &Path) -> Result<()> {
         match self.body {
             Body::File(stamp) => stamp.check(path),
+            Body::Generated(stamp) => generated::check(path, stamp, &self.sha256),
             Body::Mask(stamp) => {
                 stamp.check(path)?;
                 ensure!(masked(path)?, "systemd mask changed: {}", path.display());
@@ -140,7 +146,7 @@ impl Artifact {
     fn read(&self, path: &Path) -> Result<Cow<'_, [u8]>> {
         self.check_entry(path)?;
         match &self.body {
-            Body::File(_) => {
+            Body::File(_) | Body::Generated(_) => {
                 let bytes = read_stable_bounded(path, METADATA_BYTES, "transitive metadata")?;
                 self.check_entry(path)?;
                 ensure!(
@@ -513,11 +519,17 @@ fn census_walk(
             budget.1 <= CENSUS_BYTES,
             "consumer census byte bound exceeded"
         );
+        let sha256 = hex_lower(&Sha256::digest(&bytes));
+        let body = if definition && generated::qualified(&canonical, &sha256, stamp) {
+            Body::Generated(stamp)
+        } else {
+            Body::File(stamp)
+        };
         out.insert(
             canonical,
             Artifact {
-                sha256: hex_lower(&Sha256::digest(&bytes)),
-                body: Body::File(stamp),
+                sha256,
+                body,
                 definition,
             },
         );
@@ -821,6 +833,7 @@ fn collect() -> Result<Corpus> {
             )?;
         }
     }
+    let generator = generated::inventory()?;
     let mut seen = BTreeSet::new();
     for root in ROOTS {
         census_walk(
@@ -838,6 +851,18 @@ fn collect() -> Result<Corpus> {
     revalidate_aliases(&aliases)?;
     let graph = reverse_graph(&corpus, &aliases)?;
     revalidate_aliases(&aliases)?;
+    if let Some(before) = generator {
+        ensure!(
+            generated::inventory()?.as_ref() == Some(&before),
+            "systemd generator namespace changed across consumer census"
+        );
+        // A selected definition always retains its exact original inode and stamps.
+        for path in graph.keys() {
+            if let Body::Generated(original) = corpus[path].body {
+                original.check(path)?;
+            }
+        }
+    }
     // Stable-read every installed file to discover dependencies, including
     // old root-writable tools. Such a tool cannot enter an accepted relevant
     // closure unless its metadata is immutable; unrelated installed tools do
