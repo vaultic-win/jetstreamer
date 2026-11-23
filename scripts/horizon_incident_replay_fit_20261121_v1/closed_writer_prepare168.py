@@ -6,6 +6,8 @@ import runpy
 import hashlib
 import fcntl
 import json
+import time
+from datetime import datetime
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
 D = R/'epoch168-retry4-rebook-20261123-v1'
@@ -56,6 +58,36 @@ def quote():
         s.bound(witness['native_sample'],R/'sample-root014757-live166167170-20261123-v1.json')
         return dict(registration=reg,authenticated_gap=wr,unit=m['Id'],invocation_id=OLD,pid=0,resident_credit_bytes=0,
                     failed=True,unconsumed_observation=partial)
+    def reviewed_head(asked):
+        # Anchor obligations to the last complete and successfully priced fleet. Its
+        # scheduled successor actually sampled the same actors; use that sample's
+        # own clock here. Preserve both receipts, timestamps and their distinct roles.
+        previous_price = R/'incident-replay-fit-20261121-v1/homefloor-qualification/cold168-r4draft-01/screen-20261123T013950620430Z.json'
+        proven, _ = s.read(previous_price,'8fea18f9001d307fa7079c2c6a2c26034d49dc0961625855a78354215d78816b')
+        current, current_ref = s.read(FLEET,fr['sha256'])
+        stopped = stopped_writer()
+        witness = s.bound(stopped['authenticated_gap'],STATUS/'RETRY3_STATUS_EXIT_014757_REMOTE_READBACK.json')
+        sample = s.bound(witness['native_sample'],R/'sample-root014757-live166167170-20261123-v1.json')
+        timestamp = datetime.fromisoformat(sample['completed_at_utc']).timestamp()
+        s.need(asked==current_ref==fr==proven['fleet']==witness['last_complete'] and proven['fits'] and
+               current['sole_next_timer']=='horizon-observer-'+GAP.name+'.timer' and
+               current['recorded_unix_seconds']<datetime.fromisoformat(sample['recorded_at_utc']).timestamp()<=timestamp and
+               0<=time.time()-timestamp<=2400 and not current['actual_active_bootstraps'] and
+               not current['actual_active_private_diagnostics'] and not sample['diagnostic_replays'] and
+               not (GAP/'ROOT_COMPLETE_OPERATIONAL_FLEET.json').exists(),'different or expired preparation observations')
+        actors={v['epoch']:v for v in current['actual_executing_replays']}
+        s.need(set(actors)=={167,170,172} and len(sample['replays'])==3 and
+               {int(v['range']) for v in sample['replays']}==set(actors),'new or missing sampled replay owner')
+        for row in sample['replays']:
+            original=actors[int(row['range'])]
+            unit=original['unit']
+            s.need(row['invocation_binding_stable'] and row['scratch_path']==original['scratch_path'] and
+                   row['worker_before']['pid']==row['worker_after']['pid'] and row['worker_after']['pid']>1 and all(
+                       (row[k]['unit'],row[k]['invocation_id'],row[k]['main_pid'])==
+                       (unit['Id'],unit['InvocationID'],int(unit['MainPID'])) for k in ('producer_before','producer_after')),
+                   'different 168 preparation observation actor')
+        return current,actors
+
     def preparation():
         _, rr = s.read(D/'SUCCESSOR_ROOT.json',ROOT)
         _, gr = s.read(R/'epoch168-cold-guard-20261123-v4/GUARD_QUALIFIED.json',GUARD)
@@ -70,7 +102,7 @@ def quote():
     # The production provider keeps its mandatory live writer check. Only this local
     # calculation uses the observed dead controller and retains its entire reservation.
     inputs = preparation()
-    provider['capture_once'].__globals__['registered_status'] = stopped_writer
+    provider['capture_once'].__globals__.update(registered_status=stopped_writer,fleet_head=reviewed_head)
     result = provider['capture'](166, fr)
     reserved = fleet['retry9_auxiliary_commitments']
     s.need(preparation()==inputs and result['status_registration']==stopped_writer() and result['candidate'] is None
