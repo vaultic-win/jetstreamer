@@ -128,6 +128,9 @@ leader skips, and successful plugin finalization. A prefix read qualifies only c
 Use the public bucket base URL and an absolute path to an authenticated inventory that pins
 the target `.jet` by key, strong ETag and length. Give the plugin the target epoch as a
 one-epoch slot range, an existing private report directory, and the qualified reader executable.
+If the reader qualification specifies `minimum_thread_stack_bytes`, set `RUST_MIN_STACK`
+to that value for the direct CLI invocation. Foundation's sealed `58709604` reader uses
+`67108864` bytes. The uploader already applies the stack size from its qualification.
 
 ```sh
 public_origin=https://pub-e7795f13d2d04a5f829e49e8f3ef3011.r2.dev
@@ -181,7 +184,9 @@ and keeps its receipts and counts separate from prior runs.
 
 Capture native cumulative `horizon_tps` pulses during playback. The slot-partitioned
 verifier emits per-epoch reports after the entire range succeeds. Digest comparisons
-require the same range endpoints, partitioning mode and worker count on both sources.
+require the same range endpoints, playback mode and worker count on both sources.
+Ordinary per-epoch playback and `--slot-ranges` can produce different digests even
+when their counters and worker counts match.
 
 Give failed historical audits first priority in the next repair slot. Record whether the
 failure occurred during transport, decoding, or plugin validation. Retry interrupted
