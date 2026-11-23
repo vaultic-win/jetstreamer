@@ -47,6 +47,7 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
+LEASE_BUILD_145 = HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = HERE == D / "tools-homefloor-145-handoff-v2"
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5J_RETRY_POST = HERE == D / "tools-homefloor-145-post-v5j-v2"
@@ -54,7 +55,7 @@ V5J_POST = V5J_RETRY_POST or HERE == D / "tools-homefloor-145-post-v5j-v1"
 HOURLY169 = HERE == D / "tools-homefloor-169-hourly-v1"
 if HOURLY169:
     hourly169 = runpy.run_path(str(HERE / "hourly169_actor.py"))
-RETRY4_145 = HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
+RETRY4_145 = LEASE_BUILD_145 or HOURLY169 or V5J_POST or DETACHED_145 or HERE.name == "tools-homefloor-145-rejoin-v4"
 RETRY4_168 = RETRY4_145 or HERE.name == "tools-homefloor-cold168-retry4-v1"
 CLOSED_RETRY3 = HERE.name == "tools-homefloor-closed168-retry3-v1"
 RETRY3_145 = HERE.name == "tools-homefloor-145-rejoin-v3"
@@ -514,6 +515,9 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
+    if LEASE_BUILD_145:
+        s.need(epoch == 145, "lease repair build provider only prices the failed 145 owner")
+        return runpy.run_path(str(HERE / "v5j_lease_failure.py"))["build_phase"](s, fit)
     if V5J_POST:
         s.need(epoch == 145, "v5j completion census is for epoch 145 only")
         profile, adapter, _ = profile145(HERE, focused="v5j-post")
@@ -1272,6 +1276,8 @@ if __name__=="__main__":
     s.need(len(args)==3,"usage: post-stop-fit [--next-admission] EPOCH FLEET_ABSOLUTE_PATH FLEET_SHA256")
     signal.alarm(142)
     ref=s.ref(Path(args[1]),args[2])
+    if LEASE_BUILD_145:
+        s.need(not review and args[0] == "145", "lease repair build provider cannot admit a replay")
     if DETACHED_145:
         s.need(not review and args[0] == "145", "detached census cannot book another actor")
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)

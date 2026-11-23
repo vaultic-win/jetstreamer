@@ -249,5 +249,37 @@ class RetryLineageTest(unittest.TestCase):
             dispatch.retained(review)
 
 
+class FailedChildLeaseTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.mod = runpy.run_path(str(Path(__file__).with_name("v5j_lease_failure.py")))
+        if os.geteuid() or not cls.mod["STATE"].is_dir():
+            raise unittest.SkipTest("original paid failed-generation records unavailable")
+        cls.api, cls.proof = cls.mod["historical"]()
+        cls.rows = cls.mod["journal"](cls.api["out"])
+
+    def replay(self, key=None, change=None):
+        def read(path, expected):
+            b, ref = self.api["read"](path, expected)
+            value = json.loads(b)
+            if key is not None and path == self.mod["ARTIFACTS"][key][0]:
+                change(value)
+            return value, ref
+        return self.mod["profile"](read, self.rows)
+
+    def test_exact_failure_with_no_observed_paid_child(self):
+        self.assertEqual(self.replay(), self.proof)
+        self.assertIsNone(self.proof["failed_phase"]["retry_worker"])
+        self.assertFalse(self.proof["acquired_child_leases_proved"])
+
+    def test_rejects_stale_cursor_or_wrong_child_lease_failure(self):
+        for k, change in (("submission", lambda d: d.update(manager_start_cursor="old")),
+                          ("failure", lambda d: d.update(error="ValueError: original recovery read lease absent")),
+                          ("recovery", lambda d: d["fresh_fit"]["phase145"]["window"].update(native_child={"pid":1})),
+                          ("detached", lambda d: d["phase145"].update(InvocationID=self.mod["PREVIOUS"]))):
+            with self.subTest(key=k), self.assertRaises(ValueError):
+                self.replay(k, change)
+
+
 if __name__ == "__main__":
     unittest.main()
