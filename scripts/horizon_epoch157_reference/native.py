@@ -64,7 +64,7 @@ class Body(io.BytesIO):
         require(not self.read(1), "trailing wire bytes")
 
 
-def writes(body, slot, previous_slot, cursor, observe=None):
+def writes(body, slot, previous_slot, cursor, observe=None, observe_account=None):
     count = body.u64()
     require(count <= LIMIT // 145, "write count")
     for _ in range(count):
@@ -76,12 +76,14 @@ def writes(body, slot, previous_slot, cursor, observe=None):
         if body.flag():
             body.vec(64)
         pubkey = body.vec(32)
-        body.u64()
-        body.vec(32)
-        body.flag()
-        body.u64()
+        lamports = body.u64()
+        owner = body.vec(32)
+        executable = body.flag()
+        rent_epoch = body.u64()
         data = body.vec()
-        body.vec(32)
+        stored_hash = body.vec(32)
+        if observe_account is not None:
+            observe_account(actual, cursor - 1, pubkey, data, lamports, owner, executable, rent_epoch, stored_hash)
         if observe is not None:
             observe(actual, cursor - 1, pubkey, data)
     return count, cursor, previous_slot
@@ -116,9 +118,12 @@ def outcomes(body, expected, observe=None):
 
 
 @contextlib.contextmanager
-def worker(version):
-    path = DEPLOY / f"jetstreamer-historical-worker-v1-5-{version}"
-    digest, revision = WORKERS[version]
+def worker(version, *, image=None):
+    if image is None:
+        digest, revision = WORKERS[version]
+        path = DEPLOY / f"jetstreamer-historical-worker-v1-5-{version}"
+    else:
+        path, digest, revision = image
     require(hashlib.sha256(path.read_bytes()).hexdigest() == digest, "worker executable changed")
     env = dict(PATH="/usr/bin:/bin", LANG="C", RAYON_NUM_THREADS="8",
                SOLANA_RAYON_THREADS="8", JETSTREAMER_HISTORICAL_POH_THREADS="2")
@@ -191,20 +196,20 @@ class Session:
         self.slot = slot
         body.eof()
 
-    def checkpoint(self, slot, on_write=None):
+    def checkpoint(self, slot, on_write=None, on_account=None):
         body = self.call(3, U64.pack(slot), 3)
         require(body.u64() == slot, "wrong checkpoint slot")
         state = dict(slot=slot, bank_hash=base58(body.vec(32)), accounts_hash=base58(body.vec(32)),
                      last_blockhash=base58(body.vec(32)), capitalization=body.u64(),
                      transaction_count=body.u64(), tick_height=body.u64())
         require(body.flag() and state["tick_height"] == (slot + 1) * 64, "incomplete checkpoint")
-        state["write_count"], self.cursor, _ = writes(body, slot, slot, self.cursor, on_write)
+        state["write_count"], self.cursor, _ = writes(body, slot, slot, self.cursor, on_write, on_account)
         state["next_write_version"] = body.u64()
         require(state["next_write_version"] == self.cursor, "checkpoint cursor")
         body.eof()
         return state
 
-    def process(self, slot, entries, on_outcome=None, on_write=None):
+    def process(self, slot, entries, on_outcome=None, on_write=None, on_account=None):
         for start in range(0, len(entries), 64):
             batch = entries[start:start + 64]
             request = bytearray(U64.pack(len(batch)))
@@ -227,7 +232,7 @@ class Session:
                         completed += n
                         self.successful += successful
                     elif kind == 1:
-                        _, self.cursor, previous_slot = writes(body, slot, previous_slot, self.cursor, on_write)
+                        _, self.cursor, previous_slot = writes(body, slot, previous_slot, self.cursor, on_write, on_account)
                     elif kind == 2:
                         ticks, complete = body.u64(), body.flag()
                         require(body.u64() == self.cursor, "entry cursor")

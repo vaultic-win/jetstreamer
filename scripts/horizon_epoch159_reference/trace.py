@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from source import BOOT, CONFIG, END, VOTE, VOTE_WIRE, original_blocks
 from car import require
 from native import base58, worker
+import feature19
 
 SLOT_HASHES = bytes.fromhex("06a7d517192f0aafc6f265e3fb77cc7ada82c529d0be3b136e2d005520000000")
 HOME = Path("/home/sol/.jetstreamer-private")
@@ -68,7 +69,7 @@ def inputs():
     return identities
 
 
-def mounted_inputs():
+def mounted_inputs(corrected=False):
     import _cbor2
     import cbor2
     from native import DEPLOY
@@ -85,7 +86,13 @@ def mounted_inputs():
     )
     deps = json.loads(Path(__file__).with_name("dependencies.json").read_bytes())
     seen = {}
-    for row in [*deps["cbor2"], deps["worker"]]:
+    worker_ref = (
+        dict(path=str(feature19.WORKER), length=8732096, sha256=feature19.IMAGE)
+        if corrected
+        else deps["worker"]
+    )
+    expected_worker = feature19.WORKER if corrected else DEPLOY / "jetstreamer-historical-worker-v1-5-6"
+    for row in [*deps["cbor2"], worker_ref]:
         p = Path(row["path"])
         st = p.stat()
         require(
@@ -99,7 +106,7 @@ def mounted_inputs():
         _cbor2.__file__ in seen
         and cbor2.__file__ in seen
         and cbor2.load is _cbor2.load
-        and str(DEPLOY / "jetstreamer-historical-worker-v1-5-6") in seen,
+        and str(expected_worker) in seen,
         "native dependency resolution",
     )
     source = inputs()
@@ -117,7 +124,7 @@ def mounted_inputs():
     )
 
 
-def allocation(scratch, receipts):
+def allocation(scratch, receipts, corrected=False):
     require(
         os.geteuid() == 1001 and (scratch, receipts) == (Path("/work"), Path("/evidence")),
         "wrong service user or mounts",
@@ -139,7 +146,12 @@ def allocation(scratch, receipts):
         devsys = Path("/sys/dev/block") / f"{os.major(st.st_dev)}:{os.minor(st.st_dev)}"
         image = (devsys / "loop/backing_file").read_text().strip()
         allowed = [
-            str(root / "epoch159-bounded-reference-20261123-v1/attempt-v1" / name)
+            str(
+                root
+                / (feature19.RUNTIME if corrected else "epoch159-bounded-reference-20261123-v1")
+                / "attempt-v1"
+                / name
+            )
             for root in (
                 HOME / "horizon-root-runtime-data",
                 Path("/var/lib/jetstreamer/horizon_runtime_data"),
@@ -179,9 +191,9 @@ def allocation(scratch, receipts):
     )
 
 
-def trace(scratch, receipts):
-    booking = allocation(scratch, receipts)
-    mounted = mounted_inputs()
+def trace(scratch, receipts, corrected=False):
+    booking = allocation(scratch, receipts, corrected)
+    mounted = mounted_inputs(corrected)
     source = mounted["source"]
     incident = CONFIG["bootstrap"]["checkpoint"]
     started = time.monotonic()
@@ -208,7 +220,13 @@ def trace(scratch, receipts):
         last_complete=None,
         signed_mismatches=[],
         complete=False,
+        feature_writes=[],
     )
+
+    def capture_feature(*args):
+        feature19.observe(receipt["feature_writes"], *args)
+
+    on_account = capture_feature if corrected else None
 
     def capture_write(frame, version, pubkey, data):
         if pubkey != SLOT_HASHES or frame not in (*CHECKPOINTS, 68_687_998):
@@ -249,7 +267,9 @@ def trace(scratch, receipts):
     signal.signal(signal.SIGALRM, timeout)
     signal.alarm(2 * 3600)
     try:
-        with worker(6) as session:
+        version = 19 if corrected else 6
+        image = (feature19.WORKER, feature19.IMAGE, feature19.REVISION) if corrected else None
+        with worker(version, image=image) as session:
             native = Path("/proc") / str(session.proc.pid)
 
             def identity(proc):
@@ -271,7 +291,8 @@ def trace(scratch, receipts):
             require(
                 child["parent"] == driver["pid"]
                 and child["cgroup"] == driver["cgroup"]
-                and child["exe"].endswith("/jetstreamer-historical-worker-v1-5-6"),
+                and child["exe"].endswith(f"/jetstreamer-historical-worker-v1-5-{version}")
+                and (not corrected or child["exe"] == str(feature19.WORKER)),
                 "unexpected original worker or parent",
             )
             record(
@@ -340,13 +361,14 @@ def trace(scratch, receipts):
                     entries,
                     capture_outcome if slot == END else None,
                     capture_write,
+                    on_account,
                 )
                 receipt["blocks"] += 1
                 receipt["entries"] += len(entries)
                 receipt["transactions"] += sum(len(row[2]) for row in entries)
                 receipt["last_complete"] = slot
                 if slot in CHECKPOINTS:
-                    state = session.checkpoint(slot, capture_write)
+                    state = session.checkpoint(slot, capture_write, on_account)
                     require(
                         state["last_blockhash"] == base58(entries[-1][1])
                         and state["transaction_count"] == incident["transactions"] + session.successful,
@@ -377,6 +399,7 @@ def trace(scratch, receipts):
         receipt["complete"] = True
         receipt["canonical_checks_passed"] = (
             receipt["vote"]["accepted"]
+            and (not corrected or feature19.accepted(receipt["feature_writes"]))
             and not receipt["signed_mismatches"]
             and all(receipt["slot_hashes"][s]["expected_table_match"] for s in CONFIG["slothashes"])
         )
@@ -395,6 +418,7 @@ def trace(scratch, receipts):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--feature19", action="store_true")
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("check-source")
     sub.add_parser("check-mounted-inputs")
@@ -411,9 +435,9 @@ def main():
         require(counts == CONFIG["source_counters"], "source totals disagree")
         print(json.dumps(counts))
     elif args.action == "check-mounted-inputs":
-        print(json.dumps(mounted_inputs(), sort_keys=True))
+        print(json.dumps(mounted_inputs(args.feature19), sort_keys=True))
     else:
-        trace(args.scratch, args.receipts)
+        trace(args.scratch, args.receipts, args.feature19)
 
 
 if __name__ == "__main__":

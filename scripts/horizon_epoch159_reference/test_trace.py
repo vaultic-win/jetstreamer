@@ -7,11 +7,61 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import source
+import feature19
 import trace
 from native import Body, U32, U64, base58, outcomes, vec, writes
 
 
 class TraceTest(unittest.TestCase):
+    def test_feature_account_uses_actual_protocol_write_and_historical_slot(self):
+        key = feature19.ACCOUNT
+        self.assertEqual(base58(key), "3ccR6QpxGYsAbWyfevEtBNGfWV4xBffxRj2tD6A9i39F")
+        self.assertEqual(base58(feature19.OWNER), "Feature111111111111111111111111111111111111")
+        slot = feature19.FIRST
+        valid = dict(
+            actual=slot,
+            pubkey=key,
+            data=bytes.fromhex("018018180400000000"),
+            lamports=953520,
+            owner=feature19.OWNER,
+            executable=0,
+            rent=158,
+            digest=feature19.BOUNDARY_HASH,
+        )
+        for changes in (
+            {},
+            {"actual": slot - 1},
+            {"pubkey": bytes(32)},
+            {"data": bytes(9)},
+            {"data": valid["data"] + b"\x00"},
+            {"lamports": 1},
+            {"owner": bytes(32)},
+            {"executable": 1},
+            {"rent": 159},
+            {"digest": bytes(32)},
+        ):
+            v = valid | changes
+            frame = (
+                U64.pack(v["actual"])
+                + U64.pack(1234)
+                + b"\0"
+                + vec(v["pubkey"])
+                + U64.pack(v["lamports"])
+                + vec(v["owner"])
+                + bytes([v["executable"]])
+                + U64.pack(v["rent"])
+                + vec(v["data"])
+                + vec(v["digest"])
+            )
+            events = []
+            body = Body(U64.pack(1) + frame)
+            writes(body, slot, slot - 1, 1234, observe_account=lambda *a: feature19.observe(events, *a))
+            body.eof()
+            self.assertEqual(feature19.accepted(events), not changes)
+            if not changes:
+                self.assertEqual(events[0]["write_version"], 1234)
+                self.assertFalse(feature19.accepted(events * 2))
+
     def test_capture_failed_and_successful_signed_incident_vote(self):
         tx = source.VOTE_WIRE
         sig = tx[1:65]

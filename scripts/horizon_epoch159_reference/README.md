@@ -23,10 +23,10 @@ The bounded run compares the original restored Bank tuple, three subsequent nati
 
 ## Physical reference service
 
-The campaign owner installs the eight-member flat package under
+The campaign owner installs the flat package, including the shared feature profile module, under
 `/var/lib/jetstreamer/horizon_runtime_data/epoch159-bounded-reference-20261123-v1/package-v1`.
 The package includes the two protocol modules and original block index correction
-from the epoch 157 reference. Use the deployment sealer to bind every member.
+from the epoch 157 reference. The optional [epoch 159 feature differential](FEATURE-REFERENCE.md) uses its own package and invocation. Use the deployment sealer to bind every member.
 The existing v1.5.6 executable, CBOR extension/modules, genesis and snapshot are
 opened in the actual privilege-dropped read-only mount view by
 `service.py check-mounted-inputs`. This reads the complete snapshot and verifies

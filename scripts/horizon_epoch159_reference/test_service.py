@@ -69,6 +69,35 @@ class ServiceTest(unittest.TestCase):
             self.assertIn("--bounding-set=-all", cmd)
             self.assertEqual(cmd[-3:], ["replay", "/work", "/evidence"])
 
+    def test_feature_profile_preserves_booked_limits_and_uses_its_own_owner(self):
+        with (
+            TemporaryDirectory() as d,
+            patch.object(service, "PACKAGE", Path(d)),
+            patch.object(service, "UNIT", service.feature19.UNIT),
+        ):
+            (Path(d) / "inputs.json").write_bytes(Path(__file__).with_name("inputs.json").read_bytes())
+            self.assertEqual(service.node_argv()[-4:], ["--feature19", "replay", "/work", "/evidence"])
+            self.assertEqual(service.node_argv(True)[-2:], ["--feature19", "check-mounted-inputs"])
+            args = service.system_argv("abc")
+            self.assertIn("--unit=" + service.feature19.UNIT, args)
+            self.assertIn("--property=CPUQuota=200%", args)
+            self.assertIn("--property=MemoryMax=51539607552", args)
+            self.assertEqual(args[-3:], ["--feature19", "run", "abc"])
+
+    def test_feature_donor_refuses_live_verifier_before_opening_lock(self):
+        with (
+            patch.object(service, "UNIT", service.feature19.UNIT),
+            patch.object(
+                service.sp,
+                "check_output",
+                return_value="ActiveState=active\nMainPID=17\nControlPID=0\nJob=\nInvocationID=dba04d40f1b046b4875d7e27e0ff224a\nExecStart=.../tools-v5m/export145 arg\n",
+            ),
+            patch.object(service.os, "open", side_effect=AssertionError("lock opened")),
+        ):
+            with self.assertRaisesRegex(ValueError, "145 verifier"):
+                with service.borrow({}):
+                    pass
+
     def test_interlock_refuses_competitor(self):
         if os.geteuid() != 0:
             self.skipTest("root owner required")

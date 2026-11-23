@@ -14,6 +14,9 @@ import stat
 import subprocess as sp
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import feature19
+
 RT = Path("/var/lib/jetstreamer/horizon_runtime_data")
 ROOT = RT / "epoch159-bounded-reference-20261123-v1"
 PACKAGE = ROOT / "package-v1"
@@ -111,6 +114,34 @@ def verify_package():
     return sha(PACKAGE / SEAL)
 
 
+def check_feature_donor():
+    if UNIT != feature19.UNIT:
+        return
+    # The deployed V5m provider validates the free donor lock before and after its native price.
+    # Check before opening that lock, including the short dispatch-intent interval.
+    raw = sp.check_output(
+        [
+            "systemctl",
+            "show",
+            "-p",
+            "ActiveState,MainPID,ControlPID,Job,ExecStart,InvocationID",
+            feature19.VERIFIER,
+        ],
+        text=True,
+    )
+    state = dict(line.split("=", 1) for line in raw.splitlines())
+    uses_current_provider = (
+        state["InvocationID"] == "dba04d40f1b046b4875d7e27e0ff224a"
+        or "/tools-v5m/export145 " in state["ExecStart"]
+    )
+    drained = (
+        state["ActiveState"] in ("inactive", "failed")
+        and not state["Job"]
+        and state["MainPID"] == state["ControlPID"] == "0"
+    )
+    need(not uses_current_provider or drained, "the epoch 145 verifier still requires a free donor lock")
+
+
 def grant(digest):
     g = root_file(ROOT / "ADMISSION.json", digest)
     need(
@@ -146,14 +177,25 @@ def grant(digest):
         and any("136" in u for u in g["donor_idle_units"]),
         "missing checked donor units",
     )
+    if UNIT == feature19.UNIT:
+        check_feature_donor()
+        settled = root_file(feature19.SETTLEMENT, feature19.SETTLEMENT_SHA)
+        need(settled["iid"] == feature19.PREVIOUS_INVOCATION, "previous trace has not settled")
+        enrolled = root_file(feature19.DONOR_UNITS, feature19.DONOR_UNITS_SHA)
+        need(
+            set(enrolled["donor_idle_units"]).issubset(g["donor_idle_units"]),
+            "feature differential omitted an existing donor unit",
+        )
     return g
 
 
 @contextlib.contextmanager
 def borrow(g):
+    check_feature_donor()
     fd = os.open(LOCK, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        check_feature_donor()
         st = os.fstat(fd)
         need(
             st.st_nlink == 1
@@ -282,6 +324,8 @@ def node_argv(check_inputs=False):
         "-IB",
         "/opt/epoch159/trace.py",
     ]
+    if UNIT == feature19.UNIT:
+        cmd.append("--feature19")
     return cmd + (["check-mounted-inputs"] if check_inputs else ["replay", "/work", "/evidence"])
 
 
@@ -313,6 +357,7 @@ def system_argv(digest):
         PYTHON,
         "-IB",
         str(PACKAGE / "service.py"),
+        *(["--feature19"] if UNIT == feature19.UNIT else []),
         "run",
         digest,
     ]
@@ -511,13 +556,20 @@ def retire_scratch():
 
 
 def main():
+    global ROOT, PACKAGE, ATTEMPT, UNIT
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--feature19", action="store_true")
     p.add_argument(
         "action",
         choices=["recipe", "check-mounted-inputs", "dispatch", "run", "retire-scratch"],
     )
     p.add_argument("sha", nargs="?")
     a = p.parse_args()
+    if a.feature19:
+        ROOT = RT / feature19.RUNTIME
+        PACKAGE = ROOT / "package-v1"
+        ATTEMPT = ROOT / "attempt-v1"
+        UNIT = feature19.UNIT
     need(
         os.geteuid() == 0 and sys.flags.isolated and __debug__,
         "isolated root operator required",
