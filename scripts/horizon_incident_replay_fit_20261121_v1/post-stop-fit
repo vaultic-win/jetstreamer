@@ -48,7 +48,8 @@ ORIGINAL={166,167,170}
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
 FIVE_LANE_145 = HERE.name == "tools-homefloor-145-rejoin-v2"
-FIFTH168 = FIVE_LANE_145 or HERE.name in {"tools-homefloor-cold168-retry2-v1", "tools-homefloor-cold168-retry2-v2"}
+RETRY3_168 = HERE.name == "tools-homefloor-cold168-retry3-v1"
+FIFTH168 = RETRY3_168 or FIVE_LANE_145 or HERE.name in {"tools-homefloor-cold168-retry2-v1", "tools-homefloor-cold168-retry2-v2"}
 FOURTH166 = FIFTH168 or HERE.name == "tools-homefloor-166-after170-v1"
 PUBLISH170 = HERE.name == "tools-homefloor-publish-cold170-v1"
 RETRY13_170 = PUBLISH170 or FOURTH166 or HERE.name in {"tools-homefloor-retry13-170-v1", "tools-homefloor-retry13-170-adopted",
@@ -60,7 +61,9 @@ HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-home
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
 if FIFTH168:
-    cold168 = runpy.run_path(str(HERE / "cold168_actor.py"))
+    cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),init_globals={"RETRY3":RETRY3_168})
+if RETRY3_168:
+    writer168 = runpy.run_path(str(HERE / "retry3_status.py"))
 if PUBLISH170:
     publication170 = runpy.run_path(str(HERE / "cold170_commit.py"))
 if COLD170:
@@ -731,7 +734,12 @@ def joined_resident(active):
 
 def registered_status():
     if FIFTH168:
-        return registrations["registered_status"](s,fit,13,cold168["registered_writer"])
+        def current_writer(scope,prior):
+            retry2=cold168["registered_writer"](scope,prior)
+            if RETRY3_168:
+                return writer168["registered_writer"](scope,retry2,cold168["PREPARED_SHA"],cold168["GUARD_QUAL_SHA"])
+            return retry2
+        return registrations["registered_status"](s,fit,13,current_writer)
     if PUBLISH170:
         return registrations["registered_status"](s,fit,13,publication170["registered_writer"])
     if HOMEFLOOR:

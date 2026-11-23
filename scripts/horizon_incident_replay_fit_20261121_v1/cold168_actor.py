@@ -1,13 +1,16 @@
 """Price the metered epoch 168 successor in its original paid tree."""
 from copy import deepcopy
 import hashlib
+import json
 import os
 import re
 import stat
 from pathlib import Path
 
 R = Path('/var/lib/jetstreamer/horizon_runtime_data')
-DIRECTORY = 'epoch168-retry2-rebook-20261122-v1'
+RETRY3 = globals().get('RETRY3',False)
+RETRY2_DIRECTORY = 'epoch168-retry2-rebook-20261122-v1'
+DIRECTORY = RETRY2_DIRECTORY
 NAME = '168-full-metered-cold-v2-20261122'
 UNIT = 'horizon-qualify-' + NAME + '.service'
 GUARD = R / 'epoch168-cold-guard-20261122-v2'
@@ -22,6 +25,54 @@ ORIGINAL_ARGV_SHA = '39d2e97f8f6962984f1ec9672a4701fe0772e3a63a72465b8d945d59eab
 PREPARED_SHA = 'dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a'
 LOG_SHA = 'bdaff851db2edbac62c7b925156ba2cdb827001268324ee851e74d0790f8a84f'
 GATE_SHA = 'bdddd295d33c195dcef49fa28f69da8b85ec152a496ddd98a04be76914b45d2a'
+GUARD_QUAL_SHA = 'bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b'
+ROOT_INODE,LOG_INODE = 103481350,103481356
+ALIAS = Path('/run/horizon-full168-cold-v2')
+FAILED_IID = 'd929652cba0e459cafc75edd05356c83'
+FAILURE_SHA = 'a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643'
+
+if RETRY3:
+    DIRECTORY = 'epoch168-retry3-rebook-20261123-v1'
+    NAME = '168-full-metered-cold-v3-20261123'
+    UNIT = 'horizon-qualify-'+NAME+'.service'
+    GUARD = R/'epoch168-cold-guard-20261123-v3'
+    RUN = LANE/'full-metered-20261121-v1/cold-retry3-20261123'
+    ALIAS = Path('/run/horizon-full168-cold-v3')
+    ROOT_SHA = 'a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4'
+    ROOT_INODE,LOG_INODE = 103481378,103481382
+    generation = json.loads(Path(__file__).with_name('retry3-168-fit-generation.json').read_bytes())
+    expected = dict(prepared=R/DIRECTORY/'PREPARED.json',log=R/DIRECTORY/'OBSERVER_LOG_PREPARED.json',
+                    guard=GUARD/'GUARD_QUALIFIED.json',gate=R/DIRECTORY/'tools/gate.py')
+    if set(generation)!=set(expected) or any(set(generation[k])!={'path','sha256'} or generation[k]['path']!=str(p) or
+           not re.fullmatch('[0-9a-f]{64}',generation[k]['sha256']) for k,p in expected.items()):
+        raise ValueError('foreign qualified epoch 168 retry3 generation')
+    PREPARED_SHA,LOG_SHA,GUARD_QUAL_SHA,GATE_SHA = (generation[k]['sha256'] for k in ('prepared','log','guard','gate'))
+
+
+def failed_retry2(s,root):
+    previous=R/RETRY2_DIRECTORY
+    path=previous/'RELEASED_NODE_STARTUP_FAILURE_20261123.json'
+    failure,ref=s.read(path,FAILURE_SHA)
+    retained=s.bound(root['previous_root'],previous/'SUCCESSOR_ROOT.json')
+    s.need(root['previous_root']['sha256']=='ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc' and
+           all(retained[k]==root[k] for k in ('prior_stop','initial_cleanup')),'different retry2 root or cleanup')
+    old=failure['producer']
+    s.need(root['previous_start_failure']==ref and failure['epoch']==168 and failure['no_admission_record'] and
+           failure['private_directory_empty'] and failure['permit_consumed'] and failure['worker_receipt_absent'] and
+           not failure['replay_claimed'] and not failure['worker_in_observed_guard_samples'] and
+           old['Id']=='horizon-qualify-168-full-metered-cold-v2-20261122.service' and
+           (old['InvocationID'],old['MainPID'],old['ActiveState'],old['ExecMainStatus'])==(FAILED_IID,'0','failed','1'),
+           'different failed retry2 settlement')
+    for name in ('START_INTENT.json','ACTUAL_PRODUCER_NATIVE.json','FIRST_GUARD.json','POST_GUARD_CAPACITY.json',
+                 'AUTHORIZED_GATED_PAYLOAD.json'):
+        obj=s.bound(failure['receipts'][name],previous/name)
+        if name in ('ACTUAL_PRODUCER_NATIVE.json','AUTHORIZED_GATED_PAYLOAD.json'):
+            s.need(obj['producer_invocation_id']==FAILED_IID,'foreign spent producer')
+    permit=previous/'barrier/allow'
+    st=permit.lstat()
+    s.need((st.st_uid,st.st_gid,st.st_nlink,st.st_mode)==(0,0,1,0o100444) and permit.read_bytes()==FAILED_IID.encode() and
+           not any((previous/name).exists() for name in ('ACTUAL_ADMISSION_AND_PROTECTION.json','FIRST_PROTECTED_WORKER.json')),
+           'failed retry2 acquired a different permit or admission')
 
 
 def stable(s):
@@ -51,8 +102,10 @@ def stable(s):
     else:
         s.need((observed.st_uid,observed.st_gid)==(old['uid'],old['gid'])==(1001,1003) and
                observed.st_size==0, 'cold 168 append log changed before observer registration')
-    s.need(candidate['inode']==103481350 and root['log']['inode']==103481356 and root['worker_launched'] is False,
+    s.need(candidate['inode']==ROOT_INODE and root['log']['inode']==LOG_INODE and root['worker_launched'] is False,
            'wrong cold 168 generation')
+    if RETRY3:
+        failed_retry2(s,root)
     closed = s.bound(root['prior_stop'],OLD/'guard-receipts/stop-completion.json')
     cleanup = s.bound(root['initial_cleanup'],R/'epoch168-closed-accounts-20261122-v1/state/full-metered/COMPLETE.json')
     s.need(closed['producer_invocation_id'] == closed['terminal']['invocation_id'] ==
@@ -65,14 +118,22 @@ def stable(s):
 def observe(s,fit,native_actor,own):
     rootref = stable(s)
     root = s.bound(rootref,R / DIRECTORY / 'SUCCESSOR_ROOT.json')
-    for unit in root['stopped_units']:
+    stopped=set(root['stopped_units'])
+    if RETRY3:
+        # The creation receipt includes the successor before admission. native_actor checks it below.
+        stopped -= {UNIT,'horizon-guard-'+NAME+'.timer','horizon-guard-'+NAME+'.service'}
+        stopped.update(('horizon-qualify-168-full-metered-20261121-v1.service',
+                        'horizon-guard-168-full-metered-20261121-v1.timer','horizon-guard-168-full-metered-20261121-v1.service'))
+    for unit in stopped:
         m=s.show(unit)
-        s.need(m['ActiveState']=='inactive' and not m['Job'] and not fit.members(unit), 'stopped 168 owner returned')
+        old_failed=RETRY3 and unit=='horizon-qualify-168-full-metered-cold-v2-20261122.service' and (
+            m['ActiveState'],m['InvocationID'],m['ExecMainStatus'])==('failed',FAILED_IID,'1')
+        s.need((m['ActiveState']=='inactive' or old_failed) and not m['Job'] and not fit.members(unit), 'stopped 168 owner returned')
     predecessor = dict(original=dict(producer_invocation_id=PRIOR_IID), stop_completion=root['prior_stop'])
-    return native_actor(168,own,LANE,RUN,predecessor,generation=(DIRECTORY,NAME))
-
-
-ALIAS = Path('/run/horizon-full168-cold-v2')
+    actor=native_actor(168,own,LANE,RUN,predecessor,generation=(DIRECTORY,NAME))
+    if RETRY3 and actor is not None:
+        s.need(actor['producer_invocation_id']!=FAILED_IID,'spent retry2 invocation cannot admit retry3')
+    return actor
 
 
 def registered_inputs(s, payload):
@@ -155,6 +216,8 @@ def home_namespace(s,proc,profile,pairs):
     s.need(config==LANE/'config','foreign 168 config directory')
     writable={RUN/'output',RUN/'private'}
     readonly={RUN/'producer.log',config}
+    if RETRY3:
+        readonly.add(RUN)
     expected={home,*readonly,*writable,*(p for p in pairs if p.is_relative_to(home))}
     inaccessible,=(v.removeprefix('--property=InaccessiblePaths=').split() for v in profile['producer_argv']
                    if v.startswith('--property=InaccessiblePaths='))
@@ -180,6 +243,12 @@ def home_namespace(s,proc,profile,pairs):
     for target in writable|readonly:
         s.need(('rw' if target in writable else 'ro') in mounted[target] and
                s.same_file(proc/'root'/target.relative_to('/'),target),'foreign 168 HOME bind '+str(target))
+    if RETRY3:
+        for target in [RUN,*writable]:
+            node_view=(proc/'root'/target.relative_to('/')).stat()
+            s.need((node_view.st_uid,node_view.st_gid,node_view.st_mode)==(1001,1003,0o40700),
+                   'untrusted 168 private run parent or child '+str(target))
+        s.need('noexec' not in mounted[RUN/'private'],'168 historical worker scratch forbids execution')
     s.need(not (proc/'root/home/sol/workspace/jetstreamer/Cargo.toml').exists(),'168 workspace exposed')
 
 
@@ -189,7 +258,7 @@ def verify_start(s,d,proc,unit,timer,tree,run,intent,identity,held,readonly_moun
     s.need(intent['prepared']==ref and profile['producer_unit']==unit==UNIT and
            profile['fresh_attempt']==str(run)==str(RUN) and profile['guard_timer']==timer and
            profile['guard_worker_root']==str(tree)==str(LANE) and
-           intent['stable_root']==dict(path=str(RUN),device=64512,inode=103481350),
+           intent['stable_root']==dict(path=str(RUN),device=64512,inode=ROOT_INODE),
            'foreign cold 168 prepared owner')
     payload,_=s.read(OLD/'inputs-v1/payload.json',PAYLOAD_SHA)
     s.read(OLD/'SESSION_PRODUCER_ARGV.json',ORIGINAL_ARGV_SHA)
@@ -241,14 +310,15 @@ def verify_start(s,d,proc,unit,timer,tree,run,intent,identity,held,readonly_moun
 
 
 def guard(s,profile):
-    qualified, _ = s.read(GUARD/'GUARD_QUALIFIED.json','bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b')
+    qualified, _ = s.read(GUARD/'GUARD_QUALIFIED.json',GUARD_QUAL_SHA)
     image=GUARD/'tools/guard';digest=profile['guard_binary_sha256']
     seal=s.bound(qualified['seal'],image.parent/'deployment-seal-receipt.json')
     contract=qualified['contract']
     terms=s.bound(contract['contract'],GUARD/'contract/contract.json')
     s.bound(contract['deployment_seal'],GUARD/'contract/deployment-seal-receipt.json')
     witness=s.bound(terms['qualified_native_witness'],GUARD/'NATIVE_WITNESS.json')
-    s.need(qualified['schema']=='horizon-168-cold-v2-native-guard-qualified-v1' and qualified['guard']==dict(path=str(image),sha256=digest) and
+    schema='horizon-168-cold-v3-native-guard-qualified-v1' if RETRY3 else 'horizon-168-cold-v2-native-guard-qualified-v1'
+    s.need(qualified['schema']==schema and qualified['guard']==dict(path=str(image),sha256=digest) and
            seal['destination']==str(image.parent) and any(x['name']=='guard' and x['sha256']==digest for x in seal['members']) and
            witness['native_identity']['executable']==str(image) and witness['native_identity']['executable_sha256']==digest and
            hashlib.sha256(image.read_bytes()).hexdigest()==digest,'different qualified cold 168 guard')
@@ -271,9 +341,9 @@ def registered_writer(s, prior):
            and old_pkg==status/'tools-cold170-retry13-v2' and old_seal==s.ref(old_pkg/'deployment-seal-receipt.json',
                'f1b4781788205dbc065f5b116577c2e263e523f65e19cd658c31a9ae7e86fdb4')
            and intent['qualified']==qr, 'foreign 168 writer predecessor or handoff')
-    _, prep = s.read(R/DIRECTORY/'PREPARED.json',PREPARED_SHA)
-    _, root = s.read(R/DIRECTORY/'SUCCESSOR_ROOT.json',ROOT_SHA)
-    _, guardref = s.read(GUARD/'GUARD_QUALIFIED.json','bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b')
+    _, prep = s.read(R/RETRY2_DIRECTORY/'PREPARED.json','dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a')
+    _, root = s.read(R/RETRY2_DIRECTORY/'SUCCESSOR_ROOT.json','ec909d6701ce7dcbee72da319bf0179ba375e1cf6e284aa29686e1dd0a3cbecc')
+    _, guardref = s.read(R/'epoch168-cold-guard-20261122-v2/GUARD_QUALIFIED.json','bab2140873334dfbab487be91cf044a31a000cbdec525075fe1ea4a086198e2b')
     package = Path(q['package']['path']).parent
     seal = s.bound(q['package'],package/'deployment-seal-receipt.json')
     entry, = (v for v in seal['members'] if v['name']=='status_cycle.py')
