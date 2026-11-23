@@ -1,4 +1,4 @@
-//! Retire the original epoch 251 bootstrap copy after the external owner and
+//! Retire an enrolled bootstrap acquisition copy after the external owner and
 //! scheduled-reader census. The separate, sealed production snapshot stays local.
 #[path = "../native266-stopped-scratch/src/journal.rs"]
 mod journal;
@@ -13,14 +13,89 @@ use std::process::{Command, Stdio};
 
 const DIRECTORY: i32 = 0o200000;
 const NOFOLLOW: i32 = 0o400000;
-const DIR: &str = "/home/ubuntu/.jetstreamer-private/qualification-251-source-20261118-v1/input";
-const KEEP: &str = "/var/lib/jetstreamer/horizon251-native-input-20261118-v1";
-const STATE: &str = "/var/lib/jetstreamer/horizon251-raw-bootstrap-retire-state-v174";
-const NAME: &str = "snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst";
-const QUARANTINE: &str = ".snapshot-108431365-inode-17816708-quarantine";
-const DIGEST: &str = "b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311";
-const BYTES: u64 = 13_928_359_507;
-const INTENT: &str = "251 66305 17816708 25590232 13928359507 b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311\n";
+const DEVICE: u64 = 66305;
+
+struct Snapshot {
+    directory: &'static str,
+    directory_inode: u64,
+    inode: u64,
+    mode: u32,
+    mtime: i128,
+    ctime: i128,
+}
+
+struct Profile {
+    epoch: u32,
+    acquisition: Snapshot,
+    retained: Snapshot,
+    state: &'static str,
+    unit_prefix: &'static str,
+    name: &'static str,
+    quarantine: &'static str,
+    digest: &'static str,
+    bytes: u64,
+}
+
+const EPOCH_251: Profile = Profile {
+    epoch: 251,
+    acquisition: Snapshot {
+        directory: "/home/ubuntu/.jetstreamer-private/qualification-251-source-20261118-v1/input",
+        directory_inode: 17815016,
+        inode: 17816708,
+        mode: 0o100400,
+        mtime: 1794966334888919871,
+        ctime: 1794966374072045002,
+    },
+    retained: Snapshot {
+        directory: "/var/lib/jetstreamer/horizon251-native-input-20261118-v1",
+        directory_inode: 25590231,
+        inode: 25590232,
+        mode: 0o100444,
+        mtime: 1794983008128161549,
+        ctime: 1794983008128161549,
+    },
+    state: "/var/lib/jetstreamer/horizon251-raw-bootstrap-retire-state-v174",
+    unit_prefix: "horizon251-raw-bootstrap-retire-v174-a",
+    name: "snapshot-108431365-C5eqGwzDFEDfeBovidro6WnY3Drw7caJ2p2mjnJbGJVE.tar.zst",
+    quarantine: ".snapshot-108431365-inode-17816708-quarantine",
+    digest: "b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311",
+    bytes: 13_928_359_507,
+};
+
+const EPOCH_223: Profile = Profile {
+    epoch: 223,
+    acquisition: Snapshot {
+        directory: "/var/lib/jetstreamer/horizon-223-bootstrap-stage-ab8b843-v1/download",
+        directory_inode: 230564162,
+        inode: 230564163,
+        mode: 0o100400,
+        mtime: 1792610485253419684,
+        ctime: 1792610486237416761,
+    },
+    retained: Snapshot {
+        directory: "/var/lib/jetstreamer/horizon-223-singleton-postcount-ad1d65a-v1",
+        directory_inode: 230564216,
+        inode: 230564220,
+        mode: 0o100444,
+        mtime: 1792611457988548390,
+        ctime: 1792611457989548387,
+    },
+    state: "/var/lib/jetstreamer/horizon223-raw-bootstrap-retire-state-v236",
+    unit_prefix: "horizon223-raw-bootstrap-retire-v236-a",
+    name: "snapshot-96335538-Gavt9cmcj5BFXuZnz44JktRGbM9oxRkJqoWRF8PvMBTE.tar.zst",
+    quarantine: ".snapshot-96335538-inode-230564163-quarantine",
+    digest: "301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665",
+    bytes: 9_815_262_303,
+};
+
+impl Profile {
+    fn intent(&self) -> String {
+        format!(
+            "{} {DEVICE} {} {} {} {}\n",
+            self.epoch, self.acquisition.inode, self.retained.inode, self.bytes, self.digest
+        )
+    }
+}
 
 unsafe extern "C" {
     fn renameat2(old: i32, from: *const i8, new: i32, to: *const i8, flags: u32) -> i32;
@@ -40,13 +115,14 @@ fn open(p: &Path, flags: i32) -> io::Result<File> {
         .custom_flags(flags | NOFOLLOW)
         .open(p)
 }
-fn checked_dir(p: &str, inode: u64, mode: u32) -> io::Result<File> {
-    let path = Path::new(p);
+fn checked_dir(snapshot: &Snapshot, mode: u32) -> io::Result<File> {
+    let path = Path::new(snapshot.directory);
     need(path.canonicalize()? == path, "directory alias")?;
     let f = open(path, DIRECTORY)?;
     let m = f.metadata()?;
     need(
-        (m.dev(), m.ino(), m.uid(), m.gid(), m.mode()) == (66305, inode, 0, 0, mode),
+        (m.dev(), m.ino(), m.uid(), m.gid(), m.mode())
+            == (DEVICE, snapshot.directory_inode, 0, 0, mode),
         "directory identity",
     )?;
     Ok(f)
@@ -57,12 +133,7 @@ fn child(dir: &File, name: &str) -> PathBuf {
 fn ns(sec: i64, nsec: i64) -> i128 {
     i128::from(sec) * 1_000_000_000 + i128::from(nsec)
 }
-fn identity(m: &Metadata, raw: bool, quarantined: bool) -> io::Result<()> {
-    let (ino, mode, mtime, ctime) = if raw {
-        (17816708, 0o100400, 1794966334888919871, 1794966374072045002)
-    } else {
-        (25590232, 0o100444, 1794983008128161549, 1794983008128161549)
-    };
+fn identity(m: &Metadata, snapshot: &Snapshot, bytes: u64, quarantined: bool) -> io::Result<()> {
     need(
         (
             m.dev(),
@@ -72,26 +143,26 @@ fn identity(m: &Metadata, raw: bool, quarantined: bool) -> io::Result<()> {
             m.uid(),
             m.gid(),
             m.nlink(),
-        ) == (66305, ino, BYTES, mode, 0, 0, 1)
-            && ns(m.mtime(), m.mtime_nsec()) == mtime
-            && (quarantined || ns(m.ctime(), m.ctime_nsec()) == ctime),
+        ) == (DEVICE, snapshot.inode, bytes, snapshot.mode, 0, 0, 1)
+            && ns(m.mtime(), m.mtime_nsec()) == snapshot.mtime
+            && (quarantined || ns(m.ctime(), m.ctime_nsec()) == snapshot.ctime),
         "snapshot identity",
     )
 }
-fn full(p: &Path, raw: bool, quarantined: bool) -> io::Result<()> {
+fn full(p: &Path, expected: &Snapshot, profile: &Profile, quarantined: bool) -> io::Result<()> {
     let f = open(p, 0)?;
     let before = f.metadata()?;
-    identity(&before, raw, quarantined)?;
+    identity(&before, expected, profile.bytes, quarantined)?;
     let out = Command::new("/usr/bin/sha256sum")
         .env_clear()
         .stdin(Stdio::from(f.try_clone()?))
         .output()?;
     need(
-        out.status.success() && out.stdout == format!("{DIGEST}  -\n").as_bytes(),
+        out.status.success() && out.stdout == format!("{}  -\n", profile.digest).as_bytes(),
         "whole-file digest",
     )?;
     for m in [f.metadata()?, fs::symlink_metadata(p)?] {
-        identity(&m, raw, quarantined)?;
+        identity(&m, expected, profile.bytes, quarantined)?;
         need(
             (m.ctime(), m.ctime_nsec()) == (before.ctime(), before.ctime_nsec()),
             "changed during hash",
@@ -120,12 +191,7 @@ fn step(raw: bool, quarantined: bool, intent: bool, fenced: bool) -> io::Result<
         _ => Err(io::Error::other("unexpected retirement state")),
     }
 }
-fn run() -> io::Result<()> {
-    need(
-        std::env::args_os().collect::<Vec<_>>().get(1..)
-            == Some(&[std::ffi::OsString::from("--retire")]),
-        "expected --retire",
-    )?;
+fn run(profile: &Profile) -> io::Result<()> {
     let iid = std::env::var("INVOCATION_ID").map_err(io::Error::other)?;
     need(
         iid.len() == 32 && iid.bytes().all(|v| v.is_ascii_hexdigit()),
@@ -134,26 +200,28 @@ fn run() -> io::Result<()> {
     let cg = fs::read_to_string("/proc/self/cgroup")?;
     let uid = cg
         .trim()
-        .strip_prefix("0::/system.slice/horizon251-raw-bootstrap-retire-v174-a")
+        .strip_prefix("0::/system.slice/")
+        .and_then(|x| x.strip_prefix(profile.unit_prefix))
         .and_then(|x| x.strip_suffix(".service"))
         .ok_or_else(|| io::Error::other("wrong service"))?;
     need(
         !uid.is_empty() && uid.bytes().all(|b| b.is_ascii_digit()),
         "wrong service",
     )?;
-    let state = journal::Journal::new(Path::new(STATE), 0)?;
+    let state = journal::Journal::new(Path::new(profile.state), 0)?;
+    let expected = profile.intent();
     need(
-        state.get(&format!("checked-{iid}"))?.as_deref() == Some(INTENT),
+        state.get(&format!("checked-{iid}"))?.as_deref() == Some(expected.as_str()),
         "missing current locked reader and custody check",
     )?;
-    let src = checked_dir(DIR, 17815016, 0o40700)?;
-    let keep = checked_dir(KEEP, 25590231, 0o40555)?;
-    let retained = child(&keep, NAME);
-    full(&retained, false, false)?;
-    let original = child(&src, NAME);
-    let quarantine = child(&src, QUARANTINE);
-    let from = CString::new(NAME)?;
-    let to = CString::new(QUARANTINE)?;
+    let src = checked_dir(&profile.acquisition, 0o40700)?;
+    let keep = checked_dir(&profile.retained, 0o40555)?;
+    let retained = child(&keep, profile.name);
+    full(&retained, &profile.retained, profile, false)?;
+    let original = child(&src, profile.name);
+    let quarantine = child(&src, profile.quarantine);
+    let from = CString::new(profile.name)?;
+    let to = CString::new(profile.quarantine)?;
     loop {
         let intent = state.get("intent")?;
         let fence = state.get("verified-quarantine")?;
@@ -161,7 +229,7 @@ fn run() -> io::Result<()> {
             [intent.as_deref(), fence.as_deref()]
                 .into_iter()
                 .flatten()
-                .all(|v| v == INTENT),
+                .all(|v| v == expected),
             "foreign receipt",
         )?;
         match step(
@@ -171,9 +239,14 @@ fn run() -> io::Result<()> {
             fence.is_some(),
         )? {
             Step::Move => {
-                full(&original, true, false)?;
-                state.put("intent", INTENT)?;
-                identity(&fs::symlink_metadata(&original)?, true, false)?;
+                full(&original, &profile.acquisition, profile, false)?;
+                state.put("intent", &expected)?;
+                identity(
+                    &fs::symlink_metadata(&original)?,
+                    &profile.acquisition,
+                    profile.bytes,
+                    false,
+                )?;
                 if unsafe {
                     renameat2(
                         src.as_raw_fd(),
@@ -190,12 +263,22 @@ fn run() -> io::Result<()> {
             }
             Step::Remove => {
                 src.sync_all()?;
-                full(&quarantine, true, true)?;
-                state.put("verified-quarantine", INTENT)?;
+                full(&quarantine, &profile.acquisition, profile, true)?;
+                state.put("verified-quarantine", &expected)?;
                 let f = open(&quarantine, 0)?;
-                identity(&f.metadata()?, true, true)?;
-                identity(&fs::symlink_metadata(&retained)?, false, false)?;
-                identity(&fs::symlink_metadata(&quarantine)?, true, true)?;
+                identity(&f.metadata()?, &profile.acquisition, profile.bytes, true)?;
+                identity(
+                    &fs::symlink_metadata(&retained)?,
+                    &profile.retained,
+                    profile.bytes,
+                    false,
+                )?;
+                identity(
+                    &fs::symlink_metadata(&quarantine)?,
+                    &profile.acquisition,
+                    profile.bytes,
+                    true,
+                )?;
                 if unsafe { unlinkat(src.as_raw_fd(), to.as_ptr(), 0) } != 0 {
                     return Err(io::Error::last_os_error());
                 }
@@ -204,21 +287,48 @@ fn run() -> io::Result<()> {
             }
             Step::Finish => {
                 src.sync_all()?;
-                identity(&fs::symlink_metadata(&retained)?, false, false)?;
-                state.put("complete", INTENT)?;
-                println!("retired 66305:17816708; retained 66305:25590232 {DIGEST}");
+                identity(
+                    &fs::symlink_metadata(&retained)?,
+                    &profile.retained,
+                    profile.bytes,
+                    false,
+                )?;
+                state.put("complete", &expected)?;
+                println!(
+                    "retired {DEVICE}:{}; retained {DEVICE}:{} {}",
+                    profile.acquisition.inode, profile.retained.inode, profile.digest
+                );
                 return Ok(());
             }
         }
     }
 }
 fn main() -> io::Result<()> {
-    run()
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let profile = match args.as_slice() {
+        [mode] if mode == "--retire" => &EPOCH_251,
+        [mode] if mode == "--retire-223" => &EPOCH_223,
+        _ => return Err(io::Error::other("expected --retire or --retire-223")),
+    };
+    run(profile)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn acquisition_profiles_keep_distinct_durable_witnesses() {
+        assert_eq!(
+            EPOCH_251.intent(),
+            "251 66305 17816708 25590232 13928359507 b7af2058dd498bdf8c0f7e2a717a0d7c8153c20027eca2c3c2de15351b87b311\n"
+        );
+        assert_eq!(
+            EPOCH_223.intent(),
+            "223 66305 230564163 230564220 9815262303 301110cad7eb56ed68c99d31cf6769b7622e2c166f33aec084dc51592d0cd665\n"
+        );
+        assert_ne!(EPOCH_223.state, EPOCH_251.state);
+        assert_ne!(EPOCH_223.unit_prefix, EPOCH_251.unit_prefix);
+    }
     #[test]
     fn retries_each_durable_boundary() {
         assert_eq!(step(true, false, false, false).unwrap(), Step::Move);
