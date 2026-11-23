@@ -95,6 +95,16 @@ pub(super) fn same_owner(a: &Value, b: &Value) -> Result<()> {
     Ok(())
 }
 pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result<u64> {
+    verify_finite_owner(v, unit, iid, cap)?;
+    kernel_memory(v, unit, cap)
+}
+
+pub(super) fn peer_memory_current(v: &Value, unit: &str, iid: &str, cap: u64) -> Result<u64> {
+    verify_finite_owner(v, unit, iid, cap)?;
+    kernel_memory_current(v, unit, cap)
+}
+
+fn verify_finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result<()> {
     ensure!(
         v["Id"] == unit
             && v["LoadState"] == "loaded"
@@ -114,9 +124,18 @@ pub(super) fn finite_owner(v: &Value, unit: &str, iid: &str, cap: u64) -> Result
             && v["MemorySwapMax"] == "0",
         "live envelope changed {unit}"
     );
-    kernel_memory(v, unit, cap)
+    Ok(())
 }
 pub(super) fn kernel_memory(v: &Value, unit: &str, cap: u64) -> Result<u64> {
+    let current = kernel_memory_current(v, unit, cap)?;
+    ensure!(
+        current <= cap,
+        "{unit} memory.current {current} exceeds {cap}"
+    );
+    Ok(current)
+}
+
+fn kernel_memory_current(v: &Value, unit: &str, cap: u64) -> Result<u64> {
     let root = cgroup_path(unit);
     ensure!(root.canonicalize()? == root, "cgroup symlink");
     ensure!(
@@ -138,7 +157,6 @@ pub(super) fn kernel_memory(v: &Value, unit: &str, cap: u64) -> Result<u64> {
     let current = fs::read_to_string(root.join("memory.current"))?
         .trim()
         .parse()?;
-    ensure!(current <= cap, "kernel memory exceeds cap");
     Ok(current)
 }
 pub(super) fn drained_tree(path: &Path, budget: &mut usize) -> Result<()> {
@@ -412,7 +430,10 @@ pub(super) fn census_with_held(
             continue;
         }
         if r.unit == native266::UNIT && fleet["unit_census"][&r.unit]["ActiveState"] == "inactive" {
-            ensure!(r.release.is_none(), "native266 original reservation released");
+            ensure!(
+                r.release.is_none(),
+                "native266 original reservation released"
+            );
             let manager = n.show(&r.unit)?;
             native266_peer::terminal_owner(&manager, fleet)?;
             retained_terminals.insert(r.unit.clone(), manager);

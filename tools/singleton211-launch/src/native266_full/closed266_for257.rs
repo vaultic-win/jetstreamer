@@ -111,6 +111,22 @@ fn owners() -> Result<BTreeMap<String, Value>> {
     Ok(peers)
 }
 
+fn peer_cap(name: &str) -> u64 {
+    if name.starts_with("horizon-upload-") {
+        10 << 30
+    } else {
+        512 << 20
+    }
+}
+
+// memory.current may briefly exceed memory.max during reclaim. Retain the raw
+// sample and charge the excess on top of the fully reserved peer envelopes.
+fn peer_excess(current: &BTreeMap<String, u64>) -> Result<u64> {
+    current.iter().try_fold(0, |sum, (name, bytes)| {
+        capacity::add(sum, bytes.saturating_sub(peer_cap(name)))
+    })
+}
+
 fn census(
     n: &mut Native,
     fleet: &Value,
@@ -188,15 +204,11 @@ fn census(
     );
     let mut memory = BTreeMap::new();
     for (name, owner) in owners {
-        let cap = if name.starts_with("horizon-upload-") {
-            10 << 30
-        } else {
-            512 << 20
-        };
+        let cap = peer_cap(name);
         let now=n.show_fields(name,"Id,LoadState,ActiveState,SubState,InvocationID,NRestarts,Result,Job,Restart,KillMode,Delegate,ControlGroup,MainPID,MemoryMax,MemorySwapMax")?;
         memory.insert(
             name.clone(),
-            live::finite_owner(&now, name, text(owner, "InvocationID")?, cap)?,
+            live::peer_memory_current(&now, name, text(owner, "InvocationID")?, cap)?,
         );
         ensure!(now["MainPID"] == owner["MainPID"], "replaced peer process");
         let pid = text(owner, "MainPID")?.parse::<u32>()?;
@@ -251,9 +263,11 @@ pub(crate) fn assess(n: &mut Native, f: &Bound, controller: &str, held: bool) ->
         closed_loop(&predecessor, device)?;
         Ok((live::resources_at(scratch)?, current))
     };
-    let (first, _) = sample(n)?;
+    let (first, prior_current) = sample(n)?;
     let (growth, floor) = budget(&a, &release, &delivery)?;
     let (last, current) = sample(n)?;
+    let excess = peer_excess(&prior_current)?.max(peer_excess(&current)?);
+    let growth = capacity::add(growth, excess)?;
     let available = first.1.min(last.1);
     let free = first.2.min(last.2);
     let required = capacity::add(floor, native257_fit::NATIVE257_DISK)?;
@@ -263,7 +277,7 @@ pub(crate) fn assess(n: &mut Native, f: &Bound, controller: &str, held: bool) ->
     );
     Ok(
         json!({"fleet":f,"accounting":Bound::new(ACCOUNTING,ACCOUNTING_SHA),"release":release_ref,
-        "actual_current_memory":current,"owners":peers.keys().collect::<Vec<_>>(),"candidate_memory_bytes":native257_fit::NATIVE257_MEMORY,
+        "first_peer_memory":prior_current,"charged_peer_overage_bytes":excess,"actual_current_memory":current,"owners":peers.keys().collect::<Vec<_>>(),"candidate_memory_bytes":native257_fit::NATIVE257_MEMORY,
         "candidate_control_memory_bytes":CONTROL+GUARD,"candidate_disk_bytes":native257_fit::NATIVE257_DISK,
         "required_available_memory_bytes":growth,"observed_available_memory_bytes":available,
         "protected_existing_floor_bytes":floor,"required_initial_free_bytes":required,"observed_available_bytes":free,
@@ -279,14 +293,38 @@ pub(crate) fn booking(review: &Value) -> Result<Value> {
     ensure!(
         review["closed266_booking"] == json!(award)
             && review["epoch"] == 257
-            && review["operation"] == "native-cold"
-            && review["attempt"] == "cold-closed266-with265-v1",
+            && review["operation"] == "native-cold",
         "different closed 266 booking or restore"
     );
     let book = award.sealed()?;
+    let closure = Bound::new(
+        "/home/ubuntu/.codex/diagnostics/horizon257-post-first-close-v218-a1/completion.json",
+        "17c4d4dee84e2b9306dfd56f0c8cbf5bf2f6ddd85207c1c93453e2379749ce7e",
+    );
+    let closed = closure.json()?;
+    let terminal = binding(&closed["terminal"])?.json()?;
+    let previous = binding(&book["prepared"])?.sealed()?;
+    let next = binding(&review["preparation"])?.sealed()?;
+    let prepare_review = binding(&next["review"])?.sealed()?;
     ensure!(
-        review["preparation"] == book["prepared"]
-            && review["cpu_affinity"] == book["cpu"]
+        review["attempt"] == "cold-closed266-after-v218"
+            && next["attempt"] == review["attempt"]
+            && next["cpu_affinity"] == previous["cpu_affinity"]
+            && next["guard"] == previous["guard"]
+            && prepare_review["previous_preparation"] == book["prepared"]
+            && prepare_review["closed266_booking"] == json!(award)
+            && prepare_review["previous_closure"] == json!(closure)
+            && review["previous_closure"] == json!(closure)
+            && closed["reservation"] == json!(award)
+            && closed["released"] == false
+            && terminal["kernel_drained"] == true
+            && terminal["candidate_token_absent"] == true
+            && terminal["guarded_startup_accepted"] == false
+            && terminal["paired_257_reservations_released"] == false,
+        "fresh preparation must inherit the original booking after closure"
+    );
+    ensure!(
+        review["cpu_affinity"] == book["cpu"]
             && book["memory"] == native257_fit::NATIVE257_MEMORY + CONTROL + GUARD
             && book["disk"] == native257_fit::NATIVE257_DISK
             && book["automatic_release"] == false,
@@ -350,6 +388,19 @@ pub(crate) fn current(n: &mut Native, review: &Value, held: bool) -> Result<(Val
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn charges_all_peer_overages_without_resident_credit() {
+        let samples = BTreeMap::from([
+            (
+                "horizon250-private-holding.service".into(),
+                (512 << 20) + 4096,
+            ),
+            ("horizon-upload-247.service".into(), (10 << 30) + 8192),
+            ("horizon251-private-holding.service".into(), 0),
+        ]);
+        assert_eq!(peer_excess(&samples).unwrap(), 12288);
+    }
+
     #[test]
     fn conserved_donor_and_preexisting_growth() -> Result<()> {
         let anchor = |rss| json!({delivery247::SUCCESSOR_UNIT:rss});
