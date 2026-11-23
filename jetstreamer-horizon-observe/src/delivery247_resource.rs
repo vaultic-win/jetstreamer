@@ -26,6 +26,7 @@ impl Owner<'_> {
         match self.unit {
             UNIT248 => "248-248",
             UNIT249 => "249-249",
+            UNIT265 => "265-265",
             _ => "247-247",
         }
     }
@@ -123,19 +124,21 @@ fn staged_inputs() -> Result<Value> {
     Ok(proof)
 }
 pub(super) fn validate(c: &Config) -> Result<()> {
-    if let (Some(left), Some(right)) = (&c.delivery248_claim, &c.delivery249_claim) {
-        ensure!(
-            left.pid != right.pid
-                && left.invocation_id != right.invocation_id
-                && left.claim_sha256 != right.claim_sha256,
-            "ordinary delivery claims alias each other"
-        );
-    }
+    let mut pids = std::collections::HashSet::new();
+    let mut invocations = std::collections::HashSet::new();
+    let mut digests = std::collections::HashSet::new();
     for (unit, claim) in [
         (UNIT248, &c.delivery248_claim),
         (UNIT249, &c.delivery249_claim),
+        (UNIT265, &c.delivery265_claim),
     ] {
         let Some(claim) = claim else { continue };
+        ensure!(
+            pids.insert(claim.pid)
+                && invocations.insert(&claim.invocation_id)
+                && digests.insert(&claim.claim_sha256),
+            "ordinary delivery claims alias each other"
+        );
         claim.validate()?;
         for replay in c.replays.iter().chain(&c.diagnostic_replays) {
             ensure!(
@@ -432,6 +435,7 @@ pub(super) fn sample(
         Vec::new()
     }
 }
+const UNIT265: &str = "horizon-upload-265-ordinary-v215.service";
 const UNIT249: &str = "horizon-upload-249-ordinary-v214.service";
 const UNIT248: &str = "horizon-upload-248-ordinary-v213.service";
 const IMAGE248: &str = "/var/lib/jetstreamer/horizon247-public-images-58709604-v1/jetstreamer-r2";
@@ -440,23 +444,27 @@ const SHA248: &str = "c1e99ad4b2e7f3fe56235f42a722bbe93e3f13af2003d0eb5a150553ae
 pub(super) enum OrdinaryEpoch {
     Epoch248,
     Epoch249,
+    Epoch265,
 }
 impl OrdinaryEpoch {
     fn number(self) -> u64 {
         match self {
             Self::Epoch248 => 248,
             Self::Epoch249 => 249,
+            Self::Epoch265 => 265,
         }
     }
     fn unit(self) -> &'static str {
         match self {
             Self::Epoch248 => UNIT248,
             Self::Epoch249 => UNIT249,
+            Self::Epoch265 => UNIT265,
         }
     }
     fn digest(self) -> &'static str {
         match self {
             Self::Epoch248 => "3053ed2ca2b2881f2d83855c0fa1cff6e63618387dfb630c76a3db7a2dc7d1fd",
+            Self::Epoch265 => "801acbb79784fb29fda64a572b6b0a1ed1396cdad4216b6d39b36b1dad86a544",
             Self::Epoch249 => "03e16ae1dada49958ff00a7dda1c3ef31c2f37c7503b02b7e0a677bb40863e07",
         }
     }
@@ -467,22 +475,28 @@ impl OrdinaryEpoch {
     }
     fn argv(self) -> Vec<String> {
         let epoch = self.number();
+        let (source, receipts, plan) = match self {
+            Self::Epoch265 => (
+                "/home/ubuntu/.jetstreamer-private/qualification-265-replacement-20261119-v3/output".to_owned(),
+                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-265-v215/receipts".to_owned(),
+                "/var/lib/jetstreamer/horizon265-ordinary-reader-v215/epoch-265-plan.json".to_owned(),
+            ),
+            Self::Epoch248 | Self::Epoch249 => (
+                format!("/home/ubuntu/.jetstreamer-private/qualification-{epoch}-reboot-20261117-v1/output"),
+                format!("/home/ubuntu/.jetstreamer-private/current-reader-delivery-{epoch}-20261119-v2/receipts"),
+                format!("/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{epoch}-plan.json"),
+            ),
+        };
         vec![
             IMAGE248.into(),
             "sync".into(),
-            format!(
-                "/home/ubuntu/.jetstreamer-private/qualification-{epoch}-reboot-20261117-v1/output"
-            ),
+            source,
             "--epochs".into(),
             format!("{epoch}-{epoch}"),
             "--receipt-directory".into(),
-            format!(
-                "/home/ubuntu/.jetstreamer-private/current-reader-delivery-{epoch}-20261119-v2/receipts"
-            ),
+            receipts,
             "--current-reader-plan".into(),
-            format!(
-                "/var/lib/jetstreamer/horizon247-public-reader-58709604-v1/epoch-{epoch}-plan.json"
-            ),
+            plan,
             "--current-reader-plan-sha256".into(),
             self.digest().into(),
             "--concurrency".into(),
@@ -507,7 +521,7 @@ impl DeliveryClaim {
         };
         ensure!(
             self.pid > 1 && digest(&self.invocation_id, 32) && digest(&self.claim_sha256, 64),
-            "invalid epoch 248 delivery binding"
+            "invalid ordinary delivery binding"
         );
         Ok(())
     }
@@ -611,6 +625,14 @@ mod tests {
                 epoch.unit().trim_end_matches(".service")
             )));
         }
+        let archive = OrdinaryEpoch::Epoch265.argv();
+        assert_eq!(archive[4], "265-265");
+        assert_eq!(
+            archive[8],
+            "/var/lib/jetstreamer/horizon265-ordinary-reader-v215/epoch-265-plan.json"
+        );
+        assert_eq!(archive[10], OrdinaryEpoch::Epoch265.digest());
+        assert_ne!(archive[10], OrdinaryEpoch::Epoch249.digest());
         assert_ne!(
             OrdinaryEpoch::Epoch248.digest(),
             OrdinaryEpoch::Epoch249.digest()
