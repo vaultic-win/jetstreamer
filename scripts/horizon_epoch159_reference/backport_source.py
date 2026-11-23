@@ -11,7 +11,8 @@ import tomllib
 HERE = Path(__file__).resolve().parent
 SPEC = json.loads((HERE / "v156-backport.json").read_bytes())
 WORKTREE = "historical-runtime/v1_5_6"
-GIT_DB = "solana-7a5d8113b7344779"
+ARCHIVED_GIT_DB = "solana-7a5d8113b7344779"
+CARGO_149_GIT_DB = "solana-58d818797bb1766e"
 REGISTRY = "github.com-1ecc6299db9ec823"
 BINARY = "jetstreamer-historical-worker-v1-5-6"
 
@@ -60,8 +61,12 @@ def originals(repo, cache):
     rev = SPEC["original_jetstreamer"]
     check(git(repo, "rev-parse", rev + ":" + WORKTREE).decode().strip()
           == SPEC["original_worker_tree"], "different v1.5.6 source tree")
-    checkout = cache / "git/checkouts" / GIT_DB / SPEC["solana"][:7]
+    checkout = cache / "git/checkouts" / ARCHIVED_GIT_DB / SPEC["solana"][:7]
     check(git(checkout, "rev-parse", "HEAD").decode().strip() == SPEC["solana"], "different Solana checkout")
+    bare = cache / "git/db" / CARGO_149_GIT_DB
+    tree_ref = SPEC["solana"] + "^{tree}"
+    check(git(bare, "rev-parse", "--verify", tree_ref) == git(checkout, "rev-parse", "--verify", tree_ref),
+          "Cargo 1.49 cache has a different locked Solana tree")
     lock = git(repo, "show", f"{rev}:{WORKTREE}/Cargo.lock")
     result = registry_sources(tomllib.loads(lock.decode()), cache)
     paths = {}
@@ -92,10 +97,10 @@ def prepare(repo, cache, dest):
     (chome / "registry").mkdir(parents=True)
     for name in ("index", "cache"):
         (chome / "registry" / name).symlink_to(cache / "registry" / name, target_is_directory=True)
-    db = chome / "git/db" / GIT_DB
+    db = chome / "git/db" / CARGO_149_GIT_DB
     db.parent.mkdir(parents=True)
-    db.symlink_to(cache / "git/db" / GIT_DB, target_is_directory=True)
-    private = chome / "git/checkouts" / GIT_DB / SPEC["solana"][:7]
+    db.symlink_to(cache / "git/db" / CARGO_149_GIT_DB, target_is_directory=True)
+    private = chome / "git/checkouts" / CARGO_149_GIT_DB / SPEC["solana"][:7]
     private.parent.mkdir(parents=True)
     private.mkdir()
     git(private, "init", "-q")
@@ -125,7 +130,7 @@ def prepare(repo, cache, dest):
 def check_graph(metadata, dest):
     packages = json.loads(metadata.read_bytes())["packages"]
     required = {"solana-sdk": "sdk", "solana-vote-program": "programs/vote"}
-    private = dest / "cargo/git/checkouts" / GIT_DB / SPEC["solana"][:7]
+    private = dest / "cargo/git/checkouts" / CARGO_149_GIT_DB / SPEC["solana"][:7]
     for name, tail in required.items():
         pkg, = [p for p in packages if p["name"] == name]
         check(pkg["source"].endswith("#" + SPEC["solana"]) and
