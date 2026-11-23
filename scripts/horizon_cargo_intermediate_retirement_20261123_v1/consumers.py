@@ -1,4 +1,5 @@
 """Recheck kernel and scheduler consumers of the closed compiler profiles."""
+import hashlib
 import json
 import os
 import re
@@ -140,7 +141,37 @@ def mentioned_bindings(obj):
             yield from mentioned_bindings(child)
 
 
-def controls(base, bundle, profiles, rows, fleet, own):
+def inspection_evidence(path, aliases, directory_id, pins):
+    """Recognize only the selected root-private inspection inode through its two known mounts."""
+    pin = pins.get(path.name)
+    if pin is None or path.parent not in aliases:
+        return False
+    require(re.fullmatch(r'inspection-[0-9]{19}\.json', path.name), 'invalid inspection filename')
+    parent = path.parent
+    require(parent.resolve(strict=True) == parent, 'aliased inspection parent')
+    pfd = os.open(parent, os.O_DIRECTORY | os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        st = os.fstat(pfd)
+        require((st.st_dev, st.st_ino) == directory_id and st.st_uid == st.st_gid == 0
+                and st.st_mode == stat.S_IFDIR | 0o700 and os.path.samestat(st, parent.lstat()),
+                'changed inspection directory')
+        fd = os.open(path.name, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=pfd)
+        with os.fdopen(fd, 'rb') as file:
+            st = os.fstat(fd)
+            require((st.st_dev, st.st_ino) == (directory_id[0], pin['ino']) and st.st_uid == st.st_gid == 0
+                    and st.st_mode == stat.S_IFREG | 0o400 and st.st_nlink == 1 and 0 < st.st_size <= 1 << 20,
+                    'changed inspection file identity')
+            checksum = hashlib.file_digest(file, 'sha256').hexdigest()
+            after = os.stat(path.name, dir_fd=pfd, follow_symlinks=False)
+            require(checksum == pin['sha256'] and os.path.samestat(st, after)
+                    and after.st_ctime_ns == st.st_ctime_ns == os.fstat(fd).st_ctime_ns,
+                    'changed inspection contents')
+        return True
+    finally:
+        os.close(pfd)
+
+
+def controls(base, bundle, profiles, rows, fleet, aliases, directory_id, inspections):
     survey = json.loads((bundle / 'live-survey.json').read_bytes())
     original = json.loads((bundle / 'indirect.json').read_bytes())
     previous = json.loads((bundle / 'indirect-source-lines.json').read_bytes())
@@ -164,9 +195,7 @@ def controls(base, bundle, profiles, rows, fleet, own):
     native_hits |= scan(survey['installed_roots'], text_markers, types + ['*.json', '*.jsonl'], depth=4)
     patterns = [(m, re.compile(re.escape(m.encode()) + rb'''([^\0"'\s,;\\}]+)''')) for m in markers]
     for path in found | bound | native_hits:
-        # Our own status receipts may enumerate the selection. They are root-private data, and
-        # no other unit calls them. Never exempt a control, systemd definition, or executable.
-        if path.parent == own and re.fullmatch(r'(?:intent|captured-\d+|retired-\d+|complete|inspection)\.json', path.name):
+        if inspection_evidence(path, aliases, directory_id, inspections):
             continue
         data = path.read_bytes()
         has_marker = any(x.encode() in data for x in broad)

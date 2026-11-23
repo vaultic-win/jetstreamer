@@ -157,5 +157,110 @@ class TestRetirement(unittest.TestCase):
             resource.setrlimit(resource.RLIMIT_NOFILE, previous)
 
 
+class TestInspectionBindings(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=os.environ['HORIZON_CARGO_FIXTURE_ROOT'])
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+        self.state = self.base / 'state'
+        self.state.mkdir(mode=0o700)
+        runtime = Path('/var/lib/jetstreamer/horizon_runtime_data')
+        home = Path('/home/sol/.jetstreamer-private/horizon-root-runtime-data')
+        self.alias = home / self.state.relative_to(runtime)
+        self.assertTrue(self.alias.samefile(self.state))
+        self.name = 'inspection-1795403151826474427.json'
+        self.leaf = self.state / self.name
+        self.leaf.write_text('{"schema":"horizon-exact-cargo-inspection-v1"}\n')
+        self.leaf.chmod(0o400)
+        self.inode = self.leaf.stat().st_ino
+        st = self.state.stat()
+        self.dirid = (st.st_dev, st.st_ino)
+        self.pins = {self.name: dict(ino=self.inode, sha256=m['fingerprint'](self.leaf))}
+        self.aliases = {self.alias, self.state}
+        self.module = runpy.run_path(str(Path(__file__).with_name('consumers.py')))
+
+    def check(self, path):
+        return self.module['inspection_evidence'](path, self.aliases, self.dirid, self.pins)
+
+    def test_both_true_mount_aliases(self):
+        self.assertNotEqual(str(self.state), str(self.alias))
+        self.assertTrue(self.check(self.leaf))
+        self.assertTrue(self.check(self.alias / self.name))
+
+    def test_foreign_directory_or_other_receipt_name(self):
+        foreign = self.base / self.name
+        foreign.write_bytes(self.leaf.read_bytes())
+        foreign.chmod(0o400)
+        self.assertFalse(self.check(foreign))
+        self.assertFalse(self.check(self.state / 'inspection.json'))
+        self.assertFalse(self.check(self.state / 'inspection-1795403151826474428.json'))
+
+    def test_substitute_or_wrong_inode_not_exempt(self):
+        alternate = self.state / 'different'
+        alternate.write_bytes(self.leaf.read_bytes())
+        alternate.chmod(0o400)
+        alternate.replace(self.leaf)
+        with self.assertRaises(RuntimeError):
+            self.check(self.alias / self.name)
+
+    def test_wrong_checksum_editor_and_parent(self):
+        self.pins[self.name]['sha256'] = '0' * 64
+        with self.assertRaises(RuntimeError):
+            self.check(self.leaf)
+        self.pins[self.name]['sha256'] = m['fingerprint'](self.leaf)
+        self.dirid = (self.dirid[0], self.dirid[1] + 1)
+        with self.assertRaises(RuntimeError):
+            self.check(self.leaf)
+
+    def test_foreign_link_and_mutable_receipt(self):
+        self.leaf.chmod(0o600)
+        with self.assertRaises(RuntimeError):
+            self.check(self.leaf)
+        self.leaf.chmod(0o400)
+        os.link(self.leaf, self.base / 'another')
+        with self.assertRaises(RuntimeError):
+            self.check(self.leaf)
+
+    def test_symlink_with_real_contents(self):
+        target = self.base / 'target'
+        self.leaf.rename(target)
+        self.leaf.symlink_to(target)
+        with self.assertRaises(OSError):
+            self.check(self.leaf)
+
+    def test_real_scanner_retains_foreign_file_references(self):
+        import json
+        from unittest.mock import patch
+        bundle = self.base / 'history'
+        bundle.mkdir()
+        route = self.base / 'route.json'
+        route.write_text('{"reviewed_routes":{}}')
+        fleet = self.base / 'fleet.json'
+        fleet.write_text('{}')
+        files = {'live-survey.json': {'roots': [], 'installed_roots': []},
+                 'indirect.json': {'control_roots': [], 'route': str(route)},
+                 'indirect-source-lines.json': {}, 'scheduler-evidence.json': {},
+                 'actual-controls.json': {'concrete_direct_mentions_of_retained': []}}
+        for n, v in files.items():
+            (bundle / n).write_text(json.dumps(v))
+        candidate = self.base / 'old/target/debug/deps/libfixture-a.rlib'
+        self.leaf.chmod(0o600)
+        self.leaf.write_text(json.dumps({'parents': [str(candidate)]}))
+        self.leaf.chmod(0o400)
+        self.pins[self.name]['sha256'] = m['fingerprint'](self.leaf)
+        external = self.base / self.name
+        external.write_bytes(self.leaf.read_bytes())
+        external.chmod(0o400)
+        control = self.module['controls']
+        args = (self.base, bundle, {'old/target/debug': 'compiler'}, {str(candidate): 1}, fleet,
+                self.aliases, self.dirid, self.pins)
+        hits = {self.alias / self.name}
+        with patch.dict(control.__globals__, {'scan': lambda *a, **kw: hits}):
+            self.assertEqual(control(*args)['native_controls'], 1)
+            hits.add(external)
+            with self.assertRaisesRegex(RuntimeError, 'file referenced'):
+                control(*args)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

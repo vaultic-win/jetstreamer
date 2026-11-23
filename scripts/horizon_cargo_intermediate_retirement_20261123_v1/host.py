@@ -16,7 +16,12 @@ BUNDLE = BASE / 'peer166-closed-cargo-review-20261122-v1'
 RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
 PHASE = 'epoch166-exact-cargo-retirement-20261123-v1'
 STATE = BASE / 'horizon-root-runtime-data' / PHASE / 'state'
-PACKAGE = RUNTIME / PHASE / 'tools'
+PACKAGE = RUNTIME / PHASE / 'tools-v2'
+STATE_ALIASES = {STATE, RUNTIME / PHASE / 'state'}
+STATE_ID = (64512, 101256428)
+ORIGINAL_NAME = 'inspection-1795403151826474427.json'
+ORIGINAL_PIN = dict(ino=101256573, sha256='4d0b1d5345bbc6a578ac6431de924aaa84d10f5f5dbee14e8bc859c9770ca874')
+ORIGINAL_SEAL = '1dbc7045db4dde7bdf31d8ea4d098b094346368c2ce8c3bce9659ee0034ef1a8'
 PROPOSAL = '9c00b6eab801478310e5bc2ea315ef98f2b4393f9b865dd127994551c0c859b1'
 REFRESH = RUNTIME / 'epoch166-retry11-rebook-20261122-v1/CARGO_13754_REFRESH_021757_20261123.json'
 REFRESH_SHA = '283d0a3ccd9af8d8a3533831de9f6637ee520b710a0b54c3de1f630a3f8deaaf'
@@ -89,6 +94,8 @@ def main():
     parser.add_argument('action', choices=['inspect', 'execute'])
     parser.add_argument('seal', help='qualified deployment-seal SHA-256')
     parser.add_argument('--inspection-sha256', help='inspection selected by execution owner')
+    parser.add_argument('--inspection-name', help='exact generated receipt basename')
+    parser.add_argument('--inspection-inode', type=int, help='inspected file inode from the handoff')
     opts = parser.parse_args()
     require(os.geteuid() == 0 and sys.flags.isolated and sys.dont_write_bytecode and __debug__, 'run as root with python3 -IB')
     require(Path(__file__).absolute() == PACKAGE / 'host.py', 'use sealed deployment')
@@ -118,6 +125,30 @@ def main():
         require(st[:2] == [dev, ino] and st[3] == uid and not st[2] & 0o002, f'unexpected mutex: {path}')
         bindings.append((path, st))
     with impl['locks'](bindings):
+        pins = {ORIGINAL_NAME: ORIGINAL_PIN}
+        scope = dict(proposal=PROPOSAL, seal=opts.seal)
+
+        def checked_inspection(name, expected_scope):
+            require(name and name == Path(name).name and name in pins, 'unknown inspection basename')
+            for alias in STATE_ALIASES:
+                require(controls['inspection_evidence'](alias / name, STATE_ALIASES, STATE_ID, pins), 'inspection identity')
+            receipt = bound(STATE / name, pins[name]['sha256'])
+            require(receipt['schema'] == 'horizon-exact-cargo-inspection-v1' and receipt['scope'] == expected_scope
+                    and receipt['files'] == len(rows) and receipt['allocated_bytes'] == proposal['bytes']
+                    and receipt['credited_bytes'] == 0, 'wrong inspection scope')
+            return receipt
+
+        original = checked_inspection(ORIGINAL_NAME, dict(proposal=PROPOSAL, seal=ORIGINAL_SEAL))
+        supplied = any(x is not None for x in (opts.inspection_name, opts.inspection_inode, opts.inspection_sha256))
+        require(opts.action != 'execute' or supplied, 'execute requires exact selected inspection')
+        selected = None
+        if supplied:
+            require(opts.inspection_name and opts.inspection_name != ORIGINAL_NAME and opts.inspection_inode
+                    and opts.inspection_sha256 and len(opts.inspection_sha256) == 64, 'incomplete inspection pin')
+            pins[opts.inspection_name] = dict(ino=opts.inspection_inode, sha256=opts.inspection_sha256)
+            selected = checked_inspection(opts.inspection_name, scope)
+            require(selected['parents'] == original['parents'], 'historical compiler directories changed')
+
         def closure():
             frame = price()
             roots = {x['root'] for x in frame['bookings'].values()} | {proposal['priced_booking_roots']['172']}
@@ -131,7 +162,7 @@ def main():
             require(all(Path(p).is_file() and p not in rows for p in protected), 'retained executable absent or selected')
             linkage_count = controls['verify_linkage'](BASE, profiles, rows, linkage['needed'], proposal['omitted_runtime_libraries'])
             units = controls['check_units'](actual['units'])
-            sched = controls['controls'](BASE, BUNDLE, profiles, rows, Path(frame['fleet']['path']), STATE)
+            sched = controls['controls'](BASE, BUNDLE, profiles, rows, Path(frame['fleet']['path']), STATE_ALIASES, STATE_ID, pins)
             kernel = controls['kernel'](rows, [BASE / p for p in profiles])
             after = price()
             require(after['fleet'] == frame['fleet'] and after['status_registration'] == frame['status_registration']
@@ -141,18 +172,15 @@ def main():
                         fit_epoch=frame['epoch'], free_HOME=frame['available_HOME_bytes'],
                         required_HOME=frame['complete_required_HOME_bytes'], original_lock_count=len(bindings),
                         native_units=units, scheduler=sched, kernel=kernel, retained_files=len(protected), verified_dynamic_ELFs=linkage_count)
-        operator = impl['Retirement'](STATE, rows, dict(proposal=PROPOSAL, seal=opts.seal), closure)
+        operator = impl['Retirement'](STATE, rows, scope, closure)
         if opts.action == 'inspect':
-            require(not opts.inspection_sha256, 'inspection digest is for execute')
             inspection = operator.inspect()
+            require(inspection['parents'] == original['parents'], 'historical inspection parents differ')
             output = STATE / ('inspection-' + str(time.time_ns()) + '.json')
             impl['publish'](output, inspection)
-            print(json.dumps(dict(receipt=str(output), sha256=sha(output), physical_bytes_released=0)))
+            print(json.dumps(dict(receipt=str(output), sha256=sha(output), inode=output.stat().st_ino, physical_bytes_released=0)))
         else:
-            require(opts.inspection_sha256 and len(opts.inspection_sha256) == 64, 'exact checked inspection required')
-            matches = [p for p in STATE.glob('inspection-*.json') if sha(p) == opts.inspection_sha256]
-            require(len(matches) == 1, 'unknown inspection')
-            print(json.dumps(operator.run(read(matches[0])), sort_keys=True))
+            print(json.dumps(operator.run(selected), sort_keys=True))
 
 
 if __name__ == '__main__':
