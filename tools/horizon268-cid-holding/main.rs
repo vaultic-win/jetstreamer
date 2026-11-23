@@ -83,6 +83,7 @@ mod profile {
     pub(super) const RESTORE_FILE: &str = "epoch-250.jet";
     pub(super) const EPOCH: u64 = 250;
     pub(super) const INODE: u64 = 15_060_654;
+    pub(super) const OUTPUT_INODE: u64 = 8_820_259;
     pub(super) const TIMES: (i64, i64, i64, i64) =
         (1_795_169_606, 173_593_399, 1_795_173_253, 625_459_056);
 }
@@ -108,6 +109,7 @@ mod profile {
     pub(super) const RESTORE_FILE: &str = "epoch-249.jet";
     pub(super) const KEY: &str = "archive-d6802f70-v1.manifest";
     pub(super) const INODE: u64 = 8_820_166;
+    pub(super) const OUTPUT_INODE: u64 = 8_824_374;
     pub(super) const TIMES: (i64, i64, i64, i64) =
         (1_795_107_202, 152_908_668, 1_795_111_167, 802_019_027);
 }
@@ -133,6 +135,7 @@ mod profile {
     pub(super) const RESTORE_FILE: &str = "epoch-251.jet";
     pub(super) const KEY: &str = "archive-82487270-v1.manifest";
     pub(super) const INODE: u64 = 31_112_947;
+    pub(super) const OUTPUT_INODE: u64 = 31_110_842;
     pub(super) const TIMES: (i64, i64, i64, i64) =
         (1_795_273_267, 403_475_475, 1_795_273_837, 624_069_856);
 }
@@ -552,6 +555,16 @@ struct HeldInode {
 
 #[cfg(any(epoch249, epoch250, epoch251))]
 impl HeldInode {
+    fn original() -> Self {
+        use std::time::{Duration, UNIX_EPOCH};
+        Self {
+            device: 66305,
+            inode: INODE,
+            owner_mode: SOURCE_OWNER_MODE,
+            modified: UNIX_EPOCH + Duration::new(TIMES.0 as u64, TIMES.1 as u32),
+        }
+    }
+
     fn check(&self, metadata: &fs::Metadata) -> R<()> {
         require(
             metadata.is_file()
@@ -597,21 +610,151 @@ impl HeldInode {
 
 #[cfg(any(epoch249, epoch250, epoch251))]
 fn refill_original(c: &Client, parts: &[String]) -> R<()> {
-    use std::time::{Duration, UNIX_EPOCH};
     let dir = Path::new(DEST);
     private_dir(dir)?;
     require(
         matches!(Path::new(SRC).symlink_metadata(), Err(e) if e.kind() == io::ErrorKind::NotFound),
         "original delivery path must be vacant during private recovery",
     )?;
-    let held = HeldInode {
-        device: 66305,
-        inode: INODE,
-        owner_mode: SOURCE_OWNER_MODE,
-        modified: UNIX_EPOCH + Duration::new(TIMES.0 as u64, TIMES.1 as u32),
-    };
+    let held = HeldInode::original();
     held.refill(&dir.join("original-inode"), c, parts, SIZE, PART, SHA)?;
     File::open(dir).and_then(|dir| dir.sync_all()).map_err(ioe)
+}
+
+#[cfg(any(epoch249, epoch250, epoch251))]
+fn refill_and_return_original(c: &Client, parts: &[String]) -> R<()> {
+    let path = Path::new(SRC);
+    let output = path.parent().ok_or("missing output directory")?;
+    let quarantine = output.join(".horizon-private-holding");
+    private_dir(&quarantine)?;
+    let metadata = output.symlink_metadata().map_err(ioe)?;
+    require(
+        output.canonicalize().map_err(ioe)? == output
+            && metadata.is_dir()
+            && (
+                metadata.dev(),
+                metadata.ino(),
+                metadata.uid(),
+                metadata.gid(),
+            ) == (
+                66305,
+                OUTPUT_INODE,
+                SOURCE_OWNER_MODE.0,
+                SOURCE_OWNER_MODE.1,
+            ),
+        "different delivery directory",
+    )?;
+    let held = HeldInode::original();
+    if matches!(path.symlink_metadata(), Err(e) if e.kind() == io::ErrorKind::NotFound) {
+        held.refill(
+            &quarantine.join("original-inode"),
+            c,
+            parts,
+            SIZE,
+            PART,
+            SHA,
+        )?;
+    }
+    held.return_to_delivery(&quarantine, path, SIZE, SHA, &metadata)
+}
+
+#[cfg(any(epoch249, epoch250, epoch251))]
+impl HeldInode {
+    fn return_to_delivery(
+        &self,
+        holding: &Path,
+        delivery: &Path,
+        size: u64,
+        sha: &str,
+        original_dir: &fs::Metadata,
+    ) -> R<()> {
+        use std::os::fd::AsRawFd;
+        let parent = delivery.parent().ok_or("missing delivery parent")?;
+        let directory = |p: &Path| {
+            OpenOptions::new()
+                .read(true)
+                .custom_flags(0o200000 | 0o400000)
+                .open(p)
+                .map_err(ioe)
+        };
+        let source_dir = directory(holding)?;
+        let dest_dir = directory(parent)?;
+        let directory_identity = |m: &fs::Metadata| (m.dev(), m.ino(), m.uid(), m.gid(), m.mode());
+        let check_dirs = || -> R<()> {
+            let source = source_dir.metadata().map_err(ioe)?;
+            require(
+                source.is_dir()
+                    && source.dev() == self.device
+                    && source.uid() == unsafe { getuid() }
+                    && source.mode() & 0o7777 == 0o700
+                    && directory_identity(&source)
+                        == directory_identity(&holding.symlink_metadata().map_err(ioe)?)
+                    && directory_identity(original_dir)
+                        == directory_identity(&dest_dir.metadata().map_err(ioe)?)
+                    && directory_identity(original_dir)
+                        == directory_identity(&parent.symlink_metadata().map_err(ioe)?),
+                "quarantine or delivery directory changed",
+            )
+        };
+        check_dirs()?;
+        let anchored = |dir: &File| PathBuf::from(format!("/proc/self/fd/{}", dir.as_raw_fd()));
+        let held_name = anchored(&source_dir).join("original-inode");
+        let dest_name = anchored(&dest_dir).join(delivery.file_name().ok_or("delivery name")?);
+        let exists = |p: &Path| match p.symlink_metadata() {
+            Ok(_) => Ok(true),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(ioe(e)),
+        };
+        let at_source = exists(&held_name)?;
+        require(
+            at_source != exists(&dest_name)?,
+            "both original names occupied or vacant",
+        )?;
+        let current = if at_source { &held_name } else { &dest_name };
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(0o400000)
+            .open(current)
+            .map_err(ioe)?;
+        file.try_lock().map_err(|e| e.to_string())?;
+        let validate = |m: &fs::Metadata| {
+            self.check(m)?;
+            require(
+                m.len() == size && m.modified().map_err(ioe)? == self.modified,
+                "incomplete refill",
+            )
+        };
+        let before = file.metadata().map_err(ioe)?;
+        validate(&before)?;
+        let digest = Command::new("/usr/bin/sha256sum")
+            .env_clear()
+            .stdin(Stdio::from(file.try_clone().map_err(ioe)?))
+            .output()
+            .map_err(ioe)?;
+        require(
+            digest.status.success() && digest.stdout == format!("{sha}  -\n").as_bytes(),
+            "delivery inode digest",
+        )?;
+        let after = current.symlink_metadata().map_err(ioe)?;
+        validate(&after)?;
+        require(
+            (before.ctime(), before.ctime_nsec()) == (after.ctime(), after.ctime_nsec()),
+            "original changed during hash",
+        )?;
+        check_dirs()?;
+        if at_source {
+            publish(&held_name, &dest_name)?;
+        }
+        dest_dir.sync_all().map_err(ioe)?;
+        source_dir.sync_all().map_err(ioe)?;
+        check_dirs()?;
+        validate(&dest_name.symlink_metadata().map_err(ioe)?)?;
+        validate(&delivery.symlink_metadata().map_err(ioe)?)?;
+        require(
+            !exists(&held_name)? && !exists(&holding.join("original-inode"))?,
+            "quarantine name reappeared",
+        )
+    }
 }
 
 fn approved_owner(code: u16, body: &[u8]) -> R<()> {
@@ -625,7 +768,11 @@ fn run() -> R<()> {
     require(
         args.len() == 2
             && (matches!(args[1].as_str(), "park" | "verify" | "restore")
-                || (cfg!(any(epoch249, epoch250, epoch251)) && args[1] == "refill-original")),
+                || (cfg!(any(epoch249, epoch250, epoch251))
+                    && matches!(
+                        args[1].as_str(),
+                        "refill-original" | "refill-and-return-original"
+                    ))),
         "use park, verify or restore",
     )?;
     authority()?;
@@ -666,6 +813,8 @@ fn run() -> R<()> {
         }
         #[cfg(any(epoch249, epoch250, epoch251))]
         "refill-original" => refill_original(&c, &parts)?,
+        #[cfg(any(epoch249, epoch250, epoch251))]
+        "refill-and-return-original" => refill_and_return_original(&c, &parts)?,
         "verify" => recover(&c, &parts, SIZE, PART, SHA, &mut io::sink())?,
         _ => {}
     }
