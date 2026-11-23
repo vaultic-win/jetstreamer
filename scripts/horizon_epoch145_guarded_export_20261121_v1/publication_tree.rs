@@ -12,7 +12,9 @@ impl Tree {
         let own = fs::read_to_string("/proc/self/cgroup")?;
         let base = "/system.slice/";
         #[cfg(all(test, incident_registered136_post145_only))]
-        let expected = if cfg!(incident_v5m_post145_only) {
+        let expected = if cfg!(incident_v5n_post145_only) {
+            "0::/horizonaudit.slice/horizon-145-v5n-post-build-v1.service"
+        } else if cfg!(incident_v5m_post145_only) {
             "0::/horizonaudit.slice/horizon-145-v5m-post-build-v1.service"
         } else if cfg!(incident_v5k_post145_only) {
             "0::/horizonaudit.slice/horizon-145-v5k-post-build-v1.service"
@@ -39,7 +41,9 @@ impl Tree {
             name.ends_with(".service") && !name.contains('/'),
             "expected one service"
         );
-        let parent = Path::new("/sys/fs/cgroup").join(base.trim_matches('/')).join(name);
+        let parent = Path::new("/sys/fs/cgroup")
+            .join(base.trim_matches('/'))
+            .join(name);
         let leaf = parent.join("publication");
         fs::create_dir(&leaf).context("create delegated publication cgroup")?;
         let group = Self { leaf };
