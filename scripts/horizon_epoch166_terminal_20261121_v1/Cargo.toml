@@ -8,6 +8,7 @@ edition = "2024"
 [features]
 retry10 = []
 metered168 = []
+cold168 = ["metered168"]
 source167 = []
 cold167 = ["source167"]
 retry170 = []

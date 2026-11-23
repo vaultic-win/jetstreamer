@@ -50,10 +50,18 @@ mod generation;
     all(feature = "retry170", feature = "full172")
 ))]
 compile_error!("select a single terminal producer generation");
-#[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+#[cfg(any(
+    feature = "cold168",
+    feature = "source167",
+    feature = "retry170",
+    feature = "full172"
+))]
 #[path = "peers.rs"]
 mod generation;
-#[cfg(all(feature = "metered168", not(feature = "retry10")))]
+#[cfg(all(
+    feature = "metered168",
+    not(any(feature = "cold168", feature = "retry10"))
+))]
 #[path = "../horizon_epoch168_full_metered_20261121_v1/terminal.rs"]
 mod generation;
 #[cfg(any(
@@ -387,7 +395,12 @@ fn publish_exact(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 fn main() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    #[cfg(any(feature = "source167", feature = "retry170", feature = "full172"))]
+    #[cfg(any(
+        feature = "cold168",
+        feature = "source167",
+        feature = "retry170",
+        feature = "full172"
+    ))]
     if args == ["inspect-live-namespace"] {
         println!("{}", generation::live_namespace(&checked_live()?)?);
         return Ok(());

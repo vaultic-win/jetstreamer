@@ -1,6 +1,17 @@
 //! Fixed producer namespaces and finalized RPC evidence for the recovering peers.
 use super::*;
 
+#[cfg(feature = "cold168")]
+pub(super) const PRODUCER_UNIT: &str = "horizon-qualify-168-full-metered-cold-v4-20261123.service";
+#[cfg(feature = "cold168")]
+pub(super) const PRODUCER_IID: &str = "913443d7f9f44d7e9d3e0eec420acfab";
+#[cfg(feature = "cold168")]
+pub(super) const LIVE_SHA: &str =
+    "0ab0e88e1182f1672c5abfb612256722b101ce6beb7a78abf361f445516598d8";
+#[cfg(feature = "cold168")]
+pub(super) const TERMINAL_ROOT: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch168-cold-delivery-20261123-v4";
+
 #[cfg(feature = "source167")]
 pub(super) const EPOCH: u64 = 167;
 #[cfg(feature = "retry170")]
@@ -107,9 +118,9 @@ fn rpc(record: &Value, root: &Path, name: &str, method: &str, slot: u64) -> Resu
 }
 
 pub(super) fn boundary(live: &Value) -> Result<receipt::TerminalBoundary> {
-    #[cfg(not(feature = "full172"))]
+    #[cfg(not(any(feature = "full172", feature = "cold168")))]
     let root=Path::new("/home/sol/.jetstreamer-private/epoch166167170-current-publication-20261120-v1/finalized-boundaries").join(format!("epoch-{EPOCH}"));
-    #[cfg(not(feature = "full172"))]
+    #[cfg(not(any(feature = "full172", feature = "cold168")))]
     let p = root.join(format!("epoch-{EPOCH}.json"));
     #[cfg(feature = "full172")]
     let inputs = Path::new(
@@ -119,6 +130,15 @@ pub(super) fn boundary(live: &Value) -> Result<receipt::TerminalBoundary> {
     let (root, p) = (
         inputs.join("epoch172-rpc-evidence"),
         inputs.join("epoch-expectations/epoch-172.json"),
+    );
+    #[cfg(feature = "cold168")]
+    let inputs = Path::new(
+        "/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-delivery-20261121-v1",
+    );
+    #[cfg(feature = "cold168")]
+    let (root, p) = (
+        inputs.join("rpc-evidence"),
+        inputs.join("epoch-expectations/epoch-168.json"),
     );
     let bindings = Path::new(
         "/var/lib/jetstreamer/horizon_runtime_data/epoch168-current-delivery-20261121-v1/epoch-expectations/bindings.json",

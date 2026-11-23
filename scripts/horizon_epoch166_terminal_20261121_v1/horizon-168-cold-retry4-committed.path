@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch the cold retry4 batch receipt for epoch 168
+
+[Path]
+PathExistsGlob=/home/sol/.jetstreamer-private/epoch168-standard-lane-20261109-v1/full-metered-20261121-v1/cold-retry4-20261123/private/destination-ab320aeb1bd39ca9218ae95ef9e9b04e92f493e106c9a0e0b70582f6f568f51e/evidence/archive-batches/destination-000000000000fc00-00000000062b0180/batch-*.json
+Unit=horizon-168-cold-retry4-committed.service
+
+[Install]
+WantedBy=multi-user.target
