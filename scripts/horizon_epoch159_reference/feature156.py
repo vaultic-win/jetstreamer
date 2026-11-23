@@ -7,7 +7,7 @@ import re
 HERE = Path(__file__).resolve().parent
 RUNTIME = "epoch159-v156-vote-feature-reference-20261123-v1"
 UNIT = "horizon-epoch159-v156-vote-feature-reference-20261123-v1.service"
-WORKER = Path("/usr/local/lib/jetstreamer/epoch159-v156-vote-feature-20261123-v1/jetstreamer-historical-worker-v1-5-6")
+WORKER = Path("/opt/epoch159/jetstreamer-historical-worker-v1-5-6")
 PREVIOUS_INVOCATION = "cbf90e9daf634f5cb6fa3dc4b3e81ccd"
 PREVIOUS_ROOT = Path("/var/lib/jetstreamer/horizon_runtime_data/epoch159-vote-feature-reference-20261123-v1")
 SETTLEMENT = PREVIOUS_ROOT / "attempt-v1/scratch-retired.json"

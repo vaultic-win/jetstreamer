@@ -28,7 +28,7 @@ An observed November 20 v1.5.6 build with warm debug inputs took 6m56s for relea
 
 ## Native diagnostic
 
-Install the resulting ELF under the fixed path in `feature156.WORKER`. The owner seals and reviews the native build output, test results, input hashes and executable. Place a `v156-build.json` in the flat runtime package alongside the original ordinary reference modules, `feature156.py` and `v156-backport.json`. Its fields are `native_build_succeeded: true`, `native_build_evidence_sha256` (the owner's full native build receipt), `source_manifest_sha256` (the shipped v156-backport.json), `patch_sha256`, and `worker` with its absolute path, file length and SHA-256. The unprivileged process hashes the actual mounted worker and checks the original protocol-v5 Rust, genesis, runtime and target handshake.
+Seal the resulting ELF in the HOME-backed runtime package. The diagnostic sandbox mounts that package read-only at `/opt/epoch159`, where the worker is available at `feature156.WORKER`. The owner seals and reviews the native build output, test results, input hashes and executable. Place a `v156-build.json` in the flat runtime package alongside the original ordinary reference modules, `feature156.py` and `v156-backport.json`. Its fields are `native_build_succeeded: true`, `native_build_evidence_sha256` (the owner's full native build receipt), `source_manifest_sha256` (the shipped v156-backport.json), `patch_sha256`, and `worker` with its absolute sandbox path, file length and SHA-256. The unprivileged process hashes the actual mounted worker and checks the original protocol-v5 Rust, genesis, runtime and target handshake.
 
 ```sh
 sudo -n /usr/bin/python3 -IB package-v1/service.py --feature156 check-mounted-inputs
