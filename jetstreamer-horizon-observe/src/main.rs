@@ -129,6 +129,8 @@ struct Config {
     #[serde(default)]
     delivery248_claim: Option<delivery247_resource::DeliveryClaim>,
     #[serde(default)]
+    delivery249_claim: Option<delivery247_resource::DeliveryClaim>,
+    #[serde(default)]
     singleton_finalization_epochs: Vec<u64>,
 }
 
@@ -346,6 +348,7 @@ fn load_config(path: &Path) -> Result<(Config, String)> {
             || !config.native_input_diagnostics.is_empty()
             || config.staged247_resource_only
             || config.delivery248_claim.is_some()
+            || config.delivery249_claim.is_some()
             || config.delivery247_resource_only
             || config.singleton247_finalization
             || !config.singleton_finalization_epochs.is_empty(),
@@ -394,6 +397,7 @@ fn dispatch(path: &Path, check_config: bool) -> Result<Option<Value>> {
             "staged247_resource_only":config.staged247_resource_only,
             "successor247_claim":config.successor247_claim,
             "delivery248_claim":config.delivery248_claim,
+            "delivery249_claim":config.delivery249_claim,
             "singleton_finalization_epochs":singleton247_finalization::epochs(&config)?,
             "configuration_validated": true,
             "resource_observation_performed": false,
@@ -1990,8 +1994,18 @@ fn run(config: Config) -> Result<()> {
         config.successor247_claim.as_ref(),
         started_unix,
     );
-    if let Some(claim) = &config.delivery248_claim {
-        delivery_resources.push(delivery247_resource::sample248(claim, started_unix));
+    use delivery247_resource::OrdinaryEpoch::{Epoch248, Epoch249};
+    for (epoch, claim) in [
+        (Epoch248, &config.delivery248_claim),
+        (Epoch249, &config.delivery249_claim),
+    ] {
+        if let Some(claim) = claim {
+            delivery_resources.push(delivery247_resource::sample_ordinary(
+                epoch,
+                claim,
+                started_unix,
+            ));
+        }
     }
     let auxiliary_observations = if let Some(auxiliary) = &config.epoch203_ram_auxiliary {
         let mut rows = observe_private(
@@ -2516,6 +2530,7 @@ mod tests {
             staged247_resource_only: false,
             successor247_claim: None,
             delivery248_claim: None,
+            delivery249_claim: None,
             singleton_finalization_epochs: vec![],
             epoch203_ram_auxiliary: Some(RamAuxiliaryConfig {
                 replay,
