@@ -34,7 +34,8 @@ const EXPORT_FLOOR: u64 = 642_177_138_688;
 const UNIT: &str = "horizon-epoch163-native-input-20261106-v1.service";
 const MEMORY: u64 = 128 << 30;
 const SCRATCH_MAXIMUM: u64 = 40 << 30;
-const SCRATCH_MAXIMUM_INODES: u64 = 131072;
+// Snapshot 70415741 has 394,226 unique entries, plus restore scaffolding.
+const SCRATCH_MAXIMUM_INODES: u64 = 524_288;
 // Linux capability ABI; libc does not expose these capability numbers.
 const SYS_ADMIN_BIT: u64 = 1 << 21;
 // The canonical producer profile is epoch163_snapshot_profile.rs, not the
@@ -228,7 +229,7 @@ fn resources(p: &Plan, start: Instant) -> Result<()> {
         .trim()
         .parse::<u64>()?;
     ensure!(current <= MEMORY, "native current exceeds hard maximum");
-    scratch_limits(&p.scratch)?;
+    scratch_limits(&p.scratch, SCRATCH_MAXIMUM_INODES)?;
     native_guards::readonly(&p.snapshot)?;
     native_guards::readonly(&p.ledger)?;
     native_guards::vmas(&root, &cg)?;
@@ -248,6 +249,7 @@ fn validate_scratch_limits(
     bytes: u64,
     inodes: u64,
     flags: libc::c_ulong,
+    expected_inodes: u64,
 ) -> Result<()> {
     // The historical client executes its measured private worker copy here.
     let required = libc::ST_NOSUID | libc::ST_NODEV;
@@ -257,6 +259,7 @@ fn validate_scratch_limits(
             && bytes <= SCRATCH_MAXIMUM
             && inodes > 0
             && inodes <= SCRATCH_MAXIMUM_INODES
+            && inodes == expected_inodes
             && flags & required == required
             && flags & libc::ST_NOEXEC == 0
             && flags & libc::ST_RDONLY == 0,
@@ -298,7 +301,7 @@ fn validate_scratch_temp_paths(
     }
     Ok(())
 }
-fn scratch_limits(path: &Path) -> Result<()> {
+fn scratch_limits(path: &Path, expected_inodes: u64) -> Result<()> {
     let name = std::ffi::CString::new(path.as_os_str().as_encoded_bytes())?;
     let mut kind = std::mem::MaybeUninit::<libc::statfs>::uninit();
     let mut space = std::mem::MaybeUninit::<libc::statvfs>::uninit();
@@ -313,7 +316,13 @@ fn scratch_limits(path: &Path) -> Result<()> {
         .f_blocks
         .checked_mul(space.f_frsize)
         .context("scratch capacity overflow")?;
-    validate_scratch_limits(kind.f_type, bytes, space.f_files, space.f_flag)?;
+    validate_scratch_limits(
+        kind.f_type,
+        bytes,
+        space.f_files,
+        space.f_flag,
+        expected_inodes,
+    )?;
     let status = fs::read_to_string("/proc/self/status")?;
     validate_no_remount_authority(
         [
@@ -461,7 +470,7 @@ fn run() -> Result<()> {
             && fs::metadata(&p.scratch)?.dev() != fs::metadata(&p.protected_filesystem)?.dev(),
         "native host DATA identity must be separate from private scratch tmpfs"
     );
-    scratch_limits(&p.scratch)?;
+    scratch_limits(&p.scratch, SCRATCH_MAXIMUM_INODES)?;
     ensure!(fs::read_dir(&p.scratch)?.next().is_none(), "fresh scratch");
     let iid = env::var("INVOCATION_ID")?;
     ensure!(
@@ -613,7 +622,7 @@ mod tests {
         );
         let root = PathBuf::from(env::var("JETSTREAMER_NATIVE163_TMPFS_PROBE_ROOT")?);
         private(&root)?;
-        scratch_limits(&root)?;
+        scratch_limits(&root, 128)?;
         ensure!(
             fs::read_dir(&root)?.next().is_none(),
             "fresh disposable scratch probe root"
@@ -734,9 +743,10 @@ mod tests {
             SCRATCH_MAXIMUM,
             SCRATCH_MAXIMUM_INODES,
             flags,
+            SCRATCH_MAXIMUM_INODES,
         )
         .unwrap();
-        validate_scratch_limits(libc::TMPFS_MAGIC, 2 << 20, 1024, flags).unwrap();
+        validate_scratch_limits(libc::TMPFS_MAGIC, 2 << 20, 128, flags, 128).unwrap();
         for (kind, bytes, inodes, mode) in [
             (0, SCRATCH_MAXIMUM, SCRATCH_MAXIMUM_INODES, flags),
             (libc::TMPFS_MAGIC, 0, SCRATCH_MAXIMUM_INODES, flags),
@@ -747,6 +757,7 @@ mod tests {
                 flags,
             ),
             (libc::TMPFS_MAGIC, SCRATCH_MAXIMUM, 0, flags),
+            (libc::TMPFS_MAGIC, SCRATCH_MAXIMUM, 131_072, flags),
             (
                 libc::TMPFS_MAGIC,
                 SCRATCH_MAXIMUM,
@@ -778,7 +789,9 @@ mod tests {
                 flags | libc::ST_RDONLY,
             ),
         ] {
-            assert!(validate_scratch_limits(kind, bytes, inodes, mode).is_err());
+            assert!(
+                validate_scratch_limits(kind, bytes, inodes, mode, SCRATCH_MAXIMUM_INODES).is_err()
+            );
         }
     }
     #[test]

@@ -1,0 +1,33 @@
+# Epoch 163 native restore scratch
+
+The epoch 163 snapshot at slot 70,415,741 contains 394,226 distinct tar members. The restore uses ten inodes including the tmpfs root and its scaffolding before it creates archive members. This profile mounts a 40 GiB tmpfs with exactly 524,288 inodes. The native actor and the issuer inspect the actual namespace before restore. The native48 lifecycle verifier also checks the mounted inode count while the actor runs. The backing DATA filesystem retains its separate minimum of 131,072 free inodes.
+
+## Source preparation
+
+Build a new generation in a private working directory. The normal 128 GiB actor source lives in `jetstreamer-node/src/bin/epoch163-native-input/source/native.rs`. The original issuer and plan templates are retained in the branch as source records of their historical qualifications. Apply the appropriate successor patch in a working copy.
+
+* For native128, copy `direct163/` from `scripts/horizon_first_lane_native_before_v1/helper-overlay/jetstreamer-r2/src/fleet/` and `native-preparation/` from the same historical package into the working directory.
+* For native48, take `native.rs` from the sealed `horizon-epoch163-native48-input-source-20261112-v1` actor source. For the issuer, use `direct163/` from the native48 independent helper overlay after applying its successor `PRIOR_NATIVE48_OVERLAY_LIFECYCLE.patch` and incorporating the lifecycle overlay. The independent overlay is `epoch163-native48-independent-source-20261107-v1` and the lifecycle overlay is `epoch163-native48-lifecycle-source-20261107-v2` under the host's private root. Keep the rest of the build's actor and integrated helper graphs with their existing provenance.
+
+With the working directory arranged as above, set `package` to this package's absolute directory and `profile` to `native48` or `native128`. In the working copy, run
+
+```sh
+sha256sum --check --strict "$package/$profile.sha256" &&
+    patch --batch --fuzz=0 -p1 -i "$package/$profile.patch"
+```
+
+For native128, copy `restore_mount.py` into the successor's `native-preparation/`, alongside the patched preparer and preflight. For native48, emit its actor's `TemporaryFileSystem` assignment using
+
+```sh
+python3 "$package/restore_mount.py" "$scratch_directory"
+```
+
+Pass that output as one systemd property. Keep the existing state-only `ReadWritePaths`, read-only sources and scratch temp aliases. Qualify the actor first, then bind its actual sealed image and qualification SHA-256 in the issuer and preparer. The native48 issuer and the native128 successor templates require those qualification digests. Commit the integrated, digest-bound sources used by the selected build before admission. Preserve the original memory, swap, CPU, disk, lifecycle and admission guards for that profile.
+
+## Qualification evidence
+
+At 11:57:55 UTC on 2026-11-23, an isolated kernel test populated both tmpfs profiles with the actual snapshot member names, original order and logical file lengths. At the old limit of 131,072, Linux returned `ENOSPC` for member 131,063, `accounts/70192500.1146344438`. The production failure names this member but did not record its errno. The corrected mount accommodated all 394,226 members with 130,052 inodes left.
+
+The test used sparse stand-ins. Per-task tracepoints counted 394,226 shmem inode slots and 394,226 dentries, representing 387,918,384 bytes in those two slab caches. Allow for data pages, other kernel allocations, allocator overhead and Bank memory when pricing a real restore. The original tar contains 8,353,534,771 logical bytes. Raising `nr_inodes` leaves the data-byte cap and cgroup hard limits in force.
+
+The home-backed proof packet is `~/.jetstreamer-private/epoch163-inode-repair-20261123/proof/`. SHA-256 of `KERNEL.json` is `6ee74a7b691c1edf66bb8e274608c366c5e5dc2937c99680a54eb73548f493ad`. SHA-256 of `METADATA.json` is `d2a2d80747f8cfa0435febaf25acf1c14dd588ac039d1e9e6bac9ff917629b17`. Actual snapshot extraction, Bank hash verification and first-output production each require their own qualified run.
