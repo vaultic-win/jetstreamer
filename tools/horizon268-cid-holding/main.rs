@@ -13,7 +13,7 @@ const MAP: &str =
     "/var/lib/jetstreamer/horizon-r2-holding-foundation-node-01-user-mapping-v1/mapping.json";
 const MAP_SHA: &str = "50736c4c6633b4a97f4a717a1ba5f83374b4e2af4b7ef22c90ed4e007cad35b6";
 const PART: usize = 32 << 20;
-#[cfg(not(any(epoch250, epoch267)))]
+#[cfg(not(any(epoch249, epoch250, epoch251, epoch267)))]
 mod profile {
     pub(super) const SRC: &str = "/var/lib/jetstreamer/horizon268-cid-input-v175-a1/index.body";
     pub(super) const SIZE: u64 = 12_161_495_866;
@@ -80,18 +80,68 @@ mod profile {
     pub(super) const DEST: &str =
         "/var/lib/jetstreamer/horizon250-closed-archive-holding-restore-v1";
     pub(super) const KEY: &str = "archive-070c6021-v1.manifest";
+    pub(super) const RESTORE_FILE: &str = "epoch-250.jet";
     pub(super) const EPOCH: u64 = 250;
     pub(super) const INODE: u64 = 15_060_654;
     pub(super) const TIMES: (i64, i64, i64, i64) =
         (1_795_169_606, 173_593_399, 1_795_173_253, 625_459_056);
 }
-#[cfg(epoch250)]
+#[cfg(epoch249)]
+mod profile {
+    pub(super) const EPOCH: u64 = 249;
+    pub(super) const SRC: &str = "/home/ubuntu/.jetstreamer-private/qualification-249-reboot-20261117-v1/output/epoch-249.jet";
+    pub(super) const SIZE: u64 = 180_924_777_820;
+    pub(super) const SHA: &str = "d6802f70fa854af0ca12e6c425d9b4fbdc0b443bec680a1b631993d6b3269ded";
+    pub(super) const PREFIX: &str =
+        "foundation_node_01/closed-private-v1/epoch249-closed-archive-v1";
+    pub(super) const RECOVERY: &str =
+        "/var/lib/jetstreamer/horizon-singleton-delivery249-20261119-v1/terminal-handoff.json";
+    pub(super) const REC_SHA: &str =
+        "a98b6967565b73618b0e8913f7579231577bcdce13e6c5756cbf9927fa09533b";
+    pub(super) const STRUCTURAL: &str =
+        "/var/lib/jetstreamer/horizon-singleton-delivery249-20261119-v1/terminal-drain.json";
+    pub(super) const STR_SHA: &str =
+        "9f03c4b51dc06001620153d2da369daf0b94646fc063205abb368e22b84c41ac";
+    pub(super) const TMP: &str = "/run/horizon249-closed-archive-holding-work";
+    pub(super) const DEST: &str =
+        "/var/lib/jetstreamer/horizon249-closed-archive-holding-restore-v1";
+    pub(super) const RESTORE_FILE: &str = "epoch-249.jet";
+    pub(super) const KEY: &str = "archive-d6802f70-v1.manifest";
+    pub(super) const INODE: u64 = 8_820_166;
+    pub(super) const TIMES: (i64, i64, i64, i64) =
+        (1_795_107_202, 152_908_668, 1_795_111_167, 802_019_027);
+}
+#[cfg(epoch251)]
+mod profile {
+    pub(super) const EPOCH: u64 = 251;
+    pub(super) const SRC: &str = "/home/ubuntu/.jetstreamer-private/qualification-251-replacement-20261118-v1/output/epoch-251.jet";
+    pub(super) const SIZE: u64 = 180_869_655_584;
+    pub(super) const SHA: &str = "8248727043dc05b54effd1b383e8094283970d673a33dd65e0ff9aababa968b2";
+    pub(super) const PREFIX: &str =
+        "foundation_node_01/closed-private-v1/epoch251-closed-archive-v1";
+    pub(super) const RECOVERY: &str =
+        "/var/lib/jetstreamer/horizon-singleton-delivery251-20261119-v1/terminal-handoff.json";
+    pub(super) const REC_SHA: &str =
+        "85a9e5c794ebbb2699f00e0371aaaa2d8c4550c17622b967ae35defd13a0d65d";
+    pub(super) const STRUCTURAL: &str =
+        "/var/lib/jetstreamer/horizon-singleton-delivery251-20261119-v1/terminal-drain.json";
+    pub(super) const STR_SHA: &str =
+        "dc4e672d2b95528a5758ae06355819d8a2f7bfe17fa80d2218c7f3c8ad1f6194";
+    pub(super) const TMP: &str = "/run/horizon251-closed-archive-holding-work";
+    pub(super) const DEST: &str =
+        "/var/lib/jetstreamer/horizon251-closed-archive-holding-restore-v1";
+    pub(super) const RESTORE_FILE: &str = "epoch-251.jet";
+    pub(super) const KEY: &str = "archive-82487270-v1.manifest";
+    pub(super) const INODE: u64 = 31_112_947;
+    pub(super) const TIMES: (i64, i64, i64, i64) =
+        (1_795_273_267, 403_475_475, 1_795_273_837, 624_069_856);
+}
+#[cfg(any(epoch249, epoch250, epoch251))]
 const SOURCE_OWNER_MODE: (u32, u32, u32) = (1000, 1000, 0o440);
-#[cfg(not(epoch250))]
+#[cfg(not(any(epoch249, epoch250, epoch251)))]
 const SOURCE_OWNER_MODE: (u32, u32, u32) = (0, 0, 0o400);
-#[cfg(epoch250)]
-const RESTORE_FILE: &str = "epoch-250.jet";
-#[cfg(not(epoch250))]
+
+#[cfg(not(any(epoch249, epoch250, epoch251)))]
 const RESTORE_FILE: &str = "index.body";
 use profile::*;
 fn ioe(e: io::Error) -> String {
@@ -226,13 +276,19 @@ fn fixed() -> String {
 fn manifest(header: &str, hashes: &[String]) -> Vec<u8> {
     format!("{header}\n{}\n", hashes.join("\n")).into_bytes()
 }
+#[cfg(any(epoch249, epoch251))]
+fn header() -> String {
+    format!(
+        "horizon{EPOCH}-closed-archive-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} mapping={MAP_SHA} terminal_handoff={REC_SHA} terminal_drain={STR_SHA} canonical=false"
+    )
+}
 #[cfg(epoch250)]
 fn header() -> String {
     format!(
         "horizon{EPOCH}-closed-archive-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} mapping={MAP_SHA} original_source={REC_SHA} recovery={STR_SHA} canonical=false"
     )
 }
-#[cfg(not(epoch250))]
+#[cfg(not(any(epoch249, epoch250, epoch251)))]
 fn header() -> String {
     format!(
         "horizon{EPOCH}-cid-index-v1 epoch={EPOCH} bytes={SIZE} sha256={SHA} part_bytes={PART} car_bytes={CAR_BYTES} entries={ENTRIES} buckets={BUCKETS} mapping={MAP_SHA} recovery={REC_SHA} structural={STR_SHA} canonical=false"
@@ -486,7 +542,7 @@ fn restore<T: Transport>(
     File::open(dir).and_then(|d| d.sync_all()).map_err(ioe)?;
     completed(&out, size, sha)
 }
-#[cfg(epoch250)]
+#[cfg(any(epoch249, epoch250, epoch251))]
 struct HeldInode {
     device: u64,
     inode: u64,
@@ -494,7 +550,7 @@ struct HeldInode {
     modified: std::time::SystemTime,
 }
 
-#[cfg(epoch250)]
+#[cfg(any(epoch249, epoch250, epoch251))]
 impl HeldInode {
     fn check(&self, metadata: &fs::Metadata) -> R<()> {
         require(
@@ -539,7 +595,7 @@ impl HeldInode {
     }
 }
 
-#[cfg(epoch250)]
+#[cfg(any(epoch249, epoch250, epoch251))]
 fn refill_original(c: &Client, parts: &[String]) -> R<()> {
     use std::time::{Duration, UNIX_EPOCH};
     let dir = Path::new(DEST);
@@ -569,7 +625,7 @@ fn run() -> R<()> {
     require(
         args.len() == 2
             && (matches!(args[1].as_str(), "park" | "verify" | "restore")
-                || (cfg!(epoch250) && args[1] == "refill-original")),
+                || (cfg!(any(epoch249, epoch250, epoch251)) && args[1] == "refill-original")),
         "use park, verify or restore",
     )?;
     authority()?;
@@ -608,12 +664,12 @@ fn run() -> R<()> {
             private_dir(d)?;
             restore(&c, &parts, SIZE, PART, SHA, d)?;
         }
-        #[cfg(epoch250)]
+        #[cfg(any(epoch249, epoch250, epoch251))]
         "refill-original" => refill_original(&c, &parts)?,
         "verify" => recover(&c, &parts, SIZE, PART, SHA, &mut io::sink())?,
         _ => {}
     }
-    let kind = if cfg!(epoch250) {
+    let kind = if cfg!(any(epoch249, epoch250, epoch251)) {
         "closed-archive"
     } else {
         "cid-to-offset-and-size"

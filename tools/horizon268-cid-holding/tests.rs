@@ -105,7 +105,9 @@ fn archived_epoch_geometry_round_trips_both_manifests() {
 #[test]
 fn exact_geometry() {
     let (parts, tail) = match EPOCH {
+        249 => (5_392, 32_834_908),
         250 => (5_532, 9_976_932),
+        251 => (5_391, 11_267_104),
         267 => (310, 24_474_758),
         268 => (363, 14_791_482),
         _ => panic!("unknown source profile"),
@@ -243,7 +245,7 @@ fn owner_and_profile_do_not_accept_another_namespace() {
         .unwrap()
         .replace("node_01", "node_02");
     assert!(approved_owner(200, foreign.as_bytes()).is_err());
-    let source_kind = if EPOCH == 250 {
+    let source_kind = if matches!(EPOCH, 249..=251) {
         "closed-archive"
     } else {
         "cid-index"
@@ -255,7 +257,7 @@ fn owner_and_profile_do_not_accept_another_namespace() {
 }
 
 #[test]
-#[cfg(epoch250)]
+#[cfg(any(epoch249, epoch250, epoch251))]
 fn refills_only_the_quarantined_original_and_resumes_a_partial_part() {
     use std::time::{Duration, UNIX_EPOCH};
     let d = Dir::new();
