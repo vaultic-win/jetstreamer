@@ -8,11 +8,14 @@ scratch=$work
 cfg=epoch166_recovery
 epoch=166
 extra_cfg=()
-if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 ) ]]; then
+if [[ $# == 1 && ( $1 == epoch166-retry11 || $1 == epoch170-retry11 || $1 == epoch170-retry12 || $1 == epoch170-retry13 || $1 == epoch166-after170 || $1 == epoch166-after168 || $1 == epoch166-after168-retry3 || $1 == epoch166-after168-closed || $1 == epoch166-after168-retry4 || $1 == epoch168-cold-rebook || $1 == epoch168-cold-retry3 ) ]]; then
     if [[ $1 == epoch170-* ]]; then epoch=170; fi
     retry=${1#*-}
     src=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-    if [[ $retry == after168-closed ]]; then
+    if [[ $retry == after168-retry4 ]]; then
+        extra_cfg=(--cfg epoch166_after170 --cfg epoch166_after168 --cfg epoch166_after168_retry3 --cfg epoch166_after168_retry4)
+        retry=retry11
+    elif [[ $retry == after168-closed ]]; then
         extra_cfg=(--cfg epoch166_after170 --cfg epoch166_after168 --cfg epoch166_after168_retry3 --cfg epoch166_after168_closed)
         retry=retry11
     elif [[ $retry == after168-retry3 ]]; then
@@ -78,13 +81,19 @@ cd "$out"
 find scripts -type f -print0 | sort -z | xargs -0 sha256sum > "$stage/sources"
 args=(--edition=2024 -C opt-level=1 -C codegen-units=4 -C strip=symbols -C linker=clang -C link-arg=-fuse-ld=/home/sol/.rustup/toolchains/1.98.0-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld.lld -C link-arg=-Wl,--threads=1 -L "dependency=$deps")
 for lib in anyhow-fcfd55939853d71f serde-8c11d906d3ff8a0b serde_json-c069c0f2e8c082ee libc-298e6c33c74760e9 sha2-917ab732b7d88cc0 tempfile-20415c3ecef1c5dd; do args+=(--extern "${lib%-*}=$deps/lib$lib.rlib"); done
-if [[ ${1:-} == epoch166-after168-retry3 || ${1:-} == epoch166-after168-closed ]]; then
+if [[ ${1:-} == epoch166-after168-retry3 || ${1:-} == epoch166-after168-closed || ${1:-} == epoch166-after168-retry4 ]]; then
     provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry3-v1/deployment-seal-receipt.json
     if [[ $1 == epoch166-after168-closed ]]; then
         provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-closed168-retry3-v1/deployment-seal-receipt.json
     fi
     writer=/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry3-v1/deployment-seal-receipt.json
-    sha256sum "$provider" "$writer" > "$stage/retry3-deployments"
+    deployments=retry3-deployments
+    if [[ $1 == epoch166-after168-retry4 ]]; then
+        provider=/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry4-v1/deployment-seal-receipt.json
+        writer=/var/lib/jetstreamer/horizon_runtime_data/survivor172-cadence-20261122-v1/tools-cold168-retry4-v1/deployment-seal-receipt.json
+        deployments=retry4-deployments
+    fi
+    sha256sum "$provider" "$writer" > "$stage/$deployments"
     RETRY3_FIT_SEAL=$(sha256sum "$provider" | cut -d' ' -f1)
     RETRY3_WRITER_SEAL=$(sha256sum "$writer" | cut -d' ' -f1)
     export RETRY3_FIT_SEAL RETRY3_WRITER_SEAL
