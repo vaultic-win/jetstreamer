@@ -67,7 +67,9 @@ def generation():
 
 # Earlier sealed packages continue to follow their original lane populations.
 cold168 = None
-if (LOCAL/'retry2-168-generation.json').is_file():
+generation168 = [p for p in (LOCAL/'retry2-168-generation.json', LOCAL/'retry3-168-generation.json') if p.is_file()]
+need(len(generation168)<=1, 'overlapping 168 receiver generations')
+if generation168:
     need(ATTEMPT == 'retry13' and (LOCAL/'cold170_commit.py').is_file(), 'wrong 170 generation for 168')
     import cold168_status as cold168
 
