@@ -43,7 +43,10 @@ def capture():
     assert accepted['reader_plan']==book['approved_plan'] and accepted['full_verifier']==old['full_verifier']
     assert old['full_verifier']['sha256']==current['full_verifier']['sha256'] and old['threads']==current['threads']
     for plan in (old,current):
-        assert ref(Path(plan['full_verifier']['path']))==plan['full_verifier']
+        image=Path(plan['full_verifier']['path'])
+        assert image.resolve()==image and image.stat().st_uid==0 and not image.stat().st_mode & 0o222
+        with image.open('rb') as stream:
+            assert hashlib.file_digest(stream,'sha256').hexdigest()==plan['full_verifier']['sha256']
     assert old['epoch_expectations']==current['epoch_expectations']
     old_plugin=accepted['local_playback']
     assert old_plugin['process_exit_code']==accepted['full_exit_code']==0

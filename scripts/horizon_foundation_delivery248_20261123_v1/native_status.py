@@ -79,7 +79,10 @@ def capture(version,lane):
     if model.exists():assert bound(ref(model))==spec
     else:put(model,spec)
     binary=bound(ref(D/'horizon266-bounded-consumers-v210-a2/deployment.json'))['binaries']['jetstreamer-r2']
-    assert ref(Path(binary['path']))==binary
+    image=Path(binary['path'])
+    assert image.resolve()==image and image.stat().st_uid==0 and not image.stat().st_mode & 0o222
+    with image.open('rb') as stream:
+        assert hashlib.file_digest(stream,'sha256').hexdigest()==binary['sha256']
     cmd=[binary['path'],'status-publish-pipeline',str(model),'--plan-sha256',ref(model)['sha256']]
     result=subprocess.run([*cmd,'--check-only'],capture_output=True,text=True)
     put(folder/'check.json',dict(model=ref(model),binary=binary,code=result.returncode,stderr=result.stderr,stdout=result.stdout))
