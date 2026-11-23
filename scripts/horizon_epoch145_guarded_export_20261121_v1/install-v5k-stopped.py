@@ -14,6 +14,7 @@ BASE = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261
 DONORS = {
     "v5k": ("tools-homefloor-145-lease-build-v1", "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5"),
     "v5m": ("tools-homefloor-145-v5k-stopped-v1", "ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6"),
+    "v5n": ("tools-homefloor-145-guard-walk-rejoin-v1", "4718a18e4b458fd563b5dbf6c7eadc29a055a507d4ffd232003d20e7935d77c3"),
 }
 
 

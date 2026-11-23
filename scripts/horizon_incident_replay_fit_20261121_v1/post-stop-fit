@@ -50,9 +50,10 @@ HERE = Path(__file__).resolve().parent
 GUARD_RUNTIME_145 = HERE == D / "tools-homefloor-145-guard-walk-rejoin-v1"
 MISSED_RUNTIME_145 = GUARD_RUNTIME_145 or HERE == D / "tools-homefloor-145-missed-rejoin-v1"
 LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
+STOPPED_V5N = HERE == D / "tools-homefloor-145-v5n-stopped-v1"
 STOPPED_V5M = HERE == D / "tools-homefloor-145-v5m-stopped-v1"
 STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
-LEASE_BUILD_145 = STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
+LEASE_BUILD_145 = STOPPED_V5N or STOPPED_V5M or STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
 RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3", D / "tools-homefloor-145-handoff-v4", D / "tools-homefloor-145-handoff-v5")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5N_136 = HERE == D / "tools-homefloor-145-post-v5n-136-v1"
@@ -525,10 +526,16 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
     return cfg,adapter,dict(profile=ref,seal=sr,build=br,image=cfg["image_sha256"],adapter=cfg["adapter_sha256"])
 
 def phase145(epoch):
-    if STOPPED_V5M or STOPPED_V5K:
-        s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
-        name = "v5m_stopped.py" if STOPPED_V5M else "v5k_stopped.py"
-        return runpy.run_path(str(HERE / name))["stopped_phase"](s, fit)
+    for active, name in ((STOPPED_V5N, "v5n_stopped.py"), (STOPPED_V5M, "v5m_stopped.py"),
+                         (STOPPED_V5K, "v5k_stopped.py")):
+        if active:
+            s.need(epoch == 145, "stopped 145 provider is a read-only whole-fleet quote")
+            if STOPPED_V5N:
+                seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+                member, = [m for m in seal["members"] if m["name"] == name and m["mode"] == "0444"]
+                s.need(seal["destination"] == str(HERE), "unbound V5n stopped adapter")
+                fit.binary(HERE / name, member["sha256"])
+            return runpy.run_path(str(HERE / name))["stopped_phase"](s, fit)
     if LEASE_BUILD_145:
         s.need(epoch == 145, "lease repair build provider only prices the failed 145 owner")
         return runpy.run_path(str(HERE / "v5j_lease_failure.py"))["build_phase"](s, fit)
@@ -1261,7 +1268,7 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
-    if STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or HERE in (D / "tools-homefloor-145-handoff-v4", D / "tools-homefloor-145-handoff-v5"):
+    if STOPPED_V5N or STOPPED_V5M or V5M_POST or MISSED_RUNTIME_145 or HERE in (D / "tools-homefloor-145-handoff-v4", D / "tools-homefloor-145-handoff-v5"):
         s.need(epoch == 145 and (prestart136 is None or V5N_136), "unexpected missed-census pricing scope")
         seal, _ = s.read(HERE / "deployment-seal-receipt.json")
         module = HERE / "build_159_price.py"
@@ -1270,7 +1277,7 @@ def capture(epoch, ref, prestart136=None):
         fit.binary(module,member["sha256"])
         donor = runpy.run_path(str(module))
         before = donor["snapshot"]() if prestart136 is None else None
-        guarded = GUARD_RUNTIME_145 or V5N_POST or HERE == D / "tools-homefloor-145-handoff-v5"
+        guarded = STOPPED_V5N or GUARD_RUNTIME_145 or V5N_POST or HERE == D / "tools-homefloor-145-handoff-v5"
         if guarded:
             feature = HERE/"v5n_feature_cover.py"
             source, = [m for m in seal["members"] if m["name"] == feature.name and m["mode"] == "0444"]
