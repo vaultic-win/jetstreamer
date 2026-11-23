@@ -29,8 +29,26 @@ def cadence(source):
 
 def pricing(source):
     source = replace(source, " import lane265\n", " import lane265\n sys.path.insert(0,'/var/lib/jetstreamer/horizon265-retry-tools-v216')\n import retry265\n")
-    return replace(source, "  fixed.update(lane265.finite_owner())",
+    source = replace(source, "  fixed.update(lane265.finite_owner())",
                    "  fixed.update(lane265.finite_owner())\n  fixed.update(retry265.finite_owner())")
+    return reserve257(source)
+
+
+def reserve257(source):
+    # Raw pricing retains the full 266 booking. Its closed-donor consumers take
+    # the assessment view before removing 266 growth or funding a successor.
+    return replace(source, " return dict(closed265_delivery=", """ reservation257=None
+ closed257=V/'horizon257-closed266-reservation-v217/assignment.json'
+ if closed257.exists() and assessment_only:
+  reservation257=ref(closed257)
+  assert reservation257['sha256']=='c28b7b8e77ad679827338f883e5496c42f2d2de6a3a25cc44c7d3f38cf2862cb'
+  award=bound(reservation257)
+  assert award['schema']=='horizon-closed266-reservation-for257-v1' and award['epoch']==257
+  assert award['donor']==bound(ref(lane265.BOOK))['donor'] and not award['automatic_release']
+  assert (award['memory'],award['disk'])==(121342177280,256000000000)
+  growth+=award['memory']
+  floor+=award['disk']
+ return dict(reservation257=reservation257,closed265_delivery=""")
 
 
 def fleet(source):
