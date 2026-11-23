@@ -40,6 +40,10 @@
       "fragment": "/run/systemd/transient/horizon-closed166-retry10-consumer-census-20261122-v1.service",
       "invocation": "76053847386e400bbffe85a119a29e2e",
       "pid": "930617",
+      "requisite": [
+        "horizon-closed166-retry10-park-terminal-20261122-v1.service"
+      ],
+      "requisite_of": [],
       "result": "exit-code",
       "sha256": "a202721b1bdf54c17b14a4e2944ed5725fad24f27bb555bfccdc836b0ee2ee7d",
       "state": "failed",
@@ -52,6 +56,10 @@
       "fragment": "/run/systemd/transient/horizon-closed166-retry10-consumer-census-successor-20261123-v1.service",
       "invocation": "65307d32b63342599139b1f5f2c350d4",
       "pid": "994222",
+      "requisite": [
+        "horizon-closed166-retry10-park-terminal-20261122-v1.service"
+      ],
+      "requisite_of": [],
       "result": "success",
       "sha256": "4b2f92cd34e77b989febbc60d489724a102a7bae3c0906ae180389233a5f33d5",
       "state": "active",
@@ -64,6 +72,13 @@
       "fragment": "/run/systemd/transient/horizon-closed166-retry10-park-terminal-20261122-v1.service",
       "invocation": "5b066b089e5b4feebd3f8dee04f3b5bb",
       "pid": "915049",
+      "requisite": [
+        "horizon-closed166-retry10-park-20261122-v1.service"
+      ],
+      "requisite_of": [
+        "horizon-closed166-retry10-consumer-census-20261122-v1.service",
+        "horizon-closed166-retry10-consumer-census-successor-20261123-v1.service"
+      ],
       "result": "success",
       "sha256": "35f6927700db9411f1897cadfc91391a8cbdb00b941371e58fe498ee5cde5ae4",
       "state": "active",
@@ -76,6 +91,8 @@
       "fragment": "/run/systemd/transient/horizon-observer-root174010-live166167170-20261122-v1.service",
       "invocation": "2ad208e3074a4c7fbe54bfc3a26340cb",
       "pid": "600362",
+      "requisite": [],
+      "requisite_of": [],
       "result": "exit-code",
       "sha256": "a4e7de45858e2c80edae235b837758ce45f0083ef31c6e3b2b5fe333fc2abadf",
       "state": "failed",
