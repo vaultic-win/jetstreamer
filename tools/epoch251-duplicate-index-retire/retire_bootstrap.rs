@@ -148,7 +148,7 @@ const EPOCH_231_CACHE: Profile = Profile {
         "/var/lib/jetstreamer/horizon-contiguous-231-232-current-46b4b4a-v1",
         12293159,
         12293295,
-        1792002806904012626,
+        1792002806903012631,
         1792002806904012626,
     ),
     state: "/var/lib/jetstreamer/horizon-bootstrap-cache231-retire-v239",
