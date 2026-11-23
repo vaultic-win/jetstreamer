@@ -85,8 +85,24 @@ pub const TURNOVER266: Pilot = Pilot {
     ..SUCCESSOR266
 };
 
+pub const BOUNDED266: Pilot = Pilot {
+    unit: "horizon-qualify-266-capped-bounded-v207.service",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-capped-bounded-v207",
+    state: "/var/lib/jetstreamer/horizon266-capped-bounded-v207-control",
+    node: SUCCESSOR266.node,
+    fixed: Some(Pins {
+        iid: "39999fd278dd40c18310a3d6c10c4e21",
+        pid: 3451480,
+        handoff_sha: "28ce08fdee6af90959a2df6b5495ec6092384d0b973bdf90755dbc8baf4d9b04",
+        qa_disk: "d41f93ca8633c11f1544c1d1fc0a0e69664d937f7a1b47ce2c88b8e6129c113e",
+        qa_memory: "908f96e9757593520ef43b5321d45fc8cedb45d3d37ea843c5f7ccbc78d3095a",
+    }),
+    ..FULL266
+};
 pub fn instruction_profile(receipt: &Path) -> &'static Pilot {
-    if receipt.starts_with(TURNOVER266.state) {
+    if receipt.starts_with(BOUNDED266.state) {
+        &BOUNDED266
+    } else if receipt.starts_with(TURNOVER266.state) {
         &TURNOVER266
     } else {
         &SUCCESSOR266
@@ -111,11 +127,17 @@ fn read(b: &Value, loc: &Path, immutable: bool) -> Result<Value> {
 fn receipt_bytes(b: &Value, loc: &Path, immutable: bool) -> Result<Vec<u8>> {
     let p = Path::new(text(b, "path")?);
     let digest = text(b, "sha256")?;
+    ensure!(p == loc && hex(digest, 64), "entry proof binding");
+    let bytes = owned_bytes(p, immutable)?;
     ensure!(
-        p == loc
-            && p.starts_with("/var/lib/jetstreamer")
-            && p.canonicalize()? == p
-            && hex(digest, 64),
+        format!("{:x}", Sha256::digest(&bytes)) == digest,
+        "entry proof digest"
+    );
+    Ok(bytes)
+}
+fn owned_bytes(p: &Path, immutable: bool) -> Result<Vec<u8>> {
+    ensure!(
+        p.starts_with("/var/lib/jetstreamer") && p.canonicalize()? == p,
         "entry proof path"
     );
     for a in p.ancestors().skip(1) {
@@ -157,8 +179,7 @@ fn receipt_bytes(b: &Value, loc: &Path, immutable: bool) -> Result<Vec<u8>> {
     ensure!(
         bytes.len() as u64 == current.2
             && id(f.metadata()?) == current
-            && id(fs::symlink_metadata(p)?) == current
-            && format!("{:x}", Sha256::digest(&bytes)) == digest,
+            && id(fs::symlink_metadata(p)?) == current,
         "entry proof changed"
     );
     Ok(bytes)
@@ -333,6 +354,15 @@ impl Pilot {
             "pilot entry witness"
         );
         self.markers(&e)?;
+        if self.unit == BOUNDED266.unit {
+            let dir = state.join("bounded-first-entries");
+            ensure!(
+                path == dir.join("first-entries.json"),
+                "different bounded capture"
+            );
+            let journal = dir.join("command-0002.stdout");
+            self.original_progress(&e, &owned_bytes(&journal, false)?, pins)?;
+        }
         let proc = e["processes"].as_object().context("pilot mapped replay")?;
         let parent = proc
             .get(&pid.to_string())
@@ -364,7 +394,7 @@ impl Pilot {
                 "wrong epoch 228 Bank child"
             );
         }
-        if self.fixed.is_none() {
+        if self.fixed.is_none() || self.unit == BOUNDED266.unit {
             let (_, worker) = proc
                 .iter()
                 .find(|(_, v)| v["role"] == "worker")
@@ -390,6 +420,7 @@ impl Pilot {
         Ok(registration)
     }
     fn original(&self, b: &Value, pins: Pins<'_>) -> Result<Value> {
+        let bounded = self.unit == BOUNDED266.unit;
         let turnover = self.unit == TURNOVER266.unit;
         let election_schema = if turnover {
             "horizon266-closed-singleton-capacity-election-v1".to_owned()
@@ -444,7 +475,12 @@ impl Pilot {
                 && review["schema"]
                     == format!("horizon{}-first-entry-native-review-v1", self.epoch)
                 && fit["fleet"] == review["fleet"]
-                && fit["schema"] == election_schema
+                && (if bounded {
+                    h["held_fit"]["sha256"]
+                        == "c1f90f8f82ca19ee6679c9a30ce03c8296d8d4e450a16ab58b749bf5eb5ac47b"
+                } else {
+                    fit["schema"] == election_schema
+                })
                 && fit["winner"]["fits"] == true
                 && fit["winner"]["root"] == s["root_cap"]
                 && gp["worker_root"] == self.root
@@ -471,7 +507,25 @@ impl Pilot {
                 && sample["root_physical_observation"].is_object(),
             "pilot original admission, first firing or release"
         );
-        if turnover {
+        let runtime = if bounded {
+            &review["runtime_image"]
+        } else {
+            &review["controller_image"]
+        };
+        if bounded {
+            ensure!(
+                review["reservation"] == fit["reservation"]
+                    && fit["reservation"]["sha256"]
+                        == "273f914d9cfaf6078076998ba1eb7a49b1b50a33a561db4eebe9ebf12ed45bc8"
+                    && fit["winner"]["root"] == 344997011456u64
+                    && fit["winner"]["memory"] == 192000000000u64
+                    && runtime["sha256"]
+                        == "79be3c4ba91dc629ca3efc0cfe07286873acd2667bd9c9925ba038d4cccf26e2"
+                    && s["worker"]
+                        == "/var/lib/jetstreamer/horizon266-capped-worker-package-v199-a1/jetstreamer-historical-worker-v1-8-11",
+                "different bounded allocation or deployed worker"
+            );
+        } else if turnover {
             ensure!(
                 pins.handoff_sha
                     == "fcab517e7281c8c1dde68c9e7f56cbabc294eff2154c181bdb72b1742170a4df"
@@ -500,7 +554,7 @@ impl Pilot {
                     && q["drained"] == true
                     && q["entry_replay"] == false
                     && q["iid"] != iid
-                    && q["image"] == review["controller_image"]
+                    && q["image"] == *runtime
                     && hex(text(&q, "iid")?, 32),
                 "pilot missing pressure qualification {mode}"
             );
@@ -539,9 +593,11 @@ impl Pilot {
                 "wrong pilot first pressure stop"
             );
         }
-        let image = text(&review["controller_image"], "path")?;
+        let image = text(runtime, "path")?;
         let target = pilot.join("spec.json");
-        let command = if turnover {
+        let command = if bounded {
+            "epoch266-bounded".to_owned()
+        } else if turnover {
             "epoch266-turnover".to_owned()
         } else if self.fixed.is_none() {
             "epoch266-instructions".to_owned()
@@ -615,6 +671,34 @@ fn validate_successor(p: &Pilot, review: &Value, fit: &Value, spec: &Value) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "reads the original bounded launch and both stopped QA workers"]
+    fn bounded_writer_reopens_its_runtime_and_issued_booking() {
+        let p = instruction_profile(
+            &Path::new(BOUNDED266.state).join("bounded-first-entries/first-entries.json"),
+        );
+        let pins = p.fixed.unwrap();
+        let h =
+            json!({"path":Path::new(p.state).join("pilot/handoff.json"),"sha256":pins.handoff_sha});
+        let proof = p.original(&h, pins).unwrap();
+        assert_eq!(proof["memory"], 192000000000u64);
+        assert!(
+            proof["expected_command"]
+                .as_str()
+                .unwrap()
+                .contains("epoch266-bounded wait pilot")
+        );
+        assert!(
+            p.original(
+                &h,
+                Pins {
+                    pid: pins.pid + 1,
+                    ..pins
+                }
+            )
+            .is_err()
+        );
+    }
     #[test]
     #[ignore = "original admitted 320 GiB epoch 266 worker and stopped QA owners"]
     fn turnover_266_requires_its_original_owner_and_pressure_stops() {
