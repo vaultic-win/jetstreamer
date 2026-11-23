@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_missed_clock145_only)]
+#[cfg(incident_guard_walk145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-guard-walk-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_missed_clock145_only, not(incident_guard_walk145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-missed-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_lease_start145_only, not(incident_missed_clock145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-lease-rejoin-v1/post-stop-fit";
@@ -24,7 +26,9 @@ const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-repla
 #[cfg(all(incident_timer145_only, not(incident_fixture145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-v16/post-stop-fit";
 #[cfg(incident_fixture_post145_only)]
-const PROVIDER: &str = if cfg!(incident_v5m_post145_only) {
+const PROVIDER: &str = if cfg!(incident_v5n_post145_only) {
+    "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5n-v1/post-stop-fit"
+} else if cfg!(incident_v5m_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5m-v1/post-stop-fit"
 } else if cfg!(incident_v5k_post145_only) {
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-post-v5k-v1/post-stop-fit"

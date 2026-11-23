@@ -1,7 +1,9 @@
 //! Original-boot custody of the failed pre-incident epoch 145 semantic pass.
 use super::*;
 
-#[cfg(incident_missed_clock145_only)]
+#[cfg(incident_guard_walk145_only)]
+pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5n/export145";
+#[cfg(all(incident_missed_clock145_only, not(incident_guard_walk145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5m/export145";
 #[cfg(all(incident_lease_start145_only, not(incident_missed_clock145_only)))]
 pub const IMAGE: &str = "/var/lib/jetstreamer/horizon_runtime_data/epoch145-semantic-continuity-20261121-v1/tools-v5k/export145";
