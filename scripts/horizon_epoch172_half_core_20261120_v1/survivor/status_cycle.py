@@ -392,7 +392,8 @@ def census(c,bridge):
         if 166 in c.new_rows:
             cap['current_cold166_retry11_protection']=c.recovered_ref
         if 168 in c.new_rows:
-            cap['current_cold168_retry2_protection']=c.recovered_ref
+            name = 'current_cold168_retry3_protection' if cold_workers.cold168.RETRY3 else 'current_cold168_retry2_protection'
+            cap[name]=c.recovered_ref
         if 170 in c.new_rows:
             cap[f'current_cold170_{cold_workers.ATTEMPT}_protection']=c.recovered_ref
     durable(path,witness)
@@ -587,7 +588,7 @@ def entry():
         if cold_workers.ATTEMPT == 'retry13' and CURRENT.with_name('cold170_commit.py').is_file():
             package='tools-cold170-retry13-terminal-v1'
         if cold_workers.cold168:
-            package='tools-cold168-retry2-v1'
+            package=cold_workers.cold168.PACKAGE
     need(os.geteuid()==0 and __debug__ and CURRENT==ROOT/package/'status_cycle.py','expected deployed sole controller')
     receipt=bound(CURRENT.parent/'deployment-seal-receipt.json')
     seal=checked(receipt)

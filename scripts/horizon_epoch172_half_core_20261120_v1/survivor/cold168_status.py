@@ -23,13 +23,41 @@ NODE = '/usr/local/lib/jetstreamer/horizon-independent168-singleton-package-2026
 NODE_SHA = 'a09b8e5aa9426beaf42e6b5f2a469a5a147436bab8b7bf79f268758b60aa2e65'
 
 
+RETRY3 = Path(__file__).with_name('retry3-168-generation.json').is_file()
+PACKAGE = 'tools-cold168-retry3-v1' if RETRY3 else 'tools-cold168-retry2-v1'
+ROOT_INODE, LOG_INODE = 103481350, 103481356
+if RETRY3:
+    ROOT = BASE/'epoch168-retry3-rebook-20261123-v1'
+    GUARD = BASE/'epoch168-cold-guard-20261123-v3'
+    RUN = RUN.with_name('cold-retry3-20261123')
+    ALIAS = Path('/run/horizon-full168-cold-v3')
+    NAME = '168-full-metered-cold-v3-20261123'
+    UNIT = 'horizon-qualify-'+NAME+'.service'
+    TIMER = 'horizon-guard-'+NAME+'.timer'
+    ROOT_INODE, LOG_INODE = 103481378, 103481382
+    BINDING = Path(__file__).with_name('retry3-168-generation.json')
+    ANCHOR = dict(path=str(ROOT/'SUCCESSOR_ROOT.json'),sha256='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4')
+    FAILURE = dict(path=str(BASE/'epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json'),
+                   sha256='a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643')
+    QUAL = checked(bound(BINDING))['guard_qualification']
+    need(QUAL['path']==str(GUARD/'GUARD_QUALIFIED.json'), 'different retry3 guard path')
+
+
 def generation():
     binding = checked(bound(BINDING))
     prepared = bound(ROOT/'PREPARED.json')
-    need(prepared['sha256'] == 'dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a'
-         and binding == dict(prepared=prepared, successor_root=ANCHOR, guard_qualification=QUAL),
-         'foreign 168 generation')
+    expected = dict(prepared=prepared, successor_root=ANCHOR, guard_qualification=QUAL)
     anchor, proof, reg = checked(ANCHOR), checked(QUAL), checked(prepared)
+    if RETRY3:
+        expected['failed_retry2'] = FAILURE
+        failed = checked(FAILURE)
+        need(anchor['previous_start_failure']==FAILURE and failed['permit_consumed']
+             and failed['no_admission_record'] and failed['worker_receipt_absent'] and not failed['replay_claimed'],
+             'different consumed retry2 generation')
+    else:
+        need(prepared['sha256']=='dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a',
+             'different retry2 preparation')
+    need(binding==expected,'foreign 168 generation')
     baseline, profile = reg['baseline'], reg['profile']
     need(reg['epoch'] == 168 and reg['schema'] == 'horizon-168-replay-recovery-preparation-v1'
          and reg['worker_sha256'] == WORKER_SHA and reg['node_sha256'] == NODE_SHA
@@ -38,18 +66,18 @@ def generation():
          and anchor['prior_stop']['sha256'] == STOP, 'different 168 preparation')
     root = RUN.lstat()
     need(RUN.resolve(strict=True) == RUN and (root.st_dev, root.st_ino, root.st_uid, root.st_gid, root.st_mode)
-         == (64512, 103481350, 1001, 1003, 0o40700) and anchor['root'] == str(RUN)
+         == (64512, ROOT_INODE, 1001, 1003, 0o40700) and anchor['root'] == str(RUN)
          and baseline['root'] == dict(path=str(RUN), device=root.st_dev, inode=root.st_ino),
          'different 168 run directory')
     log = (RUN/'producer.log').lstat()
     logreg = checked(bound(ROOT/'OBSERVER_LOG_PREPARED.json'))
     need(logreg['prepared'] == prepared and logreg['path'] == anchor['log']['path'] == str(RUN/'producer.log')
-         and (logreg['device'], logreg['inode']) == (log.st_dev, log.st_ino) == (64512, 103481356)
+         and (logreg['device'], logreg['inode']) == (log.st_dev, log.st_ino) == (64512, LOG_INODE)
          and (log.st_uid, log.st_gid, log.st_mode, log.st_nlink) == (0, 0, 0o100600, 1), 'different 168 observer log')
     need(baseline['profile'] == profile and profile['producer_unit'] == UNIT and profile['guard_timer'] == TIMER
          and reg['payload'] == bound(ROOT/'COLD_PAYLOAD.json') and checked(reg['payload']) == profile['payload']
          and profile['payload']['members']['jetstreamer-node'] == [NODE, NODE_SHA]
-         and proof['schema'] == 'horizon-168-cold-v2-native-guard-qualified-v1'
+         and proof['schema'] == ('horizon-168-cold-v3-native-guard-qualified-v1' if RETRY3 else 'horizon-168-cold-v2-native-guard-qualified-v1')
          and proof['guard'] == bound(GUARD/'tools/guard') and proof['guard']['sha256'] == profile['guard_binary_sha256']
          and proof['seal'] == bound(GUARD/'tools/deployment-seal-receipt.json'), 'different 168 inputs or guard')
     return prepared, baseline, proof
@@ -183,7 +211,7 @@ def census(owners, full, recovered):
 
 def register(module):
     previous_native, previous_budget = module.native, module.guard_budget
-    module.ROUTES[168] = (NAME, ROOT.name, RUN, 103481350, 288)
+    module.ROUTES[168] = (NAME, ROOT.name, RUN, ROOT_INODE, 288)
     module.FIELD = FIELD
 
     def actor(epoch):

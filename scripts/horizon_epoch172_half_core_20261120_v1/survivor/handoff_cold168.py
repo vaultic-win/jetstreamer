@@ -35,6 +35,39 @@ def need(condition, why):
         raise ValueError(why)
 
 
+RETRY3 = False
+FAILURE = dict(path=str(BASE/'epoch168-retry2-rebook-20261122-v1/RELEASED_NODE_STARTUP_FAILURE_20261123.json'),
+               sha256='a3353dfdbcf5de9320f22229134c9bdcaa70abb40aca0e85dd1ad315c4740643')
+FIRST_RETRY2_CYCLE = dict(path=str(BASE/'root004757-live166167170-20261123-v1/ROOT_COMPLETE_OPERATIONAL_FLEET.json'),
+                          sha256='39db14ce7cbc96d1ca300e1120db6e67e4b5048582f8968f9886fd4317a107cc')
+
+
+def configure_retry3():
+    global RETRY3,SESSION,OLD,TARGET,TAG,QUALIFIED,ACTIVE,PREPARED,ANCHOR,GUARD,PREVIOUS,OLD_SHA
+    RETRY3=True
+    SESSION=BASE/'epoch168-retry3-rebook-20261123-v1'
+    OLD=ROOT/'tools-cold168-retry2-v1/status_cycle.py'
+    OLD_SHA='dc0f98d1b468c2568abc63c723167e47529ec5f8f03b683421c77468184db690'
+    TARGET=ROOT/'tools-cold168-retry3-v1'
+    TAG='COLD168_RETRY3_V1_STATUS_'
+    QUALIFIED=ROOT/(TAG+'QUALIFIED.json')
+    ACTIVE=ROOT/(TAG+'ACTIVE.json')
+    q=json.loads(QUALIFIED.read_bytes())
+    PREPARED=q['prepared']
+    GUARD=q['guard']
+    need(PREPARED['path']==str(SESSION/'PREPARED.json') and
+         GUARD['path']==str(BASE/'epoch168-cold-guard-20261123-v3/GUARD_QUALIFIED.json'), 'foreign retry3 enrollment paths')
+    ANCHOR=dict(path=str(SESSION/'SUCCESSOR_ROOT.json'),sha256='a3042cdfc0bbe51408f032a1ee33e2f33d635060f77e4db260f10c18224c86d4')
+    PREVIOUS=dict(path=str(ROOT/'COLD168_RETRY2_V1_STATUS_ACTIVE.json'),sha256='c144e7d6badc06ea10f4aef853ce84dd33a2e906a045d1f094bce04b8693a8e5')
+
+
+def generation_record():
+    data=dict(prepared=PREPARED,successor_root=ANCHOR,guard_qualification=GUARD)
+    if RETRY3:
+        data['failed_retry2']=FAILURE
+    return data
+
+
 def checked_member(c, path):
     seal = c['bound'](path.parent/'deployment-seal-receipt.json')
     manifest = c['checked'](seal)
@@ -50,7 +83,7 @@ def checked_member(c, path):
 def enrollment(c):
     ref=c['bound'](QUALIFIED)
     q=c['checked'](ref)
-    need(q['schema']=='horizon-168-retry2-v1-status-qualified-v1' and q['epoch']==168 and
+    need(q['schema']==('horizon-168-retry3-v1-status-qualified-v1' if RETRY3 else 'horizon-168-retry2-v1-status-qualified-v1') and q['epoch']==168 and
          q['guard']==GUARD and q['successor_root']==ANCHOR and q['prepared']==PREPARED and
          q['generation'] is not None and re.fullmatch('[0-9a-f]{40}',q['source_commit']) and
          isinstance(q['suites'],dict) and q['suites'], 'different status qualification')
@@ -59,15 +92,33 @@ def enrollment(c):
     program=TARGET/'status_cycle.py'
     need(checked_member(c,program)==q['package'] and c['bound'](program)==q['entry'],
          'different qualified epoch 168 program or package')
-    generation=TARGET/'retry2-168-generation.json'
+    if RETRY3:
+        need(q['failed_retry2']==c['checked'](ANCHOR)['previous_start_failure']==FAILURE
+             and c['checked'](FAILURE)['no_admission_record'], 'foreign previous 168 admission')
+    generation=TARGET/('retry3-168-generation.json' if RETRY3 else 'retry2-168-generation.json')
     need(checked_member(c,generation)==q['package'] and c['bound'](generation)==q['generation'] and
-         c['checked'](q['generation'])==dict(prepared=PREPARED,successor_root=ANCHOR,guard_qualification=GUARD),
+         c['checked'](q['generation'])==generation_record(),
          'different qualified epoch 168 generation')
     return ref,q
 
 
 def finished_forecast(c):
     """Bind the original issuer and fourteen conditional intents to all twenty authenticated readbacks."""
+    if RETRY3:
+        accepted=c['checked'](PREVIOUS)
+        fleet=c['checked'](FIRST_RETRY2_CYCLE)
+        final=fleet['complete_active_status_audit']
+        audit=c['checked'](final)
+        rows=fleet['complete_active_status_receipts']
+        need(accepted['new']['program']==str(OLD) and accepted['new']['invocation_id']=='040a0247801f47968d9e33d77eab2e5e'
+             and audit['authenticated_readback'] and not audit['archives_or_sidecars_changed']
+             and audit['receipts']==rows and len(rows)==audit['authenticated_status_count']==20,
+             'incomplete first retry2 readback')
+        for epoch, item in rows.items():
+            row=c['checked'](item)
+            need(row['authenticated_readback'] and row['epoch']==int(epoch) and
+                 re.fullmatch('[0-9a-f]{64}',row['after_sha256']) and row['after_etag'], 'foreign first retry2 status')
+        return final,FIRST_RETRY2_CYCLE
     prior=c['checked'](PREVIOUS)
     prep=c['checked'](FORECAST_PREP)
     final_ref=c['bound'](FORECAST/'FINAL_READBACK.json')
@@ -146,6 +197,8 @@ def registration(c):
     qualification,q=enrollment(c)
     final,first=finished_forecast(c)
     binding=dict(prepared=PREPARED,generation=q['generation'],completed_forecast=final)
+    if RETRY3:
+        binding.update(previous_active=PREVIOUS,failed_retry2=FAILURE)
     intent_path=ROOT/(TAG+'INTENT.json')
     if intent_path.exists():
         intent=c['read_ref'](intent_path)
@@ -179,16 +232,20 @@ def switch(c,common,head):
         if path in (ACTIVE,intent_path):
             record=dict(record,**binding)
         if path==ACTIVE:
+            if RETRY3:
+                record=dict(record,schema='horizon-168-retry3-v1-status-active-v1')
             check_owner(record['new'],incumbent,TARGET/'status_cycle.py')
         if 'restored' in record:
             check_owner(record['restored'],incumbent,OLD)
         c['durable'](path,record)
-    drop=common['DROP'].with_name('zzzzzzzzzzzzzzzzz-cold168-retry2-v1.conf')
+    drop=common['DROP'].with_name('zzzzzzzzzzzzzzzzzz-cold168-retry3-v1.conf' if RETRY3 else 'zzzzzzzzzzzzzzzzz-cold168-retry2-v1.conf')
     return common['switch'](dict(c,durable=write),head,target=TARGET,incumbent=OLD,
              incumbent_iid=incumbent['invocation_id'],tag=TAG,drop=drop,admission=enrollment_proof)
 
 
 def main(args):
+    if args.retry3:
+        configure_retry3()
     need(os.geteuid()==0 and sys.flags.isolated and sys.dont_write_bytecode and __debug__,
          'run with isolated root Python and disabled bytecode')
     need(hashlib.sha256(COMMON.read_bytes()).hexdigest()==COMMON_SHA and
@@ -227,4 +284,5 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('mode',choices=('observe','activate'))
     parser.add_argument('fleet')
+    parser.add_argument('--retry3',action='store_true')
     print(json.dumps(main(parser.parse_args()),sort_keys=True))

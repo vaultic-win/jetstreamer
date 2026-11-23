@@ -1,12 +1,36 @@
 //! Admit the original retry-11 run with or without the optional, already protected 168 producer.
 use super::*;
 
+#[cfg(not(epoch166_after168_retry3))]
 pub const FIT: &str =
     "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry2-v2/post-stop-fit";
+#[cfg(not(epoch166_after168_retry3))]
 pub const FIT_SEAL: &str = "164f3562bcb6490b05d8ee0679670489a79864e7bb2cf06e5d1de1823f678268";
 pub const PREPARED: &str = "ec59431a69b7e13fbb6cd8c14b3e49e915b9f9c003a1b5ba3d70375f42ecfe8c";
+#[cfg(not(epoch166_after168_retry3))]
 const PREVIOUS_WRITER: &str = "f1b4781788205dbc065f5b116577c2e263e523f65e19cd658c31a9ae7e86fdb4";
+#[cfg(not(epoch166_after168_retry3))]
 const NEXT_WRITER: &str = "8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d";
+
+#[cfg(epoch166_after168_retry3)]
+pub const FIT: &str =
+    "incident-replay-fit-20261121-v1/tools-homefloor-cold168-retry3-v1/post-stop-fit";
+#[cfg(epoch166_after168_retry3)]
+pub const FIT_SEAL: &str = env!("RETRY3_FIT_SEAL");
+#[cfg(epoch166_after168_retry3)]
+const PREVIOUS_WRITER: &str = "8c06411819ee01049d5e799756b078e62fa0f6109a8afebf4deb34790d1dee5d";
+#[cfg(epoch166_after168_retry3)]
+const NEXT_WRITER: &str = env!("RETRY3_WRITER_SEAL");
+const PREVIOUS_PACKAGE: &str = if cfg!(epoch166_after168_retry3) {
+    "tools-cold168-retry2-v1"
+} else {
+    "tools-cold170-retry13-v2"
+};
+const NEXT_PACKAGE: &str = if cfg!(epoch166_after168_retry3) {
+    "tools-cold168-retry3-v1"
+} else {
+    "tools-cold168-retry2-v1"
+};
 
 /// The sealed fit already authenticates the service, its exclusive lock and the native peers.
 /// Compare the stable generation evidence, excluding monotonically advancing guard samples.
@@ -64,8 +88,8 @@ pub fn peers_and_writer(price: &Value) -> Result<Value> {
     let writer = &price["status_registration"];
     let seal = st(&writer["consumer_seal"], "sha256")?;
     let name = match seal {
-        PREVIOUS_WRITER if !replicas.contains_key("168") => "tools-cold170-retry13-v2",
-        NEXT_WRITER => "tools-cold168-retry2-v1",
+        PREVIOUS_WRITER if !replicas.contains_key("168") => PREVIOUS_PACKAGE,
+        NEXT_WRITER => NEXT_PACKAGE,
         _ => bail!("wrong registered writer for active peers"),
     };
     ensure!(
@@ -127,6 +151,13 @@ mod tests {
     use super::*;
 
     fn original() -> Value {
+        #[cfg(epoch166_after168_retry3)]
+        let (mut price, _) = doc(
+            &base().join("INSTALLED_V5_AFTER_168_NODE_EXIT_20261123T005319083542Z.json"),
+            Some("829680397007018b8ecbc0a200860e9ba4cddca27fc84c32d8a6bc505c329806"),
+        )
+        .unwrap();
+        #[cfg(not(epoch166_after168_retry3))]
         let (mut price, _) = doc(
             &base().join("PREFLIGHT_001757_FIRST_AND_SECOND_20261123.json"),
             Some("307a182b84abb8bbd8428afbbfe05299cee6e1643cad778439764b86a2212aef"),
@@ -169,8 +200,16 @@ mod tests {
     fn reverse_order_requires_admitted_168_and_qualified_writer() {
         let mut price = original();
         let (prepared, _) = doc(
-            &rt("epoch168-retry2-rebook-20261122-v1/PREPARED.json"),
-            Some("dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a"),
+            &rt(if cfg!(epoch166_after168_retry3) {
+                "epoch168-retry3-rebook-20261123-v1/PREPARED.json"
+            } else {
+                "epoch168-retry2-rebook-20261122-v1/PREPARED.json"
+            }),
+            if cfg!(epoch166_after168_retry3) {
+                None
+            } else {
+                Some("dd1b2296e8cd987eccf90053b999d647cd28c09a43279493fd625c719ed0388a")
+            },
         )
         .unwrap();
         let mut peer = price["replacements"]["167"].clone();
@@ -179,7 +218,11 @@ mod tests {
         price["replacements"]["168"] = peer.clone();
         assert!(peers_and_writer(&price).is_err());
         let (q, _) = doc(
-            &rt("survivor172-cadence-20261122-v1/COLD168_RETRY2_V1_STATUS_QUALIFIED.json"),
+            &rt(if cfg!(epoch166_after168_retry3) {
+                "survivor172-cadence-20261122-v1/COLD168_RETRY3_V1_STATUS_QUALIFIED.json"
+            } else {
+                "survivor172-cadence-20261122-v1/COLD168_RETRY2_V1_STATUS_QUALIFIED.json"
+            }),
             None,
         )
         .unwrap();
