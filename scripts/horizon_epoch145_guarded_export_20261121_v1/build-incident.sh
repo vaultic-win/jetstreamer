@@ -15,6 +15,11 @@ fi
 registered=false
 fixture_recovery=false
 fixture_post=false
+donor_pressure=false
+if [[ $flavor == donor-pressure-rejoin ]]; then
+  donor_pressure=true
+  flavor=guard-walk-rejoin
+fi
 guard_walk=false
 if [[ $flavor == guard-walk-rejoin ]]; then
   guard_walk=true
@@ -159,6 +164,10 @@ if $guard_walk; then
   test -s "$src/scripts/horizon_epoch145_guarded_export_20261121_v1/guard_walk.rs"
   extra+=(--cfg incident_guard_walk145_only)
   sources+=(v5n_feature_cover.py test_v5n_feature_cover.py)
+fi
+if $donor_pressure; then
+  extra+=(--cfg incident_donor_pressure145_only)
+  sources+=(v5n_stopped.py test_v5n_stopped.py)
 fi
 if $fixture_post; then extra+=(--cfg incident_fixture_post145_only); fi
 if $v5j_post; then extra+=(--cfg incident_v5j_post145_only); sources+=(post_inputs.py test_post_inputs.py); fi
@@ -350,6 +359,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $v5k_post; then build_unit=horizon-145-v5k-post-build-v1.service; fi
     if $v5m_post; then build_unit=horizon-145-v5m-post-build-v1.service; fi
     if $guard_walk; then build_unit=horizon-145-guard-walk-rejoin-build-v1.service; fi
+    if $donor_pressure; then build_unit=horizon-145-donor-pressure-rejoin-build-v1.service; fi
     if $v5n_post; then build_unit=horizon-145-v5n-post-build-v1.service; fi
     if $v5n_136_post; then build_unit=horizon-145-v5n-136-post-build-v1.service; fi
     [[ $cg == "$slice/$build_unit" ]]
@@ -363,8 +373,18 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $guard_walk; then
       feature_snapshot > "$q/feature159-after.json"
       cmp "$q/feature159-before.json" "$q/feature159-after.json"
-      [[ $native_package == tools-homefloor-145-v5m-stopped-v1 && $seal_digest == b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7 ]]
       /usr/bin/python3 -IB "$donor" build "$q/donor-before.json" "$q/before.json" > "$q/donor-combined-price.json"
+    fi
+    if $donor_pressure; then
+      [[ $native_package == tools-homefloor-145-v5n-stopped-v1 && $seal_digest == a43da5f9618b8a5af9750e4201c67447a2fe50aa830d1445e6a896ad37e88dbf ]]
+      jq -e '.phase145.InvocationID == "f86e7e61f4b34dc7aedc4e08a128e713"
+             and .phase145.failure.sha256 == "553c2d9be55bf4688dd1c8b42bc497ba2f6ea985305e42b7fb7db951f400bd36"
+             and .phase145.recovery.sha256 == "dad6a11f67b7717668c0189c607142ac89a64fc7fde8971b28b4e3c8622619ed"
+             and .phase145.candidate.inode == 103237059 and .phase145.candidate.bytes == 105610995833
+             and .phase145.retry_worker == null and .phase145.source_checkpoint_exists == false
+             and .epoch159_donor_cover.credited_retirement_bytes == 0' "$q/before.json" >/dev/null
+    elif $guard_walk; then
+      [[ $native_package == tools-homefloor-145-v5m-stopped-v1 && $seal_digest == b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7 ]]
       jq -e '.phase145.InvocationID == "dba04d40f1b046b4875d7e27e0ff224a"
              and .phase145.failure.sha256 == "8a8ef5d04d44a1bb97771cef2a7e15958d721e0defc35f1e2aee0b3f55b85010"
              and .phase145.recovery.sha256 == "06d2a4fa77bebe110f4d1c218bc91ec3066dc2e86f07575332d8725c1cf4e9b7"
@@ -469,6 +489,7 @@ ulimit -c 0
 args+=(@"$base/epoch145-aligned-prefix-integration-20261120-g1/rustc.args")
 if $missed_rejoin; then /usr/bin/python3 -IB "$s/test_missed_clock.py"; fi
 if $guard_walk; then /usr/bin/python3 -IB "$s/test_v5n_feature_cover.py"; fi
+if $donor_pressure; then /usr/bin/python3 -IB "$s/test_v5n_stopped.py"; fi
 if $homefloor_rejoin; then
   /usr/bin/python3 -IB "$s/homefloor-phase-test.py"
   # Both the real source inode and its read-only test mounts are inside this build's own image.

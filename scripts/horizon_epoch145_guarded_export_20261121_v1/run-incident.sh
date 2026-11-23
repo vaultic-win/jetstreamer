@@ -21,6 +21,7 @@ case "$(dirname "$(realpath -e -- "$0")")" in
     "$pkg/tools-v5h") image="$pkg/tools-v5h/export145" ;;
     "$pkg/tools-v5i") image="$pkg/tools-v5i/export145" ;;
     "$pkg/tools-v5k") image="$pkg/tools-v5k/export145" ;;
+    "$pkg/tools-v5o") image="$pkg/tools-v5o/export145" ;;
     "$pkg/tools-v5n") image="$pkg/tools-v5n/export145" ;;
     "$pkg/tools-v5m") image="$pkg/tools-v5m/export145" ;;
     "$pkg/tools-v5j") image="$pkg/tools-v5j/export145" ;;
@@ -29,6 +30,9 @@ esac
 read -r image_sha _ < <(sha256sum -- "$image")
 test "$image_sha" = PINNED_INCIDENT_SHA
 read -r fleet_sha _ < <(sha256sum -- "$fleet")
+if [[ $image == "$pkg/tools-v5o/export145" ]]; then
+    exec /var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v6/run-recovery "$fleet"
+fi
 if [[ $image == "$pkg/tools-v5n/export145" ]]; then
     exec /var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-handoff-v5/run-recovery "$fleet"
 fi

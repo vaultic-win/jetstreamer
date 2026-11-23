@@ -7,7 +7,9 @@ use std::{
     collections::BTreeMap,
     io::{Read, Seek, SeekFrom},
 };
-#[cfg(incident_guard_walk145_only)]
+#[cfg(incident_donor_pressure145_only)]
+const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-donor-pressure-rejoin-v1/post-stop-fit";
+#[cfg(all(incident_guard_walk145_only, not(incident_donor_pressure145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-guard-walk-rejoin-v1/post-stop-fit";
 #[cfg(all(incident_missed_clock145_only, not(incident_guard_walk145_only)))]
 const PROVIDER: &str = "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1/tools-homefloor-145-missed-rejoin-v1/post-stop-fit";
@@ -1502,6 +1504,15 @@ mod tests {
                     started["invocation_id"],
                     intent["original"]["INVOCATION_ID"]
                 );
+            } else if cfg!(incident_donor_pressure145_only) {
+                let phase = &before["phase145"];
+                assert_eq!(phase["InvocationID"], "f86e7e61f4b34dc7aedc4e08a128e713");
+                assert_eq!(phase["failure"]["sha256"], "553c2d9be55bf4688dd1c8b42bc497ba2f6ea985305e42b7fb7db951f400bd36");
+                assert_eq!(phase["recovery"]["sha256"], "dad6a11f67b7717668c0189c607142ac89a64fc7fde8971b28b4e3c8622619ed");
+                assert_eq!(phase["candidate"]["inode"], 103237059u64);
+                assert_eq!(phase["candidate"]["bytes"], 105_610_995_833u64);
+                assert_eq!(phase["source_checkpoint_exists"], false);
+                assert!(phase["retry_worker"].is_null());
             } else if cfg!(incident_guard_walk145_only) {
                 let phase = &before["phase145"];
                 assert_eq!(phase["InvocationID"], "dba04d40f1b046b4875d7e27e0ff224a");

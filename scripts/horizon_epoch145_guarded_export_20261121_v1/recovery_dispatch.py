@@ -22,7 +22,9 @@ RETRY_PACKAGE = FIT / "tools-homefloor-145-handoff-v2"
 LEASE_PACKAGE = FIT / "tools-homefloor-145-handoff-v3"
 MISSED_PACKAGE = FIT / "tools-homefloor-145-handoff-v4"
 GUARD_PACKAGE = FIT / "tools-homefloor-145-handoff-v5"
-GUARD_RETRY = Path(__file__).resolve().parent == GUARD_PACKAGE
+DONOR_PRESSURE_PACKAGE = FIT / "tools-homefloor-145-handoff-v6"
+DONOR_PRESSURE_RETRY = Path(__file__).resolve().parent == DONOR_PRESSURE_PACKAGE
+GUARD_RETRY = DONOR_PRESSURE_RETRY or Path(__file__).resolve().parent == GUARD_PACKAGE
 MISSED_RETRY = GUARD_RETRY or Path(__file__).resolve().parent == MISSED_PACKAGE
 LEASE_RETRY = MISSED_RETRY or Path(__file__).resolve().parent == LEASE_PACKAGE
 RETRY = LEASE_RETRY or Path(__file__).resolve().parent == RETRY_PACKAGE
@@ -52,6 +54,13 @@ if GUARD_RETRY:
     OLD = "dba04d40f1b046b4875d7e27e0ff224a"
     IMAGE_SHA = "GUARD_WALK_IMAGE_SHA"
     REVIEW_SHA = "GUARD_WALK_REVIEW_SHA"
+if DONOR_PRESSURE_RETRY:
+    PACKAGE = DONOR_PRESSURE_PACKAGE
+    READER = SEMANTIC / "tools-v5o/export145"
+    HANDOFF = SEMANTIC / "v5o-name-handoff"
+    OLD = "f86e7e61f4b34dc7aedc4e08a128e713"
+    IMAGE_SHA = "DONOR_PRESSURE_IMAGE_SHA"
+    REVIEW_SHA = "DONOR_PRESSURE_REVIEW_SHA"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -307,9 +316,10 @@ def retry_phase():
     """Authenticate the same exhausted generation while attached or after reset."""
     review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
     if MISSED_RETRY:
-        archive = runpy.run_path(str(PACKAGE / ("v5m_stopped.py" if GUARD_RETRY else "v5k_stopped.py")))
+        name = "v5n_stopped.py" if DONOR_PRESSURE_RETRY else "v5m_stopped.py" if GUARD_RETRY else "v5k_stopped.py"
+        archive = runpy.run_path(str(PACKAGE / name))
         _, proof = archive["historical"]()
-        if GUARD_RETRY:
+        if GUARD_RETRY and not DONOR_PRESSURE_RETRY:
             require(proof["failed_phase"]["registered_missed_clock"] == proof["receipts"]["registered"]
                     and proof["failed_phase"]["rejected_guard"] == proof["receipts"]["rejected_guard"]
                     and proof["failed_phase"]["previous_guard"] == proof["receipts"]["previous_guard"],
@@ -318,7 +328,7 @@ def retry_phase():
                 "original_fragment")) and proof["receipts"] == review["predecessor_receipts"]
                 and proof["predecessor_review"] == review["original_review"]
                 and proof["failed_phase"]["original_leased_sample"] == proof["receipts"]["worker_sample"]
-                and proof["failed_phase"]["rejected_fleet_sample"] == proof["receipts"]["cadence"]
+                and (DONOR_PRESSURE_RETRY or proof["failed_phase"]["rejected_fleet_sample"] == proof["receipts"]["cadence"])
                 and review["reader"] == {"path": str(READER), "sha256": IMAGE_SHA}
                 and IMAGE_SHA != bound(proof["predecessor_review"])["reader"]["sha256"],
                 "different missed census, failed worker or successor image")

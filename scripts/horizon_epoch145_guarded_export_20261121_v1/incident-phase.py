@@ -8,7 +8,8 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-GUARD_WALK = VERSION == "tools-v5n"
+DONOR_PRESSURE = VERSION == "tools-v5o"
+GUARD_WALK = DONOR_PRESSURE or VERSION == "tools-v5n"
 MISSED_CLOCK = GUARD_WALK or VERSION == "tools-v5m"
 LEASE_START = MISSED_CLOCK or VERSION == "tools-v5k"
 FIVE_LANE_REJOIN = LEASE_START or VERSION in ("tools-v5h", "tools-v5i", "tools-v5j")
@@ -18,6 +19,7 @@ HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5j": "tools-homefloor-145-rejoin-v4",
                       "tools-v5m": "tools-homefloor-145-missed-rejoin-v1",
                       "tools-v5n": "tools-homefloor-145-guard-walk-rejoin-v1",
+                      "tools-v5o": "tools-homefloor-145-donor-pressure-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
 TIMER_REJOIN = VERSION in ("tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN
@@ -158,6 +160,16 @@ def inspect(s, leased, m, members, epoch, provider, profile):
                and generation != prior.name, "unqualified retry of the registered guard walk")
         window.update(guard_walk_failure=failure, rejected_guard=build["rejected_guard"],
                       registered_guard_clock=build["registered_guard_clock"])
+    if DONOR_PRESSURE:
+        prior = STATE / "f86e7e61f4b34dc7aedc4e08a128e713"
+        terminal, failure = s.read(prior / "failed.json", "553c2d9be55bf4688dd1c8b42bc497ba2f6ea985305e42b7fb7db951f400bd36")
+        _, recovery = s.read(prior / "recovery-started.json", "dad6a11f67b7717668c0189c607142ac89a64fc7fde8971b28b4e3c8622619ed")
+        s.need(build["donor_pressure_failure"] == failure and build["donor_pressure_recovery"] == recovery
+               and terminal["iid"] == prior.name and generation != prior.name
+               and terminal["error"].rstrip().endswith("ValueError: insufficient HOME or general-slot memory")
+               and {path.name for path in prior.iterdir()} == {"failed.json", "recovery-started.json"},
+               "unqualified retry of the V5n donor pressure failure")
+        window.update(donor_pressure_failure=failure, donor_pressure_recovery=recovery)
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
         return {"invocation_id": generation, "stage": "controller", "window": window}

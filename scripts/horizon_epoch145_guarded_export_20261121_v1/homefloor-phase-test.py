@@ -82,6 +82,11 @@ class HomefloorPhase(TestCase):
                     meta["previous_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
                     meta["rejected_guard"] = {"sha256":"6800d34a8bb71f468d2f06daf6a29cf9016d972f4cc1ef60d915600e8085ad1f"}
                     meta["registered_guard_clock"] = {"sha256":"119fdd9c0246b71fa188007daad510adc377bc002a110dda3e1074bb06d0819d"}
+                    if g["DONOR_PRESSURE"]:
+                        prior = "f86e7e61f4b34dc7aedc4e08a128e713"
+                        (state / prior).symlink_to(g["STATE"] / prior, target_is_directory=True)
+                        meta["donor_pressure_failure"] = Status.read(state / prior / "failed.json")[1]
+                        meta["donor_pressure_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
         build = record(pkg / "build-proof.json", meta)
         seal = record(pkg / "deployment-seal-receipt.json",
                       dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
@@ -233,6 +238,30 @@ class GuardWalkPhase(HomefloorPhase):
                 return data, ref
             with self.subTest(field=key), patch.object(Status,"read",side_effect=wrong), self.assertRaises(ValueError):
                 self.inspect((10,20))
+
+
+class DonorPressurePhase(HomefloorPhase):
+    version = "tools-v5o"
+
+    def test_binds_the_v5n_failure_and_recovery(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-donor-pressure-rejoin-v1")
+        self.write()
+        window = self.inspect((10, 20))["window"]
+        self.assertEqual(window["donor_pressure_failure"]["sha256"],
+                         "553c2d9be55bf4688dd1c8b42bc497ba2f6ea985305e42b7fb7db951f400bd36")
+        self.assertEqual(window["donor_pressure_recovery"]["sha256"],
+                         "dad6a11f67b7717668c0189c607142ac89a64fc7fde8971b28b4e3c8622619ed")
+        original = Status.read
+        for key in ("donor_pressure_failure", "donor_pressure_recovery"):
+            def wrong(path, expected=None):
+                data, ref = original(path, expected)
+                if path.name == "build-proof.json":
+                    data[key] = {"sha256": "0" * 64}
+                return data, ref
+
+            with self.subTest(field=key), patch.object(Status, "read", side_effect=wrong):
+                with self.assertRaisesRegex(ValueError, "unqualified retry of the V5n donor pressure failure"):
+                    self.inspect((10, 20))
 
 
 if __name__ == "__main__":

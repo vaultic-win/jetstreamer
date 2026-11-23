@@ -19,9 +19,10 @@ def main(commit, iid, flavor="lease-rejoin"):
     if not (os.geteuid() == 0 and sys.flags.isolated and __debug__ and re.fullmatch("[0-9a-f]{40}", commit)
             and re.fullmatch("[0-9a-f]{32}", iid)):
         raise ValueError("expected exact merged COMMIT and successful BUILD_IID")
-    if flavor not in ("lease-rejoin", "missed-rejoin", "guard-walk-rejoin"):
+    if flavor not in ("lease-rejoin", "missed-rejoin", "guard-walk-rejoin", "donor-pressure-rejoin"):
         raise ValueError("unknown recovery build")
-    guard_walk = flavor == "guard-walk-rejoin"
+    donor_pressure = flavor == "donor-pressure-rejoin"
+    guard_walk = donor_pressure or flavor == "guard-walk-rejoin"
     missed = guard_walk or flavor == "missed-rejoin"
     census = FIT / ("tools-homefloor-145-guard-walk-rejoin-v1" if guard_walk else "tools-homefloor-145-missed-rejoin-v1" if missed else "tools-homefloor-145-lease-rejoin-v1")
     dispatch_dir = FIT / ("tools-homefloor-145-handoff-v5" if guard_walk else "tools-homefloor-145-handoff-v4" if missed else "tools-homefloor-145-handoff-v3")
@@ -31,6 +32,13 @@ def main(commit, iid, flavor="lease-rejoin"):
     price_sha = ("b066013b8e25ae95d43b2e0984ad7df55c47e9a68a32c685e54d1f71667151d7" if guard_walk else "ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6" if missed
                  else "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5")
     history_name = "v5m_stopped.py" if guard_walk else "v5k_stopped.py" if missed else "v5j_lease_failure.py"
+    if donor_pressure:
+        census = FIT / "tools-homefloor-145-donor-pressure-rejoin-v1"
+        dispatch_dir = FIT / "tools-homefloor-145-handoff-v6"
+        worker_dir = SEM / "tools-v5o"
+        build_price = FIT / "tools-homefloor-145-v5n-stopped-v1"
+        price_sha = "a43da5f9618b8a5af9750e4201c67447a2fe50aa830d1445e6a896ad37e88dbf"
+        history_name = "v5n_stopped.py"
     local = Path(__file__).resolve().parent
     def git(*args):
         return subprocess.check_output(["runuser","-u","sol","--","git","-C","/home/sol/workspace/jetstreamer",*args])
@@ -104,16 +112,27 @@ def main(commit, iid, flavor="lease-rejoin"):
         for name in ("missed_clock.rs", "missed_clock.py", "test_missed_clock.py"):
             need(str(FAMILY/name) in sources, "missing missed-census build source " + name)
         proof.update(schema="horizon-epoch145-missed-census-recovery-build-v1",
-                     startup_failure=original_build["startup_failure"], missed_clock_failure=historical["receipts"]["failure"],
-                     missed_clock_rejection=historical["receipts"]["cadence"], leased_sample=historical["receipts"]["worker_sample"])
+                     startup_failure=original_build["startup_failure"],
+                     missed_clock_failure=original_build["missed_clock_failure"] if donor_pressure else historical["receipts"]["failure"],
+                     missed_clock_rejection=original_build["missed_clock_rejection"] if donor_pressure else historical["receipts"]["cadence"],
+                     leased_sample=historical["receipts"]["worker_sample"])
     if guard_walk:
         need(str(FAMILY/"guard_walk.rs") in sources and "guard_walk::tests::" in tests, "missing registered-hold tests")
         proof.update(schema="horizon-epoch145-registered-guard-walk-build-v1",
                      missed_clock_failure=original_build["missed_clock_failure"],
                      missed_clock_rejection=original_build["missed_clock_rejection"],
-                     previous_missed_recovery=original_build["previous_recovery"],
-                     guard_walk_failure=historical["receipts"]["failure"], rejected_guard=historical["receipts"]["rejected_guard"],
-                     registered_guard_clock=historical["receipts"]["registered"])
+                     previous_missed_recovery=original_build["previous_missed_recovery" if donor_pressure else "previous_recovery"],
+                     guard_walk_failure=original_build["guard_walk_failure"] if donor_pressure else historical["receipts"]["failure"],
+                     rejected_guard=original_build["rejected_guard"] if donor_pressure else historical["receipts"]["rejected_guard"],
+                     registered_guard_clock=original_build["registered_guard_clock"] if donor_pressure else historical["receipts"]["registered"])
+    if donor_pressure:
+        need(all(str(FAMILY / name) in sources for name in ("v5n_stopped.py", "test_v5n_stopped.py"))
+             and "capacity_pressure_requires_the_exact_sealed_provider_and_donor_frames ... ok" in tests,
+             "missing V5n failure or pressure fixtures")
+        proof.update(schema="horizon-epoch145-donor-pressure-recovery-build-v1",
+                     previous_recovery=original_build["previous_recovery"],
+                     donor_pressure_failure=historical["receipts"]["failure"],
+                     donor_pressure_recovery=historical["receipts"]["recovery"])
     need(proof["memory_peak"] <= 805306368 and proof["physical_scratch"] <= 73400320, "build exceeded its envelope")
     script = (source/"run-incident.sh").read_bytes()
     need(script.count(b"PINNED_INCIDENT_SHA") == 1, "unbound launcher")
@@ -152,7 +171,7 @@ def main(commit, iid, flavor="lease-rejoin"):
     staged = record(q/"lease-dispatch-review.json",review)
     digest = ref(staged)["sha256"]
     dispatcher = git("show",commit+":"+str(FAMILY/"recovery_dispatch.py"))
-    prefix = b"GUARD_WALK_" if guard_walk else b"MISSED_CLOCK_" if missed else b"LEASE_START_"
+    prefix = b"DONOR_PRESSURE_" if donor_pressure else b"GUARD_WALK_" if guard_walk else b"MISSED_CLOCK_" if missed else b"LEASE_START_"
     for needle,replacement in [(prefix+b"IMAGE_SHA",image),(prefix+b"REVIEW_SHA",digest)]:
         need(dispatcher.count(needle) == 1, "different dispatcher template")
         dispatcher = dispatcher.replace(needle,replacement.encode())
@@ -168,7 +187,8 @@ def main(commit, iid, flavor="lease-rejoin"):
          and new["original_command"](review,price["fleet"])[-5:] == [str(worker_dir/"export145"),"recover-full-output",
                   price["fleet"]["path"],price["fleet"]["sha256"],image], "different deployed repair")
     if guard_walk:
-        record(SEM/"V5N_RUNTIME_BINDINGS.json",dict(schema="horizon-145-qualified-v5n-runtime-v1", source_commit=commit,
+        generation = "v5o" if donor_pressure else "v5n"
+        record(SEM/f"{generation.upper()}_RUNTIME_BINDINGS.json",dict(schema=f"horizon-145-qualified-{generation}-runtime-v1", source_commit=commit,
                 build=ref(worker_dir/"build-proof.json"), build_iid=iid, prior_dispatch=historical["predecessor_dispatch"],
                 prior_stopped=ref(build_price/"deployment-seal-receipt.json"), worker=worker, reader=review["reader"],
                 provider=runtime, dispatcher=dispatch, review=ref(dispatch_dir/"admission-review.json")))
