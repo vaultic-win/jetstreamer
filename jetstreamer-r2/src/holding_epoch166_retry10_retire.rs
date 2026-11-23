@@ -44,7 +44,8 @@ const PARK_PLAN: &str = concat!(directory_root!(), "/package/plan.json");
 const PARK_PLAN_SHA: &str = "cee159c094d1d77778a24d7b563a6a6bdd295786652ff73745258bb086f33b04";
 const MAPPING: &str = "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json";
 const MAPPING_SHA: &str = "61f7601f78a7aa1f71394a020cbbb28aa9dbd85de858f139def1c989f2b2a89e";
-const PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
+pub(super) const PARK_UNIT: &str = "horizon-closed166-retry10-park-20261122-v1.service";
+const PARK: &str = PARK_UNIT;
 const PRODUCER: &str = "horizon-qualify-166-independent-recovery-20261121-v1.service";
 const GUARD: &str = "horizon-guard-166-independent-recovery-20261121-v1";
 const MUTATION_LOCK: &str = "/home/sol/.jetstreamer-private/r2-receipts/local-mutation.lock";
@@ -120,6 +121,84 @@ const ACTUAL_BOOKING_SHA: &str = "e9fd206ceb587186f439c8afa4b6e6d2eb4f3b64a024a0
 const ACTUAL_START_SHA: &str = "8439ad40268f89f9bcc94b511d21c6c7daf39139f284477bdd1a67099271dff9";
 const FIT_SHA: &str = "a1dd96d765c64876b211c1f8d729c39b9d1bc4c83fbf7e8c70bc0c54d550ec7e";
 const PARK_IID: &str = "57146d4b5c9940449cd129433a5acd2b";
+
+const PARK_FRAGMENT: &str =
+    "/run/systemd/transient/horizon-closed166-retry10-park-20261122-v1.service";
+const PARK_FRAGMENT_SHA: &str = "f47a3dbcf0611d6c94aed90eabedcf5db9a8a3b36a0d6645b812b8e1676a3195";
+
+fn reloaded_park_fields(
+    terminal: &Value,
+    row: &Value,
+    executable: &Path,
+    argv: &str,
+) -> Result<()> {
+    let prefix = format!(
+        "{{ path={} ; argv[]={argv} ; ignore_errors=no ; ",
+        executable.display()
+    );
+    let recorded = format!(
+        "{prefix}start_time=[Sun 2026-11-22 21:03:50 UTC] ; stop_time=[Mon 2026-11-23 02:07:52 UTC] ; pid=685781 ; code=exited ; status=0 }}"
+    );
+    let reset =
+        format!("{prefix}start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}");
+    // PID1 can clear accounting in the formatted ExecStart tuple on reload.
+    // Its independent main-process properties and the original receipt bind this exit.
+    for native in [terminal, row] {
+        park_shape(native, PARK_IID)?;
+        ensure!(
+            native["ExecMainPID"] == "685781"
+                && native["ExecMainStartTimestamp"] == "Sun 2026-11-22 21:03:50 UTC"
+                && native["FragmentPath"] == PARK_FRAGMENT
+                && native["DropInPaths"] == ""
+                && native["NRestarts"] == "0",
+            "retry10 original park owner or fragment changed"
+        );
+    }
+    ensure!(
+        terminal["ExecStart"] == recorded
+            && row["ExecStart"] == reset
+            && row["Names"] == PARK
+            && row["LoadState"] == "loaded"
+            && row["ActiveState"] == "active"
+            && row["SubState"] == "exited"
+            && row["Transient"] == "yes"
+            && row["NeedDaemonReload"] == "no"
+            && row["ExecMainCode"] == "1"
+            && row["ExecMainExitTimestamp"] == "Mon 2026-11-23 02:07:52 UTC"
+            && row["ExecMainStartTimestampMonotonic"] == "3728092056066"
+            && row["ExecMainExitTimestampMonotonic"] == "3746333458318",
+        "retry10 original park dispatch or retained main-process accounting changed"
+    );
+    Ok(())
+}
+
+pub(super) fn validate_reloaded_park(
+    terminal: &Value,
+    row: &Value,
+    helper: &Bound,
+    argv: &str,
+) -> Result<()> {
+    reloaded_park_fields(terminal, row, &helper.path, argv)?;
+    let fragment = Path::new(PARK_FRAGMENT);
+    let md = fs::symlink_metadata(fragment)?;
+    ensure!(
+        fragment.canonicalize()? == fragment
+            && md.is_file()
+            && md.uid() == 0
+            && md.nlink() == 1
+            && md.mode() & 0o022 == 0,
+        "retry10 original park fragment custody changed"
+    );
+    ensure!(
+        hex_lower(&Sha256::digest(read_stable_bounded(
+            fragment,
+            1 << 20,
+            "retry10 park fragment"
+        )?)) == PARK_FRAGMENT_SHA,
+        "retry10 original park fragment content changed"
+    );
+    Ok(())
+}
 
 fn validate_paid_rows(
     proof: &Value,
@@ -292,6 +371,70 @@ include!("holding_epoch166_partial_retire.rs");
 #[cfg(test)]
 mod independent_tests {
     use super::*;
+    #[test]
+    #[ignore = "original PID1 and sealed retry10 terminal receipt on dev-samjohnson"]
+    fn genuine_park_dispatch_after_reload() {
+        let plan: Retire = serde_json::from_value(
+            bound(&binding(
+                concat!(
+                    directory_root!(),
+                    "/retirement-evidence/prepare-check-1795407808586524117/plan.json"
+                ),
+                "cfa97e8ca48b04f991f456b37306efd8fe1360d67cd3efc8a667100a89246038",
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let current = park(&plan).unwrap();
+        let proof = bound(&plan.park_terminal).unwrap();
+        let original = &proof["native"];
+        let helper: Bound = serde_json::from_value(proof["helper"].clone()).unwrap();
+        let argv = format!(
+            "{} holding-park {PARK_PLAN} --spec-sha256 {PARK_PLAN_SHA} --self-sha256 {}",
+            helper.path.display(),
+            helper.sha256
+        );
+        validate_reloaded_park(original, &current, &helper, &argv).unwrap();
+        for field in [
+            "Id",
+            "Names",
+            "ActiveState",
+            "SubState",
+            "InvocationID",
+            "ExecStart",
+            "ExecMainPID",
+            "MainPID",
+            "ControlPID",
+            "ExecMainStatus",
+            "ExecMainCode",
+            "ExecMainStartTimestamp",
+            "ExecMainExitTimestamp",
+            "ExecMainStartTimestampMonotonic",
+            "ExecMainExitTimestampMonotonic",
+            "FragmentPath",
+            "DropInPaths",
+            "Transient",
+            "NeedDaemonReload",
+            "Result",
+            "NRestarts",
+            "Job",
+            "Restart",
+            "TriggeredBy",
+        ] {
+            let mut bad = current.clone();
+            bad[field] = json!("changed");
+            assert!(
+                reloaded_park_fields(original, &bad, &helper.path, &argv).is_err(),
+                "{field}"
+            );
+        }
+        let mut bad = original.clone();
+        bad["ExecStart"] = current["ExecStart"].clone();
+        assert!(reloaded_park_fields(&bad, &current, &helper.path, &argv).is_err());
+        assert!(
+            reloaded_park_fields(original, &current, &helper.path, &(argv + " extra")).is_err()
+        );
+    }
     #[test]
     #[ignore = "requires the original primary admission and manager receipt"]
     fn genuine_prepaid_park_rejects_crossed_fit_start_and_command() {

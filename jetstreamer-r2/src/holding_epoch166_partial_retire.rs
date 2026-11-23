@@ -213,8 +213,13 @@ fn source_identity(path: &Path) -> Result<FileIdentity> {
     Ok(id)
 }
 fn native(unit: &str) -> Result<Value> {
-    let out = std::process::Command::new("/usr/bin/systemctl").args(["show",unit,
-        "-pId,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestamp,NRestarts,Job,Result,ExecMainStatus,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths"]).output()?;
+    let properties = "Id,LoadState,ActiveState,SubState,InvocationID,MainPID,ControlPID,ExecMainPID,ExecMainStartTimestamp,NRestarts,Job,Result,ExecMainStatus,Restart,TriggeredBy,ExecStart,FragmentPath,DropInPaths";
+    let mut command = std::process::Command::new("/usr/bin/systemctl");
+    command.args(["show", unit, "-p", properties]);
+    if unit == super::epoch166_retry10_retire::PARK_UNIT {
+        command.args(["-p", "Names,Transient,NeedDaemonReload,ControlGroup,ExecMainCode,ExecMainExitTimestamp,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic"]);
+    }
+    let out = command.output()?;
     ensure!(
         out.status.success() && out.stderr.is_empty() && out.stdout.len() <= 256 << 10,
         "epoch 166 native owner query failed"
@@ -301,10 +306,18 @@ fn park(p: &Retire) -> Result<Value> {
     );
     let row = native(PARK)?;
     park_shape(&row, iid)?;
-    ensure!(
-        row["ExecStart"] == proof["native"]["ExecStart"],
-        "park native command changed"
-    );
+    if row["ExecStart"] != proof["native"]["ExecStart"] {
+        ensure!(
+            PARK == super::epoch166_retry10_retire::PARK_UNIT,
+            "park native command changed"
+        );
+        super::epoch166_retry10_retire::validate_reloaded_park(
+            &proof["native"],
+            &row,
+            &helper,
+            &argv,
+        )?;
+    }
     Ok(row)
 }
 fn scope(p: &Retire) -> Result<Value> {
@@ -568,6 +581,11 @@ pub(super) async fn run(
         "epoch 166 requires its sealed runtime and separate versioned evidence bundles"
     );
     scope(p)?;
+    if PARK == super::epoch166_retry10_retire::PARK_UNIT {
+        // Check the recorded native dispatch before spending a full archive hash.
+        // The normal closure still repeats this check before and after its census.
+        park(p)?;
+    }
     let held = locks()?;
     let supplied: Mapping = serde_json::from_value(bound(&p.mapping)?)?;
     mapping(&supplied)?;
