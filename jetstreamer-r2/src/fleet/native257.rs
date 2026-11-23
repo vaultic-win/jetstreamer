@@ -93,6 +93,75 @@ pub(super) fn recovered_origin(origin: &Value) -> bool {
     origin["schema"] == SCHEMA && origin["startup_handoff"]["sha256"] == RESTORED_HANDOFF
 }
 
+/// Recover the routine sample omitted from the fleet while the 257 bootstrap finished.
+pub(super) fn seven_delivery_predecessor(
+    fleet: &BoundFile,
+    previous: &Value,
+    observer: &BoundFile,
+    observation: &Value,
+) -> Result<bool> {
+    const BASE: &str = "/home/ubuntu/.codex/diagnostics";
+    let bound = |name: &str, digest: &str| BoundFile {
+        path: Path::new(BASE).join(name),
+        sha256: digest.to_owned(),
+    };
+    let original = bound("horizon-fleet-takeover-v220-20261120-v1/fleet-v1.json",
+        "4b26ee24aac6c5dc08971334b344772e04ea0d1e19ef0963252174790812ccfc");
+    if fleet != &original {
+        return Ok(false);
+    }
+    let samples = [
+        ("horizon-resume-observer-20261120-v220.json", "be12d4824772a344f9a718b42b275b53533d23b49bf238cafa0634ca34efba86"),
+        ("horizon-resume-observer-20261120-v221.json", "767b0fac49dba4ac44f3a2763fb97bb57814b8a59c389aba52a67b016f41e850"),
+        ("horizon-resume-observer-20261120-v222.json", "403852efe76a70ec51ceb7fe9c2c6aa1a0e73690e02440bea3cd9eca84dc8368"),
+    ].map(|(path, digest)| bound(path, digest));
+    if observer != &samples[2] {
+        return Ok(false);
+    }
+    let [first, middle, last] = [&samples[0], &samples[1], &samples[2]];
+    let a = bound_json(first)?;
+    let b = bound_json(middle)?;
+    ensure!(previous["observer_receipt"].as_str() == first.path.to_str()
+        && previous["observer_sha256"] == first.sha256
+        && previous["sampled_at_utc"] == a["recorded_at_utc"]
+        && *observation == bound_json(last)?, "different seven-delivery history");
+    for (reference, earlier, later) in [(first, &a, &b), (middle, &b, observation)] {
+        let cadence = &later["cadence"];
+        ensure!(later["schema"] == "jetstreamer-horizon-live-resource-sample-v2"
+            && cadence["previous_sample"].as_str() == reference.path.to_str()
+            && cadence["previous_sample_sha256"] == reference.sha256
+            && cadence["previous_sample_recorded_at_utc"] == earlier["recorded_at_utc"]
+            && cadence["routine_minimum_interval_enforced"] == true
+            && num(cadence, "observed_interval_seconds")? >= 1800,
+            "broken seven-delivery observation chain");
+    }
+    Ok(true)
+}
+
+#[cfg(test)]
+#[test]
+#[ignore = "reads the recorded Foundation fleet and three routine observations"]
+fn seven_delivery_chain_requires_the_recorded_fleet_and_sample() -> Result<()> {
+    let base = Path::new("/home/ubuntu/.codex/diagnostics");
+    let fleet = BoundFile {
+        path: base.join("horizon-fleet-takeover-v220-20261120-v1/fleet-v1.json"),
+        sha256: "4b26ee24aac6c5dc08971334b344772e04ea0d1e19ef0963252174790812ccfc".into(),
+    };
+    let sample = BoundFile {
+        path: base.join("horizon-resume-observer-20261120-v222.json"),
+        sha256: "403852efe76a70ec51ceb7fe9c2c6aa1a0e73690e02440bea3cd9eca84dc8368".into(),
+    };
+    let previous = bound_json(&fleet)?;
+    let mut observation = bound_json(&sample)?;
+    assert!(seven_delivery_predecessor(&fleet, &previous, &sample, &observation)?);
+    observation["cadence"]["previous_sample_sha256"] = Value::Null;
+    assert!(seven_delivery_predecessor(&fleet, &previous, &sample, &observation).is_err());
+    let mut wrong = sample.clone();
+    wrong.sha256 = "0".repeat(64);
+    assert!(!seven_delivery_predecessor(&fleet, &previous, &wrong, &observation)?);
+    Ok(())
+}
+
 pub(super) fn terminal_helper(
     origin: &Value,
     admission: &Value,

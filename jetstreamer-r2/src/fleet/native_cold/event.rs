@@ -313,10 +313,19 @@ pub(in crate::fleet) fn census_check(
     let direct = UNIT==native266::UNIT && self::owner(&prior(previous)?)?.is_none() && origin["schema"] == native266_recovery::SCHEMA
         && event.as_ref().is_some_and(|e|e["schema"]==terminal::SCHEMA && e["running_origin"]==private157::binding(&owner.evidence[0]));
     if !initial && !direct {
-        ensure!(
-            self::owner(&prior(previous)?)? == Some(owner),
-            "native bootstrap previous fleet changed ownership"
-        );
+        let prior_plan = prior(previous)?;
+        let earlier = self::owner(&prior_plan)?;
+        if earlier != Some(owner) {
+            ensure!(UNIT == native257::UNIT && !active && p.metadata_event.is_none()
+                && p.admission_transition_guard.is_none() && native257::recovered_origin(&origin)
+                && origin["fleet"] == private157::binding(predecessor)
+                && origin["observer"]["sha256"] == previous["observer_sha256"]
+                && p.gates[&EPOCH].state == "blocked-qualification",
+                "native bootstrap previous fleet changed ownership");
+            native257::verify_replacement(
+                earlier.context("missing predecessor for closed 257 replacement")?,
+                owner, &origin, &prior_plan)?;
+        }
     }
     let same = previous["observer_receipt"].as_str() == p.observer.path.to_str()
         && previous["observer_sha256"] == p.observer.sha256;
@@ -324,7 +333,10 @@ pub(in crate::fleet) fn census_check(
         let continuous = observation["cadence"]["previous_sample"] == previous["observer_receipt"]
             && observation["cadence"]["previous_sample_sha256"] == previous["observer_sha256"]
             && observation["cadence"]["previous_sample_recorded_at_utc"] == previous["sampled_at_utc"];
-        if !continuous {
+        let recovered = !continuous && !active && p.metadata_event.is_none()
+            && p.admission_transition_guard.is_none()
+            && native257::seven_delivery_predecessor(predecessor, previous, &p.observer, observation)?;
+        if !continuous && !recovered {
             ensure!(UNIT == native266::UNIT && p.metadata_event.is_none() && p.admission_transition_guard.is_none(),
                 "native bootstrap observation chain interrupted");
             horizon_singleton211_launch::native266::validate_observer_predecessor(
