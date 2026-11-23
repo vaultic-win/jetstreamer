@@ -11,6 +11,7 @@ from pathlib import Path
 
 BASE = Path('/home/sol/.jetstreamer-private')
 RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
+REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
 LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
 STAGE30_ORIGINAL = BASE / 'fifth168-fit-20261122-v1/unbooked-home-audit/proposed.json'
@@ -21,6 +22,10 @@ CARGO_HOST = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
 
 
 def selection(package):
+    if package == REMAINDER_41:
+        return ('stage41', BASE / 'late-qa-stage-duplicates-20261123-v1/MANIFEST_41.json',
+                '1616ba4291dbaf367828e2891b971e9b52af4f1ede43ca8ba05580cd03d4a76c',
+                (41, 40, 14806351872, 14807426016, 29614852032))
     if package == CURRENT_22:
         return ('stage22', BASE / 'late-qa-stage-duplicates-20261123-v1/MANIFEST_22.json',
                 '9b3814542c0603bcc492d0c8b18f8288c2497dcf2936ab0718aaad3f6c846407',
@@ -33,7 +38,9 @@ def selection(package):
 
 
 # Direct source/test imports retain the legacy defaults; main still verifies its exact executable path.
-PACK = CURRENT_22 if Path(__file__).absolute().parent == CURRENT_22 else LEGACY_30
+PACK = Path(__file__).absolute().parent
+if PACK not in (CURRENT_22, REMAINDER_41):
+    PACK = LEGACY_30
 PROFILE, MANIFEST, SCOPE, _ = selection(PACK)
 STATE = BASE / 'horizon-root-runtime-data' / PACK.parent.name / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
@@ -52,6 +59,29 @@ def check_runtime(action):
     require(os.stat('/proc/self/ns/net').st_ino != os.stat('/proc/1/ns/net').st_ino,'private network required')
     return cgroup.name
 
+def checked_remainder(manifest, bound):
+    _, prior_path, prior_sha, _ = selection(CURRENT_22)
+    original_path = prior_path.with_name('MANIFEST_63.json')
+    original_sha = '29f669b121146d55c1250d02ca1aa346b87a5aa71797c800ac582b3cdf898885'
+    completion_path = CURRENT_22.parent / 'state' / 'complete.json'
+    completion_sha = 'cfd9dbe64a6cddd02a001aa0e32ef4b4964ccd5c43e46062aa265a39ada38be7'
+    for field, path, digest in [('eligible_original_scope', original_path, original_sha),
+                                ('completed_stage22_scope', prior_path, prior_sha),
+                                ('stage22_completion', completion_path, completion_sha)]:
+        require(manifest[field] == dict(path=str(path), sha256=digest), f'changed remainder input {field}')
+    original = bound(original_path, original_sha)
+    prior = bound(prior_path, prior_sha)['proposed_files']
+    completion = bound(completion_path, completion_sha)
+    require(completion['files'] == 22 and completion['allocated_bytes_retired_once'] == 10064564224,
+            'previous stage incomplete')
+    require(len(original['proposed_files']) == 63 and len(prior) == 22
+            and all(original['proposed_files'].get(k) == v for k, v in prior.items()),
+            'previous stage differs from original 63')
+    remaining = {k:v for k,v in original['proposed_files'].items() if k not in prior}
+    require(manifest['proposed_files'] == remaining and set(manifest['excluded_source_paths'])
+            == set(original['excluded_source_paths']) | set(prior), 'not the exact 41-file remainder')
+
+
 def checked_selection(manifest, package, bound):
     profile, _, _, expected = selection(package)
     rows = manifest['proposed_files']
@@ -59,11 +89,13 @@ def checked_selection(manifest, package, bound):
     actual = (len(rows), len(excluded), manifest['physical_allocated_bytes'],
               manifest['logical_source_bytes'], manifest['final_pair_read_bound'])
     require(actual == expected and set(rows).isdisjoint(excluded), 'unrecognized exact selection')
-    if profile == 'stage22':
+    if profile in ('stage22', 'stage41'):
         require(manifest['stage30_exclusion'] == dict(path=str(STAGE30_ORIGINAL), sha256=STAGE30_ORIGINAL_SHA),
                 'original stage30 candidates changed')
         older = bound(STAGE30_ORIGINAL, STAGE30_ORIGINAL_SHA)['files']
         require(len(older) == 35 and set(older).isdisjoint(rows), 'overlap with prior staged test inventory')
+    if profile == 'stage41':
+        checked_remainder(manifest, bound)
     return rows
 
 

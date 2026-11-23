@@ -53,7 +53,7 @@ class PairedFiles:
             raise
 
     def captured_and_unlinked(self, i, row):
-        # This engine uses a single 30-member batch. A root-private captured
+        # This engine uses a single batch covering the selected manifest. A root-private captured
         # receipt precedes the first unlink and binds the first whole-pair proof.
         intent = self.state / 'intent.json'
         batch = self.engine['read'](self.state / 'captured-0.json')

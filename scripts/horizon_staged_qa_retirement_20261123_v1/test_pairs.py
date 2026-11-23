@@ -79,6 +79,57 @@ class TestFixedSelections(unittest.TestCase):
             self.check()
 
 
+class TestRemainder(unittest.TestCase):
+    def setUp(self):
+        self.host = runpy.run_path(str(base/'host.py'))
+        _, prior_path, prior_sha, _ = self.host['selection'](self.host['CURRENT_22'])
+        prior = {f'prior-{i}': [i] for i in range(22)}
+        rows = {f'remaining-{i}': [i+22] for i in range(41)}
+        original = {'proposed_files': {**prior, **rows}, 'excluded_source_paths': [f'outside-{i}' for i in range(18)]}
+        self.selection = dict(proposed_files=rows, excluded_source_paths=[*prior, *original['excluded_source_paths']],
+                              physical_allocated_bytes=14806351872, logical_source_bytes=14807426016,
+                              final_pair_read_bound=29614852032)
+        self.inputs = {}
+        def bind(key, path, digest, value):
+            self.selection[key] = {'path': str(path), 'sha256': digest}
+            self.inputs[(path, digest)] = value
+        bind('completed_stage22_scope', prior_path, prior_sha, {'proposed_files':prior})
+        bind('eligible_original_scope', prior_path.with_name('MANIFEST_63.json'),
+             '29f669b121146d55c1250d02ca1aa346b87a5aa71797c800ac582b3cdf898885', original)
+        self.completed = dict(files=22, allocated_bytes_retired_once=10064564224)
+        bind('stage22_completion', self.host['CURRENT_22'].parent/'state/complete.json',
+             'cfd9dbe64a6cddd02a001aa0e32ef4b4964ccd5c43e46062aa265a39ada38be7', self.completed)
+        bind('stage30_exclusion', self.host['STAGE30_ORIGINAL'], self.host['STAGE30_ORIGINAL_SHA'],
+             {'files': {f'earlier-{i}': i for i in range(35)}})
+
+    def check(self):
+        return self.host['checked_selection'](self.selection, self.host['REMAINDER_41'],
+                                               lambda p, d: self.inputs[(p,d)])
+
+    def test_exact_remaining_selection(self):
+        self.assertEqual(len(self.check()), 41)
+
+    def test_selected_identity_must_match_original(self):
+        self.selection['proposed_files']['remaining-0'] = [800]
+        with self.assertRaisesRegex(RuntimeError, 'exact 41-file'):
+            self.check()
+
+    def test_cannot_substitute_excluded_file(self):
+        self.selection['proposed_files']['outside-0'] = self.selection['proposed_files'].pop('remaining-0')
+        excluded = self.selection['excluded_source_paths']
+        excluded[excluded.index('outside-0')] = 'remaining-0'
+        with self.assertRaisesRegex(RuntimeError, 'exact 41-file'):
+            self.check()
+
+    def test_previous_completion_required(self):
+        self.completed['allocated_bytes_retired_once'] -= 1
+        with self.assertRaisesRegex(RuntimeError, 'previous stage incomplete'):
+            self.check()
+        self.selection['stage22_completion']['sha256'] = 'f' * 64
+        with self.assertRaisesRegex(RuntimeError, 'changed remainder input'):
+            self.check()
+
+
 class TestPair(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(dir=os.environ['HORIZON_QA_FIXTURE_HOME'])
@@ -89,20 +140,24 @@ class TestPair(unittest.TestCase):
         self.rows = {}
         self.keep = []
         for i in range(3):
-            data = hashlib.shake_256(str(i).encode()).digest(4111+i)
-            source = root/f'staged{i}'
-            keeper = root/f'keeper{i}'
-            source.write_bytes(data)
-            keeper.write_bytes(data)
-            self.keep.append(keeper)
-            self.rows[str(source)] = {'source_stat':m['identity'](source),'keeper_stat':m['identity'](keeper),
-                                      'keeper_path':str(keeper), 'whole_sha256_at_seal':hashlib.sha256(data).hexdigest()}
+            self.add_pair(i)
         self.stamps = {p:r['source_stat'] for p,r in self.rows.items()}
         self.proof = None
         self.key = 'paired exact fixture'
         self.inspection = m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=3).inspect()
         self.unselected = root/'unselected'
         self.unselected.write_bytes(b'preserve')
+
+    def add_pair(self, i):
+        root = Path(self.tmp.name)
+        data = hashlib.shake_256(str(i).encode()).digest(4111+i)
+        source = root/f'staged{i}'
+        keeper = root/f'keeper{i}'
+        source.write_bytes(data)
+        keeper.write_bytes(data)
+        self.keep.append(keeper)
+        self.rows[str(source)] = {'source_stat':m['identity'](source),'keeper_stat':m['identity'](keeper),
+                                  'keeper_path':str(keeper), 'whole_sha256_at_seal':hashlib.sha256(data).hexdigest()}
 
     def closure(self):
         return {'body_proof':self.proof}
@@ -114,7 +169,7 @@ class TestPair(unittest.TestCase):
             p = self.state/f'paired-{time.time_ns()}.json'
             m['publish'](p,{'pairs':pair.pairs})
             self.proof = {'path':str(p),'sha256':m['fingerprint'](p)}
-            op=m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=3,open_lease=pair.retained_source_lease)
+            op=m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=len(self.rows),open_lease=pair.retained_source_lease)
             return op.run(self.inspection,event=event)
 
     def assert_complete(self):
@@ -130,6 +185,18 @@ class TestPair(unittest.TestCase):
 
     def test_complete(self):
         self.assert_complete()
+
+    def test_41_pairs_share_one_proof_and_retry_idempotently(self):
+        for i in range(3,41):
+            self.add_pair(i)
+        self.stamps = {p:r['source_stat'] for p,r in self.rows.items()}
+        self.inspection = m['Retirement'](self.state,self.stamps,self.key,self.closure,batch_size=41).inspect()
+        def inspect(pair):
+            self.assertEqual(len(pair.sources), 41)
+            self.assertEqual(len(pair.keepers), 41)
+        self.run_op(opened=inspect)
+        self.assert_complete()
+        self.assertEqual(m['read'](self.state/'captured-0.json')['end'], 41)
 
     def test_all_leases_remain_held(self):
         def inspect(pair):
