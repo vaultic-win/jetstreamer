@@ -43,6 +43,10 @@ if any(CURRENT.with_name(f'{name}-170-generation.json').is_file() for name in ('
 
 # The original five-lane receipt predates all four HOME guard stops.
 SURVIVOR_CONFIGS = (('172',), ('167','172'), ('166','167','172'), ('167','170','172'), ('166','167','170','172'))
+ORIGINAL_CONFIG = {
+    'path': str(HEAD.parent/'sealed-next/observer.json'),
+    'sha256': '44fa45e339652456767ac1167c6a73c1ad39b3b151968398d1697c9541efe7bc',
+}
 
 def now():
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
@@ -69,7 +73,8 @@ def project(original, due, predecessor):
          'unexpected cadence or user observation')
     owners_by_epoch={r['range']:r for r in original['replays']}
     keys=tuple(owners_by_epoch)
-    historical=keys==('166','167','168','170','172')
+    historical=(keys==('166','167','168','170','172')
+                and original['replays']==sealed(ORIGINAL_CONFIG)['replays'])
     need(len(owners_by_epoch)==len(original['replays']) and (historical or keys in SURVIVOR_CONFIGS),
          'unrecognized prior producer population')
     need(owners_by_epoch['172']['producer_unit']==full172.UNIT,'changed survivor')

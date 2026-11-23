@@ -73,6 +73,12 @@ def main():
     target=c.sealed(parent['sole_next_observer'])
     sample=c.checked(fleet['observer']);tmp=copy.deepcopy(sample)
     projected=c.project(target,target['not_before_utc'],parent['observer'])
+    # The same five epoch numbers can belong to replacement processes.
+    # A mixed generation must never collapse to the historical 172-only view.
+    mixed=copy.deepcopy(target)
+    row=next(r for r in mixed['replays'] if r['range']=='168')
+    row['expected_producer_invocation_id']='0'*32
+    fail(lambda:c.project(mixed,target['not_before_utc'],parent['observer']))
     tmp['replays']=[r for r in tmp['replays'] if r['range']=='172']
     tmp['diagnostic_replays']=[r for r in tmp['diagnostic_replays'] if r['range']!='169']
     assert c.check_sample(parent,tmp,projected)==fleet['sampled_at_utc']
