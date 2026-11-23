@@ -51,11 +51,74 @@ fn census(row: &Value, suffix: &str) -> Result<Census> {
     Ok(result)
 }
 
+// The observer carries this maximum forward through its bound predecessor.
+// Recover the measured role RSS, including nested controller/producer groups.
+fn historical_marginal(history: &Value, century: u64) -> Result<u64> {
+    let evidence = &history["evidence"];
+    let (first, last) = evidence["range"]
+        .as_str()
+        .and_then(|range| range.split_once('-'))
+        .context("missing historical replay range")?;
+    let (first, last) = (first.parse::<u64>()?, last.parse::<u64>()?);
+    ensure!(
+        century == 200
+            && (200..=300).contains(&first)
+            && (first..=300).contains(&last)
+            && evidence["producer_unit"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty())
+            && evidence["producer_invocation_id"]
+                .as_str()
+                .is_some_and(|s| s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+            && evidence["sum_of_process_high_water_marks_used"] == false,
+        "invalid historical replay identity"
+    );
+    let mut maximum = 0;
+    for point in ["before", "after"] {
+        let p = &evidence[format!("producer_rss_{point}")];
+        let c = &evidence[format!("controller_rss_{point}")];
+        let producer = report_census(p)?;
+        let controller = report_census(c)?;
+        let shared = producer
+            .iter()
+            .filter(|(pid, _)| controller.contains_key(pid))
+            .count();
+        ensure!(
+            producer.iter().all(|(pid, (start, _))| controller
+                .get(pid)
+                .is_none_or(|(other, _)| other == start)),
+            "historical replay PID reused"
+        );
+        let p = p["aggregate_rss_bytes"].as_u64().context("producer RSS")?;
+        let c = c["aggregate_rss_bytes"]
+            .as_u64()
+            .context("controller RSS")?;
+        let bytes = if shared == 0 {
+            p.checked_add(c).context("historical replay RSS overflow")?
+        } else if shared == producer.len() && shared == controller.len() {
+            p.max(c)
+        } else if shared == producer.len() {
+            c
+        } else {
+            ensure!(shared == controller.len(), "partial historical RSS overlap");
+            p
+        };
+        maximum = maximum.max(bytes);
+    }
+    ensure!(
+        maximum > 0 && history["maximum_observed_lane_rss_bytes"] == maximum,
+        "historical replay maximum differs from its evidence"
+    );
+    Ok(maximum)
+}
+
 fn checked(o: &Value, live: usize, diagnostics: usize, century: u64) -> Result<Value> {
     ensure!(century.is_multiple_of(100), "invalid RSS century");
     let ordinary = o["replays"].as_array().context("memory lane census")?;
     ensure!(
-        live > 0 && ordinary.len() == live && live + diagnostics <= 64,
+        (live > 0 || (century == 200 && diagnostics > 0))
+            && ordinary.len() == live
+            && live + diagnostics <= 64,
         "memory lane count differs"
     );
     let private: Vec<_> = o["diagnostic_replays"]
@@ -187,7 +250,17 @@ fn checked(o: &Value, live: usize, diagnostics: usize, century: u64) -> Result<V
     let production_sum = sum
         .checked_sub(private_sum)
         .context("production RSS subtraction")?;
-    let marginal = production_sum.div_ceil(u64::try_from(live)?);
+    let (marginal, basis) = if live == 0 {
+        (
+            historical_marginal(history, century)?,
+            "observed century maximum from historical replay RSS",
+        )
+    } else {
+        (
+            production_sum.div_ceil(u64::try_from(live)?),
+            "mean current production lane RSS, rounded up; private RSS accounted separately",
+        )
+    };
     // Private experiments consume capacity explicitly, but their transient RSS
     // is not a comparable production lane size or part of host overhead.
     let production_desired = target
@@ -206,7 +279,7 @@ fn checked(o: &Value, live: usize, diagnostics: usize, century: u64) -> Result<V
         "host_usage_basis":"entire host process RSS plus kernel components; unmapped file cache excluded; shared pages may count per process",
         "aggregate_lane_rss_bytes":sum,"aggregate_production_lane_rss_bytes":production_sum,"aggregate_private_lane_rss_bytes":private_sum,
         "non_lane_resident_planning_bytes":non_lane,"kernel_resident_bytes":kernel,
-        "marginal_lane_rss_bytes":marginal,"marginal_basis":"mean current production lane RSS, rounded up; private RSS accounted separately",
+        "marginal_lane_rss_bytes":marginal,"marginal_basis":basis,
         "century_maximum_observed_lane_rss_bytes":maximum,"reservation_ceiling_bytes":reservation,
         "target_used_bytes":target,"rounding":"ceil desired lane count toward target",
         "disk_or_cpu_used_to_lower_desired_count":false,"admission_authorized":false,
@@ -361,6 +434,29 @@ mod tests {
             assert_eq!(r["executing_lanes"], 3);
             assert_eq!(r["reservation_ceiling_bytes"], 150 * 1024);
             assert_eq!(report(&o, 2, 0)["valid"], false);
+        }
+        let measured = &o["replays"][0]["producer_before"]["rss"];
+        let mut history = o["lane_rss_history"]["100"].clone();
+        history["evidence"] = json!({"range":"249-249","producer_unit":"test-replay",
+            "producer_invocation_id":"f".repeat(32),"sum_of_process_high_water_marks_used":false,
+            "producer_rss_before":measured,"producer_rss_after":measured,
+            "controller_rss_before":measured,"controller_rss_after":measured});
+        let mut idle = o.clone();
+        idle["replays"] = json!([]);
+        idle["lane_rss_history"]["200"] = history;
+        let r = report_for_century(&idle, 0, 1, 200);
+        assert_eq!(r["valid"], true, "{r}");
+        assert_eq!(r["desired_production_lanes"], 4);
+        assert_eq!(r["marginal_lane_rss_bytes"], 100 * 1024);
+        assert_eq!(report(&idle, 0, 1)["valid"], false);
+        for key in [
+            "evidence",
+            "maximum_observed_lane_rss_bytes",
+            "reservation_ceiling_bytes",
+        ] {
+            let mut bad = idle.clone();
+            bad["lane_rss_history"]["200"][key] = Value::Null;
+            assert_eq!(report_for_century(&bad, 0, 1, 200)["valid"], false);
         }
         o["diagnostic_replays"][0]["observation"]["producer_after"]["rss"]["processes"][0]["start_ticks"] =
             json!(11);

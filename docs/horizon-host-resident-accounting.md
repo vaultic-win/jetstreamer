@@ -61,6 +61,14 @@ Retained admission/launch profiles are history, not evidence of a live lane.
 Only current invocation-bound observations and the authenticated fleet census
 can contribute live owners.
 
+When the 201–300 fleet has zero comparable replays and a complete census of
+its other active owners, the target uses the largest measured replay RSS from
+the 200-century history as the marginal size. The calculator checks that
+value against the recorded producer and controller process censuses. All
+current delivery RSS stays in the host budget, and the executing replay count
+is zero. A missing owner or missing historical evidence leaves the target
+unavailable.
+
 Older samples without the host census produce an unavailable target;
 they are never retroactively populated from a later resource read. A target
 grants no launch, stop, restart, archive or R2 mutation authority. Fresh

@@ -346,6 +346,63 @@ pub(super) fn report(o: &Value, ledger: &Value) -> Value {
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "requires the Foundation host's original v215 and v216 fleet receipts"]
+    fn delivery_only_target_from_recorded_fleet() -> Result<()> {
+        use sha2::{Digest, Sha256};
+        let read = |path: &str, sha: &str| -> Result<Value> {
+            let bytes = std::fs::read(path)?;
+            ensure!(
+                format!("{:x}", Sha256::digest(&bytes)) == sha,
+                "receipt digest"
+            );
+            Ok(serde_json::from_slice(&bytes)?)
+        };
+        for (version, digest) in [
+            (
+                215,
+                "636289e37c207c03aa1961d7500d58842a120e2c2f360374edaea4c5ff0947b9",
+            ),
+            (
+                216,
+                "32a4140f1aa544df487dcca707ffd5e6813eb10747049401898f77e12d98923d",
+            ),
+        ] {
+            let path = format!(
+                "/home/ubuntu/.codex/diagnostics/horizon-fleet-takeover-v{version}-20261120-v1/fleet-v1.json"
+            );
+            let fleet = read(&path, digest)?;
+            let observer = read(
+                fleet["observer_receipt"].as_str().unwrap(),
+                fleet["observer_sha256"].as_str().unwrap(),
+            )?;
+            let result = report(&observer, &fleet);
+            if version == 216 {
+                // 265 exited between the observation and fleet construction.
+                assert_eq!(result, fleet["memory_target"]);
+                assert!(
+                    result["limiting_gate"]
+                        .as_str()
+                        .unwrap()
+                        .contains("horizon-upload-265-ordinary-v215.service")
+                );
+                continue;
+            }
+            assert_eq!(result["valid"], true, "{result}");
+            assert_eq!(result["executing_lanes"], 0);
+            assert_eq!(result["non_replay_owner_count"], 3);
+            assert!(result["non_replay_resident_bytes"].as_u64().unwrap() > 0);
+            assert_eq!(
+                result["non_lane_resident_planning_bytes"],
+                result["host_resident_planning_bytes"]
+            );
+            assert_eq!(result["marginal_lane_rss_bytes"], 149186228224u64);
+            assert_eq!(result["admission_authorized"], false);
+            println!("Recorded v{version} memory target: {result}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn two_actual_claims_survive_the_direct_bounded_reader_transition() -> Result<()> {
         let f: Value = serde_json::from_str(include_str!(
             "../../jetstreamer-horizon-observe/src/fixtures/successor247-history.json"
