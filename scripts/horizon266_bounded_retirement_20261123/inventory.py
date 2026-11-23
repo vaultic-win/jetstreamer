@@ -2,7 +2,7 @@
 import sys,os,subprocess as sp,json,hashlib,stat
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parent))
-from closed_fit import price,M,D,V,CG,ref,bound,partition
+from funding import price, M, D, V, CG, ref, bound, partition
 import funds
 prior=Path('/run/horizon249-251-rotation-v205-a1')
 def replace(src,values):
