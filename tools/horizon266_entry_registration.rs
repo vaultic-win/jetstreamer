@@ -99,8 +99,24 @@ pub const BOUNDED266: Pilot = Pilot {
     }),
     ..FULL266
 };
+pub const BOUNDED_RETRY266: Pilot = Pilot {
+    unit: "horizon-qualify-266-capped-bounded-v210.service",
+    root: "/home/ubuntu/.jetstreamer-private/qualification-266-capped-bounded-v210",
+    state: "/var/lib/jetstreamer/horizon266-capped-bounded-v210-control",
+    fixed: Some(Pins {
+        iid: "1dd482d1481448debb4e9de11f2dc1f6",
+        pid: 3483521,
+        handoff_sha: "bc83d344e4537cc1c88245ff5dc76e973770c9891c6a1b5ffadf165f2dfad76c",
+        qa_disk: "115a49820210a3d1ded3783a6697e20a0fc82adb653a60fcd30c3f8ca6767bf8",
+        qa_memory: "8274396bed81b662e7ff29b6ff34f721e60cff14a5965a56cadde306f5db343f",
+    }),
+    ..BOUNDED266
+};
+
 pub fn instruction_profile(receipt: &Path) -> &'static Pilot {
-    if receipt.starts_with(BOUNDED266.state) {
+    if receipt.starts_with(BOUNDED_RETRY266.state) {
+        &BOUNDED_RETRY266
+    } else if receipt.starts_with(BOUNDED266.state) {
         &BOUNDED266
     } else if receipt.starts_with(TURNOVER266.state) {
         &TURNOVER266
@@ -185,6 +201,10 @@ fn owned_bytes(p: &Path, immutable: bool) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 impl Pilot {
+    fn is_bounded(&self) -> bool {
+        self.unit == BOUNDED266.unit || self.unit == BOUNDED_RETRY266.unit
+    }
+
     pub fn tuple(&self, iid: &str) -> Result<Value> {
         ensure!(hex(iid, 32), "invalid pilot invocation");
         Ok(
@@ -354,7 +374,7 @@ impl Pilot {
             "pilot entry witness"
         );
         self.markers(&e)?;
-        if self.unit == BOUNDED266.unit {
+        if self.is_bounded() {
             let dir = state.join("bounded-first-entries");
             ensure!(
                 path == dir.join("first-entries.json"),
@@ -394,7 +414,7 @@ impl Pilot {
                 "wrong epoch 228 Bank child"
             );
         }
-        if self.fixed.is_none() || self.unit == BOUNDED266.unit {
+        if self.fixed.is_none() || self.is_bounded() {
             let (_, worker) = proc
                 .iter()
                 .find(|(_, v)| v["role"] == "worker")
@@ -420,7 +440,8 @@ impl Pilot {
         Ok(registration)
     }
     fn original(&self, b: &Value, pins: Pins<'_>) -> Result<Value> {
-        let bounded = self.unit == BOUNDED266.unit;
+        let bounded = self.is_bounded();
+        let retry = self.unit == BOUNDED_RETRY266.unit;
         let turnover = self.unit == TURNOVER266.unit;
         let election_schema = if turnover {
             "horizon266-closed-singleton-capacity-election-v1".to_owned()
@@ -477,7 +498,11 @@ impl Pilot {
                 && fit["fleet"] == review["fleet"]
                 && (if bounded {
                     h["held_fit"]["sha256"]
-                        == "c1f90f8f82ca19ee6679c9a30ce03c8296d8d4e450a16ab58b749bf5eb5ac47b"
+                        == if retry {
+                            "d7f0b9e5b7cf032644c6f236ded65241b1a6db458e4ab8eaee203c42c469a0a4"
+                        } else {
+                            "c1f90f8f82ca19ee6679c9a30ce03c8296d8d4e450a16ab58b749bf5eb5ac47b"
+                        }
                 } else {
                     fit["schema"] == election_schema
                 })
@@ -507,7 +532,7 @@ impl Pilot {
                 && sample["root_physical_observation"].is_object(),
             "pilot original admission, first firing or release"
         );
-        let runtime = if bounded {
+        let runtime = if bounded && !retry {
             &review["runtime_image"]
         } else {
             &review["controller_image"]
@@ -520,11 +545,46 @@ impl Pilot {
                     && fit["winner"]["root"] == 344997011456u64
                     && fit["winner"]["memory"] == 192000000000u64
                     && runtime["sha256"]
-                        == "79be3c4ba91dc629ca3efc0cfe07286873acd2667bd9c9925ba038d4cccf26e2"
+                        == if retry {
+                            "0a583cccb8901d092984a0981791daace98acf7294378e3c3dbb9d4c5b0c1c29"
+                        } else {
+                            "79be3c4ba91dc629ca3efc0cfe07286873acd2667bd9c9925ba038d4cccf26e2"
+                        }
                     && s["worker"]
                         == "/var/lib/jetstreamer/horizon266-capped-worker-package-v199-a1/jetstreamer-historical-worker-v1-8-11",
                 "different bounded allocation or deployed worker"
             );
+            if retry {
+                let reservation = read(
+                    &fit["reservation"],
+                    &Path::new(BOUNDED266.state).join("reservation.json"),
+                    true,
+                )?;
+                let assessment = state.join("successor-fit-2.json");
+                let assessed = read(
+                    &json!({"path":assessment,"sha256":"34cef8be9188fb133c626eeaa58014375487e6fbd72116f01b6b95295e1b16d8"}),
+                    &assessment,
+                    true,
+                )?;
+                let release = Path::new(
+                    "/var/lib/jetstreamer/horizon266-v207-closed-growth-v210/release.json",
+                );
+                let closed = read(
+                    &json!({"path":release,"sha256":"a4c097ded324c48c3c591c46c90f7baf6cb816405c1f6200ad0d1bcd3813600c"}),
+                    release,
+                    true,
+                )?;
+                ensure!(
+                    rpath == state.join("review-2.json")
+                        && reservation["issued"] == true
+                        && assessed["issued"] == fit["reservation"]
+                        && assessed["fleet"] == review["fleet"]
+                        && assessed["terminal"] == closed["terminal"]
+                        && closed["original"] == fit["reservation"]
+                        && closed["same_reservation_only"] == true,
+                    "bounded retry requires the closed original allocation and its reviewed assessment"
+                );
+            }
         } else if turnover {
             ensure!(
                 pins.handoff_sha
@@ -595,7 +655,9 @@ impl Pilot {
         }
         let image = text(runtime, "path")?;
         let target = pilot.join("spec.json");
-        let command = if bounded {
+        let command = if retry {
+            "epoch266-bounded-retry".to_owned()
+        } else if bounded {
             "epoch266-bounded".to_owned()
         } else if turnover {
             "epoch266-turnover".to_owned()
@@ -674,30 +736,45 @@ mod tests {
     #[test]
     #[ignore = "reads the original bounded launch and both stopped QA workers"]
     fn bounded_writer_reopens_its_runtime_and_issued_booking() {
-        let p = instruction_profile(
-            &Path::new(BOUNDED266.state).join("bounded-first-entries/first-entries.json"),
-        );
-        let pins = p.fixed.unwrap();
-        let h =
-            json!({"path":Path::new(p.state).join("pilot/handoff.json"),"sha256":pins.handoff_sha});
-        let proof = p.original(&h, pins).unwrap();
-        assert_eq!(proof["memory"], 192000000000u64);
-        assert!(
-            proof["expected_command"]
-                .as_str()
-                .unwrap()
-                .contains("epoch266-bounded wait pilot")
-        );
-        assert!(
-            p.original(
-                &h,
-                Pins {
-                    pid: pins.pid + 1,
-                    ..pins
-                }
-            )
-            .is_err()
-        );
+        for (pilot, command) in [
+            (&BOUNDED266, "epoch266-bounded"),
+            (&BOUNDED_RETRY266, "epoch266-bounded-retry"),
+        ] {
+            let p = instruction_profile(
+                &Path::new(pilot.state).join("bounded-first-entries/first-entries.json"),
+            );
+            assert_eq!(p.unit, pilot.unit);
+            let pins = p.fixed.unwrap();
+            let h = json!({"path":Path::new(p.state).join("pilot/handoff.json"),"sha256":pins.handoff_sha});
+            let proof = p.original(&h, pins).unwrap();
+            assert_eq!(proof["memory"], 192000000000u64);
+            assert!(
+                proof["expected_command"]
+                    .as_str()
+                    .unwrap()
+                    .contains(&format!("{command} wait pilot"))
+            );
+            assert!(
+                p.original(
+                    &h,
+                    Pins {
+                        pid: pins.pid + 1,
+                        ..pins
+                    }
+                )
+                .is_err()
+            );
+            assert!(
+                p.original(
+                    &h,
+                    Pins {
+                        qa_disk: pins.qa_memory,
+                        ..pins
+                    }
+                )
+                .is_err()
+            );
+        }
     }
     #[test]
     #[ignore = "original admitted 320 GiB epoch 266 worker and stopped QA owners"]

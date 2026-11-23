@@ -10,6 +10,7 @@ fn profile(c: &DiagnosticClaim) -> Option<&'static bridge::Pilot> {
         &bridge::SUCCESSOR266,
         &bridge::TURNOVER266,
         &bridge::BOUNDED266,
+        &bridge::BOUNDED_RETRY266,
     ]
     .into_iter()
     .find(|p| c.unit == p.unit)
