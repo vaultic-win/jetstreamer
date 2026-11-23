@@ -34,6 +34,8 @@ launch=c.ref(cad.D/""")
     s=replace(s,' w.update(config=dict(',''' if binding:
   assert cfg.get('delivery248_claim') in (None,binding)
   cfg['delivery248_claim']=binding
+ elif (delivery.ROOT/'terminal.json').exists():
+  cfg.pop('delivery248_claim',None)
  w.update(config=dict(''')
     return replace(s," assert result['ordinary_replay_count']", " assert result.get('delivery248_claim')==binding\n assert result['ordinary_replay_count']")
 
@@ -42,7 +44,12 @@ def status(s):
     original=" assert key in items and f'epoch-{n}.jet.sha256' not in items and (f'epoch-{n}.jet' in items)==(n==247)"
     s=replace(s,original,''' if n==248 and delivery.CLAIM.exists():
   if 'epoch-248.jet.sha256' in items:
-   raise RuntimeError('Epoch 248 readiness marker present; reconcile the authenticated ready pair and native receipt before conditional status cleanup')
+   terminal=delivery.ROOT/'terminal.json'
+   if terminal.exists() and delivery.bound(delivery.ref(terminal))['ready']:
+    write(wd/'terminal-outcome.json',dict(terminal=bind(terminal),observer=bind(obs),ready=True,status_cleanup_pending=(key in items)));continue
+   write(wd/'terminal-outcome.json',dict(observer=bind(obs),ready=False,awaiting_native_receipt=True,status_cleanup_pending=True));continue
+  if (delivery.ROOT/'terminal.json').exists():
+   write(wd/'terminal-outcome.json',dict(terminal=bind(delivery.ROOT/'terminal.json'),observer=bind(obs),ready=False,repair_required=True));continue
   assert key in items and set(items)<= {key,'epoch-248.jet'}
  else:
  '''+original)
@@ -67,6 +74,12 @@ def status(s):
 
 def fleet(s):
     s=replace(s,'import sys,importlib.util',IMPORT+'import sys,importlib.util')
+    s=replace(s," v=b.raw(marker);ip=b.checked(v['intent']);",''' incident=marker.parent/'terminal-outcome.json'
+ if n==248 and incident.exists():
+  assert b.raw(incident)['observer']==b.ref(obs)
+  b.include(p['gates']['248'],incident)
+  continue
+ v=b.raw(marker);ip=b.checked(v['intent']);''')
     s=replace(s,'q=b.raw(built);',"""added=delivery.CLAIM.exists() and delivery.census(p,o,done)
 for target in range(292,296):
  b.include(p['gates'][str(target)],d/'horizon292-bootstrap-layout-v211-a1/completion.json')

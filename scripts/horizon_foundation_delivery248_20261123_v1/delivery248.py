@@ -220,7 +220,12 @@ def finite_owner():
 
 def select_schedule(cad, version, state, replacing):
     """Keep the already-running receipt consumer and its original completion path."""
-    binding = live_binding()
+    terminal = ROOT/'terminal.json'
+    if terminal.exists():
+        assert bound(ref(terminal))['claim'] == ref(CLAIM) and not (CG/UNIT).exists()
+        binding = None
+    else:
+        binding = live_binding()
     old_names = cad.names
     normal = f'v{version}-bounded-retry266-{state}-v1'
     tagged = normal+'-with248'
@@ -245,7 +250,8 @@ def select_schedule(cad, version, state, replacing):
                     selected = bound(bound(t['plan'])['config'])
                     done = bound(ref(marker))
                     effective = bound(done['effective_config'])
-                    assert selected['delivery248_claim'] == effective['delivery248_claim'] == binding
+                    assert selected.get('delivery248_claim') == effective.get('delivery248_claim')
+                    if binding: assert selected['delivery248_claim'] == binding
                     assert done['observer_exit_code'] == 0 and done['observer_output'] == selected['output'] == str(cad.sample(v))
                     return tag
         return original(v,completed)
@@ -255,6 +261,15 @@ def select_schedule(cad, version, state, replacing):
 def census(plan, observation, completed):
     claim_ref,claim,book,launch = registered()
     selected = bound(completed['effective_config']).get('delivery248_claim')
+    terminal = ROOT/'terminal.json'
+    if terminal.exists():
+        close = bound(ref(terminal))
+        assert close['claim'] == claim_ref and not (CG/UNIT).exists()
+        gate = plan['gates']['248']
+        if ref(terminal) not in gate['evidence']: gate['evidence'].append(ref(terminal))
+        gate['next_action'] = ('Reconcile the authenticated ready pair and conditionally clean its exact status key.'
+                               if close['ready'] else 'Reconcile the recorded uploader exit and qualify a successor from the retained archive.')
+        return False
     if not selected:
         return False
     assert selected['claim_sha256'] == claim_ref['sha256'] and selected['invocation_id'] == claim['invocation_id']
