@@ -202,6 +202,42 @@ class TestDisjointExecutables(TestSmallStaging):
             self.check()
 
 
+class TestLive145Price(unittest.TestCase):
+    def setUp(self):
+        host = runpy.run_path(str(base/'host.py'))
+        self.check = host['checked_live145_price']
+        self.assertEqual(host['selection'](host['SMALL_88']), host['selection'](host['SMALL_88_LIVE145']))
+        self.fleet = {'path': '/fleet.json', 'sha256': '0' * 64}
+        self.now = 1000
+        self.frame = {
+            'schema': 'horizon-incident-replay-fit-v1', 'epoch': 145, 'fits': True,
+            'fleet': self.fleet, 'resource_credit_bytes': 0, 'recorded_unix_seconds': 990,
+            'replacements': {'166': {}, '167': {}, '168': {}, '170': {}}, 'survivors': {'172': {}},
+            'phase145': {'stage': 'leased-worker', 'invocation_id': 'f86e7e61f4b34dc7aedc4e08a128e713'},
+            'available_HOME_bytes': 2 << 30, 'complete_required_HOME_bytes': 1 << 30,
+            'available_memory_bytes': 3 << 30, 'required_available_memory_bytes': 1 << 30,
+        }
+        self.guard = {'fleet': self.fleet, 'resource_credit_bytes': 0, 'recorded_unix_seconds': 991,
+                      'free_bytes': 2 << 30, 'protected_bytes': 1 << 30,
+                      'available_memory': 3 << 30, 'required_memory': 1 << 30}
+
+    def test_requires_agreeing_fresh_five_peer_frame_and_guard(self):
+        self.check(self.frame, self.guard, self.fleet, self.now)
+        with self.assertRaisesRegex(RuntimeError, 'five-peer'):
+            self.check({**self.frame, 'replacements': {'167': {}, '168': {}, '170': {}}},
+                       self.guard, self.fleet, self.now)
+        for changed in ({'fleet': {}}, {'recorded_unix_seconds': 879}, {'resource_credit_bytes': 1}):
+            with self.subTest(changed=changed), self.assertRaisesRegex(RuntimeError, 'guard quote'):
+                self.check(self.frame, {**self.guard, **changed}, self.fleet, self.now)
+
+    def test_stricter_margin_applies_to_both_resources(self):
+        with self.assertRaisesRegex(RuntimeError, 'do not fit'):
+            self.check(self.frame, {**self.guard, 'protected_bytes': 2 << 30}, self.fleet, self.now)
+        with self.assertRaisesRegex(RuntimeError, 'do not fit'):
+            self.check({**self.frame, 'required_available_memory_bytes': 3 << 30},
+                       self.guard, self.fleet, self.now)
+
+
 class TestPair(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(dir=os.environ['HORIZON_QA_FIXTURE_HOME'])

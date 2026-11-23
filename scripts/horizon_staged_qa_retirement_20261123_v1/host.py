@@ -1,10 +1,12 @@
 """Inspect or retire one pinned set of duplicate staged QA executables."""
 import argparse
 import hashlib
+import json
 import os
 import re
 import runpy
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -13,6 +15,7 @@ BASE = Path('/home/sol/.jetstreamer-private')
 RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
 EXECUTABLES_128 = RUNTIME / 'stage128-sealed-qa-retirement-20261123-v1' / 'tools'
 SMALL_88 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v1' / 'tools'
+SMALL_88_LIVE145 = RUNTIME / 'stage88-sealed-qa-retirement-20261123-v2' / 'tools'
 REMAINDER_41 = RUNTIME / 'stage41-sealed-qa-retirement-20261123-v1' / 'tools'
 CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
 LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
@@ -21,6 +24,9 @@ STAGE30_ORIGINAL_SHA = 'fe6722856e2ee6562f77a1e5f745ff53ba2e0b09eaceb52b69f47fac
 CARGO = RUNTIME / 'epoch166-exact-cargo-retirement-20261123-v1/tools'
 CARGO_SEAL = '1dbc7045db4dde7bdf31d8ea4d098b094346368c2ce8c3bce9659ee0034ef1a8'
 CARGO_HOST = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
+LIVE145_PROVIDER = RUNTIME / 'incident-replay-fit-20261121-v1/tools-homefloor-145-guard-walk-rejoin-v1'
+LIVE145_PROVIDER_SEAL = '4718a18e4b458fd563b5dbf6c7eadc29a055a507d4ffd232003d20e7935d77c3'
+LIVE145_GUARD_LOG = RUNTIME / 'epoch145-semantic-continuity-20261121-v1/incident-full-output.stdout'
 
 
 def selection(package):
@@ -28,7 +34,7 @@ def selection(package):
         return ('stage128', BASE / 'fit-disjoint-064757-20261123-v1/MANIFEST_128.json',
                 'a971140658eb9d4bf329d9b663440002830fccc8d4c482487cb3a735f35cbfe8',
                 (128, 204, 13105426432, 13106666192, 26213332384))
-    if package == SMALL_88:
+    if package in (SMALL_88, SMALL_88_LIVE145):
         return ('stage88', BASE / 'fit-small-seal-siblings-20261123-v1/MANIFEST_88.json',
                 '2b0603cf98ce23fa152b418d01a1115846a75164e7bfbc14c4dd658bbc7f7857',
                 (88, 116, 3494883328, 3496875656, 6993751312))
@@ -49,16 +55,59 @@ def selection(package):
 
 # Direct source/test imports retain the legacy defaults; main still verifies its exact executable path.
 PACK = Path(__file__).absolute().parent
-if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88, EXECUTABLES_128):
+if PACK not in (CURRENT_22, REMAINDER_41, SMALL_88, SMALL_88_LIVE145, EXECUTABLES_128):
     PACK = LEGACY_30
 PROFILE, MANIFEST, SCOPE, _ = selection(PACK)
-STATE = BASE / 'horizon-root-runtime-data' / PACK.parent.name / 'state'
+STATE = BASE / 'horizon-root-runtime-data' / (
+    SMALL_88.parent.name if PACK == SMALL_88_LIVE145 else PACK.parent.name
+) / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
 MUTEX = BASE / 'r2-receipts/local-mutation.lock'
 
 def require(ok, why):
     if not ok:
         raise RuntimeError(str(why))
+
+
+def checked_live145_price(frame, guard, fleet, now):
+    phase = frame['phase145']
+    require(frame['schema'] == 'horizon-incident-replay-fit-v1' and frame['epoch'] == 145
+            and frame['fits'] is True and frame['fleet'] == fleet and frame['resource_credit_bytes'] == 0
+            and 0 <= now - frame['recorded_unix_seconds'] <= 120
+            and set(frame['replacements']) == {'166', '167', '168', '170'}
+            and set(frame['survivors']) == {'172'} and phase['stage'] == 'leased-worker'
+            and phase['invocation_id'] == 'f86e7e61f4b34dc7aedc4e08a128e713',
+            'unrecognized live five-peer 145 frame')
+    require(guard['fleet'] == fleet and guard['resource_credit_bytes'] == 0
+            and 0 <= now - guard['recorded_unix_seconds'] <= 120,
+            'epoch 145 guard quote does not bind the current fleet')
+    home_margin = min(frame['available_HOME_bytes'] - frame['complete_required_HOME_bytes'],
+                      guard['free_bytes'] - guard['protected_bytes'])
+    memory_margin = min(frame['available_memory_bytes'] - frame['required_available_memory_bytes'],
+                        guard['available_memory'] - guard['required_memory'])
+    require(home_margin >= (48 << 20) and memory_margin >= (768 << 20),
+            'epoch 145 and staged retirement do not fit together')
+
+
+def price(provider):
+    if PACK != SMALL_88_LIVE145:
+        return provider['price']()
+    provider['sealed'](LIVE145_PROVIDER, LIVE145_PROVIDER_SEAL)
+    head = provider['fleet']()
+    fleet = {'path': str(head), 'sha256': provider['sha'](head)}
+    child = subprocess.run([LIVE145_PROVIDER / 'post-stop-fit', '145', head, fleet['sha256']],
+                           text=True, capture_output=True, timeout=220)
+    require(child.returncode == 0, f'live five-peer price rejected: {child.stderr.strip()}')
+    frame = json.loads(child.stdout)
+    line = subprocess.check_output(['/usr/bin/tail', '-n', '1', LIVE145_GUARD_LOG], text=True)
+    stamp, separator, payload = line.partition(' epoch145 verification guard ')
+    require(stamp.isdecimal() and separator, 'missing live epoch 145 guard record')
+    guard = json.loads(payload)
+    require(head == provider['fleet']() and fleet['sha256'] == provider['sha'](head),
+            'fleet changed during live retirement pricing')
+    checked_live145_price(frame, guard, fleet, time.time())
+    return {**frame, 'staged_retirement_guard': guard}
+
 
 def check_runtime(action):
     cgroup = Path('/sys/fs/cgroup') / Path('/proc/self/cgroup').read_text().strip().split(':')[-1].lstrip('/')
@@ -184,7 +233,7 @@ def main():
         pair = pair_cls(STATE,rows,engine)
         proof = None
         def closure():
-            frame = provider['price']()
+            frame = price(provider)
             roots = set(manifest['priced_roots']) | {x['root'] for x in frame['bookings'].values()}
             require(all(not any(Path(s).is_relative_to(root) for root in roots) for s in rows),'overlap with booking')
             keepers()

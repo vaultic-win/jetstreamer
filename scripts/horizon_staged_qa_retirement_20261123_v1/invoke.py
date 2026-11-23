@@ -14,7 +14,7 @@ RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
 ALLOWED = {RUNTIME / name / 'tools' for name in
            ('stage22-sealed-qa-retirement-20261123-v1', 'stage30-sealed-qa-retirement-20261123-v1',
             'stage41-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v1',
-            'stage128-sealed-qa-retirement-20261123-v1')}
+            'stage128-sealed-qa-retirement-20261123-v1', 'stage88-sealed-qa-retirement-20261123-v2')}
 TOOLS = Path(__file__).absolute().parent
 CARGO = RUNTIME/'epoch166-exact-cargo-retirement-20261123-v1/tools'
 PROVIDER_HASH = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
@@ -62,10 +62,11 @@ def main():
     if cfg.mode=='plan':
         print('validated',len(manifest['proposed_files']),manifest['physical_allocated_bytes'],args)
         return
-    fit=host['price']()
+    fit=deployed['price'](host)
     cg=host['read'](Path(fit['fleet']['path']))['retry9_auxiliary_commitments']
     require(cg['build_and_native_qualification_serial'] and cg['holding_and_build_may_overlap']
-            and cg['build_cpu_quota_micros'] >= 500000,'missing maintenance CPU booking')
+            and cg['build_cpu_quota_micros'] >= 500000
+            and cg['build_memory_bytes'] >= (768 << 20), 'missing maintenance booking')
     for mutex in (deployed['SERIAL'],deployed['MUTEX']):
         with mutex.open('rb') as fd:
             fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
