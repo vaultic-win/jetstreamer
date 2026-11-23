@@ -1,12 +1,23 @@
 //! Read-only check of the original guard-stopped cad28704 guest. The controller
 //! separately binds its completed stop, live fleet, process census and service grant.
-#[cfg_attr(feature = "stopped-v207", path = "profile_v207.rs")]
+#[cfg_attr(feature = "stopped-v210", path = "profile_v210.rs")]
 #[cfg_attr(
-    all(feature = "stopped-v194", not(feature = "stopped-v207")),
+    all(feature = "stopped-v207", not(feature = "stopped-v210")),
+    path = "profile_v207.rs"
+)]
+#[cfg_attr(
+    all(
+        feature = "stopped-v194",
+        not(any(feature = "stopped-v207", feature = "stopped-v210"))
+    ),
     path = "profile_v194.rs"
 )]
 #[cfg_attr(
-    not(any(feature = "stopped-v194", feature = "stopped-v207")),
+    not(any(
+        feature = "stopped-v194",
+        feature = "stopped-v207",
+        feature = "stopped-v210"
+    )),
     path = "profile_v169.rs"
 )]
 mod profile;

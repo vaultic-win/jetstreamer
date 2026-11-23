@@ -15,6 +15,8 @@ elif STOPPED_PROFILE == 'v207':
     tag, minor, image_inode, mount_id, cap = '266-instructions-2789f821-v194', 12, 18340079, 416, 320 << 30
 elif STOPPED_PROFILE == 'v210':
     tag, minor, image_inode, mount_id, cap = '266-capped-bounded-v207', 15, 6025749, 611, 344997011456
+elif STOPPED_PROFILE == 'v215':
+    tag, minor, image_inode, mount_id, cap = '266-capped-bounded-v210', 18, 13850126, 804, 344997011456
 else:
     raise ValueError('unknown stopped guest')
 ROOT = Path(f'/home/ubuntu/.jetstreamer-private/qualification-{tag}')
