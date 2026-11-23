@@ -1,0 +1,36 @@
+{
+  "horizon-closed168-full-metered-consumer-census-20261123-v2.service": {
+    "argv": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-holding-20261122-v1/retirement-tools/jetstreamer-r2 holding-census168-full-metered-consumers /var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-holding-20261122-v1/package/plan.json --spec-sha256 a8c1611f228a216d68b56f249e6b8c34c346b963f4675e6d7015ae22ae8c06c6 --self-sha256 441e4002790f61baba2e5506578e8d7907d5a0caeddf4a2df2a56b305cc4f30b",
+    "exit_us": "3776418090520",
+    "fragment": "/run/systemd/transient/horizon-closed168-full-metered-consumer-census-20261123-v2.service",
+    "invocation": "d9973d3034f84fc080682c3285c6b757",
+    "pid": "1273567",
+    "requisite": [
+      "horizon-closed168-full-metered-park-terminal-20261123-v2.service"
+    ],
+    "requisite_of": [],
+    "result": "success",
+    "sha256": "1e3a9b72a327d0353562450818c97510757d68e6431119c2d2750e58c72a621b",
+    "state": "active",
+    "status": "0",
+    "substate": "exited"
+  },
+  "horizon-closed168-full-metered-park-terminal-20261123-v2.service": {
+    "argv": "/var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-holding-20261122-v1/retirement-tools/jetstreamer-r2 holding-capture168-full-metered-terminal /var/lib/jetstreamer/horizon_runtime_data/epoch168-full-metered-holding-20261122-v1/package/plan.json --spec-sha256 a8c1611f228a216d68b56f249e6b8c34c346b963f4675e6d7015ae22ae8c06c6 --self-sha256 441e4002790f61baba2e5506578e8d7907d5a0caeddf4a2df2a56b305cc4f30b",
+    "exit_us": "3775619081870",
+    "fragment": "/run/systemd/transient/horizon-closed168-full-metered-park-terminal-20261123-v2.service",
+    "invocation": "90484dca1fca4ad78a18e8bbaf45df29",
+    "pid": "1269980",
+    "requisite": [
+      "horizon-closed168-full-metered-park-20261122-v1.service"
+    ],
+    "requisite_of": [
+      "horizon-closed168-full-metered-consumer-census-20261123-v2.service"
+    ],
+    "result": "success",
+    "sha256": "3bcecc367c1812bc922b05213bf821301d583ef2ae9217fd8f18449922b99299",
+    "state": "active",
+    "status": "0",
+    "substate": "exited"
+  }
+}

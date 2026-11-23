@@ -69,6 +69,12 @@ impl Registered {
                 registry
                     .terminals
                     .retain(|owner, _| owner == METERED168_FAILED_OBSERVER);
+                // This immutable registry binds the successful PID1 start jobs and stored
+                // receipt writers of the original epoch 168 capture and census.
+                let completed: BTreeMap<String, Terminal> = serde_json::from_str(include_str!(
+                    "holding_epoch168_completed_followers.json"
+                ))?;
+                registry.terminals.extend(completed);
                 Ok(registry)
             }
             _ => Ok(Self::default()),
@@ -407,7 +413,14 @@ mod tests {
             metered.dropins.values().map(BTreeMap::len).sum::<usize>(),
             11
         );
-        assert_eq!(metered.terminals.len(), 1);
+        assert_eq!(metered.terminals.len(), 3);
+        for follower in [
+            "horizon-closed168-full-metered-park-terminal-20261123-v2.service",
+            "horizon-closed168-full-metered-consumer-census-20261123-v2.service",
+        ] {
+            assert!(metered.terminal(follower));
+            assert!(!all.terminal(follower));
+        }
         assert!(metered.terminal(METERED168_FAILED_OBSERVER));
         for owner in METERED168_DROPIN_OWNERS {
             assert_eq!(metered.dropins[owner], all.dropins[owner]);
