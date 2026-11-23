@@ -197,6 +197,56 @@ const EPOCH_223_CLOSED_WORKER: Profile = Profile {
     ..EPOCH_223_CLOSED_TAIL
 };
 
+const EPOCH_223_CLOSED_WARMUP: Profile = Profile {
+    acquisition: sealed_snapshot(
+        "/var/lib/jetstreamer/horizon-223-v1620-prefix-warmup-63ece8f4-v1",
+        230574456,
+        230574459,
+        1792773024578531571,
+        1792773024578531571,
+    ),
+    retained: sealed_snapshot(
+        "/var/lib/jetstreamer/horizon-223-known-root-prefix-b1670f57-v1",
+        230570916,
+        230570920,
+        1792711126060793646,
+        1792711126061793642,
+    ),
+    state: "/var/lib/jetstreamer/horizon-bootstrap-warmup223-retire-v239",
+    unit_prefix: "horizon-bootstrap-warmup223-retire-v239-a",
+    quarantine: ".snapshot-96335538-inode-230574459-quarantine",
+    ..EPOCH_223
+};
+
+const EPOCH_223_CLOSED_PREFLIGHT: Profile = Profile {
+    acquisition: sealed_snapshot(
+        "/var/lib/jetstreamer/horizon-223-prefix-preflight-a928381d-v1",
+        230571131,
+        230571134,
+        1792714831603580264,
+        1792714831610580237,
+    ),
+    state: "/var/lib/jetstreamer/horizon-bootstrap-preflight223-retire-v239",
+    unit_prefix: "horizon-bootstrap-preflight223-retire-v239-a",
+    quarantine: ".snapshot-96335538-inode-230571134-quarantine",
+    ..EPOCH_223_CLOSED_WARMUP
+};
+
+const EPOCH_224_CLOSED_SPAN: Profile = Profile {
+    epoch: 224,
+    acquisition: sealed_snapshot(
+        "/var/lib/jetstreamer/horizon-focused-224-complete-span-v1-6-25-01879c4-v1",
+        9069136,
+        9069144,
+        1792420459661248828,
+        1792420459662248825,
+    ),
+    state: "/var/lib/jetstreamer/horizon-bootstrap-span224-retire-v239",
+    unit_prefix: "horizon-bootstrap-span224-retire-v239-a",
+    quarantine: ".snapshot-96767522-inode-9069144-quarantine",
+    ..EPOCH_223_CLOSED_TAIL
+};
+
 impl Profile {
     fn intent(&self) -> String {
         format!(
@@ -427,6 +477,9 @@ fn main() -> io::Result<()> {
         [mode] if mode == "--retire-cached-231" => &EPOCH_231_CACHE,
         [mode] if mode == "--retire-superseded-223-tail" => &EPOCH_223_CLOSED_TAIL,
         [mode] if mode == "--retire-superseded-223-worker" => &EPOCH_223_CLOSED_WORKER,
+        [mode] if mode == "--retire-superseded-223-warmup" => &EPOCH_223_CLOSED_WARMUP,
+        [mode] if mode == "--retire-superseded-223-preflight" => &EPOCH_223_CLOSED_PREFLIGHT,
+        [mode] if mode == "--retire-superseded-224-span" => &EPOCH_224_CLOSED_SPAN,
         _ => {
             return Err(io::Error::other(
                 "expected an enrolled bootstrap retirement mode",
@@ -460,6 +513,9 @@ mod tests {
             EPOCH_231_CACHE,
             EPOCH_223_CLOSED_TAIL,
             EPOCH_223_CLOSED_WORKER,
+            EPOCH_223_CLOSED_WARMUP,
+            EPOCH_223_CLOSED_PREFLIGHT,
+            EPOCH_224_CLOSED_SPAN,
         ];
         for (i, profile) in profiles.iter().enumerate() {
             assert_ne!(profile.acquisition.directory, profile.retained.directory);
