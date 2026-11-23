@@ -23,7 +23,7 @@ const BOUND: &str = "/var/lib/jetstreamer/horizon257-full-guard-v1";
 const TOKENS: &str = "/var/lib/jetstreamer/horizon257-full-tokens-v1";
 const RECEIPTS: &str = "/var/lib/jetstreamer/horizon257-full-guard-receipts-v1";
 const GUARD: &str =
-    "/var/lib/jetstreamer/horizon251-published-guard-20257118-v1/horizon251-standalone-guard";
+    "/var/lib/jetstreamer/horizon251-published-guard-20261118-v1/horizon251-standalone-guard";
 const GUARD_SHA: &str = "938889f9dcca0b4bf271cf8c2cbad985edc3d841f944d132f1e96c8fad81386d";
 const CAP: u64 = 516130089652;
 const PERMIT: &str = "/var/lib/jetstreamer/horizon257-full-admission-after248-v1/admission.json";
@@ -489,7 +489,7 @@ fn stable_static(a: &Value) -> Result<Value> {
     ensure!(
         hash(Path::new(PROFILE))? == PROFILE_SHA
             && a["profile_sha256"] == PROFILE_SHA
-            && hash(Path::new(GUARD))? == GUARD_SHA,
+            && hash(Path::new(GUARD)).context("read installed epoch 257 guard")? == GUARD_SHA,
         "changed image or profile"
     );
     let prof = read_json(Path::new(PROFILE))?;
