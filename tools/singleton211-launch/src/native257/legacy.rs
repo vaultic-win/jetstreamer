@@ -13,7 +13,7 @@ const PREPARED_V10_SHA: &str = "3ced6828183000dd03b92c263705ae80af059e7d03a93003
 const LAUNCHER_V10: &str =
     "/var/lib/jetstreamer/horizon257-native-launch-20261120-v10/horizon-native257-launch";
 const LAUNCHER_V10_SHA: &str = "32311e67aab80ef8bf003f47a3f333833f057c7fb9b4c098bece15a06c1c0672";
-const REGISTERED: [(&str, &str, &str, &str, &str); 3] = [
+const REGISTERED: [(&str, &str, &str, &str, &str); 4] = [
     (
         PREPARED_V1,
         PREPARED_V1_SHA,
@@ -34,6 +34,13 @@ const REGISTERED: [(&str, &str, &str, &str, &str); 3] = [
         "/var/lib/jetstreamer/horizon257-native-launch-20261121-v14/horizon-native257-launch",
         "33f192bec415e3fc02ebdeb8578225251fd334a025fc39381ea4fa89f18b8172",
         "2c0d1a5f12b65e281adfdb6f84bd91ce1d807980",
+    ),
+    (
+        "/var/lib/jetstreamer/horizon-native257-prepared-guard-reap-closed266-v220/prepared.json",
+        "faffd3762e74b2de405ca258d6e74a04711845d5a81ec130ec3735799a8bfdb5",
+        "/var/lib/jetstreamer/horizon257-native-launch-closed266-v18/horizon-native257-launch",
+        "0ae705e627fbece19e180d70a45c71799098e1c0f4c4faa0e219fe665bdf3715",
+        "10fa020a5de302a36745fc196819759bfd141bd7",
     ),
 ];
 pub(super) fn prepared_transition(
