@@ -272,7 +272,7 @@ print(json.dumps(runpy.run_path(sys.argv[1])["snapshot"](runpy.run_path(sys.argv
     if $missed_rejoin || $v5m_post; then
       donor="$src/scripts/horizon_epoch145_guarded_export_20261121_v1/build_159_price.py"
       if $v5m_post; then
-        [[ $(sha256sum "$donor" | cut -d' ' -f1) == 0f25f955fc5978ee29057a5e687955326f4b6a2f1a7c788482ae8454a42746fb ]]
+        [[ $(sha256sum "$donor" | cut -d' ' -f1) == 2e69123264b8709259aa9c8aec1f2a0c4f5cce10dece303f751f628bc1f2fe24 ]]
       fi
       /usr/bin/python3 -IB "$donor" snapshot > "$q/donor-before.json"
     fi
