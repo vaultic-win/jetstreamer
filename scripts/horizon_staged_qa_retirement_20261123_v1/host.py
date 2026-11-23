@@ -1,4 +1,4 @@
-"""Inspect or retire precisely the 30 selected duplicate staged QA executables."""
+"""Inspect or retire one pinned set of duplicate staged QA executables."""
 import argparse
 import hashlib
 import os
@@ -11,14 +11,31 @@ from pathlib import Path
 
 BASE = Path('/home/sol/.jetstreamer-private')
 RUNTIME = Path('/var/lib/jetstreamer/horizon_runtime_data')
-PHASE = 'stage30-sealed-qa-retirement-20261123-v1'
-PACK = RUNTIME / PHASE / 'tools'
-STATE = BASE / 'horizon-root-runtime-data' / PHASE / 'state'
+CURRENT_22 = RUNTIME / 'stage22-sealed-qa-retirement-20261123-v1' / 'tools'
+LEGACY_30 = RUNTIME / 'stage30-sealed-qa-retirement-20261123-v1' / 'tools'
+STAGE30_ORIGINAL = BASE / 'fifth168-fit-20261122-v1/unbooked-home-audit/proposed.json'
+STAGE30_ORIGINAL_SHA = 'fe6722856e2ee6562f77a1e5f745ff53ba2e0b09eaceb52b69f47fac84dca7a3'
 CARGO = RUNTIME / 'epoch166-exact-cargo-retirement-20261123-v1/tools'
 CARGO_SEAL = '1dbc7045db4dde7bdf31d8ea4d098b094346368c2ce8c3bce9659ee0034ef1a8'
 CARGO_HOST = '47fdd08d729005893e183ece467a756bcba25b5adccfe3060c1c24829e0c4ece'
-MANIFEST = BASE / 'fifth168-fit-20261122-v1/unbooked-home-audit/QUALIFIED_SOURCE_SELECTION.json'
-SCOPE = '1e48cb9f59a62e44d43479cca522a989113ab045b2478ecb78ec7be8c126d988'
+
+
+def selection(package):
+    if package == CURRENT_22:
+        return ('stage22', BASE / 'late-qa-stage-duplicates-20261123-v1/MANIFEST_22.json',
+                '9b3814542c0603bcc492d0c8b18f8288c2497dcf2936ab0718aaad3f6c846407',
+                (22, 59, 10064564224, 10065734136, 20131468272))
+    if package == LEGACY_30:
+        return ('stage30', BASE / 'fifth168-fit-20261122-v1/unbooked-home-audit/QUALIFIED_SOURCE_SELECTION.json',
+                '1e48cb9f59a62e44d43479cca522a989113ab045b2478ecb78ec7be8c126d988',
+                (30, 5, 12639535104, 12641076584, 25282153168))
+    raise RuntimeError(f'unrecognized installed staged retirement package {package}')
+
+
+# Direct source/test imports retain the legacy defaults; main still verifies its exact executable path.
+PACK = CURRENT_22 if Path(__file__).absolute().parent == CURRENT_22 else LEGACY_30
+PROFILE, MANIFEST, SCOPE, _ = selection(PACK)
+STATE = BASE / 'horizon-root-runtime-data' / PACK.parent.name / 'state'
 SERIAL = Path('/run/lock/horizon-epoch140-suffix-compiler.lock')
 MUTEX = BASE / 'r2-receipts/local-mutation.lock'
 
@@ -28,12 +45,27 @@ def require(ok, why):
 
 def check_runtime(action):
     cgroup = Path('/sys/fs/cgroup') / Path('/proc/self/cgroup').read_text().strip().split(':')[-1].lstrip('/')
-    require(re.fullmatch(r'horizon-fit-stage30-'+action+r'-[0-9]+\.service',cgroup.name),'dedicated stage30 service required')
+    require(re.fullmatch('horizon-fit-'+PROFILE+'-'+action+r'-[0-9]+\.service',cgroup.name),'dedicated staged retirement service required')
     quota, period = map(int, (cgroup / 'cpu.max').read_text().split())
     require(quota > 0 and quota * 2 <= period and int((cgroup/'memory.max').read_text()) <= 768<<20
             and int((cgroup/'memory.swap.max').read_text()) == 0, 'unfunded CPU, RAM or swap limit')
     require(os.stat('/proc/self/ns/net').st_ino != os.stat('/proc/1/ns/net').st_ino,'private network required')
     return cgroup.name
+
+def checked_selection(manifest, package, bound):
+    profile, _, _, expected = selection(package)
+    rows = manifest['proposed_files']
+    excluded = set(manifest['excluded_source_paths'])
+    actual = (len(rows), len(excluded), manifest['physical_allocated_bytes'],
+              manifest['logical_source_bytes'], manifest['final_pair_read_bound'])
+    require(actual == expected and set(rows).isdisjoint(excluded), 'unrecognized exact selection')
+    if profile == 'stage22':
+        require(manifest['stage30_exclusion'] == dict(path=str(STAGE30_ORIGINAL), sha256=STAGE30_ORIGINAL_SHA),
+                'original stage30 candidates changed')
+        older = bound(STAGE30_ORIGINAL, STAGE30_ORIGINAL_SHA)['files']
+        require(len(older) == 35 and set(older).isdisjoint(rows), 'overlap with prior staged test inventory')
+    return rows
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -57,11 +89,7 @@ def main():
         signal.signal(sig,engine['interrupted'])
     engine['secure_state'](STATE)
     manifest = provider['bound'](MANIFEST,SCOPE)
-    rows = manifest['proposed_files']
-    require(len(rows)==30 and set(rows).isdisjoint(manifest['excluded_source_paths'])
-            and len(manifest['excluded_source_paths'])==5 and manifest['physical_allocated_bytes']==12639535104
-            and manifest['logical_source_bytes']==12641076584 and manifest['final_pair_read_bound']==25282153168,
-            'unrecognized exact selection')
+    rows = checked_selection(manifest, PACK, provider['bound'])
     initial = provider['bound'](Path(manifest['owner_snapshot']['path']), manifest['owner_snapshot']['sha256'])
     previous = {k:provider['bound'](Path(manifest[k]['path']),manifest[k]['sha256']) for k in
                 ('pair_exclusion','control_parent_classification','outside_booking_basis')}
@@ -105,7 +133,7 @@ def main():
                         available_HOME=frame['available_HOME_bytes'], committed_HOME=frame['complete_required_HOME_bytes'],
                         exact_mutex_inodes=[s[1] for _,s in local_locks])
         scope = {'selection':SCOPE,'seal':cfg.seal}
-        op = engine['Retirement'](STATE,stamps,scope,closure,batch_size=30,open_lease=pair.retained_source_lease)
+        op = engine['Retirement'](STATE,stamps,scope,closure,batch_size=len(rows),open_lease=pair.retained_source_lease)
         if cfg.action=='inspect':
             require(not cfg.inspection_sha256,'unexpected inspection argument')
             result = op.inspect()
