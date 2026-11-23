@@ -10,6 +10,10 @@ use std::{
     process::Command,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+
+#[path = "issue_257.rs"]
+mod issuer;
+
 const UNIT: &str = "horizon-qualify-257-singleton-v1.service";
 const GUARD_UNIT: &str = "horizon-257-singleton-protective-v1.service";
 const TIMER: &str = "horizon-257-singleton-protective-v1.timer";
@@ -526,30 +530,8 @@ fn stable_static(a: &Value) -> Result<Value> {
     );
     Ok(prof)
 }
-fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    ensure!(
-        args.len() == 3 && args[1] == "start",
-        "expected start ADMISSION_SHA256"
-    );
-    ensure!(unsafe { libc::geteuid() } == 0, "root required");
-    let file = Path::new(PERMIT);
-    let md = fs::symlink_metadata(file)?;
-    ensure!(
-        md.uid() == 0
-            && md.mode() & 0o222 == 0
-            && file.canonicalize()? == file
-            && hash(file)? == args[2],
-        "admission identity"
-    );
-    let a = read_json(file)?;
-    verify_parent(&a)?;
-    let prof = stable_static(&a)?;
-    check_space(&a)?;
-    ensure!(
-        hash(&std::env::current_exe()?)? == text(&a, "launcher_sha256")?,
-        "wrong launcher"
-    );
+fn prepared_start(a: &Value) -> Result<Value> {
+    let profile = stable_static(a)?;
     for dir in [BOUND, TOKENS, RECEIPTS] {
         ensure!(
             fs::read_dir(dir)?.next().is_none(),
@@ -571,6 +553,36 @@ fn main() -> Result<()> {
     ensure!(
         retained["ActiveState"] == "inactive" && retained["Job"].is_empty(),
         "retention changed"
+    );
+    Ok(profile)
+}
+
+fn main() -> Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    ensure!(unsafe { libc::geteuid() } == 0, "root required");
+    if args.len() == 5 && matches!(args[1].as_str(), "inspect" | "issue") {
+        return issuer::run(&args[1], Path::new(&args[2]), &args[3], &args[4]);
+    }
+    ensure!(
+        args.len() == 3 && args[1] == "start",
+        "expected start ADMISSION_SHA256 or inspect|issue CHECK_JSON CHECK_SHA256 SELF_SHA256"
+    );
+    let file = Path::new(PERMIT);
+    let md = fs::symlink_metadata(file)?;
+    ensure!(
+        md.uid() == 0
+            && md.mode() & 0o222 == 0
+            && file.canonicalize()? == file
+            && hash(file)? == args[2],
+        "admission identity"
+    );
+    let a = read_json(file)?;
+    verify_parent(&a)?;
+    let prof = prepared_start(&a)?;
+    check_space(&a)?;
+    ensure!(
+        hash(&std::env::current_exe()?)? == text(&a, "launcher_sha256")?,
+        "wrong launcher"
     );
     let started = now()?;
     let clock = Instant::now();
