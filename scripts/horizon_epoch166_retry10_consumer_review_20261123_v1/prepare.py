@@ -522,7 +522,16 @@ def main():
         ),
         "old generation in current active or scheduled consumers, or scheduler/fleet differ",
     )
-    units = set([service, timer, FUTURE, *live])
+    # These two attempts belonged to the same retirement lifecycle. The second
+    # actually read the partial. Bind their image and terminal commands explicitly.
+    lifecycle_ref = {
+        "path": str(W / "PRIOR_LIFECYCLE_CHECKS_20261123T043101Z.json"),
+        "sha256": "78820090c365d65858ad4e0d73946598f83d6006a654a3176ccd4b4ff94eb655",
+    }
+    lifecycle = doc(lifecycle_ref, True)
+    checked(lifecycle["image"], True)
+    prior_attempts = {attempt["unit"]: attempt for attempt in lifecycle["attempts"]}
+    units = set([service, timer, FUTURE, *live, *prior_attempts])
     classified = {}
     for n in g["nodes"]:
         k = n["file"]["path"]
@@ -588,7 +597,7 @@ def main():
         ),
     ]:
         image = m["lifecycle_programs"][section]
-        proof = [ins, m["lifecycle_programs"]["successor_origin_proof"]]
+        proof = [ins, m["lifecycle_programs"]["successor_origin_proof"], lifecycle_ref]
         if section == "base":
             # The successor occupies the original service pathname in the checker namespace.
             # Its HOME backing name still opens the original, sealed inode.
@@ -646,7 +655,42 @@ def main():
         if u in live or u in (timer, service):
             continue
         cgroup_empty(u)
-        if u == PARK or u in terminal:
+        if u in prior_attempts:
+            attempt = prior_attempts[u]
+            checked(attempt["submit"], True)
+            if r["LoadState"] == "not-found" and dead(r):
+                continue
+            before = attempt["manager"]
+            checked(attempt["fragment"])
+            fields = (
+                "Id",
+                "Job",
+                "MainPID",
+                "ControlPID",
+                "ActiveState",
+                "SubState",
+                "InvocationID",
+                "ExecMainPID",
+                "ExecMainStatus",
+                "ExecMainExitTimestampMonotonic",
+                "Restart",
+                "NRestarts",
+                "Result",
+                "FragmentPath",
+                "DropInPaths",
+                "ControlGroup",
+                "TriggeredBy",
+                "Triggers",
+            )
+            need(
+                all(r.get(k) == before.get(k) for k in fields)
+                and r["ExecStart"].count("argv[]=") == 1
+                and r["ExecStart"].partition(" ; start_time=")[0]
+                == before["ExecStart"].partition(" ; start_time=")[0],
+                "previous lifecycle attempt reacquired its input or changed command: "
+                + u,
+            )
+        elif u == PARK or u in terminal:
             original = m["native_snapshot"][u]
             for field in [
                 "Id",
@@ -696,6 +740,7 @@ def main():
         "source_ino": 93782070,
         "source_size": 64922604512,
         "local_transition": transition,
+        "previous_lifecycle_checks": lifecycle_ref,
         "bootstrap_inode": bootstat.st_ino,
         "static_inputs": ins,
         "classifications": dict(
