@@ -30,8 +30,31 @@ def evidence():
     return record, origin, h
 
 
+def original_manager(h, fields):
+    current = props(UNIT, fields)
+    if current["InvocationID"] == h["invocation_id"]:
+        return current
+    # The terminal retention target can unload the spent producer. Use its
+    # captured PID1 clock after checking the original terminal proof and timer.
+    manager = props(UNIT, ["LoadState", "ActiveState", "MainPID", "Job", "ControlGroup"])
+    assert manager["ActiveState"] == "inactive" and manager["MainPID"] == "0"
+    assert not manager["Job"] and not manager["ControlGroup"] and not (CG / UNIT).exists()
+    stop = ref(D / "horizon257-v16-spent-timer-v219/completion.json")
+    assert stop["sha256"] == "5e4c7b06db595057b097acabb23c41a17662a99777b2301c24003d07fcc6a8a1"
+    stopped = bound(stop)
+    proof = bound(bound(ref(TERMINAL))["terminal"])
+    assert stopped["after"]["proof"] == bound(ref(TERMINAL))["terminal"]
+    assert stopped["after"]["startup"] == bound(proof["running_origin"])["startup_handoff"]
+    assert proof["unit"] == UNIT and proof["invocation_id"] == h["invocation_id"]
+    assert stopped["after"]["timer"]["ActiveState"] == "inactive" and not stopped["released"]
+    original = proof["terminal_manager"]
+    assert original["InvocationID"] == h["invocation_id"] and original["MainPID"] == "0"
+    assert original["ActiveState"] == "inactive" and not original["ControlGroup"]
+    return {field: original[field] for field in fields}
+
+
 def running(h):
-    current = props(UNIT, ["InvocationID", "MainPID", "ActiveState", "ControlGroup", "Job"])
+    current = original_manager(h, ["InvocationID", "MainPID", "ActiveState", "ControlGroup", "Job"])
     assert current["InvocationID"] == h["invocation_id"] and not current["Job"]
     if current["ActiveState"] == "active":
         assert current["MainPID"] == str(h["main_pid"]) and current["ControlGroup"] == "/system.slice/" + UNIT
