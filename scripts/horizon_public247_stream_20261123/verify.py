@@ -18,7 +18,8 @@ from funds import put
 D, V, CG = prior.D, prior.V, prior.CG
 ref, bound, props = prior.ref, prior.bound, prior.props
 NAME = 'horizon-r2-public247-current-reader-v214'
-UNIT = NAME + '.service'
+FIRST_UNIT = NAME + '.service'
+UNIT = NAME + '-a2.service'
 ROOT = D / NAME
 REPORTS = ROOT / 'reports'
 BOOK = ROOT / 'assignment.json'
@@ -78,6 +79,10 @@ def charge():
 
 def witness():
     if not BOOK.exists() or END.exists(): return {}
+    if not LAUNCH.exists() and not (CG/UNIT).exists():
+        assert props(FIRST_UNIT,['ActiveState','MainPID','ExecMainStatus']) == dict(ActiveState='failed',MainPID='0',ExecMainStatus='2')
+        assert not (CG/FIRST_UNIT).exists()
+        return {}
     state=active(bound(ref(BOOK)))
     assert state==bound(ref(LAUNCH))['unit']
     return {UNIT:(state['InvocationID'],int(state['MainPID']),LIMIT,CPUS)}
@@ -127,7 +132,7 @@ def issue():
         argv=[current['image']['path'],'247:247',ORIGIN,'--verify-only','--slot-ranges','--threads','256','--max-active-partitions','16','--archive-inventory',inv['path'],'--verification-report-dir',str(REPORTS)]
         properties=['Type=exec','Restart=no','KillMode=control-group','AllowedCPUs=20-31','CPUAffinity=20-31','CPUQuota=1200%',
                     f'MemoryMax={LIMIT}','MemorySwapMax=0','TasksMax=512','LimitFSIZE=33554432','NoNewPrivileges=yes','ProtectSystem=strict','ProtectHome=read-only',
-                    'CapabilityBoundingSet=','UMask=0077','PrivateDevices=yes','ReadWritePaths='+str(REPORTS),'StandardOutput=append:'+str(ROOT/'operation.log'),'StandardError=inherit']
+                    'CapabilityBoundingSet=','SupplementaryGroups=ubuntu','UMask=0077','PrivateDevices=yes','ReadWritePaths='+str(REPORTS),'StandardOutput=append:'+str(ROOT/'operation.log'),'StandardError=inherit']
         install_price()
         book=put(BOOK,dict(gross=GROSS,metadata=METADATA,archive_staging=0,source=current,argv=argv,properties=properties,pin=inv,control=prior.MAIN if hasattr(prior,'MAIN') else os.environ['CODEX_THREAD_ID'],
                           boot=q['boot'],fit=q,donor=ref(prior.BOOK),donor_after=parent['reserve_after']-GROSS,observed_two_worker_rss=measured,old_local=local,
@@ -137,6 +142,33 @@ def issue():
                         '--setenv=RUST_LOG=info','--setenv=RUST_MIN_STACK='+str(current['stack']),'--setenv=TOKIO_WORKER_THREADS=12',*argv],check=True)
         state=active(bound(book))
         put(LAUNCH,dict(assignment=book,unit=state,at=time.time()))
+        print(LAUNCH,flush=True)
+    finish()
+
+def retry_unreadable_directory():
+    with partition.take():
+        book=bound(ref(BOOK))
+        assert not LAUNCH.exists() and not END.exists() and not list(REPORTS.iterdir())
+        old=props(FIRST_UNIT,['ActiveState','MainPID','ExecMainStatus','InvocationID','Result','NRestarts'])
+        assert old==dict(ActiveState='failed',MainPID='0',ExecMainStatus='2',InvocationID='5e11e873f7c64b2283ebf1eb6f78a655',Result='exit-code',NRestarts='0')
+        assert not (CG/FIRST_UNIT).exists() and not (CG/UNIT).exists()
+        assert props(UNIT,['ActiveState','LoadState','Job'])==dict(ActiveState='inactive',LoadState='not-found',Job='')
+        perms=['setpriv','--bounding-set=-all','--inh-caps=-all','--ambient-caps=-all']
+        assert subprocess.run([*perms,'--clear-groups','test','-d',REPORTS]).returncode==1
+        assert subprocess.run([*perms,'--groups','1000','test','-d',REPORTS]).returncode==0
+        q=price(0,0,0)
+        assert q['public247_charge']==GROSS and q['public247_metadata']==METADATA
+        assert all(CPUS.isdisjoint(os.sched_getaffinity(int(props(u,['MainPID'])['MainPID']))) for u in q['before'])
+        assert remote()==bound(book['pin'])['objects'][0]
+        checked=source();assert checked['image']==book['source']['image']
+        properties=['StandardOutput=append:'+str(ROOT/'public-replay.log') if p.startswith('StandardOutput=') else p for p in book['properties']]
+        properties.append('SupplementaryGroups=ubuntu')
+        retry=put(ROOT/'retry.json',dict(prior_manager=old,assignment=ref(BOOK),source=checked,fit=q,properties=properties,original_log=ref(ROOT/'operation.log'),unit=UNIT,extra_memory=0))
+        subprocess.run(['systemd-run','--quiet','--unit='+UNIT,*['--property='+p for p in properties],
+                        '--property=UnsetEnvironment=HORIZON_ACCESS_KEY_ID HORIZON_SECRET_ACCESS_KEY HORIZON_S3_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY SSH_AUTH_SOCK',
+                        '--setenv=RUST_LOG=info','--setenv=RUST_MIN_STACK='+str(checked['stack']),'--setenv=TOKIO_WORKER_THREADS=12',*book['argv']],check=True)
+        state=active(book)
+        put(LAUNCH,dict(assignment=ref(BOOK),retry=retry,unit=state,at=time.time()))
         print(LAUNCH,flush=True)
     finish()
 
@@ -171,4 +203,5 @@ def finish():
         print(put(ACCEPT,dict(terminal=ref(END),report=native,source_after=branch,authenticated_object=remote(),counters_match=True,publication_performed=False,archive_staging=0)),flush=True)
 
 if __name__=='__main__':
-    issue() if sys.argv[1:]==['issue'] else finish()
+    action,=sys.argv[1:]
+    {'issue':issue,'retry-unreadable-directory':retry_unreadable_directory,'finish':finish}[action]()
