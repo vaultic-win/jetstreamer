@@ -66,8 +66,12 @@ def assess():
                 peak=sample['conservative_physical_bytes'];peak_ref=lane.ref(path)
         assert observed>0 and peak>=term['archive']['size']
         # Use the established full-epoch planning allowances. Only early recording was observed.
-        source=lane.ref(Path('/tmp/horizon267-replay-election-v175-capacity/result.json'))
-        basis=lane.bound(source)['physical']['phases']['267']['terms']
+        assessment=lane.bound(lane.shared.pin(lane.D/'horizon296-300-live-workspace-v210-a1/assessment.json',
+            '25b1eff5500c335395a9721f77fb4b00cc5b5d18cc028a33ca1ef99cc4202844'))
+        source=assessment['prior_model']
+        data=Path(source['path']).read_bytes()
+        assert hashlib.sha256(data).hexdigest()==source['sha256']=='97d81ed3bb3616e32b01dd3332757385ec9a47e7cd8c392fc5c5de86cbe571ab'
+        basis=json.loads(data)['physical']['phases']['267']['terms']
         terms={k:basis[k] for k in ('scratch_if_capped_shrink','all_outputs_through_epoch','host_control_logs_and_metadata')}
         assert terms['scratch_if_capped_shrink']>=peak
         # Existing snapshot and indexes stay bound at their original paths.
