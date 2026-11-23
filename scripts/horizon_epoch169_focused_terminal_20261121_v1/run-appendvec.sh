@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 umask 077
-pkg=/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v2
+pkg=/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v3
 test "$(id -u)" = 0
 test "$(realpath -e "$0")" = "$pkg/run"
 test "$#" = 2

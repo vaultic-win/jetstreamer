@@ -26,7 +26,7 @@ mod stopped_tree;
 const PRIVATE: &str = "/home/sol/.jetstreamer-private";
 const SOURCE: &str = "/home/sol/.jetstreamer-private/epoch169-focused-diagnostic-20261117-v1/v158/scratch/.historical-runtime/jetstreamer-historical-parent-6hfz7E/jetstreamer-historical-v1.5.8-eHT65K/accounts-state";
 const PACKAGE: &str =
-    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v2";
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch169-g4-appendvec-20261123-v1/tools-v3";
 const DEVICE: u64 = 64512;
 const ROOT_INODE: u64 = 114770421;
 const BYTES: u64 = 50285883392;
@@ -140,7 +140,7 @@ fn allocated(root: &Path, ledger: &stopped_tree::Ledger) -> Result<(u64, Vec<(u6
                 [slot, id].iter().all(|n| !n.is_empty()
                     && n.len() <= 20
                     && n.bytes().all(|c| c.is_ascii_digit()))
-                    && v["mode"].as_u64().context("mode")? & 0o7777 == 0o600,
+                    && matches!(v["mode"].as_u64().context("mode")?, 0o100600 | 0o100644),
                 "unexpected AppendVec entry {path}"
             );
             let row = shards.get_mut(dir).context("unknown shard")?;
@@ -153,6 +153,15 @@ fn allocated(root: &Path, ledger: &stopped_tree::Ledger) -> Result<(u64, Vec<(u6
         fs::symlink_metadata(root)?.blocks() * 512 + rows.iter().map(|r| r.2).sum::<u64>(),
         rows,
     ))
+}
+fn original_shards(fd: &File, source: &Path) -> Result<stopped_tree::Ledger> {
+    let tree = stopped_tree::capture(fd, DEVICE, 1001, 1003)?;
+    let (bytes, shards) = allocated(source, &tree)?;
+    ensure!(
+        bytes == BYTES && shards == SHARDS,
+        "actual scope or allocation changed"
+    );
+    Ok(tree)
 }
 struct Limited<W> {
     inner: W,
@@ -375,11 +384,16 @@ fn run() -> Result<()> {
     if mode == "qualify" {
         let price = observer.check("initial")?;
         let source = observer.check("source-readers")?;
-        let held = observer.check("held-readers")?;
+        let held_readers = observer.check("held-readers")?;
+        ensure!(!held.try_exists()?, "source already entered handback");
+        let fd = stopped_tree::open_root(src, DEVICE, ROOT_INODE)?;
+        let tree = original_shards(&fd, src)?;
         println!(
             "{}",
             json!({"scope":"normal installed read-only qualification","price":price,"original_scope":source,
-                  "quarantine_scope":held,"production_cleanup_started":false,"source_bytes_read":0,"r2_mutations":false})
+                  "quarantine_scope":held_readers,"production_cleanup_started":false,
+                  "source_inode":ROOT_INODE,"source_device":DEVICE,"entries_including_root":tree.len(),
+                  "shards":SHARDS,"allocated_bytes":BYTES,"source_bytes_read":0,"r2_mutations":false})
         );
         return Ok(());
     }
@@ -404,12 +418,7 @@ fn run() -> Result<()> {
         );
         observer.check("source-readers")?;
         let fd = stopped_tree::open_root(src, DEVICE, ROOT_INODE)?;
-        let tree = stopped_tree::capture(&fd, DEVICE, 1001, 1003)?;
-        let (bytes, rows) = allocated(src, &tree)?;
-        ensure!(
-            bytes == BYTES && rows == SHARDS,
-            "actual scope or allocation changed"
-        );
+        let tree = original_shards(&fd, src)?;
         stopped_tree::validate_remaining(
             &tree,
             &stopped_tree::capture(&fd, DEVICE, 1001, 1003)?,
@@ -417,7 +426,7 @@ fn run() -> Result<()> {
         )?;
         let hash = ledger_file(&ledger, &tree)?;
         let evidence = json!({"device":DEVICE,"root_inode":ROOT_INODE,"source":src,"quarantine":held,
-            "ledger_sha256":hash,"size_bytes":BYTES,"shards":rows,"entries_including_root":tree.len(),
+            "ledger_sha256":hash,"size_bytes":BYTES,"shards":SHARDS,"entries_including_root":tree.len(),
             "semantic_owner":first["terminal"],"preserved_log":first["log"],"preserved_partial":first["partial"],
             "reclaimed_bytes":0,"released_reservation_bytes":0});
         save(&checked, &evidence)?;
@@ -532,7 +541,8 @@ mod appendvec_tests {
             fs::set_permissions(&d, fs::Permissions::from_mode(0o700)).unwrap();
             let p = d.join(format!("73238440.{i}"));
             fs::write(&p, b"scratch fixture").unwrap();
-            fs::set_permissions(p, fs::Permissions::from_mode(0o600)).unwrap();
+            let mode = if i % 2 == 0 { 0o644 } else { 0o600 };
+            fs::set_permissions(p, fs::Permissions::from_mode(mode)).unwrap();
         }
     }
     #[test]
@@ -572,6 +582,21 @@ mod appendvec_tests {
         );
         assert_eq!(fs::read(keeper).unwrap(), b"retain");
         assert!(!src.exists());
+    }
+    #[test]
+    fn unrelated_leaf_modes_are_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("source");
+        make(&root);
+        let leaf = root.join("1/73238440.1");
+        let m = root.metadata().unwrap();
+        let fd = stopped_tree::open_root(&root, m.dev(), m.ino()).unwrap();
+        for mode in [0o640, 0o400, 0o755, 0o4644, 0o666] {
+            fs::set_permissions(&leaf, fs::Permissions::from_mode(mode)).unwrap();
+            let result = stopped_tree::capture(&fd, m.dev(), m.uid(), m.gid())
+                .and_then(|tree| allocated(&root, &tree));
+            assert!(result.is_err(), "accepted mode {mode:o}");
+        }
     }
     #[test]
     fn unexpected_leaf_or_existing_quarantine_denied() {
