@@ -15,7 +15,7 @@ use std::{
 };
 
 const SLOTS: u64 = 432_000;
-const REVIEWED_EPOCHS: std::ops::RangeInclusive<u64> = 268..=295;
+const REVIEWED_EPOCHS: std::ops::RangeInclusive<u64> = 268..=300;
 const HEADER: u64 = 59;
 const PROFILE: &str = include_str!("plan.json");
 
@@ -122,6 +122,11 @@ fn known_root(e: u64) -> Result<&'static str> {
         293 => Ok("bafyreihykwqix4y6y5ve4dl2xgxsv4mxybemg5sivlizxkgtjdap3jj52y"),
         294 => Ok("bafyreibagip3au2fkj5owmq6tswoflt266elzvcgqqls4scbiqfp2a4jre"),
         295 => Ok("bafyreifit4zyjy664wgdfzc75farxhnif2xrkvlkdvi5pufh2spav7lh3m"),
+        296 => Ok("bafyreig5pqhwelpi6f4fikdp4bzd6ezntyuviuxdpvlausdmv5mpzewade"),
+        297 => Ok("bafyreie34tp3pqsr2cxtyfxy7ugfcebu7k7yp3b7vvbavebsx7lcluc46u"),
+        298 => Ok("bafyreihsmeo6tbb5vbwrk7md4k4mbbmjdhkkpvqnnpcpnxmmgjxkdeyu6a"),
+        299 => Ok("bafyreiaom6ox5xoiql6sng2v6z53eemxqiwfaxvhkzcmysc5me4lo6xcoi"),
+        300 => Ok("bafyreih45lcghluasjbqciqkixfjfjufbltuu3vhhkrx6ktdkotahpklva"),
         _ => Err("unexpected epoch".into()),
     }
 }
@@ -487,6 +492,26 @@ fn reviewed(epoch: u64, plan_path: &Path, expected: &str) -> Result<(String, u64
             473_764_283_986,
             "37b92faeaef1b41ad4cd313f6f14b09c21117d25fbda54d7e95e82b47f9b9a28",
         ),
+        296 => (
+            409_134_410_703,
+            "cc2a5c5318df3677ec330134a50952ae4304efc21d26e1987f255a195de5595b",
+        ),
+        297 => (
+            361_472_655_299,
+            "45612fd8f9aee6024a7f71bd698e7a40a14c7954126f0b8f4594c894a3468111",
+        ),
+        298 => (
+            320_301_441_025,
+            "451d491b8f887440f8177b1b18708f6ae7d1cb8b19e46ef46753743bc36f2f82",
+        ),
+        299 => (
+            417_915_306_272,
+            "4da64750e675da9aa5304335371390ceb22befa14c792ba78841640929dc326f",
+        ),
+        300 => (
+            508_337_873_180,
+            "ccd566b2535cf6e07f2aedb48fb22db221e5b79cb516ee2ec63e5b75fe456d87",
+        ),
         _ => return Err("unregistered dynamic epoch".into()),
     };
     let first = epoch * SLOTS;
@@ -562,7 +587,7 @@ fn main() -> Result<()> {
         .filter(|epoch| REVIEWED_EPOCHS.contains(epoch));
     let (profile, body_bytes, range_count) = if let Some(epoch) = dynamic_epoch {
         command.next();
-        let path = command.next().ok_or("usage: repair --epoch{268..295} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
+        let path = command.next().ok_or("usage: repair --epoch{268..300} PLAN PLAN_SHA256 PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR")?;
         let digest = command.next().ok_or("missing reviewed plan SHA-256")?;
         let (plan, bytes, count) =
             reviewed(epoch, Path::new(&path), digest.to_str().ok_or("SHA-256")?)?;
@@ -580,7 +605,7 @@ fn main() -> Result<()> {
     let args: Vec<_> = command.collect();
     if args.len() != 4 {
         return Err(
-            "usage: repair [--epoch267 | --epoch{268..295} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
+            "usage: repair [--epoch267 | --epoch{268..300} PLAN PLAN_SHA256] PINNED_INDEX_DIR CAPTURE_DIR CAPTURE_MANIFEST_SHA256 EMPTY_OUTPUT_DIR"
                 .into(),
         );
     }
