@@ -9,12 +9,19 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path('/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v169')
-IMAGE = Path('/var/lib/jetstreamer/horizon266-instructions-2789f821-v169-control/pilot/private.ext4')
-LOOP = Path('/dev/loop9')
+if globals().get('STOPPED_PROFILE', 'v173') == 'v173':
+    generation, minor, image_inode, mount_id, cap = 'v169', 9, 18335082, 1555, 128 << 30
+elif STOPPED_PROFILE == 'v207':
+    generation, minor, image_inode, mount_id, cap = 'v194', 12, 18340079, 416, 320 << 30
+else:
+    raise ValueError('unknown stopped guest')
+ROOT = Path(f'/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-{generation}')
+IMAGE = Path(f'/var/lib/jetstreamer/horizon266-instructions-2789f821-{generation}-control/pilot/private.ext4')
+LOOP = Path(f'/dev/loop{minor}')
 PATHS = [os.fsencode(p) for p in (ROOT, IMAGE, LOOP)]
-DEVICE = os.makedev(7, 9)
-IMAGE_ID = (66305, 18335082)
+DEVICE = os.makedev(7, minor)
+IMAGE_ID = (66305, image_inode)
+MOUNT_DEVICE = f'7:{minor}'.encode()
 DEADLINE = time.monotonic() + 270
 
 def require(condition, reason):
@@ -32,15 +39,15 @@ def geometry():
     image = IMAGE.lstat()
     loop = LOOP.lstat()
     require((root.st_dev, root.st_ino) == (DEVICE, 2), 'guest root')
-    require((image.st_dev, image.st_ino) == IMAGE_ID and image.st_size == 128 << 30
+    require((image.st_dev, image.st_ino) == IMAGE_ID and image.st_size == cap
             and stat.S_ISREG(image.st_mode) and image.st_nlink == 1 and image.st_uid == 0
             and image.st_mode & 0o077 == 0, 'image identity')
     require(LOOP.resolve() == LOOP and stat.S_ISBLK(loop.st_mode) and loop.st_rdev == DEVICE, 'loop identity')
     require(ROOT.resolve() == ROOT and IMAGE.resolve() == IMAGE
-            and Path('/sys/block/loop9/loop/backing_file').read_text().strip() == str(IMAGE), 'backing path')
+            and Path(f'/sys/block/loop{minor}/loop/backing_file').read_text().strip() == str(IMAGE), 'backing path')
     rows = [x.split() for x in Path('/proc/self/mountinfo').read_bytes().splitlines()]
     entry, = [x for x in rows if x[4] == PATHS[0]]
-    require(entry[:1] == [b'1555'] and entry[2:4] == [b'7:9', b'/'] and entry[-3:-1] == [b'ext4', PATHS[2]], 'host mount identity')
+    require(entry[:1] == [str(mount_id).encode()] and entry[2:4] == [MOUNT_DEVICE, b'/'] and entry[-3:-1] == [b'ext4', PATHS[2]], 'host mount identity')
 
 def path_reference(data):
     return any(re.search(re.escape(path) + rb"(?:$|[/\s\x00\"',;])", data) for path in PATHS)
@@ -66,7 +73,7 @@ def check_links(proc, links):
 def mapped(proc):
     # Check device and inode, including maps that no longer have a pathname.
     # Carry a partial line across reads; the host's replay maps can be hundreds of MiB.
-    expr = rb'^\S+\s+\S+\s+\S+\s+(?:0*7:0*9\s+|0*103:0*1\s+18335082(?:\s|$))'
+    expr = (rf'^\S+\s+\S+\s+\S+\s+(?:0*7:0*{minor:x}\s+|0*103:0*1\s+{image_inode}(?:\s|$))').encode()
     pattern = re.compile(expr, re.M)
     carry = b''
     total = 0
@@ -76,7 +83,7 @@ def mapped(proc):
             require(total <= 1 << 30 and time.monotonic() < DEADLINE, 'maps limit')
             lines, _, carry = (carry + chunk).rpartition(b'\n')
             require(len(carry) < 65536, 'proc map row limit')
-            if ((b'7:09' in lines or b'7:9 ' in lines or b'18335082' in lines) and pattern.search(lines)) or any(p in lines for p in PATHS):
+            if (pattern.search(lines)) or any(p in lines for p in PATHS):
                 return True, total
     return bool(pattern.search(carry) or any(p in carry for p in PATHS)), total
 
@@ -99,7 +106,7 @@ def census():
                 submounts = []
                 for row in mounts:
                     fields = row.split()
-                    if fields[2] == b'7:9':
+                    if fields[2] == MOUNT_DEVICE:
                         exposures.append(row.decode())
                         require(fields[3:5] == [b'/', PATHS[0]] and fields[-3:-1] == [b'ext4', PATHS[2]], 'aliased target mount')
                     if fields[4].startswith(PATHS[0]+b'/'):
@@ -126,7 +133,7 @@ def census():
     require(counts['processes'] > 1 and any(namespaces.values()), 'incomplete host census')
     geometry()
     return dict(invocation=os.environ['INVOCATION_ID'], census=dict(counts), namespaces=namespaces,
-                references=refs, geometry=[1555, DEVICE, 2, *IMAGE_ID,128<<30], readonly_observation=True)
+                references=refs, geometry=[mount_id, DEVICE, 2, *IMAGE_ID, cap], readonly_observation=True)
 
 if __name__ == '__main__':
     print(json.dumps(census(), sort_keys=True))

@@ -22,8 +22,8 @@ impl Volume for Original {
         need(rows.len() == 1, "ambiguous mount")?;
         let r = &rows[0];
         need(
-            r[0] == "1555"
-                && r[2] == "7:9"
+            r[0].parse::<u64>().ok() == Some(MOUNT)
+                && r[2] == format!("7:{}", DEVICE & 255)
                 && r[3] == "/"
                 && r[r.len() - 3] == "ext4"
                 && r[r.len() - 2] == retained::LOOP,
@@ -34,7 +34,7 @@ impl Volume for Original {
             mro == r.last().unwrap().split(',').any(|s| s == "ro"),
             "vfs/superblock read-only disagreement",
         )?;
-        let block = fs::read_to_string("/sys/block/loop9/ro")?;
+        let block = fs::read_to_string(format!("/sys/block/loop{}/ro", DEVICE & 255))?;
         need(matches!(block.trim(), "0" | "1"), "loop RO state")?;
         Ok((mro, block.trim() == "1"))
     }
@@ -42,13 +42,17 @@ impl Volume for Original {
         let m = fs::symlink_metadata(retained::IMAGE)?;
         need(
             m.dev() == 66305
-                && m.ino() == 18335082
-                && m.len() == 128 << 30
+                && m.ino() == IMAGE_INODE
+                && m.len() == IMAGE_SIZE
                 && m.is_file()
                 && m.nlink() == 1
                 && m.uid() == 0
                 && m.mode() & 0o077 == 0
-                && fs::read_to_string("/sys/block/loop9/loop/backing_file")?.trim()
+                && fs::read_to_string(format!(
+                    "/sys/block/loop{}/loop/backing_file",
+                    DEVICE & 255
+                ))?
+                .trim()
                     == retained::IMAGE,
             "backing identity",
         )?;
@@ -103,7 +107,7 @@ fn record(
         .and_then(|s| s.strip_suffix('\n'))
         .and_then(|s| s.parse::<u64>().ok())
         .ok_or_else(|| io::Error::other("invalid closure chain"))?;
-    need(n <= 128 << 30, "bad backing allocation")?;
+    need(n <= IMAGE_SIZE, "bad backing allocation")?;
     j.put(name, &v)?;
     Ok((v, n))
 }
@@ -183,7 +187,7 @@ pub fn close(
     gate(true)?;
     v.verify()?;
     let a = v.allocated()?;
-    need(a < start && a <= 128 << 30, "final allocation")?;
+    need(a < start && a <= IMAGE_SIZE, "final allocation")?;
     let (receipt, final_bytes) = record(j, "closed", &after, "final", a)?;
     need(final_bytes == a, "backing changed since closure")?;
     println!(

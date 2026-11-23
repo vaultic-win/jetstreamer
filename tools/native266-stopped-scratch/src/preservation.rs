@@ -1,12 +1,15 @@
 //! Stream already-closed originals through a pinned OS checksum utility, for the Main-only
 //! initial preservation or read-only closure phase. No replay, publication or write mode.
+pub(crate) use crate::profile::RUN;
+use crate::profile::{
+    ARCHIVE_INODE, ARCHIVE_MTIME, ARCHIVE_SHA, ARCHIVE_SIZE, DEVICE, STATE_INODE, STATE_MTIME,
+};
 use std::fs::{self, File, Metadata, OpenOptions};
 use std::io;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-pub const RUN: &str = "/home/ubuntu/.jetstreamer-private/qualification-266-instructions-2789f821-v169/state/destination-7842454ffe9bde170be8ce42da5b2a5b9ffe7770939d4697f306fceecf45b7c3/work/root-cohort-266-266/run-2863142-1795309320359102473";
 pub const HASHER: &str = "/usr/bin/sha256sum";
 pub const HASHER_SHA256: &str = "27a7d8f6a005702618e92c88f20b829d38247ad3369e0c35b1ff219d15194bd1";
 const STATE_SHA: &str = "2c9c246126a8878f8e11928858512f8ef881a6a794118c04d1a1572b18427c87";
@@ -95,7 +98,7 @@ fn original(name: &str, ino: u64, size: u64, mtime_ns: i64) -> io::Result<Member
     let (f, st) = open(&p)?;
     need(
         (st.dev, st.ino, st.len, st.mode, st.uid, st.gid)
-            == (1801, ino, size, 0o100600, 1000, 1000)
+            == (DEVICE, ino, size, 0o100600, 1000, 1000)
             && st.mtime == st.ctime
             && st.mtime == (mtime_ns / 1_000_000_000, mtime_ns % 1_000_000_000),
         "wrong original producer object",
@@ -127,18 +130,15 @@ pub fn originals() -> io::Result<[Member; 2]> {
         "checksum utility identity",
     )?;
     stable(&utility, &hasher, &stamp)?;
-    let state = original("cohort-state.json", 5767179, 222, 1795309320358444375)?;
+    let state = original("cohort-state.json", STATE_INODE, 222, STATE_MTIME)?;
     need(state.sha256 == STATE_SHA, "cohort state changed")?;
     let archive = original(
         "archives/epoch-266.jet",
-        5767194,
-        488934107,
-        1795310933092021856,
+        ARCHIVE_INODE,
+        ARCHIVE_SIZE,
+        ARCHIVE_MTIME,
     )?;
-    need(
-        archive.sha256 == "0cbc940306fb1fce868729390ff4c38b0967fd18ff73eaf4b19a0ddbc71cff2d",
-        "partial archive changed",
-    )?;
+    need(archive.sha256 == ARCHIVE_SHA, "partial archive changed")?;
     Ok([archive, state])
 }
 #[cfg(test)]
