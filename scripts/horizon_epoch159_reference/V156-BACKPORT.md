@@ -39,3 +39,29 @@ sudo -n /usr/bin/python3 -IB package-v1/service.py --feature156 dispatch "$admis
 The separate service checks the actual prior invocation and scratch retirement, the prior donor-unit set, the same global donor lock and the live epoch 145 verifier before borrowing. The physical package, entire snapshot, independently pinned index and seven original CAR windows, capacity, lease set, unique intent, UID, mounts, resource caps and retention procedure all use the existing reference controls. The replay reservation is two CPUs, 48 GiB RAM, zero swap, a fully allocated 24 GiB HOME ext4 with 524,288 inodes, and 32 MiB other HOME.
 
 After restoring the original snapshot, the worker must produce the first signed child, matching its ordered canonical transaction signatures, success flags and fees. The first-child write stream also records a native digest. A mismatch stops this attempt and leaves the evidence for comparison. The final epoch 158 checkpoint must match all nine original native fields. At both first epoch 159 slots, collect native Bank hashes, complete SlotHashes and ordinal transaction results. At epoch activation observe the actual original feature write, including account hash, owner, rent epoch and bytes. Transaction 78 must succeed. All 157 blocks, 69,491 original entries and 97,502 transactions must be covered. This diagnostic has no archive publication step.
+
+
+## Qualify the standard producer
+
+The November 23 23:01 UTC reference passed all four signed Bank checkpoints, all 157 blocks and the formerly failing vote at slot 68,688,001. `production_probe.py` verifies the retained successful invocation and exact worker bytes, then prints the snapshot, checkpoints, worker binding and expected terminal results. This is a read-only check:
+
+```sh
+sudo -n /usr/bin/python3 -IB production_probe.py
+```
+
+Use the sealed, current `account-updates` production node in a new private proof lane. The standard historical registry selects v1.5.6 for the entire warmup and output interval. The backport implements protocol v5 and advertises the same runtime, toolchain, target and mainnet genesis. Set its executable for this invocation through the existing worker environment variable, and record the actual executable SHA-256 in the qualification evidence. Keep other lanes' executable bindings independent. The archive wire format, PoH checks and publication gates use the existing production implementation.
+
+After the ordinary capacity and sandbox admission, seal the reference's `checkpoint_filenames` as the one-filename-per-line checkpoint file, and bind the exact snapshot and current node in the same deployment. Use the ordinary Old Faithful input path with the qualified indexes. The smallest replay that can exercise the failure through both the production input and archive writer starts at slot 68,687,834 and ends at slot 68,688,001:
+
+```sh
+JETSTREAMER_ALLOW_CANDIDATE_RUNTIME=yes \
+JETSTREAMER_HISTORICAL_WORKER_V1_5_6="$sealed_worker" \
+  "$sealed_node" 159 "$private_destination" --verify \
+  --snapshot-archive="$bound_snapshot" --epoch-hashes="$bound_checkpoints" \
+  --replay-scratch="$private_scratch" --qualification-end-slot=68688001 \
+  --horizon-output="$private_destination/epoch-159-prefix.jet"
+```
+
+Require the standard producer to reach and verify all four post-bootstrap accounts checkpoints. Compare its terminal native checkpoint to the signed reference and check the emitted segment's bootstrap and terminal evidence, sealed worker digest, exact coverage of slots 68,688,000–68,688,001, anchored PoH and current-reader decode. Join transaction 78 in the second block by full signature and require success and the 5,000-lamport fee. A source mismatch should identify the first failing block and compare its CID-qualified entries against the existing bounded reference before introducing a source adapter.
+
+The retained epoch-159 root at 69,119,821 precedes epoch end. A full candidate still needs all 432,000 output slots and a canonical end-of-epoch or successor checkpoint that covers the tail. The existing production route supports an explicit verification tail, subject to its qualified terminal evidence and one-owner constraints. Qualify that full route and independently verify the complete archive before considering publication.
