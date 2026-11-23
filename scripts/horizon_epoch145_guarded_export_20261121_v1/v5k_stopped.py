@@ -87,7 +87,8 @@ def validate(prior, v, rows):
                 rejected_fleet_sample=ref("cadence"))
 
 
-def stopped_phase(s, fit):
+def historical():
+    """Reconstruct the original closure even after its transient unit has been released."""
     raw = (DISPATCH / "deployment-seal-receipt.json").read_bytes()
     need(hashlib.sha256(raw).hexdigest() == DSHA, "wrong dispatcher seal")
     row, = [r for r in json.loads(raw)["members"] if r["name"] == "run-recovery"]
@@ -95,15 +96,29 @@ def stopped_phase(s, fit):
     need(hashlib.sha256(script.read_bytes()).hexdigest() == row["sha256"], "wrong dispatcher reader")
     api = runpy.run_path(str(script))
     prior, values, rows = evidence(api)
-    native = api["inspect_unit"]()
-    api["check_empty"](native)
+    phase = validate(prior, values, rows)
     argv = values["argv"]
     expected = dict(prior["old_manager"], InvocationID=IID, Description=" ".join(argv[argv.index("--") + 1:]))
-    need(native == expected and not fit.members(UNIT),
+    refs = {k: {"path": str(path), "sha256": digest} for k, (path, digest) in ARTIFACTS.items()}
+    refs["recovery"] = refs.pop("started")
+    refs["failure"] = refs.pop("failed")
+    proof = dict(predecessor_review={"path": str(DISPATCH / "admission-review.json"), "sha256": REVIEW},
+                 predecessor_dispatch={"path": str(DISPATCH / "deployment-seal-receipt.json"), "sha256": DSHA},
+                 failed_phase=phase, old_manager=expected, original_pid1_exit=phase["manager_exit"],
+                 original_fragment=dict(prior["original_fragment"], sha256=FRAGMENT), receipts=refs)
+    need({p.name for p in STATE.iterdir()} == {"failed.json", "recovery-started.json"},
+         "unexpected terminal state in the failed generation")
+    return api, proof
+
+
+def stopped_phase(s, fit):
+    api, proof = historical()
+    native = api["inspect_unit"]()
+    api["check_empty"](native)
+    need(native == proof["old_manager"] and not fit.members(UNIT),
          "failed owner no longer exclusively holds the drained unit")
-    phase = validate(prior, values, rows)
-    api["retained"](prior)
+    api["retained"](api["bound"](proof["predecessor_review"]))
     api["read"](native["FragmentPath"], FRAGMENT)
     need({p.name for p in STATE.iterdir()} == {"failed.json", "recovery-started.json"} and
          api["inspect_unit"]() == native and not fit.members(UNIT), "state or owner changed during inspection")
-    return phase
+    return proof["failed_phase"]

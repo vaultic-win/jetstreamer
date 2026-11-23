@@ -13,27 +13,32 @@ PROVIDER = "scripts/horizon_incident_replay_fit_20261121_v1/post-stop-fit"
 FIT = Path("/var/lib/jetstreamer/horizon_runtime_data/incident-replay-fit-20261121-v1")
 SEM = FIT.parent / "epoch145-semantic-continuity-20261121-v1"
 DONOR = FIT / "tools-homefloor-145-rejoin-v4"
-CENSUS = FIT / "tools-homefloor-145-lease-rejoin-v1"
-DISPATCH = FIT / "tools-homefloor-145-handoff-v3"
-WORKER = SEM / "tools-v5k"
-BUILD_UNIT = "horizon-145-lease-rejoin-build-v1.service"
-BUILD_PRICE = FIT / "tools-homefloor-145-lease-build-v1"
-BUILD_PRICE_SHA = "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5"
 
 
-def main(commit, iid):
+def main(commit, iid, flavor="lease-rejoin"):
     if not (os.geteuid() == 0 and sys.flags.isolated and __debug__ and re.fullmatch("[0-9a-f]{40}", commit)
             and re.fullmatch("[0-9a-f]{32}", iid)):
         raise ValueError("expected exact merged COMMIT and successful BUILD_IID")
+    if flavor not in ("lease-rejoin", "missed-rejoin"):
+        raise ValueError("unknown recovery build")
+    missed = flavor == "missed-rejoin"
+    census = FIT / ("tools-homefloor-145-missed-rejoin-v1" if missed else "tools-homefloor-145-lease-rejoin-v1")
+    dispatch_dir = FIT / ("tools-homefloor-145-handoff-v4" if missed else "tools-homefloor-145-handoff-v3")
+    worker_dir = SEM / ("tools-v5m" if missed else "tools-v5k")
+    build_unit = "horizon-145-" + flavor + "-build-v1.service"
+    build_price = FIT / ("tools-homefloor-145-v5k-stopped-v1" if missed else "tools-homefloor-145-lease-build-v1")
+    price_sha = ("ea8e6bd7138cc8eb241c3b39f12e69fc65844505cb60a0d29be966adf56f05c6" if missed
+                 else "ba47dd7987accfbb8471b845425dd56a9b9c2e3e2231601e277889e6444a30b5")
+    history_name = "v5k_stopped.py" if missed else "v5j_lease_failure.py"
     local = Path(__file__).resolve().parent
     def git(*args):
         return subprocess.check_output(["runuser","-u","sol","--","git","-C","/home/sol/workspace/jetstreamer",*args])
     git("merge-base","--is-ancestor",commit,"origin/account-updates")
-    for src in (Path(__file__).name, "install-v5j-post.py", "v5j_lease_failure.py"):
+    for src in (Path(__file__).name, "install-v5j-post.py", history_name):
         if git("show",commit+":"+str(FAMILY/src)) != (local/src).read_bytes():
             raise ValueError("changed installation source " + src)
     util = runpy.run_path(str(local/"install-v5j-post.py"))
-    fail = runpy.run_path(str(local/"v5j_lease_failure.py"))
+    fail = runpy.run_path(str(local/history_name))
     need, ref, item, install, write, record = (util[k] for k in ("require","ref","item","install","write","record"))
     previous, historical = fail["historical"]()
     prior = previous["bound"](historical["predecessor_review"])
@@ -43,13 +48,13 @@ def main(commit, iid):
     q = SEM / ("incident-build-" + iid)
     need(q.resolve(strict=True) == q and q.lstat().st_uid == 0 and q.lstat().st_mode & 0o077 == 0, "untrusted build directory")
     rows = [json.loads(row) for row in previous["out"](["/usr/bin/journalctl","--no-pager","-ojson",
-            "_PID=1","UNIT="+BUILD_UNIT,"INVOCATION_ID="+iid]).splitlines()]
+            "_PID=1","UNIT="+build_unit,"INVOCATION_ID="+iid]).splitlines()]
     start, = [r for r in rows if r.get("MESSAGE_ID") == "39f53479d3a045ac8e11786248231fbf"]
     end, = [r for r in rows if r.get("MESSAGE_ID") == "7ad2d189f7e94e70a38c781354912448"]
-    need(" lease-rejoin " in start["MESSAGE"] and start["MESSAGE"].endswith(" tools-homefloor-145-lease-build-v1.")
+    need(" " + flavor + " " in start["MESSAGE"] and start["MESSAGE"].endswith(" " + build_price.name + ".")
          and int(start["__MONOTONIC_TIMESTAMP"]) < int(end["__MONOTONIC_TIMESTAMP"])
          and all(r.get("_BOOT_ID") == historical["original_pid1_exit"]["_BOOT_ID"] for r in rows)
-         and not (Path("/sys/fs/cgroup/horizonaudit.slice")/BUILD_UNIT).exists(), "build not successfully drained")
+         and not (Path("/sys/fs/cgroup/horizonaudit.slice")/build_unit).exists(), "build not successfully drained")
     product = q/"products"
     sources = {}
     for line in (q/"sources").read_text().splitlines():
@@ -65,38 +70,45 @@ def main(commit, iid):
          price["complete_cpu_quota_micros"] == 64000000 and price["complete_memory_plus_reserve_bytes"] == 810658050048 and
          price["available_HOME_bytes"]-price["complete_required_HOME_bytes"] >= 92274688+16777216 and
          price["available_memory_bytes"]-price["required_available_memory_bytes"] >= 805306368, "foreign or underfunded build")
-    need(ref(BUILD_PRICE/"deployment-seal-receipt.json")["sha256"] == BUILD_PRICE_SHA
+    need(ref(build_price/"deployment-seal-receipt.json")["sha256"] == price_sha
          and ref(DONOR/"deployment-seal-receipt.json")["sha256"] == util["DONOR_SHA"]
          and ref(util["SEALER"])["sha256"] == util["SEAL_SHA"], "different donor or capacity provider")
-    original_build = json.loads((SEM/"tools-v5j/build-proof.json").read_bytes())
     prior_seal = previous["bound"](prior["seal"])
     original_build_sha, = [r["sha256"] for r in prior_seal["members"] if r["name"] == "build-proof.json"]
-    need(ref(SEM/"tools-v5j/build-proof.json")["sha256"] == original_build_sha, "different original tests")
+    original_build = previous["bound"]({"path": str(Path(prior["reader"]["path"]).with_name("build-proof.json")),
+                                        "sha256": original_build_sha})
     tests = (q/"build.log").read_text()
     existing = original_build["native_fixture_names"]
     readiness = [line.split(" ... ")[0].removeprefix("test ") for line in tests.splitlines()
                  if "lease_startup::tests::" in line and line.endswith(" ... ok")]
-    need(len(set(readiness)) >= 2 and "test result: FAILED" not in tests and "Ran 14 tests in " in tests and
+    phase_tests = ("Ran 17 tests in " in tests or (not missed and "Ran 14 tests in " in tests))
+    need(len(set(readiness)) >= 2 and "test result: FAILED" not in tests and phase_tests and
          all(name+" ... ok" in tests for name in existing), "missing original or lease-readiness build tests")
     tool = product/"export145"
     image = ref(tool)["sha256"]
     artifacts = {Path(path).name:sha for sha,path in (line.split("  ",1) for line in (q/"artifacts").read_text().splitlines())}
-    need(artifacts["export145"] == image != fail["IMAGE"] and str(WORKER/"export145").encode() in tool.read_bytes()
-         and str(CENSUS/"post-stop-fit").encode() in tool.read_bytes(), "wrong successor binary")
+    need(artifacts["export145"] == image != prior["reader"]["sha256"] and str(worker_dir/"export145").encode() in tool.read_bytes()
+         and str(census/"post-stop-fit").encode() in tool.read_bytes(), "wrong successor binary")
     source = product/"source"/FAMILY
     proof = dict(schema="horizon-epoch145-child-lease-startup-build-v1", source_commit=commit,source_hashes=sources,
                  build_iid=iid,native_success_cursor=end["__CURSOR"],verifier_sha256=image,
                  startup_failure=historical["receipts"]["failure"], previous_recovery=historical["receipts"]["recovery"],
-                 predecessor_dispatch=historical["predecessor_dispatch"], capacity=ref(q/"before.json"),capacity_provider=ref(BUILD_PRICE/"deployment-seal-receipt.json"),
+                 predecessor_dispatch=historical["predecessor_dispatch"], capacity=ref(q/"before.json"),capacity_provider=ref(build_price/"deployment-seal-receipt.json"),
                  native_fixture_names=existing+readiness, child_lease_readiness_protocol="self-stop-after-three-leases",
                  tests=ref(q/"build.log"),compiler_outputs=ref(q/"artifacts"),source_snapshot=ref(q/"sources"),
                  memory_peak=int((q/"memory.peak").read_text()),physical_scratch=int((q/"scratch-bytes").read_text().split()[0]),
                  resource_credit_bytes=0, replay_launch_authorized=False,r2_mutations=False)
+    if missed:
+        for name in ("missed_clock.rs", "missed_clock.py", "test_missed_clock.py"):
+            need(str(FAMILY/name) in sources, "missing missed-census build source " + name)
+        proof.update(schema="horizon-epoch145-missed-census-recovery-build-v1",
+                     startup_failure=original_build["startup_failure"], missed_clock_failure=historical["receipts"]["failure"],
+                     missed_clock_rejection=historical["receipts"]["cadence"], leased_sample=historical["receipts"]["worker_sample"])
     need(proof["memory_peak"] <= 805306368 and proof["physical_scratch"] <= 73400320, "build exceeded its envelope")
     script = (source/"run-incident.sh").read_bytes()
     need(script.count(b"PINNED_INCIDENT_SHA") == 1, "unbound launcher")
     launcher = write(q/"lease-ready-launcher",script.replace(b"PINNED_INCIDENT_SHA",image.encode()))
-    worker = install(WORKER, [item("export145",tool,0o555),item("incident-phase.py",source/"incident-phase.py",0o444),
+    worker = install(worker_dir, [item("export145",tool,0o555),item("incident-phase.py",source/"incident-phase.py",0o444),
         item("run-recovery",launcher,0o555),item("build-proof.json",record(q/"lease-build-proof.json",proof),0o444)], q/"lease-semantic-plan.json")
     donor = json.loads((DONOR/"deployment-seal-receipt.json").read_bytes())
     members = {}
@@ -107,31 +119,39 @@ def main(commit, iid):
         need(members[name]["sha256"] == row["sha256"], "changed donor member " + name)
     provider = write(q/"lease-provider",git("show",commit+":"+PROVIDER))
     members["post-stop-fit"] = item("post-stop-fit",provider,0o555)
-    profile = dict(build_sha256=ref(WORKER/"build-proof.json")["sha256"],image_sha256=image,
-                   adapter_sha256=ref(WORKER/"incident-phase.py")["sha256"],seal_sha256=worker["sha256"])
+    profile = dict(build_sha256=ref(worker_dir/"build-proof.json")["sha256"],image_sha256=image,
+                   adapter_sha256=ref(worker_dir/"incident-phase.py")["sha256"],seal_sha256=worker["sha256"])
     members["profile145-lease-semantic.json"] = item("profile145-lease-semantic.json",record(q/"lease-runtime-profile.json",profile),0o444)
-    runtime = install(CENSUS,list(members.values()),q/"lease-runtime-plan.json")
+    if missed:
+        name = "build_159_price.py"
+        path = write(q/name,git("show",commit+":"+str(FAMILY/name)))
+        members[name] = item(name,path,0o444)
+    runtime = install(census,list(members.values()),q/"lease-runtime-plan.json")
     cmd = list(prior["sealed_service_argv"])
-    need(cmd[-5] == prior["reader"]["path"] and cmd[-1] == fail["IMAGE"], "original verifier argv changed")
-    cmd[-5], cmd[-1] = str(WORKER/"export145"), image
-    review = dict(prior, schema="horizon-145-lease-startup-dispatch-review-v1",old_manager=historical["old_manager"],
+    need(cmd[-5] == prior["reader"]["path"] and cmd[-1] == prior["reader"]["sha256"], "original verifier argv changed")
+    cmd[-5], cmd[-1] = str(worker_dir/"export145"), image
+    schema = "horizon-145-missed-census-dispatch-review-v1" if missed else "horizon-145-lease-startup-dispatch-review-v1"
+    review = dict(prior, schema=schema,old_manager=historical["old_manager"],
                   original_pid1_exit=historical["original_pid1_exit"],original_fragment=historical["original_fragment"],
                   failed_phase=historical["failed_phase"],predecessor_receipts=historical["receipts"],original_review=historical["predecessor_review"],
-                  reader=ref(WORKER/"export145"),stock_launcher=ref(WORKER/"run-recovery"),seal=worker,provider=runtime,sealed_service_argv=cmd)
+                  reader=ref(worker_dir/"export145"),stock_launcher=ref(worker_dir/"run-recovery"),seal=worker,provider=runtime,sealed_service_argv=cmd)
     staged = record(q/"lease-dispatch-review.json",review)
     digest = ref(staged)["sha256"]
     dispatcher = git("show",commit+":"+str(FAMILY/"recovery_dispatch.py"))
-    for needle,replacement in [(b"LEASE_START_IMAGE_SHA",image),(b"LEASE_START_REVIEW_SHA",digest)]:
+    prefix = b"MISSED_CLOCK_" if missed else b"LEASE_START_"
+    for needle,replacement in [(prefix+b"IMAGE_SHA",image),(prefix+b"REVIEW_SHA",digest)]:
         need(dispatcher.count(needle) == 1, "different dispatcher template")
         dispatcher = dispatcher.replace(needle,replacement.encode())
     members["run-recovery"] = item("run-recovery",write(q/"lease-dispatch",dispatcher),0o555)
     members["admission-review.json"] = item("admission-review.json",staged,0o444)
-    members["v5j_lease_failure.py"] = item("v5j_lease_failure.py",write(q/"lease-failure-evidence.py",git("show",commit+":"+str(FAMILY/"v5j_lease_failure.py"))),0o444)
-    dispatch = install(DISPATCH,list(members.values()),q/"lease-dispatch-plan.json")
-    new = runpy.run_path(str(DISPATCH/"run-recovery"))
-    need(new["PACKAGE"] == DISPATCH and new["LEASE_RETRY"] and new["READER"] == WORKER/"export145"
+    members[history_name] = item(history_name,write(q/"lease-failure-evidence.py",git("show",commit+":"+str(FAMILY/history_name))),0o444)
+    if missed:
+        members["missed_clock.py"] = item("missed_clock.py",source/"missed_clock.py",0o444)
+    dispatch = install(dispatch_dir,list(members.values()),q/"lease-dispatch-plan.json")
+    new = runpy.run_path(str(dispatch_dir/"run-recovery"))
+    need(new["PACKAGE"] == dispatch_dir and new["LEASE_RETRY"] and new["MISSED_RETRY"] == missed and new["READER"] == worker_dir/"export145"
          and new["REVIEW_SHA"] == digest and new["IMAGE_SHA"] == image and new["OLD"] == fail["IID"]
-         and new["original_command"](review,price["fleet"])[-5:] == [str(WORKER/"export145"),"recover-full-output",
+         and new["original_command"](review,price["fleet"])[-5:] == [str(worker_dir/"export145"),"recover-full-output",
                   price["fleet"]["path"],price["fleet"]["sha256"],image], "different deployed repair")
     print(json.dumps(dict(worker=worker,provider=runtime,dispatcher=dispatch,review_sha256=digest,commit=commit,
                           verified_or_published=False,production_worker_started=False),sort_keys=True))

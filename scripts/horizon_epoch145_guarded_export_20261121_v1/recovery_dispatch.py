@@ -20,7 +20,9 @@ RUNTIME = Path("/var/lib/jetstreamer/horizon_runtime_data")
 FIT = RUNTIME / "incident-replay-fit-20261121-v1"
 RETRY_PACKAGE = FIT / "tools-homefloor-145-handoff-v2"
 LEASE_PACKAGE = FIT / "tools-homefloor-145-handoff-v3"
-LEASE_RETRY = Path(__file__).resolve().parent == LEASE_PACKAGE
+MISSED_PACKAGE = FIT / "tools-homefloor-145-handoff-v4"
+MISSED_RETRY = Path(__file__).resolve().parent == MISSED_PACKAGE
+LEASE_RETRY = MISSED_RETRY or Path(__file__).resolve().parent == LEASE_PACKAGE
 RETRY = LEASE_RETRY or Path(__file__).resolve().parent == RETRY_PACKAGE
 PACKAGE = LEASE_PACKAGE if LEASE_RETRY else RETRY_PACKAGE if RETRY else FIT / "tools-homefloor-145-handoff-v1"
 SEMANTIC = RUNTIME / "epoch145-semantic-continuity-20261121-v1"
@@ -34,6 +36,13 @@ OLD = "f2afc696a63a4e6aa6812451cf3559e5" if LEASE_RETRY else "48ad7b2234d74e74b0
 IMAGE_SHA = "LEASE_START_IMAGE_SHA" if LEASE_RETRY else "52d2dd991c69b24079308fafefd054af9aa4fe1d095d0469ec3d90ef851f1cc4"
 RETRY_REVIEW_SHA = "38774819c4dbbe1246851585afb57ba65df4919cbf457fb6a04b75ef2e77fc07"
 REVIEW_SHA = "LEASE_START_REVIEW_SHA" if LEASE_RETRY else RETRY_REVIEW_SHA if RETRY else "4b8963f5490bd9dba3d9d6db521b9e9e864a28108c7b79bbe420417eefaf82e6"
+if MISSED_RETRY:
+    PACKAGE = MISSED_PACKAGE
+    READER = SEMANTIC / "tools-v5m/export145"
+    HANDOFF = SEMANTIC / "v5m-name-handoff"
+    OLD = "ff597d64ad37400ea5c6836336fb6706"
+    IMAGE_SHA = "MISSED_CLOCK_IMAGE_SHA"
+    REVIEW_SHA = "MISSED_CLOCK_REVIEW_SHA"
 START = "39f53479d3a045ac8e11786248231fbf"
 BOOT = Path("/proc/sys/kernel/random/boot_id")
 PROPS = ("Id,Names,LoadState,ActiveState,SubState,FragmentPath,DropInPaths,InvocationID,"
@@ -107,6 +116,14 @@ def successors(first):
         require(match is not None, "invalid fleet successor")
         next_path = RUNTIME / match[1] / path.name
         if not os.path.lexists(next_path):
+            if MISSED_RETRY:
+                clock = runpy.run_path(str(PACKAGE / "missed_clock.py"))
+                replacement = clock["clock"](chain[-1], fleet, int(time.time()))
+                if replacement["state"] == "accepted":
+                    require(replacement["fleet"] not in chain, "cycle in accepted replacement fleet")
+                    chain.append(replacement["fleet"])
+                    continue
+                require(replacement["state"] == "ordinary", "waiting for the registered replacement fleet")
             return chain
         data, ref = read(next_path)
         require(json.loads(data)["recorded_unix_seconds"] > fleet["recorded_unix_seconds"], "stale fleet chain")
@@ -255,6 +272,12 @@ def exact_price(price, current, review, attached=False, at=None):
             and price["available_memory_bytes"] >= price["required_available_memory_bytes"]
             and price["resource_credit_bytes"] == 0 and price["replay_launch_authorized"] is False
             and 0 <= (time.time() if at is None else at) - price["recorded_unix_seconds"] <= 180, "failed fresh detached 145 fit")
+    if MISSED_RETRY:
+        cover = price["epoch159_donor_cover"]
+        require(cover["schema"] == "horizon-145-drained-159-donor-cover-v1" and cover["fleet"] == current
+                and cover["native_recorded_unix_seconds"] == price["recorded_unix_seconds"]
+                and cover["remaining_home_bytes"] >= 0 and cover["credited_retirement_bytes"] == 0
+                and not cover["replay_launch_authorized"], "missing current donor coverage")
     require((phase["Id"], phase["InvocationID"], phase["ActiveState"], phase["SubState"], phase["MainPID"])
             == ((UNIT, OLD, "failed", "failed", "0") if attached else (UNIT, "", "inactive", "dead", "0"))
             and all(phase[k] == review["failed_phase"][k] for k in
@@ -268,7 +291,18 @@ def exact_price(price, current, review, attached=False, at=None):
 def retry_phase():
     """Authenticate the same exhausted generation while attached or after reset."""
     review = json.loads(read(PACKAGE / "admission-review.json", REVIEW_SHA)[0])
-    if LEASE_RETRY:
+    if MISSED_RETRY:
+        archive = runpy.run_path(str(PACKAGE / "v5k_stopped.py"))
+        _, proof = archive["historical"]()
+        require(all(proof[k] == review[k] for k in ("failed_phase", "old_manager", "original_pid1_exit",
+                "original_fragment")) and proof["receipts"] == review["predecessor_receipts"]
+                and proof["predecessor_review"] == review["original_review"]
+                and proof["failed_phase"]["original_leased_sample"] == proof["receipts"]["worker_sample"]
+                and proof["failed_phase"]["rejected_fleet_sample"] == proof["receipts"]["cadence"]
+                and review["reader"] == {"path": str(READER), "sha256": IMAGE_SHA}
+                and IMAGE_SHA != bound(proof["predecessor_review"])["reader"]["sha256"],
+                "different missed census, failed worker or successor image")
+    elif LEASE_RETRY:
         archive = runpy.run_path(str(PACKAGE / "v5j_lease_failure.py"))
         _, proof = archive["historical"]()
         require(all(proof[k] == review[k] for k in ("failed_phase", "old_manager", "original_pid1_exit",

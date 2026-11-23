@@ -47,10 +47,11 @@ ORIGINAL={166,167,170}
 
 # The proof copy runs from the root-owned qualification directory before sealing.
 HERE = Path(__file__).resolve().parent
-LEASE_RUNTIME_145 = HERE == D / "tools-homefloor-145-lease-rejoin-v1"
+MISSED_RUNTIME_145 = HERE == D / "tools-homefloor-145-missed-rejoin-v1"
+LEASE_RUNTIME_145 = MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-lease-rejoin-v1"
 STOPPED_V5K = HERE == D / "tools-homefloor-145-v5k-stopped-v1"
 LEASE_BUILD_145 = STOPPED_V5K or HERE == D / "tools-homefloor-145-lease-build-v1"
-RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3")
+RETRY_HANDOFF_145 = HERE in (D / "tools-homefloor-145-handoff-v2", D / "tools-homefloor-145-handoff-v3", D / "tools-homefloor-145-handoff-v4")
 DETACHED_145 = RETRY_HANDOFF_145 or HERE == D / "tools-homefloor-145-handoff-v1"
 V5K_POST = HERE == D / "tools-homefloor-145-post-v5k-v1"
 V5J_RETRY_POST = V5K_POST or HERE == D / "tools-homefloor-145-post-v5j-v2"
@@ -476,7 +477,7 @@ def profile145(here, post=False, rejoin=False, timeout_rejoin=False, recovery_po
         post_directory = fixture_post_directory(here)
         profiles = {"v5j-post": ("profile145-v5j-post.json", "tools-v13f" if V5K_POST else "tools-v13e" if V5J_RETRY_POST else "tools-v13d"),
                     "retry4-semantic": ("profile145-retry4-semantic.json", "tools-v5j"),
-                    "lease-semantic": ("profile145-lease-semantic.json", "tools-v5k"),
+                    "lease-semantic": ("profile145-lease-semantic.json", "tools-v5m" if MISSED_RUNTIME_145 else "tools-v5k"),
                     "retry3-semantic": ("profile145-retry3-semantic.json", "tools-v5i"),
                     "five-lane-semantic": ("profile145-five-lane-semantic.json", "tools-v5h"),
                     "homefloor-semantic": ("profile145-homefloor-semantic.json", "tools-v5g"),
@@ -1231,6 +1232,18 @@ def capture_native(epoch,ref,prestart136=None):
     return result
 
 def capture(epoch, ref, prestart136=None):
+    if MISSED_RUNTIME_145 or HERE == D / "tools-homefloor-145-handoff-v4":
+        s.need(epoch == 145 and prestart136 is None, "unexpected missed-census pricing scope")
+        seal, _ = s.read(HERE / "deployment-seal-receipt.json")
+        module = HERE / "build_159_price.py"
+        member, = [v for v in seal["members"] if v["name"] == module.name]
+        s.need(seal["destination"] == str(HERE) and member["mode"] == "0444", "unbound donor price")
+        fit.binary(module,member["sha256"])
+        donor = runpy.run_path(str(module))
+        before = donor["snapshot"]()
+        native = capture_native(epoch,ref)
+        native["epoch159_donor_cover"] = donor["cover"](before,native,donor["snapshot"]())
+        return native
     if HOURLY169:
         s.need(epoch == 145 and prestart136 is None, "hourly actor registration requires its dedicated complete quote")
         fleet, _ = fleet_head(ref)

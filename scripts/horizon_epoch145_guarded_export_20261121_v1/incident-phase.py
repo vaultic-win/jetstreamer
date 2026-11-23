@@ -8,12 +8,14 @@ import sys
 BASE = Path("/var/lib/jetstreamer/horizon_runtime_data")
 UNIT = "horizon-holding-export145-20261121-v1.service"
 VERSION = Path(__file__).resolve().parent.name
-LEASE_START = VERSION == "tools-v5k"
+MISSED_CLOCK = VERSION == "tools-v5m"
+LEASE_START = MISSED_CLOCK or VERSION == "tools-v5k"
 FIVE_LANE_REJOIN = LEASE_START or VERSION in ("tools-v5h", "tools-v5i", "tools-v5j")
 HOMEFLOOR_REJOIN = VERSION == "tools-v5g" or FIVE_LANE_REJOIN
 HOMEFLOOR_PROVIDER = {"tools-v5h": "tools-homefloor-145-rejoin-v2",
                       "tools-v5i": "tools-homefloor-145-rejoin-v3",
                       "tools-v5j": "tools-homefloor-145-rejoin-v4",
+                      "tools-v5m": "tools-homefloor-145-missed-rejoin-v1",
                       "tools-v5k": "tools-homefloor-145-lease-rejoin-v1"}.get(VERSION, "tools-homefloor-145-rejoin-v1")
 FIXTURE_REJOIN = VERSION == "tools-v5f" or HOMEFLOOR_REJOIN
 TIMER_REJOIN = VERSION in ("tools-v5e", "tools-v5f") or HOMEFLOOR_REJOIN
@@ -137,6 +139,13 @@ def inspect(s, leased, m, members, epoch, provider, profile):
         s.need(build["startup_failure"] == actual and build["child_lease_readiness_protocol"] == "self-stop-after-three-leases"
                and generation != need_failure.parent.name, "unqualified retry of the child lease failure")
         window["startup_failure"] = actual
+    if MISSED_CLOCK:
+        missed = STATE / "ff597d64ad37400ea5c6836336fb6706"
+        _, failure = s.read(missed / "failed.json", "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6")
+        _, recovery = s.read(missed / "recovery-started.json", "706b0986b8a3979caa083d08ac007d93905919819b50126486e738cee6977e48")
+        s.need(build["missed_clock_failure"] == failure and build["previous_recovery"] == recovery
+               and generation != missed.name, "unqualified retry of the missed fleet census")
+        window["missed_clock_failure"] = failure
     if observed == (pid,):
         s.need(epoch == 145 and os.getpid() in members, "145 participant has no leased child")
         return {"invocation_id": generation, "stage": "controller", "window": window}

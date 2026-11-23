@@ -62,13 +62,18 @@ class HomefloorPhase(TestCase):
             return Status.read(p)[1]
 
         meta = dict(verifier_sha256=self.sha)
-        if self.version == "tools-v5k":
+        if g["LEASE_START"]:
             iid = "f2afc696a63a4e6aa6812451cf3559e5"
             state = root / "state"
             state.mkdir()
             (state / iid).symlink_to(g["STATE"] / iid, target_is_directory=True)
             meta["startup_failure"] = Status.read(state / iid / "failed.json")[1]
             meta["child_lease_readiness_protocol"] = "self-stop-after-three-leases"
+            if g["MISSED_CLOCK"]:
+                prior = "ff597d64ad37400ea5c6836336fb6706"
+                (state / prior).symlink_to(g["STATE"] / prior, target_is_directory=True)
+                meta["missed_clock_failure"] = Status.read(state / prior / "failed.json")[1]
+                meta["previous_recovery"] = Status.read(state / prior / "recovery-started.json")[1]
         build = record(pkg / "build-proof.json", meta)
         seal = record(pkg / "deployment-seal-receipt.json",
                       dict(destination=str(pkg), members=[dict(name="export145", sha256=self.sha),
@@ -179,6 +184,28 @@ class LeaseReadyPhase(HomefloorPhase):
         v = self.inspect((10,20))
         self.assertEqual(v["window"]["startup_failure"]["sha256"],
                          "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7")
+
+
+class MissedClockPhase(HomefloorPhase):
+    version = "tools-v5m"
+
+    def test_separate_provider_and_both_failures(self):
+        self.assertEqual(self.provider.parent.name, "tools-homefloor-145-missed-rejoin-v1")
+        self.write()
+        v = self.inspect((10,20))
+        self.assertEqual(v["window"]["startup_failure"]["sha256"],
+                         "eff2c5c0da6cb103890f6ced5cb11920959f637234567d7fd2382a2fca2fbcc7")
+        self.assertEqual(v["window"]["missed_clock_failure"]["sha256"],
+                         "04eeb879aa90c3f3170e738c781f10eaf17ef44b2d8835d6f9f8f7ee29ee5fb6")
+        original_read = Status.read
+        def wrong_history(path, expected=None):
+            data, ref = original_read(path, expected)
+            if path.name == "build-proof.json":
+                data["missed_clock_failure"] = data["startup_failure"]
+            return data, ref
+        with patch.object(Status, "read", side_effect=wrong_history):
+            with self.assertRaisesRegex(ValueError,"unqualified retry of the missed fleet census"):
+                self.inspect((10,20))
 
 
 if __name__ == "__main__":
