@@ -2,10 +2,14 @@ use super::*;
 
 const BASE: &str = "/run/systemd/generator";
 
+fn uses_reviewed_generators() -> bool {
+    matches!(profile!("", ""), "retry10" | "168-full-metered")
+}
+
 // These neutral generator outputs were read on dev-samjohnson after PID1 regenerated
 // them during retry10's census. Never accept a replacement of an arbitrary unit.
 pub(super) fn qualified(path: &Path, digest: &str, stamp: FileStamp) -> bool {
-    profile!("", "") == "retry10"
+    uses_reviewed_generators()
         && stamp.uid == 0
         && stamp.gid == 0
         && stamp.links == 1
@@ -163,7 +167,7 @@ fn directory_tree(
 }
 
 pub(super) fn inventory() -> Result<Option<BTreeMap<PathBuf, Entry>>> {
-    if profile!("", "") != "retry10" {
+    if !uses_reviewed_generators() {
         return Ok(None);
     }
     let mut rows = BTreeMap::new();
@@ -190,7 +194,14 @@ mod tests {
         stamp.gid = 0;
         let root = Path::new(BASE).join("-.mount");
         let hash = "81b1ac579c5be43aea8e1b6765b7dd31e059d119fd813f243ea87300adf9adb1";
-        assert_eq!(qualified(&root, hash, stamp), profile!("", "") == "retry10");
+        assert_eq!(
+            qualified(&root, hash, stamp),
+            matches!(
+                PARK,
+                "horizon-closed166-retry10-park-20261122-v1.service"
+                    | "horizon-closed168-full-metered-park-20261122-v1.service"
+            )
+        );
         assert!(!qualified(&root, &"0".repeat(64), stamp));
         assert!(!qualified(
             &Path::new(BASE).join("changed.service"),

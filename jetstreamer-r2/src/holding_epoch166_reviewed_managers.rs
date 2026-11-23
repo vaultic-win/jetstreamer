@@ -5,6 +5,20 @@ use super::*;
 use std::{ffi::OsStr, io::ErrorKind, process::Command};
 
 const RETRY10_PARK: &str = "horizon-closed166-retry10-park-20261122-v1.service";
+const METERED168_PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
+const METERED168_DROPIN_OWNERS: [&str; 9] = [
+    "horizon-observer-root144959-live166167170-20261121-v1.service",
+    "horizon-observer-root154959-live166167170-20261121-v1.service",
+    "horizon-observer-root165022-live166167170-20261121-v1.service",
+    "horizon-observer-root172022-live166167170-20261121-v1.service",
+    "horizon-observer-root221010-live166167170-20261121-v1.service",
+    "horizon-observer-root224010-live166167170-20261121-v1.service",
+    "horizon-observer-root231010-live166167170-20261121-v1.service",
+    "horizon-observer-root234010-live166167170-20261121-v1.service",
+    "horizon-observer-root004010-live166167170-20261122-v1.service",
+];
+const METERED168_FAILED_OBSERVER: &str =
+    "horizon-observer-root174010-live166167170-20261122-v1.service";
 const REGISTRY: &str = include_str!("holding_epoch166_reviewed_managers.json");
 const PROPERTIES: &str = "Id,Names,Job,NeedDaemonReload,Transient,LoadState,ActiveState,SubState,CanStart,UnitFileState,FragmentPath,DropInPaths,InvocationID,ExecStart,ExecMainPID,ExecMainExitTimestampMonotonic,ExecMainCode,ExecMainStatus,MainPID,ControlPID,ControlGroup,NRestarts,Result,Restart,RequiredBy,Requisite,RequisiteOf,WantedBy,BoundBy,UpheldBy,ConsistsOf,OnSuccessOf,OnFailureOf,TriggeredBy,Triggers";
 const BACKLINKS: [&str; 9] = [
@@ -43,10 +57,21 @@ pub(super) struct Registered {
 
 impl Registered {
     pub(super) fn profile(park_name: &str) -> Result<Self> {
-        if park_name == RETRY10_PARK {
-            Ok(serde_json::from_str(REGISTRY)?)
-        } else {
-            Ok(Self::default())
+        match park_name {
+            RETRY10_PARK => Ok(serde_json::from_str(REGISTRY)?),
+            METERED168_PARK => {
+                // These same retired observers also reference the old 168 run.
+                // Keep retry10's own terminal/census units out of the 168 registry.
+                let mut registry: Self = serde_json::from_str(REGISTRY)?;
+                registry
+                    .dropins
+                    .retain(|owner, _| METERED168_DROPIN_OWNERS.contains(&owner.as_str()));
+                registry
+                    .terminals
+                    .retain(|owner, _| owner == METERED168_FAILED_OBSERVER);
+                Ok(registry)
+            }
+            _ => Ok(Self::default()),
         }
     }
 
@@ -373,6 +398,23 @@ mod tests {
         Registered::profile(RETRY10_PARK).unwrap()
     }
 
+    #[test]
+    fn metered168_inherits_only_the_exact_shared_observer_definitions() {
+        let all = actual();
+        let metered = Registered::profile(METERED168_PARK).unwrap();
+        assert_eq!(metered.dropins.len(), 9);
+        assert_eq!(
+            metered.dropins.values().map(BTreeMap::len).sum::<usize>(),
+            11
+        );
+        assert_eq!(metered.terminals.len(), 1);
+        assert!(metered.terminal(METERED168_FAILED_OBSERVER));
+        for owner in METERED168_DROPIN_OWNERS {
+            assert_eq!(metered.dropins[owner], all.dropins[owner]);
+        }
+        assert!(!metered.terminal("horizon-closed166-retry10-park-terminal-20261122-v1.service"));
+    }
+
     fn absent(unit: &str) -> Value {
         let mut row = json!({"Id":unit,"Names":unit,"Job":"","NeedDaemonReload":"no","DropInPaths":"","LoadState":"not-found","ActiveState":"inactive","SubState":"dead","Transient":"no","CanStart":"no","FragmentPath":"","UnitFileState":""});
         for key in BACKLINKS.into_iter().chain(["Requisite", "RequisiteOf"]) {
@@ -587,9 +629,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "read-only proof against dev-samjohnson historical retry10 service registry"]
+    #[ignore = "read-only proof against the selected dev-samjohnson historical service registry"]
     fn actual_retired_managers_and_activation_namespace() {
-        assert_eq!(PARK, RETRY10_PARK);
-        actual().verify().unwrap();
+        assert!(matches!(PARK, RETRY10_PARK | METERED168_PARK));
+        Registered::profile(PARK).unwrap().verify().unwrap();
     }
 }

@@ -60,8 +60,15 @@ const PARK_PLAN: &str = concat!(holding_dir!(), "/package/plan.json");
 const PARK_PLAN_SHA: &str = "a8c1611f228a216d68b56f249e6b8c34c346b963f4675e6d7015ae22ae8c06c6";
 const MAPPING: &str = "/usr/local/lib/jetstreamer/horizon-node02-holding-20261023-v1/mapping.json";
 const MAPPING_SHA: &str = "61f7601f78a7aa1f71394a020cbbb28aa9dbd85de858f139def1c989f2b2a89e";
-const PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
+pub(super) const PARK: &str = "horizon-closed168-full-metered-park-20261122-v1.service";
 const PARK_START: &str = concat!(holding_dir!(), "/PARK_START.json");
+const ORIGINAL_START_SHA: &str = "fd018eb97b53be8f2dda0718efa8d938355b042d4287ed9ad5dd3c2c1d043f5e";
+const PARK_IID: &str = "04a7eb03f34345d88ec47da9bda309b4";
+const PARK_PID: &str = "1157909";
+const PARK_TIME: &str = "Mon 2026-11-23 07:11:28 UTC";
+const PARK_FRAGMENT: &str =
+    "/run/systemd/transient/horizon-closed168-full-metered-park-20261122-v1.service";
+const PARK_FRAGMENT_SHA: &str = "f715fdb711adb06296a91dcfe88790fa6e511bd890097d7ba168ae97ffb86a5a";
 const ADMISSION: &str = concat!(holding_dir!(), "/PARK_ADMISSION.json");
 const FIT: &str = concat!(holding_dir!(), "/PARK_FIT.json");
 const PRODUCER: &str = "horizon-qualify-168-full-metered-20261121-v1.service";
@@ -253,12 +260,108 @@ fn adequate_budget(fit: &Value, available: &str, required: &str) -> bool {
 }
 fn validate_profile_rows(proof: &Value, iid: &str, start: &Value, prepared: &Value) -> Result<()> {
     ensure!(
-        checked_receipt(&proof["start"], PARK_START, 1 << 20)? == *start,
+        proof["start"] == json!(binding(PARK_START, ORIGINAL_START_SHA))
+            && checked_receipt(&proof["start"], PARK_START, 1 << 20)? == *start
+            && iid == PARK_IID
+            && start["native"]["MainPID"] == PARK_PID
+            && start["native"]["ExecMainStartTimestamp"] == PARK_TIME,
         "native start changed"
     );
     let admission = checked_receipt(&start["admission"], ADMISSION, 1 << 20)?;
     let fit = checked_receipt(&admission["fit"], FIT, 2 << 20)?;
     validate_paid_rows(proof, iid, start, prepared, &admission, &fit)
+}
+
+// PID1 clears the per-command accounting tuple on reload. Its independent
+// main-process exit information survives, as does the original transient fragment.
+fn same_terminal_dispatch(terminal: &Value, row: &Value, image: &Path, argv: &str) -> Result<()> {
+    let exit = terminal["ExecMainExitTimestamp"]
+        .as_str()
+        .context("missing 168 park exit time")?;
+    let micros = |key: &str| -> Result<u64> {
+        Ok(terminal[key]
+            .as_str()
+            .context("missing 168 monotonic time")?
+            .parse()?)
+    };
+    let start_us = micros("ExecMainStartTimestampMonotonic")?;
+    ensure!(
+        start_us > 0
+            && micros("ExecMainExitTimestampMonotonic")? > start_us
+            && !exit.is_empty()
+            && exit != "n/a",
+        "incomplete original 168 park accounting"
+    );
+    for state in [terminal, row] {
+        park_shape(state, PARK_IID)?;
+        ensure!(
+            state["Id"] == PARK
+                && state["Names"] == PARK
+                && state["Transient"] == "yes"
+                && state["NeedDaemonReload"] == "no"
+                && state["LoadState"] == "loaded"
+                && state["ActiveState"] == "active"
+                && state["SubState"] == "exited"
+                && state["ExecMainCode"] == "1"
+                && state["ExecMainPID"] == PARK_PID
+                && state["ExecMainStartTimestamp"] == PARK_TIME
+                && state["FragmentPath"] == PARK_FRAGMENT
+                && state["DropInPaths"] == ""
+                && state["NRestarts"] == "0",
+            "foreign 168 park generation or fragment"
+        );
+    }
+    for key in [
+        "ExecMainExitTimestamp",
+        "ExecMainStartTimestampMonotonic",
+        "ExecMainExitTimestampMonotonic",
+    ] {
+        ensure!(
+            row[key] == terminal[key],
+            "168 park main-process accounting changed: {key}"
+        );
+    }
+    let command = format!(
+        "{{ path={} ; argv[]={argv} ; ignore_errors=no ; ",
+        image.display()
+    );
+    let recorded = format!(
+        "{command}start_time=[{PARK_TIME}] ; stop_time=[{exit}] ; pid={PARK_PID} ; code=exited ; status=0 }}"
+    );
+    let reset = format!(
+        "{command}start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
+    );
+    ensure!(
+        terminal["ExecStart"] == recorded && row["ExecStart"] == reset,
+        "168 park command differs from the original exit or exact systemd reload form"
+    );
+    Ok(())
+}
+
+pub(super) fn validate_reloaded_park(
+    terminal: &Value,
+    row: &Value,
+    helper: &Bound,
+    argv: &str,
+) -> Result<()> {
+    same_terminal_dispatch(terminal, row, &helper.path, argv)?;
+    let fragment = Path::new(PARK_FRAGMENT);
+    let md = fs::symlink_metadata(fragment)?;
+    ensure!(
+        fragment.canonicalize()? == fragment
+            && md.is_file()
+            && md.nlink() == 1
+            && md.uid() == 0
+            && md.gid() == 0
+            && md.mode() & 0o022 == 0
+            && hex_lower(&Sha256::digest(read_stable_bounded(
+                fragment,
+                1 << 20,
+                "168 park fragment"
+            )?)) == PARK_FRAGMENT_SHA,
+        "168 original park fragment custody or contents changed"
+    );
+    Ok(())
 }
 
 fn checked_retained(row: &Value) -> Result<Value> {
@@ -361,6 +464,82 @@ include!("holding_epoch166_partial_retire.rs");
 #[cfg(test)]
 mod metered_tests {
     use super::*;
+
+    #[test]
+    fn park_reload_requires_original_generation_and_unchanged_exit_accounting() {
+        let image = Path::new("/fixture/jetstreamer-r2");
+        let argv = "/fixture/jetstreamer-r2 holding-park /fixture/plan";
+        let prefix = format!(
+            "{{ path={} ; argv[]={argv} ; ignore_errors=no ; ",
+            image.display()
+        );
+        let exit = "fixture park completion";
+        let mut terminal = json!({"Id":PARK,"Names":PARK,"InvocationID":PARK_IID,
+            "LoadState":"loaded","ActiveState":"active","SubState":"exited","MainPID":"0",
+            "ControlPID":"0","Job":"","Restart":"no","Result":"success","ExecMainStatus":"0",
+            "ExecMainCode":"1","ExecMainPID":PARK_PID,"ExecMainStartTimestamp":PARK_TIME,
+            "ExecMainExitTimestamp":exit,"ExecMainStartTimestampMonotonic":"1000",
+            "ExecMainExitTimestampMonotonic":"1001","NRestarts":"0","DropInPaths":"",
+            "FragmentPath":PARK_FRAGMENT,"TriggeredBy":"","NeedDaemonReload":"no","Transient":"yes"});
+        terminal["ExecStart"] = json!(format!(
+            "{prefix}start_time=[{PARK_TIME}] ; stop_time=[{exit}] ; pid={PARK_PID} ; code=exited ; status=0 }}"
+        ));
+        let mut reset = terminal.clone();
+        reset["ExecStart"] = json!(format!(
+            "{prefix}start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }}"
+        ));
+        same_terminal_dispatch(&terminal, &reset, image, argv).unwrap();
+        for (key, value) in [
+            ("Id", "other.service"),
+            ("Names", "alias.service"),
+            ("InvocationID", "new"),
+            ("ExecMainPID", "1"),
+            ("ExecMainStatus", "1"),
+            ("ExecMainCode", "2"),
+            ("ExecMainStartTimestamp", "new"),
+            ("ExecMainExitTimestamp", "new"),
+            ("ExecMainStartTimestampMonotonic", "900"),
+            ("ExecMainExitTimestampMonotonic", "1002"),
+            ("ActiveState", "active-with-job"),
+            ("SubState", "running"),
+            ("MainPID", "1"),
+            ("ControlPID", "1"),
+            ("Job", "2"),
+            ("Restart", "always"),
+            ("NRestarts", "1"),
+            ("LoadState", "not-found"),
+            ("NeedDaemonReload", "yes"),
+            ("Transient", "no"),
+            ("FragmentPath", "/other"),
+            ("DropInPaths", "/other"),
+            ("TriggeredBy", "timer"),
+            ("ExecStart", "other command"),
+        ] {
+            let mut bad = reset.clone();
+            bad[key] = json!(value);
+            assert!(
+                same_terminal_dispatch(&terminal, &bad, image, argv).is_err(),
+                "{key}"
+            );
+        }
+        assert!(same_terminal_dispatch(&reset, &reset, image, argv).is_err());
+        assert!(same_terminal_dispatch(&terminal, &reset, image, "other argv").is_err());
+        terminal["ExecMainExitTimestampMonotonic"] = json!("999");
+        assert!(same_terminal_dispatch(&terminal, &reset, image, argv).is_err());
+    }
+
+    #[test]
+    #[ignore = "read-only original 168 dispatch on dev-samjohnson"]
+    fn recorded_active_copy_binds_this_park_start_and_fragment() {
+        let s = bound(&binding(PARK_START, ORIGINAL_START_SHA)).unwrap();
+        assert_eq!(s["native"]["InvocationID"], PARK_IID);
+        assert_eq!(s["native"]["MainPID"], PARK_PID);
+        assert_eq!(s["native"]["ExecMainStartTimestamp"], PARK_TIME);
+        assert_eq!(s["start_ticks"], "376454927");
+        let frag =
+            read_stable_bounded(Path::new(PARK_FRAGMENT), 1 << 20, "original fragment").unwrap();
+        assert_eq!(hex_lower(&Sha256::digest(&frag)), PARK_FRAGMENT_SHA);
+    }
 
     #[test]
     fn funded_invocation_joins_price_pid_and_command() {
