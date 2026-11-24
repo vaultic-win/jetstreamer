@@ -1,0 +1,19 @@
+# Full metered epoch 170 preflight source
+
+The Rust preflight uses the verified full-root input receipt and the independent diagnostic readback receipt. It preserves the retry-13 failure and guard-drain references. The candidate uses node `a09b8e5a` and the corrected metered worker `b0219574` through a distinct read-only worker alias. The bootstrap, canonical root, and retained index projections are carried over from the admitted singleton manifest; the output and log use a new private generation.
+
+`guard-route.patch` adds an exclusive native guard route for `horizon-qualify-170-full-metered-20261124-v1.service`. It preserves the retry-13 route and binds the new route to the legacy 384 GiB lane root, the original minimum floor, the VMA ceiling, a distinct receipt directory, and the new root inode through the native witness. The root receipt must use schema `horizon-epoch170-metered-successor-root-v1` and bind the exact `root`, `device`, `inode`, and `retained_retry13_terminal_sha256`.
+
+`inputs` derives the proposed worker and native process arguments, guard route, and observer position from immutable input receipts and a complete fleet receipt. The output field `producer_argv_after_protection` is the eventual post-permit producer specification. The actual service requires an invocation-bound held entry and release after the genuine first native guard and post-guard fit.
+
+`cadence` checks the installed observer registration and package member, live service invocation and PID/start ticks, exact program arguments, and exclusive lock inode. `preflight` requires the candidate guard's build, seal, native rooted witness, static plan, and actual negative control against retry 13. It also requires a candidate observer enrollment and a fresh native prestart capacity quote bound to the exact candidate, current fleet, guard qualification, source profile, and observer enrollment. The executable rechecks the live cadence actor, peer invocation IDs, and the expected coordinated timer. All reports carry zero resource credit and no launch authority.
+
+```text
+horizon-epoch170-metered-preflight inputs OFFLINE DIAGNOSTIC FLEET FLEET_SHA
+horizon-epoch170-metered-preflight cadence ACTIVE ACTIVE_SHA
+horizon-epoch170-metered-preflight preflight OFFLINE DIAGNOSTIC FLEET FLEET_SHA GUARD_SHA OBSERVER_SHA PRICE PRICE_SHA
+```
+
+The first pending native qualification is the new invocation route and `GUARD_QUALIFIED.json`. Publish the source changes on `account-updates`, stage the distinct HOME-backed root and its receipt, and build, seal, and qualify the route-specific guard using its installed image and native witness. The next preflight inputs are the enrolled candidate observer and the exact native fit quote. Use a fresh fleet receipt for this transition. The candidate provider and held release transaction still need integration with the current controller before a worker start.
+
+The offline build passed Clippy with warnings denied and three focused tests. The guard suite compiled for `incident-recovery,epoch170-full-metered`. Running under its native root custody passed 101 tests with one ignored namespace test. That test requires the new precreated candidate root. The first unprivileged test run hit four existing root-custody tests, which passed under the root run. The `inputs` and `cadence` commands succeeded on actual retained evidence. The production preflight rejected the missing new guard qualification before considering later inputs.

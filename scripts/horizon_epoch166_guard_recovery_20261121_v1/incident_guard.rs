@@ -15,7 +15,8 @@ const IMAGE: &str =
     feature = "epoch168-cold-v4",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
-    feature = "epoch170-retry13"
+    feature = "epoch170-retry13",
+    feature = "epoch170-full-metered"
 )))]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/incident-replay-guard-20261121-v1/tools/guard";
@@ -43,6 +44,11 @@ const IMAGE: &str =
 #[cfg(feature = "epoch170-retry13")]
 const IMAGE: &str =
     "/var/lib/jetstreamer/horizon_runtime_data/epoch170-retry13-guard-20261122-v1/tools/guard";
+#[cfg(feature = "epoch170-full-metered")]
+const IMAGE: &str =
+    "/var/lib/jetstreamer/horizon_runtime_data/epoch170-full-metered-guard-20261124-v1/tools/guard";
+#[cfg(feature = "epoch170-full-metered")]
+const METERED_RUN: &str = "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/full-metered-20261124-v1";
 const HOME: &str = "/home/sol/.jetstreamer-private";
 const MIN_FLOOR: u64 = 8_297_502_499_408;
 
@@ -109,6 +115,13 @@ const LANES: &[Lane] = &[Lane {
     runtime: "epoch170-retry13-rebook-20261122-v1",
     cap: 384 << 30,
 }];
+#[cfg(feature = "epoch170-full-metered")]
+const LANES: &[Lane] = &[Lane {
+    unit: "horizon-qualify-170-full-metered-20261124-v1.service",
+    tree: "epoch170-standard-lane-20261109-v1",
+    runtime: "epoch170-full-metered-rebook-20261124-v1",
+    cap: 384 << 30,
+}];
 #[cfg(feature = "epoch170-384")]
 const LANES: &[Lane] = &[Lane {
     unit: "horizon-qualify-170-replacement-local3retry10-20261121-v1.service",
@@ -125,7 +138,8 @@ const LANES: &[Lane] = &[Lane {
     feature = "epoch168-cold-v4",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
-    feature = "epoch170-retry13"
+    feature = "epoch170-retry13",
+    feature = "epoch170-full-metered"
 )))]
 const LANES: &[Lane] = &[
     Lane {
@@ -181,7 +195,8 @@ pub(crate) fn validate(p: &Plan) -> Result<()> {
     feature = "epoch168-cold-v4",
     feature = "epoch170-retry11",
     feature = "epoch170-retry12",
-    feature = "epoch170-retry13"
+    feature = "epoch170-retry13",
+    feature = "epoch170-full-metered"
 ))]
 pub(crate) fn validate_cold_contract(plan: &Plan, image_sha256: &str) -> Result<()> {
     let deployment = Path::new(IMAGE)
@@ -230,7 +245,7 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch170-retry12-rebook-20261122-v1/SUCCESSOR_ROOT.json",
             "466f48f20716b258189e242eef4d4e2e54fbf6202e6ecd4ff008eb3dd0d10b19",
         ),
-        #[cfg(feature = "epoch170-retry13")]
+        #[cfg(any(feature = "epoch170-retry13", feature = "epoch170-full-metered"))]
         (
             "epoch170-retry13-rebook-20261122-v1/SUCCESSOR_ROOT.json",
             "654e6612f8ce9ee2f9f5c9f172f79f9ce5da4b0f6f02443c856f3a5228a5ca69",
@@ -288,7 +303,7 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
             "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry12-20261122",
             113836033,
         ),
-        #[cfg(feature = "epoch170-retry13")]
+        #[cfg(any(feature = "epoch170-retry13", feature = "epoch170-full-metered"))]
         (
             "epoch170-standard-lane-20261109-v1/replacement-local3retry7-20261110-v1/replacement-local3retry10-20261121-v1/cold-retry13-20261122",
             113981945,
@@ -353,6 +368,39 @@ pub(crate) fn qualification_roots(image: &Path) -> Result<Value> {
                 && m.mode() & 0o7777 == 0o700,
             "precreated successor root changed: {rel}"
         );
+    }
+    #[cfg(feature = "epoch170-full-metered")]
+    {
+        let path = Path::new(RUNTIME)
+            .join(LANES[0].runtime)
+            .join("SUCCESSOR_ROOT.json");
+        let bytes = crate::read_private(&path)?;
+        let evidence: Value = serde_json::from_slice(&bytes)?;
+        let root = Path::new(HOME).join(METERED_RUN);
+        let mut dir = root_directory()?;
+        for part in safe_components(&root)? {
+            dir = openat(&dir, part, true)?;
+        }
+        let meta = dir.metadata()?;
+        ensure!(
+            evidence["schema"] == "horizon-epoch170-metered-successor-root-v1"
+                && evidence["root"] == json!(root)
+                && evidence["device"] == meta.dev()
+                && evidence["inode"] == meta.ino()
+                && evidence["retained_retry13_terminal_sha256"]
+                    == "16664fda43d296d115858ff67a173d6d0cccb5f2ac90d446aa797da34a2f6c9d"
+                && meta.dev() == 64512
+                && meta.uid() == 1001
+                && meta.gid() == 1003
+                && meta.mode() & 0o7777 == 0o700,
+            "metered epoch 170 successor directory changed"
+        );
+        let reference = Bound {
+            path,
+            sha256: crate::sha(&bytes),
+        };
+        bound(&reference)?;
+        refs.push(reference);
     }
     Ok(json!({"schema":"horizon-incident-native-successor-roots-v1","receipts":refs}))
 }
@@ -512,6 +560,19 @@ mod tests {
         ));
     }
 
+    #[cfg(feature = "epoch170-full-metered")]
+    #[test]
+    fn metered_170_guard_recognizes_only_the_corrected_producer() {
+        assert_eq!(LANES.len(), 1);
+        assert_eq!(LANES[0].cap, 384 << 30);
+        assert!(is_route(
+            "horizon-qualify-170-full-metered-20261124-v1.service"
+        ));
+        assert!(!is_route(
+            "horizon-qualify-170-replacement-local3retry13-20261122.service"
+        ));
+    }
+
     #[cfg(feature = "epoch167-cold-v3")]
     #[test]
     fn cold167_accepts_only_the_v3_source_index_unit() {
@@ -558,6 +619,11 @@ mod tests {
             4
         } else {
             3
+        };
+        let expected = if cfg!(feature = "epoch170-full-metered") {
+            5
+        } else {
+            expected
         };
         assert_eq!(roots["receipts"].as_array().unwrap().len(), expected);
         assert!(qualification_roots(Path::new("/tmp/guard")).is_err());
