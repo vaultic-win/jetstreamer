@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, "/var/lib/jetstreamer/horizon249-delivery-v214-tools")
 import diagnostic271_boundary as diagnostic
 
 V = Path("/var/lib/jetstreamer")
