@@ -10,6 +10,7 @@ use std::process::Command;
 #[cfg(feature = "registered-post")]
 mod boundary;
 mod encoded_cutover;
+mod encoded_semantic;
 mod events;
 mod incident;
 mod outcome;
@@ -228,6 +229,12 @@ fn run() -> Result<()> {
         && mode == "inspect-encoded-prefix-cutover"
     {
         println!("{}", encoded_cutover::inspect(stage_sha, fleet, fleet_sha)?);
+        return Ok(());
+    }
+    if let [mode, custody_sha] = args.as_slice()
+        && let Some(report) = encoded_semantic::run(mode, custody_sha)?
+    {
+        println!("{report}");
         return Ok(());
     }
     if let [mode, stage_sha, fleet, fleet_sha] = args.as_slice()

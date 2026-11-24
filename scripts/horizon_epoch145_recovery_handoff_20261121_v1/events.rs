@@ -107,12 +107,15 @@ fn explicit_stop(
                 )
         })
         .collect::<Vec<_>>();
-    let [(stop_index, start), (_, deactivated), (finish_index, finish)] = terminal.as_slice() else {
+    let [
+        (stop_index, start),
+        (_, deactivated),
+        (finish_index, finish),
+    ] = terminal.as_slice()
+    else {
         bail!("expected exactly one manager stop job and a clean deactivation");
     };
-    let time = |row: &Value| -> Result<u64> {
-        Ok(text(&row["__MONOTONIC_TIMESTAMP"])?.parse()?)
-    };
+    let time = |row: &Value| -> Result<u64> { Ok(text(&row["__MONOTONIC_TIMESTAMP"])?.parse()?) };
     ensure!(
         start["MESSAGE_ID"] == STOPPING
             && start["JOB_TYPE"] == "stop"
@@ -128,7 +131,10 @@ fn explicit_stop(
             && start["__CURSOR"] != finish["__CURSOR"],
         "missing, failed, or stale manager stop"
     );
-    ensure!(finish_index - stop_index == 2, "overlapping manager generations");
+    ensure!(
+        finish_index - stop_index == 2,
+        "overlapping manager generations"
+    );
     let mut records =
         json!({"stop_started":start,"deactivated":deactivated,"stop_finished":finish});
     match successor {
@@ -176,7 +182,10 @@ pub fn inspect_native_stop(
     let observe = || -> Result<Value> {
         let manager = native(unit)?;
         if let Some(next) = successor {
-            ensure!(stable(&manager, unit)?.1 == next, "foreign successor manager");
+            ensure!(
+                stable(&manager, unit)?.1 == next,
+                "foreign successor manager"
+            );
         } else {
             drained(&manager, unit)?;
             ensure!(
@@ -224,6 +233,49 @@ pub fn inspect_native_stop(
         witness["successor_invocation_id"] = next.into();
     }
     Ok(witness)
+}
+
+pub fn observed_success(unit: &str, start: &Value) -> Result<Value> {
+    let iid = text(&start["INVOCATION_ID"])?;
+    let boot = text(&start["_BOOT_ID"])?;
+    ensure!(valid_iid(iid) && valid_iid(boot), "invalid terminal scope");
+    let rows = command(
+        Path::new("/usr/bin/journalctl"),
+        &[
+            "--no-pager",
+            "-o",
+            "json",
+            "--output-fields=_PID,UNIT,INVOCATION_ID,_BOOT_ID,MESSAGE_ID,JOB_TYPE,JOB_RESULT",
+            "_PID=1",
+            &format!("_BOOT_ID={boot}"),
+            &format!("UNIT={unit}"),
+            &format!("INVOCATION_ID={iid}"),
+            &format!("MESSAGE_ID={STARTED}"),
+            &format!("MESSAGE_ID={STOPPING}"),
+            &format!("MESSAGE_ID={SUCCESS}"),
+            &format!("MESSAGE_ID={FAILURE}"),
+            &format!("MESSAGE_ID={STOPPED}"),
+        ],
+    )?;
+    let rows = std::str::from_utf8(&rows)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<serde_json::Result<Vec<Value>>>()?;
+    let [found_start, success] = rows.as_slice() else {
+        bail!("expected a single confirmed manager start and successful exit");
+    };
+    ensure!(
+        found_start == start
+            && start["MESSAGE_ID"] == STARTED
+            && start["JOB_TYPE"] == "start"
+            && start["JOB_RESULT"] == "done"
+            && success["_BOOT_ID"] == boot
+            && generation_event(success, unit, iid)?
+            && text(&start["__MONOTONIC_TIMESTAMP"])?.parse::<u64>()?
+                < text(&success["__MONOTONIC_TIMESTAMP"])?.parse::<u64>()?,
+        "different native completion generation"
+    );
+    Ok(success.clone())
 }
 pub(super) fn owned(n: i32) -> Result<OwnedFd> {
     if n < 0 {
@@ -349,9 +401,7 @@ mod tests {
         started["JOB_RESULT"] = "done".into();
         superseded.push(started);
         assert!(explicit_stop(&superseded, unit, &iid, &boot, 10, Some(&next)).is_ok());
-        assert!(
-            explicit_stop(&superseded, unit, &iid, &boot, 10, Some(&"e".repeat(32))).is_err()
-        );
+        assert!(explicit_stop(&superseded, unit, &iid, &boot, 10, Some(&"e".repeat(32))).is_err());
         rows.swap(1, 2);
         assert!(explicit_stop(&rows, unit, &iid, &boot, 10, None).is_err());
         rows.swap(1, 2);
@@ -364,7 +414,10 @@ mod tests {
     fn native_explicit_stop_is_distinct_from_recovery_success() {
         let unit = std::env::var("HANDOFF_STOP_UNIT").unwrap();
         let iid = std::env::var("HANDOFF_STOP_IID").unwrap();
-        let after = std::env::var("HANDOFF_STOP_AFTER").unwrap().parse().unwrap();
+        let after = std::env::var("HANDOFF_STOP_AFTER")
+            .unwrap()
+            .parse()
+            .unwrap();
         let witness = inspect_native_stop(&unit, &iid, after, None).unwrap();
         assert_eq!(witness["records"]["stop_finished"]["JOB_RESULT"], "done");
         assert_eq!(
@@ -373,7 +426,10 @@ mod tests {
         );
         let natural_unit = std::env::var("HANDOFF_NATURAL_UNIT").unwrap();
         let natural_iid = std::env::var("HANDOFF_NATURAL_IID").unwrap();
-        let natural_after = std::env::var("HANDOFF_NATURAL_AFTER").unwrap().parse().unwrap();
+        let natural_after = std::env::var("HANDOFF_NATURAL_AFTER")
+            .unwrap()
+            .parse()
+            .unwrap();
         assert_eq!(
             manager(&natural_unit, &natural_iid).unwrap()["MESSAGE_ID"],
             SUCCESS
@@ -382,14 +438,71 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root and systemd for two disposable native generations"]
+    fn observed_completion_requires_the_saved_start_and_natural_exit() -> Result<()> {
+        let name = format!("horizon-fixture-observed145-{}", std::process::id());
+        let unit = format!("{name}.service");
+        let start = |delay: &str| -> Result<Value> {
+            command(
+                Path::new("/usr/bin/systemd-run"),
+                &[
+                    "--quiet",
+                    &format!("--unit={name}"),
+                    "-p",
+                    "Type=exec",
+                    "--",
+                    "/usr/bin/sleep",
+                    delay,
+                ],
+            )?;
+            let (_, iid) = stable(&native(&unit)?, &unit)?;
+            let raw = command(
+                Path::new("/usr/bin/journalctl"),
+                &[
+                    "--no-pager",
+                    "-o",
+                    "json",
+                    "--output-fields=_PID,UNIT,INVOCATION_ID,_BOOT_ID,MESSAGE_ID,JOB_TYPE,JOB_RESULT",
+                    "_PID=1",
+                    &format!("UNIT={unit}"),
+                    &format!("INVOCATION_ID={iid}"),
+                    &format!("MESSAGE_ID={STARTED}"),
+                ],
+            )?;
+            Ok(serde_json::from_slice(&raw)?)
+        };
+        let result = (|| -> Result<()> {
+            let forced = start("600")?;
+            platform::ctl(&["stop", &unit])?;
+            assert!(observed_success(&unit, &forced).is_err());
+            let natural = start("2")?;
+            let iid = text(&natural["INVOCATION_ID"])?;
+            manager(&unit, iid)?;
+            assert_eq!(observed_success(&unit, &natural)?["MESSAGE_ID"], SUCCESS);
+            let mut different = natural.clone();
+            different["__CURSOR"] = json!("different");
+            assert!(observed_success(&unit, &different).is_err());
+            Ok(())
+        })();
+        let _ = platform::ctl(&["stop", &unit]);
+        result
+    }
+
+    #[test]
     #[ignore = "requires the two isolated PID 1 generations from this boot"]
     fn native_successor_must_immediately_follow_the_explicit_stop() {
         let unit = std::env::var("HANDOFF_SUCCESSOR_UNIT").unwrap();
         let iid = std::env::var("HANDOFF_SUCCESSOR_OLD").unwrap();
-        let after = std::env::var("HANDOFF_SUCCESSOR_AFTER").unwrap().parse().unwrap();
+        let after = std::env::var("HANDOFF_SUCCESSOR_AFTER")
+            .unwrap()
+            .parse()
+            .unwrap();
         let next = std::env::var("HANDOFF_SUCCESSOR_NEW").unwrap();
         let witness = inspect_native_stop(&unit, &iid, after, Some(&next)).unwrap();
-        assert_eq!(witness["records"]["successor_started"]["INVOCATION_ID"], next);
+        assert_eq!(
+            witness["records"]["successor_started"]["INVOCATION_ID"],
+            next
+        );
         assert!(inspect_native_stop(&unit, &iid, after, None).is_err());
         assert!(inspect_native_stop(&unit, &iid, after, Some(&"e".repeat(32))).is_err());
     }
