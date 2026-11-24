@@ -714,6 +714,14 @@ fn refresh(previous: &Bound) -> Result<Capture> {
         .output()?;
     let err = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
+        #[cfg(any(incident_homefloor145_only, incident_v5j_post145_only))]
+        if out.status.code() == Some(75)
+            && out.stdout.is_empty()
+            && err == "public audit workers changed during capacity capture\n"
+        {
+            return Err(anyhow::Error::new(capacity::TopologyTimeout)
+                .context("public audit worker roster changed while measuring capacity"));
+        }
         #[cfg(incident_guard_walk145_only)]
         if out.status.code() == Some(1)
             && out.stdout.is_empty()

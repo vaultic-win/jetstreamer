@@ -88,6 +88,12 @@ RETRY11 = COLD170 or HERE.name in {"tools-homefloor-retry11-166-v1", "tools-home
 HOMEFLOOR = (RETRY11 or HERE.name in { "tools-homefloor-cold167-v3", "tools-homefloor-cold167-v3-adopted"}) and (
     HERE.parent == D or HERE.parent.parent == D / "homefloor-qualification"
 )
+
+
+class PublicReaderTurnover(Exception):
+    pass
+
+
 if FIFTH168:
     cold168 = runpy.run_path(str(HERE / "cold168_actor.py"),init_globals={"RETRY3":RETRY3_168,"RETRY4":RETRY4_168})
 if RETRY4_168:
@@ -1056,7 +1062,8 @@ def capture_once(epoch,ref,prestart136=None):
     extension=extensions["funding"](s,epoch)
     closed=replacement_terminals(f,rows)
     interrupted = recover["settled"](f, bound, loader["load_package"]) if HOMEFLOOR else {}
-    obligations = recover["obligations"](f, ref, bound, loader["load_package"]) if HOMEFLOOR else None
+    obligations = recover["obligations"](f, ref, bound, loader["load_package"],
+                                         fresh_workers=post_price) if HOMEFLOOR else None
     s.need(not (closed.keys() & interrupted.keys()), "committed and interrupted producer overlap")
     closed_prepaid={}
     rep={};books={}
@@ -1205,11 +1212,15 @@ def capture_once(epoch,ref,prestart136=None):
                                 remaining_prefix140_bytes=growth, prefix_before=prefix_before, prefix_after=prefix_after)
     recovered_price = {}
     if HOMEFLOOR:
-        after = recover["obligations"](f, ref, bound, loader["load_package"])
+        after = recover["obligations"](f, ref, bound, loader["load_package"], fresh_workers=post_price)
         s.need(recover["settled"](f, bound, loader["load_package"]) == interrupted and
-               all(after[k] == obligations[k] for k in ("mirror_inputs", "public_owner", "public_workers")) and
+               all(after[k] == obligations[k] for k in ("mirror_inputs", "public_owner")) and
                after["prefix"]["registration"] == obligations["prefix"]["registration"] and
                after["prefix"]["child"] == obligations["prefix"]["child"], "recovery owner changed during price")
+        if after["public_workers"] != obligations["public_workers"]:
+            if post_price:
+                raise PublicReaderTurnover("public audit workers changed during capacity capture")
+            s.need(False, "public audit workers changed during price")
         prefix_growth = max(after["prefix"]["remaining_DATA_growth_bytes"], obligations["prefix"]["remaining_DATA_growth_bytes"])
         # Preserve 136's original 72 GiB and all absolute guards even when a
         # different producer is being priced. The historical audit allowance
@@ -1392,7 +1403,11 @@ if __name__=="__main__":
         s.need(not review and args[0] == "145", "detached census cannot book another actor")
         runpy.run_path(str(HERE / "run-recovery"))["check_quote_parent"](ref)
     handback = v5n136_post_window() if launching_post else None
-    result=capture(int(args[0]),ref)
+    try:
+        result=capture(int(args[0]),ref)
+    except PublicReaderTurnover as error:
+        print(error, file=sys.stderr)
+        sys.exit(os.EX_TEMPFAIL)
     if launching_post:
         s.need(result["phase145"]["stage"] == "v5j-semantic-complete" and
                result["phase145"]["completion"] == handback[1] and v5n136_post_window() == handback,
