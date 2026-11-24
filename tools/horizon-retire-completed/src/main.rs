@@ -49,6 +49,40 @@ struct CloudBootstrap {
     inactive_units: &'static [&'static str],
 }
 
+const EPOCH247_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon247-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon247-bootstrap-copy0347-work-v2/projection/bootstrap/snapshot-106703614-AtkJcCAEp3EfF4ymeeN9t3YvHuAq3aykuQ6vogtDYcf9.tar.zst",
+    sha256: "060fa4a95bdbf8a41000ed043af667bcd9ae3b6a080c12415ce35f0b5d2bf5ba",
+    bytes: 13_262_956_541,
+    key: "106703614/snapshot-106703614-AtkJcCAEp3EfF4ymeeN9t3YvHuAq3aykuQ6vogtDYcf9.tar.zst",
+    generation: "1637159461322785",
+    md5: "Bl+pS/L8pYBfbwpO359gNg==",
+    crc32c: "Z0Zcdw==",
+    inactive_units: &[
+        "horizon-qualify-247-bootstrap-copy0347-v2.service",
+        "horizon-qualify-247-reboot-20261117-v2.service",
+        "horizon-247-reboot-20261117-protective-v2.service",
+        "horizon-247-reboot-20261117-protective-v2.timer",
+    ],
+};
+
+const EPOCH248_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
+    review_schema: "horizon248-obsolete-bootstrap-main-review-v1",
+    path: "/var/lib/jetstreamer/horizon248-bootstrap-copy2454-work-v1/projection/bootstrap/snapshot-107135393-BvNzVFUVa9kQwGJQxKFyDVPcBd8yVRbVDaN8YLr28i95.tar.zst",
+    sha256: "7a9331400c84cba660aa208c08c18b40f4bc7376f998e25fd1d525143eb883bd",
+    bytes: 13_405_638_044,
+    key: "107135393/snapshot-107135393-BvNzVFUVa9kQwGJQxKFyDVPcBd8yVRbVDaN8YLr28i95.tar.zst",
+    generation: "1637390510433248",
+    md5: "ywjFbVgimmaMN0hriDVMJA==",
+    crc32c: "Fnetbg==",
+    inactive_units: &[
+        "horizon-qualify-248-bootstrap-copy2454-v1.service",
+        "horizon-qualify-248-reboot-20261117-v1.service",
+        "horizon-248-reboot-20261117-protective-v1.service",
+        "horizon-248-reboot-20261117-protective-v1.timer",
+    ],
+};
+
 const EPOCH249_BOOTSTRAP: CloudBootstrap = CloudBootstrap {
     review_schema: "horizon249-obsolete-bootstrap-main-review-v1",
     path: "/var/lib/jetstreamer/horizon-contiguous-249-251-current-46b4b4a-v1/snapshot-107567592-DBPics19TxLy8wawfQYvS65d72vKvFGLCW9HZv5q6GeH.tar.zst",
@@ -336,6 +370,8 @@ fn ordinary_private_path(path: &Path) -> bool {
 }
 fn cloud_bootstrap(epoch: u64) -> Option<&'static CloudBootstrap> {
     match epoch {
+        247 => Some(&EPOCH247_BOOTSTRAP),
+        248 => Some(&EPOCH248_BOOTSTRAP),
         249 => Some(&EPOCH249_BOOTSTRAP),
         251 => Some(&EPOCH251_BOOTSTRAP),
         _ => None,
@@ -837,7 +873,12 @@ mod tests {
     }
     #[test]
     fn cloud_bootstrap_requires_its_exact_epoch_file_and_generation() {
-        for (epoch, profile) in [(249, &EPOCH249_BOOTSTRAP), (251, &EPOCH251_BOOTSTRAP)] {
+        for (epoch, profile) in [
+            (247, &EPOCH247_BOOTSTRAP),
+            (248, &EPOCH248_BOOTSTRAP),
+            (249, &EPOCH249_BOOTSTRAP),
+            (251, &EPOCH251_BOOTSTRAP),
+        ] {
             let path = Path::new(profile.path);
             assert_eq!(external_bootstrap_sha(epoch, path), Some(profile.sha256));
             assert!(external_bootstrap_sha(epoch + 1, path).is_none());
